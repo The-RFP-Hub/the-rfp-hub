@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1210",
+  "id": "fundingmap:1210",
   "type": "hackathon",
   "title": "HackByte 4․0",
   "description": "Reality is Glitching. Debug the Future.\n\n**HackByte is an official MLH member event.**\n\nStep-By-Step guide for registration: [Registration Guide](https://youtu.be/l-uHuOxPOLU?si=d7ggGnEwMQvSGXL3)\n\n## About HackByte:\nHackByte is the annual flagship hackathon of IIITDM Jabalpur. We are back for our 4th edition with a new theme: \"Patch the Reality.\"\n\nJust like software needs updates to fix bugs and improve performance, the world around us needs new solutions to solve existing problems. Our goal is to provide a platform where you can collaborate, learn, and build those solutions. Whether you are fixing a small gap or reimagining a whole system, join us to turn your ideas into impactful reality. See you there! 👀\nCheck us out at [hackbyte.in](url)\n## Hackathon Details\n\nHackByte 4.0 is a 36-hour in-person hackathon happening from April 03-05, 2026, inviting hackers, builders and problem solvers. 🧑‍💻\n\n👉 Join our [discord](https://discord.com/invite/NTueHjdPn8) to get started, grab your roles say a few hellos! We will be glad to have a chat. 🚀\n\n**Note**: Only 3-4 member teams will be considered for HackByte. After registration, no requests for adding or replacing team members will be accepted, so please finalize your team beforehand.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://www.hackbyte.in/",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1210",
     "verifiedAgainstSource": null
   },
@@ -31,10 +31,6 @@
   "closesAt": "2026-03-18T18:29:00.000Z",
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-19T00:03:44.000Z",
-  "extensions": {
-    "karma.programId": "1210",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-04-03T13:30:00.000Z",
     "endDate": "2026-04-05T02:30:00.000Z",

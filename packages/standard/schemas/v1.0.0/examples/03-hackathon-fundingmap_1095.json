@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1095",
+  "id": "fundingmap:1095",
   "type": "hackathon",
   "title": "ETHGlobal Cannes 2026",
   "description": "ETHGlobal Cannes 2026 is an event bringing together some of the top minds and experts in Ethereum Ecosystem to Cannes. We enable teams to make something great in only 36 hours by providing an abundance of web3 resources like mentors, partners, and software. Sleeping is optional, but trying something new is not!",
@@ -11,7 +11,7 @@
   },
   "source": {
     "url": "https://ethglobal.com/events/cannes2026",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1095",
     "verifiedAgainstSource": null
   },
@@ -33,10 +33,6 @@
   "closesAt": "2026-04-05T23:59:59.000Z",
   "createdAt": "2026-03-06T14:11:50.000Z",
   "updatedAt": "2026-04-06T00:01:36.000Z",
-  "extensions": {
-    "karma.programId": "1095",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-04-03T12:00:00.000Z",
     "endDate": "2026-04-05T23:59:59.999Z",

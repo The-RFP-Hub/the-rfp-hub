@@ -46,7 +46,7 @@ describe("assertOpportunity", () => {
   });
 });
 
-describe("real Karma examples (@rfp-hub/standard)", () => {
+describe("real example entries (@rfp-hub/standard)", () => {
   const examplesDir = join(here, "..", "..", "standard", "schemas", "v1.0.0", "examples");
   const examples = loadDir(examplesDir);
 

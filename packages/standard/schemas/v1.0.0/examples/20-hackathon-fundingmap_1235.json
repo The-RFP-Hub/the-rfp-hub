@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1235",
+  "id": "fundingmap:1235",
   "type": "hackathon",
   "title": "EVE Frontier x Sui Hackathon 2026",
   "description": "Builders create mods extending the EVE Frontier space survival game on Sui, across categories like utility, technical excellence, creativity, weirdest idea, and live server integration. Open to all builders; register via the event site and launcher for server access, then submit projects for evaluation. Prizes include cash awards up to $15,000, SUI tokens, EVE Points, game access, and Sui Basecamp tickets.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1235",
     "verifiedAgainstSource": null
   },
@@ -33,10 +33,6 @@
   "closesAt": "2026-03-31T00:00:00.000Z",
   "createdAt": "2026-03-10T00:09:06.000Z",
   "updatedAt": "2026-03-31T00:02:00.000Z",
-  "extensions": {
-    "karma.programId": "1235",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-03-11T00:00:00.000Z",
     "endDate": "2026-04-24T23:59:00.000Z",

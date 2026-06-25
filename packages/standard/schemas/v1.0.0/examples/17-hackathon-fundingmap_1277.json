@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1277",
+  "id": "fundingmap:1277",
   "type": "hackathon",
   "title": "ETHGlobal Open Agents",
   "description": "Open Agents is an event bringing together some of the top minds and experts in Ethereum Ecosystem. Join the largest Ethereum developer community to tackle the challenges that will define the next evolution in Web3. Connect networks; bring operations on chain; even create your own dApp. Whatever project you choose, you’ll build alongside mentors and partners and finish by presenting your work to some of the most respected minds in the industry.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://ethglobal.com/events/openagents",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1277",
     "verifiedAgainstSource": null
   },
@@ -39,10 +39,6 @@
   "closesAt": "2026-05-06T23:59:59.000Z",
   "createdAt": "2026-03-20T00:01:31.000Z",
   "updatedAt": "2026-05-07T00:05:55.000Z",
-  "extensions": {
-    "karma.programId": "1277",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-04-24T12:00:00.000Z",
     "endDate": "2026-05-06T23:59:59.999Z",

@@ -4,9 +4,9 @@
 
 Please **do not** open a public issue for security vulnerabilities.
 
-Report them privately to **security@karmahq.xyz** (or use GitHub's
+Report them privately using GitHub's
 [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
-on this repository).
+on this repository's **Security** tab.
 
 Please include: a description, steps to reproduce, affected package/version, and any potential
 impact.

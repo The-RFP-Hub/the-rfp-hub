@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1219",
+  "id": "fundingmap:1219",
   "type": "hackathon",
   "title": "KnowledgeQuarry: Data Science Challenge",
   "description": "A **Data Science Challenge** by **Convoke 8.0, Cluster Innovation Centre, University of Delhi.** Step into the world of data and discovery with **KnowledgeQuarry**. \n\nParticipants can choose between two exciting streams: the **analytics track**, where you mine insights through descriptive and inferential statistics to answer pressing questions, or the **ML engineering track**, where you build pipelines with trained models capable of real‑time predictions. In both cases, your findings must be presented through a dashboard — whether simple or advanced — and bonus points await teams that incorporate optimization or “what‑if” scenarios. Above all, this challenge is about telling a compelling story with data and communicating it effectively. \n\nThe **initial phase** of this event will involve an **online screening round** where the participating teams will be tested on their thought and design process, problem solving approach, basics and awareness of Data Science concepts and coding skills. The top teams clearing this round will move on to **Path A**, while the rest will have the opportunity to continue on **Path B**. Both tracks will involve a multi-day challenge for the teams to complete and submit their problem solution. Submissions should be made in the form of a dashboard and a presentation/report. \n\n**Path A:** The final day will be held at DU CIC. At least one team member must be present at the venue to present their findings. \n**Path B:** This track will be completely online. Submissions have to be made via a pre-designated channel.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://knowledgequarry-2026.devfolio.co",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1219",
     "verifiedAgainstSource": null
   },
@@ -33,10 +33,6 @@
   "closesAt": "2026-03-29T18:29:00.000Z",
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-30T00:01:54.000Z",
-  "extensions": {
-    "karma.programId": "1219",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-04-01T00:00:00.000Z",
     "endDate": "2026-04-10T09:30:00.000Z",

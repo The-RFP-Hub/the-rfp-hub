@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1242",
+  "id": "fundingmap:1242",
   "type": "rfp",
   "title": "RFP 3 Institutional Narrative Experiment",
   "description": "10-week community activation program to promote ZKsync narratives around institutional positioning, privacy via Prividium, and ZK Stack. Funds one administrator to run content strategy with KPIs. Proposals due by March 20 via forum.",
@@ -11,7 +11,7 @@
   },
   "source": {
     "url": "https://forum.zknation.io/t/community-activation-rfp-3-zksync-institutional-narrative-experiment/922",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1242",
     "verifiedAgainstSource": null
   },
@@ -29,10 +29,6 @@
   "closesAt": "2026-03-20T00:00:00.000Z",
   "createdAt": "2026-03-11T00:10:20.000Z",
   "updatedAt": "2026-03-20T00:01:36.000Z",
-  "extensions": {
-    "karma.programId": "1242",
-    "karma.isValid": true
-  },
   "rfp": {
     "issuingOrganization": "ZKsync Foundation",
     "scope": null,

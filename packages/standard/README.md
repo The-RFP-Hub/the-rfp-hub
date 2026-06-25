@@ -37,7 +37,7 @@ types in `src/generated/` are produced from it with `pnpm codegen`
 (`json-schema-to-typescript`); `src/types.ts` curates the public type names. Never edit the
 generated file by hand.
 
-See `schemas/v1.0.0/FIELDS.md` for the full field reference and the Karma mapping, and
+See `schemas/v1.0.0/FIELDS.md` for the full field reference, and
 `BENCHMARK.md` for real-data validation results.
 
 ## License

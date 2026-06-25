@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rfphub.org/standard/v1.0.0/opportunity.schema.json",
   "title": "RFP Hub Opportunity",
-  "description": "RFP Hub Standard v1.0.0 — a canonical, ecosystem-neutral representation of an Ethereum-ecosystem funding opportunity. Covers six opportunity types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Released as CC0 1.0. Informed by, but deliberately decoupled from, Karma's internal program_registry schema; aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. See FIELDS.md for the full field reference and the Karma program_registry mapping.",
+  "description": "RFP Hub Standard v1.0.0 — a canonical, ecosystem-neutral representation of an Ethereum-ecosystem funding opportunity. Covers six opportunity types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Released as CC0 1.0. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. See FIELDS.md for the full field reference.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -31,7 +31,7 @@
     "type": {
       "type": "string",
       "enum": ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"],
-      "description": "The kind of funding opportunity. Values match Karma's OpportunityType enum to minimise mapping friction. Every entry carries a type-specific object under a key EQUAL to this value (type 'hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.type]`. The matching block is required for all six types (see allOf); for grants it may be an empty object."
+      "description": "The kind of funding opportunity. Every entry carries a type-specific object under a key EQUAL to this value (type 'hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.type]`. The matching block is required for all six types (see allOf); for grants it may be an empty object."
     },
     "title": {
       "type": "string",
@@ -47,7 +47,7 @@
     "summary": {
       "type": ["string", "null"],
       "maxLength": 500,
-      "description": "Optional short teaser (≈1–2 sentences) for list/card views. Maps from Karma metadata.shortDescription."
+      "description": "Optional short teaser (≈1–2 sentences) for list/card views."
     },
     "status": {
       "type": "string",
@@ -90,7 +90,7 @@
     "applicationUrl": {
       "type": ["string", "null"],
       "format": "uri",
-      "description": "URL where applicants submit or apply. Maps from Karma submissionUrl."
+      "description": "URL where applicants submit or apply."
     },
     "website": {
       "type": ["string", "null"],
@@ -118,12 +118,12 @@
     "opensAt": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "RFC 3339 timestamp when applications open. Maps from Karma metadata.startsAt."
+      "description": "RFC 3339 timestamp when applications open."
     },
     "closesAt": {
       "type": ["string", "null"],
       "format": "date-time",
-      "description": "RFC 3339 application deadline. Maps from Karma deadline / metadata.endsAt. When this passes, status should transition to 'closed'."
+      "description": "RFC 3339 application deadline. When this passes, status should transition to 'closed'."
     },
     "postedAt": {
       "type": ["string", "null"],
@@ -166,7 +166,7 @@
     },
     "extensions": {
       "type": "object",
-      "description": "Namespace for publisher- or integrator-specific data not covered by the standard. Keys SHOULD be namespaced (e.g. 'karma.programId'). Contents are not validated by this schema.",
+      "description": "Namespace for publisher- or integrator-specific data not covered by the standard. Keys SHOULD be namespaced (e.g. 'mysource.internalId'). Contents are not validated by this schema.",
       "additionalProperties": true
     }
   },
@@ -279,10 +279,10 @@
         "submittedBy": { "type": ["string", "null"], "description": "Who submitted or published this entry — a public handle, organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed." },
         "ingestedVia": {
           "type": ["string", "null"],
-          "enum": ["publisher_api", "submission", "scrape", "import", "karma_outbox", null],
-          "description": "How this entry entered the Hub. 'karma_outbox' = pushed one-way from Karma program-manager edits (see DEV-439)."
+          "enum": ["publisher_api", "submission", "scrape", "import", "outbox", null],
+          "description": "How this entry entered the Hub. 'outbox' = a one-way push from an upstream source system's outbox; 'import' = a backfill/seed import."
         },
-        "originalId": { "type": ["string", "null"], "description": "Identifier of this opportunity in the source system (e.g. Karma programId)." },
+        "originalId": { "type": ["string", "null"], "description": "Identifier of this opportunity in the source system." },
         "verifiedAgainstSource": { "type": ["boolean", "null"], "description": "Whether the entry's fields were verified against the source URL by the verification-assist job. null = not yet checked." },
         "verifiedAt": { "type": ["string", "null"], "format": "date-time", "description": "RFC 3339 timestamp of the last source verification." },
         "snapshotUrl": { "type": ["string", "null"], "format": "uri", "description": "IPFS or archived snapshot of the source at verification time." }

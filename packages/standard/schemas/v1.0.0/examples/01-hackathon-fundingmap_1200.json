@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1200",
+  "id": "fundingmap:1200",
   "type": "hackathon",
   "title": "Electrothon 8.0",
   "description": "In the neon glow of Eternum’s endless corridors, a new era of Electrothon powers up. The screens flicker, the circuits hum, and the pixelated gates of the Labyrinth swing open for those daring enough to enter. Here, every coder is a player, every idea a power-up, and every challenge a boss fight waiting to be conquered.\n\nWithin the Hall of Circuits, echoes of past champions still pulse like 8-bit heartbeats. They navigated every twist, cracked every code, and pushed the machine to its very limit. This spring, join North India's biggest hackathon as the Labyrinth of Eternum is set to be bigger, brighter, and far more unpredictable. Once again, we call upon the next generation of builders, breakers, dreamers, and doers.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://electrothon-8.devfolio.co",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1200",
     "verifiedAgainstSource": null
   },
@@ -31,10 +31,6 @@
   "closesAt": "2026-03-10T18:29:00.000Z",
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-13T13:16:36.000Z",
-  "extensions": {
-    "karma.programId": "1200",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-03-13T06:30:00.000Z",
     "endDate": "2026-03-15T04:30:00.000Z",

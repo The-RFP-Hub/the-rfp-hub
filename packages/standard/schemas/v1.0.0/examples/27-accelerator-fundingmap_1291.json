@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1291",
+  "id": "fundingmap:1291",
   "type": "accelerator",
   "title": "Incubation Program Batch 07",
   "description": "Offers up to $50K investment, $100K ecosystem grants from partner chains, $500K+ credits, 6-week incubation, and demo day for MVP/Seed stage Web3, AI x Crypto, DeFi, infrastructure projects. Deploying on partners like BNB Chain unlocks non-dilutive funding. Apply via form.",
@@ -11,7 +11,7 @@
   },
   "source": {
     "url": "https://forms.clickup.com/9018573221/f/8crt0d5-26918/BWOVOFB8AMT993WNEF",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1291",
     "verifiedAgainstSource": null
   },
@@ -34,10 +34,6 @@
   "closesAt": "2026-04-15T00:00:00.000Z",
   "createdAt": "2026-03-25T13:23:18.000Z",
   "updatedAt": "2026-04-15T00:02:13.000Z",
-  "extensions": {
-    "karma.programId": "1291",
-    "karma.isValid": true
-  },
   "accelerator": {
     "applicationDeadline": "2026-04-15T00:00:00.000Z",
     "programDurationWeeks": 3,

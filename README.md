@@ -21,7 +21,7 @@ JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 - Schema: [`packages/standard/schemas/v1.0.0/opportunity.schema.json`](./packages/standard/schemas/v1.0.0/opportunity.schema.json)
 - Field reference: [`FIELDS.md`](./packages/standard/schemas/v1.0.0/FIELDS.md)
 - Prior-art crosswalk (DAOIP-5 · schema.org/Grant): [`CROSSWALK.md`](./packages/standard/schemas/v1.0.0/CROSSWALK.md)
-- Validated against 311 real funding-map entries: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.0/BENCHMARK.md)
+- Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.0/BENCHMARK.md)
 
 Validate anything against it:
 

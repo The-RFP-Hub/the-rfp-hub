@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:600",
+  "id": "fundingmap:600",
   "type": "grant",
   "title": "Prezenti Mint Round",
   "description": "Celo Community Run Grant Program\n\nWe are funded through the Celo Community Fund treasury, as a community driven grants programme.\nWe were originally funded by Celo community funds (CGP 54 & CGP 72) in 2023, and more recently funded again in 2024 (CGP 162).\n\nWe are passionately committed to maintaining a grassroots grant funding initiative, spearheaded by proven and reputable members of the Celo community.\n\nBy reimagining the traditional model of foundation-funded grants, we introduce community-driven grant programs as a dynamic and complementary alternative.\n\nLeveraging our extensive experience, we aim to deliver a framework that empowers other community members and projects in the space. This initiative is rooted in the true spirit of open source, embracing collaboration and innovation to foster a vibrant and diverse funding ecosystem",
@@ -10,7 +10,7 @@
   },
   "source": {
     "url": "https://prezenti.xyz",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "600",
     "verifiedAgainstSource": null
   },
@@ -49,11 +49,6 @@
   "closesAt": "2024-11-30T08:00:00.000Z",
   "createdAt": "2024-09-19T18:02:23.000Z",
   "updatedAt": "2026-05-18T13:37:50.000Z",
-  "extensions": {
-    "karma.programId": "600",
-    "karma.chainID": 42161,
-    "karma.isValid": true
-  },
   "grant": {
     "recurring": true
   }

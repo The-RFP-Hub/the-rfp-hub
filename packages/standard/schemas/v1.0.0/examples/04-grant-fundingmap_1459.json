@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1459",
+  "id": "fundingmap:1459",
   "type": "grant",
   "title": "Prezenti Boost Pool S2",
   "description": "This pool is designed for projects with a proven track record in other ecosystems that we aim to fast-track for deployment on Celo. Delivered by Prezenti in partnership with the Celo Foundation’s DevRel team, the program offers a streamlined process and targeted, high-impact funding to accelerate onboarding.",
@@ -13,7 +13,7 @@
   "source": {
     "url": "https://prezenti.xyz/grants",
     "publisher": "celo",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1459",
     "verifiedAgainstSource": null
   },
@@ -55,12 +55,5 @@
   "closesAt": "2026-06-30T23:59:00.000Z",
   "createdAt": "2026-05-04T20:43:34.000Z",
   "updatedAt": "2026-05-18T17:16:27.000Z",
-  "extensions": {
-    "karma.programId": "1459",
-    "karma.isValid": true,
-    "karma.communitySlugs": [
-      "celo"
-    ]
-  },
   "grant": {}
 }

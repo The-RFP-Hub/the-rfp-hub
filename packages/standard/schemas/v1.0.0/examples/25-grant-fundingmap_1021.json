@@ -1,0 +1,50 @@
+{
+  "specVersion": "1.0.0",
+  "id": "fundingmap:1021",
+  "type": "grant",
+  "title": "Localism Mini Grant Round 01 | Colombia",
+  "description": "This program funds ReFi Colombia local nodes to execute place based regenerative and community onboarding activities across Colombia.\n\nThrough an open local round, up to 5 nodes *(either existing or proposed new nodes)* will be selected and awarded between $750 and $2,000 each. Funding decisions will be based on proposal quality, node history and previous activities, consistency of participation in ReFi Colombia meetings and initiatives, collaboration within the ReFi Colombia and wider ReFiDAO network, and alignment with ReFi Colombia’s values, mission, and rules.\n\nNew node activations are also eligible. These will be evaluated using adapted criteria, including prior participation in activities organized by existing nodes, engagement in the ReFi Colombia Telegram community and social media channels, the background and experience of the proposed team, and demonstrated commitment to ReFi Colombia’s values, mission, and internal rules.\n\nSupported activities include reforestation, environmental restoration, ReFi-focused educational workshops, cleanup actions, mindfulness and community well being initiatives, and Web3 onboarding through these activities. The program prioritizes local leadership, continuity, expansion potential, and transparent allocation, enabling nodes to scale activities according to their real on-the-ground capacity while strengthening the national ReFi Colombia network.",
+  "summary": "Local mini grants for ReFi Colombia Local Nodes based on impact, consistency, and network alignment",
+  "status": "closed",
+  "organization": {
+    "name": "Localism Mini Grant Round 01 | Colombia",
+    "slug": "refi-colombia-community"
+  },
+  "source": {
+    "url": "https://t.me/reficolombia",
+    "publisher": "refi-colombia-community",
+    "ingestedVia": "import",
+    "originalId": "1021",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Celo"
+  ],
+  "networks": [
+    "Celo"
+  ],
+  "categories": [
+    "Communities"
+  ],
+  "tags": [
+    "Direct Grants"
+  ],
+  "socialLinks": {
+    "twitter": "https://x.com/RefiColombia",
+    "telegram": "https://t.me/reficolombia"
+  },
+  "funding": {
+    "minAward": 750,
+    "maxAward": 2000,
+    "totalBudget": 4500,
+    "amountDistributed": 0,
+    "awardsToDate": 0
+  },
+  "opensAt": "2026-01-15T05:00:00.000Z",
+  "closesAt": "2026-02-07T23:59:00.000Z",
+  "createdAt": "2026-01-03T21:58:12.000Z",
+  "updatedAt": "2026-02-02T17:28:21.000Z",
+  "grant": {
+    "recurring": true
+  }
+}
