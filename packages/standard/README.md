@@ -39,3 +39,10 @@ generated file by hand.
 
 See `schemas/v1.0.0/FIELDS.md` for the full field reference and the Karma mapping, and
 `BENCHMARK.md` for real-data validation results.
+
+## License
+
+Dedicated to the public domain under **CC0 1.0 Universal** ([`LICENSE`](./LICENSE)). To the
+extent possible under law, The RFP Hub contributors have waived all copyright and related
+rights to the standard — the schema, generated types, and docs — so it can be embedded,
+forked, and re-published without restriction.

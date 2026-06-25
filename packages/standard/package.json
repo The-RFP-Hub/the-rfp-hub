@@ -15,7 +15,7 @@
     },
     "./schemas/*": "./schemas/*"
   },
-  "files": ["dist", "schemas"],
+  "files": ["dist", "schemas", "LICENSE"],
   "sideEffects": false,
   "scripts": {
     "codegen": "node scripts/codegen.mjs",
