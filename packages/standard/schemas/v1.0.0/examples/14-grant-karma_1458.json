@@ -1,0 +1,58 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1458",
+  "type": "grant",
+  "title": "Prezenti Anchor Pool",
+  "description": "# Season 2: Anchor Open Round [2026]\n\n**STATUS: OPEN**\n\n## Current Round\n\nThis round is open 25th February 2026 - 30th June 2026 [$220,000 USDm available]\n\n## Timeline\n\n- This round is open 25th February 2026 - 30th June 2026\n- Inform outcome to applicants: Within 2-4 weeks of submission, offered on a rolling basis\n- Close out / end of grants: 4 months after contract signatory\n\n## Anchor Mission and Fund Allocation\n\nIn alignment with Season 2's focus on sustainable ecosystem growth, Prezenti plans to explicitly support applications that generate revenue for the chain, whether through transaction fees, sequencer revenue contribution, or other mechanisms. This extends beyond the existing intent framework to teams building durable, revenue-positive infrastructure.\n\n### The Revenue Concentration Reality\n\nAnalysis of mature L2 ecosystems reveals a consistent pattern: a small number of high-throughput, revenue-generating applications drive the overwhelming majority of sustainable chain economics. On leading L2s, it's common for a single application category — whether DEXs, prediction markets, or payments infrastructure — to account for 40–60% of total ecosystem revenue. Networks that attract these anchor applications early compound their advantage through liquidity effects, user retention, and sustainable fee generation. The key differentiator is no longer technical. Arguably it has never been: it's distribution.\n\n## Eligibility & Focus\n\n**What we're looking for:**\n\n- Verifiable evidence of real usage (transactions, users, revenue)\n- Clear path to generating meaningful transaction volume on Celo\n- Product-market fit demonstrated elsewhere, or credible pilot results within MiniPay\n- Teams slightly below Stage 2 funding thresholds may be considered where a proven track record and substantial evidence demonstrate imminent viability\n\n| Stage | Profile | Est. Daily TXs | Grant size |\n|-------|---------|----------------|------------|\n| Stage 1 | — | >5k daily tx's | — |\n| Stage 2 | Valora apps, Mini apps | 10K – 100K | $25k est |\n| Stage 3 | Seed-stage or scaled products with traction | 100k–500k | $50k est |\n| Stage 4 | Mature ecosystem apps | 500k+ | Case-by-case |\n\n- **Must** demonstrate 10k–100k daily transactions on Celo mainnet [if you cannot demonstrate these daily tx's then you should be able to demonstrate a good level of sustained transactions over a period of time]\n- We are ideally looking for a sustained daily average over 5,000 tx\n- Projects should be deployed, open to the public, and open source or published\n\n## Not Eligible\n\n- Ongoing salaries, pure marketing spend, events, liquidity provision, token listings, or general VC investment\n- Applications gaming transaction counts without generating underlying value, e.g. spamming micro USDT transfers to addresses with little previous history\n- Projects without verifiable traction or credible usage evidence\n- Teams that cannot articulate how they contribute to transaction growth or TVL\n\n## General Information\n\n- One-off grant cUSD to all successful applicants\n- Payments will be split 20% at project onset, and 80% after agreed delivery\n- For unsuccessful applications there will be some feedback\n- Applicants will be KYC'ed and sign a contract with Prezenti\n\n## Evaluation Rubric\n\nThe Prezenti review team will use the rubric below to help guide and grade proposals. To arrive at a final decision, Prezenti will evaluate each proposal and come to a consensus through an internal vote.\n\n| Criterion | Score | Notes |\n|-----------|-------|-------|\n| Alignment | 0: No clear alignment / 1: Partial alignment with no notable gaps | — |\n| Open Source Commitment | 0: No / 1: Yes / Partial | Comment |\n| Demo Quality | 0: No demo / 1: Yes / Explains concept | — |\n| Team Assessment | 0: Can't assess / bad / 1: Strong team | — |\n| Metrics / KPIs | 0: Not good / 1: Somewhat good / good | — |\n| Correctly specified their appropriate stage? | 0: No / 1: Yes | — |\n| Clear understanding of the actual demand for this product | 0: Not clear, no real understanding demonstrated / 1: Somewhat good / good | — |\n| Do they have a clear financial plan for sustainable growth? | 0: No / 1: Yes / Partial | — |\n| Discretionary factor | -1 / 0 / 1 | Comment |\n\n## Grant Submission Outcomes Process\n\nAfter you have submitted your application on Charmverse, you will need to wait for an outcome. This typically takes around 4 weeks from submission, although we strive to turnaround applications faster.\n\nAlthough Charmverse has an outcome function, we will first inform you via email. This will be sent to the email address of the lead submitted within the Charmverse application. This is so we have a full audit trail of each application in our systems / in case Charmverse goes down.\n\nOnce the emails have been issued we will then update Charmverse with the outcomes to be public and close off the Charmverse process.",
+  "summary": "The Anchor Pool funds teams with real traction driving Celo ecosystem growth.",
+  "status": "open",
+  "organization": {
+    "name": "Prezenti Anchor Pool",
+    "slug": "celo"
+  },
+  "source": {
+    "url": "https://prezenti.xyz/grants",
+    "publisher": "celo",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1458",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Celo",
+    "celo"
+  ],
+  "categories": [
+    "Payments",
+    "Privacy",
+    "Lend/Borrow",
+    "Infrastructure",
+    "Developer Tools",
+    "DeFi",
+    "DeFAI",
+    "DEX"
+  ],
+  "socialLinks": {
+    "twitter": "https://x.com/prezenti_grants",
+    "discord": "https://discord.gg/YCgGjFaP7f",
+    "forum": "https://forum.celo.org/search?q=Prezenti",
+    "blog": "https://forum.celo.org/search?q=Prezenti"
+  },
+  "funding": {
+    "minAward": 25002,
+    "totalBudget": 220000
+  },
+  "opensAt": "2026-02-25T00:00:00.000Z",
+  "closesAt": "2026-06-30T23:59:00.000Z",
+  "createdAt": "2026-05-04T20:37:34.000Z",
+  "updatedAt": "2026-05-18T17:16:43.000Z",
+  "extensions": {
+    "karma.programId": "1458",
+    "karma.isValid": true,
+    "karma.communitySlugs": [
+      "celo"
+    ]
+  },
+  "grant": {
+    "recurring": true
+  }
+}

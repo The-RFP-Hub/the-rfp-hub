@@ -1,0 +1,54 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1453",
+  "type": "bounty",
+  "title": "Internships: Colosseum Frontier",
+  "description": "**Do you want to get work experience with an early-stage web3 startup?**\n\nSuperteam UK is matching early creator, business and developer talent with startups participating in the Colosseum Frontier hackathon. Projects include managing social media accounts to drive traction, work on pitchdecks and demo videos, improve strategy or use your technical skills to help build the MVP.\n\nHere’s how it works:\n\n-   Fill in the [internship request](https://superteamuk.org/internship-request) form **ASAP** and no later than Sunday, 26th April\n    \n-   Your profile will be made visible to startup/project founders, who will reach out to you if they are interested in working with you\n    \n-   If you complete 10+ hours of work, **submit a one pager to this bounty** (e.g. google doc) outlining the work you did and for which startup\n    \n\n**Scoring Process**\n\nWe will reach out to the relevant startup for feedback on your internship. Prizes will be allocated based on this feedback, and the value added through your work.\n\nPlease note that this scheme is free for the startups. Payment is not guaranteed.\n\n**Start ASAP**\n\nIt will take time for startups to reach out, confirm an internship and onboard you to their team. Early applicants are much more likely to complete the internship project before the deadline.",
+  "summary": "**Do you want to get work experience with an early-stage web3 startup?",
+  "status": "archived",
+  "organization": {
+    "name": "Internships: Colosseum Frontier",
+    "website": "https://superteam.fun/earn/listing/internships-colosseum-frontier"
+  },
+  "source": {
+    "url": "https://superteam.fun/earn/listing/internships-colosseum-frontier",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1453",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Solana"
+  ],
+  "categories": [
+    "Bounty"
+  ],
+  "applicationUrl": "https://superteam.fun/earn/listing/internships-colosseum-frontier",
+  "website": "https://superteam.fun/earn/listing/internships-colosseum-frontier",
+  "funding": {
+    "totalBudget": 1400
+  },
+  "opensAt": null,
+  "closesAt": "2026-05-15T22:59:59.000Z",
+  "createdAt": "2026-05-01T14:53:40.000Z",
+  "updatedAt": "2026-05-16T00:02:40.000Z",
+  "extensions": {
+    "karma.programId": "1453",
+    "karma.isValid": true
+  },
+  "bounty": {
+    "difficulty": null,
+    "skills": [
+      "Growth",
+      "Content",
+      "Other",
+      "Design",
+      "Frontend",
+      "Backend"
+    ],
+    "platform": "Superteam Earn",
+    "reward": {
+      "amount": 1400,
+      "currency": "USDG"
+    }
+  }
+}

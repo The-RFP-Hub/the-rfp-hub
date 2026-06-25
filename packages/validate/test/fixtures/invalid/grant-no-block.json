@@ -1,0 +1,10 @@
+{
+  "specVersion": "1.0.0",
+  "id": "bad-3",
+  "type": "grant",
+  "title": "Missing grant block",
+  "description": "type is grant but there is no grant block, so opportunity[type] would not resolve.",
+  "status": "open",
+  "organization": { "name": "Org" },
+  "source": { "url": "https://example.org" }
+}

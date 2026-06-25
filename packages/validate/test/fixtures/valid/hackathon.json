@@ -1,0 +1,20 @@
+{
+  "specVersion": "1.0.0",
+  "id": "example:hack-1",
+  "type": "hackathon",
+  "title": "Example Hackathon 2026",
+  "description": "A weekend Ethereum hackathon.",
+  "status": "upcoming",
+  "organization": { "name": "Example DAO" },
+  "source": { "url": "https://example.org/hack" },
+  "ecosystems": ["Ethereum", "Base"],
+  "hackathon": {
+    "startDate": "2026-09-01T09:00:00.000Z",
+    "endDate": "2026-09-03T18:00:00.000Z",
+    "location": "Lisbon",
+    "online": false,
+    "tracks": ["DeFi", "Infra"],
+    "prizes": [{ "track": "DeFi", "amount": 5000, "currency": "USD" }],
+    "teamSize": { "min": 1, "max": 5 }
+  }
+}

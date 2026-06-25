@@ -1,0 +1,65 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1092",
+  "type": "hackathon",
+  "title": "ETHGlobal Tokyo 2026",
+  "description": "ETHGlobal Tokyo 2026 is an event bringing together some of the top minds and experts in Ethereum Ecosystem to Tokyo. We enable teams to make something great in only 36 hours by providing an abundance of web3 resources like mentors, partners, and software. Sleeping is optional, but trying something new is not!",
+  "status": "upcoming",
+  "organization": {
+    "name": "ETHGlobal Tokyo 2026",
+    "website": "https://ethglobal.com/events/tokyo2026"
+  },
+  "source": {
+    "url": "https://ethglobal.com/events/tokyo2026",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1092",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "tags": [
+    "Hackathons"
+  ],
+  "applicationUrl": "https://ethglobal.com/events/tokyo2026",
+  "website": "https://ethglobal.com/events/tokyo2026",
+  "funding": {
+    "totalBudget": 35000
+  },
+  "opensAt": "2026-09-25T12:00:00.000Z",
+  "closesAt": "2026-09-27T23:59:59.000Z",
+  "createdAt": "2026-03-06T14:11:32.000Z",
+  "updatedAt": "2026-03-09T14:24:32.000Z",
+  "extensions": {
+    "karma.programId": "1092",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-09-25T12:00:00.000Z",
+    "endDate": "2026-09-27T23:59:59.999Z",
+    "location": "Tokyo, Japan",
+    "online": null,
+    "registrationDeadline": "2026-09-23T14:59:06.202Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10000,
+        "currency": "USD"
+      }
+    ]
+  }
+}

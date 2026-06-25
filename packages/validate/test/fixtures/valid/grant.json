@@ -1,0 +1,15 @@
+{
+  "specVersion": "1.0.0",
+  "id": "example:grant-1",
+  "type": "grant",
+  "title": "Example Ecosystem Grants",
+  "description": "Funding for public goods in the Ethereum ecosystem.",
+  "status": "open",
+  "organization": { "name": "Example Foundation", "slug": "example", "website": "https://example.org" },
+  "source": { "url": "https://example.org/grants", "ingestedVia": "submission" },
+  "ecosystems": ["Ethereum", "Optimism"],
+  "categories": ["Public Goods"],
+  "funding": { "currency": "USD", "minAward": 5000, "maxAward": 50000, "totalBudget": 500000 },
+  "closesAt": "2026-12-31T23:59:59.000Z",
+  "grant": { "fundingMechanism": "proactive", "milestoneBased": true, "recurring": true }
+}

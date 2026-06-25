@@ -1,0 +1,40 @@
+{
+  "name": "rfphub-validate",
+  "version": "0.1.0",
+  "description": "Validate funding opportunities against the RFP Hub Standard (CLI + typed library).",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "rfphub-validate": "./dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rfp-hub/standard": "workspace:*",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "keywords": ["rfp-hub", "funding", "grants", "json-schema", "validation", "ethereum", "cli"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
+    "directory": "packages/validate"
+  }
+}

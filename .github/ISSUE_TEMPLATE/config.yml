@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: RFP Hub Standard — field reference
+    url: https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/standard/schemas/v1.0.0/FIELDS.md
+    about: How to read and use the standard before filing an issue.
+  - name: Questions & discussion
+    url: https://github.com/The-RFP-Hub/the-rfp-hub/discussions
+    about: For questions, ideas, and general discussion (not bugs).

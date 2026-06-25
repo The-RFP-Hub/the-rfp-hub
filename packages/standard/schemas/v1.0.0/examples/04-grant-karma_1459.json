@@ -1,0 +1,66 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1459",
+  "type": "grant",
+  "title": "Prezenti Boost Pool S2",
+  "description": "This pool is designed for projects with a proven track record in other ecosystems that we aim to fast-track for deployment on Celo. Delivered by Prezenti in partnership with the Celo Foundation’s DevRel team, the program offers a streamlined process and targeted, high-impact funding to accelerate onboarding.",
+  "summary": "Fast-track funding for proven projects launching on Celo, run by Prezenti with CF DevRel team.",
+  "status": "open",
+  "organization": {
+    "name": "Prezenti Boost Pool S2",
+    "slug": "celo"
+  },
+  "source": {
+    "url": "https://prezenti.xyz/grants",
+    "publisher": "celo",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1459",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Celo"
+  ],
+  "categories": [
+    "Analytics",
+    "Bridges",
+    "Climate/ReFi",
+    "Communities",
+    "Content/Media",
+    "DAO Tooling",
+    "DEX",
+    "DeFAI",
+    "DeFi",
+    "DeSci",
+    "Developer Tools",
+    "Identity",
+    "Infrastructure",
+    "Lend/Borrow",
+    "Payments",
+    "Privacy",
+    "Wallets",
+    "Yield Farming"
+  ],
+  "socialLinks": {
+    "twitter": "https://x.com/prezenti_grants",
+    "discord": "https://discord.gg/YCgGjFaP7f",
+    "forum": "https://forum.celo.org/search?q=Prezenti",
+    "blog": "https://forum.celo.org/search?q=Prezenti"
+  },
+  "funding": {
+    "minAward": 5000,
+    "maxAward": 5000,
+    "totalBudget": 70000
+  },
+  "opensAt": "2026-02-25T00:00:00.000Z",
+  "closesAt": "2026-06-30T23:59:00.000Z",
+  "createdAt": "2026-05-04T20:43:34.000Z",
+  "updatedAt": "2026-05-18T17:16:27.000Z",
+  "extensions": {
+    "karma.programId": "1459",
+    "karma.isValid": true,
+    "karma.communitySlugs": [
+      "celo"
+    ]
+  },
+  "grant": {}
+}

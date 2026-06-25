@@ -1,0 +1,27 @@
+name: Feature request / standard proposal
+description: Propose a feature, or a change to the RFP Hub Standard
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do, and what's missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: >
+        Describe the change. For schema changes, note whether it's additive (minor) or
+        breaking (major), and which opportunity type(s) it affects.
+    validations:
+      required: true
+  - type: checkboxes
+    id: schema
+    attributes:
+      label: Does this change the Standard?
+      options:
+        - label: This proposes a change to the JSON Schema / standard object
+        - label: This is additive / backwards-compatible

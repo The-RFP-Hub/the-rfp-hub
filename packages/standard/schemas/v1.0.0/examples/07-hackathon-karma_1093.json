@@ -1,0 +1,75 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1093",
+  "type": "hackathon",
+  "title": "ETHGlobal Lisbon 2026",
+  "description": "ETHGlobal Lisbon 2026 is an event bringing together some of the top minds and experts in Ethereum Ecosystem to Lisbon. We enable teams to make something great in only 36 hours by providing an abundance of web3 resources like mentors, partners, and software. Sleeping is optional, but trying something new is not!",
+  "status": "upcoming",
+  "organization": {
+    "name": "ETHGlobal Lisbon 2026",
+    "website": "https://ethglobal.com/events/lisbon2026"
+  },
+  "source": {
+    "url": "https://ethglobal.com/events/lisbon2026",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1093",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "tags": [
+    "Hackathons"
+  ],
+  "applicationUrl": "https://ethglobal.com/events/lisbon2026",
+  "website": "https://ethglobal.com/events/lisbon2026",
+  "funding": {
+    "totalBudget": 60000
+  },
+  "opensAt": "2026-07-24T12:00:00.000Z",
+  "closesAt": "2026-07-26T23:59:59.000Z",
+  "createdAt": "2026-03-06T14:11:38.000Z",
+  "updatedAt": "2026-03-09T14:24:34.000Z",
+  "extensions": {
+    "karma.programId": "1093",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-07-24T12:00:00.000Z",
+    "endDate": "2026-07-26T23:59:59.999Z",
+    "location": "Lisbon, Portugal",
+    "online": null,
+    "registrationDeadline": "2026-07-10T22:59:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 5000,
+        "currency": "USD"
+      }
+    ]
+  }
+}

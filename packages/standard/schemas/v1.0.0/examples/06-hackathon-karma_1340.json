@@ -1,0 +1,77 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1340",
+  "type": "hackathon",
+  "title": "Hack-Helix",
+  "description": "Hack Helix is the flagship hackathon of Helix, designed to bring together some of the brightest and most innovative minds to build impactful solutions for real-world problems. It is a high-intensity, time-bound competition that emphasizes innovation, technical excellence, and teamwork.\n\nParticipants will collaborate in teams to ideate, design, and develop practical solutions across diverse domains. The hackathon encourages participants to move beyond theoretical ideas and focus on building functional prototypes that address real challenges.\n\nWith mentorship support, structured evaluation, and a competitive environment, Hack Helix provides a platform for participants to experiment, innovate, and transform ideas into tangible solutions while enhancing their problem-solving and development skills.\n\n**Buy Accommodations** at https://accommodationstiet.shop/",
+  "summary": "Hack Helix is the flagship hackathon of Helix, designed to bring together some of the brightest...",
+  "status": "archived",
+  "organization": {
+    "name": "Hack-Helix",
+    "website": "https://hackhelix1.devfolio.co"
+  },
+  "source": {
+    "url": "https://hackhelix1.devfolio.co",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1340",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "applicationUrl": "https://hackhelix1.devfolio.co",
+  "website": "https://hackhelix1.devfolio.co",
+  "funding": {
+    "totalBudget": 100020
+  },
+  "opensAt": "2026-04-18T06:30:00.000Z",
+  "closesAt": "2026-04-06T18:45:00.000Z",
+  "createdAt": "2026-04-01T00:01:47.000Z",
+  "updatedAt": "2026-04-07T00:01:28.000Z",
+  "extensions": {
+    "karma.programId": "1340",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-04-18T06:30:00.000Z",
+    "endDate": "2026-04-19T06:30:00.000Z",
+    "location": "Thapar Institute of Engineering & Technology, Bhadson Road, Adarsh Nagar, Prem Nagar, Patiala, Punjab, India",
+    "online": null,
+    "registrationDeadline": "2026-04-06T18:45:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 50000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 30000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 20000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10,
+        "currency": "USD"
+      }
+    ],
+    "teamSize": {
+      "min": 3,
+      "max": 6
+    }
+  }
+}

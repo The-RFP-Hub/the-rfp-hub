@@ -1,0 +1,38 @@
+name: Bug report
+description: Report a problem with the standard, the CLI, or the API
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - "Standard (schema / types)"
+        - "rfphub-validate (CLI / library)"
+        - "API"
+        - "Docs"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, commands, or a sample entry that triggers the issue.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Package version / spec version (e.g. rfphub-validate@0.1.0, spec 1.0.0).
+    validations:
+      required: false

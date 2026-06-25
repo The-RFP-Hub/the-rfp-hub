@@ -1,0 +1,57 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1059",
+  "type": "grant",
+  "title": "Build Agents for the Real World Hackathon V2",
+  "description": "This hackathon challenges you to build agentic applications on Celo, an Ethereum Layer 2 built for the real world and designed for fast, low-cost payments worldwide. Celo's tooling and robust ecosystem enable AI agents to deploy and scale applications across a diverse array of use cases optimized for global payments, mobile accessibility, and stablecoin-native transactions. With 700K+ daily active users and battle-tested infrastructure, teams can deploy, test, and iterate as they leverage agentic solutions for everyday utility. If you’re interested in agents with genuine economic agency and global distribution, this is the place to build.",
+  "summary": "Build your agent for the real world on Celo: an Agentic hackathon with a $8.5k USD₮ prize pool.",
+  "status": "closed",
+  "organization": {
+    "name": "Build Agents for the Real World Hackathon V2",
+    "slug": "celo"
+  },
+  "source": {
+    "url": "https://celoplatform.notion.site/Agents-for-the-Real-World-Hackathon-2fdd5cb803de80c99010c04b6902a3a9",
+    "publisher": "celo",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1059",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Celo"
+  ],
+  "categories": [
+    "DeFAI",
+    "DeFi",
+    "GameFi",
+    "Lend/Borrow",
+    "Infrastructure",
+    "Payments",
+    "Privacy"
+  ],
+  "socialLinks": {
+    "twitter": "https://x.com/CeloDevs",
+    "discord": "https://discord.com/invite/celo",
+    "telegram": "https://t.me/realworldagentshackathon",
+    "forum": "https://forum.celo.org/"
+  },
+  "funding": {
+    "minAward": 0,
+    "maxAward": 0,
+    "totalBudget": 8500,
+    "amountDistributed": 0,
+    "awardsToDate": 0
+  },
+  "opensAt": "2026-03-02T00:00:00.000Z",
+  "closesAt": "2026-03-23T23:59:00.000Z",
+  "createdAt": "2026-02-26T22:33:01.000Z",
+  "updatedAt": "2026-03-14T08:46:45.000Z",
+  "extensions": {
+    "karma.programId": "1059",
+    "karma.isValid": true,
+    "karma.communitySlugs": [
+      "celo"
+    ]
+  },
+  "grant": {}
+}

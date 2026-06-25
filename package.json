@@ -1,0 +1,31 @@
+{
+  "name": "@rfp-hub/monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "RFP Hub — open standard, validation tooling, API, client, and agent libraries for Ethereum-ecosystem funding opportunities.",
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "codegen": "pnpm -r --if-present codegen",
+    "codegen:check": "pnpm -r --if-present codegen:check",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^2.27.10",
+    "@types/node": "^22.10.2",
+    "json-schema-to-typescript": "^15.0.3",
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}

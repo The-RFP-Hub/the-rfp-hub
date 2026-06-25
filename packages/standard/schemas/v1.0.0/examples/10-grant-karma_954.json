@@ -1,0 +1,64 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:954",
+  "type": "grant",
+  "title": "Proof of Ship - Season 7",
+  "description": "[Proof-of-Ship](https://celoplatform.notion.site/Proof-of-Ship-17cd5cb803de8060ba10d22a72b549f8) is a monthly program for builders to grow their onchain reputation and **earn rewards** in the Celo ecosystem. Each month, builders prove their impact, showcase progress, and earn rewards. Your onchain reputation unlocks access to grants, retro funding, airdrops, and other funding opportunities. **Apply** by creating your project following this [guide](https://docs.gap.karmahq.xyz/how-to-guides/integrations/celo-proof-of-ship) and sign up for Proof of Ship [HERE](https://celo-devs.beehiiv.com/subscribe) to receive notifications. Learn more about bounties, agenda, and FAQs on the main [Proof of Ship page](https://celoplatform.notion.site/Proof-of-Ship-17cd5cb803de8060ba10d22a72b549f8).",
+  "status": "closed",
+  "organization": {
+    "name": "Proof of Ship - Season 7",
+    "slug": "celo"
+  },
+  "source": {
+    "url": "https://docs.gap.karmahq.xyz/how-to-guides/integrations/celo-proof-of-ship",
+    "publisher": "celo",
+    "ingestedVia": "karma_outbox",
+    "originalId": "954",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Celo"
+  ],
+  "networks": [
+    "Celo"
+  ],
+  "categories": [
+    "AI",
+    "DeFAI",
+    "DeFi",
+    "DEX",
+    "Lend/Borrow"
+  ],
+  "tags": [
+    "Bounties"
+  ],
+  "socialLinks": {
+    "twitter": "https://x.com/CeloDevs",
+    "discord": "https://discord.com/invite/celo",
+    "telegram": "https://t.me/proofofship",
+    "forum": "https://forum.celo.org/"
+  },
+  "funding": {
+    "minAward": 0,
+    "maxAward": 0,
+    "totalBudget": 10000,
+    "amountDistributed": 40000,
+    "awardsToDate": 0
+  },
+  "opensAt": "2025-07-31T22:00:00.000Z",
+  "closesAt": "2025-08-28T22:00:00.000Z",
+  "createdAt": "2025-07-23T06:40:50.000Z",
+  "updatedAt": "2025-07-23T06:40:50.000Z",
+  "extensions": {
+    "karma.programId": "954",
+    "karma.chainID": 42161,
+    "karma.isValid": true,
+    "karma.communitySlugs": [
+      "celo"
+    ]
+  },
+  "grant": {
+    "fundingMechanism": "retroactive",
+    "recurring": true
+  }
+}

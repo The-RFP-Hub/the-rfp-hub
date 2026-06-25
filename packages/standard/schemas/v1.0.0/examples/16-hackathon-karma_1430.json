@@ -1,0 +1,67 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1430",
+  "type": "hackathon",
+  "title": "Locus' Paygentic Hackathon - #4",
+  "description": "**The Locus Paygentic Hackathon #4** is the **FOURTH** and **LAST** week of a hackathon series spanning 4 weeks. \n&#013;\n1 track per week, 4 weeks, **$4000** in prizes over the series. Each week, the hackathon will kick off on Friday and will close on Thursday, starting the cycle again the day after. This hackathon series is centered around the different verticals of Locus, each week focusing on a different one.\n&#013;\n**Week 4 Track**: Using **LocusFounder** to build a business!\n&#013;\nHackathon series will be hosted virtually in our Locus Discord server, with team sizes of **1-4**, with free admission. \n&#013;\nEach team will receive $10 in credits to build and experiment with Locus.\n&#013;\nLink to Locus' Discord server: [discord.gg/locus](https://discord.gg/locus)",
+  "summary": "**The Locus Paygentic Hackathon #4** is the **FOURTH** and **LAST** week of a hackathon series...",
+  "status": "archived",
+  "organization": {
+    "name": "Locus' Paygentic Hackathon - #4",
+    "website": "https://discord.gg/locus"
+  },
+  "source": {
+    "url": "https://discord.gg/locus",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1430",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "FinTech"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "applicationUrl": "https://paygentic-week4.devfolio.co",
+  "website": "https://discord.gg/locus",
+  "funding": {
+    "totalBudget": 1000
+  },
+  "opensAt": "2026-05-02T00:30:00.000Z",
+  "closesAt": "2026-05-05T06:59:00.000Z",
+  "createdAt": "2026-05-01T14:52:54.000Z",
+  "updatedAt": "2026-05-06T00:05:42.000Z",
+  "extensions": {
+    "karma.programId": "1430",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-05-02T00:30:00.000Z",
+    "endDate": "2026-05-07T06:59:00.000Z",
+    "location": "Online",
+    "online": null,
+    "registrationDeadline": "2026-05-05T06:59:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 600,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 300,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 100,
+        "currency": "USD"
+      }
+    ],
+    "teamSize": {
+      "min": 1,
+      "max": 4
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1254",
+  "type": "hackathon",
+  "title": "TON AI Agent Hackathon",
+  "description": "Two-week hackathon with $20K prizes split across Agent Infrastructure ($10K for tooling, wallets, payments on TON) and User-Facing Agents ($10K for Telegram-integrated AI agents like commerce, trading, automation). Open to developers building AI on TON/Telegram stack; register via IdentityHub.",
+  "summary": "Two-week hackathon with $20K prizes split across Agent Infrastructure ($10K for tooling,...",
+  "status": "archived",
+  "organization": {
+    "name": "TON AI Agent Hackathon",
+    "website": "https://identityhub.app/contests/ai-hackathon"
+  },
+  "source": {
+    "url": "https://identityhub.app/contests/ai-hackathon",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1254",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "TON"
+  ],
+  "categories": [
+    "Funding Opportunity",
+    "AI"
+  ],
+  "applicationUrl": "https://identityhub.app/contests/ai-hackathon",
+  "website": "https://identityhub.app/contests/ai-hackathon",
+  "funding": {
+    "totalBudget": 20000
+  },
+  "opensAt": "2026-03-11T00:00:00.000Z",
+  "closesAt": "2026-03-25T23:59:00.000Z",
+  "createdAt": "2026-03-12T19:59:39.000Z",
+  "updatedAt": "2026-03-26T00:02:10.000Z",
+  "extensions": {
+    "karma.programId": "1254",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-03-11T00:00:00.000Z",
+    "endDate": "2026-03-25T23:59:00.000Z",
+    "location": "Virtual",
+    "online": null,
+    "tracks": [
+      "Agent Infrastructure",
+      "User-Facing AI Agents"
+    ],
+    "registrationDeadline": "2026-03-25T23:59:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 20000,
+        "currency": "USD"
+      }
+    ]
+  }
+}

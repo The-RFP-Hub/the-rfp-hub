@@ -1,0 +1,75 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1094",
+  "type": "hackathon",
+  "title": "ETHGlobal New York 2026",
+  "description": "ETHGlobal New York 2026 is an event bringing together some of the top minds and experts in Ethereum Ecosystem to New York. We enable teams to make something great in only 36 hours by providing an abundance of web3 resources like mentors, partners, and software. Sleeping is optional, but trying something new is not!",
+  "status": "archived",
+  "organization": {
+    "name": "ETHGlobal New York 2026",
+    "website": "https://ethglobal.com/events/newyork2026"
+  },
+  "source": {
+    "url": "https://ethglobal.com/events/newyork2026",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1094",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "tags": [
+    "Hackathons"
+  ],
+  "applicationUrl": "https://ethglobal.com/events/newyork2026",
+  "website": "https://ethglobal.com/events/newyork2026",
+  "funding": {
+    "totalBudget": 75000
+  },
+  "opensAt": "2026-06-12T12:00:00.000Z",
+  "closesAt": "2026-06-14T23:59:59.000Z",
+  "createdAt": "2026-03-06T14:11:44.000Z",
+  "updatedAt": "2026-06-15T00:02:11.000Z",
+  "extensions": {
+    "karma.programId": "1094",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-06-12T12:00:00.000Z",
+    "endDate": "2026-06-14T23:59:59.999Z",
+    "location": "New York City, United States",
+    "online": null,
+    "registrationDeadline": "2026-05-30T03:59:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 20000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 15000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10000,
+        "currency": "USD"
+      }
+    ]
+  }
+}

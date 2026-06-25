@@ -1,0 +1,55 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:491",
+  "type": "grant",
+  "title": "Sonic Labs Boom Bounty program",
+  "description": "This initiative is set to drive early growth on Sonic by attracting top-tier projects and fostering the development of essential applications within our ecosystem.",
+  "status": "closed",
+  "organization": {
+    "name": "Sonic Labs Boom Bounty program"
+  },
+  "source": {
+    "url": "https://blog.soniclabs.com/sonic-gems-and-sonic-boom-bounty-program/",
+    "ingestedVia": "karma_outbox",
+    "originalId": "491",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Fantom"
+  ],
+  "networks": [
+    "EVM"
+  ],
+  "categories": [
+    "DeFi",
+    "Lend/Borrow",
+    "Infrastructure",
+    "NFT",
+    "GameFi"
+  ],
+  "tags": [
+    "Bounties"
+  ],
+  "socialLinks": {
+    "twitter": "https://x.com/0xSonicLabs",
+    "discord": "https://discord.gg/3Ynr2QDSnB",
+    "blog": "https://blog.soniclabs.com/"
+  },
+  "funding": {
+    "minAward": 0,
+    "maxAward": 0,
+    "totalBudget": 0,
+    "amountDistributed": 0,
+    "awardsToDate": 0
+  },
+  "opensAt": "2024-08-19T20:00:00.000Z",
+  "closesAt": "2024-10-31T20:00:00.000Z",
+  "createdAt": "2024-08-29T11:26:52.000Z",
+  "updatedAt": "2024-08-29T11:28:06.000Z",
+  "extensions": {
+    "karma.programId": "491",
+    "karma.chainID": 42161,
+    "karma.isValid": true
+  },
+  "grant": {}
+}

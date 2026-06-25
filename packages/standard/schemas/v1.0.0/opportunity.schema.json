@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rfphub.org/standard/v1.0.0/opportunity.schema.json",
+  "title": "RFP Hub Opportunity",
+  "description": "RFP Hub Standard v1.0.0 — a canonical, ecosystem-neutral representation of an Ethereum-ecosystem funding opportunity. Covers six opportunity types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Released as CC0 1.0. Informed by, but deliberately decoupled from, Karma's internal program_registry schema; aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. See FIELDS.md for the full field reference and the Karma program_registry mapping.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specVersion",
+    "id",
+    "type",
+    "title",
+    "description",
+    "status",
+    "organization",
+    "source"
+  ],
+  "properties": {
+    "specVersion": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "The RFP Hub Standard version this entry conforms to. Fixed at 1.0.0 for this schema. Consumers use it to select the correct validator."
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$",
+      "description": "Stable, unique identifier for the opportunity within the Hub. Immutable once assigned. A namespaced form (e.g. 'filecoin:propgf-batch-3') is recommended but not required."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"],
+      "description": "The kind of funding opportunity. Values match Karma's OpportunityType enum to minimise mapping friction. Every entry carries a type-specific object under a key EQUAL to this value (type 'hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.type]`. The matching block is required for all six types (see allOf); for grants it may be an empty object."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "description": "Human-readable name of the opportunity."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full description of the opportunity. Markdown is permitted; consumers should treat it as untrusted and sanitise before rendering."
+    },
+    "summary": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional short teaser (≈1–2 sentences) for list/card views. Maps from Karma metadata.shortDescription."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["upcoming", "open", "closed", "archived"],
+      "description": "Lifecycle status of the opportunity. 'upcoming' = announced but not yet accepting applications; 'open' = currently accepting; 'closed' = deadline passed or no longer accepting (auto-set when closesAt passes); 'archived' = withdrawn or retired. Editorial/review state (pending, rejected) is NOT represented here — it is server-side metadata."
+    },
+    "organization": {
+      "$ref": "#/$defs/organization",
+      "description": "The organisation issuing or hosting the opportunity."
+    },
+    "source": {
+      "$ref": "#/$defs/provenance",
+      "description": "Provenance of this entry, including the canonical source URL and verification status. Required so every entry is traceable to an original posting."
+    },
+    "ecosystems": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped (per DEV-437), but this is an open, extensible list — NOT a closed enum — so L2s and ETH-adjacent ecosystems are first-class. Examples (non-normative): 'Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'Scroll', 'zkSync', 'Linea', 'OP Stack', 'Celo'.",
+      "examples": [["Optimism"], ["Ethereum", "Base"]]
+    },
+    "networks": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Specific networks/chains the funding is denominated on or deployed to (e.g. 'optimism', 'base', 'ethereum-mainnet'). Free-text; not constrained to a closed set in v1.0.0."
+    },
+    "categories": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Topical categories (e.g. 'DeFi', 'Public Goods', 'Infrastructure', 'Developer Tooling'). Free-text in v1.0.0."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Free-form tags for search and faceting."
+    },
+    "applicationUrl": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL where applicants submit or apply. Maps from Karma submissionUrl."
+    },
+    "website": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "Primary website for the opportunity or program."
+    },
+    "logoUrl": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL of the program/organisation logo image."
+    },
+    "bannerUrl": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL of a banner/hero image."
+    },
+    "socialLinks": {
+      "$ref": "#/$defs/socialLinks",
+      "description": "Social and community links."
+    },
+    "funding": {
+      "$ref": "#/$defs/funding",
+      "description": "Funding envelope for the opportunity (award sizes, total budget, currency)."
+    },
+    "opensAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when applications open. Maps from Karma metadata.startsAt."
+    },
+    "closesAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "RFC 3339 application deadline. Maps from Karma deadline / metadata.endsAt. When this passes, status should transition to 'closed'."
+    },
+    "postedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when the opportunity was first publicly announced at the source."
+    },
+    "createdAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when this entry was created in the Hub."
+    },
+    "updatedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when this entry was last modified in the Hub."
+    },
+    "grant": {
+      "$ref": "#/$defs/grant",
+      "description": "Grant-specific fields. Present (possibly an empty object) when type is 'grant'."
+    },
+    "hackathon": {
+      "$ref": "#/$defs/hackathon",
+      "description": "Hackathon-specific fields. Present when type is 'hackathon'."
+    },
+    "bounty": {
+      "$ref": "#/$defs/bounty",
+      "description": "Bounty-specific fields. Present when type is 'bounty'."
+    },
+    "accelerator": {
+      "$ref": "#/$defs/accelerator",
+      "description": "Accelerator-specific fields. Present when type is 'accelerator'."
+    },
+    "vc_fund": {
+      "$ref": "#/$defs/vcFund",
+      "description": "VC-fund-specific fields. Present when type is 'vc_fund'."
+    },
+    "rfp": {
+      "$ref": "#/$defs/rfp",
+      "description": "RFP-specific fields. Present when type is 'rfp'."
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Namespace for publisher- or integrator-specific data not covered by the standard. Keys SHOULD be namespaced (e.g. 'karma.programId'). Contents are not validated by this schema.",
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "grant" } }, "required": ["type"] },
+      "then": { "required": ["grant"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "hackathon" } }, "required": ["type"] },
+      "then": { "required": ["hackathon"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "bounty" } }, "required": ["type"] },
+      "then": { "required": ["bounty"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "accelerator" } }, "required": ["type"] },
+      "then": { "required": ["accelerator"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "vc_fund" } }, "required": ["type"] },
+      "then": { "required": ["vc_fund"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "rfp" } }, "required": ["type"] },
+      "then": { "required": ["rfp"] }
+    }
+  ],
+  "$defs": {
+    "grant": {
+      "type": "object",
+      "title": "Grant details",
+      "additionalProperties": false,
+      "description": "Grant-specific attributes not covered by the core fields. May be an empty object ({}) — core funding and date fields live at the top level.",
+      "properties": {
+        "fundingMechanism": {
+          "type": ["string", "null"],
+          "enum": ["retroactive", "proactive", "streaming", "quadratic", "other", null],
+          "description": "How funds are allocated (e.g. retroactive public goods, proactive application, streaming, quadratic)."
+        },
+        "milestoneBased": { "type": ["boolean", "null"], "description": "Whether disbursement is tied to milestones." },
+        "recurring": { "type": ["boolean", "null"], "description": "Whether the program runs in recurring rounds/seasons." }
+      }
+    },
+    "monetaryAmount": {
+      "type": "object",
+      "title": "Monetary amount",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Amount in major units of the currency (e.g. 2000000 = 2,000,000 USD)."
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "ISO 4217 fiat code (USD, EUR) or a token symbol (ETH, OP, USDC)."
+        }
+      }
+    },
+    "amountRange": {
+      "type": "object",
+      "title": "Amount range",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": ["number", "null"], "minimum": 0, "description": "Lower bound in major units." },
+        "max": { "type": ["number", "null"], "minimum": 0, "description": "Upper bound in major units." },
+        "currency": { "type": ["string", "null"], "maxLength": 16, "description": "ISO 4217 code or token symbol." }
+      }
+    },
+    "teamSize": {
+      "type": "object",
+      "title": "Team size range",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": ["integer", "null"], "minimum": 1 },
+        "max": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "organization": {
+      "type": "object",
+      "title": "Organization",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "The organisation issuing/hosting the opportunity (the funder). Embedded on an opportunity as a descriptive summary; the same shape is the standalone Organization directory record. NOTE: verification status is NOT here — verification belongs to the publishing relationship (a user permissioned on a verified org), not to the issuer.",
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 256, "description": "Display name of the organisation." },
+        "slug": { "type": ["string", "null"], "pattern": "^[a-z0-9-]+$", "description": "Lowercase URL-safe identifier; also the organisation's namespace." },
+        "type": { "type": ["string", "null"], "enum": ["foundation", "dao", "company", "protocol", "program", "individual", "other", null], "description": "Kind of issuing entity." },
+        "description": { "type": ["string", "null"], "description": "Short description of the organisation." },
+        "website": { "type": ["string", "null"], "format": "uri" },
+        "logoUrl": { "type": ["string", "null"], "format": "uri" },
+        "bannerUrl": { "type": ["string", "null"], "format": "uri" },
+        "socialLinks": { "$ref": "#/$defs/socialLinks" },
+        "ecosystems": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Ethereum-family ecosystems the organisation operates in." }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "title": "Provenance",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string", "format": "uri", "description": "Canonical URL of the original posting at the source. Anti-spam and verification jobs fetch this." },
+        "publisher": { "type": ["string", "null"], "description": "Namespace (organisation slug) this entry was published under (e.g. 'filecoin'). T2 auto-approval requires the publishing account to be a member of this verified org. May differ from the issuing organization." },
+        "submittedBy": { "type": ["string", "null"], "description": "Who submitted or published this entry — a public handle, organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed." },
+        "ingestedVia": {
+          "type": ["string", "null"],
+          "enum": ["publisher_api", "submission", "scrape", "import", "karma_outbox", null],
+          "description": "How this entry entered the Hub. 'karma_outbox' = pushed one-way from Karma program-manager edits (see DEV-439)."
+        },
+        "originalId": { "type": ["string", "null"], "description": "Identifier of this opportunity in the source system (e.g. Karma programId)." },
+        "verifiedAgainstSource": { "type": ["boolean", "null"], "description": "Whether the entry's fields were verified against the source URL by the verification-assist job. null = not yet checked." },
+        "verifiedAt": { "type": ["string", "null"], "format": "date-time", "description": "RFC 3339 timestamp of the last source verification." },
+        "snapshotUrl": { "type": ["string", "null"], "format": "uri", "description": "IPFS or archived snapshot of the source at verification time." }
+      }
+    },
+    "socialLinks": {
+      "type": "object",
+      "title": "Social links",
+      "additionalProperties": false,
+      "properties": {
+        "twitter": { "type": ["string", "null"] },
+        "discord": { "type": ["string", "null"] },
+        "github": { "type": ["string", "null"] },
+        "telegram": { "type": ["string", "null"] },
+        "farcaster": { "type": ["string", "null"] },
+        "forum": { "type": ["string", "null"] },
+        "blog": { "type": ["string", "null"] }
+      }
+    },
+    "funding": {
+      "type": "object",
+      "title": "Funding envelope",
+      "additionalProperties": false,
+      "properties": {
+        "currency": { "type": ["string", "null"], "maxLength": 16, "description": "ISO 4217 code or token symbol for the amounts below." },
+        "minAward": { "type": ["number", "null"], "minimum": 0, "description": "Minimum individual award in major units." },
+        "maxAward": { "type": ["number", "null"], "minimum": 0, "description": "Maximum individual award in major units." },
+        "totalBudget": { "type": ["number", "null"], "minimum": 0, "description": "Total program budget in major units." },
+        "amountDistributed": { "type": ["number", "null"], "minimum": 0, "description": "Amount distributed to date in major units." },
+        "awardsToDate": { "type": ["integer", "null"], "minimum": 0, "description": "Number of awards/grants made to date." }
+      }
+    },
+    "prize": {
+      "type": "object",
+      "title": "Hackathon prize",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "track": { "type": ["string", "null"], "description": "Track this prize belongs to, if tracked." },
+        "amount": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "minLength": 1, "maxLength": 16 }
+      }
+    },
+    "hackathon": {
+      "type": "object",
+      "title": "Hackathon details",
+      "additionalProperties": false,
+      "properties": {
+        "startDate": { "type": ["string", "null"], "format": "date-time" },
+        "endDate": { "type": ["string", "null"], "format": "date-time" },
+        "location": { "type": ["string", "null"], "description": "Physical location, or null for fully online." },
+        "online": { "type": ["boolean", "null"], "description": "Whether the event is (also) held online." },
+        "tracks": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "prizes": { "type": "array", "items": { "$ref": "#/$defs/prize" } },
+        "registrationDeadline": { "type": ["string", "null"], "format": "date-time" },
+        "submissionDeadline": { "type": ["string", "null"], "format": "date-time" },
+        "teamSize": { "$ref": "#/$defs/teamSize" }
+      }
+    },
+    "bounty": {
+      "type": "object",
+      "title": "Bounty details",
+      "additionalProperties": false,
+      "required": ["reward"],
+      "properties": {
+        "reward": { "$ref": "#/$defs/monetaryAmount" },
+        "difficulty": { "type": ["string", "null"], "enum": ["beginner", "intermediate", "advanced", null] },
+        "skills": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "platform": { "type": ["string", "null"], "description": "Platform hosting the bounty (e.g. 'Gitcoin', 'Layer3')." }
+      }
+    },
+    "accelerator": {
+      "type": "object",
+      "title": "Accelerator details",
+      "additionalProperties": false,
+      "properties": {
+        "applicationDeadline": { "type": ["string", "null"], "format": "date-time" },
+        "programDurationWeeks": { "type": ["integer", "null"], "minimum": 0 },
+        "batchSize": { "type": ["integer", "null"], "minimum": 0 },
+        "equity": { "type": ["string", "null"], "description": "Equity taken, expressed as a string (e.g. '5%', 'none')." },
+        "funding": { "$ref": "#/$defs/monetaryAmount" },
+        "stage": { "type": ["string", "null"], "enum": ["pre-seed", "seed", "series-a", null] },
+        "location": { "type": ["string", "null"] },
+        "online": { "type": ["boolean", "null"] }
+      }
+    },
+    "vcFund": {
+      "type": "object",
+      "title": "VC fund details",
+      "additionalProperties": false,
+      "properties": {
+        "checkSize": { "$ref": "#/$defs/amountRange" },
+        "stages": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["pre-seed", "seed", "series-a", "series-b+", "growth"] },
+          "uniqueItems": true,
+          "description": "Investment stages the fund participates in."
+        },
+        "thesis": { "type": ["string", "null"], "description": "Investment thesis." },
+        "portfolio": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "contactMethod": { "type": ["string", "null"], "enum": ["email", "form", "intro-only", null] },
+        "activelyInvesting": { "type": ["boolean", "null"] }
+      }
+    },
+    "rfp": {
+      "type": "object",
+      "title": "RFP details",
+      "additionalProperties": false,
+      "properties": {
+        "issuingOrganization": { "type": ["string", "null"], "description": "Organisation issuing the RFP, if distinct from organization.name." },
+        "budget": { "$ref": "#/$defs/monetaryAmount" },
+        "scope": { "type": ["string", "null"], "description": "Scope of work." },
+        "requirements": { "type": "array", "items": { "type": "string" } },
+        "proposalDeadline": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}

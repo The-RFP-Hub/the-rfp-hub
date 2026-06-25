@@ -1,0 +1,32 @@
+{
+  "name": "@rfp-hub/standard",
+  "version": "1.0.0",
+  "description": "RFP Hub Standard — canonical JSON Schema + generated TypeScript types for Ethereum-ecosystem funding opportunities.",
+  "license": "CC0-1.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./schemas/*": "./schemas/*"
+  },
+  "files": ["dist", "schemas"],
+  "sideEffects": false,
+  "scripts": {
+    "codegen": "node scripts/codegen.mjs",
+    "codegen:check": "node scripts/codegen.mjs --check",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["rfp-hub", "funding", "grants", "json-schema", "ethereum", "standard"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
+    "directory": "packages/standard"
+  }
+}

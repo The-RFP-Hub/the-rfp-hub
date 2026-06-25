@@ -1,0 +1,68 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1356",
+  "type": "hackathon",
+  "title": "Locus' Paygentic Hackathon - #1",
+  "description": "The Locus Paygentic Hackathon #1 is the first week of a hackathon series spanning 4 weeks. 1 track per week, 4 weeks, $4000 in prizes over the series. Each week the hackathon will kickoff on Friday and will close on Thursday, starting the cycle again the day after. This hackathon series is centered around the different verticals of Locus, each week focusing on a different one.\n\nWeek 1 Track : Using PayWithLocus to leverage our suite. \n\nHackathon series will be hosted virtually in our Locus discord server, with team sizes of 1-4 with free admission. All teams get $15 build credits and $15 locus credits\n\n[discord.gg/locus](discord.gg/locus)",
+  "summary": "The Locus Paygentic Hackathon #1 is the first week of a hackathon series spanning 4 weeks.",
+  "status": "archived",
+  "organization": {
+    "name": "Locus' Paygentic Hackathon - #1",
+    "website": "https://discord.gg/locus"
+  },
+  "source": {
+    "url": "https://discord.gg/locus",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1356",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "FinTech",
+    "AI"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "applicationUrl": "https://paygentic-week1.devfolio.co",
+  "website": "https://discord.gg/locus",
+  "funding": {
+    "totalBudget": 1000
+  },
+  "opensAt": "2026-04-11T00:00:00.000Z",
+  "closesAt": "2026-04-15T06:59:00.000Z",
+  "createdAt": "2026-04-04T00:01:49.000Z",
+  "updatedAt": "2026-04-16T00:02:58.000Z",
+  "extensions": {
+    "karma.programId": "1356",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-04-11T00:00:00.000Z",
+    "endDate": "2026-04-16T06:59:00.000Z",
+    "location": "Online",
+    "online": null,
+    "registrationDeadline": "2026-04-15T06:59:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 600,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 300,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 100,
+        "currency": "USD"
+      }
+    ],
+    "teamSize": {
+      "min": 1,
+      "max": 4
+    }
+  }
+}

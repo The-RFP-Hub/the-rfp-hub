@@ -1,0 +1,107 @@
+{
+  "specVersion": "1.0.0",
+  "id": "karma:1197",
+  "type": "hackathon",
+  "title": "HACKANOVA 5.O",
+  "description": "# OVERVIEW\n\nThakur College of Engineering & Technology is pleased to announce the 5th edition of Hackanova, our most awaited technical event. The theme of Hackanova 5.0 is **Break the loop, Create the future**.\n\nThis year, we’re introducing *two tracks* for Hackanova 5.0:\n\n- *Software Track: Focusing on innovations in **Agentic AI***.\n- *Hardware Track: Focusing on development in **Industry 4.0***.\n\n## How to Apply\n* Your Idea should be related to Agentic AI or Industry 4.0. It can be a mobile app, a web app, or any hardware-based project you find relevant to the theme.\n* Use the [Idea Submission Template (Software Track)](https://drive.google.com/drive/folders/1xYl7WghR8fyoQ1DjmPpzvlAqfS7zf6Qc?usp=sharing) to prepare a PPT for your idea (Software Track).\n* Use the [Idea Submission Template (Hardware Track)](https://drive.google.com/drive/u/7/folders/10NdKdO-uq5Krs8rEQO40eqaVDN-GU3kV) to prepare a PPT for your idea (Hardware Track).\n* All team members must upload the same PPT to the application form.\n* The team leader must also fill this form:  \n\n   - *For Software Track*: [Software Track Leader Form](https://forms.gle/c3m6YWqTNbkPg2kq9)  \n   - *For Hardware Track*: [Hardware Track Leader Form](https://forms.gle/KrNxgG6ariBNEqWc8)  \n\n* The team leader should *Create a Team* and share the invite code with their teammates.\n* Once all team members have joined, they can submit their application.\n\n*Note*:  \n1. Individual applications will not be entertained. Kindly apply in a team of minimum 2 members and maximum 4 members.  \n2. There will be a different set of problem statements in the final offline round.",
+  "summary": "# OVERVIEW\n\nThakur College of Engineering & Technology is pleased to announce the 5th edition of...",
+  "status": "archived",
+  "organization": {
+    "name": "HACKANOVA 5.O",
+    "website": "https://www.tsdw.in/"
+  },
+  "source": {
+    "url": "https://www.tsdw.in/",
+    "ingestedVia": "karma_outbox",
+    "originalId": "1197",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Hackathon"
+  ],
+  "applicationUrl": "https://hackanova-5-0.devfolio.co",
+  "website": "https://www.tsdw.in/",
+  "funding": {
+    "totalBudget": 140348
+  },
+  "opensAt": "2026-03-13T04:30:00.000Z",
+  "closesAt": "2026-03-10T12:30:00.000Z",
+  "createdAt": "2026-03-09T20:29:39.000Z",
+  "updatedAt": "2026-03-13T13:16:36.000Z",
+  "extensions": {
+    "karma.programId": "1197",
+    "karma.isValid": true
+  },
+  "hackathon": {
+    "startDate": "2026-03-13T04:30:00.000Z",
+    "endDate": "2026-03-14T16:00:00.000Z",
+    "location": "Thakur College of Engineering and Technology, Thakur Road, ठाकुर, Thakur Village, Kandivali East, Mumbai, Maharashtra, India",
+    "online": null,
+    "registrationDeadline": "2026-03-10T12:30:00.000Z",
+    "submissionDeadline": null,
+    "prizes": [
+      {
+        "track": null,
+        "amount": 50000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 35000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 25000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 20000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 10000,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 300,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 2,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 1,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 6,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 19,
+        "currency": "USD"
+      },
+      {
+        "track": null,
+        "amount": 20,
+        "currency": "USD"
+      }
+    ],
+    "teamSize": {
+      "min": 2,
+      "max": 4
+    }
+  }
+}

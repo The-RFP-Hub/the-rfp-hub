@@ -1,0 +1,11 @@
+{
+  "specVersion": "1.0.0",
+  "id": "bad-2",
+  "type": "grant",
+  "title": "Bad status",
+  "description": "Status is not a valid enum value.",
+  "status": "Active",
+  "organization": { "name": "Org" },
+  "source": { "url": "https://example.org" },
+  "grant": {}
+}
