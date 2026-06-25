@@ -1,0 +1,27 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@vocab": "https://rfphub.org/standard/v1.0.0#",
+    "schema": "https://schema.org/",
+    "daoip5": "https://www.daostar.org/schemas#",
+
+    "id": "schema:identifier",
+    "title": "schema:name",
+    "name": "schema:name",
+    "description": "schema:description",
+    "summary": "schema:disambiguatingDescription",
+
+    "applicationUrl": { "@id": "schema:url", "@type": "@id" },
+    "url": { "@id": "schema:url", "@type": "@id" },
+    "website": { "@id": "schema:sameAs", "@type": "@id" },
+    "logoUrl": { "@id": "schema:logo", "@type": "@id" },
+    "bannerUrl": { "@id": "schema:image", "@type": "@id" },
+
+    "organization": "schema:funder",
+    "currency": "schema:currency",
+
+    "closesAt": "daoip5:closeDate",
+    "fundingMechanism": "daoip5:grantFundingMechanism",
+    "extensions": "daoip5:extensions"
+  }
+}

@@ -33,22 +33,51 @@ onto both, so a consumer can translate between them.
 | `type` (6 opportunity types) | (`Grant` only) | (Grant Pool = grant only) |
 | `source.verifiedAgainstSource` | — | — (RFP Hub provenance extension) |
 
+Also: `logoUrl` ↔ `image`, `bannerUrl` ↔ `coverImage`, `extensions` ↔ `extensions` (both
+standards carry a free-form `extensions` object), and DAOIP-5 adds `applicationsURI`,
+`governanceURI`, and `totalGrantPoolSizeInUSD`.
+
 Notes:
 - schema.org has no native "status / deadline / mechanism" for grants — RFP Hub adds these
   (they're first-class in DAOIP-5 via `isOpen`/`closeDate`/`grantFundingMechanism`).
 - `grant.fundingMechanism` values (`retroactive`/`proactive`/`streaming`/`quadratic`/`other`)
-  should be documented against DAOIP-5's `grantFundingMechanism` vocabulary
-  (e.g. "Direct Grants", "Retroactive…") in the alignment work.
-- DAOIP-5 field names here are from the spec's object model; verify against the
-  `daostar/DAOIPs` JSON examples before publishing a normative mapping.
+  map onto DAOIP-5's `grantFundingMechanism` vocabulary (e.g. "Retroactive", "Direct Grants",
+  "Quadratic Funding").
+- `funding.totalBudget` + `currency` is a single value; DAOIP-5 `totalGrantPoolSize` is an
+  array of `{amount, denomination}` (multi-asset). The mapping takes the primary amount; carry
+  additional denominations under `extensions` if needed.
+- ✅ DAOIP-5 field names above are **verified against the published DAOIP-5 spec** (Grant System
+  + Grant Pool objects).
 
-## What "looking fine" needs (status)
+## Alignment status — conclusive for v1.0.0
 
-- ✅ **This crosswalk** — demonstrates we built on prior art (ships with v1.0.0).
-- ⬜ **JSON-LD `@context`** so RFP Hub objects are also `schema.org/Grant`-interpretable
-  (`@type: "Grant"`, `name`/`description`/`url`/`funder`/`amount`). Low effort; planned.
-- ⬜ **DAOIP-5 `grantPools` export** for grant-type opportunities (an export-format adapter,
-  alongside the M2 JSON/CSV exports).
+- ✅ **Crosswalk verified** against the published DAOIP-5 spec and schema.org/Grant. Every
+  schema.org/Grant property and every DAOIP-5 Grant Pool field has an RFP Hub equivalent —
+  **no v1.0.0 field had to change to align.**
+- ✅ **JSON-LD `@context` shipped** — [`context.jsonld`](./context.jsonld). Apply it to any RFP
+  Hub opportunity and it reads as linked data: `id → schema:identifier`, `title → schema:name`,
+  `description → schema:description`, `applicationUrl → schema:url`, `organization →
+  schema:funder`, `closesAt → daoip5:closeDate`, `grant.fundingMechanism →
+  daoip5:grantFundingMechanism`, `extensions → daoip5:extensions`; every other field resolves
+  under the RFP Hub vocabulary (no data loss).
+- ⬜ **DAOIP-5 `grantPools` export** (optional) — a one-way *output adapter* that emits
+  grant-type opportunities in DAOIP-5 `grantPools` JSON. This is an export *format* (belongs
+  with the dataset exports), **not** a prerequisite for the standard being aligned.
 
-The JSON-LD context and DAOIP-5 export are tracked as a follow-up (non-blocking for v1.0.0,
-which already maps cleanly — no field had to change to align).
+### Using the JSON-LD context
+
+```jsonc
+{
+  "@context": "https://rfphub.org/standard/v1.0.0/context.jsonld",
+  "@type": "schema:Grant",
+  "id": "example:grant-1",
+  "title": "Example Grants",
+  "description": "…",
+  "organization": { "name": "Example Foundation" }
+  // … the rest of a normal RFP Hub opportunity
+}
+```
+
+A JSON-LD processor expands this to a `schema:Grant` with `schema:identifier` / `schema:name` /
+`schema:description` / `schema:funder`, etc. (The `@context` host is a placeholder pending the
+project domain.)
