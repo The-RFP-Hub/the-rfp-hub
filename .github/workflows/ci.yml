@@ -24,11 +24,12 @@ jobs:
       - name: Type drift check (generated types vs schema)
         run: pnpm codegen:check
 
-      - name: Typecheck
-        run: pnpm typecheck
-
+      # Build first: validate's typecheck/tests resolve @rfp-hub/standard from its built dist.
       - name: Build
         run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       - name: Test
         run: pnpm test
