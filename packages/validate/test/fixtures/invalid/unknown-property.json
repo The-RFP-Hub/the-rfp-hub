@@ -3,7 +3,7 @@
   "id": "bad-4",
   "type": "grant",
   "title": "Leaks an internal field",
-  "description": "chainID is a Karma internal and is not part of the neutral standard.",
+  "description": "chainID is an internal field not part of the neutral standard.",
   "status": "open",
   "organization": { "name": "Org" },
   "source": { "url": "https://example.org" },

@@ -1,9 +1,9 @@
 # RFP Hub — Postgres Data Model (sketch)
 
-Storage model backing the M2 `/v1/` API ([DEV-432](https://linear.app/showkarma/issue/DEV-432)).
+Storage model backing the public `/v1/` API (M2).
 Target: **PostgreSQL 15+** with `pgvector` (semantic dedup) and `pg_trgm`. This is the
-*internal* model — a clean-slate redesign, intentionally NOT a copy of Karma's
-`program_registry`. It maps onto, but is independent from, the public
+*internal* model — a clean-slate redesign, intentionally NOT a copy of any single source
+system's schema. It maps onto, but is independent from, the public
 [RFP Hub Standard v1.0.0](../../standard/schemas/v1.0.0/opportunity.schema.json).
 
 ## Principles
@@ -21,8 +21,8 @@ Target: **PostgreSQL 15+** with `pgvector` (semantic dedup) and `pg_trgm`. This 
    snapshots are insert-only (no UPDATE/DELETE) — satisfies the M3 "append-only audit trail".
 5. **Editorial state is server-side.** `review_status` (pending/approved/rejected) is a column,
    never exposed in the public object; public reads filter to approved + listed.
-6. **Idempotent ingestion.** `(source_system, original_id)` is unique; the Karma→Hub outbox
-   (DEV-439) is deduped by an event-id table so at-least-once delivery is safe.
+6. **Idempotent ingestion.** `(source_system, original_id)` is unique; the upstream→Hub outbox
+   is deduped by an event-id table so at-least-once delivery is safe.
 
 ## ERD
 
@@ -48,7 +48,7 @@ erDiagram
 CREATE TYPE opportunity_type   AS ENUM ('grant','hackathon','bounty','accelerator','vc_fund','rfp');
 CREATE TYPE opportunity_status AS ENUM ('upcoming','open','closed','archived');   -- public lifecycle
 CREATE TYPE review_status      AS ENUM ('pending','approved','rejected');         -- server-side editorial
-CREATE TYPE ingestion_method   AS ENUM ('publisher_api','submission','scrape','import','karma_outbox');
+CREATE TYPE ingestion_method   AS ENUM ('publisher_api','submission','scrape','import','outbox');
 CREATE TYPE account_role       AS ENUM ('submitter','reviewer','admin');          -- T1 / T3 / T4 (T0=no account, T2=via org membership)
 CREATE TYPE org_role           AS ENUM ('owner','admin','publisher');             -- a user's role within an org
 CREATE TYPE org_type           AS ENUM ('foundation','dao','company','protocol','program','individual','other');
@@ -106,7 +106,7 @@ CREATE TABLE opportunities (
   source_url             TEXT NOT NULL,
   source_publisher       TEXT,                         -- namespace (= organizations.slug)
   ingested_via           ingestion_method,
-  source_system          TEXT,                         -- e.g. 'karma'
+  source_system          TEXT,                         -- e.g. an upstream system id
   original_id            TEXT,                         -- id in the source system
   verified_against_source BOOLEAN,
   verified_at            TIMESTAMPTZ,
@@ -153,16 +153,16 @@ CREATE INDEX gin_opp_typedata   ON opportunities USING gin (type_data jsonb_path
 ```
 
 `type_data` shape is enforced **app-side** by the same JSON Schema the `rfphub-validate` CLI
-uses (DEV-442). Optionally enforce in-DB with the `pg_jsonschema` extension as a `CHECK`.
+uses. Optionally enforce in-DB with the `pg_jsonschema` extension as a `CHECK`.
 
-## Identity & access (Privy separate app + API keys — DEV-438)
+## Identity & access (Privy separate app + API keys)
 
 **Model:** `accounts` are principals; `organizations` are issuers/namespaces (optionally `verified` publishers); `org_memberships` grant an account publishing rights on an org. A user can be permissioned on **many** orgs. **There is no separate publisher entity** — "publisher" = a user permissioned on a verified org.
 
 ```sql
 CREATE TABLE accounts (
   id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  privy_did      TEXT UNIQUE,            -- from the SEPARATE Privy app (PII isolated from Karma)
+  privy_did      TEXT UNIQUE,            -- from the SEPARATE Privy app (PII isolated from any source system)
   primary_wallet TEXT,
   email          TEXT,                   -- optional; PII — lives only in this app
   display_name   TEXT,
@@ -273,9 +273,9 @@ CREATE TABLE opportunity_duplicates (
   detected_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   reviewed_at     TIMESTAMPTZ,
   UNIQUE (opportunity_id, duplicate_of_id)
-);  -- intra-Hub only; cross-system (Hub↔Karma registry) dedup deferred per DEV-437
+);  -- intra-Hub only; cross-system (Hub ↔ external aggregator) dedup deferred
 
--- Karma → Hub outbox idempotency (DEV-439)
+-- Upstream → Hub outbox idempotency
 CREATE TABLE ingestion_events (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   event_id      TEXT NOT NULL UNIQUE,        -- idempotency key from the outbox
@@ -346,8 +346,8 @@ CREATE TABLE dataset_snapshots (
   `review_status='approved'` + run verification; else `'pending'` (community submit — no
   membership required). Every write inserts an `opportunity_audit` row.
 - **Ingestion (outbox):** upsert keyed by `(source_system, original_id)`, deduped by
-  `ingestion_events.event_id`; `ingested_via='karma_outbox'`. One-way only — the Hub never
-  reads back into Karma.
+  `ingestion_events.event_id`; `ingested_via='outbox'`. One-way only — the Hub never
+  reads back into the source system.
 - **Verification (M3):** job fetches `source_url`, writes a `verification_runs` row, sets
   `verified_against_source`/`verified_at`/`snapshot_url` on the opportunity.
 - **Dedup (M3):** on submit, embed the entry, ANN-search `opportunity_embeddings`, record
@@ -357,7 +357,7 @@ CREATE TABLE dataset_snapshots (
 
 ## Open questions / deferred
 
-- **Cross-system dedup** (Hub ETH ↔ Karma registry non-ETH) — deferred (DEV-437). The
+- **Cross-system dedup** (Hub ETH ↔ an external aggregator's non-ETH registry) — deferred. The
   `(source_system, original_id)` key + `opportunity_duplicates` give us hooks, but the
   merge-precedence policy at the aggregation layer is unresolved.
 - **In-DB JSONB validation** of `type_data` — optional `pg_jsonschema` CHECK vs app-only.

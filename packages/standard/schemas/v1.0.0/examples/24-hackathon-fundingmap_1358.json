@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1358",
+  "id": "fundingmap:1358",
   "type": "hackathon",
   "title": "ETHOnline 2026",
   "description": "Async hackathon by ETH Global",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://ethglobal.com/events/ethonline2026",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1358",
     "verifiedAgainstSource": null
   },
@@ -37,10 +37,6 @@
   "closesAt": "2026-04-13T23:59:00.000Z",
   "createdAt": "2026-04-06T00:01:32.000Z",
   "updatedAt": "2026-04-14T00:02:09.000Z",
-  "extensions": {
-    "karma.programId": "1358",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-09-04T12:00:00.000Z",
     "endDate": "2026-09-16T23:59:59.999Z",

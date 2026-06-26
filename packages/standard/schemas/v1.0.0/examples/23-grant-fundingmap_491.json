@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:491",
+  "id": "fundingmap:491",
   "type": "grant",
   "title": "Sonic Labs Boom Bounty program",
   "description": "This initiative is set to drive early growth on Sonic by attracting top-tier projects and fostering the development of essential applications within our ecosystem.",
@@ -10,7 +10,7 @@
   },
   "source": {
     "url": "https://blog.soniclabs.com/sonic-gems-and-sonic-boom-bounty-program/",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "491",
     "verifiedAgainstSource": null
   },
@@ -46,10 +46,5 @@
   "closesAt": "2024-10-31T20:00:00.000Z",
   "createdAt": "2024-08-29T11:26:52.000Z",
   "updatedAt": "2024-08-29T11:28:06.000Z",
-  "extensions": {
-    "karma.programId": "491",
-    "karma.chainID": 42161,
-    "karma.isValid": true
-  },
   "grant": {}
 }

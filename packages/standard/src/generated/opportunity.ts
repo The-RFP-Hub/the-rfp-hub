@@ -3,7 +3,7 @@
 /* biome-ignore-all lint: generated */
 
 /**
- * RFP Hub Standard v1.0.0 — a canonical, ecosystem-neutral representation of an Ethereum-ecosystem funding opportunity. Covers six opportunity types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Released as CC0 1.0. Informed by, but deliberately decoupled from, Karma's internal program_registry schema; aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. See FIELDS.md for the full field reference and the Karma program_registry mapping.
+ * RFP Hub Standard v1.0.0 — a canonical, ecosystem-neutral representation of an Ethereum-ecosystem funding opportunity. Covers six opportunity types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Released as CC0 1.0. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. See FIELDS.md for the full field reference.
  */
 export type RFPHubOpportunity = {
   [k: string]: unknown;
@@ -17,7 +17,7 @@ export type RFPHubOpportunity = {
    */
   id: string;
   /**
-   * The kind of funding opportunity. Values match Karma's OpportunityType enum to minimise mapping friction. Every entry carries a type-specific object under a key EQUAL to this value (type 'hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.type]`. The matching block is required for all six types (see allOf); for grants it may be an empty object.
+   * The kind of funding opportunity. Every entry carries a type-specific object under a key EQUAL to this value (type 'hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.type]`. The matching block is required for all six types (see allOf); for grants it may be an empty object.
    */
   type: "grant" | "hackathon" | "bounty" | "accelerator" | "vc_fund" | "rfp";
   /**
@@ -29,7 +29,7 @@ export type RFPHubOpportunity = {
    */
   description: string;
   /**
-   * Optional short teaser (≈1–2 sentences) for list/card views. Maps from Karma metadata.shortDescription.
+   * Optional short teaser (≈1–2 sentences) for list/card views.
    */
   summary?: string | null;
   /**
@@ -55,7 +55,7 @@ export type RFPHubOpportunity = {
    */
   tags?: string[];
   /**
-   * URL where applicants submit or apply. Maps from Karma submissionUrl.
+   * URL where applicants submit or apply.
    */
   applicationUrl?: string | null;
   /**
@@ -73,11 +73,11 @@ export type RFPHubOpportunity = {
   socialLinks?: SocialLinks1;
   funding?: FundingEnvelope;
   /**
-   * RFC 3339 timestamp when applications open. Maps from Karma metadata.startsAt.
+   * RFC 3339 timestamp when applications open.
    */
   opensAt?: string | null;
   /**
-   * RFC 3339 application deadline. Maps from Karma deadline / metadata.endsAt. When this passes, status should transition to 'closed'.
+   * RFC 3339 application deadline. When this passes, status should transition to 'closed'.
    */
   closesAt?: string | null;
   /**
@@ -99,7 +99,7 @@ export type RFPHubOpportunity = {
   vc_fund?: VCFundDetails;
   rfp?: RFPDetails;
   /**
-   * Namespace for publisher- or integrator-specific data not covered by the standard. Keys SHOULD be namespaced (e.g. 'karma.programId'). Contents are not validated by this schema.
+   * Namespace for publisher- or integrator-specific data not covered by the standard. Keys SHOULD be namespaced (e.g. 'mysource.internalId'). Contents are not validated by this schema.
    */
   extensions?: {
     [k: string]: unknown;
@@ -161,11 +161,11 @@ export interface Provenance {
    */
   submittedBy?: string | null;
   /**
-   * How this entry entered the Hub. 'karma_outbox' = pushed one-way from Karma program-manager edits (see DEV-439).
+   * How this entry entered the Hub. 'outbox' = a one-way push from an upstream source system's outbox; 'import' = a backfill/seed import.
    */
-  ingestedVia?: "publisher_api" | "submission" | "scrape" | "import" | "karma_outbox" | null;
+  ingestedVia?: "publisher_api" | "submission" | "scrape" | "import" | "outbox" | null;
   /**
-   * Identifier of this opportunity in the source system (e.g. Karma programId).
+   * Identifier of this opportunity in the source system.
    */
   originalId?: string | null;
   /**

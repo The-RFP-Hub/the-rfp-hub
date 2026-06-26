@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1302",
+  "id": "fundingmap:1302",
   "type": "hackathon",
   "title": "HashCash Hashathon",
   "description": "Multi-track hackathon for builders, artists, analysts, toolmakers in data/AI, builder tools, art, Grotto L1, hardware supplier tracks on Avalanche ecosystem. Build useful projects; applications open April 1.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://hashcash.club/hashathon",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1302",
     "verifiedAgainstSource": null
   },
@@ -33,10 +33,6 @@
   "closesAt": "2026-04-30T23:59:00.000Z",
   "createdAt": "2026-03-27T20:58:42.000Z",
   "updatedAt": "2026-03-28T00:01:58.000Z",
-  "extensions": {
-    "karma.programId": "1302",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-04-01T00:00:00.000Z",
     "endDate": "2026-04-30T23:59:00.000Z",

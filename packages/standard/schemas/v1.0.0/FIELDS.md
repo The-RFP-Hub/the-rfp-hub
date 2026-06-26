@@ -3,17 +3,17 @@
 The **RFP Hub Standard** is a canonical, ecosystem-neutral representation of a funding
 opportunity in the Ethereum ecosystem. The normative artifact is
 [`opportunity.schema.json`](./opportunity.schema.json) (JSON Schema, draft 2020-12). This
-document is the human-readable companion: it explains every field, the lifecycle/status
-semantics, and how the standard maps to Karma's internal `program_registry`.
+document is the human-readable companion: it explains every field and the lifecycle/status
+semantics.
 
 - **License:** CC0 1.0 (the standard and its docs are public domain).
 - **Spec version:** `1.0.0` (every entry carries `specVersion: "1.0.0"`).
 - **Canonical `$id`:** `https://rfphub.org/standard/v1.0.0/opportunity.schema.json`
-  — ⚠️ **placeholder host.** The final stable URL depends on the `rfp-hub` org / domain
-  (we are creating the org; domain TBD). Update `$id` once decided; the path layout
-  (`/standard/<version>/opportunity.schema.json`) is intended to be stable.
+  — ⚠️ **placeholder host.** The final stable URL depends on the project domain (TBD). Update
+  `$id` once decided; the path layout (`/standard/<version>/opportunity.schema.json`) is
+  intended to be stable.
 
-## Scope (per DEV-437)
+## Scope
 
 The Hub is **ETH-scoped**, not a multi-ecosystem catch-all. It does not attempt to absorb
 Solana/Cosmos/other non-ETH ecosystems. However, `ecosystems` is an **open, extensible
@@ -23,18 +23,17 @@ first-class. This keeps the standard from needing a rewrite if positioning is re
 
 ## Design principles
 
-1. **Decoupled from Karma.** Karma-internal / on-chain-Allo fields (`chainID`, `profileId`,
-   `offChain`, `anchorAddress`, `registryAddress`, `txHash`, `langfusePromptId`,
-   `createdAtBlock`) are **deliberately excluded** from the public standard. Forkability
-   dies if the neutral hub re-couples to Karma's schema. Such data, if needed, goes under
-   `extensions` with namespaced keys (e.g. `karma.programId`).
+1. **Source-agnostic.** The standard carries no source-system internal fields (on-chain ids,
+   internal primary keys, vendor-specific flags). Such data, if needed, goes under `extensions`
+   with namespaced keys (e.g. `mysource.internalId`). This keeps the standard neutral and
+   forkable — it isn't coupled to any one aggregator's schema.
 2. **Provenance-first.** Every entry MUST carry a `source.url`. This is what the
-   verification-assist job (M3) fetches to confirm the opportunity exists and diff fields.
+   verification-assist job fetches to confirm the opportunity exists and diff fields.
 3. **Closed core, open edges.** The top-level object and all type-specific blocks are
    `additionalProperties: false`. Arbitrary publisher/integrator data goes in the
    free-form `extensions` object. New standard fields arrive via minor-version bumps.
 4. **Alignment.** Concepts align with DAOIP-5 (Grants Metadata) and schema.org/Grant where
-   practical, without inheriting their full surface area.
+   practical, without inheriting their full surface area. See [CROSSWALK.md](./CROSSWALK.md).
 
 ---
 
@@ -44,10 +43,10 @@ first-class. This keeps the standard from needing a rewrite if positioning is re
 |---|---|:--:|---|
 | `specVersion` | const `"1.0.0"` | ✅ | Standard version the entry conforms to. |
 | `id` | string | ✅ | Stable, immutable, unique within the Hub. `^[A-Za-z0-9._:-]+$`, ≤128. Namespaced form (`filecoin:propgf-batch-3`) recommended. |
-| `type` | enum | ✅ | One of `grant`, `hackathon`, `bounty`, `accelerator`, `vc_fund`, `rfp`. Matches Karma's `OpportunityType`. |
+| `type` | enum | ✅ | One of `grant`, `hackathon`, `bounty`, `accelerator`, `vc_fund`, `rfp`. |
 | `title` | string | ✅ | ≤300 chars. |
 | `description` | string | ✅ | Full description. Markdown allowed; treat as untrusted, sanitise on render. |
-| `summary` | string\|null | | Short teaser (≤500) for cards/lists. ← Karma `metadata.shortDescription`. |
+| `summary` | string\|null | | Short teaser (≤500) for cards/lists. |
 | `status` | enum | ✅ | Lifecycle: `upcoming` \| `open` \| `closed` \| `archived`. See [Status](#status-semantics). |
 | `organization` | object | ✅ | Issuing org; `name` required. |
 | `source` | object | ✅ | Provenance; `url` required. See [Provenance](#provenance-source). |
@@ -55,14 +54,14 @@ first-class. This keeps the standard from needing a rewrite if positioning is re
 | `networks` | string[] | | Specific chains/networks. Open list. |
 | `categories` | string[] | | Topical categories. Open list. |
 | `tags` | string[] | | Free-form tags. |
-| `applicationUrl` | string(uri)\|null | | Where to apply/submit. ← Karma `submissionUrl`. |
+| `applicationUrl` | string(uri)\|null | | Where to apply/submit. |
 | `website` | string(uri)\|null | | Primary website. |
 | `logoUrl` | string(uri)\|null | | Logo image. |
 | `bannerUrl` | string(uri)\|null | | Banner/hero image. |
 | `socialLinks` | object | | `twitter`, `discord`, `github`, `telegram`, `farcaster`, `forum`, `blog`. |
 | `funding` | object | | Funding envelope (see below). |
-| `opensAt` | date-time\|null | | When applications open. ← Karma `metadata.startsAt`. |
-| `closesAt` | date-time\|null | | Application deadline. ← Karma `deadline` / `metadata.endsAt`. Drives auto-`closed`. |
+| `opensAt` | date-time\|null | | When applications open. |
+| `closesAt` | date-time\|null | | Application deadline. Drives auto-`closed`. |
 | `postedAt` | date-time\|null | | First public announcement at source. |
 | `createdAt` | date-time\|null | | When created in the Hub. |
 | `updatedAt` | date-time\|null | | When last modified in the Hub. |
@@ -85,8 +84,8 @@ All date-time fields are **RFC 3339 / ISO 8601** strings.
 | `url` | string(uri) | ✅ | Canonical URL of the original posting. |
 | `publisher` | string\|null | | Namespace (org slug) the entry was published under. T2 auto-approval requires the publishing account to be a member of this verified org. May differ from the issuing org. |
 | `submittedBy` | string\|null | | Who submitted/published — public handle, org slug, or `community`. Internal account identity not exposed. |
-| `ingestedVia` | enum\|null | | `publisher_api` \| `submission` \| `scrape` \| `import` \| `karma_outbox`. |
-| `originalId` | string\|null | | ID in the source system (e.g. Karma `programId`). |
+| `ingestedVia` | enum\|null | | `publisher_api` \| `submission` \| `scrape` \| `import` \| `outbox`. |
+| `originalId` | string\|null | | ID of this opportunity in the source system. |
 | `verifiedAgainstSource` | bool\|null | | Set by the verification-assist job. `null` = not yet checked. |
 | `verifiedAt` | date-time\|null | | Last source verification time. |
 | `snapshotUrl` | string(uri)\|null | | IPFS/archived snapshot at verification time. |
@@ -138,62 +137,18 @@ it does not change the object's canonical schema.
 |---|---|
 | `upcoming` | Announced but not yet accepting applications. |
 | `open` | Currently accepting applications. |
-| `closed` | Deadline passed or no longer accepting. Auto-set when `closesAt` passes (M3 staleness job). |
+| `closed` | Deadline passed or no longer accepting. Auto-set when `closesAt` passes (staleness job). |
 | `archived` | Withdrawn or retired. |
 
 Review state (`pending`, `rejected`) and the verified/auto-approved distinction are
-**server-side metadata**, not part of the public object. (Karma's `isValid: null/true/false`
-is editorial state and does NOT map to `status`.)
-
----
-
-## Karma `program_registry` → Standard mapping
-
-Reference for the M2 seed dataset and the DEV-439 Karma→Hub outbox contract.
-
-| Karma field | Standard field | Transform |
-|---|---|---|
-| `programId` | `source.originalId` + `extensions["karma.programId"]` | also basis for `id` (`karma:<programId>`) |
-| `type` | `type` | identity (enum values already match) |
-| `name` / `metadata.title` | `title` | prefer `metadata.title`, fall back to `name` |
-| `metadata.description` | `description` | identity |
-| `metadata.shortDescription` | `summary` | identity |
-| `metadata.startsAt` | `opensAt` | normalise to RFC 3339 (Karma allows unix or ISO) |
-| `deadline` / `metadata.endsAt` | `closesAt` | prefer `deadline`; normalise |
-| `isActive` + `metadata.status` + `closesAt` | `status` | derive: inactive→`archived`; deadline passed→`closed`; future `startsAt`→`upcoming`; else→`open` |
-| `submissionUrl` | `applicationUrl` | identity |
-| `metadata.website` | `website` | identity |
-| `metadata.logoUrl` / `logoImg` | `logoUrl` | identity |
-| `metadata.ecosystems[]` | `ecosystems[]` | identity (free-text both sides) |
-| `metadata.networks[]` | `networks[]` | identity |
-| `metadata.categories[]` | `categories[]` | identity |
-| `metadata.minGrantSize` | `funding.minAward` | identity |
-| `metadata.maxGrantSize` | `funding.maxAward` | identity |
-| `metadata.programBudget` | `funding.totalBudget` | coerce string→number |
-| `metadata.amountDistributedToDate` | `funding.amountDistributed` | coerce |
-| `metadata.grantsToDate` | `funding.awardsToDate` | identity |
-| `metadata.currency` | `funding.currency` | identity |
-| `metadata.socialLinks{}` | `socialLinks{}` | field-by-field |
-| `type` (grant) | `grant` | block always present (may be `{}`); `fundingMechanism`/`recurring` inferred where possible |
-| `hackathonMetadata` | `hackathon` | restructure to typed block |
-| `bountyMetadata` | `bounty` | restructure |
-| `acceleratorMetadata` | `accelerator` | restructure |
-| `vcFundMetadata` | `vc_fund` | restructure |
-| `rfpMetadata` | `rfp` | restructure |
-| `source` (ingestion source) | `source.ingestedVia` | map values; Karma edits→`karma_outbox` |
-| `createdAt` / `updatedAt` | `createdAt` / `updatedAt` | identity |
-| `chainID`, `profileId`, `offChain`, `anchorAddress`, `registryAddress`, `txHash`, `createdAtBlock`, `langfusePromptId` | `extensions["karma.*"]` (if retained at all) | **NOT** part of the standard |
+**server-side metadata**, not part of the public object.
 
 ---
 
 ## Open items
 
-- **Canonical host / `$id`** — pending `rfp-hub` org + domain decision.
-- **≥20 real-entry validation** (DEV-441) — ✅ **done.** 311/311 live Funding Map entries map
-  and validate; 28 curated fixtures live in [`examples/`](./examples). See
-  [BENCHMARK.md](./BENCHMARK.md). Gap: **`vc_fund` has 0 real entries** in the registry, so
-  that block is only unit-tested — add real VC-fund data during M5 seeding.
+- **Canonical host / `$id`** — pending the project domain decision.
 - **`networks`/`ecosystems` controlled vocabulary** — free-text in v1.0.0; a curated ETH-family
   vocabulary could land in a v1.x minor.
-- **Cross-system dedup** (Hub vs Karma registry) — deferred (DEV-437), surfaces at the M2
-  read/aggregation layer.
+- **Cross-system dedup** — when the same opportunity is aggregated from more than one upstream
+  source, a merge-precedence policy is needed at the read/aggregation layer.

@@ -1,6 +1,6 @@
 {
   "specVersion": "1.0.0",
-  "id": "karma:1231",
+  "id": "fundingmap:1231",
   "type": "hackathon",
   "title": "RNS Hack_Overflow 2.0",
   "description": "RNS_HackOverflow 2.0 is an annual 24-Hour Hackathon,hosted by the Department of Information Science and Engineering. This Hackathon serves as the backbone for fulfilling the primary motto of HackOverflow 2.0, i.e.\"developing interest and encouraging innovation intechnology among the peers\".\nIt offers a supportive environment to showcase yourpassion for technology and innovation by coding andcollaborating with others. But this hackathon isn't just about coding - it's about the learning and experiences that come with creating something new and impactful. It\nprovides an opportunity to share knowledge, build a network, and learn new techniques and industry tools.",
@@ -12,7 +12,7 @@
   },
   "source": {
     "url": "https://rns-hackoverflow-2.devfolio.co",
-    "ingestedVia": "karma_outbox",
+    "ingestedVia": "import",
     "originalId": "1231",
     "verifiedAgainstSource": null
   },
@@ -31,10 +31,6 @@
   "closesAt": "2026-07-09T18:29:00.000Z",
   "createdAt": "2026-03-09T20:29:40.000Z",
   "updatedAt": "2026-03-11T01:07:17.000Z",
-  "extensions": {
-    "karma.programId": "1231",
-    "karma.isValid": true
-  },
   "hackathon": {
     "startDate": "2026-07-17T03:30:00.000Z",
     "endDate": "2026-08-14T03:45:00.000Z",
