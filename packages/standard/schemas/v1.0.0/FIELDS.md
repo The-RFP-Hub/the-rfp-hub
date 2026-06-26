@@ -84,6 +84,7 @@ All date-time fields are **RFC 3339 / ISO 8601** strings.
 | `url` | string(uri) | ✅ | Canonical URL of the original posting. |
 | `publisher` | string\|null | | Namespace (org slug) the entry was published under. T2 auto-approval requires the publishing account to be a member of this verified org. May differ from the issuing org. |
 | `submittedBy` | string\|null | | Who submitted/published — public handle, org slug, or `community`. Internal account identity not exposed. |
+| `submittedAt` | date-time\|null | | When the entry was submitted/published to the Hub. Pairs with `submittedBy`. |
 | `ingestedVia` | enum\|null | | `publisher_api` \| `submission` \| `scrape` \| `import` \| `outbox`. |
 | `originalId` | string\|null | | ID of this opportunity in the source system. |
 | `verifiedAgainstSource` | bool\|null | | Set by the verification-assist job. `null` = not yet checked. |

@@ -277,6 +277,7 @@
         "url": { "type": "string", "format": "uri", "description": "Canonical URL of the original posting at the source. Anti-spam and verification jobs fetch this." },
         "publisher": { "type": ["string", "null"], "description": "Namespace (organisation slug) this entry was published under (e.g. 'filecoin'). T2 auto-approval requires the publishing account to be a member of this verified org. May differ from the issuing organization." },
         "submittedBy": { "type": ["string", "null"], "description": "Who submitted or published this entry — a public handle, organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed." },
+        "submittedAt": { "type": ["string", "null"], "format": "date-time", "description": "RFC 3339 timestamp of when the entry was submitted or published to the Hub. Pairs with submittedBy." },
         "ingestedVia": {
           "type": ["string", "null"],
           "enum": ["publisher_api", "submission", "scrape", "import", "outbox", null],

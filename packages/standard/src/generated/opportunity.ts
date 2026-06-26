@@ -161,6 +161,10 @@ export interface Provenance {
    */
   submittedBy?: string | null;
   /**
+   * RFC 3339 timestamp of when the entry was submitted or published to the Hub. Pairs with submittedBy.
+   */
+  submittedAt?: string | null;
+  /**
    * How this entry entered the Hub. 'outbox' = a one-way push from an upstream source system's outbox; 'import' = a backfill/seed import.
    */
   ingestedVia?: "publisher_api" | "submission" | "scrape" | "import" | "outbox" | null;
