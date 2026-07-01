@@ -11,6 +11,10 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
         tags: ["opportunities"],
         summary: "List opportunities (thin projection)",
         querystring: listQuerySchema,
+        response: {
+          200: { $ref: "PaginatedOpportunities#" },
+          400: { $ref: "ErrorResponse#" },
+        },
       },
     },
     Module.getAll,
@@ -19,7 +23,13 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
   // static `/schema` is matched ahead of the `/:id` param route by the router
   router.get(
     "/schema",
-    { schema: { tags: ["opportunities"], summary: "The RFP Hub Standard JSON Schema" } },
+    {
+      schema: {
+        tags: ["opportunities"],
+        summary: "The RFP Hub Standard JSON Schema",
+        response: { 200: { $ref: "SchemaResponse#" } },
+      },
+    },
     Module.schema,
   );
 
@@ -33,6 +43,10 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
           type: "object",
           properties: { id: { type: "string", description: "Public id, e.g. fundingmap:1459" } },
           required: ["id"],
+        },
+        response: {
+          200: { $ref: "Opportunity#" },
+          404: { $ref: "ErrorResponse#" },
         },
       },
     },

@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerRoutes } from "./modules/routes/index.js";
+import { responseSchemas } from "./openapi/schemas.js";
 import { registerSwagger } from "./plugins/swagger.js";
 
 export interface BuildOptions {
@@ -10,6 +11,9 @@ export interface BuildOptions {
 /** Build the Fastify app (no network bind) — used by both the server and the integration tests. */
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: opts.logger ?? false });
+
+  // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
+  for (const schema of responseSchemas) app.addSchema(schema);
 
   await registerSwagger(app); // before routes so their schemas are captured
   await registerRoutes(app);

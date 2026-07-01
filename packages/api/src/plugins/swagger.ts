@@ -23,6 +23,12 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         { name: "meta", description: "Service metadata" },
       ],
     },
+    // Name components by their $id (Opportunity, Stats, …) instead of the default def-0/def-1/…
+    refResolver: {
+      buildLocalReference(json, _baseUri, fragment, i) {
+        return (typeof json.$id === "string" && json.$id) || `def-${i}`;
+      },
+    },
   });
 
   await app.register(swaggerUI, {
