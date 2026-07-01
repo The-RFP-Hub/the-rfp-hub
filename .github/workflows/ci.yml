@@ -8,6 +8,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Postgres for the @rfp-hub/api integration tests (gated on DATABASE_URL; otherwise skipped).
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: rfphub
+          POSTGRES_PASSWORD: rfphub
+          POSTGRES_DB: rfphub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rfphub -d rfphub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://rfphub:rfphub@localhost:5432/rfphub
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +47,9 @@ jobs:
       # Build first: validate's typecheck/tests resolve @rfp-hub/standard from its built dist.
       - name: Build
         run: pnpm build
+
+      - name: Migrate API database (for integration tests)
+        run: pnpm --filter @rfp-hub/api migrate
 
       - name: Typecheck
         run: pnpm typecheck

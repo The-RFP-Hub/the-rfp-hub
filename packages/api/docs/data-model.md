@@ -6,6 +6,36 @@ Target: **PostgreSQL 15+** with `pgvector` (semantic dedup) and `pg_trgm`. This 
 system's schema. It maps onto, but is independent from, the public
 [RFP Hub Standard v1.0.0](../../standard/schemas/v1.0.0/opportunity.schema.json).
 
+## M2 implementation status
+
+This document is the **full design target**. M2 (the public read layer) deliberately implements
+only a **subset**; the rest is built in later milestones. The implemented slice lives in
+`packages/api/src/db/schema.ts` (Drizzle) — kept in sync with the `✅ M2` rows below. Nothing here
+is deleted: this doc stays the canonical reference so deferred work remains discoverable.
+
+**Legend:** ✅ M2 (implemented now) · ⏳ M3 · ⏳ M4 (deferred)
+
+| Table / feature | Status |
+|---|---|
+| `organizations` (minus `verified`) | ✅ M2 |
+| `opportunities` core columns + provenance + `text[]`/GIN + `jsonb` `type_data`/`extensions` | ✅ M2 |
+| `dataset_snapshots` (nightly export bookkeeping) | ✅ M2 |
+| `opportunities.search_tsv` generated `tsvector` column + `gin_opp_search` | ⏳ deferred (use `ILIKE`/`pg_trgm` in M2; add when data volume warrants) |
+| `gin_opp_typedata` (GIN on `type_data`) | ⏳ deferred (M2 never filters inside `type_data`) |
+| `organizations.verified` + `/publishers` | ⏳ M3 (verification is a publishing-relationship concern) |
+| `accounts`, `api_keys`, `organizations` membership, `org_memberships` (auth tiers T1–T4) | ⏳ M3 (write API) |
+| `verification_runs`, `opportunity_audit`, `opportunity_duplicates`, `opportunity_embeddings` (pgvector) | ⏳ M3 |
+| `ingestion_events` (outbox idempotency) | ⏳ M3 (DEV-439 spike) |
+| `opportunity_events` (partitioned) + `opportunity_stats_daily` | ⏳ M3 (publisher dashboard analytics) |
+
+**M2 read path (what the `/v1/` API actually touches):** `organizations` + `opportunities`
+filtered by `review_status='approved' AND is_listed`, with `text[]`+GIN for the
+ecosystem/network/category/tag filters, `numeric` award columns for grant-size ranges, and `ILIKE`
+over `title`/`summary`/`description` for the `q` text search (the generated `tsvector` column is
+**deferred** — premature at the M2 dataset size). `dataset_snapshots` records each nightly export.
+
+Each ⏳ table/feature below is annotated inline where it appears.
+
 ## Principles
 
 1. **Hybrid relational + JSONB.** Typed columns for everything the API filters/sorts/searches
@@ -102,24 +132,26 @@ CREATE TABLE opportunities (
   type_data          JSONB NOT NULL DEFAULT '{}',     -- = opportunity[type]
   extensions         JSONB NOT NULL DEFAULT '{}',
 
-  -- provenance (1:1, required)
+  -- provenance (1:1, required) — ✅ M2
   source_url             TEXT NOT NULL,
   source_publisher       TEXT,                         -- namespace (= organizations.slug)
+  source_submitted_by    TEXT,                         -- Standard source.submittedBy (public handle/slug/'community')
+  source_submitted_at    TIMESTAMPTZ,                  -- Standard source.submittedAt
   ingested_via           ingestion_method,
   source_system          TEXT,                         -- e.g. an upstream system id
   original_id            TEXT,                         -- id in the source system
-  verified_against_source BOOLEAN,
+  verified_against_source BOOLEAN,                     -- (set by M3 verification-assist; column ✅ M2)
   verified_at            TIMESTAMPTZ,
   snapshot_url           TEXT,                          -- latest source snapshot (IPFS/archive)
 
   -- editorial / server-side (never in public object)
-  review_status      review_status NOT NULL DEFAULT 'pending',
-  submitted_by       BIGINT REFERENCES accounts(id),
-  approved_by        BIGINT REFERENCES accounts(id),
-  approved_at        TIMESTAMPTZ,
-  is_listed          BOOLEAN NOT NULL DEFAULT TRUE,     -- soft hide without delete
+  review_status      review_status NOT NULL DEFAULT 'pending',  -- ✅ M2
+  is_listed          BOOLEAN NOT NULL DEFAULT TRUE,     -- ✅ M2; soft hide without delete
+  submitted_by       BIGINT REFERENCES accounts(id),    -- ⏳ M3 (needs accounts)
+  approved_by        BIGINT REFERENCES accounts(id),    -- ⏳ M3
+  approved_at        TIMESTAMPTZ,                        -- ⏳ M3
 
-  -- staleness
+  -- staleness — ⏳ M3
   last_seen_at       TIMESTAMPTZ,                       -- last confirmed-at-source / publisher touch
 
   -- full-text search (weighted)
@@ -157,6 +189,11 @@ uses. Optionally enforce in-DB with the `pg_jsonschema` extension as a `CHECK`.
 
 ## Identity & access (Privy separate app + API keys)
 
+> **Mostly deferred → M3.** M2 is unauthenticated read-only (tier T0 only). **Exception:**
+> `organizations` **is** created and used by M2 (embedded on each opportunity) — but **without** the
+> `verified` / `verified_at` columns, which power `/publishers` and land with M3. `accounts`,
+> `api_keys`, and `org_memberships` are entirely ⏳ M3 (they arrive with the write API).
+
 **Model:** `accounts` are principals; `organizations` are issuers/namespaces (optionally `verified` publishers); `org_memberships` grant an account publishing rights on an org. A user can be permissioned on **many** orgs. **There is no separate publisher entity** — "publisher" = a user permissioned on a verified org.
 
 ```sql
@@ -185,7 +222,7 @@ CREATE TABLE api_keys (
 );
 CREATE UNIQUE INDEX ux_api_keys_hash ON api_keys (key_hash);
 
-CREATE TABLE organizations (
+CREATE TABLE organizations (   -- ✅ M2 (except the two `verified*` columns below)
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   slug          TEXT NOT NULL UNIQUE,    -- the org's NAMESPACE (e.g. 'filecoin')
   name          TEXT NOT NULL,
@@ -196,8 +233,8 @@ CREATE TABLE organizations (
   banner_url    TEXT,
   social_links  JSONB NOT NULL DEFAULT '{}',
   ecosystems    TEXT[] NOT NULL DEFAULT '{}',
-  verified      BOOLEAN NOT NULL DEFAULT FALSE,   -- approved-publisher status; powers /publishers
-  verified_at   TIMESTAMPTZ,
+  verified      BOOLEAN NOT NULL DEFAULT FALSE,   -- ⏳ M3; approved-publisher status; powers /publishers
+  verified_at   TIMESTAMPTZ,                      -- ⏳ M3
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -226,6 +263,10 @@ CREATE TABLE org_memberships (
 | **T4** Admin | `accounts.global_role='admin'` → assign/revoke reviewers |
 
 ## Supporting tables (abbreviated)
+
+> ⏳ **Deferred → M3/M4**, except `dataset_snapshots` (✅ M2). The verification, audit, dedup,
+> embedding, outbox, and analytics tables below are NOT in the M2 migration — see the status table
+> at the top.
 
 ```sql
 -- M3 scraping/verification-assist: append-only run log + source snapshots
@@ -327,7 +368,7 @@ CREATE TABLE dataset_snapshots (
 | `id` | `opportunities.public_id` |
 | `specVersion`,`type`,`status`,`title`,`description`,`summary` | same-named columns |
 | `organization{}` | FK `organization_id` → `organizations` (embedded on read) |
-| `source{}` | `source_url`, `source_publisher`, `ingested_via`, `source_system`, `original_id`, `verified_against_source`, `verified_at`, `snapshot_url`; `source.submittedBy` ← public handle derived from `submitted_by` account |
+| `source{}` | `source_url`, `source_publisher`, `source_submitted_by` (= `source.submittedBy`), `source_submitted_at` (= `source.submittedAt`), `ingested_via`, `source_system`, `original_id`, `verified_against_source`, `verified_at`, `snapshot_url` |
 | `ecosystems`/`networks`/`categories`/`tags` | `TEXT[]` columns (GIN) |
 | `applicationUrl`/`website`/`logoUrl`/`bannerUrl`/`socialLinks` | same-named columns (`social_links` JSONB) |
 | `funding{}` | `currency`,`min_award`,`max_award`,`total_budget`,`amount_distributed`,`awards_to_date` |

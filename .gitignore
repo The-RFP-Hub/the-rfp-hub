@@ -5,3 +5,8 @@ coverage/
 .turbo/
 .DS_Store
 *.log
+
+# local env + API data exports (M2)
+.env
+.env.local
+packages/api/exports/

@@ -1,0 +1,22 @@
+# Local Postgres for the RFP Hub /v1/ API (M2). Cloud target chosen later in the milestone.
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: rfphub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rfphub
+      POSTGRES_PASSWORD: rfphub
+      POSTGRES_DB: rfphub
+    ports:
+      - "5432:5432"
+    volumes:
+      - rfphub_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rfphub -d rfphub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rfphub_pgdata:
