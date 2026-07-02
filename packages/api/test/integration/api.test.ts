@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityController } from "../../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 const TAG = "TESTONLY";
 
@@ -35,7 +35,7 @@ run("/v1 API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    const ctl = new OpportunityController();
+    const ctl = new OpportunityService();
     await ctl.upsertFromStandard(fixture({ id: "itest:grant-1", type: "grant", grant: {} }), {
       reviewStatus: "approved",
       isListed: true,
@@ -58,6 +58,9 @@ run("/v1 API", () => {
     });
 
     app = await buildApp();
+    app.get("/__boom__", async () => {
+      throw new Error("pg: password authentication failed for user secret");
+    });
     await app.ready();
   });
 
@@ -111,11 +114,33 @@ run("/v1 API", () => {
       const res = await app.inject({ method: "GET", url: `/v1/opportunities/${id}` });
       expect(res.statusCode).toBe(404);
     }
+    const res = await app.inject({ method: "GET", url: "/v1/opportunities/itest:nope" });
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      error: "not_found",
+      message: "opportunity 'itest:nope' not found",
+    });
   });
 
   it("400s on an invalid sort value", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/opportunities?sort=bogus" });
     expect(res.statusCode).toBe(400);
+    const body = res.json();
+    expect(body.error).toBe("bad_request");
+    expect(typeof body.message).toBe("string");
+  });
+
+  it("normalizes unknown-route 404s to the canonical shape", async () => {
+    const res = await app.inject({ method: "GET", url: "/v1/does-not-exist" });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().error).toBe("not_found");
+  });
+
+  it("returns a generic 500 without leaking internals", async () => {
+    const res = await app.inject({ method: "GET", url: "/__boom__" });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "internal_error", message: "internal server error" });
+    expect(res.body).not.toContain("password");
   });
 
   it("GET /v1/opportunities/schema serves the Standard", async () => {

@@ -158,8 +158,12 @@ export const opportunities = pgTable(
     index("gin_opp_networks").using("gin", t.networks),
     index("gin_opp_categories").using("gin", t.categories),
     index("gin_opp_tags").using("gin", t.tags),
-    // cross-system idempotency key (also used by M3 outbox ingest)
-    uniqueIndex("ux_opp_source").on(t.sourceSystem, t.originalId),
+    // cross-system idempotency key (M3 outbox/import). PARTIAL: only rows that carry BOTH a source
+    // system and original id are deduped; source-less community submissions stay unconstrained
+    // (a plain unique would let NULL rows coexist, but this makes the intent explicit).
+    uniqueIndex("ux_opp_source")
+      .on(t.sourceSystem, t.originalId)
+      .where(sql`${t.sourceSystem} IS NOT NULL AND ${t.originalId} IS NOT NULL`),
   ],
 );
 

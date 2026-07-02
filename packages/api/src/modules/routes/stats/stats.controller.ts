@@ -1,10 +1,10 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { StatsController } from "../../controller/Stats.controller.js";
+import { StatsService } from "../../services/stats/stats.service.js";
 
 /** GET /v1/stats — aggregate counts over the public dataset. */
 const summary = async (_req: FastifyRequest, res: FastifyReply) => {
-  const ctl = new StatsController();
-  return res.send(await ctl.summary());
+  const service = new StatsService();
+  return res.send(await service.summary());
 };
 
-export const Module = { summary };
+export const statsController = { summary };

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { Module } from "./health.module.js";
+import { healthController } from "./health.controller.js";
 
 export const health = async (router: FastifyInstance): Promise<void> => {
   router.get(
@@ -11,6 +11,6 @@ export const health = async (router: FastifyInstance): Promise<void> => {
         response: { 200: { $ref: "Health#" }, 503: { $ref: "Health#" } },
       },
     },
-    Module.check,
+    healthController.check,
   );
 };

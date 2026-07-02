@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { Module } from "./opportunity.module.js";
+import { opportunityController } from "./opportunity.controller.js";
 import { listQuerySchema } from "./types.js";
 
 /** Registers the /v1/opportunities routes (mounted with that prefix by the aggregator). */
@@ -17,7 +17,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
         },
       },
     },
-    Module.getAll,
+    opportunityController.getAll,
   );
 
   // static `/schema` is matched ahead of the `/:id` param route by the router
@@ -30,7 +30,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
         response: { 200: { $ref: "SchemaResponse#" } },
       },
     },
-    Module.schema,
+    opportunityController.schema,
   );
 
   router.get(
@@ -50,6 +50,6 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
         },
       },
     },
-    Module.find,
+    opportunityController.find,
   );
 };

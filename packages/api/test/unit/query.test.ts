@@ -34,11 +34,16 @@ describe("parseOpportunityQuery", () => {
     expect(q.ecosystem).toEqual(["Optimism", "Base"]);
   });
 
-  it("only honors known sort fields and the desc order", () => {
+  it("normalizes schema-permitted sort and order inputs", () => {
     expect(parseOpportunityQuery({ sort: "updatedAt", order: "desc" })).toMatchObject({
       sort: "updatedAt",
       order: "desc",
     });
+  });
+
+  it("falls back for out-of-enum sort/order (defensive; HTTP schema returns 400 first)", () => {
+    // Over HTTP these inputs fail listQuerySchema's `sort`/`order` enums and yield 400 before the
+    // parser runs; the fallbacks below only guard direct (non-HTTP) callers.
     expect(parseOpportunityQuery({ sort: "bogus" }).sort).toBe("closesAt");
     expect(parseOpportunityQuery({ order: "sideways" }).order).toBe("asc");
   });
