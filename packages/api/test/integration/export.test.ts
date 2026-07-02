@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runExport } from "../../scripts/export.js";
 import { db, pool } from "../../src/db/client.js";
 import { datasetSnapshots, opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityController } from "../../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 const run = process.env.DATABASE_URL ? describe : describe.skip;
 const OUT = join(tmpdir(), "rfphub-export-test");
@@ -19,7 +19,7 @@ const fixtureId = "etest:export-1";
 
 run("open-data export", () => {
   beforeAll(async () => {
-    const ctl = new OpportunityController();
+    const ctl = new OpportunityService();
     await ctl.upsertFromStandard(
       {
         specVersion: "1.0.0",
@@ -50,7 +50,7 @@ run("open-data export", () => {
   });
 
   it("writes JSON + CSV (CC0-marked) and records dataset_snapshots", async () => {
-    const { jsonPath, csvPath, count } = await runExport(OUT);
+    const { jsonPath, csvPath, licensePath, count } = await runExport(OUT);
     expect(count).toBeGreaterThanOrEqual(1);
 
     const json = JSON.parse(await readFile(jsonPath, "utf8"));
@@ -63,6 +63,10 @@ run("open-data export", () => {
     expect(csv.split("\n")[0]).toContain("id,type,status,title");
     expect(csv).toContain(fixtureId);
 
+    const license = await readFile(licensePath, "utf8");
+    expect(license).toContain("SPDX-License-Identifier: CC0-1.0");
+    expect(license).toContain("CC0 1.0 Universal");
+
     const snapshots = await db
       .select()
       .from(datasetSnapshots)
@@ -74,5 +78,6 @@ run("open-data export", () => {
     // a temp dir listing shows exactly the two files
     const files = await readdir(OUT);
     expect(files.filter((f) => f.endsWith(".json") || f.endsWith(".csv"))).toHaveLength(2);
+    expect(files).toContain("LICENSE");
   });
 });

@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityController } from "../../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 const run = process.env.DATABASE_URL ? describe : describe.skip;
 const OAS_ID = "https://rfphub.local/openapi.json";
@@ -69,7 +69,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
   }
 
   beforeAll(async () => {
-    const ctl = new OpportunityController();
+    const ctl = new OpportunityService();
     await ctl.upsertFromStandard(FIXTURE, { reviewStatus: "approved", isListed: true });
     app = await buildApp();
     await app.ready();

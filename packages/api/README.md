@@ -36,10 +36,10 @@ seed source (`SOURCE_API_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`).
 
 ## Architecture
 
-A layered, modular structure, trimmed to a read API:
-`routes/<entity>/index.ts` (registration) → `routes/<entity>/<entity>.module.ts` (thin HTTP
-handlers) → `controller/<Entity>.controller.ts` (data + logic over Drizzle, extending
-`abstract/Drizzle.controller.ts`) → `mappers/opportunity.mapper.ts` (pure row ↔ Standard).
+Layered, module-per-folder — full pattern in [`docs/architecture.md`](./docs/architecture.md):
+`routes/<module>/<entity>.controller.ts` (HTTP handlers) → `services/<module>/<name>.service.ts`
+(logic + data over Drizzle) → `mappers/<entity>.mapper.ts` (pure row ↔ Standard). Route
+registration lives in `routes/<module>/index.ts`.
 
 - **DB**: Drizzle ORM over node-postgres; schema in `src/db/schema.ts`, migrations in
   `src/db/migrations`. The schema is the **M2 subset** of the full design in

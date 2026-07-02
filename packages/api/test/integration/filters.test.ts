@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityController } from "../../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 const TAG = "FILTERTEST";
 
@@ -101,7 +101,7 @@ run("/v1/opportunities filters, sort & pagination", () => {
   }
 
   beforeAll(async () => {
-    const ctl = new OpportunityController();
+    const ctl = new OpportunityService();
     for (const f of FIXTURES) {
       await ctl.upsertFromStandard(f, { reviewStatus: "approved", isListed: true });
     }

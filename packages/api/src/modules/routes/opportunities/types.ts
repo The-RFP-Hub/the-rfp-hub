@@ -1,9 +1,18 @@
 /**
  * PURE query-string parsing/normalization for the list endpoint — no Fastify/DB deps, unit-tested.
- * Unknown/invalid values fall back to safe defaults rather than erroring (forgiving public API).
+ *
+ * `listQuerySchema` (below) is the authoritative contract: Fastify validates the querystring first,
+ * so unknown params (additionalProperties:false) and out-of-enum `sort`/`order` are rejected with
+ * 400 before this parser runs. The parser normalizes schema-permitted inputs (splitting comma
+ * lists, trimming, de-duping, coercing numbers) and whitelists the free-text list params
+ * (type/status) — for those the whitelist IS the filter. Its sort/order fallbacks are a defensive
+ * default for non-HTTP callers, not a "forgiving" HTTP behaviour.
  */
 import type { OpportunityStatus, OpportunityType } from "@rfp-hub/standard";
-import type { OpportunityQuery, SortField } from "../../controller/Opportunity.controller.js";
+import type {
+  OpportunityQuery,
+  SortField,
+} from "../../services/opportunities/opportunity.service.js";
 
 // Values may already be coerced (numbers) by the Fastify querystring schema below.
 export type RawQuery = Record<string, unknown>;

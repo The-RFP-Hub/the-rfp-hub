@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { registerRoutes } from "./modules/routes/index.js";
 import { responseSchemas } from "./openapi/schemas.js";
 import { registerSwagger } from "./plugins/swagger.js";
@@ -14,6 +14,29 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
   for (const schema of responseSchemas) app.addSchema(schema);
+
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    // Schema/validation failures stay 400 with a safe message.
+    if (error.validation) {
+      reply.code(400).send({ error: "bad_request", message: error.message });
+      return;
+    }
+    // Preserve explicitly-thrown client (4xx) errors.
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 400 && statusCode < 500) {
+      reply.code(statusCode).send({ error: "client_error", message: error.message });
+      return;
+    }
+    // Unexpected (5xx / uncaught) → log the real cause, return a generic body (no internals leaked).
+    request.log.error(error);
+    reply.code(500).send({ error: "internal_error", message: "internal server error" });
+  });
+
+  app.setNotFoundHandler((request, reply) => {
+    reply
+      .code(404)
+      .send({ error: "not_found", message: `route ${request.method} ${request.url} not found` });
+  });
 
   await registerSwagger(app); // before routes so their schemas are captured
   await registerRoutes(app);

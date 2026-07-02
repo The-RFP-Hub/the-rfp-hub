@@ -1,5 +1,5 @@
 /**
- * Open-data export (DEV-448, local slice): dump the public dataset to JSON + CSV under ./exports
+ * Open-data export (local slice): dump the public dataset to JSON + CSV under ./exports
  * and record a `dataset_snapshots` row per file. Cloud bucket upload + nightly cron land at deploy.
  * Exports are released under CC0-1.0 (marked in the JSON envelope).
  */
@@ -15,6 +15,14 @@ import { toCsv } from "./csv.js";
 
 const OUT_DIR = "exports";
 const LICENSE = "CC0-1.0";
+const LICENSE_NOTICE = `SPDX-License-Identifier: CC0-1.0
+
+To the extent possible under law, the publisher of this dataset has waived all
+copyright and related or neighboring rights to it. This dataset is released under
+the Creative Commons CC0 1.0 Universal Public Domain Dedication.
+
+https://creativecommons.org/publicdomain/zero/1.0/legalcode
+`;
 
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 
@@ -22,6 +30,7 @@ const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex
 export async function runExport(outDir: string = OUT_DIR): Promise<{
   jsonPath: string;
   csvPath: string;
+  licensePath: string;
   count: number;
 }> {
   const rows = await db
@@ -54,6 +63,11 @@ export async function runExport(outDir: string = OUT_DIR): Promise<{
   await writeFile(jsonPath, json);
   await writeFile(csvPath, csv);
 
+  // CC0 rights sidecar: makes a bare exported file set machine-detectable as CC0 (SPDX + licensee)
+  // even without the JSON envelope. Not hashed into dataset_snapshots (those track data files only).
+  const licensePath = join(outDir, "LICENSE");
+  await writeFile(licensePath, LICENSE_NOTICE);
+
   await db.insert(datasetSnapshots).values([
     {
       format: "json",
@@ -71,14 +85,14 @@ export async function runExport(outDir: string = OUT_DIR): Promise<{
     },
   ]);
 
-  return { jsonPath, csvPath, count: items.length };
+  return { jsonPath, csvPath, licensePath, count: items.length };
 }
 
 // CLI entry — skipped under Vitest so tests can import runExport without side effects.
 if (!process.env.VITEST) {
   runExport()
-    .then(({ count, jsonPath, csvPath }) => {
-      console.log(`✓ exported ${count} opportunities → ${jsonPath}, ${csvPath}`);
+    .then(({ count, jsonPath, csvPath, licensePath }) => {
+      console.log(`✓ exported ${count} opportunities → ${jsonPath}, ${csvPath}, ${licensePath}`);
     })
     .catch((err) => {
       console.error(err);

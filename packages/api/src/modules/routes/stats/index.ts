@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { Module } from "./stats.module.js";
+import { statsController } from "./stats.controller.js";
 
 export const stats = async (router: FastifyInstance): Promise<void> => {
   router.get(
@@ -11,6 +11,6 @@ export const stats = async (router: FastifyInstance): Promise<void> => {
         response: { 200: { $ref: "Stats#" } },
       },
     },
-    Module.summary,
+    statsController.summary,
   );
 };

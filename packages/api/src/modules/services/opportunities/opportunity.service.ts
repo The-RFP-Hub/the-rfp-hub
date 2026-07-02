@@ -12,19 +12,21 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityInsert,
   type OrganizationInsert,
   opportunities,
   organizations,
-} from "../../db/schema.js";
-import { DrizzleController } from "../abstract/Drizzle.controller.js";
+} from "../../../db/schema.js";
 import {
   type OpportunityInsertData,
+  type OpportunitySummary,
   fromStandard,
   toStandard,
   toSummary,
-} from "../mappers/opportunity.mapper.js";
+} from "../../mappers/opportunity.mapper.js";
+import { paginate } from "../../shared/pagination.js";
 
 export type SortField = "closesAt" | "opensAt" | "postedAt" | "updatedAt" | "createdAt";
 
@@ -62,8 +64,19 @@ const SORT_COLUMNS = {
   createdAt: opportunities.createdAt,
 } as const;
 
+/**
+ * Escape Postgres LIKE/ILIKE metacharacters (%, _, \) so user text matches literally.
+ * Patterns are parameter-bound (no injection) — this is precision only. Backslash is Postgres's
+ * default ILIKE escape char, so no explicit ESCAPE clause is required.
+ */
+export function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, "\\$&");
+}
+
 /** Data + business logic for opportunities. Public reads are always approved + listed. */
-export class OpportunityController extends DrizzleController {
+export class OpportunityService {
+  constructor(private readonly db: DB = defaultDb) {}
+
   /** Conditions shared by every public read. */
   private liveFilters(q: OpportunityQuery): SQL[] {
     const where: SQL[] = [
@@ -89,7 +102,7 @@ export class OpportunityController extends DrizzleController {
       );
     }
     if (q.q) {
-      const like = `%${q.q}%`;
+      const like = `%${escapeLike(q.q)}%`;
       const text = or(
         ilike(opportunities.title, like),
         ilike(opportunities.summary, like),
@@ -101,8 +114,8 @@ export class OpportunityController extends DrizzleController {
   }
 
   /** List opportunities (thin projection) with filters, sort and pagination. */
-  async getAll(q: OpportunityQuery): Promise<Page<Opportunity>> {
-    const { page, limit, offset } = this.paginate(q.page, q.limit);
+  async getAll(q: OpportunityQuery): Promise<Page<OpportunitySummary>> {
+    const { page, limit, offset } = paginate(q.page, q.limit);
     const whereClause = and(...this.liveFilters(q));
     const sortCol = SORT_COLUMNS[q.sort];
     const primary = q.order === "asc" ? asc(sortCol) : desc(sortCol);

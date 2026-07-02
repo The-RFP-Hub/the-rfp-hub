@@ -1,5 +1,5 @@
 /**
- * Seed loader (DEV-447): ingest programs from an upstream funding-map registry API, map each to
+ * Seed loader: ingest programs from an upstream funding-map registry API, map each to
  * the RFP Hub Standard, VALIDATE with rfphub-validate, and upsert the valid ones (approved +
  * listed). Invalid entries are skipped and counted (no silent truncation). Target >=100 valid.
  *
@@ -12,13 +12,23 @@ import type { Opportunity } from "@rfp-hub/standard";
 import { validateOpportunity } from "rfphub-validate";
 import { config } from "../src/config.js";
 import { pool } from "../src/db/client.js";
-import { OpportunityController } from "../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
 import { type RegistryProgram, mapProgram } from "./map-program.js";
 
 const TARGET = Number(process.env.SEED_TARGET ?? 120);
 const PAGE_LIMIT = 100;
 const MAX_PAGES = 20;
+const MIN_VALID = 100;
 const INVOCATION_ID = randomUUID();
+
+/** Hard floor on the seed: throw (non-zero exit via the top-level catch) if too few loaded. */
+export function assertSeedContract(loaded: number, min = MIN_VALID): void {
+  if (loaded < min) {
+    throw new Error(
+      `seed contract violated: only ${loaded} valid entries (< ${min}) — raise SEED_TARGET or check the source`,
+    );
+  }
+}
 
 async function fetchPage(page: number): Promise<{ programs: RegistryProgram[]; hasNext: boolean }> {
   const url = new URL("/v2/program-registry/search", config.sourceApiUrl);
@@ -65,7 +75,7 @@ async function main(): Promise<void> {
     if (!hasNext) break;
   }
 
-  const ctl = new OpportunityController();
+  const ctl = new OpportunityService();
   let loaded = 0;
   for (const std of valid) {
     await ctl.upsertFromStandard(std, {
@@ -77,14 +87,15 @@ async function main(): Promise<void> {
   }
 
   console.log(`✓ ${loaded} opportunities loaded, ${skipped} skipped (invalid)`);
-  if (loaded < 100) {
-    console.warn(`⚠ only ${loaded} valid entries (<100) — raise SEED_TARGET or check the source`);
-  }
+  assertSeedContract(loaded);
   await pool.end();
 }
 
-main().catch(async (err) => {
-  console.error(err);
-  await pool.end().catch(() => {});
-  process.exit(1);
-});
+// CLI entry — skipped under Vitest so tests can import the pure helper without a live seed run.
+if (!process.env.VITEST) {
+  main().catch(async (err) => {
+    console.error(err);
+    await pool.end().catch(() => {});
+    process.exit(1);
+  });
+}
