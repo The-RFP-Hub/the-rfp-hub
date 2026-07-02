@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DB } from "../../src/db/client.js";
-import { HealthService } from "../../src/modules/services/health.service.js";
+import { HealthService } from "../../src/modules/services/health/health.service.js";
 
 describe("HealthService.ping", () => {
   it("returns true when the database answers", async () => {

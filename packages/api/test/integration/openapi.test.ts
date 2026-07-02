@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityService } from "../../src/modules/services/opportunity.service.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 const run = process.env.DATABASE_URL ? describe : describe.skip;
 const OAS_ID = "https://rfphub.local/openapi.json";

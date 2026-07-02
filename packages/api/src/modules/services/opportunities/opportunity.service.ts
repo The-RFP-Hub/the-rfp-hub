@@ -12,21 +12,21 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../db/client.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityInsert,
   type OrganizationInsert,
   opportunities,
   organizations,
-} from "../../db/schema.js";
+} from "../../../db/schema.js";
 import {
   type OpportunityInsertData,
   type OpportunitySummary,
   fromStandard,
   toStandard,
   toSummary,
-} from "../mappers/opportunity.mapper.js";
-import { paginate } from "../shared/pagination.js";
+} from "../../mappers/opportunity.mapper.js";
+import { paginate } from "../../shared/pagination.js";
 
 export type SortField = "closesAt" | "opensAt" | "postedAt" | "updatedAt" | "createdAt";
 

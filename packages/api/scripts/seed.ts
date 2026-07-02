@@ -12,7 +12,7 @@ import type { Opportunity } from "@rfp-hub/standard";
 import { validateOpportunity } from "rfphub-validate";
 import { config } from "../src/config.js";
 import { pool } from "../src/db/client.js";
-import { OpportunityService } from "../src/modules/services/opportunity.service.js";
+import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
 import { type RegistryProgram, mapProgram } from "./map-program.js";
 
 const TARGET = Number(process.env.SEED_TARGET ?? 120);

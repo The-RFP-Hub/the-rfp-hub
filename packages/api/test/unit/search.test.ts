@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeLike } from "../../src/modules/services/opportunity.service.js";
+import { escapeLike } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 describe("escapeLike", () => {
   it("escapes the % wildcard", () => {

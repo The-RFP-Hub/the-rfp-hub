@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../db/client.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 
 /** Liveness + DB readiness probe for `/v1/health`. */
 export class HealthService {

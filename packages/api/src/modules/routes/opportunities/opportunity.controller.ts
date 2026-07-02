@@ -1,6 +1,6 @@
 import { SPEC_VERSION, opportunitySchema } from "@rfp-hub/standard";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { OpportunityService } from "../../services/opportunity.service.js";
+import { OpportunityService } from "../../services/opportunities/opportunity.service.js";
 import { type RawQuery, parseOpportunityQuery } from "./types.js";
 
 /** GET /v1/opportunities — filtered, sorted, paginated thin list. */

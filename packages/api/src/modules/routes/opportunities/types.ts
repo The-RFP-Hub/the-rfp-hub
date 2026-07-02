@@ -9,7 +9,10 @@
  * default for non-HTTP callers, not a "forgiving" HTTP behaviour.
  */
 import type { OpportunityStatus, OpportunityType } from "@rfp-hub/standard";
-import type { OpportunityQuery, SortField } from "../../services/opportunity.service.js";
+import type {
+  OpportunityQuery,
+  SortField,
+} from "../../services/opportunities/opportunity.service.js";
 
 // Values may already be coerced (numbers) by the Fastify querystring schema below.
 export type RawQuery = Record<string, unknown>;

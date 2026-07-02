@@ -1,6 +1,6 @@
 import { and, count, eq, max, sql } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../db/client.js";
-import { opportunities } from "../../db/schema.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import { opportunities } from "../../../db/schema.js";
 
 export interface StatsSummary {
   /** Total publicly visible (approved + listed) opportunities. */

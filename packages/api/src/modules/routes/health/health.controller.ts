@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { HealthService } from "../../services/health.service.js";
+import { HealthService } from "../../services/health/health.service.js";
 
 /** GET /v1/health — liveness + DB readiness. */
 const check = async (_req: FastifyRequest, res: FastifyReply) => {

@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runExport } from "../../scripts/export.js";
 import { db, pool } from "../../src/db/client.js";
 import { datasetSnapshots, opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityService } from "../../src/modules/services/opportunity.service.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 
 const run = process.env.DATABASE_URL ? describe : describe.skip;
 const OUT = join(tmpdir(), "rfphub-export-test");
