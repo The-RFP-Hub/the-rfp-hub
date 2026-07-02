@@ -12,7 +12,7 @@ import type { Opportunity } from "@rfp-hub/standard";
 import { validateOpportunity } from "rfphub-validate";
 import { config } from "../src/config.js";
 import { pool } from "../src/db/client.js";
-import { OpportunityController } from "../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../src/modules/services/opportunity.service.js";
 import { type RegistryProgram, mapProgram } from "./map-program.js";
 
 const TARGET = Number(process.env.SEED_TARGET ?? 120);
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
     if (!hasNext) break;
   }
 
-  const ctl = new OpportunityController();
+  const ctl = new OpportunityService();
   let loaded = 0;
   for (const std of valid) {
     await ctl.upsertFromStandard(std, {

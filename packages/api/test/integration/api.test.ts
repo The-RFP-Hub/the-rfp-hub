@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityController } from "../../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../../src/modules/services/opportunity.service.js";
 
 const TAG = "TESTONLY";
 
@@ -35,7 +35,7 @@ run("/v1 API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    const ctl = new OpportunityController();
+    const ctl = new OpportunityService();
     await ctl.upsertFromStandard(fixture({ id: "itest:grant-1", type: "grant", grant: {} }), {
       reviewStatus: "approved",
       isListed: true,

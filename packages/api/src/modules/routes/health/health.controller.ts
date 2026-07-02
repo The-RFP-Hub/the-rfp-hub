@@ -1,12 +1,12 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { HealthController } from "../../controller/Health.controller.js";
+import { HealthService } from "../../services/health.service.js";
 
 /** GET /v1/health — liveness + DB readiness. */
 const check = async (_req: FastifyRequest, res: FastifyReply) => {
-  const ctl = new HealthController();
-  return (await ctl.ping())
+  const service = new HealthService();
+  return (await service.ping())
     ? res.send({ status: "ok", db: "up" })
     : res.code(503).send({ status: "degraded", db: "down" });
 };
 
-export const Module = { check };
+export const healthController = { check };

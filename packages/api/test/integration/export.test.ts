@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runExport } from "../../scripts/export.js";
 import { db, pool } from "../../src/db/client.js";
 import { datasetSnapshots, opportunities, organizations } from "../../src/db/schema.js";
-import { OpportunityController } from "../../src/modules/controller/Opportunity.controller.js";
+import { OpportunityService } from "../../src/modules/services/opportunity.service.js";
 
 const run = process.env.DATABASE_URL ? describe : describe.skip;
 const OUT = join(tmpdir(), "rfphub-export-test");
@@ -19,7 +19,7 @@ const fixtureId = "etest:export-1";
 
 run("open-data export", () => {
   beforeAll(async () => {
-    const ctl = new OpportunityController();
+    const ctl = new OpportunityService();
     await ctl.upsertFromStandard(
       {
         specVersion: "1.0.0",

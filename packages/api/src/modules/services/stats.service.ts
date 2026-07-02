@@ -1,6 +1,6 @@
 import { and, count, eq, max, sql } from "drizzle-orm";
+import { type DB, db as defaultDb } from "../../db/client.js";
 import { opportunities } from "../../db/schema.js";
-import { DrizzleController } from "../abstract/Drizzle.controller.js";
 
 export interface StatsSummary {
   /** Total publicly visible (approved + listed) opportunities. */
@@ -13,7 +13,9 @@ export interface StatsSummary {
 }
 
 /** Aggregate counts for the `/v1/stats` endpoint (public dataset only). */
-export class StatsController extends DrizzleController {
+export class StatsService {
+  constructor(private readonly db: DB = defaultDb) {}
+
   async summary(): Promise<StatsSummary> {
     const live = and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true));
 

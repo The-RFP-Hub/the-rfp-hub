@@ -1,8 +1,10 @@
 import { sql } from "drizzle-orm";
-import { DrizzleController } from "../abstract/Drizzle.controller.js";
+import { type DB, db as defaultDb } from "../../db/client.js";
 
 /** Liveness + DB readiness probe for `/v1/health`. */
-export class HealthController extends DrizzleController {
+export class HealthService {
+  constructor(private readonly db: DB = defaultDb) {}
+
   /** True when the database answers a trivial query, false otherwise. */
   async ping(): Promise<boolean> {
     try {
