@@ -95,12 +95,11 @@ export const responseSchemas = [
   {
     $id: "ErrorResponse",
     type: "object",
-    additionalProperties: true,
-    required: ["error"],
+    additionalProperties: false,
+    required: ["error", "message"],
     properties: {
-      error: { type: "string" },
-      message: { type: "string" },
-      statusCode: { type: "integer" },
+      error: { type: "string", description: "Stable machine-readable error code (snake_case)." },
+      message: { type: "string", description: "Human-readable detail." },
     },
   },
 ] as const;

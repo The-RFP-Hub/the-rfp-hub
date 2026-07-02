@@ -2,8 +2,9 @@
  * PURE mappers between DB rows and the RFP Hub Standard object — no DB access, fully unit-testable.
  *
  * - `toStandard(row, org)`  — read path (detail): full, schema-valid `Opportunity`.
- * - `toSummary(row, org)`   — read path (list): thin projection, omits the `opportunity[type]`
- *                              block + `extensions` per FIELDS.md "Delivery (API list vs detail)".
+ * - `toSummary(row, org)`   — read path (list): thin `OpportunitySummary` projection, omits the
+ *                              `opportunity[type]` block + `extensions` per FIELDS.md
+ *                              "Delivery (API list vs detail)".
  * - `fromStandard(std)`     — write path: Standard → { org insert, opp insert } for the seed loader.
  */
 import type { Funding, Opportunity, Organization, Provenance } from "@rfp-hub/standard";
@@ -13,6 +14,20 @@ import type {
   OrganizationInsert,
   OrganizationRow,
 } from "../../db/schema.js";
+
+/** Strip the generated type's `[k: string]: unknown` index signature so Omit can drop named keys. */
+type RemoveIndex<T> = {
+  [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
+};
+
+/**
+ * Thin list projection type — a full Opportunity minus the six type-specific blocks and
+ * `extensions` (a delivery concern, per FIELDS.md "Delivery (API list vs detail)").
+ */
+export type OpportunitySummary = Omit<
+  RemoveIndex<Opportunity>,
+  "grant" | "hackathon" | "bounty" | "accelerator" | "vc_fund" | "rfp" | "extensions"
+>;
 
 // ── small helpers ────────────────────────────────────────────────────────────────
 /** Drop keys whose value is `undefined` (keeps `false`/`0`/`""`/`null`), returning a new object. */
@@ -122,8 +137,8 @@ export function toStandard(row: OpportunityRow, org: OrganizationRow): Opportuni
 }
 
 /** Thin list projection — omits the type block + extensions (a delivery concern, not a schema). */
-export function toSummary(row: OpportunityRow, org: OrganizationRow): Opportunity {
-  return baseOf(row, org) as Opportunity;
+export function toSummary(row: OpportunityRow, org: OrganizationRow): OpportunitySummary {
+  return baseOf(row, org) as OpportunitySummary;
 }
 
 // ── inverse (write path) ──────────────────────────────────────────────────────────

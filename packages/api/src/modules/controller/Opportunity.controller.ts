@@ -21,6 +21,7 @@ import {
 import { DrizzleController } from "../abstract/Drizzle.controller.js";
 import {
   type OpportunityInsertData,
+  type OpportunitySummary,
   fromStandard,
   toStandard,
   toSummary,
@@ -62,6 +63,15 @@ const SORT_COLUMNS = {
   createdAt: opportunities.createdAt,
 } as const;
 
+/**
+ * Escape Postgres LIKE/ILIKE metacharacters (%, _, \) so user text matches literally.
+ * Patterns are parameter-bound (no injection) — this is precision only. Backslash is Postgres's
+ * default ILIKE escape char, so no explicit ESCAPE clause is required.
+ */
+export function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, "\\$&");
+}
+
 /** Data + business logic for opportunities. Public reads are always approved + listed. */
 export class OpportunityController extends DrizzleController {
   /** Conditions shared by every public read. */
@@ -89,7 +99,7 @@ export class OpportunityController extends DrizzleController {
       );
     }
     if (q.q) {
-      const like = `%${q.q}%`;
+      const like = `%${escapeLike(q.q)}%`;
       const text = or(
         ilike(opportunities.title, like),
         ilike(opportunities.summary, like),
@@ -101,7 +111,7 @@ export class OpportunityController extends DrizzleController {
   }
 
   /** List opportunities (thin projection) with filters, sort and pagination. */
-  async getAll(q: OpportunityQuery): Promise<Page<Opportunity>> {
+  async getAll(q: OpportunityQuery): Promise<Page<OpportunitySummary>> {
     const { page, limit, offset } = this.paginate(q.page, q.limit);
     const whereClause = and(...this.liveFilters(q));
     const sortCol = SORT_COLUMNS[q.sort];

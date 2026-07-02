@@ -1,0 +1,2 @@
+DROP INDEX "ux_opp_source";--> statement-breakpoint
+CREATE UNIQUE INDEX "ux_opp_source" ON "opportunities" USING btree ("source_system","original_id") WHERE "opportunities"."source_system" IS NOT NULL AND "opportunities"."original_id" IS NOT NULL;
