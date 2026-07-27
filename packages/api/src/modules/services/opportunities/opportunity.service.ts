@@ -1,4 +1,4 @@
-import type { FundingType, Opportunity, OpportunityStatus } from "@rfp-hub/standard";
+import type { FundingType, Opportunity, OpportunityStatus } from "@the-rfp-hub/standard";
 import {
   type SQL,
   and,

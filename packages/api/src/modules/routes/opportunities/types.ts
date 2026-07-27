@@ -9,7 +9,7 @@
  * whitelist IS the filter. Its sort/order fallbacks are a defensive default for non-HTTP callers,
  * not a "forgiving" HTTP behaviour.
  */
-import type { FundingType, OpportunityStatus } from "@rfp-hub/standard";
+import type { FundingType, OpportunityStatus } from "@the-rfp-hub/standard";
 import type {
   OpportunityQuery,
   SortField,

@@ -1,4 +1,4 @@
-import { opportunitySchema } from "@rfp-hub/standard";
+import { opportunitySchema } from "@the-rfp-hub/standard";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { OpportunityService } from "../../services/opportunities/opportunity.service.js";
 import { type RawQuery, parseOpportunityQuery } from "./types.js";

@@ -1,4 +1,4 @@
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { describe, expect, it } from "vitest";
 import { CSV_COLUMNS, csvCell, toCsv } from "../../scripts/csv.js";
 

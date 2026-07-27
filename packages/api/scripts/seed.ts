@@ -17,7 +17,7 @@
  * own examples were regenerated with; everything downstream of it is already re-cut-shaped.
  */
 import { randomUUID } from "node:crypto";
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { humanizeErrors, validateOpportunity } from "rfphub-validate";
 import { config } from "../src/config.js";
 import { pool } from "../src/db/client.js";

@@ -8,7 +8,7 @@
  * a future fixed date, a past-only fixed date, rolling-only, and none at all — and assert that
  * the last three sort LAST and are excluded from the deadline-window filters.
  */
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

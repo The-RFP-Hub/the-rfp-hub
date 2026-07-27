@@ -1,4 +1,4 @@
-import { activeValues, isRegistered } from "@rfp-hub/standard";
+import { activeValues, isRegistered } from "@the-rfp-hub/standard";
 import { type Check, type Warning, isRecord } from "./types.js";
 
 const shortList = (name: Parameters<typeof activeValues>[0]) => activeValues(name).join(", ");

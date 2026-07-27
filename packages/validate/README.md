@@ -4,7 +4,7 @@ CLI **and** typed library to validate funding opportunities against the
 [RFP Hub Standard](https://github.com/The-RFP-Hub/the-rfp-hub/tree/main/packages/standard)
 (JSON Schema, draft 2020-12). MIT licensed.
 
-Built on `@rfp-hub/standard` — the schema is **not** vendored here; it comes from the
+Built on `@the-rfp-hub/standard` — the schema is **not** vendored here; it comes from the
 single source of truth.
 
 ## CLI (no install)
@@ -75,7 +75,7 @@ assertOpportunity(input);          // input is now typed as Opportunity
 
 Exports: `validateOpportunity`, `assertOpportunity`, `createValidator` (inject a custom
 schema), `humanizeError`/`humanizeErrors`, `checks`/`runChecks`/`entryPhrase` (the advisory
-tier), `SPEC_VERSION`, and the `Opportunity` type (re-exported from `@rfp-hub/standard`).
+tier), `SPEC_VERSION`, and the `Opportunity` type (re-exported from `@the-rfp-hub/standard`).
 
 ### Error messages
 
@@ -105,7 +105,7 @@ mode accepts them. The same `createValidator()` is reused by the API and tests, 
 is identical everywhere.
 
 The test suite runs the standard's own conformance suite
-(`@rfp-hub/standard/conformance/v1.0.0/{pass,fail}/`) rather than private fixtures, so the
+(`@the-rfp-hub/standard/conformance/v1.0.0/{pass,fail}/`) rather than private fixtures, so the
 reference implementation is held to exactly the contract external implementers are given.
 
 ## Develop

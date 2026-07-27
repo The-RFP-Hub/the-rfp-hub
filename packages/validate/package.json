@@ -27,7 +27,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@rfp-hub/standard": "workspace:*",
+    "@the-rfp-hub/standard": "workspace:*",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1"
   },

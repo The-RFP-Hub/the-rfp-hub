@@ -1,5 +1,5 @@
 {
-  "name": "@rfp-hub/api",
+  "name": "@the-rfp-hub/api",
   "version": "0.0.0",
   "private": true,
   "description": "RFP Hub public /v1/ REST API (Fastify + Postgres) serving the RFP Hub Standard.",
@@ -19,7 +19,7 @@
   "dependencies": {
     "@fastify/swagger": "^9.4.2",
     "@fastify/swagger-ui": "^5.2.1",
-    "@rfp-hub/standard": "workspace:*",
+    "@the-rfp-hub/standard": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "fastify": "^5.2.1",
     "pg": "^8.13.1",

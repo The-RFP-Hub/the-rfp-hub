@@ -3,7 +3,7 @@
  * Seeds its own isolated fixtures (ecosystem "TESTONLY") and cleans them up, so it's deterministic
  * regardless of whatever else is in the database.
  */
-import { type Opportunity, opportunitySchema } from "@rfp-hub/standard";
+import { type Opportunity, opportunitySchema } from "@the-rfp-hub/standard";
 import { inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -16,7 +16,7 @@ const loadDir = (d: string) =>
     .map((f) => ({ name: f, data: readJson(join(d, f)) }));
 
 /**
- * The conformance suite is the contract, and it lives in @rfp-hub/standard so that an
+ * The conformance suite is the contract, and it lives in @the-rfp-hub/standard so that an
  * external implementer can run the same cases. Every file is named after the rule it
  * exercises, so a red run here names the violated constraint directly.
  */
@@ -116,7 +116,7 @@ describe("assertOpportunity", () => {
   });
 });
 
-describe("real example entries (@rfp-hub/standard)", () => {
+describe("real example entries (@the-rfp-hub/standard)", () => {
   const examples = loadDir(join(standard, "schemas", "v1.0.0", "examples"));
 
   it("has a meaningful sample", () => {

@@ -22,7 +22,7 @@ are generated from it, and every other format the standard does or doesn't ship 
 
 The heart of the project is the **RFP Hub Standard** — a versioned, documented, validated
 JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
-[`@rfp-hub/standard`](./packages/standard) (CC0-1.0) and ships generated TypeScript types.
+[`@the-rfp-hub/standard`](./packages/standard) (CC0-1.0) and ships generated TypeScript types.
 
 - Schema: [`packages/standard/schemas/v1.0.0/opportunity.schema.json`](./packages/standard/schemas/v1.0.0/opportunity.schema.json)
 - Field reference: [`FIELDS.md`](./packages/standard/schemas/v1.0.0/FIELDS.md)
@@ -47,14 +47,14 @@ npx rfphub-validate opportunity.json
 
 | Package | npm | License | Purpose |
 |---|---|---|---|
-| `packages/standard` | `@rfp-hub/standard` | CC0-1.0 | Canonical JSON Schema, generated TS types, registries, conformance suite, migration table. Zero runtime deps. **SSoT.** |
+| `packages/standard` | `@the-rfp-hub/standard` | CC0-1.0 | Canonical JSON Schema, generated TS types, registries, conformance suite, migration table. Zero runtime deps. **SSoT.** |
 | `packages/validate` | `rfphub-validate` | MIT | `npx rfphub-validate` CLI + typed validation library, with an advisory warning tier over the registries. |
 | `packages/api` | — | MIT | Public `/v1/` REST API (Fastify + Postgres). |
-| `packages/client` | `@rfp-hub/client` | MIT | Typed HTTP client *(planned)*. |
-| `packages/mcp` | `@rfp-hub/mcp` | MIT | MCP server + agent skill *(planned)*. |
+| `packages/client` | `@the-rfp-hub/client` | MIT | Typed HTTP client *(planned)*. |
+| `packages/mcp` | `@the-rfp-hub/mcp` | MIT | MCP server + agent skill *(planned)*. |
 | `packages/frontend` | — | MIT | Reference frontend *(planned)*. |
 
-Every package depends only on `@rfp-hub/standard` for the contract — never on each other's
+Every package depends only on `@the-rfp-hub/standard` for the contract — never on each other's
 internals (dependency inversion at the package level).
 
 **Two version axes.** A package's `version` is its npm distribution version and moves freely; the

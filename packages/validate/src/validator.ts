@@ -1,4 +1,4 @@
-import { type Opportunity, SPEC_VERSION, opportunitySchema } from "@rfp-hub/standard";
+import { type Opportunity, SPEC_VERSION, opportunitySchema } from "@the-rfp-hub/standard";
 import addFormats from "ajv-formats";
 import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { type Warning, runChecks } from "./checks/index.js";

@@ -10,7 +10,13 @@
  * Since the re-cut the organizations an opportunity names are ARRAYS with semantic order, stored
  * verbatim on the opportunity row as jsonb, so the read mappers no longer take an organization row.
  */
-import type { Deadline, Funding, Milestone, Opportunity, Organization } from "@rfp-hub/standard";
+import type {
+  Deadline,
+  Funding,
+  Milestone,
+  Opportunity,
+  Organization,
+} from "@the-rfp-hub/standard";
 import type { OpportunityInsert, OpportunityRow, OrganizationInsert } from "../../db/schema.js";
 import { nextDeadlineAt } from "../shared/deadlines.js";
 

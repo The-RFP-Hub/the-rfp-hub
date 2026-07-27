@@ -22,7 +22,7 @@
  *   grant.fundingMechanism     → grant.fundingMechanisms[]
  *   source.url                 → removed; the program URL now feeds `applicationUrl`
  */
-import type { Deadline, FundingType, Opportunity, OpportunityStatus } from "@rfp-hub/standard";
+import type { Deadline, FundingType, Opportunity, OpportunityStatus } from "@the-rfp-hub/standard";
 
 export interface RegistryCommunity {
   uid?: string;

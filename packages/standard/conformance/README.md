@@ -1,7 +1,7 @@
 # RFP Hub Standard conformance suite
 
 A set of whole documents that an implementation of the RFP Hub Standard is expected to accept
-or reject. It is shipped inside the `@rfp-hub/standard` npm package so that an external
+or reject. It is shipped inside the `@the-rfp-hub/standard` npm package so that an external
 implementer — a validator in another language, an ingestion pipeline, a publisher's export
 job — can run the same cases the reference implementation runs.
 
@@ -32,7 +32,7 @@ The reference run lives in `packages/validate/test/conformance.test.ts`.
 ```bash
 pnpm --filter rfphub-validate test
 # or, against the published package:
-npx rfphub-validate node_modules/@rfp-hub/standard/conformance/v1.0.0/pass
+npx rfphub-validate node_modules/@the-rfp-hub/standard/conformance/v1.0.0/pass
 ```
 
 ## Scope

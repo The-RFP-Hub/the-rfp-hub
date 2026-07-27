@@ -14,7 +14,7 @@
 //                        published identifier must dereference or be visibly provisional;
 //                        a URL pointing at an unowned domain is neither.
 //
-// Run with `pnpm --filter @rfp-hub/standard check`. Exits non-zero on any failure.
+// Run with `pnpm --filter @the-rfp-hub/standard check`. Exits non-zero on any failure.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

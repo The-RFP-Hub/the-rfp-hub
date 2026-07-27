@@ -1,5 +1,5 @@
 /** PURE CSV serialization for the open-data export — no DB/IO, unit-testable. */
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { nextDeadlineAt } from "../src/modules/shared/deadlines.js";
 
 /**
