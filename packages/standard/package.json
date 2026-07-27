@@ -41,14 +41,7 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm -w build"
   },
-  "keywords": [
-    "rfp-hub",
-    "funding",
-    "grants",
-    "json-schema",
-    "ethereum",
-    "standard"
-  ],
+  "keywords": ["rfp-hub", "funding", "grants", "json-schema", "ethereum", "standard"],
   "repository": {
     "type": "git",
     "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
