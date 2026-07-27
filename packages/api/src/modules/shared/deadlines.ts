@@ -17,7 +17,7 @@
  * which is the question a deadline sort asks. Anything that needs "the application deadline"
  * specifically must select by label per the Standard (`registries/deadline-labels.json`).
  */
-import type { Deadline } from "@rfp-hub/standard";
+import type { Deadline } from "@the-rfp-hub/standard";
 
 /** Parse a deadline's `date` to a Date, or null when absent/unparseable. */
 function dateOf(d: Deadline): Date | null {

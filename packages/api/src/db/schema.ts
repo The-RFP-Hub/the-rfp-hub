@@ -11,7 +11,7 @@
  * Column names are written camelCase here and mapped to snake_case in SQL via Drizzle
  * `casing: "snake_case"` (configured in drizzle.config.ts and the runtime client).
  */
-import type { Contact, Deadline, Milestone, Organization } from "@rfp-hub/standard";
+import type { Contact, Deadline, Milestone, Organization } from "@the-rfp-hub/standard";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -30,7 +30,7 @@ import {
 // ── jsonb payload types ────────────────────────────────────────────────────────
 // The jsonb columns below store Standard sub-objects verbatim, so their types come FROM the
 // Standard and are never redefined here. They are re-declared as locally-named interfaces purely
-// so TypeScript's declaration emit can name them: `@rfp-hub/standard` ships a bundled `.d.ts` in
+// so TypeScript's declaration emit can name them: `@the-rfp-hub/standard` ships a bundled `.d.ts` in
 // which these interfaces are internally renamed (`Organization$1`, …) and therefore unnameable
 // from the outside, which trips TS4023 on Drizzle's inferred table types.
 // (A plain `type X = Organization` alias does NOT fix TS4023 — the alias still resolves to the

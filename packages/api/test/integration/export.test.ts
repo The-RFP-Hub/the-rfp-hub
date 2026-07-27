@@ -5,7 +5,7 @@
 import { readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { eq, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runExport } from "../../scripts/export.js";

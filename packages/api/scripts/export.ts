@@ -6,7 +6,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { SPEC_VERSION } from "@rfp-hub/standard";
+import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import { and, asc, eq } from "drizzle-orm";
 import { db, pool } from "../src/db/client.js";
 import { datasetSnapshots, opportunities } from "../src/db/schema.js";

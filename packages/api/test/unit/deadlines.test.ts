@@ -2,7 +2,7 @@
  * Pure unit tests for the derivations that replaced the removed `closesAt` scalar:
  * `nextDeadlineAt` (the sort/filter key) and `isPastDue` (the re-keyed auto-close predicate).
  */
-import type { Deadline } from "@rfp-hub/standard";
+import type { Deadline } from "@the-rfp-hub/standard";
 import { describe, expect, it } from "vitest";
 import {
   hasRollingDeadline,

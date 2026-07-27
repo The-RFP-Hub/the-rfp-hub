@@ -18,7 +18,7 @@ schema project loses the ability to explain itself.
 | Axis | Where it lives | What it means | Who bumps it |
 |---|---|---|---|
 | **Spec version** | `spec.config.json` → the schema `$id`, `specVersion`, the `schemas/<version>/` directory | The version of **the data contract**. A document declares which one it conforms to. | This document. |
-| **Package version** | `package.json` of `@rfp-hub/standard`, `rfphub-validate`, … | The version of **the npm distribution**. Bumped for any shipped change — new generated types, a fixed export map, a doc file added to the `files` array. | Changesets, ordinary semver. |
+| **Package version** | `package.json` of `@the-rfp-hub/standard`, `rfphub-validate`, … | The version of **the npm distribution**. Bumped for any shipped change — new generated types, a fixed export map, a doc file added to the `files` array. | Changesets, ordinary semver. |
 
 A publisher pins a **spec version**. A build pins a **package version**. The package version may
 run far ahead of the spec version and that is not a problem — it is the point of separating them.

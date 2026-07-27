@@ -1,5 +1,5 @@
 {
-  "name": "@rfp-hub/standard",
+  "name": "@the-rfp-hub/standard",
   "version": "1.0.0",
   "description": "RFP Hub Standard — canonical JSON Schema + generated TypeScript types for Ethereum-ecosystem funding opportunities.",
   "license": "CC0-1.0",

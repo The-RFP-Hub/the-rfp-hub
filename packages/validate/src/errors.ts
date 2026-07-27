@@ -1,4 +1,4 @@
-import { opportunitySchema } from "@rfp-hub/standard";
+import { opportunitySchema } from "@the-rfp-hub/standard";
 import type { ErrorObject } from "ajv";
 
 /**

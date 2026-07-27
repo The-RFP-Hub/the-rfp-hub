@@ -1,4 +1,4 @@
-import { SPEC_VERSION } from "@rfp-hub/standard";
+import { SPEC_VERSION } from "@the-rfp-hub/standard";
 
 export interface CliOptions {
   spec: string;

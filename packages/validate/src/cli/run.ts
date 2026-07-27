@@ -1,4 +1,4 @@
-import { SPEC_VERSION } from "@rfp-hub/standard";
+import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import type { ValidateFunction } from "ajv/dist/2020.js";
 import { createValidator, validateOpportunity } from "../validator.js";
 import { HELP, parseArgs } from "./args.js";

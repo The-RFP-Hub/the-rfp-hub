@@ -2,7 +2,7 @@
  * Pure unit tests for the seed's two guarantees: the ingestion gate (nothing unvalidated reaches
  * the database) and the >=100 contract guard. No DB and no network — only the exported helpers.
  */
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { describe, expect, it, vi } from "vitest";
 import { mapProgram } from "../../scripts/map-program.js";
 import {

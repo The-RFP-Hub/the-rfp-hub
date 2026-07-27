@@ -30,7 +30,7 @@ artifact that nobody has adopted require a version bump?**
 
 The constraints that were true on the day, and that this decision depends on:
 
-- **The package was never published.** `@rfp-hub/standard` did not exist on the npm registry
+- **The package was never published.** `@the-rfp-hub/standard` did not exist on the npm registry
   (verified: `npm view` returned a 404). There is no immutable published artifact to contradict.
 - **No external consumer had adopted the shape.** No third party was reading `opportunity.type`.
 - **The milestone that would have declared the schema complete had not closed.** v1.0.0 was a

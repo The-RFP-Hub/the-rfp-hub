@@ -1,4 +1,4 @@
-# @rfp-hub/api
+# @the-rfp-hub/api
 
 The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
 serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a 100+ entry seed dataset ingested
@@ -50,12 +50,12 @@ The API is pre-adoption, so the re-cut renames are applied without a back-compat
 ```bash
 docker compose up -d                     # Postgres 15 (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
-pnpm --filter @rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
+pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
 export SOURCE_API_URL=https://…          # upstream funding-map registry API (see .env-example)
-pnpm --filter @rfp-hub/api seed          # ingest 100+ entries from SOURCE_API_URL
-pnpm --filter @rfp-hub/api seed -- --strict   # ...and fail the run on ANY non-conforming record
-pnpm --filter @rfp-hub/api dev           # start the server (http://localhost:3001)
-pnpm --filter @rfp-hub/api export        # write JSON + CSV to ./exports
+pnpm --filter @the-rfp-hub/api seed          # ingest 100+ entries from SOURCE_API_URL
+pnpm --filter @the-rfp-hub/api seed -- --strict   # ...and fail the run on ANY non-conforming record
+pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
+pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 ```
 
 Config is read from the environment (see `.env-example`): `DATABASE_URL`, `PORT`, `HOST`, and the
@@ -67,7 +67,7 @@ seed source (`SOURCE_API_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`).
 > pure drizzle-kit output beats hand-writing a rename script. **If you have a database from
 > before the re-cut, drop it and re-migrate**, then re-run the seed; every row is re-derivable
 > from the upstream source. Regenerate after a schema change with
-> `pnpm --filter @rfp-hub/api db:generate`.
+> `pnpm --filter @the-rfp-hub/api db:generate`.
 
 ## Architecture
 
@@ -80,7 +80,7 @@ registration lives in `routes/<module>/index.ts`.
   `src/db/migrations`. The schema is the **M2 subset** of the full design in
   [`docs/data-model.md`](./docs/data-model.md) (which tags what's deferred to M3/M4).
 - **Search**: `ILIKE` over title/summary/description (the generated `tsvector` column is deferred).
-- **Validation/types**: reuses [`@rfp-hub/standard`](../standard) (schema + types) and
+- **Validation/types**: reuses [`@the-rfp-hub/standard`](../standard) (schema + types) and
   [`rfphub-validate`](../validate). **The seed loader validates every mapped record against the
   schema before anything reaches the database** (`gateForSeed` in `scripts/seed.ts`), printing each
   rejection with its id and the rules it broke — a rejected record is never silently subtracted
@@ -98,7 +98,7 @@ registration lives in `routes/<module>/index.ts`.
   against Postgres, with isolated self-cleaning fixtures.
 
 ```bash
-pnpm --filter @rfp-hub/api typecheck
+pnpm --filter @the-rfp-hub/api typecheck
 DATABASE_URL=… pnpm test     # integration tests run when DATABASE_URL is set; otherwise skipped
 ```
 

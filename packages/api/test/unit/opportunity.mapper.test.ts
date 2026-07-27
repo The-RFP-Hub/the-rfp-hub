@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { validateOpportunity } from "rfphub-validate";
 import { describe, expect, it } from "vitest";
 import type { OpportunityRow } from "../../src/db/schema.js";

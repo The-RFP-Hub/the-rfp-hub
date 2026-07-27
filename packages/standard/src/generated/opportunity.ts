@@ -3,7 +3,7 @@
 /* biome-ignore-all lint: generated */
 
 /**
- * RFP Hub Standard v1.0.0 — the normative definition of a funding opportunity in the Ethereum ecosystem. A document conforms to this version of the standard when it validates against this file. Covers six funding types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. Published under CC0 1.0 Universal. The field reference is FIELDS.md, the normative/informative split is NORMATIVE.md, and both ship alongside this file in the @rfp-hub/standard package and at https://github.com/The-RFP-Hub/the-rfp-hub.
+ * RFP Hub Standard v1.0.0 — the normative definition of a funding opportunity in the Ethereum ecosystem. A document conforms to this version of the standard when it validates against this file. Covers six funding types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. Published under CC0 1.0 Universal. The field reference is FIELDS.md, the normative/informative split is NORMATIVE.md, and both ship alongside this file in the @the-rfp-hub/standard package and at https://github.com/The-RFP-Hub/the-rfp-hub.
  */
 export type RFPHubOpportunity = {
   [k: string]: unknown;

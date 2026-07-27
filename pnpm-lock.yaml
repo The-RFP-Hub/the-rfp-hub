@@ -38,7 +38,7 @@ importers:
       '@fastify/swagger-ui':
         specifier: ^5.2.1
         version: 5.2.6
-      '@rfp-hub/standard':
+      '@the-rfp-hub/standard':
         specifier: workspace:*
         version: link:../standard
       drizzle-orm:
@@ -74,7 +74,7 @@ importers:
 
   packages/validate:
     dependencies:
-      '@rfp-hub/standard':
+      '@the-rfp-hub/standard':
         specifier: workspace:*
         version: link:../standard
       ajv:

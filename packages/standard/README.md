@@ -1,4 +1,4 @@
-# @rfp-hub/standard
+# @the-rfp-hub/standard
 
 The **canonical RFP Hub Standard** — a JSON Schema (draft 2020-12) describing an
 Ethereum-ecosystem funding opportunity, plus the TypeScript types **generated from it**.
@@ -9,7 +9,7 @@ validator, API, client, and agent libraries all build on.
 ## Usage
 
 ```ts
-import { opportunitySchema, SPEC_VERSION, type Opportunity } from "@rfp-hub/standard";
+import { opportunitySchema, SPEC_VERSION, type Opportunity } from "@the-rfp-hub/standard";
 
 const opp: Opportunity = {
   specVersion: SPEC_VERSION,
@@ -29,7 +29,7 @@ const opp: Opportunity = {
 The raw schema file is also published and importable directly:
 
 ```ts
-import schema from "@rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json";
+import schema from "@the-rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json";
 ```
 
 ## What this package ships

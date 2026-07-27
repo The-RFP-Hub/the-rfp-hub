@@ -4,7 +4,7 @@
  * response schema each operation DECLARES in that live document (ajv, draft 2020-12).
  * Gated on DATABASE_URL; seeds one isolated fixture for the list/detail endpoints and cleans up.
  */
-import type { Opportunity } from "@rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import addFormats from "ajv-formats";
 import Ajv2020 from "ajv/dist/2020.js";
 import { eq, like } from "drizzle-orm";
