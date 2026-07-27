@@ -11,15 +11,20 @@ because it tells contributors to expect a process nobody will actually run.
 
 ## Editors
 
-The standard has **editors**: the maintainers of the `The-RFP-Hub` organisation. Editors are the
-people who can merge a change to a normative artifact, and they are listed in
-[`.github/CODEOWNERS`](./.github/CODEOWNERS) — that file is the authoritative list, because it is
-the one CI enforces. Prose lists of names go stale; a CODEOWNERS entry cannot.
+The standard has **editors**: the people with merge access to this repository. At the project's
+current size, "editor" and "maintainer with write access" are the same set, so there is no
+separate roster to maintain — the repository's collaborator list is the authoritative record.
+
+**Enforced path-level review is deliberately not set up yet.** A `CODEOWNERS` file requiring an
+editor's review on the normative paths (`schemas/**`, `registries/**`, the process docs) will be
+introduced when the first external contribution arrives — that is the moment the distinction
+between "contributor" and "editor" starts doing real work. Before then it would be process
+pointing at a distinction that does not exist.
 
 **Becoming an editor.** There is no application and no membership tier. Someone becomes an editor
 when they have been reviewing and landing changes in this repo for long enough that an existing
-editor proposes it, and no other editor objects. That is the whole mechanism. It is added by a PR
-to `CODEOWNERS`, so the change is visible in the git history like everything else.
+editor proposes it, and no other editor objects. That is the whole mechanism — recorded by
+granting merge access (and, once it exists, a PR to `CODEOWNERS`).
 
 **Stepping back** is symmetrical and expected: an editor who is no longer active removes
 themselves, or is removed after a period of inactivity. No ceremony, no vote.
