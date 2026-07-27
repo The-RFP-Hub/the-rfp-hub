@@ -1,0 +1,11 @@
+{
+  "$comment": "The spec's identity, and the ONLY place a base URL or version string is hand-written. Every $id, the JSON-LD @vocab and every generated version string is stamped from this file by scripts/codegen.mjs, so adopting a canonical domain is a one-line edit here plus `pnpm codegen` — no grep, no hand-edited URLs. See ARTIFACTS.md and schemas/v1.0.0/STATUS.md.",
+  "specVersion": "1.0.0",
+  "schemaDir": "schemas/v1.0.0",
+  "baseUrl": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard",
+  "baseUrlNote": "PROVISIONAL — the project has no canonical domain yet. These raw URLs are used precisely because they dereference to the real bytes today; the one known limitation is that GitHub serves them as text/plain rather than application/schema+json. A URL that resolves to the actual document with the wrong Content-Type is strictly better than one that resolves to a parking page or to nothing at all.",
+  "vocabIri": "https://github.com/The-RFP-Hub/the-rfp-hub/ns/draft/rfp#",
+  "vocabIriNote": "PROVISIONAL and deliberately marked so. A vocabulary namespace IRI must be versionless — term IRIs are versioned by the context DOCUMENT, never by the term — so it cannot live under schemas/<version>/, and there is no versionless document to point it at. Rather than mint an IRI on a domain the project does not own, this uses an authority the project demonstrably controls (its own GitHub org) with a `draft` path segment mirroring `status` below, so no reader mistakes it for a minted namespace. It does not dereference, and that is stated in STATUS.md rather than hidden.",
+  "status": "draft",
+  "recutDate": "2026-07-27"
+}

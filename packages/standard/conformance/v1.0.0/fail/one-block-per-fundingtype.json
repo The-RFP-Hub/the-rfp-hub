@@ -1,0 +1,18 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:two-blocks",
+  "fundingType": "grant",
+  "title": "A grant carrying an rfp block",
+  "description": "fundingType is 'grant' and the grant block is present, but an rfp block is present too. Pre-re-cut this validated. It must now fail: only the block matching fundingType may be present, so opportunity[opportunity.fundingType] is a guarantee.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "grant": {},
+  "rfp": {
+    "scope": "This block has no business being here."
+  }
+}

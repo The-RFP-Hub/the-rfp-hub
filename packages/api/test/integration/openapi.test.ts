@@ -1,11 +1,11 @@
-import type { Opportunity } from "@rfp-hub/standard";
-import addFormats from "ajv-formats";
 /**
- * DEV-446 "published test suite that runs against the live spec": boots the app, fetches the
- * OpenAPI 3.1 document served at /v1/docs/json, and validates ACTUAL responses from every endpoint
- * against the response schema each operation DECLARES in that live document (ajv, draft 2020-12).
+ * Published contract test that runs against the LIVE spec: boots the app, fetches the OpenAPI 3.1
+ * document served at /v1/docs/json, and validates ACTUAL responses from every endpoint against the
+ * response schema each operation DECLARES in that live document (ajv, draft 2020-12).
  * Gated on DATABASE_URL; seeds one isolated fixture for the list/detail endpoints and cleans up.
  */
+import type { Opportunity } from "@rfp-hub/standard";
+import addFormats from "ajv-formats";
 import Ajv2020 from "ajv/dist/2020.js";
 import { eq, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -21,13 +21,14 @@ const OAS_ID = "https://rfphub.local/openapi.json";
 const FIXTURE: Opportunity = {
   specVersion: "1.0.0",
   id: "otest:1",
-  type: "grant",
+  fundingType: "grant",
   title: "OpenAPI fixture",
   description: "d",
   status: "open",
-  organization: { name: "OAS Org", slug: "oas-org" },
-  source: { url: "https://example.com/oas-1", ingestedVia: "import", verifiedAgainstSource: null },
+  sponsoringOrganizations: [{ name: "OAS Org", slug: "oas-org" }],
+  source: { ingestedVia: "import", verifiedAgainstSource: null },
   ecosystems: ["OASTEST"],
+  deadlines: [{ type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
   grant: {},
 };
 
@@ -50,9 +51,16 @@ run("OpenAPI 3.1 live-spec contract", () => {
   let doc: any;
   let ajv: Ajv2020;
 
-  /** The `$ref` an operation declares for its 200 JSON response, rebased onto the bundle. */
+  /**
+   * The `$ref` an operation declares for its 200 response, rebased onto the bundle. Operations
+   * declare exactly one media type — `application/json` for most, `application/schema+json` for
+   * the schema route — so the single content entry is taken rather than a hard-coded key.
+   */
   function response200Ref(pathKey: string): string {
-    const ref = doc.paths[pathKey].get.responses["200"].content["application/json"].schema.$ref;
+    const content = doc.paths[pathKey].get.responses["200"].content;
+    const mediaTypes = Object.keys(content);
+    expect(mediaTypes).toHaveLength(1);
+    const ref = content[mediaTypes[0] as string].schema.$ref;
     expect(typeof ref).toBe("string"); // e.g. "#/components/schemas/Stats"
     return OAS_ID + ref;
   }
@@ -118,6 +126,40 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(doc.paths["/v1/opportunities/{id}"].get.responses["404"]).toBeTruthy();
   });
 
+  it("publishes the re-cut filter surface, with the rolling-only exclusion documented", () => {
+    const params: { name: string; description?: string; schema?: Record<string, unknown> }[] =
+      doc.paths["/v1/opportunities/"].get.parameters;
+    const byName = new Map(params.map((p) => [p.name, p]));
+
+    expect([...byName.keys()]).toEqual(
+      expect.arrayContaining(["fundingType", "deadlineAfter", "deadlineBefore", "organization"]),
+    );
+    expect(byName.has("type")).toBe(false); // renamed to fundingType
+
+    for (const name of ["deadlineAfter", "deadlineBefore", "sort"]) {
+      expect(byName.get(name)?.description, `${name} documents the rolling exclusion`).toMatch(
+        /rolling-only/i,
+      );
+    }
+    expect(byName.get("organization")?.description).toMatch(/ANY entry/);
+
+    const sortEnum = byName.get("sort")?.schema?.enum as string[];
+    expect(sortEnum).toContain("nextDeadlineAt");
+    expect(sortEnum).not.toContain("closesAt");
+    expect(byName.get("sort")?.schema?.default).toBe("nextDeadlineAt");
+  });
+
+  it("declares the Opportunity component in the re-cut shape", () => {
+    const opportunity = doc.components.schemas.Opportunity;
+    expect(opportunity.required).toEqual(
+      expect.arrayContaining(["fundingType", "sponsoringOrganizations"]),
+    );
+    expect(opportunity.required).not.toContain("type");
+    expect(opportunity.required).not.toContain("organization");
+    expect(opportunity.properties.deadlines).toBeTruthy();
+    expect(opportunity.properties.closesAt).toBeUndefined();
+  });
+
   it("GET /v1/opportunities conforms to its declared 200 schema", async () => {
     const res = await app.inject({
       method: "GET",
@@ -133,9 +175,13 @@ run("OpenAPI 3.1 live-spec contract", () => {
     assertConformsTo("/v1/opportunities/{id}", res.json());
   });
 
-  it("GET /v1/opportunities/schema conforms to its declared 200 schema", async () => {
+  it("GET /v1/opportunities/schema declares and serves application/schema+json", async () => {
+    expect(Object.keys(doc.paths["/v1/opportunities/schema"].get.responses["200"].content)).toEqual(
+      ["application/schema+json"],
+    );
     const res = await app.inject({ method: "GET", url: "/v1/opportunities/schema" });
     expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/schema+json");
     assertConformsTo("/v1/opportunities/schema", res.json());
   });
 

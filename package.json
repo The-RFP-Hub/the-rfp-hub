@@ -10,6 +10,8 @@
   "scripts": {
     "codegen": "pnpm -r --if-present codegen",
     "codegen:check": "pnpm -r --if-present codegen:check",
+    "check": "pnpm -r --if-present check",
+    "check:neutral": "node scripts/check-neutral.mjs",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",

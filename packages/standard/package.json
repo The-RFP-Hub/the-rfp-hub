@@ -13,13 +13,30 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./schemas/*": "./schemas/*"
+    "./schemas/*": "./schemas/*",
+    "./registries/*": "./registries/*",
+    "./conformance/*": "./conformance/*",
+    "./meta/*": "./meta/*",
+    "./spec.config.json": "./spec.config.json"
   },
-  "files": ["dist", "schemas", "LICENSE"],
+  "files": [
+    "dist",
+    "schemas",
+    "registries",
+    "conformance",
+    "meta",
+    "spec.config.json",
+    "CHANGELOG.md",
+    "NORMATIVE.md",
+    "PROCESS.md",
+    "ARTIFACTS.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
   "scripts": {
     "codegen": "node scripts/codegen.mjs",
     "codegen:check": "node scripts/codegen.mjs --check",
+    "check": "node scripts/check-spec.mjs",
     "build": "tsup",
     "typecheck": "tsc --noEmit"
   },

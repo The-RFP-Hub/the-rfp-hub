@@ -12,7 +12,8 @@ Dependency direction is one-way: **controller → service → mapper / db**.
 |---|---|---|---|
 | **Controller** | `modules/routes/<module>/<entity>.controller.ts` | The HTTP boundary. Parse the request, call a service, shape the response, set status codes. | SQL, business rules |
 | **Service** | `modules/services/<module>/<name>.service.ts` | Business logic + data access over Drizzle. Enforces domain rules (e.g. public reads are always `approved + listed`). | Touch HTTP (no `req`/`res`) |
-| **Mapper** | `modules/mappers/<entity>.mapper.ts` | Pure functions: DB row ↔ Standard object. | Any I/O |
+| **Mapper** | `modules/mappers/<entity>.mapper.ts` | Pure functions: DB row ↔ Standard object, plus the ingest guards (one block per `fundingType`) and the write-time derivations. | Any I/O |
+| **Shared** | `modules/shared/*.ts` | Pure cross-cutting helpers used by more than one layer (pagination; the `deadlines[]` derivations that back `next_deadline_at` and auto-close). | Any I/O |
 
 Route **registration** (paths + schemas) lives in `modules/routes/<module>/index.ts`; the aggregator
 `modules/routes/index.ts` mounts each module under `/v1/<module>`.
@@ -48,6 +49,7 @@ packages/api/src/
       opportunity.mapper.ts          pure row ↔ Standard
     shared/
       pagination.ts                  cross-cutting helpers
+      deadlines.ts                   pure deadlines[] derivations (nextDeadlineAt, isPastDue)
 ```
 
 ## Conventions

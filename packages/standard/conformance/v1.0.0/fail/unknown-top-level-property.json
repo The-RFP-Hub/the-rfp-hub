@@ -1,0 +1,16 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:unknown-prop",
+  "fundingType": "grant",
+  "title": "Leaks an internal field",
+  "description": "chainID is an internal field, not part of the neutral standard. The top level is closed; publisher-specific data belongs under extensions.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "grant": {},
+  "chainID": 1
+}

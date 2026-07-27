@@ -7,10 +7,16 @@
 An open, neutral aggregation layer and **standard** for **Ethereum-ecosystem funding
 opportunities** — grants, hackathons, bounties, accelerators, VC funds, and RFPs. It indexes,
 verifies, and distributes opportunities through a standard format, a public API, open data
-exports, and agent-friendly tooling — always linking back to the original source to apply.
+exports, and agent-friendly tooling — and every entry carries an **application link** that sends
+you to the opportunity's own submission channel to apply.
 
-pnpm monorepo. The hand-authored **JSON Schema is the single source of truth**; TypeScript
-types (and, later, Zod/Pydantic) are generated from it.
+That link (`applicationUrl`) is the single link-back target in the standard, and it carries
+whatever the submission channel actually is — an application portal, a form, or a forum thread
+where no portal exists. The Hub is where you find the opportunity, never where you apply.
+
+pnpm monorepo. The hand-authored **JSON Schema is the single source of truth**; TypeScript types
+are generated from it, and every other format the standard does or doesn't ship is listed in
+[`ARTIFACTS.md`](./packages/standard/ARTIFACTS.md).
 
 ## The Standard
 
@@ -20,8 +26,16 @@ JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 
 - Schema: [`packages/standard/schemas/v1.0.0/opportunity.schema.json`](./packages/standard/schemas/v1.0.0/opportunity.schema.json)
 - Field reference: [`FIELDS.md`](./packages/standard/schemas/v1.0.0/FIELDS.md)
+- Status of this version (maturity, known issues): [`STATUS.md`](./packages/standard/schemas/v1.0.0/STATUS.md)
 - Prior-art crosswalk (DAOIP-5 · schema.org/Grant): [`CROSSWALK.md`](./packages/standard/schemas/v1.0.0/CROSSWALK.md)
 - Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.0/BENCHMARK.md)
+- What's normative vs. informative: [`NORMATIVE.md`](./packages/standard/NORMATIVE.md)
+
+> ⚠️ **v1.0.0 was re-cut in place on 2026-07-27.** Documents published under this version string
+> before that date do not validate against it. This was done once, deliberately, before anyone
+> had adopted it — see the
+> [field mapping table](./packages/standard/CHANGELOG.md#field-mapping-old--new) for what moved
+> where, and [`adr/0001`](./adr/0001-recut-v1.0.0-in-place.md) for why.
 
 Validate anything against it:
 
@@ -33,8 +47,8 @@ npx rfphub-validate opportunity.json
 
 | Package | npm | License | Purpose |
 |---|---|---|---|
-| `packages/standard` | `@rfp-hub/standard` | CC0-1.0 | Canonical JSON Schema + generated TS types. Zero runtime deps. **SSoT.** |
-| `packages/validate` | `rfphub-validate` | MIT | `npx rfphub-validate` CLI + typed validation library. |
+| `packages/standard` | `@rfp-hub/standard` | CC0-1.0 | Canonical JSON Schema, generated TS types, registries, conformance suite, migration table. Zero runtime deps. **SSoT.** |
+| `packages/validate` | `rfphub-validate` | MIT | `npx rfphub-validate` CLI + typed validation library, with an advisory warning tier over the registries. |
 | `packages/api` | — | MIT | Public `/v1/` REST API (Fastify + Postgres). |
 | `packages/client` | `@rfp-hub/client` | MIT | Typed HTTP client *(planned)*. |
 | `packages/mcp` | `@rfp-hub/mcp` | MIT | MCP server + agent skill *(planned)*. |
@@ -42,6 +56,21 @@ npx rfphub-validate opportunity.json
 
 Every package depends only on `@rfp-hub/standard` for the contract — never on each other's
 internals (dependency inversion at the package level).
+
+**Two version axes.** A package's `version` is its npm distribution version and moves freely; the
+**spec version** (`1.0.0`, in `specVersion` and the schema `$id`) is the data contract and moves
+only under [`PROCESS.md`](./packages/standard/PROCESS.md). They are different numbers on purpose.
+
+## Governance
+
+The standard is governed by written process, not by whoever is around:
+
+- [`GOVERNANCE.md`](./GOVERNANCE.md) — editors, the decision rule, review windows, appeals, and
+  the list of things this project deliberately does *not* have.
+- [`packages/standard/PROCESS.md`](./packages/standard/PROCESS.md) — feature stages, what
+  "breaking" means operationally, deprecation, how to register a vocabulary value, the release
+  checklist.
+- [`adr/`](./adr) — the decision records behind the shape of the data model.
 
 ## Repo topology
 

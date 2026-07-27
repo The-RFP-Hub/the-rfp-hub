@@ -5,7 +5,8 @@ import { opportunities } from "../../../db/schema.js";
 export interface StatsSummary {
   /** Total publicly visible (approved + listed) opportunities. */
   total: number;
-  byType: Record<string, number>;
+  /** Counts per Standard `fundingType` (renamed from `byType` with the v1.0.0 re-cut). */
+  byFundingType: Record<string, number>;
   byStatus: Record<string, number>;
   topEcosystems: { ecosystem: string; count: number }[];
   /** Most recent `updatedAt` across the public dataset (ISO), or null when empty. */
@@ -19,13 +20,13 @@ export class StatsService {
   async summary(): Promise<StatsSummary> {
     const live = and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true));
 
-    const [totalRows, byType, byStatus, ecoRes, updatedRows] = await Promise.all([
+    const [totalRows, byFundingType, byStatus, ecoRes, updatedRows] = await Promise.all([
       this.db.select({ value: count() }).from(opportunities).where(live),
       this.db
-        .select({ key: opportunities.type, value: count() })
+        .select({ key: opportunities.fundingType, value: count() })
         .from(opportunities)
         .where(live)
-        .groupBy(opportunities.type),
+        .groupBy(opportunities.fundingType),
       this.db
         .select({ key: opportunities.status, value: count() })
         .from(opportunities)
@@ -60,7 +61,7 @@ export class StatsService {
 
     return {
       total: totalRows[0]?.value ?? 0,
-      byType: tally(byType),
+      byFundingType: tally(byFundingType),
       byStatus: tally(byStatus),
       topEcosystems,
       lastUpdatedAt: lastUpdated ? new Date(lastUpdated).toISOString() : null,

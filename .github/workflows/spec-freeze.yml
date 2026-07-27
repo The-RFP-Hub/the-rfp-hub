@@ -1,0 +1,75 @@
+# Mechanises the one rule the standard's own history makes it hardest to keep.
+#
+# A published spec version is frozen: `packages/standard/schemas/v<version>/` must never be
+# edited again once it is declared stable. That rule is enforced here rather than by memory,
+# because the reasoning that justified re-cutting v1.0.0 in place ("nobody has adopted it yet")
+# will feel true again next time, and the second time it will not be defensible.
+#
+# A version directory is frozen when it contains a `FROZEN` marker file. The marker lands in the
+# commit that declares the version stable — it is deliberately NOT present today, while v1.0.0's
+# maturity is still `draft`.
+#
+# See packages/standard/PROCESS.md and adr/0001-recut-v1.0.0-in-place.md.
+name: Spec freeze
+
+on:
+  pull_request:
+    paths:
+      - "packages/standard/schemas/v*/**"
+
+jobs:
+  frozen:
+    name: Reject edits to frozen spec versions
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changed spec directories against their FROZEN markers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- 'packages/standard/schemas/v*' || true)
+          if [ -z "$changed" ]; then
+            echo "✓ no spec version directory touched"
+            exit 0
+          fi
+
+          # One entry per touched version directory.
+          dirs=$(printf '%s\n' "$changed" \
+            | sed -n 's|^\(packages/standard/schemas/v[^/]*\)/.*$|\1|p' \
+            | sort -u)
+
+          violations=0
+          for dir in $dirs; do
+            # Read the marker from the BASE ref, not the head: deleting FROZEN in the same PR
+            # must not be a way through the gate.
+            if git cat-file -e "$BASE_SHA:$dir/FROZEN" 2>/dev/null; then
+              echo "✗ $dir is FROZEN and this PR edits it:"
+              printf '%s\n' "$changed" | grep "^$dir/" | sed 's/^/    /'
+              violations=$((violations + 1))
+            else
+              echo "✓ $dir is not frozen"
+            fi
+          done
+
+          if [ "$violations" -gt 0 ]; then
+            cat <<'MSG'
+
+          A published spec version directory is immutable once frozen. Breaking changes take a
+          NEW version directory; the previous one stays published and unedited, forever.
+
+          If this is an editorial correction to an informative document, it belongs outside the
+          version directory or in a new version — see packages/standard/NORMATIVE.md.
+          If you believe the freeze itself is wrong, that is a governance question: open an issue
+          (GOVERNANCE.md). Do not remove the marker to land a change.
+          MSG
+            exit 1
+          fi
+
+          echo "✓ no frozen spec version was modified"

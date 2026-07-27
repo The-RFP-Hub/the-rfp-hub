@@ -1,0 +1,46 @@
+{
+  "stage": {
+    "description": "How mature an applicant team or project must be. Where a program restricts by maturity — idea, prototype, live product, revenue — that restriction goes here rather than into the description prose.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["Pre-seed to Series A", "Live on mainnet with users", "Idea stage welcome"]
+  },
+  "geography": {
+    "description": "Where applicants must be based or where the funded work must happen. The residency/location axis, distinct from the legal axis in 'jurisdiction'.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["Global", "Latin America only", "EU-based teams"]
+  },
+  "jurisdiction": {
+    "description": "Legal and sanctions constraints on who may receive funds — the compliance-driven half of location. Kept separate from 'geography' because a globally open program can still exclude sanctioned jurisdictions.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["No US persons", "Excludes OFAC-sanctioned jurisdictions"]
+  },
+  "sector": {
+    "description": "The problem domain or vertical an applicant must work in, where that is an eligibility gate rather than a preference. Topical interest that is not a gate belongs in categories/tags.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["DeFi and payments", "Public goods infrastructure", "Developer tooling only"]
+  },
+  "entityType": {
+    "description": "What kind of legal entity may apply — individual, unincorporated team, company, non-profit, DAO. Frequently the first thing that disqualifies an applicant and frequently buried in prose.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": [
+      "Registered legal entity required",
+      "Individuals and teams welcome",
+      "Non-profits only"
+    ]
+  },
+  "compliance": {
+    "description": "Process obligations an applicant must accept to be eligible: KYC/KYB, audited financials, reporting commitments, agreement terms.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": [
+      "KYC required before payout",
+      "Audited financials for awards over $100k",
+      "Quarterly reporting required"
+    ]
+  }
+}

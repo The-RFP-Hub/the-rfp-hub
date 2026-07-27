@@ -1,0 +1,23 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:rolling",
+  "fundingType": "grant",
+  "title": "Rolling applications",
+  "description": "A rolling deadline carries no date. `date` is required only when type is 'fixed'; a rolling programme is exactly the case that requirement must not catch.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "deadlines": [
+    {
+      "type": "rolling",
+      "label": "application"
+    }
+  ],
+  "grant": {
+    "recurring": true
+  }
+}

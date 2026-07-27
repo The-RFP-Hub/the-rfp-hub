@@ -1,0 +1,26 @@
+{
+  "grant": {
+    "description": "An ordinary grant round: applications in, awards out, closeout on delivery. The default operating model — record it explicitly only where distinguishing it from the models below is meaningful. Note this is the PROGRAM MODEL 'grant', not the fundingType 'grant'; the two axes are deliberately separate.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["grant"]
+  },
+  "program": {
+    "description": "A managed program with a cohort, a schedule and ongoing operator involvement, rather than a one-shot award. Different lifecycle and different closeout criteria from a plain grant round.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["program"]
+  },
+  "infra": {
+    "description": "Funding directed at infrastructure or partnership work, usually negotiated and sourced rather than openly applied for. Tracked differently because delivery is measured against integration rather than a proposal.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["infra", "partnerships"]
+  },
+  "incentives": {
+    "description": "Usage or liquidity incentives paid against on-chain activity rather than against a proposal. Collapsing this into 'grant' misrepresents both the lifecycle and the tracking needs.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["incentives", "liquidity incentives"]
+  }
+}

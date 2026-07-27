@@ -15,50 +15,72 @@ is deleted: this doc stays the canonical reference so deferred work remains disc
 
 **Legend:** ✅ M2 (implemented now) · ⏳ M3 · ⏳ M4 (deferred)
 
+> **Re-cut note.** This model tracks **RFP Hub Standard v1.0.0 as re-cut** (see the field
+> mapping table in `packages/standard/CHANGELOG.md`). Because the standard was re-cut *in place*
+> and nothing had been published from this database yet, `src/db/migrations` was **regenerated
+> from scratch** into a single `0000_recut_v1_0_0` migration rather than carrying a rename chain
+> — the migration directory stays 100% drizzle-kit output and is never hand-edited. Applying it
+> to a database that already holds the pre-re-cut schema will fail: drop and re-migrate, then
+> re-run the seed (every row is re-derivable from the upstream source).
+
 | Table / feature | Status |
 |---|---|
-| `organizations` (minus `verified`) | ✅ M2 |
-| `opportunities` core columns + provenance + `text[]`/GIN + `jsonb` `type_data`/`extensions` | ✅ M2 |
+| `organizations` (minus `verified`) — the org **directory**, written on ingest | ✅ M2 |
+| `opportunities` core columns + provenance + `text[]`/GIN + `jsonb` org arrays / `deadlines` / `type_data` / `extensions` | ✅ M2 |
+| `opportunities.next_deadline_at` (derived, denormalized) + `ix_opp_next_deadline` | ✅ M2 |
 | `dataset_snapshots` (nightly export bookkeeping) | ✅ M2 |
 | `opportunities.search_tsv` generated `tsvector` column + `gin_opp_search` | ⏳ deferred (use `ILIKE`/`pg_trgm` in M2; add when data volume warrants) |
 | `gin_opp_typedata` (GIN on `type_data`) | ⏳ deferred (M2 never filters inside `type_data`) |
 | `organizations.verified` + `/publishers` | ⏳ M3 (verification is a publishing-relationship concern) |
 | `accounts`, `api_keys`, `organizations` membership, `org_memberships` (auth tiers T1–T4) | ⏳ M3 (write API) |
 | `verification_runs`, `opportunity_audit`, `opportunity_duplicates`, `opportunity_embeddings` (pgvector) | ⏳ M3 |
-| `ingestion_events` (outbox idempotency) | ⏳ M3 (DEV-439 spike) |
+| `ingestion_events` (outbox idempotency) | ⏳ M3 |
 | `opportunity_events` (partitioned) + `opportunity_stats_daily` | ⏳ M3 (publisher dashboard analytics) |
 
-**M2 read path (what the `/v1/` API actually touches):** `organizations` + `opportunities`
-filtered by `review_status='approved' AND is_listed`, with `text[]`+GIN for the
-ecosystem/network/category/tag filters, `numeric` award columns for grant-size ranges, and `ILIKE`
-over `title`/`summary`/`description` for the `q` text search (the generated `tsvector` column is
-**deferred** — premature at the M2 dataset size). `dataset_snapshots` records each nightly export.
+**M2 read path (what the `/v1/` API actually touches):** `opportunities` alone, filtered by
+`review_status='approved' AND is_listed` — reads no longer join `organizations` (see
+"Organizations" below). `text[]`+GIN backs the ecosystem/network/category/tag/sponsor filters,
+`numeric` award columns back the grant-size ranges, `next_deadline_at` backs the deadline sort and
+window filters, and `ILIKE` over `title`/`summary`/`description` backs the `q` text search (the
+generated `tsvector` column is **deferred** — premature at the M2 dataset size).
+`dataset_snapshots` records each nightly export.
 
 Each ⏳ table/feature below is annotated inline where it appears.
 
 ## Principles
 
 1. **Hybrid relational + JSONB.** Typed columns for everything the API filters/sorts/searches
-   on (the live filters are type, ecosystem, network, status, grant size, text). Normalized
-   FKs for real entities (organizations, accounts). `JSONB` only for the genuinely variable
-   bits: the per-type block and `extensions`.
+   on (the live filters are funding type, ecosystem, network, status, grant size, sponsor,
+   deadline window, text). `JSONB` for the genuinely variable or order-significant bits: the
+   per-type block, the organization arrays, `deadlines`, `milestones`, `eligibility` and
+   `extensions`.
 2. **Type-as-key via one JSONB column.** The discriminated-union payload lives in
-   `opportunities.type_data`; the API serves it under a key equal to `type` (so
-   `opportunity[opportunity.type]` works) without per-type tables/columns.
-3. **Provenance-first.** `source_url` is `NOT NULL`. Verification history and source snapshots
-   are append-only side tables.
-4. **Append-only history.** Audit trail, verification runs, analytics events, and dataset
+   `opportunities.type_data`; the API serves it under a key equal to `funding_type` (so
+   `opportunity[opportunity.fundingType]` works) without per-type tables/columns. Since the
+   v1.0.0 re-cut the Standard also *forbids* every non-matching block, so ingest rejects a
+   record that carries one (`assertSingleTypeBlock` in the mapper) rather than silently
+   dropping it.
+3. **Derive-then-denormalize for anything sortable that lives in an array.** The Standard has no
+   sortable deadline scalar — `deadlines[]` is an array of `{type, date?, label?}`. The API
+   derives `next_deadline_at` (earliest **future** `fixed` entry) and stores it in a real,
+   indexed column, recomputed on every write. Nothing sorts or ranges over JSONB.
+4. **Provenance-first, but not schema-enforced.** The re-cut removed `source.url` and left
+   `source` with no required member, so provenance completeness is an **ingestion-policy**
+   concern here, not a `NOT NULL`. `application_url` is the single link-back target and the
+   verification job's only fetch target. Verification history and source snapshots are
+   append-only side tables.
+5. **Append-only history.** Audit trail, verification runs, analytics events, and dataset
    snapshots are insert-only (no UPDATE/DELETE) — satisfies the M3 "append-only audit trail".
-5. **Editorial state is server-side.** `review_status` (pending/approved/rejected) is a column,
+6. **Editorial state is server-side.** `review_status` (pending/approved/rejected) is a column,
    never exposed in the public object; public reads filter to approved + listed.
-6. **Idempotent ingestion.** `(source_system, original_id)` is unique; the upstream→Hub outbox
+7. **Idempotent ingestion.** `(source_system, original_id)` is unique; the upstream→Hub outbox
    is deduped by an event-id table so at-least-once delivery is safe.
 
 ## ERD
 
 ```mermaid
 erDiagram
-    organizations ||--o{ opportunities : issues
+    organizations ||..o{ opportunities : "named in sponsoring/operating arrays (no FK)"
     organizations ||--o{ org_memberships : grants
     accounts      ||--o{ org_memberships : holds
     accounts      ||--o{ api_keys : owns
@@ -75,7 +97,7 @@ erDiagram
 ## Enums
 
 ```sql
-CREATE TYPE opportunity_type   AS ENUM ('grant','hackathon','bounty','accelerator','vc_fund','rfp');
+CREATE TYPE funding_type       AS ENUM ('grant','hackathon','bounty','accelerator','vc_fund','rfp');
 CREATE TYPE opportunity_status AS ENUM ('upcoming','open','closed','archived');   -- public lifecycle
 CREATE TYPE review_status      AS ENUM ('pending','approved','rejected');         -- server-side editorial
 CREATE TYPE ingestion_method   AS ENUM ('publisher_api','submission','scrape','import','outbox');
@@ -94,16 +116,21 @@ CREATE TABLE opportunities (
   id                 BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- internal FK target
   public_id          TEXT NOT NULL UNIQUE,            -- standard `id`, e.g. 'filecoin:propgf-batch-3'
   spec_version       TEXT NOT NULL DEFAULT '1.0.0',
-  type               opportunity_type   NOT NULL,
+  funding_type       funding_type       NOT NULL,     -- the Standard's structural discriminator
   status             opportunity_status NOT NULL,
 
   title              TEXT NOT NULL,
   description        TEXT NOT NULL,
   summary            TEXT,
 
-  organization_id    BIGINT NOT NULL REFERENCES organizations(id),
+  -- Organizations: ARRAYS with semantic order ([0] = primary/display), each optionally carrying
+  -- contacts[]. Stored verbatim as JSONB and served back unchanged — an FK can only carry one
+  -- organization and cannot carry order, so reads do not join `organizations` at all.
+  sponsoring_organizations JSONB NOT NULL,            -- min 1 (enforced app-side by the Standard)
+  operating_organizations  JSONB NOT NULL DEFAULT '[]',
+  sponsor_slugs      TEXT[] NOT NULL DEFAULT '{}',    -- denormalized lookup key for ?organization=
 
-  application_url    TEXT,
+  application_url    TEXT,                            -- the single link-back target
   website            TEXT,
   logo_url           TEXT,
   banner_url         TEXT,
@@ -115,25 +142,34 @@ CREATE TABLE opportunities (
   categories         TEXT[] NOT NULL DEFAULT '{}',
   tags               TEXT[] NOT NULL DEFAULT '{}',
 
-  -- funding envelope (grant-size filters)
+  -- open key→value eligibility map + free-text qualifiers (deliberately NOT filterable)
+  eligibility        JSONB NOT NULL DEFAULT '{}',
+  prerequisites      TEXT,
+  resource_links     TEXT,
+  service_agreement  TEXT,
+
+  -- funding envelope (grant-size filters). `allocated` = COMMITTED to date, not disbursed;
+  -- `remaining` is derived (budget − allocated) at the consumer layer and never stored.
   currency           TEXT,
   min_award          NUMERIC,
   max_award          NUMERIC,
-  total_budget       NUMERIC,
-  amount_distributed NUMERIC,
-  awards_to_date     INTEGER,
+  budget             NUMERIC,
+  allocated          NUMERIC,
+
+  milestones         JSONB NOT NULL DEFAULT '[]',     -- array order IS the sequence
 
   -- dates
   opens_at           TIMESTAMPTZ,
-  closes_at          TIMESTAMPTZ,     -- deadline; drives staleness auto-close
+  deadlines          JSONB NOT NULL DEFAULT '[]',     -- [{type:'fixed'|'rolling', date?, label?}]
+  next_deadline_at   TIMESTAMPTZ,                     -- DERIVED: earliest FUTURE fixed deadline
   posted_at          TIMESTAMPTZ,
 
-  -- discriminated-union payload (served under the `type` key) + escape hatch
-  type_data          JSONB NOT NULL DEFAULT '{}',     -- = opportunity[type]
+  -- discriminated-union payload (served under the `funding_type` key) + escape hatch
+  type_data          JSONB NOT NULL DEFAULT '{}',     -- = opportunity[fundingType]
   extensions         JSONB NOT NULL DEFAULT '{}',
 
-  -- provenance (1:1, required) — ✅ M2
-  source_url             TEXT NOT NULL,
+  -- provenance (1:1) — ✅ M2. No column is NOT NULL: the Standard's `source` has no required
+  -- member since the re-cut, so completeness is an ingestion-policy concern.
   source_publisher       TEXT,                         -- namespace (= organizations.slug)
   source_submitted_by    TEXT,                         -- Standard source.submittedBy (public handle/slug/'community')
   source_submitted_at    TIMESTAMPTZ,                  -- Standard source.submittedAt
@@ -168,24 +204,74 @@ CREATE TABLE opportunities (
 );
 
 -- hot public query: approved + active
-CREATE INDEX ix_opp_public_live ON opportunities (status, closes_at)
+CREATE INDEX ix_opp_public_live   ON opportunities (status, next_deadline_at)
   WHERE review_status = 'approved' AND is_listed;
-CREATE INDEX ix_opp_type        ON opportunities (type);
-CREATE INDEX ix_opp_org         ON opportunities (organization_id);
-CREATE INDEX ix_opp_closes_at   ON opportunities (closes_at);
-CREATE INDEX ix_opp_budget      ON opportunities (total_budget);
-CREATE INDEX ix_opp_award       ON opportunities (min_award, max_award);
-CREATE INDEX ix_opp_updated     ON opportunities (updated_at DESC);
-CREATE INDEX gin_opp_ecosystems ON opportunities USING gin (ecosystems);
-CREATE INDEX gin_opp_networks   ON opportunities USING gin (networks);
-CREATE INDEX gin_opp_categories ON opportunities USING gin (categories);
-CREATE INDEX gin_opp_tags       ON opportunities USING gin (tags);
-CREATE INDEX gin_opp_search     ON opportunities USING gin (search_tsv);
-CREATE INDEX gin_opp_typedata   ON opportunities USING gin (type_data jsonb_path_ops);
+CREATE INDEX ix_opp_funding_type  ON opportunities (funding_type);
+CREATE INDEX ix_opp_next_deadline ON opportunities (next_deadline_at);
+CREATE INDEX ix_opp_budget        ON opportunities (budget);
+CREATE INDEX ix_opp_award         ON opportunities (min_award, max_award);
+CREATE INDEX ix_opp_updated       ON opportunities (updated_at DESC);
+CREATE INDEX gin_opp_ecosystems   ON opportunities USING gin (ecosystems);
+CREATE INDEX gin_opp_networks     ON opportunities USING gin (networks);
+CREATE INDEX gin_opp_categories   ON opportunities USING gin (categories);
+CREATE INDEX gin_opp_tags         ON opportunities USING gin (tags);
+CREATE INDEX gin_opp_sponsors     ON opportunities USING gin (sponsor_slugs);
+CREATE INDEX gin_opp_search       ON opportunities USING gin (search_tsv);
+CREATE INDEX gin_opp_typedata     ON opportunities USING gin (type_data jsonb_path_ops);
 ```
 
 `type_data` shape is enforced **app-side** by the same JSON Schema the `rfphub-validate` CLI
 uses. Optionally enforce in-DB with the `pg_jsonschema` extension as a `CHECK`.
+
+### Deadlines: `deadlines[]`, `next_deadline_at`, and auto-close
+
+The Standard has **no** deadline scalar. `deadlines` is an array of
+`{type: 'fixed' | 'rolling', date?, label?}` where consumers must **select by label**, never by
+array position (the head of a hackathon's array is its event start, not its application deadline).
+That leaves nothing to sort or range-scan on, so the API derives two things — both pure functions
+in `src/modules/shared/deadlines.ts`, both unit-tested:
+
+| Derivation | Definition | Used by |
+|---|---|---|
+| **`next_deadline_at`** | The earliest `fixed` entry whose `date` is **in the future**. `NULL` when the record is rolling-only, all its fixed dates have passed, or it has no deadlines. | `?sort=nextDeadlineAt`, `?deadlineAfter=`/`?deadlineBefore=`, the CSV export |
+| **`isPastDue`** | The **latest** `fixed` entry is in the past **AND** there is **no** `rolling` entry. | staleness auto-close (⏳ M3) |
+
+`next_deadline_at` is a real, indexed `TIMESTAMPTZ` column, **denormalized and recomputed on every
+write** (`fromStandard` → `OpportunityService.upsertFromStandard`). It is deliberately *not* a
+generated column: "in the future" depends on `now()`, which Postgres will not accept in a
+`GENERATED ALWAYS AS` expression, and a JSONB expression index could not answer a range query on
+"earliest future fixed date" anyway. The consequence is that the value goes stale as time passes —
+a row whose next deadline elapses keeps pointing at that past instant until it is rewritten. The
+M3 staleness job that already has to walk the table for auto-close recomputes it in the same pass;
+until then the seed/ingest path refreshes it on every upsert.
+
+**Null semantics are load-bearing and public.** Records with a `NULL` `next_deadline_at` sort
+**last** in both directions (`ORDER BY next_deadline_at ASC/DESC NULLS LAST`) and are **excluded**
+from the `deadlineAfter`/`deadlineBefore` window filters, because there is no date to compare. That
+exclusion is documented on each of those parameters in the OpenAPI document — a rolling program
+silently vanishing from a deadline-window query would otherwise look like a bug.
+
+**Auto-close is re-keyed, not just renamed.** The pre-re-cut rule was `closes_at < now()`. The
+replacement is *not* "latest fixed deadline < now()" on its own: a program that publishes both an
+old fixed date and a `rolling` entry is still accepting applications, so **a rolling program never
+auto-closes**, however old its fixed dates are.
+
+### Organizations
+
+`sponsoringOrganizations` is an array with **semantic order** (`[0]` is the primary/display
+organization), `operatingOrganizations` is a second array, and each entry may carry `contacts[]`.
+An FK can express neither multiplicity nor order, so both arrays are stored verbatim as JSONB on
+the opportunity and are served back byte-for-byte — which is also what keeps the mapper round-trip
+exact against the Standard's committed examples.
+
+`organizations` survives as the **directory / namespace registry**, not as a read-path join: every
+sponsoring *and* operating organization is upserted into it on ingest (keyed by `slug`, or a slug
+derived from `name` when the publisher omits one). That is what M3's `verified` flag, `/publishers`
+and `org_memberships` hang off.
+
+Filtering by organization would otherwise mean a JSONB containment scan, so `sponsor_slugs` carries
+one entry per **sponsoring** organization, GIN-indexed. `?organization=<slug>` therefore matches
+**any** sponsor — not only the primary `[0]` one — and does **not** match operating organizations.
 
 ## Identity & access (Privy separate app + API keys)
 
@@ -233,6 +319,7 @@ CREATE TABLE organizations (   -- ✅ M2 (except the two `verified*` columns bel
   banner_url    TEXT,
   social_links  JSONB NOT NULL DEFAULT '{}',
   ecosystems    TEXT[] NOT NULL DEFAULT '{}',
+  contacts      JSONB NOT NULL DEFAULT '[]',       -- ✅ M2; the re-cut's organization.contacts[]
   verified      BOOLEAN NOT NULL DEFAULT FALSE,   -- ⏳ M3; approved-publisher status; powers /publishers
   verified_at   TIMESTAMPTZ,                      -- ⏳ M3
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -366,22 +453,27 @@ CREATE TABLE dataset_snapshots (
 | Standard field | Storage |
 |---|---|
 | `id` | `opportunities.public_id` |
-| `specVersion`,`type`,`status`,`title`,`description`,`summary` | same-named columns |
-| `organization{}` | FK `organization_id` → `organizations` (embedded on read) |
-| `source{}` | `source_url`, `source_publisher`, `source_submitted_by` (= `source.submittedBy`), `source_submitted_at` (= `source.submittedAt`), `ingested_via`, `source_system`, `original_id`, `verified_against_source`, `verified_at`, `snapshot_url` |
+| `specVersion`,`fundingType`,`status`,`title`,`description`,`summary` | same-named columns |
+| `sponsoringOrganizations[]` / `operatingOrganizations[]` | `sponsoring_organizations` / `operating_organizations` JSONB (verbatim, order preserved) + derived `sponsor_slugs` `TEXT[]` (GIN) |
+| `source{}` | `source_publisher`, `source_submitted_by` (= `source.submittedBy`), `source_submitted_at` (= `source.submittedAt`), `ingested_via`, `source_system`, `original_id`, `verified_against_source`, `verified_at`, `snapshot_url`. **`source.url` was removed by the re-cut** and has no column. |
 | `ecosystems`/`networks`/`categories`/`tags` | `TEXT[]` columns (GIN) |
+| `eligibility` | `eligibility` JSONB (open string map) |
+| `prerequisites`/`resourceLinks`/`serviceAgreement` | same-named `TEXT` columns |
 | `applicationUrl`/`website`/`logoUrl`/`bannerUrl`/`socialLinks` | same-named columns (`social_links` JSONB) |
-| `funding{}` | `currency`,`min_award`,`max_award`,`total_budget`,`amount_distributed`,`awards_to_date` |
-| `opensAt`/`closesAt`/`postedAt`/`createdAt`/`updatedAt` | `*_at` columns |
-| `opportunity[type]` (grant/hackathon/…) | **`type_data` JSONB** (served under the `type` key) |
+| `funding{}` | `currency`,`min_award`,`max_award`,`budget`,`allocated` |
+| `milestones[]` | `milestones` JSONB (array order = sequence) |
+| `deadlines[]` | `deadlines` JSONB, **plus the derived `next_deadline_at`** column |
+| `opensAt`/`postedAt`/`createdAt`/`updatedAt` | `*_at` columns |
+| `opportunity[fundingType]` (grant/hackathon/…) | **`type_data` JSONB** (served under the `fundingType` key) |
 | `extensions` | `extensions` JSONB |
+| `$schema`/`@context`/`@type` | accepted on ingest and **stripped** — they describe the document, not the opportunity |
 | *(not in standard)* `review_status`,`is_listed`,`submitted_by`,`approved_by`,`last_seen_at` | server-side only |
 
 ## Key flows
 
-- **Read (T0):** `WHERE review_status='approved' AND is_listed` (+ filters). List = column
-  projection minus `type_data`/`extensions` (thin lists); detail = full row, `type_data`
-  hoisted to the `type` key.
+- **Read (T0):** `WHERE review_status='approved' AND is_listed` (+ filters), no joins. List =
+  column projection minus `type_data`/`extensions` (thin lists); detail = full row, `type_data`
+  hoisted to the `funding_type` key.
 - **Write (T1/T2):** validate body against the Standard → resolve org/namespace → if the
   account has an `org_memberships` row for that org and the org is `verified` →
   `review_status='approved'` + run verification; else `'pending'` (community submit — no
@@ -389,12 +481,17 @@ CREATE TABLE dataset_snapshots (
 - **Ingestion (outbox):** upsert keyed by `(source_system, original_id)`, deduped by
   `ingestion_events.event_id`; `ingested_via='outbox'`. One-way only — the Hub never
   reads back into the source system.
-- **Verification (M3):** job fetches `source_url`, writes a `verification_runs` row, sets
+- **Verification (M3):** job fetches `application_url` (the re-cut's only link-back target — the
+  removed `source.url` used to serve this), writes a `verification_runs` row, sets
   `verified_against_source`/`verified_at`/`snapshot_url` on the opportunity.
 - **Dedup (M3):** on submit, embed the entry, ANN-search `opportunity_embeddings`, record
   matches in `opportunity_duplicates`, notify submitter.
-- **Staleness (M3):** job sets `status='closed'` where `closes_at < now()`; auto-closes rows
-  inactive 90+ days (by `last_seen_at`/`updated_at`). Logged in `opportunity_audit`.
+- **Staleness (M3):** job sets `status='closed'` where the record `isPastDue` — the latest `fixed`
+  entry in `deadlines` is in the past **and** the record carries no `rolling` entry (so rolling
+  programs never auto-close). It recomputes `next_deadline_at` in the same pass. Also auto-closes
+  rows inactive 90+ days (by `last_seen_at`/`updated_at`). Logged in `opportunity_audit`.
+  The predicate lives in `src/modules/shared/deadlines.ts` and is unit-tested today, ahead of the
+  job that will call it.
 
 ## Open questions / deferred
 

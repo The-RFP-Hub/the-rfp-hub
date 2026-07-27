@@ -1,0 +1,38 @@
+{
+  "application": {
+    "description": "The deadline by which an application or proposal must be submitted. The default answer to \"when must I apply by?\" — every per-type proposal/application deadline folds in under this label.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["application", "proposal deadline", "applications close"]
+  },
+  "community feedback": {
+    "description": "The deadline for public comment on a proposal, where the process runs a community-feedback window before the application window closes. A listing that carries only one deadline routinely loses this one.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["community feedback", "forum discussion closes"]
+  },
+  "registration": {
+    "description": "The deadline to register or sign up for an event, as distinct from submitting work. Most commonly used on hackathons.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["registration", "sign-up closes"]
+  },
+  "submission": {
+    "description": "The deadline to submit a project or deliverable after registering. On hackathons this is normally later than 'registration' and at or before 'event end'.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["submission", "project submission"]
+  },
+  "event start": {
+    "description": "The moment an event begins. An EVENT BOUNDARY, not a deadline — it shares the array because the standard keeps one date model, which is exactly why consumers must filter on label rather than taking the array head.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["event start", "hacking begins"]
+  },
+  "event end": {
+    "description": "The moment an event finishes. An event boundary, not a deadline.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["event end", "closing ceremony"]
+  }
+}

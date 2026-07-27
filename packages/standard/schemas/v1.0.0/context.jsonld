@@ -1,27 +1,86 @@
 {
   "@context": {
     "@version": 1.1,
-    "@vocab": "https://rfphub.org/standard/v1.0.0#",
+    "@vocab": "https://github.com/The-RFP-Hub/the-rfp-hub/ns/draft/rfp#",
     "schema": "https://schema.org/",
     "daoip5": "https://www.daostar.org/schemas#",
 
-    "id": "schema:identifier",
-    "title": "schema:name",
-    "name": "schema:name",
-    "description": "schema:description",
-    "summary": "schema:disambiguatingDescription",
+    "specVersion": { "@id": "schema:schemaVersion", "@protected": true },
+    "id": { "@id": "schema:identifier", "@protected": true },
+    "fundingType": { "@id": "schema:additionalType", "@protected": true },
+    "title": { "@id": "schema:name", "@protected": true },
+    "name": { "@id": "schema:name", "@protected": true },
+    "description": { "@id": "schema:description", "@protected": true },
+    "summary": { "@id": "schema:disambiguatingDescription", "@protected": true },
+    "status": { "@id": "daoip5:isOpen", "@protected": true },
 
-    "applicationUrl": { "@id": "schema:url", "@type": "@id" },
-    "url": { "@id": "schema:url", "@type": "@id" },
+    "sponsoringOrganizations": { "@id": "schema:funder", "@container": "@set", "@protected": true },
+    "operatingOrganizations": { "@id": "schema:sponsor", "@container": "@set", "@protected": true },
+    "contacts": { "@id": "schema:contactPoint", "@container": "@set" },
+    "role": "schema:roleName",
+    "email": "schema:email",
+    "telegram": "schema:sameAs",
+
+    "source": "provenance",
+    "publisher": "schema:publisher",
+    "submittedBy": "schema:contributor",
+    "submittedAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" },
+    "ingestedVia": "ingestedVia",
+    "originalId": "schema:identifier",
+    "verifiedAgainstSource": "verifiedAgainstSource",
+    "verifiedAt": { "@id": "verifiedAt", "@type": "schema:DateTime" },
+    "snapshotUrl": { "@id": "schema:archivedAt", "@type": "@id" },
+
+    "applicationUrl": { "@id": "schema:url", "@type": "@id", "@protected": true },
     "website": { "@id": "schema:sameAs", "@type": "@id" },
     "logoUrl": { "@id": "schema:logo", "@type": "@id" },
     "bannerUrl": { "@id": "schema:image", "@type": "@id" },
+    "socialLinks": "schema:sameAs",
+    "resourceLinks": "schema:citation",
 
-    "organization": "schema:funder",
+    "ecosystems": { "@id": "ecosystems", "@container": "@set" },
+    "networks": { "@id": "networks", "@container": "@set" },
+    "categories": { "@id": "schema:about", "@container": "@set" },
+    "tags": { "@id": "schema:keywords", "@container": "@set" },
+
+    "eligibility": { "@id": "schema:eligibleCustomerType", "@protected": true },
+    "prerequisites": "schema:competencyRequired",
+    "serviceAgreement": "serviceAgreement",
+
+    "funding": { "@id": "schema:amount", "@protected": true },
     "currency": "schema:currency",
+    "budget": { "@id": "daoip5:totalGrantPoolSize", "@protected": true },
+    "allocated": "allocated",
+    "minAward": "minAward",
+    "maxAward": "maxAward",
 
-    "closesAt": "daoip5:closeDate",
-    "fundingMechanism": "daoip5:grantFundingMechanism",
-    "extensions": "daoip5:extensions"
+    "milestones": { "@id": "milestones", "@container": "@list" },
+    "amount": "schema:amount",
+    "criteria": "criteria",
+
+    "deadlines": { "@id": "deadlines", "@container": "@set", "@protected": true },
+    "date": { "@id": "daoip5:closeDate", "@type": "schema:DateTime" },
+    "label": "schema:name",
+
+    "opensAt": { "@id": "schema:startDate", "@type": "schema:DateTime" },
+    "postedAt": { "@id": "schema:datePublished", "@type": "schema:DateTime" },
+    "createdAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" },
+    "updatedAt": { "@id": "schema:dateModified", "@type": "schema:DateTime" },
+
+    "grant": "grant",
+    "hackathon": "hackathon",
+    "bounty": "bounty",
+    "accelerator": "accelerator",
+    "vc_fund": "vc_fund",
+    "rfp": "rfp",
+
+    "fundingMechanisms": { "@id": "daoip5:grantFundingMechanism", "@container": "@set" },
+    "programModel": "programModel",
+    "milestoneBased": "milestoneBased",
+    "recurring": "recurring",
+    "scope": "scope",
+    "requirements": { "@id": "requirements", "@container": "@set" },
+
+    "extensions": { "@id": "daoip5:extensions", "@protected": true }
   }
 }

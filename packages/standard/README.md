@@ -14,12 +14,14 @@ import { opportunitySchema, SPEC_VERSION, type Opportunity } from "@rfp-hub/stan
 const opp: Opportunity = {
   specVersion: SPEC_VERSION,
   id: "example:grant-1",
-  type: "grant",
+  fundingType: "grant",
   title: "Example Grants",
   description: "…",
   status: "open",
-  organization: { name: "Example Foundation" },
-  source: { url: "https://example.org/grants" },
+  sponsoringOrganizations: [{ name: "Example Foundation" }],
+  source: {},
+  applicationUrl: "https://example.org/grants",
+  deadlines: [{ type: "fixed", date: "2026-12-31T23:59:59.000Z", label: "application" }],
   grant: {},
 };
 ```
@@ -30,15 +32,48 @@ The raw schema file is also published and importable directly:
 import schema from "@rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json";
 ```
 
+## What this package ships
+
+| Artifact | What it is |
+|---|---|
+| `schemas/v1.0.0/opportunity.schema.json` | The **normative** schema. Everything else is derived from it or governed by it. |
+| `schemas/v1.0.0/context.jsonld` | JSON-LD context. Term IRIs are versionless; the context *document* is what gets versioned. |
+| `schemas/v1.0.0/examples/` | 28 curated real-world entries. |
+| `conformance/v1.0.0/{pass,fail}/` | One document per rule, named after the rule. Run these against your own implementation — see [`conformance/README.md`](./conformance/README.md). |
+| `registries/` | Three open vocabularies: eligibility keys, deadline labels, program models. The schema keeps these fields free-text; the registry fixes what each value means. `ecosystems` and `networks` are open too and deliberately have no registry — see [`ARTIFACTS.md`](./ARTIFACTS.md). |
+| `meta/rfphub-schema.meta.json` | Metaschema constraining our schema file's shape and legalising `x-stability` / `x-since` / `x-deprecated`. |
+| `spec.config.json` | The spec's identity. Every generated version string and URL is stamped from here. |
+
 ## Source of truth
 
-`schemas/v1.0.0/opportunity.schema.json` is hand-authored and authoritative. TypeScript
-types in `src/generated/` are produced from it with `pnpm codegen`
-(`json-schema-to-typescript`); `src/types.ts` curates the public type names. Never edit the
-generated file by hand.
+`schemas/v1.0.0/opportunity.schema.json` is hand-authored and authoritative; `spec.config.json`
+is the only place a version string or namespace IRI is hand-written. `pnpm codegen` stamps that
+identity into the schema, the context and `SPEC_VERSION`, then generates
+`src/generated/opportunity.ts`, `registries/index.json`, `schemas/index.json` and the field
+tables in `FIELDS.md`. `pnpm codegen:check` fails CI when any of them is stale; `pnpm check` runs
+the publication rules (context↔schema drift, version-string agreement, source neutrality). Never
+edit a generated file by hand.
 
-See `schemas/v1.0.0/FIELDS.md` for the full field reference, and
-`BENCHMARK.md` for real-data validation results.
+See [`schemas/v1.0.0/FIELDS.md`](./schemas/v1.0.0/FIELDS.md) for the full field reference (its
+tables are generated from the schema), [`CHANGELOG.md`](./CHANGELOG.md) for the release record,
+and [`schemas/v1.0.0/BENCHMARK.md`](./schemas/v1.0.0/BENCHMARK.md) for real-data validation
+results.
+
+## How this standard is governed
+
+| Document | Answers |
+|---|---|
+| [`NORMATIVE.md`](./NORMATIVE.md) | Which artifacts carry authority, and which can be corrected any day without a release. |
+| [`PROCESS.md`](./PROCESS.md) | Feature stages, what "breaking" means operationally, deprecation, how to register a vocabulary value, the release checklist. |
+| [`ARTIFACTS.md`](./ARTIFACTS.md) | Every artifact this standard ships, plans to ship, or has declined — with the reason. |
+| [`schemas/v1.0.0/STATUS.md`](./schemas/v1.0.0/STATUS.md) | Where this version stands: maturity, known issues, and the in-place re-cut. |
+| [`CHANGELOG.md`](./CHANGELOG.md) | What changed and when — including the [field mapping table](./CHANGELOG.md#field-mapping-old--new) for the re-cut. No row is ever removed from it. |
+
+Who decides, and the review windows, are in `GOVERNANCE.md` at the repository root.
+
+> ⚠️ **v1.0.0 was re-cut in place on 2026-07-27** — the contents under this version string differ
+> from those published before that date. See `STATUS.md` and the field mapping table in
+> `CHANGELOG.md`.
 
 ## License
 

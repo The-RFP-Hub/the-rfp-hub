@@ -10,7 +10,9 @@
       "**/migrations/**",
       "**/examples/**",
       "**/schemas/**",
-      "**/fixtures/**"
+      "**/fixtures/**",
+      "**/conformance/**",
+      "**/registries/index.json"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

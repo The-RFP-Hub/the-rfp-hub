@@ -1,9 +1,19 @@
 /** PURE CSV serialization for the open-data export — no DB/IO, unit-testable. */
 import type { Opportunity } from "@rfp-hub/standard";
+import { nextDeadlineAt } from "../src/modules/shared/deadlines.js";
 
+/**
+ * Flat columns for the CC0 tabular export.
+ *
+ * The re-cut removed the two scalars this used to lean on: `closesAt` (now `deadlines[]`) and
+ * `source.url` (removed outright). CSV is a flat format, so the array is represented by the same
+ * derived scalar the API sorts on — `nextDeadlineAt`, the earliest upcoming FIXED deadline — plus
+ * a `rollingDeadline` boolean so a rolling program is distinguishable from one that simply has no
+ * upcoming date. The full `deadlines[]` array is available in the JSON export.
+ */
 export const CSV_COLUMNS = [
   "id",
-  "type",
+  "fundingType",
   "status",
   "title",
   "organization",
@@ -13,11 +23,12 @@ export const CSV_COLUMNS = [
   "currency",
   "minAward",
   "maxAward",
-  "totalBudget",
+  "budget",
+  "allocated",
   "opensAt",
-  "closesAt",
+  "nextDeadlineAt",
+  "rollingDeadline",
   "applicationUrl",
-  "sourceUrl",
 ] as const;
 
 export function csvCell(v: unknown): string {
@@ -29,27 +40,31 @@ export function csvCell(v: unknown): string {
 }
 
 export function toCsv(items: Opportunity[]): string {
-  const rows = items.map((o) =>
-    [
+  const rows = items.map((o) => {
+    // sponsoringOrganizations[0] is the primary/display organization (array order is semantic).
+    const primary = o.sponsoringOrganizations?.[0];
+    const next = nextDeadlineAt(o.deadlines);
+    return [
       o.id,
-      o.type,
+      o.fundingType,
       o.status,
       o.title,
-      o.organization?.name,
-      o.organization?.slug,
+      primary?.name,
+      primary?.slug,
       (o.ecosystems ?? []).join("|"),
       (o.categories ?? []).join("|"),
       o.funding?.currency,
       o.funding?.minAward,
       o.funding?.maxAward,
-      o.funding?.totalBudget,
+      o.funding?.budget,
+      o.funding?.allocated,
       o.opensAt,
-      o.closesAt,
+      next ? next.toISOString() : "",
+      (o.deadlines ?? []).some((d) => d.type === "rolling"),
       o.applicationUrl,
-      o.source?.url,
     ]
       .map(csvCell)
-      .join(","),
-  );
+      .join(",");
+  });
   return `${[CSV_COLUMNS.join(","), ...rows].join("\n")}\n`;
 }

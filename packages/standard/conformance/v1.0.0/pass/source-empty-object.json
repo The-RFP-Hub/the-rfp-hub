@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:source-empty",
+  "fundingType": "rfp",
+  "title": "Rich record with no provenance at all",
+  "description": "The provenance block has no required property since source.url was removed. A fully populated record may still carry \"source\": {} — provenance completeness is an ingestion-policy concern, not a validation one.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example DAO"
+    }
+  ],
+  "source": {},
+  "applicationUrl": "https://forum.example.org/t/rfp-thread/42",
+  "ecosystems": ["Ethereum"],
+  "funding": {
+    "currency": "USD",
+    "budget": 120000
+  },
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-09-30T23:59:59.000Z",
+      "label": "application"
+    }
+  ],
+  "rfp": {
+    "scope": "Build and operate the thing. Out of scope: anything requiring custody of user funds."
+  }
+}

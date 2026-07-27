@@ -1,0 +1,14 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:no-block",
+  "fundingType": "grant",
+  "title": "Missing the grant block",
+  "description": "fundingType is 'grant' but there is no grant block, so opportunity[opportunity.fundingType] would not resolve. Adapted from the pre-re-cut grant-no-block fixture.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {}
+}
