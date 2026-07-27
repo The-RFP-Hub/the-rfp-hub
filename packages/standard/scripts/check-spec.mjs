@@ -149,6 +149,10 @@ const TRACKER_ID = /\bDEV-\d+\b/g;
 // never dereferences, and every downstream fork inherits it. Identifiers live in
 // spec.config.json and nowhere else. Assembled from parts so this rule does not trip itself.
 const UNOWNED_DOMAIN = new RegExp(`\\b${["rfphub", "org"].join("\\.")}\\b`, "g");
+// The npm scope was renamed to match the org (@the-rfp-hub). The retired scope must never
+// reappear — a stale build once shipped it inside a published tarball. Assembled from parts
+// so this rule does not trip itself; "@the-rfp-hub/" does not match it.
+const RETIRED_SCOPE = new RegExp(`@${["rfp", "hub"].join("-")}/`, "g");
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", ".turbo"]);
 const TEXT_EXT = /\.(json|jsonld|ts|mjs|js|md|yml|yaml)$/;
 
@@ -176,6 +180,13 @@ for (const file of walk(pkgRoot)) {
     fail(
       "neutrality",
       `${relative(pkgRoot, file)} references the retired placeholder domain (${hits2[0]}) — the project does not own it. Identifiers come from spec.config.json; there is no canonical domain yet`,
+    );
+  }
+  const hits3 = text.match(RETIRED_SCOPE);
+  if (hits3) {
+    fail(
+      "neutrality",
+      `${relative(pkgRoot, file)} references the retired npm scope (${hits3[0]}) — the package publishes as @the-rfp-hub/standard`,
     );
   }
 }

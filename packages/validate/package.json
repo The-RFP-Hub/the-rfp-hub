@@ -1,6 +1,6 @@
 {
   "name": "rfphub-validate",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Validate funding opportunities against the RFP Hub Standard (CLI + typed library).",
   "license": "MIT",
   "type": "module",
@@ -24,7 +24,8 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm -w build"
   },
   "dependencies": {
     "@the-rfp-hub/standard": "workspace:*",
