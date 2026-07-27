@@ -9,30 +9,65 @@ milestone **M2**.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/opportunities` | List (thin projection). Filters: `type`, `status`, `ecosystem`, `network`, `category`, `tag`, `organization`, `minAward`, `maxAward`, `q`; `sort` (`closesAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
+| `GET` | `/v1/opportunities` | List (thin projection). Filters: `fundingType`, `status`, `ecosystem`, `network`, `category`, `tag`, `organization`, `minAward`, `maxAward`, `deadlineAfter`, `deadlineBefore`, `q`; `sort` (`nextDeadlineAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
 | `GET` | `/v1/opportunities/:id` | One full Standard object (e.g. `fundingmap:1459`); `404` if not found. |
-| `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema. |
-| `GET` | `/v1/stats` | Totals + breakdowns by type/status/ecosystem. |
+| `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served verbatim as `application/schema+json`. |
+| `GET` | `/v1/stats` | Totals + breakdowns by funding type/status/ecosystem. |
 | `GET` | `/v1/health` | Liveness + DB readiness. |
 | `GET` | `/v1/docs` | Swagger UI (OpenAPI 3.1). |
 
 Public reads return only `review_status = 'approved' AND is_listed` rows. List responses omit the
-`opportunity[type]` block and `extensions` (a delivery optimization; see the Standard's FIELDS.md).
+`opportunity[fundingType]` block and `extensions` (a delivery optimization; see the Standard's
+FIELDS.md).
+
+### Deadlines, sorting and the rolling-only exclusion
+
+The Standard has no deadline scalar — `deadlines[]` holds `{type: 'fixed' | 'rolling', date?,
+label?}` entries and consumers must select by label, never by array position. The API therefore
+derives **`nextDeadlineAt`**: the earliest `fixed` deadline still in the future, stored in an
+indexed column and recomputed on every write.
+
+It is **null** for a record that is rolling-only, whose fixed deadlines have all passed, or that
+has no deadlines at all. Those records **sort last** (in both `asc` and `desc`) and are
+**excluded** from the `deadlineAfter`/`deadlineBefore` window filters, since there is no date to
+compare — the OpenAPI description of each of those parameters says so. `docs/data-model.md`
+covers the derivation and the matching auto-close rule (a rolling program never auto-closes).
+
+### Query-param renames (v1.0.0 re-cut)
+
+The API is pre-adoption, so the re-cut renames are applied without a back-compat shim:
+
+| Before | After |
+|---|---|
+| `?type=` | `?fundingType=` |
+| `?sort=closesAt` | `?sort=nextDeadlineAt` (also the new default) |
+| — | `?deadlineAfter=` / `?deadlineBefore=` (RFC 3339) |
+| `?organization=` (issuer FK) | `?organization=` — now matches **any** entry in `sponsoringOrganizations`, not only the primary `[0]` |
+| `/v1/stats` → `byType` | `/v1/stats` → `byFundingType` |
 
 ## Local development
 
 ```bash
 docker compose up -d                     # Postgres 15 (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
-pnpm --filter @rfp-hub/api migrate       # apply Drizzle migrations
+pnpm --filter @rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
 export SOURCE_API_URL=https://…          # upstream funding-map registry API (see .env-example)
 pnpm --filter @rfp-hub/api seed          # ingest 100+ entries from SOURCE_API_URL
+pnpm --filter @rfp-hub/api seed -- --strict   # ...and fail the run on ANY non-conforming record
 pnpm --filter @rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @rfp-hub/api export        # write JSON + CSV to ./exports
 ```
 
 Config is read from the environment (see `.env-example`): `DATABASE_URL`, `PORT`, `HOST`, and the
 seed source (`SOURCE_API_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`).
+
+> **Migrations were regenerated for the v1.0.0 re-cut.** `src/db/migrations` is a single
+> drizzle-kit-generated `0000_recut_v1_0_0` migration, not a rename chain on top of the
+> pre-re-cut schema — nothing had been published from this database, and keeping the directory
+> pure drizzle-kit output beats hand-writing a rename script. **If you have a database from
+> before the re-cut, drop it and re-migrate**, then re-run the seed; every row is re-derivable
+> from the upstream source. Regenerate after a schema change with
+> `pnpm --filter @rfp-hub/api db:generate`.
 
 ## Architecture
 
@@ -46,12 +81,19 @@ registration lives in `routes/<module>/index.ts`.
   [`docs/data-model.md`](./docs/data-model.md) (which tags what's deferred to M3/M4).
 - **Search**: `ILIKE` over title/summary/description (the generated `tsvector` column is deferred).
 - **Validation/types**: reuses [`@rfp-hub/standard`](../standard) (schema + types) and
-  [`rfphub-validate`](../validate) (the seed loader hard-validates every entry).
+  [`rfphub-validate`](../validate). **The seed loader validates every mapped record against the
+  schema before anything reaches the database** (`gateForSeed` in `scripts/seed.ts`), printing each
+  rejection with its id and the rules it broke — a rejected record is never silently subtracted
+  from a count. `--strict` (or `SEED_STRICT=1`) turns any rejection into a failed run; it is off by
+  default because the upstream is a third-party feed, so one malformed program should not block a
+  120-record seed.
 
 ## Tests
 
-- **unit** (`test/unit`, no DB): mappers vs the committed Standard examples, `map-program`
-  registry→Standard, query-param parsing.
+- **unit** (`test/unit`, no DB): mappers round-tripped against the committed Standard examples,
+  the `deadlines.ts` derivations (`nextDeadlineAt` / auto-close), the ingest guards
+  (one-block-per-`fundingType`, self-identification stripping), `map-program`
+  old-upstream→re-cut-Standard, query-param parsing, CSV serialization.
 - **integration** (`test/integration`, gated on `DATABASE_URL`): each endpoint via `app.inject()`
   against Postgres, with isolated self-cleaning fixtures.
 

@@ -1,14 +1,15 @@
-import type { Opportunity, OpportunityStatus, OpportunityType } from "@rfp-hub/standard";
+import type { FundingType, Opportunity, OpportunityStatus } from "@rfp-hub/standard";
 import {
   type SQL,
   and,
   arrayOverlaps,
-  asc,
   count,
   desc,
   eq,
+  gte,
   ilike,
   inArray,
+  lte,
   or,
   sql,
 } from "drizzle-orm";
@@ -28,19 +29,27 @@ import {
 } from "../../mappers/opportunity.mapper.js";
 import { paginate } from "../../shared/pagination.js";
 
-export type SortField = "closesAt" | "opensAt" | "postedAt" | "updatedAt" | "createdAt";
+/**
+ * Sortable fields. `closesAt` is gone with the re-cut — `nextDeadlineAt` (the derived, denormalized
+ * earliest FUTURE fixed deadline) replaces it and is the default.
+ */
+export type SortField = "nextDeadlineAt" | "opensAt" | "postedAt" | "updatedAt" | "createdAt";
 
 /** Normalized query for the list endpoint (produced by routes/opportunities/types.ts). */
 export interface OpportunityQuery {
-  type?: OpportunityType[];
+  fundingType?: FundingType[];
   status?: OpportunityStatus[];
   ecosystem?: string[];
   network?: string[];
   category?: string[];
   tag?: string[];
+  /** Sponsoring-organization slug — matches ANY sponsor, not only the primary one. */
   organization?: string;
   minAward?: number;
   maxAward?: number;
+  /** Deadline window over `next_deadline_at` (ISO instants). Rolling-only records are excluded. */
+  deadlineAfter?: Date;
+  deadlineBefore?: Date;
   q?: string;
   sort: SortField;
   order: "asc" | "desc";
@@ -57,7 +66,7 @@ export interface Page<T> {
 }
 
 const SORT_COLUMNS = {
-  closesAt: opportunities.closesAt,
+  nextDeadlineAt: opportunities.nextDeadlineAt,
   opensAt: opportunities.opensAt,
   postedAt: opportunities.postedAt,
   updatedAt: opportunities.updatedAt,
@@ -83,24 +92,31 @@ export class OpportunityService {
       eq(opportunities.reviewStatus, "approved"),
       eq(opportunities.isListed, true),
     ];
-    if (q.type?.length) where.push(inArray(opportunities.type, q.type));
+    if (q.fundingType?.length) where.push(inArray(opportunities.fundingType, q.fundingType));
     if (q.status?.length) where.push(inArray(opportunities.status, q.status));
     if (q.ecosystem?.length) where.push(arrayOverlaps(opportunities.ecosystems, q.ecosystem));
     if (q.network?.length) where.push(arrayOverlaps(opportunities.networks, q.network));
     if (q.category?.length) where.push(arrayOverlaps(opportunities.categories, q.category));
     if (q.tag?.length) where.push(arrayOverlaps(opportunities.tags, q.tag));
-    if (q.organization) where.push(eq(organizations.slug, q.organization));
+    // ANY sponsoring organization, via the denormalized GIN-indexed slug array.
+    if (q.organization) {
+      where.push(arrayOverlaps(opportunities.sponsorSlugs, [q.organization]));
+    }
     // Include the same-side bound so a row that sets only one of min/max/budget still matches.
     if (q.minAward !== undefined) {
       where.push(
-        sql`coalesce(${opportunities.maxAward}, ${opportunities.totalBudget}, ${opportunities.minAward}) >= ${q.minAward}`,
+        sql`coalesce(${opportunities.maxAward}, ${opportunities.budget}, ${opportunities.minAward}) >= ${q.minAward}`,
       );
     }
     if (q.maxAward !== undefined) {
       where.push(
-        sql`coalesce(${opportunities.minAward}, ${opportunities.totalBudget}, ${opportunities.maxAward}) <= ${q.maxAward}`,
+        sql`coalesce(${opportunities.minAward}, ${opportunities.budget}, ${opportunities.maxAward}) <= ${q.maxAward}`,
       );
     }
+    // Deadline window. `next_deadline_at` is NULL for rolling-only / all-past / no-deadline
+    // records, so those are excluded by either bound — documented on the query params.
+    if (q.deadlineAfter) where.push(gte(opportunities.nextDeadlineAt, q.deadlineAfter));
+    if (q.deadlineBefore) where.push(lte(opportunities.nextDeadlineAt, q.deadlineBefore));
     if (q.q) {
       const like = `%${escapeLike(q.q)}%`;
       const text = or(
@@ -113,31 +129,33 @@ export class OpportunityService {
     return where;
   }
 
+  /**
+   * Primary ORDER BY. NULLS LAST in BOTH directions so records with no next fixed deadline
+   * (rolling-only, all-past, or none at all) always sort after those that have one.
+   */
+  private orderBy(q: OpportunityQuery): SQL {
+    const col = SORT_COLUMNS[q.sort];
+    return q.order === "asc" ? sql`${col} asc nulls last` : sql`${col} desc nulls last`;
+  }
+
   /** List opportunities (thin projection) with filters, sort and pagination. */
   async getAll(q: OpportunityQuery): Promise<Page<OpportunitySummary>> {
     const { page, limit, offset } = paginate(q.page, q.limit);
     const whereClause = and(...this.liveFilters(q));
-    const sortCol = SORT_COLUMNS[q.sort];
-    const primary = q.order === "asc" ? asc(sortCol) : desc(sortCol);
 
     const rows = await this.db
       .select()
       .from(opportunities)
-      .innerJoin(organizations, eq(opportunities.organizationId, organizations.id))
       .where(whereClause)
-      .orderBy(primary, desc(opportunities.id))
+      .orderBy(this.orderBy(q), desc(opportunities.id))
       .limit(limit)
       .offset(offset);
 
-    const counted = await this.db
-      .select({ value: count() })
-      .from(opportunities)
-      .innerJoin(organizations, eq(opportunities.organizationId, organizations.id))
-      .where(whereClause);
+    const counted = await this.db.select({ value: count() }).from(opportunities).where(whereClause);
     const total = counted[0]?.value ?? 0;
 
     return {
-      items: rows.map((r) => toSummary(r.opportunities, r.organizations)),
+      items: rows.map(toSummary),
       page,
       limit,
       total,
@@ -150,7 +168,6 @@ export class OpportunityService {
     const rows = await this.db
       .select()
       .from(opportunities)
-      .innerJoin(organizations, eq(opportunities.organizationId, organizations.id))
       .where(
         and(
           eq(opportunities.publicId, publicId),
@@ -160,10 +177,15 @@ export class OpportunityService {
       )
       .limit(1);
     const r = rows[0];
-    return r ? toStandard(r.opportunities, r.organizations) : null;
+    return r ? toStandard(r) : null;
   }
 
   // ── write path (used by the seed loader, not exposed as a route in M2) ─────────────
+  /**
+   * Ingest one Standard object. Rejects a record carrying a block that does not match its
+   * `fundingType` (the re-cut forbids non-matching blocks), keeps the organization directory in
+   * sync, and derives `next_deadline_at` from `deadlines[]` on the way in.
+   */
   async upsertFromStandard(
     std: Opportunity,
     opts: {
@@ -172,11 +194,10 @@ export class OpportunityService {
       sourceSystem?: string;
     } = {},
   ): Promise<void> {
-    const { org, opp } = fromStandard(std);
-    const organizationId = await this.upsertOrganization(org);
+    const { orgs, opp } = fromStandard(std);
+    for (const org of orgs) await this.upsertOrganization(org);
     const row: OpportunityInsert = {
       ...opp,
-      organizationId,
       sourceSystem: opts.sourceSystem ?? null,
       reviewStatus: opts.reviewStatus ?? "approved",
       isListed: opts.isListed ?? true,
@@ -204,6 +225,7 @@ export class OpportunityService {
           bannerUrl: org.bannerUrl,
           socialLinks: org.socialLinks,
           ecosystems: org.ecosystems,
+          contacts: org.contacts,
           updatedAt: new Date(),
         },
       })

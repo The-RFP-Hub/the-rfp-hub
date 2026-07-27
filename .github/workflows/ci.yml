@@ -41,8 +41,16 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Type drift check (generated types vs schema)
+      - name: Type drift check (generated artifacts vs schema + spec.config.json)
         run: pnpm codegen:check
+
+      # Publication rules: context↔schema drift, version-string agreement, source neutrality.
+      - name: Spec publication rules
+        run: pnpm check
+
+      # Same neutrality rule, repo-wide: no internal tracker IDs anywhere in a public repo.
+      - name: Source neutrality (repo-wide)
+        run: pnpm check:neutral
 
       # Build first: validate's typecheck/tests resolve @rfp-hub/standard from its built dist.
       - name: Build

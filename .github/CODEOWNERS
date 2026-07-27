@@ -1,0 +1,32 @@
+# Code owners for the RFP Hub.
+#
+# This file is the authoritative list of editors of the standard (GOVERNANCE.md points here
+# rather than naming people in prose, because a prose list goes stale and a CODEOWNERS entry
+# cannot). Editors are added and removed by PR to this file.
+#
+# Ownership here means: a change to these paths needs an editor's review. It is not a claim of
+# authorship — the standard is CC0.
+
+# Default: the maintainer team reviews anything not matched below.
+*                                       @The-RFP-Hub/maintainers
+
+# ---------------------------------------------------------------- the standard --
+# Normative artifacts. A change to any of these is a change to the data contract.
+/packages/standard/schemas/**           @The-RFP-Hub/maintainers
+/packages/standard/registries/**        @The-RFP-Hub/maintainers
+/packages/standard/conformance/**       @The-RFP-Hub/maintainers
+/packages/standard/meta/**              @The-RFP-Hub/maintainers
+/packages/standard/spec.config.json     @The-RFP-Hub/maintainers
+
+# ------------------------------------------------------------------- governance --
+# The rules themselves, and the record of how they were decided.
+/packages/standard/PROCESS.md           @The-RFP-Hub/maintainers
+/packages/standard/NORMATIVE.md         @The-RFP-Hub/maintainers
+/packages/standard/CHANGELOG.md         @The-RFP-Hub/maintainers
+/GOVERNANCE.md                          @The-RFP-Hub/maintainers
+/CONTRIBUTING.md                        @The-RFP-Hub/maintainers
+/adr/**                                 @The-RFP-Hub/maintainers
+
+# ------------------------------------------------------------------------- CI ---
+# The checks that enforce all of the above.
+/.github/**                             @The-RFP-Hub/maintainers

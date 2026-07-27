@@ -1,0 +1,67 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:hackathon",
+  "fundingType": "hackathon",
+  "title": "Example Hackathon",
+  "description": "A hackathon whose registration deadline, submission deadline and event boundaries all live in the shared deadlines array. Adapted from the pre-re-cut valid fixture of the same name.",
+  "status": "upcoming",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Events",
+      "type": "company"
+    }
+  ],
+  "source": {
+    "ingestedVia": "import",
+    "originalId": "evt-1"
+  },
+  "ecosystems": ["Ethereum"],
+  "applicationUrl": "https://example.org/hack",
+  "funding": {
+    "currency": "USD",
+    "budget": 100000
+  },
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-05-01T23:59:59.000Z",
+      "label": "registration"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-05-10T12:00:00.000Z",
+      "label": "event start"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-05-12T12:00:00.000Z",
+      "label": "submission"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-05-12T18:00:00.000Z",
+      "label": "event end"
+    }
+  ],
+  "hackathon": {
+    "location": "Berlin, Germany",
+    "online": true,
+    "tracks": ["DeFi", "Infra"],
+    "prizes": [
+      {
+        "track": "DeFi",
+        "amount": 25000,
+        "currency": "USD"
+      },
+      {
+        "track": "Infra",
+        "amount": 25000,
+        "currency": "USD"
+      }
+    ],
+    "teamSize": {
+      "min": 1,
+      "max": 5
+    }
+  }
+}

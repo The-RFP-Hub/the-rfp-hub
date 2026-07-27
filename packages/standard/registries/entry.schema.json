@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/registries/entry.schema.json",
+  "title": "RFP Hub registry file",
+  "description": "The shape of every registry file under packages/standard/registries/. A registry governs one open vocabulary in the standard: the schema keeps the field open (free text), and the registry keeps the values interoperable. Registered values are normative; the schema does not enforce them and unregistered values remain valid. Entries are NEVER deleted — set status to 'deprecated' and point replacedBy at the successor.",
+  "type": "object",
+  "propertyNames": { "minLength": 1, "maxLength": 120 },
+  "additionalProperties": { "$ref": "#/$defs/entry" },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "title": "Registry entry",
+      "additionalProperties": false,
+      "required": ["description", "status", "since"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What this value means and when a publisher should use it."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "deprecated"],
+          "description": "'active' = registered and recommended. 'deprecated' = still valid data, no longer recommended; see replacedBy."
+        },
+        "since": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "The spec version in which this value was registered."
+        },
+        "replacedBy": {
+          "type": ["string", "null"],
+          "description": "Key of the successor entry, when status is 'deprecated'."
+        },
+        "reference": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "A URL supporting the registration (a publisher's own documentation, a governance post)."
+        },
+        "examples": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Real values or phrasings seen in the wild for this key. May be empty."
+        }
+      }
+    }
+  }
+}

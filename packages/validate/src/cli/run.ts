@@ -84,7 +84,8 @@ export function run(argv: string[]): number {
         index,
         count: entries.length,
         id: typeof obj.id === "string" ? obj.id : undefined,
-        type: typeof obj.type === "string" ? obj.type : undefined,
+        fundingType: typeof obj.fundingType === "string" ? obj.fundingType : undefined,
+        data,
         result: validateOpportunity(data, { validator }),
       });
     });
@@ -94,6 +95,8 @@ export function run(argv: string[]): number {
   reporter.report(results);
 
   if (results.some((r) => !r.result.valid)) return 1;
+  // --strict promotes the advisory tier: quality findings become a failing build.
+  if (opts.strict && results.some((r) => r.result.warnings.length > 0)) return 1;
   if (ioError) return 2;
   return 0;
 }

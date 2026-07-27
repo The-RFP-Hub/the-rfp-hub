@@ -1,5 +1,5 @@
 {
-  "id": "3f8d8d1e-98e2-4b1f-b50d-8a9611008011",
+  "id": "67a68dd7-e92f-4a06-b386-c1395059ce94",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -111,9 +111,9 @@
           "notNull": true,
           "default": "'1.0.0'"
         },
-        "type": {
-          "name": "type",
-          "type": "opportunity_type",
+        "funding_type": {
+          "name": "funding_type",
+          "type": "funding_type",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -143,11 +143,25 @@
           "primaryKey": false,
           "notNull": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "bigint",
+        "sponsoring_organizations": {
+          "name": "sponsoring_organizations",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "operating_organizations": {
+          "name": "operating_organizations",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "sponsor_slugs": {
+          "name": "sponsor_slugs",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
         },
         "application_url": {
           "name": "application_url",
@@ -208,6 +222,31 @@
           "notNull": true,
           "default": "'{}'"
         },
+        "eligibility": {
+          "name": "eligibility",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "prerequisites": {
+          "name": "prerequisites",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resource_links": {
+          "name": "resource_links",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "service_agreement": {
+          "name": "service_agreement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "currency": {
           "name": "currency",
           "type": "text",
@@ -226,23 +265,24 @@
           "primaryKey": false,
           "notNull": false
         },
-        "total_budget": {
-          "name": "total_budget",
+        "budget": {
+          "name": "budget",
           "type": "numeric",
           "primaryKey": false,
           "notNull": false
         },
-        "amount_distributed": {
-          "name": "amount_distributed",
+        "allocated": {
+          "name": "allocated",
           "type": "numeric",
           "primaryKey": false,
           "notNull": false
         },
-        "awards_to_date": {
-          "name": "awards_to_date",
-          "type": "integer",
+        "milestones": {
+          "name": "milestones",
+          "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "opens_at": {
           "name": "opens_at",
@@ -250,8 +290,15 @@
           "primaryKey": false,
           "notNull": false
         },
-        "closes_at": {
-          "name": "closes_at",
+        "deadlines": {
+          "name": "deadlines",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "next_deadline_at": {
+          "name": "next_deadline_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -275,12 +322,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "source_url": {
-          "name": "source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
         },
         "source_publisher": {
           "name": "source_publisher",
@@ -378,7 +419,7 @@
               "nulls": "last"
             },
             {
-              "expression": "closes_at",
+              "expression": "next_deadline_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -390,11 +431,11 @@
           "method": "btree",
           "with": {}
         },
-        "ix_opp_type": {
-          "name": "ix_opp_type",
+        "ix_opp_funding_type": {
+          "name": "ix_opp_funding_type",
           "columns": [
             {
-              "expression": "type",
+              "expression": "funding_type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -405,26 +446,11 @@
           "method": "btree",
           "with": {}
         },
-        "ix_opp_org": {
-          "name": "ix_opp_org",
+        "ix_opp_next_deadline": {
+          "name": "ix_opp_next_deadline",
           "columns": [
             {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "ix_opp_closes_at": {
-          "name": "ix_opp_closes_at",
-          "columns": [
-            {
-              "expression": "closes_at",
+              "expression": "next_deadline_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -439,7 +465,7 @@
           "name": "ix_opp_budget",
           "columns": [
             {
-              "expression": "total_budget",
+              "expression": "budget",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -546,6 +572,21 @@
           "method": "gin",
           "with": {}
         },
+        "gin_opp_sponsors": {
+          "name": "gin_opp_sponsors",
+          "columns": [
+            {
+              "expression": "sponsor_slugs",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
         "ux_opp_source": {
           "name": "ux_opp_source",
           "columns": [
@@ -563,28 +604,21 @@
             }
           ],
           "isUnique": true,
+          "where": "\"opportunities\".\"source_system\" IS NOT NULL AND \"opportunities\".\"original_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
-      "foreignKeys": {
-        "opportunities_organization_id_organizations_id_fk": {
-          "name": "opportunities_organization_id_organizations_id_fk",
-          "tableFrom": "opportunities",
-          "tableTo": "organizations",
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "opportunities_publicId_unique": {
           "name": "opportunities_publicId_unique",
           "nullsNotDistinct": false,
-          "columns": ["public_id"]
+          "columns": [
+            "public_id"
+          ]
         }
       },
       "policies": {},
@@ -669,6 +703,13 @@
           "notNull": true,
           "default": "'{}'"
         },
+        "contacts": {
+          "name": "contacts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -691,7 +732,9 @@
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": ["slug"]
+          "columns": [
+            "slug"
+          ]
         }
       },
       "policies": {},
@@ -700,30 +743,60 @@
     }
   },
   "enums": {
+    "public.funding_type": {
+      "name": "funding_type",
+      "schema": "public",
+      "values": [
+        "grant",
+        "hackathon",
+        "bounty",
+        "accelerator",
+        "vc_fund",
+        "rfp"
+      ]
+    },
     "public.ingestion_method": {
       "name": "ingestion_method",
       "schema": "public",
-      "values": ["publisher_api", "submission", "scrape", "import", "outbox"]
+      "values": [
+        "publisher_api",
+        "submission",
+        "scrape",
+        "import",
+        "outbox"
+      ]
     },
     "public.opportunity_status": {
       "name": "opportunity_status",
       "schema": "public",
-      "values": ["upcoming", "open", "closed", "archived"]
-    },
-    "public.opportunity_type": {
-      "name": "opportunity_type",
-      "schema": "public",
-      "values": ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"]
+      "values": [
+        "upcoming",
+        "open",
+        "closed",
+        "archived"
+      ]
     },
     "public.org_type": {
       "name": "org_type",
       "schema": "public",
-      "values": ["foundation", "dao", "company", "protocol", "program", "individual", "other"]
+      "values": [
+        "foundation",
+        "dao",
+        "company",
+        "protocol",
+        "program",
+        "individual",
+        "other"
+      ]
     },
     "public.review_status": {
       "name": "review_status",
       "schema": "public",
-      "values": ["pending", "approved", "rejected"]
+      "values": [
+        "pending",
+        "approved",
+        "rejected"
+      ]
     }
   },
   "schemas": {},

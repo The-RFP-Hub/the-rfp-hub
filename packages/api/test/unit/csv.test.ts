@@ -33,16 +33,23 @@ describe("toCsv", () => {
   const opp = {
     specVersion: "1.0.0",
     id: "x:1",
-    type: "grant",
+    fundingType: "grant",
     title: "Title, with comma",
     description: "d",
     status: "open",
-    organization: { name: "Org", slug: "org" },
-    source: { url: "https://example.com/1", ingestedVia: "import", verifiedAgainstSource: null },
+    sponsoringOrganizations: [
+      { name: "Primary Org", slug: "primary-org" },
+      { name: "Second Org", slug: "second-org" },
+    ],
+    source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: ["Ethereum", "Base"],
     categories: ["DeFi"],
-    funding: { minAward: 100, maxAward: 500, currency: "USD" },
-    closesAt: "2026-12-31T00:00:00.000Z",
+    funding: { minAward: 100, maxAward: 500, budget: 9000, allocated: 4000, currency: "USD" },
+    applicationUrl: "https://example.com/1",
+    deadlines: [
+      { type: "fixed", date: "2999-12-31T00:00:00.000Z", label: "application" },
+      { type: "fixed", date: "2000-01-01T00:00:00.000Z", label: "registration" },
+    ],
     grant: {},
   } as Opportunity;
 
@@ -54,6 +61,38 @@ describe("toCsv", () => {
     expect(lines[1]).toContain('"Title, with comma"'); // comma quoted
     expect(lines[1]).toContain("Ethereum|Base"); // array joined
     expect(lines[1]).toContain("https://example.com/1");
+  });
+
+  it("uses sponsoringOrganizations[0] as the display organization", () => {
+    const row = toCsv([opp]).trimEnd().split("\n")[1] as string;
+    expect(row).toContain("Primary Org");
+    expect(row).toContain("primary-org");
+    expect(row).not.toContain("Second Org");
+  });
+
+  it("flattens deadlines[] to the derived nextDeadlineAt, skipping past entries", () => {
+    const row = toCsv([opp]).trimEnd().split("\n")[1] as string;
+    expect(row).toContain("2999-12-31T00:00:00.000Z");
+    expect(row).not.toContain("2000-01-01T00:00:00.000Z");
+  });
+
+  it("marks a rolling program (empty nextDeadlineAt, rollingDeadline=true)", () => {
+    // no embedded commas in this fixture, so a naive split lines up with CSV_COLUMNS
+    const rolling = {
+      ...opp,
+      title: "Rolling program",
+      deadlines: [{ type: "rolling", label: "application" }],
+    } as Opportunity;
+    const cells = (toCsv([rolling]).trimEnd().split("\n")[1] as string).split(",");
+    expect(cells[CSV_COLUMNS.indexOf("nextDeadlineAt")]).toBe("");
+    expect(cells[CSV_COLUMNS.indexOf("rollingDeadline")]).toBe("true");
+  });
+
+  it("no longer emits the removed source.url / closesAt columns", () => {
+    expect(CSV_COLUMNS).not.toContain("sourceUrl");
+    expect(CSV_COLUMNS).not.toContain("closesAt");
+    expect(CSV_COLUMNS).not.toContain("totalBudget");
+    expect(CSV_COLUMNS).toContain("fundingType");
   });
 
   it("ends with a trailing newline", () => {

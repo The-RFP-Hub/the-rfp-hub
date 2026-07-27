@@ -1,17 +1,18 @@
 {
   "specVersion": "1.0.0",
   "id": "fundingmap:1459",
-  "type": "grant",
+  "fundingType": "grant",
   "title": "Prezenti Boost Pool S2",
   "description": "This pool is designed for projects with a proven track record in other ecosystems that we aim to fast-track for deployment on Celo. Delivered by Prezenti in partnership with the Celo Foundation’s DevRel team, the program offers a streamlined process and targeted, high-impact funding to accelerate onboarding.",
   "summary": "Fast-track funding for proven projects launching on Celo, run by Prezenti with CF DevRel team.",
   "status": "open",
-  "organization": {
-    "name": "Prezenti Boost Pool S2",
-    "slug": "celo"
-  },
+  "sponsoringOrganizations": [
+    {
+      "name": "Prezenti Boost Pool S2",
+      "slug": "celo"
+    }
+  ],
   "source": {
-    "url": "https://prezenti.xyz/grants",
     "publisher": "celo",
     "ingestedVia": "import",
     "originalId": "1459",
@@ -40,6 +41,7 @@
     "Wallets",
     "Yield Farming"
   ],
+  "applicationUrl": "https://prezenti.xyz/grants",
   "socialLinks": {
     "twitter": "https://x.com/prezenti_grants",
     "discord": "https://discord.gg/YCgGjFaP7f",
@@ -47,12 +49,18 @@
     "blog": "https://forum.celo.org/search?q=Prezenti"
   },
   "funding": {
+    "budget": 70000,
     "minAward": 5000,
-    "maxAward": 5000,
-    "totalBudget": 70000
+    "maxAward": 5000
   },
   "opensAt": "2026-02-25T00:00:00.000Z",
-  "closesAt": "2026-06-30T23:59:00.000Z",
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-06-30T23:59:00.000Z",
+      "label": "application"
+    }
+  ],
   "createdAt": "2026-05-04T20:43:34.000Z",
   "updatedAt": "2026-05-18T17:16:27.000Z",
   "grant": {}

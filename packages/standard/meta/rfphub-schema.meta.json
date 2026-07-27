@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/meta/rfphub-schema.meta.json",
+  "title": "RFP Hub schema metaschema",
+  "description": "Constrains the shape of opportunity.schema.json itself and legalises the x- annotation keywords the standard uses on top of the 2020-12 vocabulary. This is deliberately NOT a JSON Schema $vocabulary or a custom dialect — the standard is an application schema, not a schema language. It exists so the annotations are a machine-checked contract rather than a convention, and so nobody hand-edits one into an invalid shape. Validate the schema file against this in CI.",
+  "$comment": "Only three x- keywords exist, and each earns its place by expressing something 2020-12 cannot. Anything 2020-12 CAN express must use the standard keyword: `deprecated`, `examples`, `$comment`, `default`, `readOnly` and `writeOnly` are all native and must never be re-invented with an x- prefix.",
+  "type": "object",
+  "required": ["$schema", "$id", "title", "description", "type", "properties", "$defs"],
+  "properties": {
+    "$schema": {
+      "const": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The dialect is pinned. Never alias it to 'latest' — the dialect choice is extremely sticky once publishers have tooling."
+    },
+    "$id": {
+      "type": "string",
+      "format": "uri",
+      "description": "Stamped from spec.config.json by codegen; never hand-edited."
+    },
+    "type": { "const": "object" },
+    "additionalProperties": {
+      "const": false,
+      "description": "The top level is closed. Instances extend through the `extensions` object, not through unknown keys."
+    },
+    "required": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "properties": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/annotatedSchema" }
+    },
+    "$defs": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/annotatedSchema" }
+    },
+    "allOf": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/annotatedSchema" }
+    }
+  },
+  "$ref": "#/$defs/annotations",
+  "$defs": {
+    "annotations": {
+      "type": "object",
+      "description": "The annotation keywords any schema object in our file may carry: the native 2020-12 metadata keywords we rely on, plus the three x- extensions.",
+      "dependentRequired": {
+        "x-deprecated": ["deprecated"]
+      },
+      "properties": {
+        "deprecated": {
+          "type": "boolean",
+          "description": "THE NATIVE 2020-12 DEPRECATION FLAG, and the machine-readable one. Any deprecated element sets `deprecated: true` here; generic tooling that knows nothing about this standard still sees it. `x-deprecated` may accompany it but never replaces it — see dependentRequired above."
+        },
+        "$comment": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Editorial note for maintainers of this schema. Not for consumers, and not rendered into the generated field reference — that is what `description` is for. Design rationale, deliberate omissions and traps a future editor might 'fix' belong here."
+        },
+        "examples": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Native 2020-12 annotation: an array of valid instance values for this element. Non-normative and non-validating — an example is an illustration, not a constraint. Prefer them on any element whose shape is not obvious from its type."
+        },
+        "x-stability": {
+          "type": "string",
+          "enum": ["stable", "provisional"],
+          "description": "'stable' = the element is expected to survive unchanged. 'provisional' = accepted on single-source evidence or otherwise at risk; it may change or be withdrawn without the ceremony a stable element would get. ABSENCE MEANS 'stable': the document root declares `x-stability: stable` and every element inherits that unless it says otherwise, so only the at-risk elements are annotated."
+        },
+        "x-since": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "The spec version in which this schema element was introduced. 2020-12 has no native equivalent."
+        },
+        "x-deprecated": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["since"],
+          "properties": {
+            "since": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+$",
+              "description": "The spec version in which this element was deprecated."
+            },
+            "replacedBy": {
+              "type": ["string", "null"],
+              "description": "Path or name of the successor element, or null when there is none."
+            },
+            "note": {
+              "type": ["string", "null"],
+              "description": "Why it was deprecated and what a publisher should do instead."
+            }
+          },
+          "description": "Carries ONLY the deprecation metadata 2020-12 cannot express: which version deprecated the element, what replaces it, and why. The deprecation itself is signalled by the native `deprecated: true`, which this keyword requires — it is a supplement, never a substitute. Elements removed outright are recorded in the release's field mapping table in CHANGELOG.md instead."
+        }
+      }
+    },
+    "annotatedSchema": {
+      "description": "Any subschema in our file: an object schema (which may carry the annotations above) or the boolean form.",
+      "anyOf": [
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "$ref": "#/$defs/annotations",
+          "properties": {
+            "properties": {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/annotatedSchema" }
+            },
+            "items": { "$ref": "#/$defs/annotatedSchema" },
+            "additionalProperties": {
+              "anyOf": [{ "type": "boolean" }, { "$ref": "#/$defs/annotatedSchema" }]
+            },
+            "allOf": { "type": "array", "items": { "$ref": "#/$defs/annotatedSchema" } },
+            "anyOf": { "type": "array", "items": { "$ref": "#/$defs/annotatedSchema" } },
+            "not": { "$ref": "#/$defs/annotatedSchema" },
+            "if": { "$ref": "#/$defs/annotatedSchema" },
+            "then": { "$ref": "#/$defs/annotatedSchema" },
+            "else": { "$ref": "#/$defs/annotatedSchema" },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Every named element in our schema carries a description; the field reference is generated from them."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

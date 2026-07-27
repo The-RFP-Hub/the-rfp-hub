@@ -24,17 +24,15 @@ run("open-data export", () => {
       {
         specVersion: "1.0.0",
         id: fixtureId,
-        type: "grant",
+        fundingType: "grant",
         title: "Export Fixture",
         description: "d",
         status: "open",
-        organization: { name: "Export Org", slug: "export-org" },
-        source: {
-          url: "https://example.com/export-1",
-          ingestedVia: "import",
-          verifiedAgainstSource: null,
-        },
+        sponsoringOrganizations: [{ name: "Export Org", slug: "export-org" }],
+        source: { ingestedVia: "import", verifiedAgainstSource: null },
         ecosystems: ["EXPORTTEST"],
+        funding: { budget: 12345, currency: "USD" },
+        deadlines: [{ type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
         grant: {},
       } satisfies Opportunity,
       { reviewStatus: "approved", isListed: true },
@@ -57,11 +55,21 @@ run("open-data export", () => {
     expect(json.license).toBe("CC0-1.0");
     expect(json.specVersion).toBe("1.0.0");
     expect(json.count).toBe(count);
-    expect(json.opportunities.some((o: Opportunity) => o.id === fixtureId)).toBe(true);
+    const exported = json.opportunities.find((o: Opportunity) => o.id === fixtureId);
+    expect(exported).toBeTruthy();
+    // the JSON export carries the full re-cut shape, including the deadlines array
+    expect(exported.fundingType).toBe("grant");
+    expect(exported.sponsoringOrganizations[0].slug).toBe("export-org");
+    expect(exported.funding).toEqual({ budget: 12345, currency: "USD" });
+    expect(exported.deadlines).toHaveLength(1);
+    expect(exported).not.toHaveProperty("closesAt");
 
     const csv = await readFile(csvPath, "utf8");
-    expect(csv.split("\n")[0]).toContain("id,type,status,title");
+    expect(csv.split("\n")[0]).toContain("id,fundingType,status,title");
+    expect(csv.split("\n")[0]).toContain("nextDeadlineAt,rollingDeadline");
     expect(csv).toContain(fixtureId);
+    // CSV flattens deadlines[] to the derived nextDeadlineAt
+    expect(csv).toContain("2999-01-01T00:00:00.000Z");
 
     const license = await readFile(licensePath, "utf8");
     expect(license).toContain("SPDX-License-Identifier: CC0-1.0");

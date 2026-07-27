@@ -11,8 +11,10 @@ export interface AppConfig {
   /** Provenance namespace recorded on seeded entries (source_system column + public id prefix). */
   sourceSystem: string;
   /**
-   * Base URL for a program's page on the upstream source, used as a provenance fallback when a
-   * program has no application/website URL. Deployment-specific — set via SOURCE_PROGRAM_URL_BASE.
+   * Base URL for a program's page on the upstream source. Used as the last-resort
+   * `applicationUrl` when a program publishes no submission or website URL — the re-cut removed
+   * `source.url`, making `applicationUrl` the only link-back target. Deployment-specific — set
+   * via SOURCE_PROGRAM_URL_BASE.
    */
   sourceProgramUrlBase: string;
 }

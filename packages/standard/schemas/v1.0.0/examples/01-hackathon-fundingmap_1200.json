@@ -1,17 +1,18 @@
 {
   "specVersion": "1.0.0",
   "id": "fundingmap:1200",
-  "type": "hackathon",
+  "fundingType": "hackathon",
   "title": "Electrothon 8.0",
   "description": "In the neon glow of Eternum’s endless corridors, a new era of Electrothon powers up. The screens flicker, the circuits hum, and the pixelated gates of the Labyrinth swing open for those daring enough to enter. Here, every coder is a player, every idea a power-up, and every challenge a boss fight waiting to be conquered.\n\nWithin the Hall of Circuits, echoes of past champions still pulse like 8-bit heartbeats. They navigated every twist, cracked every code, and pushed the machine to its very limit. This spring, join North India's biggest hackathon as the Labyrinth of Eternum is set to be bigger, brighter, and far more unpredictable. Once again, we call upon the next generation of builders, breakers, dreamers, and doers.",
   "summary": "In the neon glow of Eternum’s endless corridors, a new era of Electrothon powers up.",
   "status": "archived",
-  "organization": {
-    "name": "Electrothon 8.0",
-    "website": "https://electrothon-8.devfolio.co"
-  },
+  "sponsoringOrganizations": [
+    {
+      "name": "Electrothon 8.0",
+      "website": "https://electrothon-8.devfolio.co"
+    }
+  ],
   "source": {
-    "url": "https://electrothon-8.devfolio.co",
     "ingestedVia": "import",
     "originalId": "1200",
     "verifiedAgainstSource": null
@@ -25,19 +26,36 @@
   "applicationUrl": "https://electrothon-8.devfolio.co",
   "website": "https://electrothon-8.devfolio.co",
   "funding": {
-    "totalBudget": 113565
+    "budget": 113565
   },
   "opensAt": "2026-03-13T06:30:00.000Z",
-  "closesAt": "2026-03-10T18:29:00.000Z",
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-03-10T18:29:00.000Z",
+      "label": "application"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-03-10T18:29:00.000Z",
+      "label": "registration"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-03-13T06:30:00.000Z",
+      "label": "event start"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-03-15T04:30:00.000Z",
+      "label": "event end"
+    }
+  ],
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-13T13:16:36.000Z",
   "hackathon": {
-    "startDate": "2026-03-13T06:30:00.000Z",
-    "endDate": "2026-03-15T04:30:00.000Z",
     "location": "National Institute of Technology, Hamirpur, NIT, Hamirpur, Himachal Pradesh, India",
     "online": null,
-    "registrationDeadline": "2026-03-10T18:29:00.000Z",
-    "submissionDeadline": null,
     "prizes": [
       {
         "track": null,

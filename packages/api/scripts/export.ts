@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { SPEC_VERSION } from "@rfp-hub/standard";
 import { and, asc, eq } from "drizzle-orm";
 import { db, pool } from "../src/db/client.js";
-import { datasetSnapshots, opportunities, organizations } from "../src/db/schema.js";
+import { datasetSnapshots, opportunities } from "../src/db/schema.js";
 import { toStandard } from "../src/modules/mappers/opportunity.mapper.js";
 import { toCsv } from "./csv.js";
 
@@ -36,11 +36,10 @@ export async function runExport(outDir: string = OUT_DIR): Promise<{
   const rows = await db
     .select()
     .from(opportunities)
-    .innerJoin(organizations, eq(opportunities.organizationId, organizations.id))
     .where(and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true)))
     .orderBy(asc(opportunities.publicId));
 
-  const items = rows.map((r) => toStandard(r.opportunities, r.organizations));
+  const items = rows.map(toStandard);
   const generatedAt = new Date().toISOString();
   const date = generatedAt.slice(0, 10);
 

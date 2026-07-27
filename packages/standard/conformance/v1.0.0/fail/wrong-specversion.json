@@ -1,0 +1,15 @@
+{
+  "specVersion": "2.0.0",
+  "id": "conformance:bad-specversion",
+  "fundingType": "grant",
+  "title": "Wrong spec version",
+  "description": "specVersion is a const: this schema defines version 1.0.0 and nothing else. A patch-line pattern was tried during the re-cut and reverted the same day, so 1.0.1 fails here too — a spec patch would be a new cut, not a value a document may assert unilaterally.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "grant": {}
+}

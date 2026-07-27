@@ -20,14 +20,22 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
     opportunityController.getAll,
   );
 
-  // static `/schema` is matched ahead of the `/:id` param route by the router
+  // static `/schema` is matched ahead of the `/:id` param route by the router.
+  // Served as `application/schema+json` (RFC 9485 / the JSON Schema media type) rather than
+  // wrapped in an envelope, so a generic validator can consume the URL directly.
   router.get(
     "/schema",
     {
       schema: {
         tags: ["opportunities"],
-        summary: "The RFP Hub Standard JSON Schema",
-        response: { 200: { $ref: "SchemaResponse#" } },
+        summary: "The RFP Hub Standard JSON Schema (application/schema+json)",
+        response: {
+          200: {
+            content: {
+              "application/schema+json": { schema: { $ref: "SchemaResponse#" } },
+            },
+          },
+        },
       },
     },
     opportunityController.schema,

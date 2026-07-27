@@ -1,37 +1,59 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rfphub.org/standard/v1.0.0/opportunity.schema.json",
+  "$id": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json",
   "title": "RFP Hub Opportunity",
-  "description": "RFP Hub Standard v1.0.0 — a canonical, ecosystem-neutral representation of an Ethereum-ecosystem funding opportunity. Covers six opportunity types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Released as CC0 1.0. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. See FIELDS.md for the full field reference.",
+  "description": "RFP Hub Standard v1.0.0 — the normative definition of a funding opportunity in the Ethereum ecosystem. A document conforms to this version of the standard when it validates against this file. Covers six funding types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. Published under CC0 1.0 Universal. The field reference is FIELDS.md, the normative/informative split is NORMATIVE.md, and both ship alongside this file in the @rfp-hub/standard package and at https://github.com/The-RFP-Hub/the-rfp-hub.",
+  "$comment": "AUTHORING NOTES (not for consumers). (1) `additionalProperties: false` at this level is safe alongside `allOf` only because no branch introduces a property name: each branch uses `required` and `not` exclusively, and every name they mention is declared in this object's `properties`. That is the classic 2020-12 trap avoided by construction rather than by `unevaluatedProperties`, which is deliberately not used — it would relax this object from closed to 'closed after evaluation' for no gain. Any future branch that adds `properties` MUST be paired with a switch to `unevaluatedProperties: false` here. The same reasoning applies inside $defs/deadline, whose `then` narrows `date`, a property already declared in its own `properties`. (2) Absence of `x-stability` means `stable`; only fields resting on narrow evidence are annotated `provisional`. (3) Property order is grouped identity → classification → organisations → provenance → content → money → time → type blocks → extensions, and `required` follows property order, so diffs stay reviewable.",
   "type": "object",
   "additionalProperties": false,
+  "x-stability": "stable",
+  "x-since": "1.0.0",
   "required": [
     "specVersion",
     "id",
-    "type",
+    "fundingType",
     "title",
     "description",
     "status",
-    "organization",
+    "sponsoringOrganizations",
     "source"
   ],
   "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional self-identification: the URL of the RFP Hub schema this document claims to conform to. Permitted so a generic validator can discover the contract from the instance alone. Ignored by validation — naming a different schema here does not change which schema the document is validated against.",
+      "examples": ["https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json"]
+    },
+    "@context": {
+      "anyOf": [{ "type": "string" }, { "type": "object" }, { "type": "array" }],
+      "description": "Optional JSON-LD context: a URL, an inline context object, or an array of either. Permitted so an instance can be consumed as linked data. Ignored by validation — the standard makes no claim about its contents.",
+      "examples": ["https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/context.jsonld"]
+    },
+    "@type": {
+      "anyOf": [{ "type": "string" }, { "type": "array" }],
+      "description": "Optional JSON-LD type, or an array of types. Permitted so an instance can be consumed as linked data; ignored by validation.",
+      "examples": ["schema:Grant"]
+    },
     "specVersion": {
       "type": "string",
       "const": "1.0.0",
-      "description": "The RFP Hub Standard version this entry conforms to. Fixed at 1.0.0 for this schema. Consumers use it to select the correct validator."
+      "description": "The RFP Hub Standard version this entry conforms to. Fixed at 1.0.0 for this schema. Consumers use it to select the correct validator.",
+      "examples": ["1.0.0"]
     },
     "id": {
       "type": "string",
       "minLength": 1,
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9._:-]+$",
-      "description": "Stable, unique identifier for the opportunity within the Hub. Immutable once assigned. A namespaced form (e.g. 'filecoin:propgf-batch-3') is recommended but not required."
+      "description": "Stable, unique identifier for the opportunity within the Hub. Immutable once assigned. A namespaced form is recommended but not required.",
+      "examples": ["filecoin:propgf-batch-3", "fundingmap:1242"]
     },
-    "type": {
+    "fundingType": {
       "type": "string",
       "enum": ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"],
-      "description": "The kind of funding opportunity. Every entry carries a type-specific object under a key EQUAL to this value (type 'hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.type]`. The matching block is required for all six types (see allOf); for grants it may be an empty object."
+      "description": "The kind of funding opportunity, and the structural discriminator of the standard. Every entry carries a type-specific object under a key equal to this value ('hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.fundingType]`. The matching block is required and no other type block may be present; for grants the block may be empty.",
+      "examples": ["grant", "rfp"]
     },
     "title": {
       "type": "string",
@@ -42,44 +64,55 @@
     "description": {
       "type": "string",
       "minLength": 1,
-      "description": "Full description of the opportunity. Markdown is permitted; consumers should treat it as untrusted and sanitise before rendering."
+      "description": "Full description of the opportunity. Markdown is permitted; consumers are advised to treat it as untrusted and sanitise before rendering."
     },
     "summary": {
       "type": ["string", "null"],
       "maxLength": 500,
-      "description": "Optional short teaser (≈1–2 sentences) for list/card views."
+      "description": "Optional short teaser (roughly one or two sentences) for list and card views."
     },
     "status": {
       "type": "string",
       "enum": ["upcoming", "open", "closed", "archived"],
-      "description": "Lifecycle status of the opportunity. 'upcoming' = announced but not yet accepting applications; 'open' = currently accepting; 'closed' = deadline passed or no longer accepting (auto-set when closesAt passes); 'archived' = withdrawn or retired. Editorial/review state (pending, rejected) is NOT represented here — it is server-side metadata."
+      "description": "Lifecycle status of the opportunity. 'upcoming' = announced but not yet accepting applications, and also the value for a pre-open posting — there is no 'draft' status; 'open' = currently accepting; 'closed' = no longer accepting; 'archived' = withdrawn or retired. Editorial and review state (pending, rejected) is not represented here — it is server-side metadata.",
+      "examples": ["open"]
     },
-    "organization": {
-      "$ref": "#/$defs/organization",
-      "description": "The organisation issuing or hosting the opportunity."
+    "sponsoringOrganizations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/organization" },
+      "description": "The organisations issuing or backing the opportunity. Array order is semantic: entry 0 is the primary organisation and the one to display. This is the issuer or backer, not necessarily the source of funds — for donor-funded models the money's origin is deliberately not modelled, and the party running the process belongs in operatingOrganizations instead.",
+      "$comment": "Deliberately not uniqueItems: co-sponsors are distinguished by their own fields, and enforcing uniqueness on a whole entity object catches nothing useful while making a partially-populated duplicate a hard error."
+    },
+    "operatingOrganizations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/organization" },
+      "description": "The organisations that actually run intake and process — for example an operator running the application funnel on a funder's behalf. May be absent or empty when the sponsor also operates."
     },
     "source": {
       "$ref": "#/$defs/provenance",
-      "description": "Provenance of this entry, including the canonical source URL and verification status. Required so every entry is traceable to an original posting."
+      "description": "Provenance of this entry. Required as an object, but every field inside it is optional, so `\"source\": {}` validates. Provenance completeness is a data-quality and ingestion-policy concern rather than a schema constraint."
     },
     "ecosystems": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true,
-      "description": "Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped (per DEV-437), but this is an open, extensible list — NOT a closed enum — so L2s and ETH-adjacent ecosystems are first-class. Examples (non-normative): 'Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'Scroll', 'zkSync', 'Linea', 'OP Stack', 'Celo'.",
+      "description": "Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped, but this is an open, extensible list — not a closed enum, and deliberately not registry-governed either — so L2s and ETH-adjacent ecosystems are first-class and a newly launched one needs no process.",
       "examples": [["Optimism"], ["Ethereum", "Base"]]
     },
     "networks": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true,
-      "description": "Specific networks/chains the funding is denominated on or deployed to (e.g. 'optimism', 'base', 'ethereum-mainnet'). Free-text; not constrained to a closed set in v1.0.0."
+      "description": "Specific networks or chains the funding is denominated on or deployed to. A plain open list, deliberately not registry-governed, so a newly launched chain is expressible immediately.",
+      "examples": [["optimism"], ["ethereum-mainnet", "base"]]
     },
     "categories": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true,
-      "description": "Topical categories (e.g. 'DeFi', 'Public Goods', 'Infrastructure', 'Developer Tooling'). Free-text in v1.0.0."
+      "description": "Topical categories. Free text.",
+      "examples": [["DeFi", "Public Goods"], ["Infrastructure", "Developer Tooling"]]
     },
     "tags": {
       "type": "array",
@@ -87,10 +120,45 @@
       "uniqueItems": true,
       "description": "Free-form tags for search and faceting."
     },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Open key-value map of eligibility criteria. Publishers choose their own keys and write plain-string values; there are no fixed or required keys. Conventional keys (stage, geography, jurisdiction, sector, entityType, compliance) are published in registries/eligibility-keys.json — using them keeps the field comparable across publishers, and unregistered keys stay valid.",
+      "examples": [
+        {
+          "stage": "Pre-seed to Series A",
+          "geography": "Global, excluding sanctioned jurisdictions",
+          "entityType": "Registered legal entity required before payout"
+        }
+      ]
+    },
+    "prerequisites": {
+      "type": ["string", "null"],
+      "description": "Free text describing what a proposal must contain to be considered — track record, approach, milestone plan, disclosures. Distinct from rfp.requirements, which describes what the work must deliver.",
+      "examples": [
+        "A proposal must include prior track record, technical approach, a milestone plan with amounts, and disclosure of any conflicts."
+      ]
+    },
+    "resourceLinks": {
+      "type": ["string", "null"],
+      "description": "A single free-form string of supporting links and references — guidelines, past rounds, forum threads, original postings. Deliberately one string rather than an array of URIs, because publishers paste what they have.",
+      "examples": ["Original posting: https://forum.example.org/t/opsec-rfp/1 · Prior round retrospective: https://example.org/retro"]
+    },
+    "serviceAgreement": {
+      "type": ["string", "null"],
+      "x-stability": "provisional",
+      "x-since": "1.0.0",
+      "description": "Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design.",
+      "examples": [
+        "Runs as a rolling twelve-month engagement rather than a one-off deliverable; renewal is decided at the end of each term by the sponsoring foundation.",
+        "Ongoing service-provider relationship, scoped annually, with a published scope-of-work and quarterly reporting."
+      ]
+    },
     "applicationUrl": {
       "type": ["string", "null"],
       "format": "uri",
-      "description": "URL where applicants submit or apply."
+      "description": "URL where applicants submit or apply — the only URL that points at the opportunity itself, and therefore the only link-back target. It may carry whatever the submission channel is, including a forum thread when no portal exists; the URL's kind is not typed. Clarifications go in description.",
+      "examples": ["https://example.org/apply", "https://forum.example.org/t/rfp-thread/42"]
     },
     "website": {
       "type": ["string", "null"],
@@ -100,30 +168,45 @@
     "logoUrl": {
       "type": ["string", "null"],
       "format": "uri",
-      "description": "URL of the program/organisation logo image."
+      "description": "URL of the program or organisation logo image."
     },
     "bannerUrl": {
       "type": ["string", "null"],
       "format": "uri",
-      "description": "URL of a banner/hero image."
+      "description": "URL of a banner or hero image."
     },
     "socialLinks": {
       "$ref": "#/$defs/socialLinks",
-      "description": "Social and community links."
+      "description": "Social and community links for the opportunity or program."
     },
     "funding": {
       "$ref": "#/$defs/funding",
-      "description": "Funding envelope for the opportunity (award sizes, total budget, currency)."
+      "description": "Program-level funding envelope: single currency, total budget, amount committed to date, and the per-award range."
+    },
+    "milestones": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/milestone" },
+      "x-stability": "provisional",
+      "x-since": "1.0.0",
+      "description": "Optional milestone sequence, valid on any fundingType. Array order is the milestone sequence — there is no order or index field. Milestone-based payment is expressed by this array together with grant.milestoneBased; there is no separate payment-schedule concept.",
+      "$comment": "Deliberately not uniqueItems: every property of a milestone is optional, so two sparsely-populated entries can legitimately be byte-identical while denoting different milestones distinguished only by position."
     },
     "opensAt": {
       "type": ["string", "null"],
       "format": "date-time",
       "description": "RFC 3339 timestamp when applications open."
     },
-    "closesAt": {
-      "type": ["string", "null"],
-      "format": "date-time",
-      "description": "RFC 3339 application deadline. When this passes, status should transition to 'closed'."
+    "deadlines": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/deadline" },
+      "uniqueItems": true,
+      "description": "All deadlines and event boundaries for the opportunity, each either a fixed date or rolling, distinguished by label. Consumers should select by label rather than by array position: the first entry may be a hackathon's start date rather than its application deadline. Conventional labels are published in registries/deadline-labels.json. (Selection-by-label is a consumer convention, not schema-enforceable; see FIELDS.md.)",
+      "examples": [
+        [
+          { "type": "fixed", "date": "2026-08-15T23:59:59.000Z", "label": "community feedback" },
+          { "type": "fixed", "date": "2026-09-30T23:59:59.000Z", "label": "application" }
+        ]
+      ]
     },
     "postedAt": {
       "type": ["string", "null"],
@@ -142,74 +225,270 @@
     },
     "grant": {
       "$ref": "#/$defs/grant",
-      "description": "Grant-specific fields. Present (possibly an empty object) when type is 'grant'."
+      "description": "Grant-specific fields. Required, possibly as an empty object, when fundingType is 'grant'; forbidden otherwise."
     },
     "hackathon": {
       "$ref": "#/$defs/hackathon",
-      "description": "Hackathon-specific fields. Present when type is 'hackathon'."
+      "description": "Hackathon-specific fields. Required when fundingType is 'hackathon'; forbidden otherwise."
     },
     "bounty": {
       "$ref": "#/$defs/bounty",
-      "description": "Bounty-specific fields. Present when type is 'bounty'."
+      "description": "Bounty-specific fields. Required when fundingType is 'bounty'; forbidden otherwise."
     },
     "accelerator": {
       "$ref": "#/$defs/accelerator",
-      "description": "Accelerator-specific fields. Present when type is 'accelerator'."
+      "description": "Accelerator-specific fields. Required when fundingType is 'accelerator'; forbidden otherwise."
     },
     "vc_fund": {
       "$ref": "#/$defs/vcFund",
-      "description": "VC-fund-specific fields. Present when type is 'vc_fund'."
+      "description": "VC-fund-specific fields. Required when fundingType is 'vc_fund'; forbidden otherwise."
     },
     "rfp": {
       "$ref": "#/$defs/rfp",
-      "description": "RFP-specific fields. Present when type is 'rfp'."
+      "description": "RFP-specific fields. Required when fundingType is 'rfp'; forbidden otherwise."
     },
     "extensions": {
       "type": "object",
-      "description": "Namespace for publisher- or integrator-specific data not covered by the standard. Keys SHOULD be namespaced (e.g. 'mysource.internalId'). Contents are not validated by this schema.",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "description": "Namespace for publisher- or integrator-specific data not covered by the standard. Keys are conventionally namespaced, for example 'mysource.internalId'. Contents are not validated by this schema.",
+      "$comment": "Top level only — the organization $def deliberately has no equivalent. The asymmetry is a decision, not an oversight.",
+      "examples": [{ "mysource.internalId": "OPP-4821" }]
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "type": { "const": "grant" } }, "required": ["type"] },
-      "then": { "required": ["grant"] }
+      "$comment": "One block per funding type. Each branch requires the matching block and forbids all five others, so `opportunity[opportunity.fundingType]` is a guarantee rather than an expectation. Branches introduce no property names — see the root $comment.",
+      "if": { "properties": { "fundingType": { "const": "grant" } }, "required": ["fundingType"] },
+      "then": {
+        "required": ["grant"],
+        "not": {
+          "anyOf": [
+            { "required": ["hackathon"] },
+            { "required": ["bounty"] },
+            { "required": ["accelerator"] },
+            { "required": ["vc_fund"] },
+            { "required": ["rfp"] }
+          ]
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "const": "hackathon" } }, "required": ["type"] },
-      "then": { "required": ["hackathon"] }
+      "if": { "properties": { "fundingType": { "const": "hackathon" } }, "required": ["fundingType"] },
+      "then": {
+        "required": ["hackathon"],
+        "not": {
+          "anyOf": [
+            { "required": ["grant"] },
+            { "required": ["bounty"] },
+            { "required": ["accelerator"] },
+            { "required": ["vc_fund"] },
+            { "required": ["rfp"] }
+          ]
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "const": "bounty" } }, "required": ["type"] },
-      "then": { "required": ["bounty"] }
+      "if": { "properties": { "fundingType": { "const": "bounty" } }, "required": ["fundingType"] },
+      "then": {
+        "required": ["bounty"],
+        "not": {
+          "anyOf": [
+            { "required": ["grant"] },
+            { "required": ["hackathon"] },
+            { "required": ["accelerator"] },
+            { "required": ["vc_fund"] },
+            { "required": ["rfp"] }
+          ]
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "const": "accelerator" } }, "required": ["type"] },
-      "then": { "required": ["accelerator"] }
+      "if": { "properties": { "fundingType": { "const": "accelerator" } }, "required": ["fundingType"] },
+      "then": {
+        "required": ["accelerator"],
+        "not": {
+          "anyOf": [
+            { "required": ["grant"] },
+            { "required": ["hackathon"] },
+            { "required": ["bounty"] },
+            { "required": ["vc_fund"] },
+            { "required": ["rfp"] }
+          ]
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "const": "vc_fund" } }, "required": ["type"] },
-      "then": { "required": ["vc_fund"] }
+      "if": { "properties": { "fundingType": { "const": "vc_fund" } }, "required": ["fundingType"] },
+      "then": {
+        "required": ["vc_fund"],
+        "not": {
+          "anyOf": [
+            { "required": ["grant"] },
+            { "required": ["hackathon"] },
+            { "required": ["bounty"] },
+            { "required": ["accelerator"] },
+            { "required": ["rfp"] }
+          ]
+        }
+      }
     },
     {
-      "if": { "properties": { "type": { "const": "rfp" } }, "required": ["type"] },
-      "then": { "required": ["rfp"] }
+      "if": { "properties": { "fundingType": { "const": "rfp" } }, "required": ["fundingType"] },
+      "then": {
+        "required": ["rfp"],
+        "not": {
+          "anyOf": [
+            { "required": ["grant"] },
+            { "required": ["hackathon"] },
+            { "required": ["bounty"] },
+            { "required": ["accelerator"] },
+            { "required": ["vc_fund"] }
+          ]
+        }
+      }
     }
   ],
   "$defs": {
-    "grant": {
+    "organization": {
       "type": "object",
-      "title": "Grant details",
+      "title": "Organization",
       "additionalProperties": false,
-      "description": "Grant-specific attributes not covered by the core fields. May be an empty object ({}) — core funding and date fields live at the top level.",
+      "required": ["name"],
+      "description": "An organisation sponsoring or operating the opportunity. Embedded on an opportunity as a descriptive summary; the same shape is the standalone Organization directory record.",
+      "$comment": "Two deliberate absences, both decisions rather than oversights. There is no `verified` flag: verification belongs to the publishing relationship — a user permissioned on a verified org — not to the organisation itself. There is no `extensions` object: extensions are top level only.",
       "properties": {
-        "fundingMechanism": {
-          "type": ["string", "null"],
-          "enum": ["retroactive", "proactive", "streaming", "quadratic", "other", null],
-          "description": "How funds are allocated (e.g. retroactive public goods, proactive application, streaming, quadratic)."
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "description": "Display name of the organisation."
         },
-        "milestoneBased": { "type": ["boolean", "null"], "description": "Whether disbursement is tied to milestones." },
-        "recurring": { "type": ["boolean", "null"], "description": "Whether the program runs in recurring rounds/seasons." }
+        "slug": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Lowercase URL-safe identifier, and also the organisation's namespace.",
+          "examples": ["example-foundation"]
+        },
+        "type": {
+          "type": ["string", "null"],
+          "enum": ["foundation", "dao", "company", "protocol", "program", "individual", "other", null],
+          "description": "Kind of entity."
+        },
+        "description": { "type": ["string", "null"], "description": "Short description of the organisation." },
+        "website": { "type": ["string", "null"], "format": "uri", "description": "The organisation's primary website." },
+        "logoUrl": { "type": ["string", "null"], "format": "uri", "description": "URL of the organisation's logo image." },
+        "bannerUrl": { "type": ["string", "null"], "format": "uri", "description": "URL of the organisation's banner or hero image." },
+        "socialLinks": { "$ref": "#/$defs/socialLinks", "description": "Social and community links for the organisation." },
+        "ecosystems": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Ethereum-family ecosystems the organisation operates in. Same open list as the top-level field."
+        },
+        "contacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contact" },
+          "description": "Named contact routes into the organisation. Optional, and every field of every entry is optional too."
+        }
+      }
+    },
+    "contact": {
+      "type": "object",
+      "title": "Contact",
+      "additionalProperties": false,
+      "description": "A named contact route into the organisation. Every property is optional and there is no minimum-one-identifier constraint, so `{}` validates — deliberately, because not every publisher can or will name a person.",
+      "properties": {
+        "name": { "type": ["string", "null"], "description": "The person's name." },
+        "role": {
+          "type": ["string", "null"],
+          "description": "Role in the program.",
+          "examples": ["Steward", "Program owner", "Grants Manager"]
+        },
+        "telegram": {
+          "type": ["string", "null"],
+          "description": "Telegram handle. A handle rather than a URL — unlike socialLinks.telegram, which is a link.",
+          "examples": ["@example_steward"]
+        },
+        "email": { "type": ["string", "null"], "format": "email", "description": "Email address." }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "title": "Provenance",
+      "additionalProperties": false,
+      "description": "How this entry reached the Hub and when it was last checked. Every field is optional, so `{}` validates. There is no source URL: link-back to the opportunity runs through the top-level applicationUrl alone.",
+      "properties": {
+        "publisher": {
+          "type": ["string", "null"],
+          "description": "Namespace — an organisation slug — this entry was published under. Auto-approval requires the publishing account to be a member of this verified org. May differ from the sponsoring organisation.",
+          "examples": ["filecoin"]
+        },
+        "submittedBy": {
+          "type": ["string", "null"],
+          "description": "Who submitted or published this entry: a public handle, an organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed. This is the attribution carrier for data-partner credit."
+        },
+        "submittedAt": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "RFC 3339 timestamp of when the entry was submitted or published to the Hub. Pairs with submittedBy."
+        },
+        "ingestedVia": {
+          "type": ["string", "null"],
+          "enum": ["publisher_api", "submission", "scrape", "import", "outbox", null],
+          "description": "How this entry entered the Hub. 'outbox' is a one-way push from an upstream source system's outbox; 'import' is a backfill or seed import. Always set server-side by the ingestion layer."
+        },
+        "originalId": { "type": ["string", "null"], "description": "Identifier of this opportunity in the source system." },
+        "verifiedAgainstSource": {
+          "type": ["boolean", "null"],
+          "description": "Whether the entry's fields were verified against the live opportunity by the verification-assist job. null means not yet checked."
+        },
+        "verifiedAt": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "RFC 3339 timestamp of the last verification. Record-level only — there is no per-field freshness."
+        },
+        "snapshotUrl": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "IPFS or archived snapshot of the opportunity taken at verification time."
+        }
+      }
+    },
+    "socialLinks": {
+      "type": "object",
+      "title": "Social links",
+      "additionalProperties": false,
+      "description": "Social and community links. Every value is a full URL, not a handle.",
+      "properties": {
+        "twitter": { "type": ["string", "null"], "format": "uri", "description": "Link to the X/Twitter profile." },
+        "discord": { "type": ["string", "null"], "format": "uri", "description": "Discord server invite or channel link." },
+        "github": { "type": ["string", "null"], "format": "uri", "description": "Link to the GitHub organisation or repository." },
+        "telegram": { "type": ["string", "null"], "format": "uri", "description": "Link to the Telegram group or channel." },
+        "farcaster": { "type": ["string", "null"], "format": "uri", "description": "Link to the Farcaster profile or channel." },
+        "forum": { "type": ["string", "null"], "format": "uri", "description": "Link to the governance or community forum." },
+        "blog": { "type": ["string", "null"], "format": "uri", "description": "Link to the blog or announcements feed." }
+      }
+    },
+    "funding": {
+      "type": "object",
+      "title": "Funding envelope",
+      "additionalProperties": false,
+      "description": "The program-level funding envelope. Single-currency by design, and that rule is scoped to this envelope only: bounty.reward, hackathon.prizes[].currency and accelerator.funding each keep their own currency, because a prize pool may legitimately be denominated differently from the program budget. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.",
+      "properties": {
+        "currency": {
+          "type": ["string", "null"],
+          "maxLength": 16,
+          "description": "ISO 4217 code or token symbol for the amounts below, and for milestones[].amount.",
+          "examples": ["USD", "OP"]
+        },
+        "budget": { "type": ["number", "null"], "minimum": 0, "description": "Total program budget in major units." },
+        "allocated": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Amount committed to date in major units — committed, not necessarily disbursed. Disbursement and delivery are not modelled."
+        },
+        "minAward": { "type": ["number", "null"], "minimum": 0, "description": "Minimum individual award in major units." },
+        "maxAward": { "type": ["number", "null"], "minimum": 0, "description": "Maximum individual award in major units." }
       }
     },
     "monetaryAmount": {
@@ -217,17 +496,18 @@
       "title": "Monetary amount",
       "additionalProperties": false,
       "required": ["amount", "currency"],
+      "description": "A single amount with its own currency, used where a sub-block is denominated independently of the program envelope.",
       "properties": {
         "amount": {
           "type": "number",
           "minimum": 0,
-          "description": "Amount in major units of the currency (e.g. 2000000 = 2,000,000 USD)."
+          "description": "Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents."
         },
         "currency": {
           "type": "string",
           "minLength": 1,
           "maxLength": 16,
-          "description": "ISO 4217 fiat code (USD, EUR) or a token symbol (ETH, OP, USDC)."
+          "description": "ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC."
         }
       }
     },
@@ -235,85 +515,123 @@
       "type": "object",
       "title": "Amount range",
       "additionalProperties": false,
+      "description": "A lower and upper bound with a shared currency. Either bound may be absent, expressing an open-ended range.",
       "properties": {
         "min": { "type": ["number", "null"], "minimum": 0, "description": "Lower bound in major units." },
         "max": { "type": ["number", "null"], "minimum": 0, "description": "Upper bound in major units." },
-        "currency": { "type": ["string", "null"], "maxLength": 16, "description": "ISO 4217 code or token symbol." }
+        "currency": { "type": ["string", "null"], "maxLength": 16, "description": "ISO 4217 code or token symbol for both bounds." }
       }
     },
-    "teamSize": {
+    "deadline": {
       "type": "object",
-      "title": "Team size range",
+      "title": "Deadline",
       "additionalProperties": false,
+      "required": ["type"],
+      "description": "A single deadline or event boundary. A 'fixed' entry carries a date; 'rolling' means applications are accepted continuously.",
+      "$comment": "There is deliberately no event-anchored or relative form ('opens on X, then 30 days'): an unanchored window does not denote a point in time, so the publisher posts a fixed date when the window actually opens. 'recurring' is likewise out of the enum — grant.recurring is the only carrier of that concept.",
       "properties": {
-        "min": { "type": ["integer", "null"], "minimum": 1 },
-        "max": { "type": ["integer", "null"], "minimum": 1 }
-      }
-    },
-    "organization": {
-      "type": "object",
-      "title": "Organization",
-      "additionalProperties": false,
-      "required": ["name"],
-      "description": "The organisation issuing/hosting the opportunity (the funder). Embedded on an opportunity as a descriptive summary; the same shape is the standalone Organization directory record. NOTE: verification status is NOT here — verification belongs to the publishing relationship (a user permissioned on a verified org), not to the issuer.",
-      "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 256, "description": "Display name of the organisation." },
-        "slug": { "type": ["string", "null"], "pattern": "^[a-z0-9-]+$", "description": "Lowercase URL-safe identifier; also the organisation's namespace." },
-        "type": { "type": ["string", "null"], "enum": ["foundation", "dao", "company", "protocol", "program", "individual", "other", null], "description": "Kind of issuing entity." },
-        "description": { "type": ["string", "null"], "description": "Short description of the organisation." },
-        "website": { "type": ["string", "null"], "format": "uri" },
-        "logoUrl": { "type": ["string", "null"], "format": "uri" },
-        "bannerUrl": { "type": ["string", "null"], "format": "uri" },
-        "socialLinks": { "$ref": "#/$defs/socialLinks" },
-        "ecosystems": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true, "description": "Ethereum-family ecosystems the organisation operates in." }
-      }
-    },
-    "provenance": {
-      "type": "object",
-      "title": "Provenance",
-      "additionalProperties": false,
-      "required": ["url"],
-      "properties": {
-        "url": { "type": "string", "format": "uri", "description": "Canonical URL of the original posting at the source. Anti-spam and verification jobs fetch this." },
-        "publisher": { "type": ["string", "null"], "description": "Namespace (organisation slug) this entry was published under (e.g. 'filecoin'). T2 auto-approval requires the publishing account to be a member of this verified org. May differ from the issuing organization." },
-        "submittedBy": { "type": ["string", "null"], "description": "Who submitted or published this entry — a public handle, organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed." },
-        "submittedAt": { "type": ["string", "null"], "format": "date-time", "description": "RFC 3339 timestamp of when the entry was submitted or published to the Hub. Pairs with submittedBy." },
-        "ingestedVia": {
-          "type": ["string", "null"],
-          "enum": ["publisher_api", "submission", "scrape", "import", "outbox", null],
-          "description": "How this entry entered the Hub. 'outbox' = a one-way push from an upstream source system's outbox; 'import' = a backfill/seed import."
+        "type": {
+          "type": "string",
+          "enum": ["fixed", "rolling"],
+          "description": "Whether this deadline is a fixed point in time or an open-ended rolling window."
         },
-        "originalId": { "type": ["string", "null"], "description": "Identifier of this opportunity in the source system." },
-        "verifiedAgainstSource": { "type": ["boolean", "null"], "description": "Whether the entry's fields were verified against the source URL by the verification-assist job. null = not yet checked." },
-        "verifiedAt": { "type": ["string", "null"], "format": "date-time", "description": "RFC 3339 timestamp of the last source verification." },
-        "snapshotUrl": { "type": ["string", "null"], "format": "uri", "description": "IPFS or archived snapshot of the source at verification time." }
+        "date": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "RFC 3339 timestamp. Required and non-null when type is 'fixed', enforced by the if/then below; meaningless, and normally omitted, when type is 'rolling'."
+        },
+        "label": {
+          "type": ["string", "null"],
+          "maxLength": 120,
+          "description": "What this deadline is for. Free text; conventional values are published in registries/deadline-labels.json. This is how a consumer tells an application deadline from an event boundary.",
+          "examples": ["application", "community feedback", "registration", "submission", "event start", "event end"]
+        }
+      },
+      "if": { "properties": { "type": { "const": "fixed" } }, "required": ["type"] },
+      "then": { "required": ["date"], "properties": { "date": { "type": "string" } } },
+      "examples": [
+        { "type": "fixed", "date": "2026-09-30T23:59:59.000Z", "label": "application" },
+        { "type": "rolling", "label": "application" }
+      ]
+    },
+    "milestone": {
+      "type": "object",
+      "title": "Milestone",
+      "additionalProperties": false,
+      "description": "One milestone in an opportunity's milestone sequence. Every property is optional — a publisher may list titles with no amounts, or amounts with no criteria. There is no date field: where a publisher has a due date, it goes into `criteria` as free text.",
+      "properties": {
+        "title": { "type": ["string", "null"], "description": "Short name of the milestone." },
+        "amount": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Payment for this milestone in major units, denominated in the top-level funding.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and funding.currency is absent."
+        },
+        "criteria": { "type": ["string", "null"], "description": "Free-text acceptance criteria, including any due date." }
+      },
+      "examples": [
+        {
+          "title": "Ratings framework published",
+          "amount": 50000,
+          "criteria": "Published methodology, reviewed by the coalition. Due within 8 weeks of kickoff."
+        }
+      ]
+    },
+    "grant": {
+      "type": "object",
+      "title": "Grant details",
+      "additionalProperties": false,
+      "description": "Grant-specific attributes not covered by the core fields. May be an empty object, because core funding and date fields live at the top level.",
+      "properties": {
+        "fundingMechanisms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["retroactive", "proactive", "streaming", "quadratic", "matching", "other"]
+          },
+          "description": "How funds are allocated. An array because mechanisms co-occur: a funder can offer a fixed grant and a matching grant in the same program.",
+          "examples": [["proactive"], ["proactive", "matching"], ["retroactive", "quadratic"]]
+        },
+        "programModel": {
+          "type": ["string", "null"],
+          "x-stability": "provisional",
+          "x-since": "1.0.0",
+          "description": "The operating model of the program, as distinct from the funding instrument. An open list rather than a closed enum — conventional values are published in registries/program-models.json, and a publisher's own vocabulary is valid without a schema change.",
+          "examples": ["grant", "program", "infra", "incentives"]
+        },
+        "milestoneBased": {
+          "type": ["boolean", "null"],
+          "description": "Whether disbursement is tied to milestones. Pairs with the top-level milestones array."
+        },
+        "recurring": {
+          "type": ["boolean", "null"],
+          "description": "Whether the program runs in recurring rounds or seasons.",
+          "$comment": "The only carrier of a 'recurring round' concept: deadlines[] has no 'recurring' type, so a recurring program is expressed here plus a rolling or fixed deadline."
+        }
       }
     },
-    "socialLinks": {
+    "hackathon": {
       "type": "object",
-      "title": "Social links",
+      "title": "Hackathon details",
       "additionalProperties": false,
+      "description": "Hackathon-specific attributes. All dates — registration, submission, event start and event end — live in the shared top-level deadlines array, distinguished by label.",
       "properties": {
-        "twitter": { "type": ["string", "null"] },
-        "discord": { "type": ["string", "null"] },
-        "github": { "type": ["string", "null"] },
-        "telegram": { "type": ["string", "null"] },
-        "farcaster": { "type": ["string", "null"] },
-        "forum": { "type": ["string", "null"] },
-        "blog": { "type": ["string", "null"] }
-      }
-    },
-    "funding": {
-      "type": "object",
-      "title": "Funding envelope",
-      "additionalProperties": false,
-      "properties": {
-        "currency": { "type": ["string", "null"], "maxLength": 16, "description": "ISO 4217 code or token symbol for the amounts below." },
-        "minAward": { "type": ["number", "null"], "minimum": 0, "description": "Minimum individual award in major units." },
-        "maxAward": { "type": ["number", "null"], "minimum": 0, "description": "Maximum individual award in major units." },
-        "totalBudget": { "type": ["number", "null"], "minimum": 0, "description": "Total program budget in major units." },
-        "amountDistributed": { "type": ["number", "null"], "minimum": 0, "description": "Amount distributed to date in major units." },
-        "awardsToDate": { "type": ["integer", "null"], "minimum": 0, "description": "Number of awards/grants made to date." }
+        "location": { "type": ["string", "null"], "description": "Physical location, or null for a fully online event." },
+        "online": { "type": ["boolean", "null"], "description": "Whether the event is also, or only, held online." },
+        "tracks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Named tracks or themes participants can build against.",
+          "examples": [["DeFi", "Infra"]]
+        },
+        "prizes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/prize" },
+          "description": "The prize pool, one entry per prize. Each prize carries its own currency.",
+          "$comment": "Deliberately not uniqueItems: identical prizes are routine — several equal-value track prizes, or repeated runner-up awards — so uniqueness would reject real data."
+        },
+        "teamSize": { "$ref": "#/$defs/teamSize", "description": "Permitted team size range." }
       }
     },
     "prize": {
@@ -321,26 +639,21 @@
       "title": "Hackathon prize",
       "additionalProperties": false,
       "required": ["amount", "currency"],
+      "description": "A single hackathon prize, optionally attributed to a track.",
       "properties": {
-        "track": { "type": ["string", "null"], "description": "Track this prize belongs to, if tracked." },
-        "amount": { "type": "number", "minimum": 0 },
-        "currency": { "type": "string", "minLength": 1, "maxLength": 16 }
+        "track": { "type": ["string", "null"], "description": "Track this prize belongs to, where prizes are tracked separately." },
+        "amount": { "type": "number", "minimum": 0, "description": "Prize amount in major units." },
+        "currency": { "type": "string", "minLength": 1, "maxLength": 16, "description": "ISO 4217 code or token symbol for this prize." }
       }
     },
-    "hackathon": {
+    "teamSize": {
       "type": "object",
-      "title": "Hackathon details",
+      "title": "Team size range",
       "additionalProperties": false,
+      "description": "Permitted team size, as an inclusive range. Either bound may be absent.",
       "properties": {
-        "startDate": { "type": ["string", "null"], "format": "date-time" },
-        "endDate": { "type": ["string", "null"], "format": "date-time" },
-        "location": { "type": ["string", "null"], "description": "Physical location, or null for fully online." },
-        "online": { "type": ["boolean", "null"], "description": "Whether the event is (also) held online." },
-        "tracks": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-        "prizes": { "type": "array", "items": { "$ref": "#/$defs/prize" } },
-        "registrationDeadline": { "type": ["string", "null"], "format": "date-time" },
-        "submissionDeadline": { "type": ["string", "null"], "format": "date-time" },
-        "teamSize": { "$ref": "#/$defs/teamSize" }
+        "min": { "type": ["integer", "null"], "minimum": 1, "description": "Minimum number of team members." },
+        "max": { "type": ["integer", "null"], "minimum": 1, "description": "Maximum number of team members." }
       }
     },
     "bounty": {
@@ -348,56 +661,97 @@
       "title": "Bounty details",
       "additionalProperties": false,
       "required": ["reward"],
+      "description": "Bounty-specific attributes. A bounty is a single scoped task with a stated reward, so the reward is the one required field.",
       "properties": {
-        "reward": { "$ref": "#/$defs/monetaryAmount" },
-        "difficulty": { "type": ["string", "null"], "enum": ["beginner", "intermediate", "advanced", null] },
-        "skills": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-        "platform": { "type": ["string", "null"], "description": "Platform hosting the bounty (e.g. 'Gitcoin', 'Layer3')." }
+        "reward": { "$ref": "#/$defs/monetaryAmount", "description": "The reward paid on completion. Carries its own currency." },
+        "difficulty": {
+          "type": ["string", "null"],
+          "enum": ["beginner", "intermediate", "advanced", null],
+          "description": "Self-assessed difficulty, as a hint to applicants."
+        },
+        "skills": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Skills the task calls for. Free text.",
+          "examples": [["Frontend", "Design"]]
+        },
+        "platform": {
+          "type": ["string", "null"],
+          "description": "Platform hosting the bounty.",
+          "examples": ["Gitcoin", "Layer3", "Superteam Earn"]
+        }
       }
     },
     "accelerator": {
       "type": "object",
       "title": "Accelerator details",
       "additionalProperties": false,
+      "description": "Accelerator-specific attributes. The application deadline lives in the shared top-level deadlines array with label 'application'.",
       "properties": {
-        "applicationDeadline": { "type": ["string", "null"], "format": "date-time" },
-        "programDurationWeeks": { "type": ["integer", "null"], "minimum": 0 },
-        "batchSize": { "type": ["integer", "null"], "minimum": 0 },
-        "equity": { "type": ["string", "null"], "description": "Equity taken, expressed as a string (e.g. '5%', 'none')." },
-        "funding": { "$ref": "#/$defs/monetaryAmount" },
-        "stage": { "type": ["string", "null"], "enum": ["pre-seed", "seed", "series-a", null] },
-        "location": { "type": ["string", "null"] },
-        "online": { "type": ["boolean", "null"] }
+        "programDurationWeeks": { "type": ["integer", "null"], "minimum": 0, "description": "Length of the program in weeks." },
+        "batchSize": { "type": ["integer", "null"], "minimum": 0, "description": "Number of teams accepted per cohort." },
+        "equity": {
+          "type": ["string", "null"],
+          "description": "Equity taken, expressed as a string because programs state it in incomparable ways.",
+          "examples": ["5%", "none", "up to 7% SAFE"]
+        },
+        "funding": { "$ref": "#/$defs/monetaryAmount", "description": "Investment or stipend offered per team. Carries its own currency." },
+        "stage": {
+          "type": ["string", "null"],
+          "enum": ["pre-seed", "seed", "series-a", null],
+          "description": "Company stage the program targets."
+        },
+        "location": { "type": ["string", "null"], "description": "Physical location, or null for a fully remote program." },
+        "online": { "type": ["boolean", "null"], "description": "Whether the program is also, or only, run remotely." }
       }
     },
     "vcFund": {
       "type": "object",
       "title": "VC fund details",
       "additionalProperties": false,
+      "description": "Venture-fund-specific attributes. A fund is an ongoing source of capital rather than a round, so it carries no deadline of its own.",
       "properties": {
-        "checkSize": { "$ref": "#/$defs/amountRange" },
+        "checkSize": { "$ref": "#/$defs/amountRange", "description": "Typical investment size, as a range." },
         "stages": {
           "type": "array",
           "items": { "type": "string", "enum": ["pre-seed", "seed", "series-a", "series-b+", "growth"] },
           "uniqueItems": true,
           "description": "Investment stages the fund participates in."
         },
-        "thesis": { "type": ["string", "null"], "description": "Investment thesis." },
-        "portfolio": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-        "contactMethod": { "type": ["string", "null"], "enum": ["email", "form", "intro-only", null] },
-        "activelyInvesting": { "type": ["boolean", "null"] }
+        "thesis": { "type": ["string", "null"], "description": "Investment thesis, in the fund's own words." },
+        "portfolio": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Named portfolio companies, where the fund publishes them."
+        },
+        "contactMethod": {
+          "type": ["string", "null"],
+          "enum": ["email", "form", "intro-only", null],
+          "description": "How the fund prefers to be approached. 'intro-only' means a warm introduction is required."
+        },
+        "activelyInvesting": { "type": ["boolean", "null"], "description": "Whether the fund is currently deploying capital." }
       }
     },
     "rfp": {
       "type": "object",
       "title": "RFP details",
       "additionalProperties": false,
+      "description": "RFP-specific attributes. The issuing organisation is sponsoringOrganizations[0], the budget is the top-level funding envelope, and the proposal deadline is a deadlines entry labelled 'application'.",
       "properties": {
-        "issuingOrganization": { "type": ["string", "null"], "description": "Organisation issuing the RFP, if distinct from organization.name." },
-        "budget": { "$ref": "#/$defs/monetaryAmount" },
-        "scope": { "type": ["string", "null"], "description": "Scope of work." },
-        "requirements": { "type": "array", "items": { "type": "string" } },
-        "proposalDeadline": { "type": ["string", "null"], "format": "date-time" }
+        "scope": {
+          "type": ["string", "null"],
+          "description": "Scope of work, as one free-text field. In-scope and out-of-scope prose both live here.",
+          "$comment": "There is deliberately no separate outOfScope field — same philosophy as requirements and milestone criteria: one free-text field rather than a structure publishers would fill inconsistently."
+        },
+        "requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Free-text statements of what the work must deliver. RFP-only, and deliberately not split into hard and soft. What a proposal must contain goes in the top-level prerequisites instead.",
+          "examples": [["Methodology must be reproducible from public evidence."]]
+        }
       }
     }
   }

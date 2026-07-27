@@ -1,0 +1,14 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-type",
+  "fundingType": "wishlist",
+  "title": "Not one of the six funding types",
+  "description": "'wishlist' was considered and dropped; the discriminator stays at six values. Service agreements are a top-level field, not a seventh type.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {}
+}

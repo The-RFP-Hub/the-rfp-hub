@@ -6,8 +6,23 @@
  * Field rules were derived from the committed examples in
  * packages/standard/schemas/v1.0.0/examples. The provenance namespace (id prefix + source_system)
  * and the fallback program URL are supplied by the caller — this mapper is source-agnostic.
+ *
+ * ── Old-upstream → re-cut Standard ─────────────────────────────────────────────────
+ * The upstream registry still speaks the pre-re-cut vocabulary, so THIS FILE is where the
+ * conversion lives (the same rules the Standard's own examples were regenerated with):
+ *
+ *   type                       → fundingType
+ *   organization (single)      → sponsoringOrganizations[0]   (rfp.issuingOrganization wins the name)
+ *   deadline / metadata.endsAt → deadlines[{type:'fixed', date, label:'application'}]
+ *   hackathon.registrationDeadline / submissionDeadline / startDate / endDate
+ *                              → deadlines[… label 'registration' | 'submission' | 'event start' | 'event end']
+ *   accelerator.applicationDeadline, rfp.proposalDeadline
+ *                              → deadlines[… label 'application']
+ *   funding.totalBudget        → funding.budget      (rfp.budget folds into the same envelope)
+ *   grant.fundingMechanism     → grant.fundingMechanisms[]
+ *   source.url                 → removed; the program URL now feeds `applicationUrl`
  */
-import type { Opportunity, OpportunityStatus, OpportunityType } from "@rfp-hub/standard";
+import type { Deadline, FundingType, Opportunity, OpportunityStatus } from "@rfp-hub/standard";
 
 export interface RegistryCommunity {
   uid?: string;
@@ -47,6 +62,7 @@ export interface RegistryProgram {
     bannerImg?: string;
     socialLinks?: Record<string, string>;
   };
+  grantMetadata?: Record<string, unknown> | null;
   hackathonMetadata?: Record<string, unknown> | null;
   bountyMetadata?: Record<string, unknown> | null;
   acceleratorMetadata?: Record<string, unknown> | null;
@@ -54,26 +70,25 @@ export interface RegistryProgram {
   rfpMetadata?: Record<string, unknown> | null;
 }
 
-const TYPES: OpportunityType[] = ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"];
+const FUNDING_TYPES: FundingType[] = [
+  "grant",
+  "hackathon",
+  "bounty",
+  "accelerator",
+  "vc_fund",
+  "rfp",
+];
 const STATUSES: OpportunityStatus[] = ["upcoming", "open", "closed", "archived"];
 
-/** Standard-allowed keys per type block (additionalProperties:false ⇒ whitelist before emit). */
-const TYPE_BLOCK_KEYS: Record<OpportunityType, string[]> = {
-  grant: ["fundingMechanism", "milestoneBased", "recurring"],
-  hackathon: [
-    "startDate",
-    "endDate",
-    "location",
-    "online",
-    "tracks",
-    "prizes",
-    "registrationDeadline",
-    "submissionDeadline",
-    "teamSize",
-  ],
+/**
+ * Standard-allowed keys per type block (additionalProperties:false ⇒ whitelist before emit).
+ * Every date key is absent by design — the re-cut moved them all into the shared `deadlines[]`.
+ */
+const TYPE_BLOCK_KEYS: Record<FundingType, string[]> = {
+  grant: ["fundingMechanisms", "programModel", "milestoneBased", "recurring"],
+  hackathon: ["location", "online", "tracks", "prizes", "teamSize"],
   bounty: ["reward", "difficulty", "skills", "platform"],
   accelerator: [
-    "applicationDeadline",
     "programDurationWeeks",
     "batchSize",
     "equity",
@@ -83,7 +98,22 @@ const TYPE_BLOCK_KEYS: Record<OpportunityType, string[]> = {
     "online",
   ],
   vc_fund: ["checkSize", "stages", "thesis", "portfolio", "contactMethod", "activelyInvesting"],
-  rfp: ["issuingOrganization", "budget", "scope", "requirements", "proposalDeadline"],
+  rfp: ["scope", "requirements"],
+};
+
+/**
+ * Per-type block date fields that fold into `deadlines[]`, and the conventional label each takes
+ * (registries/deadline-labels.json). Consumers select by label, never by array position.
+ */
+const BLOCK_DEADLINE_LABELS: Partial<Record<FundingType, Record<string, string>>> = {
+  hackathon: {
+    registrationDeadline: "registration",
+    submissionDeadline: "submission",
+    startDate: "event start",
+    endDate: "event end",
+  },
+  accelerator: { applicationDeadline: "application" },
+  rfp: { proposalDeadline: "application" },
 };
 
 const SOCIAL_KEYS = ["twitter", "discord", "github", "telegram", "farcaster", "forum", "blog"];
@@ -149,7 +179,7 @@ function coercePrize(p: unknown): Record<string, unknown> | undefined {
 }
 
 /** Coerce a `{amount, currency}` money object; drop if amount isn't numeric. */
-function coerceMoney(v: unknown): Record<string, unknown> | undefined {
+function coerceMoney(v: unknown): { amount: number; currency: string } | undefined {
   if (!v || typeof v !== "object") return undefined;
   const o = v as Record<string, unknown>;
   const amount = num(o.amount);
@@ -157,14 +187,6 @@ function coerceMoney(v: unknown): Record<string, unknown> | undefined {
   return { amount, currency: nonEmpty(o.currency) ? o.currency : "USD" };
 }
 
-const BLOCK_DATE_KEYS = [
-  "startDate",
-  "endDate",
-  "registrationDeadline",
-  "submissionDeadline",
-  "applicationDeadline",
-  "proposalDeadline",
-];
 const BLOCK_NUM_KEYS = ["programDurationWeeks", "batchSize"];
 
 /** Coerce a `{min?, max?, currency?}` numeric range (checkSize); undefined if nothing survives. */
@@ -194,28 +216,42 @@ function coerceTeamSize(v: unknown): Record<string, unknown> | undefined {
 
 /** Standard enum values for constrained single-string type-block fields. */
 const BLOCK_ENUMS: Record<string, string[]> = {
-  fundingMechanism: ["retroactive", "proactive", "streaming", "quadratic", "other"],
   difficulty: ["beginner", "intermediate", "advanced"],
   stage: ["pre-seed", "seed", "series-a"],
   contactMethod: ["email", "form", "intro-only"],
 };
+/** grant.fundingMechanisms items — 'matching' was added by the re-cut. */
+const FUNDING_MECHANISMS = [
+  "retroactive",
+  "proactive",
+  "streaming",
+  "quadratic",
+  "matching",
+  "other",
+];
 const STAGE_VALUES = ["pre-seed", "seed", "series-a", "series-b+", "growth"]; // vc_fund.stages items
 const BLOCK_BOOLEANS = new Set(["milestoneBased", "recurring", "online", "activelyInvesting"]);
+
+/** Keep only the members of `values` present in `v` (accepting a bare scalar for an array field). */
+function enumArray(v: unknown, values: string[]): string[] | undefined {
+  const raw = Array.isArray(v) ? v : [v];
+  const kept = [...new Set(raw.filter((x): x is string => typeof x === "string"))].filter((x) =>
+    values.includes(x),
+  );
+  return kept.length ? kept : undefined;
+}
 
 /** Coerce type-block fields to the Standard's expected shapes; drop any value that can't conform. */
 function normalizeBlock(src: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(src)) {
-    if (BLOCK_DATE_KEYS.includes(k)) {
-      const d = isoDate(v);
-      if (d) out[k] = d;
-    } else if (BLOCK_NUM_KEYS.includes(k)) {
+    if (BLOCK_NUM_KEYS.includes(k)) {
       const n = num(v);
       if (n !== undefined) out[k] = n;
     } else if (k === "prizes" && Array.isArray(v)) {
       const prizes = v.map(coercePrize).filter((x): x is Record<string, unknown> => Boolean(x));
       if (prizes.length) out[k] = prizes;
-    } else if (k === "reward" || k === "funding" || k === "budget") {
+    } else if (k === "reward" || k === "funding") {
       const money = coerceMoney(v);
       if (money) out[k] = money;
     } else if (k === "teamSize") {
@@ -224,13 +260,14 @@ function normalizeBlock(src: Record<string, unknown>): Record<string, unknown> {
     } else if (k === "checkSize") {
       const range = coerceRange(v);
       if (range) out[k] = range;
+    } else if (k === "fundingMechanisms") {
+      const mechanisms = enumArray(v, FUNDING_MECHANISMS);
+      if (mechanisms) out[k] = mechanisms;
     } else if (k in BLOCK_ENUMS) {
       if (typeof v === "string" && BLOCK_ENUMS[k]?.includes(v)) out[k] = v;
     } else if (k === "stages" && Array.isArray(v)) {
-      const stages = v.filter(
-        (x): x is string => typeof x === "string" && STAGE_VALUES.includes(x),
-      );
-      if (stages.length) out[k] = stages;
+      const stages = enumArray(v, STAGE_VALUES);
+      if (stages) out[k] = stages;
     } else if (BLOCK_BOOLEANS.has(k)) {
       if (typeof v === "boolean") out[k] = v;
     } else {
@@ -273,23 +310,72 @@ function socialLinksOf(src: Record<string, string> | undefined): Record<string, 
   return out;
 }
 
-function typeBlockOf(p: RegistryProgram, type: OpportunityType): Record<string, unknown> {
-  const raw: Record<string, unknown> =
-    type === "hackathon"
-      ? (p.hackathonMetadata ?? {})
-      : type === "bounty"
-        ? (p.bountyMetadata ?? {})
-        : type === "accelerator"
-          ? (p.acceleratorMetadata ?? {})
-          : type === "vc_fund"
-            ? (p.vcFundMetadata ?? {})
-            : type === "rfp"
-              ? (p.rfpMetadata ?? {})
-              : {};
+/** The raw upstream metadata blob for a funding type (all of them keep their old key names). */
+function rawBlockOf(p: RegistryProgram, type: FundingType): Record<string, unknown> {
+  switch (type) {
+    case "hackathon":
+      return p.hackathonMetadata ?? {};
+    case "bounty":
+      return p.bountyMetadata ?? {};
+    case "accelerator":
+      return p.acceleratorMetadata ?? {};
+    case "vc_fund":
+      return p.vcFundMetadata ?? {};
+    case "rfp":
+      return p.rfpMetadata ?? {};
+    default:
+      return p.grantMetadata ?? {};
+  }
+}
+
+/**
+ * Build `deadlines[]` from the program's top-level deadline plus every per-type date field the
+ * re-cut folded in. Entries are deduped on (type, date, label) and ordered earliest-first, and a
+ * date that doesn't parse is dropped rather than emitted as a `fixed` entry without a date (which
+ * the schema forbids).
+ */
+function deadlinesOf(
+  p: RegistryProgram,
+  type: FundingType,
+  rawBlock: Record<string, unknown>,
+): Deadline[] {
+  const entries: Deadline[] = [];
+  const push = (value: unknown, label: string): void => {
+    const date = isoDate(value);
+    if (date) entries.push({ type: "fixed", date, label });
+  };
+
+  // The single upstream deadline is the application deadline (metadata.endsAt is the fallback).
+  push(p.deadline ?? p.metadata?.endsAt, "application");
+  for (const [key, label] of Object.entries(BLOCK_DEADLINE_LABELS[type] ?? {})) {
+    push(rawBlock[key], label);
+  }
+
+  const seen = new Set<string>();
+  return entries
+    .filter((d) => {
+      const key = `${d.type}|${d.date}|${d.label}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function typeBlockOf(
+  p: RegistryProgram,
+  type: FundingType,
+  rawBlock: Record<string, unknown>,
+): Record<string, unknown> {
   const picked: Record<string, unknown> = {};
   for (const k of TYPE_BLOCK_KEYS[type]) {
-    const v = raw[k];
+    const v = rawBlock[k];
     if (v !== undefined && v !== null && v !== "") picked[k] = v;
+  }
+  // Pre-re-cut upstreams send the scalar `fundingMechanism`; wrap it into the array field.
+  if (type === "grant" && picked.fundingMechanisms === undefined) {
+    const legacy = rawBlock.fundingMechanism;
+    if (legacy !== undefined && legacy !== null && legacy !== "") picked.fundingMechanisms = legacy;
   }
   const out = normalizeBlock(picked);
   // bounty.reward is required by the Standard — synthesize from the budget if absent.
@@ -306,9 +392,10 @@ export function mapProgram(
 ): Opportunity {
   const sourceSystem = opts.sourceSystem || "fundingmap";
   const md = p.metadata ?? {};
-  const type: OpportunityType = (TYPES as string[]).includes(p.type ?? "")
-    ? (p.type as OpportunityType)
+  const fundingType: FundingType = (FUNDING_TYPES as string[]).includes(p.type ?? "")
+    ? (p.type as FundingType)
     : "grant";
+  const rawBlock = rawBlockOf(p, fundingType);
 
   const programId = String(p.programId ?? p.id ?? "");
   const title = nonEmpty(md.title) ? md.title : (p.name ?? programId);
@@ -324,29 +411,34 @@ export function mapProgram(
     md.ecosystems?.length ? md.ecosystems : p.communities?.map((c) => c.name),
   );
 
+  // `rfp.issuingOrganization` was free text describing the real issuer — it now names the primary
+  // sponsoring organization, which is strictly better than the title-derived fallback.
+  const issuing = fundingType === "rfp" ? rawBlock.issuingOrganization : undefined;
+  const orgName = (nonEmpty(issuing) ? issuing : title).slice(0, 256); // Standard caps name at 256
+
   const budget = parseAmount(md.programBudget);
-  const minAward = num(md.minGrantSize);
-  const maxAward = num(md.maxGrantSize);
+  // `rfp.budget` ({amount, currency}) folds into the shared top-level funding envelope.
+  const rfpBudget = fundingType === "rfp" ? coerceMoney(rawBlock.budget) : undefined;
   const funding = compact({
-    currency: budget.currency,
-    minAward,
-    maxAward,
-    totalBudget: budget.amount,
+    currency: budget.currency ?? rfpBudget?.currency,
+    minAward: num(md.minGrantSize),
+    maxAward: num(md.maxGrantSize),
+    budget: budget.amount ?? rfpBudget?.amount,
   });
 
   const sl = md.socialLinks;
   const social = socialLinksOf(sl);
-  // Provenance fallback: a program's page on the source. Source-agnostic — no fabricated URL when
-  // the caller supplies no base (the entry then lacks source.url and is skipped by validation).
+  // `source.url` is gone; `applicationUrl` is now the single link-back target, so the program's
+  // page on the source becomes its last-resort value. Source-agnostic — nothing is fabricated when
+  // the caller supplies no base.
   const fallbackUrl = opts.programUrlBase
     ? `${opts.programUrlBase.replace(/\/+$/, "")}/${programId}`
     : undefined;
-  const sourceUrl = validUri(p.submissionUrl) ?? validUri(md.website) ?? fallbackUrl;
 
   const out: Record<string, unknown> = compact({
     specVersion: "1.0.0",
     id: `${sourceSystem}:${programId}`,
-    type,
+    fundingType,
     title,
     description,
     summary:
@@ -354,14 +446,15 @@ export function mapProgram(
         ? md.shortDescription.slice(0, 500)
         : undefined,
     status: statusOf(p),
-    organization: compact({
-      name: title.slice(0, 256), // Standard caps organization.name at 256 (title allows 300)
-      slug: slugify(nonEmpty(communitySlug) ? communitySlug : title),
-      logoUrl: validUri(md.logoImg),
-      ecosystems,
-    }),
+    sponsoringOrganizations: [
+      compact({
+        name: orgName,
+        slug: slugify(nonEmpty(communitySlug) ? communitySlug : orgName),
+        logoUrl: validUri(md.logoImg),
+        ecosystems,
+      }),
+    ],
     source: compact({
-      url: sourceUrl,
       publisher: nonEmpty(communitySlug) ? slugify(communitySlug) : undefined,
       ingestedVia: "import",
       originalId: programId,
@@ -371,20 +464,25 @@ export function mapProgram(
     networks: cleanArr(md.networks),
     categories: cleanArr(md.categories),
     tags: cleanArr(md.grantTypes),
-    applicationUrl: validUri(p.submissionUrl) ?? validUri(sl?.grantsSite),
+    applicationUrl:
+      validUri(p.submissionUrl) ??
+      validUri(sl?.grantsSite) ??
+      validUri(md.website) ??
+      validUri(fallbackUrl),
     website: validUri(md.website) ?? validUri(sl?.website),
     logoUrl: validUri(md.logoImg),
     bannerUrl: validUri(md.bannerImg),
     socialLinks: Object.keys(social).length ? social : undefined,
     funding: Object.keys(funding).length ? funding : undefined,
     opensAt: isoDate(md.startsAt),
-    closesAt: isoDate(p.deadline ?? md.endsAt),
+    deadlines: deadlinesOf(p, fundingType, rawBlock),
     createdAt: isoDate(p.createdAt),
     updatedAt: isoDate(p.updatedAt),
   });
 
-  // required type-specific block under the `type` key (may be {} for grants)
-  out[type] = typeBlockOf(p, type);
+  // required type-specific block under the `fundingType` key (may be {} for grants), and NO other
+  // type block — the re-cut forbids them.
+  out[fundingType] = typeBlockOf(p, fundingType, rawBlock);
   // source.verifiedAgainstSource must survive compaction of `null` — re-add explicitly
   (out.source as Record<string, unknown>).verifiedAgainstSource = null;
 

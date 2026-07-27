@@ -1,0 +1,15 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:minimal",
+  "fundingType": "grant",
+  "title": "Minimal conforming grant",
+  "description": "Carries exactly the eight required top-level properties plus the type block the discriminator demands. Nothing optional is present, and source is the empty object the re-cut permits.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "grant": {}
+}

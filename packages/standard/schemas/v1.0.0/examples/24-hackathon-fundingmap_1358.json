@@ -1,17 +1,18 @@
 {
   "specVersion": "1.0.0",
   "id": "fundingmap:1358",
-  "type": "hackathon",
+  "fundingType": "hackathon",
   "title": "ETHOnline 2026",
   "description": "Async hackathon by ETH Global",
   "summary": "Async hackathon by ETH Global",
   "status": "archived",
-  "organization": {
-    "name": "ETHOnline 2026",
-    "website": "https://ethglobal.com/events/ethonline2026"
-  },
+  "sponsoringOrganizations": [
+    {
+      "name": "ETHOnline 2026",
+      "website": "https://ethglobal.com/events/ethonline2026"
+    }
+  ],
   "source": {
-    "url": "https://ethglobal.com/events/ethonline2026",
     "ingestedVia": "import",
     "originalId": "1358",
     "verifiedAgainstSource": null
@@ -31,19 +32,36 @@
     "twitter": "https://x.com/ETHGlobal"
   },
   "funding": {
-    "totalBudget": 50000
+    "budget": 50000
   },
   "opensAt": "2026-09-04T12:00:00.000Z",
-  "closesAt": "2026-04-13T23:59:00.000Z",
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-04-13T23:59:00.000Z",
+      "label": "application"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-09-06T17:00:00.000Z",
+      "label": "registration"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-09-04T12:00:00.000Z",
+      "label": "event start"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-09-16T23:59:59.999Z",
+      "label": "event end"
+    }
+  ],
   "createdAt": "2026-04-06T00:01:32.000Z",
   "updatedAt": "2026-04-14T00:02:09.000Z",
   "hackathon": {
-    "startDate": "2026-09-04T12:00:00.000Z",
-    "endDate": "2026-09-16T23:59:59.999Z",
     "location": "Remote",
     "online": null,
-    "registrationDeadline": "2026-09-06T17:00:00.000Z",
-    "submissionDeadline": null,
     "prizes": [
       {
         "track": null,

@@ -6,8 +6,11 @@ import type {
   AcceleratorDetails as GenAcceleratorDetails,
   AmountRange as GenAmountRange,
   BountyDetails as GenBountyDetails,
+  Contact as GenContact,
+  Deadline as GenDeadline,
   GrantDetails as GenGrantDetails,
   HackathonDetails as GenHackathonDetails,
+  Milestone as GenMilestone,
   MonetaryAmount as GenMonetaryAmount,
   Organization as GenOrganization,
   Provenance as GenProvenance,
@@ -22,19 +25,24 @@ import type {
 /** A funding opportunity conforming to the RFP Hub Standard. */
 export type Opportunity = RFPHubOpportunity;
 
-/** The six opportunity types. */
-export type OpportunityType = Opportunity["type"];
+/** The six funding types. The value is also the key of the opportunity's type block. */
+export type FundingType = Opportunity["fundingType"];
 /** Public lifecycle status. */
 export type OpportunityStatus = Opportunity["status"];
 /** How an entry entered the Hub. */
 export type IngestionMethod = NonNullable<GenProvenance["ingestedVia"]>;
+/** Whether a deadline is a fixed point in time or an open-ended window. */
+export type DeadlineType = GenDeadline["type"];
 
 export type Organization = GenOrganization;
+export type Contact = GenContact;
 export type Provenance = GenProvenance;
 export type Funding = FundingEnvelope;
 export type SocialLinks = GenSocialLinks;
 export type MonetaryAmount = GenMonetaryAmount;
 export type AmountRange = GenAmountRange;
+export type Deadline = GenDeadline;
+export type Milestone = GenMilestone;
 
 export type GrantDetails = GenGrantDetails;
 export type HackathonDetails = GenHackathonDetails;
@@ -45,8 +53,13 @@ export type AcceleratorDetails = GenAcceleratorDetails;
 export type VcFundDetails = VCFundDetails;
 export type RfpDetails = RFPDetails;
 
-/** Map from an opportunity `type` to the shape of `opportunity[type]`. */
-export interface DetailsByType {
+/**
+ * Map from a `fundingType` to the shape of `opportunity[fundingType]`.
+ *
+ * The re-cut makes this a guarantee rather than an expectation: the matching block is
+ * required AND every non-matching block is forbidden, so a record can never carry two.
+ */
+export interface DetailsByFundingType {
   grant: GrantDetails;
   hackathon: HackathonDetails;
   bounty: BountyDetails;

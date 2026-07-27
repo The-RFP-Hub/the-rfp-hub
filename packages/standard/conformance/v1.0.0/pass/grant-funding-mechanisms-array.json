@@ -1,0 +1,27 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:mechanisms",
+  "fundingType": "grant",
+  "title": "Co-occurring funding mechanisms",
+  "description": "A funder offering a fixed grant and a matching grant in the same programme. The scalar fundingMechanism could not express this; the array can, and 'matching' is now a registered value.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    },
+    {
+      "name": "Matching Partner"
+    }
+  ],
+  "source": {},
+  "funding": {
+    "currency": "USD",
+    "budget": 500000
+  },
+  "grant": {
+    "fundingMechanisms": ["proactive", "matching"],
+    "programModel": "program",
+    "milestoneBased": true,
+    "recurring": false
+  }
+}

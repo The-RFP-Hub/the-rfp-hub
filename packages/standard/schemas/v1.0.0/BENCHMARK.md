@@ -1,25 +1,68 @@
 # RFP Hub Standard v1.0.0 — Real-Data Benchmark
 
 Validation of the standard against **real-world funding-opportunity data** from a production
-funding aggregator's public API, plus a ranked benchmark set for schema/CLI testing. Satisfies
-the M1 criterion: *"Schema validates successfully against ≥20 real-world funding-opportunity
-entries seeded from existing funding-map data."*
+funding aggregator's public API, plus a ranked benchmark set for schema/CLI testing.
+
+**This document is informative** ([`NORMATIVE.md`](../../NORMATIVE.md)). It records a
+measurement, not a rule.
+
+> ⚠️ **Two measurements, two shapes.** The 311-entry pull below was run against the schema **as
+> it stood before the 2026-07-27 in-place re-cut**, and has **not** been re-run. The 28 committed
+> example documents **have** been converted to the re-cut shape and re-validated. Read the
+> corpus-wide numbers as evidence about the data model, and the fixture numbers as evidence about
+> the current schema. See the [field mapping table](../../CHANGELOG.md#field-mapping-old--new).
 
 ## Result
 
-| Metric | Value |
-|---|---|
-| Unique entries pulled | **311** |
-| Mapped to source-neutral examples + validated | **289 / 289 valid (0 failures)** |
-| Curated benchmark fixtures | **28** (in [`examples/`](./examples)) |
-| Types covered by fixtures | grant, hackathon, bounty, accelerator, rfp |
+| Metric | Value | Measured against |
+|---|---|---|
+| Unique entries pulled | **311** | pre-re-cut shape |
+| Mapped to source-neutral examples + validated | **289 / 289 valid (0 failures)** | pre-re-cut shape |
+| Curated benchmark fixtures | **28** (in [`examples/`](./examples)) | **re-cut shape — 28/28 valid** |
+| Funding types covered by fixtures | grant, hackathon, bounty, accelerator, rfp | — |
 
-289 of the 311 pulled entries mapped to public-source, source-neutral examples and **all
-validate (0 failures)** — strong evidence the schema is faithful to a real funding model. The
-remaining ~22 were set aside for lacking a public `source.url` or to keep the sample free of
-any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace.
+289 of the 311 pulled entries mapped to public-source, source-neutral examples and all validated
+with 0 failures — evidence that the data model is faithful to a real funding corpus. The
+remaining ~22 were set aside for lacking a public original-posting URL or to keep the sample free
+of any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace.
 
-## Methodology
+The **28 committed fixtures are the live claim**: they were converted field-by-field to the
+re-cut shape and all 28 validate against the current
+[`opportunity.schema.json`](./opportunity.schema.json).
+
+```bash
+npx rfphub-validate packages/standard/schemas/v1.0.0/examples
+# 28 passed, 0 failed
+```
+
+## What the re-cut conversion did to these 28 documents
+
+Mechanical, and lossless where a real value existed. Each move follows a row in the
+[field mapping table](../../CHANGELOG.md#field-mapping-old--new):
+
+- **`type` → `fundingType`**, and each document's type block re-keyed to match. No document
+  carried a second, non-matching type block, so the newly enforced one-block-per-type rule cost
+  nothing here.
+- **`organization` → `sponsoringOrganizations[0]`** — a wrap, no data change. No fixture needed
+  `operatingOrganizations`.
+- **`source.url` has no successor.** Where a document had no `applicationUrl`, the old source URL
+  became the `applicationUrl` — it was the only link-back target left. Where `applicationUrl`
+  already pointed somewhere else, the source URL was preserved in **`resourceLinks`** rather than
+  dropped: **6 of the 28 documents** carry one for that reason.
+- **Hackathon date folding.** `registrationDeadline`, `submissionDeadline`, `startDate` and
+  `endDate` all folded into `deadlines[]` with labels `registration` / `submission` /
+  `event start` / `event end`; `closesAt` and `rfp.proposalDeadline` folded in as `application`.
+  Across the corpus this produced **28 `application`, 18 `registration`, 19 `event start` and 19
+  `event end`** entries — which is exactly why a consumer must select by label: on 19 of these
+  documents `deadlines[0]` is an event boundary, not a deadline.
+- **`funding.totalBudget` → `budget`**, `amountDistributed` → `allocated`. Only one document had
+  a non-zero `funding.awardsToDate`, a field with no successor; that value was preserved under
+  **`extensions`** rather than deleted. It is the only fixture using `extensions`.
+- No fixture exercises `milestones[]`, `eligibility`, `serviceAgreement` or `prerequisites` —
+  the source corpus carries none of them. Those fields are exercised by the
+  [conformance suite](../../conformance/v1.0.0), not by this benchmark.
+
+## Methodology (original pull)
 
 - **Source:** a production funding aggregator's public REST API (`isValid=accepted`, sorted by
   recency); 3 general pages (100/page) plus one page per type for diversity, deduped to 311.
@@ -27,13 +70,18 @@ any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace
   are dropped (the standard is source-agnostic).
 - **Validation:** ajv 8 (`ajv/dist/2020`) + `ajv-formats`, `strict: true, strictRequired: false`.
 - **Fill score** — count of *populated* Standard fields (scalar leaves + non-empty arrays and
-  their items), excluding the always-present `specVersion`/`id`/`type` and `extensions`.
-  Higher = richer entry, better for exercising schema breadth.
+  their items), excluding the always-present `specVersion`/`id`/type discriminator and
+  `extensions`. Higher = richer entry, better for exercising schema breadth.
 - **Activity score** — `status` weight (`open` 4 / `upcoming` 3 / `closed` 1 / `archived` 0)
-  `+3` if `closesAt` is in the future, `+1` if `opensAt` is in the future, `+` recency (up to
-  `+4`, linearly decaying over 1 year from `updatedAt`).
+  `+3` if the application deadline is in the future, `+1` if `opensAt` is in the future,
+  `+` recency (up to `+4`, linearly decaying over 1 year from `updatedAt`). *(Computed on the
+  pre-re-cut single `closesAt` scalar; under the re-cut shape the same score would read the
+  `application`-labelled entry of `deadlines[]`.)*
 
-## Per-type coverage
+Both scores are **ranking heuristics for choosing fixtures**, not quality metrics of the
+standard, and neither is normative.
+
+## Per-type coverage (original pull)
 
 | Type | Sampled | Valid |
 |---|--:|--:|
@@ -45,11 +93,21 @@ any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace
 | **vc_fund** | **0** | — |
 
 > ⚠️ **`vc_fund` coverage gap:** there are **zero** VC-fund entries in the source data, so the
-> `vc_fund` block cannot be benchmarked against real data yet. The block is unit-tested in the
-> schema smoke test; real VC-fund entries should be added during later seeding. `rfp` is also
-> thin (2 entries) — worth expanding given this is the *RFP* Hub.
+> `vc_fund` block still cannot be benchmarked against real data. It is covered by the conformance
+> suite only; real VC-fund entries should be added during later seeding. `rfp` is also thin
+> (2 entries) — worth expanding given this is the *RFP* Hub.
 
-## Top 15 by FILL (most complete entries)
+## Benchmark fixture set
+
+The 28 fixtures in [`examples/`](./examples) are the top entries by fill, with type diversity
+injected (≥1 of each available type): **19 hackathon, 6 grant, 1 bounty, 1 accelerator, 1 rfp**.
+They serve as (a) the real-data validation corpus, (b) golden inputs for the `rfphub-validate`
+CLI, and (c) realistic seed candidates for the public dataset. They are **examples, not
+conformance cases** — the pass/fail rule documents live in
+[`conformance/v1.0.0/`](../../conformance/v1.0.0). The single best all-round benchmark entry is
+**Prezenti Boost Pool S2** (`fundingmap:1459`) — open, future deadline, and high fill.
+
+### Top 15 by FILL (most complete entries, original pull)
 
 | # | Fill | Activity | Type | Status | Name | id |
 |--:|--:|--:|---|---|---|---|
@@ -69,7 +127,7 @@ any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace
 | 14 | 33 | 3.87 | grant | closed | Build Agents for the Real World Hackathon V2 | fundingmap:1059 |
 | 15 | 33 | 3.44 | hackathon | archived | Locus' Paygentic Hackathon - #4 | fundingmap:1430 |
 
-## Top 15 by ACTIVITY (most live opportunities)
+### Top 15 by ACTIVITY (most live opportunities, original pull)
 
 | # | Activity | Fill | Type | Status | Name | id |
 |--:|--:|--:|---|---|---|---|
@@ -89,16 +147,14 @@ any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace
 | 14 | 10.05 | 24 | grant | open | infraBUIDL(AI) | fundingmap:938 |
 | 15 | 10.05 | 15 | grant | open | Arbitrum Audit Program | fundingmap:1320 |
 
-## Benchmark fixture set
-
-The 28 fixtures in [`examples/`](./examples) are the top entries by fill, with type diversity
-injected (≥1 of each available valid type). They double as: (a) the M1 ≥20-entry validation
-corpus, (b) golden inputs for the `rfphub-validate` CLI, and (c) realistic seed candidates for
-the public dataset. The single best all-round benchmark entry is **Prezenti Boost Pool S2**
-(`fundingmap:1459`) — open, future deadline, and high fill (42).
+*Both scores are as measured on the pre-re-cut shape at pull time. The re-cut removed some fields
+and added others, so the absolute fill numbers would shift, and activity scores decay with the
+calendar; the ranking that selected these fixtures would not change materially.*
 
 ## Reproduce
 
 An internal pull/map/rank script reads a production funding aggregator's public API, maps each
 entry to the Standard, validates with ajv, and ranks by fill/activity. Raw pulled data and full
-scored rankings stay local (reproducible from the public API) and are not committed.
+scored rankings stay local (reproducible from the public API) and are not committed. Re-running
+it against the re-cut shape is worthwhile before the next cut, and would replace the pre-re-cut
+figures above.

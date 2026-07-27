@@ -1,0 +1,45 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:grant",
+  "fundingType": "grant",
+  "title": "Example Ecosystem Grants",
+  "description": "An ordinary open grants programme with an application deadline and a funding envelope. Adapted from the pre-re-cut valid fixture of the same name.",
+  "summary": "Open grants for ecosystem tooling.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation",
+      "type": "foundation",
+      "website": "https://example.org"
+    }
+  ],
+  "source": {
+    "publisher": "example-foundation",
+    "ingestedVia": "publisher_api",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": ["Ethereum", "Optimism"],
+  "categories": ["Developer Tooling"],
+  "applicationUrl": "https://example.org/apply",
+  "funding": {
+    "currency": "USD",
+    "budget": 250000,
+    "allocated": 40000,
+    "minAward": 5000,
+    "maxAward": 50000
+  },
+  "opensAt": "2026-01-01T00:00:00.000Z",
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-12-31T23:59:59.000Z",
+      "label": "application"
+    }
+  ],
+  "grant": {
+    "fundingMechanisms": ["proactive"],
+    "milestoneBased": true,
+    "recurring": false
+  }
+}

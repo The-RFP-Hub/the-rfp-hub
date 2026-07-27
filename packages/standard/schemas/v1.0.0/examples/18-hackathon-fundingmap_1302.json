@@ -1,17 +1,18 @@
 {
   "specVersion": "1.0.0",
   "id": "fundingmap:1302",
-  "type": "hackathon",
+  "fundingType": "hackathon",
   "title": "HashCash Hashathon",
   "description": "Multi-track hackathon for builders, artists, analysts, toolmakers in data/AI, builder tools, art, Grotto L1, hardware supplier tracks on Avalanche ecosystem. Build useful projects; applications open April 1.",
   "summary": "Multi-track hackathon for builders, artists, analysts, toolmakers in data/AI, builder tools,...",
   "status": "archived",
-  "organization": {
-    "name": "HashCash Hashathon",
-    "website": "https://hashcash.club/hashathon"
-  },
+  "sponsoringOrganizations": [
+    {
+      "name": "HashCash Hashathon",
+      "website": "https://hashcash.club/hashathon"
+    }
+  ],
   "source": {
-    "url": "https://hashcash.club/hashathon",
     "ingestedVia": "import",
     "originalId": "1302",
     "verifiedAgainstSource": null
@@ -22,20 +23,35 @@
   "categories": [
     "Funding Opportunity"
   ],
+  "applicationUrl": "https://hashcash.club/hashathon",
   "website": "https://hashcash.club/hashathon",
   "socialLinks": {
     "twitter": "https://x.com/clubhashcash"
   },
   "funding": {
-    "totalBudget": 5000
+    "budget": 5000
   },
   "opensAt": "2026-04-01T00:00:00.000Z",
-  "closesAt": "2026-04-30T23:59:00.000Z",
+  "deadlines": [
+    {
+      "type": "fixed",
+      "date": "2026-04-30T23:59:00.000Z",
+      "label": "application"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-04-01T00:00:00.000Z",
+      "label": "event start"
+    },
+    {
+      "type": "fixed",
+      "date": "2026-04-30T23:59:00.000Z",
+      "label": "event end"
+    }
+  ],
   "createdAt": "2026-03-27T20:58:42.000Z",
   "updatedAt": "2026-03-28T00:01:58.000Z",
   "hackathon": {
-    "startDate": "2026-04-01T00:00:00.000Z",
-    "endDate": "2026-04-30T23:59:00.000Z",
     "location": "Remote",
     "online": null,
     "tracks": [
@@ -45,8 +61,6 @@
       "Grotto",
       "Hardware Supplier"
     ],
-    "registrationDeadline": null,
-    "submissionDeadline": null,
     "prizes": [
       {
         "track": null,

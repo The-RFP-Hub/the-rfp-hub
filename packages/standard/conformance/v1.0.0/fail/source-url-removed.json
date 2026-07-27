@@ -1,0 +1,17 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:source-url",
+  "fundingType": "grant",
+  "title": "Provenance still carrying a source URL",
+  "description": "source.url was removed by the re-cut and the provenance block is closed, so a pre-re-cut record still carrying it now fails. Link-back runs through applicationUrl alone.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {
+    "url": "https://example.org/original-posting"
+  },
+  "grant": {}
+}

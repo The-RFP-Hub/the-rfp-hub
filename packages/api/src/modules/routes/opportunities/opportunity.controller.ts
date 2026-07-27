@@ -1,4 +1,4 @@
-import { SPEC_VERSION, opportunitySchema } from "@rfp-hub/standard";
+import { opportunitySchema } from "@rfp-hub/standard";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { OpportunityService } from "../../services/opportunities/opportunity.service.js";
 import { type RawQuery, parseOpportunityQuery } from "./types.js";
@@ -21,9 +21,13 @@ const find = async (req: FastifyRequest, res: FastifyReply) => {
   return res.send(opportunity);
 };
 
-/** GET /v1/opportunities/schema — the canonical RFP Hub Standard JSON Schema. */
+/**
+ * GET /v1/opportunities/schema — the canonical RFP Hub Standard JSON Schema, served verbatim
+ * under the JSON Schema media type so a generic validator can `$ref` this URL directly. The
+ * document self-identifies (`$id`, `$schema`), so no envelope is needed to carry the version.
+ */
 const schema = async (_req: FastifyRequest, res: FastifyReply) => {
-  return res.send({ specVersion: SPEC_VERSION, schema: opportunitySchema });
+  return res.type("application/schema+json").send(opportunitySchema);
 };
 
 export const opportunityController = { getAll, find, schema };
