@@ -24,7 +24,7 @@
     "@fastify/swagger-ui": "^5.2.1",
     "@the-rfp-hub/standard": "workspace:*",
     "drizzle-orm": "^0.38.3",
-    "fastify": "^5.2.1",
+    "fastify": "^5.8.5",
     "pg": "^8.13.1",
     "rfphub-validate": "workspace:*"
   },

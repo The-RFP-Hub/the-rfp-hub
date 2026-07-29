@@ -45,7 +45,7 @@ importers:
         specifier: ^0.38.3
         version: 0.38.4(@types/pg@8.20.0)(pg@8.22.0)
       fastify:
-        specifier: ^5.2.1
+        specifier: ^5.8.5
         version: 5.8.5
       pg:
         specifier: ^8.13.1

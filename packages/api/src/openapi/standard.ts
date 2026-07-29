@@ -31,6 +31,19 @@ export const STANDARD_REQUIRED: readonly string[] = Object.freeze([
   ...(standard.required as string[]),
 ]);
 
+/**
+ * The `enum` a Standard property declares. Throws at boot if that property ever loses its enum.
+ * Used by the REQUEST contract (routes/opportunities/types.ts) so the values the list endpoint
+ * accepts as filters cannot drift from the values the response components publish.
+ */
+export function standardEnum(name: string): string[] {
+  const values = standardProperties[name]?.enum;
+  if (!Array.isArray(values)) {
+    throw new Error(`the Standard's '${name}' property declares no enum`);
+  }
+  return [...values] as string[];
+}
+
 /** A `$ref` into the Standard's `$defs`, served as a pass-through object (see the file header). */
 const PASSTHROUGH_OBJECT = { type: "object", additionalProperties: true } as const;
 
