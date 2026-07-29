@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { registerRoutes } from "./modules/routes/index.js";
 import { responseSchemas } from "./openapi/schemas.js";
@@ -25,6 +26,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // return the whole dataset. Turn it off so the schema's strictness actually reaches the client.
     ajv: { customOptions: { removeAdditional: false } },
   });
+
+  // Fully public, unauthenticated read API — explicit product decision to allow any origin.
+  // Only the read-safe verbs are permitted (this API never mutates), so there is no credentialed
+  // request to protect against and no origin allowlist to maintain.
+  await app.register(cors, { origin: "*", methods: ["GET", "HEAD", "OPTIONS"] });
 
   // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
   for (const schema of responseSchemas) app.addSchema(schema);
