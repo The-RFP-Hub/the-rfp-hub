@@ -59,6 +59,74 @@ jobs:
       - name: Migrate API database (for integration tests)
         run: pnpm --filter @the-rfp-hub/api migrate
 
+      # The seed's reproducibility gate. `--from-file` reads the frozen corpus of raw upstream
+      # programs committed under test/fixtures — no network, no credentials, same result every run.
+      # `--strict` fails the build on a single schema-invalid record (the per-record gate already
+      # validates every one), and the >=100 floor is asserted before the first write.
+      - name: Seed from the frozen corpus (offline, strict)
+        run: pnpm --filter @the-rfp-hub/api seed --from-file test/fixtures/seed-corpus.json --strict
+
+      - name: Export the open-data slice (JSON + CSV)
+        run: pnpm --filter @the-rfp-hub/api export
+
+      # Assert what actually landed: >=100 live rows in Postgres, and every export file carrying
+      # every one of them. Runs before `pnpm test`, whose fixtures are self-isolating and unaffected.
+      - name: Assert seeded rows and exported files (>=100 entries)
+        working-directory: packages/api
+        run: |
+          node <<'EOF'
+          const { readdirSync, readFileSync } = require("node:fs");
+          const { Client } = require("pg");
+
+          const MIN = 100;
+          const dir = "exports";
+          const files = readdirSync(dir);
+          // Match the dated archive by name rather than taking whichever file readdir happened to
+          // list first, so the assertion cannot silently check nothing.
+          const dated = (ext) => files.filter((f) => new RegExp(`^opportunities-\\d{4}-\\d{2}-\\d{2}\\.${ext}$`).test(f));
+          const [datedJson, datedCsv] = [dated("json"), dated("csv")];
+          if (datedJson.length !== 1 || datedCsv.length !== 1) {
+            throw new Error(`expected exactly one dated JSON + CSV archive in ${dir}/, got: ${files.join(", ")}`);
+          }
+          if (!files.includes("LICENSE")) {
+            throw new Error(`expected the CC0 LICENSE sidecar in ${dir}/, got: ${files.join(", ")}`);
+          }
+
+          const json = JSON.parse(readFileSync(`${dir}/${datedJson[0]}`, "utf8"));
+          const csv = readFileSync(`${dir}/${datedCsv[0]}`, "utf8");
+          const exported = json.opportunities ?? [];
+          if (exported.length < MIN || json.count !== exported.length) {
+            throw new Error(`${datedJson[0]}: ${exported.length} entries (count=${json.count}), want >= ${MIN}`);
+          }
+          // Row count by id membership, not by line count: a quoted field may span lines.
+          const missing = exported.filter((o) => !csv.includes(o.id));
+          if (missing.length) {
+            throw new Error(`${datedCsv[0]}: missing ${missing.length} exported id(s), e.g. ${missing[0].id}`);
+          }
+          console.log(`✓ ${exported.length} entries in ${datedJson[0]} + ${datedCsv[0]}`);
+
+          const client = new Client({ connectionString: process.env.DATABASE_URL });
+          client
+            .connect()
+            .then(() =>
+              client.query(
+                "select count(*)::int as n from opportunities where review_status = 'approved' and is_listed",
+              ),
+            )
+            .then(({ rows }) => {
+              if (rows[0].n < MIN) throw new Error(`only ${rows[0].n} live rows seeded, want >= ${MIN}`);
+              console.log(`✓ ${rows[0].n} live rows, ${exported.length} entries exported`);
+            })
+            .then(() => client.end())
+            .catch((err) => {
+              console.error(err.message);
+              process.exit(1);
+            });
+          EOF
+          # Machine-written output, gitignored but not invisible to biome (it does not read
+          # .gitignore here) — drop it so the repo-wide lint below only sees authored files.
+          rm -rf exports
+
       - name: Typecheck
         run: pnpm typecheck
 

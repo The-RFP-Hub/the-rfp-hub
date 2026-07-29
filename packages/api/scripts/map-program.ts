@@ -12,7 +12,9 @@
  * conversion lives (the same rules the Standard's own examples were regenerated with):
  *
  *   type                       → fundingType
- *   organization (single)      → sponsoringOrganizations[0]   (rfp.issuingOrganization wins the name)
+ *   metadata.organizations[]   → sponsoringOrganizations[]    (rfp.issuingOrganization wins the name;
+ *                                                              then the listing community, then — last
+ *                                                              resort — the program title)
  *   deadline / metadata.endsAt → deadlines[{type:'fixed', date, label:'application'}]
  *   hackathon.registrationDeadline / submissionDeadline / startDate / endDate
  *                              → deadlines[… label 'registration' | 'submission' | 'event start' | 'event end']
@@ -21,8 +23,26 @@
  *   funding.totalBudget        → funding.budget      (rfp.budget folds into the same envelope)
  *   grant.fundingMechanism     → grant.fundingMechanisms[]
  *   source.url                 → removed; the program URL now feeds `applicationUrl`
+ *
+ * ── Fields the upstream carries that the Standard has a home for ───────────────────
+ *   metadata.amountDistributedToDate → funding.allocated   (only when positive)
+ *   metadata.anyoneCanJoin           → eligibility.openTo
+ *   socialLinks.grantsSite / metadata.bugBounty → resourceLinks (when not the applicationUrl)
+ *   socialLinks.orgWebsite           → sponsoringOrganizations[0].website
+ *   createdAt                        → postedAt (first listed at the source)
+ *   hackathon/accelerator location "Online" → the block's `online` flag
+ *   metadata.grantsToDate, chainID   → extensions['<sourceSystem>.…'] (no Standard field)
+ *
+ * Still unmapped because the upstream publishes nothing for them: operatingOrganizations,
+ * prerequisites, serviceAgreement, milestones, and the three JSON-LD self-identification keys.
  */
-import type { Deadline, FundingType, Opportunity, OpportunityStatus } from "@the-rfp-hub/standard";
+import {
+  type Deadline,
+  type FundingType,
+  type Opportunity,
+  type OpportunityStatus,
+  SPEC_VERSION,
+} from "@the-rfp-hub/standard";
 
 export interface RegistryCommunity {
   uid?: string;
@@ -37,6 +57,8 @@ export interface RegistryProgram {
   type?: string;
   name?: string;
   isActive?: boolean;
+  /** Chain the program pays out on, when it names one. No Standard field — goes to `extensions`. */
+  chainID?: string | number | null;
   deadline?: string | null;
   submissionUrl?: string | null;
   communities?: RegistryCommunity[];
@@ -53,10 +75,19 @@ export interface RegistryProgram {
     ecosystems?: string[];
     networks?: string[];
     grantTypes?: string[];
+    /** The real organisations behind the program — the sponsoring orgs, in upstream order. */
     organizations?: string[];
     minGrantSize?: number | string | null;
     maxGrantSize?: number | string | null;
     programBudget?: number | string | null;
+    /** Committed to date. Upstream defaults it to "0", so only a positive value means anything. */
+    amountDistributedToDate?: number | string | null;
+    /** Awards made to date. No Standard field — goes to `extensions`. */
+    grantsToDate?: number | string | null;
+    /** Whether anyone may apply, or the program invites/pre-selects. The one eligibility signal. */
+    anyoneCanJoin?: boolean;
+    /** Bug-bounty page, when the program runs one. No Standard field — goes to `resourceLinks`. */
+    bugBounty?: string;
     website?: string;
     logoImg?: string;
     bannerImg?: string;
@@ -310,6 +341,110 @@ function socialLinksOf(src: Record<string, string> | undefined): Record<string, 
   return out;
 }
 
+/** Standard caps an organization name at 256 characters. */
+const ORG_NAME_MAX = 256;
+
+/** Where a sponsor's NAME came from. The caller keys the directory slug off it. */
+export type SponsorNameSource = "upstream" | "community" | "title";
+
+/**
+ * The names of the organisations SPONSORING the program, in the order the upstream lists them.
+ *
+ * The upstream carries them in `metadata.organizations`, and for an RFP `rfp.issuingOrganization`
+ * names the issuer as free text — that one wins the primary slot. Names are deduped
+ * case-insensitively, because an upstream list can repeat the issuer.
+ *
+ * The Standard requires at least one sponsor, and most upstream programs name none, so there are
+ * two fallbacks and the order between them matters:
+ *
+ *   community — the ecosystem community that lists the program ("Filecoin", "Optimism"). A real,
+ *               lookup-able organisation with a slug the upstream itself publishes.
+ *   title     — last resort, and nothing more: a title is not an organisation, and publishing one
+ *               fabricates a sponsor ("Filecoin ProPGF Batch 3") nobody can look up or deduplicate.
+ *
+ * `source` is what stops the two from being mixed. A title-derived name must NEVER be filed under
+ * the community's slug: several programs of one community would then land on a single directory
+ * row under whichever fabricated name was written last, and `?organization=<slug>` would conflate
+ * them. Title fallbacks therefore get their own (title-derived) slug.
+ */
+export function sponsorNamesOf(
+  organizations: unknown,
+  issuingOrganization: unknown,
+  fallbacks: { community?: unknown; title: string },
+): { names: string[]; source: SponsorNameSource } {
+  const candidates = [
+    ...(nonEmpty(issuingOrganization) ? [issuingOrganization] : []),
+    ...cleanArr(organizations),
+  ];
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of candidates) {
+    const name = raw.trim().slice(0, ORG_NAME_MAX);
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  if (names.length) return { names, source: "upstream" };
+  if (nonEmpty(fallbacks.community)) {
+    return { names: [fallbacks.community.trim().slice(0, ORG_NAME_MAX)], source: "community" };
+  }
+  return { names: [fallbacks.title.trim().slice(0, ORG_NAME_MAX)], source: "title" };
+}
+
+/** A location that literally says the event is remote — the upstream has no `online` flag. */
+const ONLINE_LOCATION = /^\s*(online|virtual|remote)\b/i;
+
+/**
+ * `eligibility` is an open key-value map of plain strings. The upstream publishes exactly one
+ * eligibility signal — whether anyone may apply — so that is the only key emitted, under the
+ * unregistered but self-describing `openTo` (registries/eligibility-keys.json documents the
+ * conventional keys and admits others).
+ */
+function eligibilityOf(anyoneCanJoin: unknown): Record<string, string> | undefined {
+  if (typeof anyoneCanJoin !== "boolean") return undefined;
+  return {
+    openTo: anyoneCanJoin
+      ? "Anyone may apply — no invitation or pre-selection."
+      : "Not open to all applicants — the program invites or pre-selects participants.",
+  };
+}
+
+/**
+ * Supporting links no other Standard field carries. `applicationUrl` is the single link-back
+ * target, so a program that publishes BOTH a submission URL and a separate program page would
+ * otherwise drop the page; one free-form string is where the Standard puts the leftovers.
+ */
+function resourceLinksOf(
+  sl: Record<string, string> | undefined,
+  bugBounty: unknown,
+  applicationUrl: string | undefined,
+): string | undefined {
+  const parts: string[] = [];
+  const programSite = validUri(sl?.grantsSite);
+  if (programSite && programSite !== applicationUrl) parts.push(`Program site: ${programSite}`);
+  const bounty = validUri(bugBounty);
+  if (bounty) parts.push(`Bug bounty: ${bounty}`);
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
+/**
+ * Upstream data with no Standard home, under the source's own namespace — the documented purpose
+ * of `extensions`. Kept to values that carry information: a zero award count is the upstream's
+ * default, not a fact about the program.
+ */
+function extensionsOf(p: RegistryProgram, sourceSystem: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const grantsToDate = num(p.metadata?.grantsToDate);
+  if (grantsToDate !== undefined && grantsToDate > 0) {
+    out[`${sourceSystem}.grantsToDate`] = grantsToDate;
+  }
+  if (p.chainID !== undefined && p.chainID !== null && p.chainID !== "") {
+    out[`${sourceSystem}.chainId`] = String(p.chainID);
+  }
+  return out;
+}
+
 /** The raw upstream metadata blob for a funding type (all of them keep their old key names). */
 function rawBlockOf(p: RegistryProgram, type: FundingType): Record<string, unknown> {
   switch (type) {
@@ -378,6 +513,11 @@ function typeBlockOf(
     if (legacy !== undefined && legacy !== null && legacy !== "") picked.fundingMechanisms = legacy;
   }
   const out = normalizeBlock(picked);
+  // hackathon/accelerator `online` has no upstream field, but a location of "Online" (or Virtual /
+  // Remote) states it in words — read it rather than leave the flag unset on a remote event.
+  if ((type === "hackathon" || type === "accelerator") && out.online === undefined) {
+    if (nonEmpty(out.location) && ONLINE_LOCATION.test(out.location)) out.online = true;
+  }
   // bounty.reward is required by the Standard — synthesize from the budget if absent.
   if (type === "bounty" && !out.reward) {
     const { amount, currency } = parseAmount(p.metadata?.programBudget);
@@ -412,18 +552,30 @@ export function mapProgram(
   );
 
   // `rfp.issuingOrganization` was free text describing the real issuer — it now names the primary
-  // sponsoring organization, which is strictly better than the title-derived fallback.
+  // sponsoring organization, ahead of `metadata.organizations`; the community that lists the
+  // program comes next, and the title is the last resort.
   const issuing = fundingType === "rfp" ? rawBlock.issuingOrganization : undefined;
-  const orgName = (nonEmpty(issuing) ? issuing : title).slice(0, 256); // Standard caps name at 256
+  const { names: sponsorNames, source: sponsorNameSource } = sponsorNamesOf(
+    md.organizations,
+    issuing,
+    {
+      community: community?.name,
+      title,
+    },
+  );
 
   const budget = parseAmount(md.programBudget);
   // `rfp.budget` ({amount, currency}) folds into the shared top-level funding envelope.
   const rfpBudget = fundingType === "rfp" ? coerceMoney(rawBlock.budget) : undefined;
+  // `allocated` is committed-to-date. The upstream defaults it to 0 on programs that never report
+  // it, so only a positive figure is a fact worth publishing.
+  const allocated = num(md.amountDistributedToDate);
   const funding = compact({
     currency: budget.currency ?? rfpBudget?.currency,
     minAward: num(md.minGrantSize),
     maxAward: num(md.maxGrantSize),
     budget: budget.amount ?? rfpBudget?.amount,
+    allocated: allocated !== undefined && allocated > 0 ? allocated : undefined,
   });
 
   const sl = md.socialLinks;
@@ -435,8 +587,32 @@ export function mapProgram(
     ? `${opts.programUrlBase.replace(/\/+$/, "")}/${programId}`
     : undefined;
 
+  const applicationUrl =
+    validUri(p.submissionUrl) ??
+    validUri(sl?.grantsSite) ??
+    validUri(md.website) ??
+    validUri(fallbackUrl);
+  const extensions = extensionsOf(p, sourceSystem);
+
+  // Array order is semantic: entry 0 is the primary organisation. Only it carries the program's
+  // branding; a co-sponsor the upstream names in passing gets the identity it actually published.
+  // The slug is derived from the name that is actually published, so two different sponsor names
+  // can never share one directory row. The single exception is the community fallback, where the
+  // name IS the community's and its own published slug is the more authoritative spelling.
+  const sponsorSlug = (name: string): string =>
+    slugify(sponsorNameSource === "community" && nonEmpty(communitySlug) ? communitySlug : name);
+  const sponsoringOrganizations = sponsorNames.map((name, i) =>
+    compact({
+      name,
+      slug: sponsorSlug(name),
+      website: i === 0 ? validUri(sl?.orgWebsite) : undefined,
+      logoUrl: i === 0 ? validUri(md.logoImg) : undefined,
+      ecosystems: i === 0 ? ecosystems : undefined,
+    }),
+  );
+
   const out: Record<string, unknown> = compact({
-    specVersion: "1.0.0",
+    specVersion: SPEC_VERSION,
     id: `${sourceSystem}:${programId}`,
     fundingType,
     title,
@@ -446,14 +622,7 @@ export function mapProgram(
         ? md.shortDescription.slice(0, 500)
         : undefined,
     status: statusOf(p),
-    sponsoringOrganizations: [
-      compact({
-        name: orgName,
-        slug: slugify(nonEmpty(communitySlug) ? communitySlug : orgName),
-        logoUrl: validUri(md.logoImg),
-        ecosystems,
-      }),
-    ],
+    sponsoringOrganizations,
     source: compact({
       publisher: nonEmpty(communitySlug) ? slugify(communitySlug) : undefined,
       ingestedVia: "import",
@@ -464,11 +633,9 @@ export function mapProgram(
     networks: cleanArr(md.networks),
     categories: cleanArr(md.categories),
     tags: cleanArr(md.grantTypes),
-    applicationUrl:
-      validUri(p.submissionUrl) ??
-      validUri(sl?.grantsSite) ??
-      validUri(md.website) ??
-      validUri(fallbackUrl),
+    eligibility: eligibilityOf(md.anyoneCanJoin),
+    resourceLinks: resourceLinksOf(sl, md.bugBounty, applicationUrl),
+    applicationUrl,
     website: validUri(md.website) ?? validUri(sl?.website),
     logoUrl: validUri(md.logoImg),
     bannerUrl: validUri(md.bannerImg),
@@ -476,8 +643,12 @@ export function mapProgram(
     funding: Object.keys(funding).length ? funding : undefined,
     opensAt: isoDate(md.startsAt),
     deadlines: deadlinesOf(p, fundingType, rawBlock),
+    // The upstream record is created when the program is first listed at the source — the closest
+    // thing it publishes to "first publicly announced", which is what postedAt means.
+    postedAt: isoDate(p.createdAt),
     createdAt: isoDate(p.createdAt),
     updatedAt: isoDate(p.updatedAt),
+    extensions: Object.keys(extensions).length ? extensions : undefined,
   });
 
   // required type-specific block under the `fundingType` key (may be {} for grants), and NO other
