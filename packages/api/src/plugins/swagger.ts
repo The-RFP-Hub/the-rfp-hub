@@ -1,6 +1,7 @@
 import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
 import type { FastifyInstance } from "fastify";
+import { config } from "../config.js";
 
 /**
  * OpenAPI 3.1 spec (collected from route schemas) + Swagger UI at /v1/docs.
@@ -17,7 +18,9 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
           "Public, unauthenticated read API serving the RFP Hub Standard v1.0.0 — Ethereum-ecosystem funding opportunities.",
         license: { name: "MIT", identifier: "MIT" },
       },
-      servers: [{ url: "/" }],
+      // Driven by PUBLIC_BASE_URL (default "/" — relative, correct wherever the server is hosted).
+      // No domain exists yet; once one does, setting the env var is the only change needed.
+      servers: [{ url: config.publicBaseUrl }],
       tags: [
         { name: "opportunities", description: "Funding opportunities" },
         { name: "stats", description: "Dataset statistics" },
