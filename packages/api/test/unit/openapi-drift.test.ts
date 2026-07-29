@@ -10,7 +10,8 @@
  *    added to the mapper and not to the spec fails here, and so does a property declared in the
  *    spec that nothing ever emits;
  * 2. the Standard — the enums and the `required` list the components publish must be the
- *    Standard's own, byte for byte.
+ *    Standard's own, byte for byte, on the RESPONSE side AND on the request side (the list
+ *    endpoint's fundingType/status filters, whose drift a client sees as a hard 400).
  *
  * The components that close their shape with `additionalProperties: false` get a third guard: a
  * field a service starts returning is silently DROPPED by fast-json-stringify, so the "live spec"
@@ -31,6 +32,7 @@ import {
   toStandard,
   toSummary,
 } from "../../src/modules/mappers/opportunity.mapper.js";
+import { listQuerySchema } from "../../src/modules/routes/opportunities/types.js";
 import type { Page } from "../../src/modules/services/opportunities/opportunity.service.js";
 import type { StatsSummary } from "../../src/modules/services/stats/stats.service.js";
 import { responseSchemas } from "../../src/openapi/schemas.js";
@@ -179,6 +181,37 @@ describe("OpenAPI components vs the Standard (derivation guard)", () => {
       if (schema.format) expect(served[name].format, `${name}.format`).toBe(schema.format);
     }
   });
+});
+
+describe("the REQUEST contract vs the Standard (list filters)", () => {
+  const filters = {
+    fundingType: listQuerySchema.properties.fundingType,
+    status: listQuerySchema.properties.status,
+  };
+
+  for (const [name, filter] of Object.entries(filters)) {
+    const values = standardProperty(name).enum as string[];
+
+    it(`${name} accepts exactly the Standard's values, alone and as a comma list`, () => {
+      const pattern = new RegExp(filter.items.pattern);
+      for (const value of values) {
+        expect(pattern.test(value), `${name}=${value}`).toBe(true);
+        expect(filter.description, `${name} documents ${value}`).toContain(value);
+      }
+      expect(pattern.test(values.join(",")), `${name}=<all>`).toBe(true);
+      // …and nothing else: an out-of-Standard value is what the 400 exists for
+      expect(pattern.test("not-a-real-value")).toBe(false);
+      expect(pattern.test(`${values[0]},not-a-real-value`)).toBe(false);
+    });
+
+    // Empty values are what URLSearchParams-style builders and HTML forms emit for an unselected
+    // filter. `ecosystem`/`tag`/`q` have always accepted them; these two must not be the exception.
+    it(`${name} accepts an empty value, like every other list filter`, () => {
+      const pattern = new RegExp(filter.items.pattern);
+      expect(pattern.test("")).toBe(true);
+      expect(pattern.test("   ")).toBe(true);
+    });
+  }
 });
 
 /**
