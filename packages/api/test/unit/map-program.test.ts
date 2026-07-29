@@ -24,7 +24,9 @@ describe("mapProgram", () => {
     expect(o).not.toHaveProperty("organization");
     expect(o).not.toHaveProperty("closesAt");
     expect(o.sponsoringOrganizations).toHaveLength(1);
-    expect(o.sponsoringOrganizations[0]?.name).toBe("Filecoin ProPGF Batch 3");
+    // the upstream names no organisation, so the listing community stands in — NOT the program
+    // title, which is not an organisation anyone can look up (see sponsorNamesOf)
+    expect(o.sponsoringOrganizations[0]?.name).toBe("Filecoin");
     expect(o.sponsoringOrganizations[0]?.slug).toBe("filecoin");
     expect(o.source.originalId).toBe("1479");
     expect(o.source).not.toHaveProperty("url");

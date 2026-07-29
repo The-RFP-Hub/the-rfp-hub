@@ -59,6 +59,89 @@ jobs:
       - name: Migrate API database (for integration tests)
         run: pnpm --filter @the-rfp-hub/api migrate
 
+      # The seed's reproducibility gate. `--from-file` reads the frozen corpus of raw upstream
+      # programs committed under test/fixtures — no network, no credentials, same result every run.
+      # `--strict` fails the build on a single schema-invalid record (the per-record gate already
+      # validates every one), and the >=100 floor is asserted before the first write.
+      - name: Seed from the frozen corpus (offline, strict)
+        run: pnpm --filter @the-rfp-hub/api seed --from-file test/fixtures/seed-corpus.json --strict
+
+      - name: Export the open-data slice (JSON + CSV)
+        run: pnpm --filter @the-rfp-hub/api export
+
+      # Assert what actually landed: >=100 live rows in Postgres, and EVERY export file carrying
+      # every one of them. Runs before `pnpm test`, whose fixtures are self-isolating and unaffected.
+      - name: Assert seeded rows and exported files (>=100 entries)
+        working-directory: packages/api
+        run: |
+          node <<'EOF'
+          const { readdirSync, readFileSync } = require("node:fs");
+          const { Client } = require("pg");
+
+          const MIN = 100;
+          const dir = "exports";
+          const files = readdirSync(dir);
+          // The exporter publishes FOUR data files: the dated archive (what dataset_snapshots.url
+          // records) and the latest.* aliases. Check both pairs by name — picking whichever file
+          // readdir happened to list first would leave the dated archive unasserted.
+          const dated = (ext) => files.filter((f) => new RegExp(`^opportunities-\\d{4}-\\d{2}-\\d{2}\\.${ext}$`).test(f));
+          const [datedJson, datedCsv] = [dated("json"), dated("csv")];
+          if (datedJson.length !== 1 || datedCsv.length !== 1) {
+            throw new Error(`expected exactly one dated JSON + CSV archive in ${dir}/, got: ${files.join(", ")}`);
+          }
+          const pairs = [[datedJson[0], datedCsv[0]], ["latest.json", "latest.csv"]];
+          for (const name of pairs.flat().concat("LICENSE")) {
+            if (!files.includes(name)) {
+              throw new Error(`expected ${name} in ${dir}/, got: ${files.join(", ")}`);
+            }
+          }
+
+          for (const [jsonFile, csvFile] of pairs) {
+            const json = JSON.parse(readFileSync(`${dir}/${jsonFile}`, "utf8"));
+            const csv = readFileSync(`${dir}/${csvFile}`, "utf8");
+            const exported = json.opportunities ?? [];
+            if (exported.length < MIN || json.count !== exported.length) {
+              throw new Error(`${jsonFile}: ${exported.length} entries (count=${json.count}), want >= ${MIN}`);
+            }
+            // Row count by id membership, not by line count: a quoted field may span lines.
+            const missing = exported.filter((o) => !csv.includes(o.id));
+            if (missing.length) {
+              throw new Error(`${csvFile}: missing ${missing.length} exported id(s), e.g. ${missing[0].id}`);
+            }
+            console.log(`✓ ${exported.length} entries in ${jsonFile} + ${csvFile}`);
+          }
+
+          // The stable aliases must be byte-identical to the dated archive they alias, or the two
+          // advertised URLs are describing different datasets.
+          for (const [dated, latest] of [[pairs[0][0], "latest.json"], [pairs[0][1], "latest.csv"]]) {
+            if (readFileSync(`${dir}/${dated}`, "utf8") !== readFileSync(`${dir}/${latest}`, "utf8")) {
+              throw new Error(`${latest} does not match ${dated}`);
+            }
+          }
+
+          const exported = JSON.parse(readFileSync(`${dir}/${pairs[0][0]}`, "utf8")).opportunities;
+          const client = new Client({ connectionString: process.env.DATABASE_URL });
+          client
+            .connect()
+            .then(() =>
+              client.query(
+                "select count(*)::int as n from opportunities where review_status = 'approved' and is_listed",
+              ),
+            )
+            .then(({ rows }) => {
+              if (rows[0].n < MIN) throw new Error(`only ${rows[0].n} live rows seeded, want >= ${MIN}`);
+              console.log(`✓ ${rows[0].n} live rows, ${exported.length} entries exported`);
+            })
+            .then(() => client.end())
+            .catch((err) => {
+              console.error(err.message);
+              process.exit(1);
+            });
+          EOF
+          # Machine-written output, gitignored but not invisible to biome (it does not read
+          # .gitignore here) — drop it so the repo-wide lint below only sees authored files.
+          rm -rf exports
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -67,3 +150,13 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # `examples/` is deliberately NOT a workspace member — each example must install like a real
+      # consumer would, from the published packages — so `pnpm typecheck` above does not reach it.
+      # Run the documented `npm run typecheck` on its own install instead, or the shipped example
+      # can stop compiling without anything noticing.
+      - name: Typecheck the TypeScript example (installs like a consumer)
+        working-directory: examples/typescript
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck

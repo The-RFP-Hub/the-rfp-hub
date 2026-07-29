@@ -1,0 +1,21 @@
+# Keep the build context to what the image actually needs (workspace manifests + source for
+# @the-rfp-hub/standard, rfphub-validate, @the-rfp-hub/api — see Dockerfile).
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+**/*.log
+.git
+.github
+.DS_Store
+
+# Local env + API data exports — never baked into an image; the container reads config from the
+# environment it's run with (see packages/api/README.md).
+.env
+.env.local
+packages/api/exports/
+
+# Not needed to build or run the image.
+examples/
+adr/

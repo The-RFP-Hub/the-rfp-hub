@@ -84,6 +84,16 @@ run("/v1 API", () => {
     expect(res.json()).toMatchObject({ status: "ok" });
   });
 
+  it("is CORS-open to any origin (fully public, unauthenticated read API)", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/v1/health",
+      headers: { origin: "https://example.org" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBe("*");
+  });
+
   it("GET /v1/opportunities returns only approved+listed, thin projection, with pagination", async () => {
     const res = await app.inject({ method: "GET", url: `/v1/opportunities?ecosystem=${TAG}` });
     expect(res.statusCode).toBe(200);

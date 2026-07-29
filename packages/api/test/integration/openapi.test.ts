@@ -104,16 +104,17 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.info?.title).toBeTruthy();
     for (const path of [
-      "/v1/opportunities/",
+      "/v1/opportunities",
       "/v1/opportunities/{id}",
       "/v1/opportunities/schema",
-      "/v1/stats/",
-      "/v1/health/",
+      "/v1/stats",
+      "/v1/health",
     ]) {
       expect(doc.paths?.[path]?.get, `documents GET ${path}`).toBeTruthy();
     }
     for (const name of [
       "Opportunity",
+      "OpportunitySummary",
       "PaginatedOpportunities",
       "Stats",
       "SchemaResponse",
@@ -122,13 +123,18 @@ run("OpenAPI 3.1 live-spec contract", () => {
       expect(doc.components?.schemas?.[name], `components has ${name}`).toBeTruthy();
     }
     // the error contract is published, too
-    expect(doc.paths["/v1/opportunities/"].get.responses["400"]).toBeTruthy();
+    expect(doc.paths["/v1/opportunities"].get.responses["400"]).toBeTruthy();
     expect(doc.paths["/v1/opportunities/{id}"].get.responses["404"]).toBeTruthy();
+  });
+
+  it("publishes collection paths in the documented no-slash form", () => {
+    const collections = Object.keys(doc.paths).filter((p: string) => p !== "/" && p.endsWith("/"));
+    expect(collections, "no published path carries a trailing slash").toEqual([]);
   });
 
   it("publishes the re-cut filter surface, with the rolling-only exclusion documented", () => {
     const params: { name: string; description?: string; schema?: Record<string, unknown> }[] =
-      doc.paths["/v1/opportunities/"].get.parameters;
+      doc.paths["/v1/opportunities"].get.parameters;
     const byName = new Map(params.map((p) => [p.name, p]));
 
     expect([...byName.keys()]).toEqual(
@@ -149,6 +155,32 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(byName.get("sort")?.schema?.default).toBe("nextDeadlineAt");
   });
 
+  it("publishes the accepted values of the enum filters and the repeatable list form", () => {
+    const params: { name: string; description?: string; schema?: Record<string, unknown> }[] =
+      doc.paths["/v1/opportunities"].get.parameters;
+    const byName = new Map(params.map((p) => [p.name, p]));
+
+    for (const [name, values] of [
+      ["fundingType", ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"]],
+      ["status", ["upcoming", "open", "closed", "archived"]],
+    ] as const) {
+      const param = byName.get(name);
+      // list params are arrays (repeatable); the comma-list pattern is what documents the values
+      expect(param?.schema?.type, `${name} is a repeatable list`).toBe("array");
+      const pattern = (param?.schema?.items as { pattern?: string } | undefined)?.pattern;
+      for (const value of values) {
+        expect(pattern, `${name} pattern accepts ${value}`).toContain(value);
+        expect(param?.description, `${name} description lists ${value}`).toContain(value);
+      }
+      expect(param?.description).toMatch(/comma-separate/i);
+    }
+
+    for (const name of ["ecosystem", "network", "category", "tag"]) {
+      expect(byName.get(name)?.schema?.type, `${name} is a repeatable list`).toBe("array");
+      expect(byName.get(name)?.description).toMatch(/Repeat the parameter/i);
+    }
+  });
+
   it("declares the Opportunity component in the re-cut shape", () => {
     const opportunity = doc.components.schemas.Opportunity;
     expect(opportunity.required).toEqual(
@@ -160,13 +192,62 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(opportunity.properties.closesAt).toBeUndefined();
   });
 
+  it("publishes detail (Opportunity) and list (OpportunitySummary) as distinct components", () => {
+    const detail = doc.components.schemas.Opportunity;
+    const summary = doc.components.schemas.OpportunitySummary;
+    const blocks = ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"];
+
+    // the detail object carries every type block plus `extensions`; the thin projection has neither
+    for (const block of [...blocks, "extensions"]) {
+      expect(detail.properties[block], `Opportunity declares ${block}`).toBeTruthy();
+      expect(summary.properties[block], `OpportunitySummary omits ${block}`).toBeUndefined();
+    }
+    // everything else is shared — including the fields the served object carries beyond the core
+    for (const field of [
+      "website",
+      "logoUrl",
+      "bannerUrl",
+      "socialLinks",
+      "postedAt",
+      "updatedAt",
+    ]) {
+      expect(detail.properties[field], `Opportunity declares ${field}`).toBeTruthy();
+      expect(summary.properties[field], `OpportunitySummary declares ${field}`).toBeTruthy();
+    }
+    expect(summary.required).toEqual(detail.required);
+    // enums are the Standard's, not a hand-kept copy (test/unit/openapi-drift.test.ts diffs them)
+    expect(detail.properties.fundingType.enum).toEqual(blocks);
+    expect(detail.properties.status.enum).toEqual(["upcoming", "open", "closed", "archived"]);
+  });
+
+  it("routes the list through OpportunitySummary and the detail through Opportunity", async () => {
+    expect(response200Ref("/v1/opportunities")).toBe(
+      `${OAS_ID}#/components/schemas/PaginatedOpportunities`,
+    );
+    expect(doc.components.schemas.PaginatedOpportunities.properties.items.items.$ref).toBe(
+      "#/components/schemas/OpportunitySummary",
+    );
+    expect(response200Ref("/v1/opportunities/{id}")).toBe(
+      `${OAS_ID}#/components/schemas/Opportunity`,
+    );
+
+    // and the split is real, not merely declared: the list drops the type block, the detail keeps it
+    const list = await app.inject({
+      method: "GET",
+      url: "/v1/opportunities?ecosystem=OASTEST&limit=5",
+    });
+    expect(list.json().items[0].grant).toBeUndefined();
+    const one = await app.inject({ method: "GET", url: "/v1/opportunities/otest:1" });
+    expect(one.json().grant).toEqual({});
+  });
+
   it("GET /v1/opportunities conforms to its declared 200 schema", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/v1/opportunities?ecosystem=OASTEST&limit=5",
     });
     expect(res.statusCode).toBe(200);
-    assertConformsTo("/v1/opportunities/", res.json());
+    assertConformsTo("/v1/opportunities", res.json());
   });
 
   it("GET /v1/opportunities/:id conforms to its declared 200 schema", async () => {
@@ -188,13 +269,13 @@ run("OpenAPI 3.1 live-spec contract", () => {
   it("GET /v1/stats conforms to its declared 200 schema", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/stats" });
     expect(res.statusCode).toBe(200);
-    assertConformsTo("/v1/stats/", res.json());
+    assertConformsTo("/v1/stats", res.json());
   });
 
   it("GET /v1/health conforms to its declared 200 schema", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/health" });
     expect(res.statusCode).toBe(200);
-    assertConformsTo("/v1/health/", res.json());
+    assertConformsTo("/v1/health", res.json());
   });
 
   it("honors the documented 400 (bad param) and 404 (missing) contracts", async () => {

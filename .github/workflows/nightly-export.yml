@@ -1,0 +1,90 @@
+name: Nightly export
+
+# Publishes the CC0 open-data slice every night: seed from the configured upstream source, then
+# export JSON + CSV (dated archive + stable latest.*) with the CC0 sidecar to the object store.
+#
+# The job is intentionally fail-loud: every step is required, the export refuses to publish below
+# EXPORT_MIN_COUNT, and a missing secret fails in preflight rather than half-way through a run.
+# Everything deployment-specific — the upstream base URL, the database, the bucket — is a repository
+# secret; nothing about a source or a destination is committed here.
+
+on:
+  schedule:
+    # 03:17 UTC daily. Off the hour so the run is not queued behind the top-of-hour crowd.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# One export at a time; a manual run must not race the nightly one over `latest.*`.
+concurrency:
+  group: nightly-export
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Preflight (required secrets are configured)
+        env:
+          SOURCE_API_URL: ${{ secrets.SOURCE_API_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: |
+          missing=()
+          for name in DATABASE_URL SOURCE_API_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION S3_BUCKET; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::missing repository secret(s): ${missing[*]}"
+            exit 1
+          fi
+          echo "✓ all required secrets present"
+
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The API resolves @the-rfp-hub/standard from its built dist.
+      - name: Build workspace packages
+        run: pnpm build
+
+      - name: Migrate
+        run: pnpm --filter @the-rfp-hub/api migrate
+
+      # LIVE mode: pages the upstream registry (no --from-file). `--strict` fails the run on a
+      # single schema-invalid record, and the seed's own >=100 floor is asserted before any write.
+      - name: Seed from the upstream source (live, strict)
+        env:
+          SOURCE_API_URL: ${{ secrets.SOURCE_API_URL }}
+        run: pnpm --filter @the-rfp-hub/api seed --strict
+
+      # Publishes opportunities-<date>.json/.csv, latest.json/.csv and the CC0 LICENSE sidecar.
+      # S3_BUCKET is what selects the upload sink; without it this would fall back to a local write.
+      - name: Export to the public bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_PREFIX: ${{ secrets.S3_PREFIX }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
+          EXPORT_MIN_COUNT: ${{ vars.EXPORT_MIN_COUNT || 100 }}
+        run: pnpm --filter @the-rfp-hub/api export

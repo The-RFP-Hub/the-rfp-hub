@@ -1,15 +1,18 @@
 /**
  * PURE query-string parsing/normalization for the list endpoint — no Fastify/DB deps, unit-tested.
  *
- * `listQuerySchema` (below) is the authoritative contract: Fastify validates the querystring first,
- * so unknown params (additionalProperties:false), out-of-enum `sort`/`order` and malformed
- * `deadlineAfter`/`deadlineBefore` instants are rejected with 400 before this parser runs. The
- * parser normalizes schema-permitted inputs (splitting comma lists, trimming, de-duping, coercing
- * numbers/dates) and whitelists the free-text list params (fundingType/status) — for those the
- * whitelist IS the filter. Its sort/order fallbacks are a defensive default for non-HTTP callers,
- * not a "forgiving" HTTP behaviour.
+ * `listQuerySchema` (below) is the authoritative contract and it is STRICT: Fastify validates the
+ * querystring first, so unknown params (additionalProperties:false, with ajv `removeAdditional`
+ * disabled in buildApp so they are rejected rather than stripped), out-of-enum `fundingType` /
+ * `status` / `sort` / `order` values and malformed `deadlineAfter`/`deadlineBefore` instants all
+ * return 400 before this parser runs — nothing is silently ignored.
+ *
+ * The parser therefore only normalizes already-valid input (splitting comma lists, trimming,
+ * de-duping, coercing numbers/dates). Its enum whitelisting and sort/order fallbacks are a
+ * defensive default for direct, non-HTTP callers, not a "forgiving" HTTP behaviour.
  */
 import type { FundingType, OpportunityStatus } from "@the-rfp-hub/standard";
+import { standardEnum } from "../../../openapi/standard.js";
 import type {
   OpportunityQuery,
   SortField,
@@ -18,15 +21,14 @@ import type {
 // Values may already be coerced (numbers) by the Fastify querystring schema below.
 export type RawQuery = Record<string, unknown>;
 
-const FUNDING_TYPES: FundingType[] = [
-  "grant",
-  "hackathon",
-  "bounty",
-  "accelerator",
-  "vc_fund",
-  "rfp",
-];
-const STATUSES: OpportunityStatus[] = ["upcoming", "open", "closed", "archived"];
+/**
+ * The REQUEST contract's enums are read out of `@the-rfp-hub/standard` at module load, exactly
+ * like the response components (src/openapi/standard.ts). These two are the only value sets whose
+ * drift is visible to a client as a hard 400, so re-typing them here would mean the API could
+ * publish a `fundingType` in its own OpenAPI document and then reject it as a filter.
+ */
+const FUNDING_TYPES = standardEnum("fundingType") as FundingType[];
+const STATUSES = standardEnum("status") as OpportunityStatus[];
 const SORT_FIELDS: SortField[] = [
   "nextDeadlineAt",
   "opensAt",
@@ -41,6 +43,29 @@ const SORT_FIELDS: SortField[] = [
  */
 const ROLLING_NOTE =
   "Records with no upcoming fixed deadline (rolling-only programs, all-past deadlines, or none at all) have a null nextDeadlineAt: they sort LAST and are EXCLUDED by this filter.";
+
+/**
+ * Every list filter accepts BOTH wire forms and they compose: repeat the parameter
+ * (`?tag=a&tag=b`), comma-separate it (`?tag=a,b`), or mix the two. Repeated in every list
+ * parameter's description so the OpenAPI docs state it at the point of use.
+ */
+const LIST_NOTE = "Repeat the parameter and/or comma-separate values; both forms OR together.";
+
+/**
+ * ajv `pattern` accepting one value, or a comma-separated list of values, from a fixed set. Used
+ * instead of `enum` because these parameters carry a comma list — the pattern is what makes an
+ * out-of-set value a 400, and it is also what publishes the accepted values in the OpenAPI docs.
+ * Surrounding whitespace is tolerated to match what `list()` below trims off.
+ *
+ * An EMPTY value (`?fundingType=`) matches too, and is then dropped by `list()`. Query builders,
+ * HTML forms and dashboard filter UIs routinely emit every key with the unselected ones blank, and
+ * every other list filter (`ecosystem`, `tag`, `q`, …) accepts that; rejecting it here alone would
+ * make the same request 400 or 200 depending on which filter the user left empty.
+ */
+function commaListPattern(values: readonly string[]): string {
+  const one = `\\s*(?:${values.join("|")})\\s*`;
+  return `^(?:\\s*|${one}(?:,${one})*)$`;
+}
 
 /** Split a repeated or comma-separated param into a clean string list (`undefined` if empty). */
 function list(v: unknown): string[] | undefined {
@@ -77,6 +102,8 @@ function date(v: unknown): Date | undefined {
 }
 
 export function parseOpportunityQuery(raw: RawQuery): OpportunityQuery {
+  // Over HTTP an out-of-enum value already 400'd against listQuerySchema; the whitelists below
+  // only guard direct (non-HTTP) callers, exactly like the sort/order fallbacks further down.
   const fundingType = list(raw.fundingType)?.filter((t): t is FundingType =>
     (FUNDING_TYPES as string[]).includes(t),
   );
@@ -111,22 +138,40 @@ export function parseOpportunityQuery(raw: RawQuery): OpportunityQuery {
   };
 }
 
-/** JSON Schema for the list querystring — drives request coercion + the OpenAPI/Swagger docs. */
+/**
+ * JSON Schema for the list querystring — drives request validation/coercion + the OpenAPI docs.
+ * List parameters are typed `array` so a repeated parameter validates; Fastify's ajv runs with
+ * `coerceTypes: 'array'`, so a single occurrence is coerced to a one-element array.
+ */
 export const listQuerySchema = {
   type: "object",
   properties: {
     fundingType: {
-      type: "string",
-      description: "Comma-separated: grant,hackathon,bounty,accelerator,vc_fund,rfp",
+      type: "array",
+      items: { type: "string", pattern: commaListPattern(FUNDING_TYPES) },
+      description: `Filter by funding type. Accepted values: ${FUNDING_TYPES.join(", ")}. ${LIST_NOTE} Any other value is rejected with 400 — it is never silently ignored.`,
     },
-    status: { type: "string", description: "Comma-separated: upcoming,open,closed,archived" },
+    status: {
+      type: "array",
+      items: { type: "string", pattern: commaListPattern(STATUSES) },
+      description: `Filter by status. Accepted values: ${STATUSES.join(", ")}. ${LIST_NOTE} Any other value is rejected with 400 — it is never silently ignored.`,
+    },
     ecosystem: {
-      type: "string",
-      description: "Comma-separated ecosystem names (e.g. Optimism,Base)",
+      type: "array",
+      items: { type: "string" },
+      description: `Ecosystem names, e.g. Optimism,Base. ${LIST_NOTE}`,
     },
-    network: { type: "string", description: "Comma-separated network names" },
-    category: { type: "string", description: "Comma-separated categories" },
-    tag: { type: "string", description: "Comma-separated tags" },
+    network: {
+      type: "array",
+      items: { type: "string" },
+      description: `Network names. ${LIST_NOTE}`,
+    },
+    category: {
+      type: "array",
+      items: { type: "string" },
+      description: `Categories. ${LIST_NOTE}`,
+    },
+    tag: { type: "array", items: { type: "string" }, description: `Tags. ${LIST_NOTE}` },
     organization: {
       type: "string",
       description:
@@ -155,5 +200,7 @@ export const listQuerySchema = {
     page: { type: "integer", minimum: 1, default: 1 },
     limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
   },
+  // Enforced (not stripped): buildApp disables ajv's `removeAdditional`, so an unknown or
+  // misspelled parameter is a 400 instead of a filter that silently does nothing.
   additionalProperties: false,
 } as const;
