@@ -140,6 +140,52 @@ export const mechanismProgram: RegistryProgram = {
   },
 };
 
+/**
+ * The upstream names the REAL organisations behind a program in `metadata.organizations`, and this
+ * shape is the one that used to be mapped worst: the program title was published as the sponsor's
+ * name and the community slug as its identity. It also carries the fields that had no mapping at
+ * all — committed-to-date, the open/closed applicant flag, award count, chain, an org website, and
+ * a program page distinct from the submission URL.
+ */
+export const multiOrgProgram: RegistryProgram = {
+  programId: "2050",
+  type: "grant",
+  isActive: true,
+  chainID: 42161,
+  submissionUrl: "https://apply.example.org/frontier",
+  communities: [{ name: "Solana", slug: "solana" }],
+  createdAt: "2026-01-05T10:00:00.000Z",
+  updatedAt: "2026-02-05T10:00:00.000Z",
+  metadata: {
+    title: "Frontier Builders Round",
+    description: "Grants for frontier builders.",
+    // two real sponsors, plus a case-variant repeat of the first — the upstream is not deduped
+    organizations: ["Solana Foundation", "Colosseum", "solana foundation"],
+    anyoneCanJoin: true,
+    amountDistributedToDate: "125000",
+    grantsToDate: 12,
+    socialLinks: {
+      orgWebsite: "https://foundation.example.org",
+      grantsSite: "https://example.org/frontier-round",
+    },
+  },
+};
+
+/** Same shape with nothing but the title to go on — the fallback path, and an invite-only program. */
+export const unnamedSponsorProgram: RegistryProgram = {
+  programId: "2051",
+  type: "grant",
+  isActive: true,
+  communities: [{ name: "Base", slug: "base" }],
+  metadata: {
+    title: "Anonymous Builders Round",
+    description: "A program whose sponsor the upstream never names.",
+    organizations: ["", "   "], // present but empty — still "genuinely absent"
+    anyoneCanJoin: false,
+    amountDistributedToDate: "0", // upstream's default: no information, not a fact
+  },
+};
+
 /** Every recorded upstream shape, by the funding type it exercises. */
 export const UPSTREAM_PROGRAMS: Record<string, RegistryProgram> = {
   grant: grantProgram,
@@ -149,4 +195,6 @@ export const UPSTREAM_PROGRAMS: Record<string, RegistryProgram> = {
   rfp: rfpProgram,
   accelerator: acceleratorProgram,
   "grant (legacy scalar mechanism)": mechanismProgram,
+  "grant (named sponsors)": multiOrgProgram,
+  "grant (unnamed sponsor)": unnamedSponsorProgram,
 };
