@@ -2,69 +2,84 @@
  * Reusable response schemas, registered on the Fastify instance so both the OpenAPI 3.1 document
  * (served at /v1/docs/json) and the response serializer reference them by `$ref`.
  *
- * Standard objects use `additionalProperties: true` on purpose: the serializer must pass the full
- * Standard object through untouched (the `opportunity[fundingType]` block, `extensions`, etc. are
- * extra properties) — a strict schema here would silently drop fields.
+ * The two opportunity components are DERIVED from `@the-rfp-hub/standard` (see ./standard.ts):
+ * every property, enum, format and the `required` list come out of the canonical JSON Schema at
+ * module load, so the published contract cannot drift from the Standard. Only what the Standard
+ * cannot know is written by hand here — the list/detail split, and the components that are not
+ * part of the Standard at all (Stats, Health, ErrorResponse, …).
+ *
+ * `Opportunity` uses `additionalProperties: true` on purpose: the serializer must pass a full
+ * Standard object through untouched, so a Standard that grows a field keeps serving it (the
+ * drift-guard test in test/unit/openapi-drift.test.ts is what makes sure it also gets DOCUMENTED).
+ * `OpportunitySummary` is the opposite case — a server-controlled projection with a closed shape.
  */
-export const responseSchemas = [
+import { STANDARD_REQUIRED, detailOnly, standardEnum, standardProperty } from "./standard.js";
+
+/** Every property `toSummary` emits — the fields shared by the list and detail projections. */
+const summaryProperties = {
+  specVersion: standardProperty("specVersion"),
+  id: standardProperty("id"),
+  fundingType: standardProperty("fundingType"),
+  title: standardProperty("title"),
+  description: standardProperty("description"),
+  summary: standardProperty("summary"),
+  status: standardProperty("status"),
+  sponsoringOrganizations: standardProperty("sponsoringOrganizations"),
+  operatingOrganizations: standardProperty("operatingOrganizations"),
+  source: standardProperty("source"),
+  ecosystems: standardProperty("ecosystems"),
+  networks: standardProperty("networks"),
+  categories: standardProperty("categories"),
+  tags: standardProperty("tags"),
+  eligibility: standardProperty("eligibility"),
+  prerequisites: standardProperty("prerequisites"),
+  resourceLinks: standardProperty("resourceLinks"),
+  serviceAgreement: standardProperty("serviceAgreement"),
+  applicationUrl: standardProperty("applicationUrl"),
+  website: standardProperty("website"),
+  logoUrl: standardProperty("logoUrl"),
+  bannerUrl: standardProperty("bannerUrl"),
+  socialLinks: standardProperty("socialLinks"),
+  funding: standardProperty("funding"),
+  milestones: standardProperty("milestones"),
+  opensAt: standardProperty("opensAt"),
+  deadlines: standardProperty("deadlines"),
+  postedAt: standardProperty("postedAt"),
+  createdAt: standardProperty("createdAt"),
+  updatedAt: standardProperty("updatedAt"),
+};
+
+/**
+ * The six type-specific blocks, keyed by `fundingType` value. Exactly one is present on any given
+ * entry — which one is a runtime fact (`opportunity[opportunity.fundingType]`), so all six are
+ * declared as optional properties rather than modelled as a union.
+ */
+const typeBlockProperties = Object.fromEntries(
+  standardEnum("fundingType").map((type) => [type, detailOnly(standardProperty(type))]),
+);
+
+export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
   {
     $id: "Opportunity",
     type: "object",
+    description:
+      "A full RFP Hub Standard opportunity, as served by GET /v1/opportunities/{id}: the shared fields plus the block named by `fundingType` and any publisher `extensions`.",
     additionalProperties: true,
-    required: [
-      "specVersion",
-      "id",
-      "fundingType",
-      "title",
-      "description",
-      "status",
-      "sponsoringOrganizations",
-      "source",
-    ],
+    required: [...STANDARD_REQUIRED],
     properties: {
-      specVersion: { type: "string" },
-      id: { type: "string" },
-      fundingType: {
-        type: "string",
-        enum: ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"],
-        description:
-          "Structural discriminator: the entry always carries a block under a key equal to this value, and never a block for any other type.",
-      },
-      title: { type: "string" },
-      description: { type: "string" },
-      summary: { type: ["string", "null"] },
-      status: { type: "string", enum: ["upcoming", "open", "closed", "archived"] },
-      sponsoringOrganizations: {
-        type: "array",
-        minItems: 1,
-        items: { type: "object", additionalProperties: true },
-        description: "Issuing/backing organizations. ARRAY ORDER IS SEMANTIC: [0] is primary.",
-      },
-      operatingOrganizations: {
-        type: "array",
-        items: { type: "object", additionalProperties: true },
-        description: "Organizations that run intake/process, when distinct from the sponsor.",
-      },
-      source: { type: "object", additionalProperties: true },
-      ecosystems: { type: "array", items: { type: "string" } },
-      networks: { type: "array", items: { type: "string" } },
-      categories: { type: "array", items: { type: "string" } },
-      tags: { type: "array", items: { type: "string" } },
-      eligibility: { type: "object", additionalProperties: { type: "string" } },
-      prerequisites: { type: ["string", "null"] },
-      resourceLinks: { type: ["string", "null"] },
-      serviceAgreement: { type: ["string", "null"] },
-      applicationUrl: { type: ["string", "null"] },
-      funding: { type: "object", additionalProperties: true },
-      milestones: { type: "array", items: { type: "object", additionalProperties: true } },
-      opensAt: { type: ["string", "null"] },
-      deadlines: {
-        type: "array",
-        items: { type: "object", additionalProperties: true },
-        description:
-          "Every deadline and event boundary, each {type: fixed|rolling, date?, label?}. SELECT BY LABEL, never by array position.",
-      },
+      ...summaryProperties,
+      ...typeBlockProperties,
+      extensions: detailOnly(standardProperty("extensions")),
     },
+  },
+  {
+    $id: "OpportunitySummary",
+    type: "object",
+    description:
+      "The thin list projection served by GET /v1/opportunities: a Standard opportunity minus the type-specific block and `extensions`. Fetch the detail endpoint for those.",
+    additionalProperties: false,
+    required: [...STANDARD_REQUIRED],
+    properties: { ...summaryProperties },
   },
   {
     $id: "PaginatedOpportunities",
@@ -72,7 +87,7 @@ export const responseSchemas = [
     additionalProperties: false,
     required: ["items", "page", "limit", "total", "totalPages"],
     properties: {
-      items: { type: "array", items: { $ref: "Opportunity" } },
+      items: { type: "array", items: { $ref: "OpportunitySummary" } },
       page: { type: "integer" },
       limit: { type: "integer" },
       total: { type: "integer" },
@@ -129,4 +144,4 @@ export const responseSchemas = [
       message: { type: "string", description: "Human-readable detail." },
     },
   },
-] as const;
+];

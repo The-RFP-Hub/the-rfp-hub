@@ -114,6 +114,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
     }
     for (const name of [
       "Opportunity",
+      "OpportunitySummary",
       "PaginatedOpportunities",
       "Stats",
       "SchemaResponse",
@@ -158,6 +159,55 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(opportunity.required).not.toContain("organization");
     expect(opportunity.properties.deadlines).toBeTruthy();
     expect(opportunity.properties.closesAt).toBeUndefined();
+  });
+
+  it("publishes detail (Opportunity) and list (OpportunitySummary) as distinct components", () => {
+    const detail = doc.components.schemas.Opportunity;
+    const summary = doc.components.schemas.OpportunitySummary;
+    const blocks = ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"];
+
+    // the detail object carries every type block plus `extensions`; the thin projection has neither
+    for (const block of [...blocks, "extensions"]) {
+      expect(detail.properties[block], `Opportunity declares ${block}`).toBeTruthy();
+      expect(summary.properties[block], `OpportunitySummary omits ${block}`).toBeUndefined();
+    }
+    // everything else is shared — including the fields the served object carries beyond the core
+    for (const field of [
+      "website",
+      "logoUrl",
+      "bannerUrl",
+      "socialLinks",
+      "postedAt",
+      "updatedAt",
+    ]) {
+      expect(detail.properties[field], `Opportunity declares ${field}`).toBeTruthy();
+      expect(summary.properties[field], `OpportunitySummary declares ${field}`).toBeTruthy();
+    }
+    expect(summary.required).toEqual(detail.required);
+    // enums are the Standard's, not a hand-kept copy (test/unit/openapi-drift.test.ts diffs them)
+    expect(detail.properties.fundingType.enum).toEqual(blocks);
+    expect(detail.properties.status.enum).toEqual(["upcoming", "open", "closed", "archived"]);
+  });
+
+  it("routes the list through OpportunitySummary and the detail through Opportunity", async () => {
+    expect(response200Ref("/v1/opportunities/")).toBe(
+      `${OAS_ID}#/components/schemas/PaginatedOpportunities`,
+    );
+    expect(doc.components.schemas.PaginatedOpportunities.properties.items.items.$ref).toBe(
+      "#/components/schemas/OpportunitySummary",
+    );
+    expect(response200Ref("/v1/opportunities/{id}")).toBe(
+      `${OAS_ID}#/components/schemas/Opportunity`,
+    );
+
+    // and the split is real, not merely declared: the list drops the type block, the detail keeps it
+    const list = await app.inject({
+      method: "GET",
+      url: "/v1/opportunities?ecosystem=OASTEST&limit=5",
+    });
+    expect(list.json().items[0].grant).toBeUndefined();
+    const one = await app.inject({ method: "GET", url: "/v1/opportunities/otest:1" });
+    expect(one.json().grant).toEqual({});
   });
 
   it("GET /v1/opportunities conforms to its declared 200 schema", async () => {
