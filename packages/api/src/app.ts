@@ -10,7 +10,21 @@ export interface BuildOptions {
 
 /** Build the Fastify app (no network bind) — used by both the server and the integration tests. */
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: opts.logger ?? false });
+  const app = Fastify({
+    logger: opts.logger ?? false,
+    // Route modules mount their index as "/" under a prefix. Without this Fastify would register
+    // AND publish the trailing-slash variant ("/v1/opportunities/"), which is not the form the
+    // docs advertise; with it only the canonical no-slash path is registered/published, while a
+    // stray trailing slash still resolves to it instead of 404ing.
+    // `routerOptions` is a 5.8-era option (the flat `ignoreTrailingSlash` is deprecated); an older
+    // 5.x would treat this as an unknown top-level key and silently ignore it, so package.json's
+    // range floor is pinned accordingly.
+    routerOptions: { ignoreTrailingSlash: true },
+    // Fastify's ajv defaults to removeAdditional:true, which STRIPS unknown querystring keys
+    // before `additionalProperties: false` can reject them — a misspelled filter would silently
+    // return the whole dataset. Turn it off so the schema's strictness actually reaches the client.
+    ajv: { customOptions: { removeAdditional: false } },
+  });
 
   // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
   for (const schema of responseSchemas) app.addSchema(schema);
