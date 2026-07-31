@@ -1,0 +1,210 @@
+# Build the API image, push it to the container registry, run pending migrations as a one-off task,
+# then roll the production service onto the new revision.
+#
+# Same shape as staging.yml, with three differences: the trigger is a `production-*` tag rather
+# than a push to main, there is no `build_only` escape (production is never the place to rehearse a
+# build), and the concurrency group and the `production` GitHub Environment are separate from
+# staging's. Everything environment-specific arrives from that Environment; this file names no
+# cluster, registry or host, because this repository is public and source-neutral.
+#
+# Required in the `production` GitHub Environment:
+#   secrets    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ECR_REPOSITORY, ECS_CLUSTER,
+#              DISCORD_WEBHOOK
+#   variables  AWS_REGION, ECS_SERVICE_FAMILY, ECS_MIGRATION_FAMILY
+#
+# To deploy: push a `production-<version>` tag. To re-deploy an unchanged tree (after a secret
+# rotation, say — task-definition secrets resolve at task start, so a value change needs a new
+# deployment to take effect), run this workflow manually.
+name: Deploy API (production)
+
+on:
+  push:
+    tags: ["production-*"]
+  workflow_dispatch:
+
+# Deploys serialize instead of cancelling each other. A cancelled run is the worst outcome
+# available: it stops between the migration and the rollout, skips the revision assertion, and
+# skips the notification, so a half-applied deploy reports as neither success nor failure.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build_image:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Three tags, one image. `:latest` is what a task definition falls back to before any deploy
+      # has pinned a digest; `:cron` is what the scheduled refresh task pins, so scheduled work
+      # only moves when a deploy republishes it. Do not declare a job-level `outputs.image` here —
+      # this action emits `imageid`/`digest`/`metadata`, never `image`, and a notification that
+      # interpolates a non-existent output renders an empty line.
+      - id: build-image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:cron
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  db_migrations:
+    name: Run database migrations
+    needs: [build_image]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Read the current migration task definition
+        id: download-task
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$FAMILY" \
+            --query taskDefinition > task-definition.json
+          echo "revision=$(jq -r '.revision' task-definition.json)" >> "$GITHUB_OUTPUT"
+        env:
+          FAMILY: ${{ vars.ECS_MIGRATION_FAMILY }}
+
+      - name: Point the migration task at this commit's image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ vars.ECS_MIGRATION_FAMILY }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # No `service:` — this registers the new revision and returns its ARN. Nothing is rolled out.
+      - name: Register the migration task definition
+        id: register
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: false
+
+      # The service rollout below is gated on this: a non-zero migration fails the run here, with
+      # the old revision still serving traffic.
+      - name: Run the migration task
+        run: bash ./deploy/migration.sh "$FAMILY" "$CLUSTER" "$TASK_DEFINITION_ARN"
+        env:
+          FAMILY: ${{ vars.ECS_MIGRATION_FAMILY }}
+          CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          TASK_DEFINITION_ARN: ${{ steps.register.outputs.task-definition-arn }}
+
+      - name: Deregister the previous migration revision
+        run: aws ecs deregister-task-definition --task-definition "$FAMILY:$PREVIOUS_REVISION" > /dev/null
+        env:
+          FAMILY: ${{ vars.ECS_MIGRATION_FAMILY }}
+          PREVIOUS_REVISION: ${{ steps.download-task.outputs.revision }}
+
+  deploy_service:
+    name: Deploy service
+    needs: [build_image, db_migrations]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Read the current service task definition
+        id: download-task
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$FAMILY" \
+            --query taskDefinition > task-definition.json
+          echo "revision=$(jq -r '.revision' task-definition.json)" >> "$GITHUB_OUTPUT"
+        env:
+          FAMILY: ${{ vars.ECS_SERVICE_FAMILY }}
+
+      - name: Point the service task at this commit's image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ vars.ECS_SERVICE_FAMILY }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # wait-for-minutes is 8, under this job's 10-minute timeout on purpose: a slow rollout has to
+      # surface as a failed STEP (which notifies) rather than a cancelled JOB (which does not).
+      # wait-max-delay-seconds caps the SDK's exponential backoff, which otherwise grows to polling
+      # once every 10 minutes and can miss the whole rollout window.
+      - name: Roll the service onto the new revision
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ vars.ECS_SERVICE_FAMILY }}-service
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 8
+          wait-max-delay-seconds: 15
+
+      - name: Assert the service moved to the new revision
+        run: bash ./deploy/check_service_revision.sh "$((PREVIOUS_REVISION + 1))" "$SERVICE" "$CLUSTER"
+        env:
+          PREVIOUS_REVISION: ${{ steps.download-task.outputs.revision }}
+          SERVICE: ${{ vars.ECS_SERVICE_FAMILY }}-service
+          CLUSTER: ${{ secrets.ECS_CLUSTER }}
+
+      - name: Deregister the previous service revision
+        run: aws ecs deregister-task-definition --task-definition "$FAMILY:$PREVIOUS_REVISION" > /dev/null
+        env:
+          FAMILY: ${{ vars.ECS_SERVICE_FAMILY }}
+          PREVIOUS_REVISION: ${{ steps.download-task.outputs.revision }}
+
+  notify_deploy:
+    name: Notify
+    needs: [build_image, db_migrations, deploy_service]
+    # always() rather than a !failure() guard: a cancelled or timed-out job must report failure.
+    # A guard that only excludes failure() stays silent on exactly the runs worth alerting on.
+    if: always()
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'failure' || 'success' }}
+          title: "API deployed (production)"
+          description: "Commit: ${{ github.sha }}"

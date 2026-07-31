@@ -167,9 +167,8 @@ docker compose -f docker-compose.test.yml down
 
 ## Deployment
 
-No domain exists yet. Everything above is env-driven with local-friendly defaults (see
-**Configuration** above), so pointing this at a real host is a matter of setting the environment,
-not changing code.
+Everything above is env-driven with local-friendly defaults (see **Configuration** above), so
+pointing this at a real host is a matter of setting the environment, not changing code.
 
 - **Container image**: [`/Dockerfile`](../../Dockerfile) (repo root — a pnpm-workspace-aware,
   multi-stage build; it needs the workspace lockfile and `@the-rfp-hub/standard`'s source, so it
@@ -182,31 +181,73 @@ not changing code.
 
   The final stage is a slim `node:20-alpine` runtime, running as a non-root user, with only
   `@the-rfp-hub/api`'s production dependencies (`pnpm deploy --prod`) — no dev tooling, no other
-  workspace package's source.
+  workspace package's source. `curl` is installed in that stage on purpose: the container health
+  check is an HTTP request to `/v1/health` issued from inside the container.
 
-- **Migrations before start**: the image also builds `dist/migrate.js` (drizzle-orm's migrator
-  against `src/db/migrations`, the same `DATABASE_URL`-driven config as the server). Run it as a
-  one-off before rolling out a new revision, then start the server as usual:
+### One image, four entrypoints
 
-  ```bash
-  docker run --rm -e DATABASE_URL=… rfp-hub-api node dist/migrate.js   # apply pending migrations
-  docker run --rm -p 3001:3001 -e DATABASE_URL=… rfp-hub-api           # then start the server
-  ```
+The image ships four compiled entrypoints and is started by overriding the command. There is no
+second image, no second build, and no separate migration image:
+
+| Command | Used by | Notes |
+|---|---|---|
+| `node dist/server.js` | the long-running service (default `CMD`) | listens on `PORT` (3001), health at `/v1/health` |
+| `node dist/migrate.js` | the one-off migration job, before every rollout | drizzle-orm's migrator over `src/db/migrations` |
+| `node dist/seed.js --strict` | the scheduled refresh job | `--strict` fails the run on any non-conforming upstream record |
+| `node dist/export.js` | the scheduled refresh job, right after the seed | writes the open-data export; exits non-zero below `EXPORT_MIN_COUNT` |
+
+The scheduled refresh runs them in order as a single command —
+`node dist/migrate.js && node dist/seed.js --strict && node dist/export.js` — so a failed migration
+or a rejected record stops the run before anything is published.
+
+Locally the same three:
+
+```bash
+docker run --rm -e DATABASE_URL=… rfp-hub-api node dist/migrate.js   # apply pending migrations
+docker run --rm -e DATABASE_URL=… rfp-hub-api node dist/seed.js --strict
+docker run --rm -e DATABASE_URL=… rfp-hub-api node dist/export.js
+docker run --rm -p 3001:3001 -e DATABASE_URL=… rfp-hub-api           # then start the server
+```
+
+**Env contract for all four.** Nothing is baked into the image and nothing is read from a `.env`
+file in production — `src/config.ts` reads `process.env` directly and never loads dotenv. Every
+value in the **Configuration** table above is supplied by the task definition the container is
+started from: secret values (`DATABASE_URL`, `SOURCE_API_URL`, and the S3 credentials if the export
+does not use an instance/task role) come from the deployment platform's secrets store; non-secret
+values (`PUBLIC_BASE_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`, `EXPORT_MIN_COUNT`,
+`S3_BUCKET`, `S3_PREFIX`, `S3_PUBLIC_BASE_URL`) are plain environment entries on the same task
+definition. Two consequences worth knowing: an image is not environment-specific and the same
+digest can be promoted between environments, and **changing a secret's value does not restart
+anything** — those references resolve at task start, so a rotation needs a forced new deployment.
+
+> **Migrations must be backward-compatible with the revision already running.** The migration job
+> runs *before* the new service revision rolls out, and the rollout drains the old tasks gradually,
+> so for the length of every deploy the **previous** code is talking to the **new** schema. A
+> migration that drops or renames a column, tightens a constraint, or changes a column's type in
+> place will break the running service before the new code that expects it is live. Split those
+> into two deploys: first an additive migration the old code tolerates (add the column, backfill,
+> write to both), then — once the new code is fully rolled out — a second migration that removes
+> what is no longer read. A failed migration fails the deploy before the service is touched, which
+> is the safe direction; an *applied but incompatible* migration does not.
 
 - **Graceful shutdown**: `SIGTERM`/`SIGINT` stop the server, drain in-flight requests, close the
   Postgres pool (a Fastify `onClose` hook on the server's own instance — see `src/server.ts`), then
   exit `0`. A forced-exit timeout (`process.exit(1)`) guards against a hung close.
 - **CORS**: `Access-Control-Allow-Origin: *`, `GET`/`HEAD`/`OPTIONS` only — an explicit product
   decision for a fully public, unauthenticated read API (see `src/app.ts`).
-- **CI image publish**: [`.github/workflows/docker-image.yml`](../../.github/workflows/docker-image.yml)
-  builds and pushes this image to GHCR (`ghcr.io/<org>/<repo>/api`) on every push to `main`, using
-  the built-in `GITHUB_TOKEN` — no registry secret to manage. Publishing the image is not the same
-  as deploying it: there is no running instance or public URL yet.
+- **Pipelines**: [`.github/workflows/staging.yml`](../../.github/workflows/staging.yml) (push to
+  `main`, or a manual run — with a `build_only` option that stops after the image is pushed) and
+  [`.github/workflows/production.yml`](../../.github/workflows/production.yml) (a `production-*`
+  tag, or a manual run). Both do the same four things: build and push the image, run the migration
+  job and gate on its exit code, roll the service onto the new revision and assert it actually
+  moved, then notify. Deploys serialize rather than cancel each other. Every environment-specific
+  value — registry repository, cluster, credentials, task families — comes from the matching GitHub
+  Environment, so neither file names a host, an account or a resource.
 
 ## Deferred (later in M2 / beyond)
 
-Cloud hosting for the built image (a running instance + public URL — the image itself now builds
-and publishes, see **Deployment** above); a public export bucket (the export + nightly workflow now
-run, but no `S3_BUCKET` is deployed, so `S3_PUBLIC_BASE_URL` has no live value — see **Configuration**
+The public URL itself (the pipelines above deploy the image, but the hostname is still being
+decided, so `PUBLIC_BASE_URL` has no live value yet); a public export bucket (the export runs, but
+no `S3_BUCKET` is deployed, so `S3_PUBLIC_BASE_URL` has no live value — see **Configuration**
 above); DAOIP-5 `grantPools` export adapter. The write API, auth, verification, dedup, and analytics
 are M3+ (see `docs/data-model.md`).
