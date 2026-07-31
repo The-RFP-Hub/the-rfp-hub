@@ -11,9 +11,18 @@
 # reaches this script from the workflow, which reads it from a GitHub Environment secret/variable.
 #
 # Optional environment overrides:
-#   ECS_LAUNCH_TYPE   launch type passed to run-task (default: EC2)
-#   POLL_INTERVAL     seconds between describe-tasks polls (default: 15)
-#   POLL_DEADLINE     seconds to wait before giving up (default: 1500, i.e. 25 minutes)
+#   ECS_CAPACITY_PROVIDER  run on this capacity provider explicitly (weight 1)
+#   ECS_LAUNCH_TYPE        run on this launch type explicitly — mutually exclusive with the above
+#   POLL_INTERVAL          seconds between describe-tasks polls (default: 15)
+#   POLL_DEADLINE          seconds to wait before giving up (default: 1500, i.e. 25 minutes)
+#
+# By default NEITHER is passed, so the task lands on the cluster's default capacity-provider
+# strategy. That default matters: the service this migration gates is pinned to a capacity provider
+# with managed scaling, and an explicit --launch-type OVERRIDES the default strategy rather than
+# using it. On a cluster whose instances are fully committed to running tasks, that is the
+# difference between "the capacity provider scales out and the migration runs" and "run-task
+# returns an empty tasks array with RESOURCE:MEMORY in failures[], and the deploy is blocked".
+# Set one of the two only to pin placement deliberately.
 
 set -euo pipefail
 
@@ -21,7 +30,8 @@ TASK_FAMILY="${1:?Error: missing task family (arg 1) — example: app-migration-
 CLUSTER="${2:?Error: missing ECS cluster (arg 2) — example: my-cluster-staging}"
 TASK_DEFINITION="${3:?Error: missing task definition ARN or family:revision (arg 3)}"
 
-LAUNCH_TYPE="${ECS_LAUNCH_TYPE:-EC2}"
+CAPACITY_PROVIDER="${ECS_CAPACITY_PROVIDER:-}"
+LAUNCH_TYPE="${ECS_LAUNCH_TYPE:-}"
 POLL_INTERVAL="${POLL_INTERVAL:-15}"
 # `aws ecs wait tasks-stopped` is deliberately not used: it gives up after a fixed ~10 minutes,
 # which is shorter than a large migration. Poll to our own, longer deadline instead.
@@ -30,16 +40,32 @@ POLL_DEADLINE="${POLL_DEADLINE:-1500}"
 # before concluding the task is gone, but do not tolerate them forever.
 MAX_UNKNOWN_READS=8
 
+if [ -n "${CAPACITY_PROVIDER}" ] && [ -n "${LAUNCH_TYPE}" ]; then
+  echo "✗ Set ECS_CAPACITY_PROVIDER or ECS_LAUNCH_TYPE, not both — run-task rejects the pair." >&2
+  exit 1
+fi
+
+PLACEMENT_ARGS=()
+PLACEMENT_DESC="cluster default capacity-provider strategy"
+if [ -n "${CAPACITY_PROVIDER}" ]; then
+  PLACEMENT_ARGS=(--capacity-provider-strategy "capacityProvider=${CAPACITY_PROVIDER},weight=1")
+  PLACEMENT_DESC="capacity provider ${CAPACITY_PROVIDER}"
+elif [ -n "${LAUNCH_TYPE}" ]; then
+  PLACEMENT_ARGS=(--launch-type "${LAUNCH_TYPE}")
+  PLACEMENT_DESC="launch type ${LAUNCH_TYPE} (overrides the cluster default strategy)"
+fi
+
 echo "Running migration task"
 echo "  family:     ${TASK_FAMILY}"
 echo "  cluster:    ${CLUSTER}"
 echo "  definition: ${TASK_DEFINITION}"
+echo "  placement:  ${PLACEMENT_DESC}"
 
 RUN_TASK_OUTPUT="$(
   aws ecs run-task \
     --cluster "${CLUSTER}" \
     --task-definition "${TASK_DEFINITION}" \
-    --launch-type "${LAUNCH_TYPE}" \
+    ${PLACEMENT_ARGS[@]+"${PLACEMENT_ARGS[@]}"} \
     --count 1 \
     --started-by "deploy-migration" \
     --output json

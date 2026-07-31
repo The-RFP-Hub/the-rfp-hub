@@ -208,13 +208,26 @@ jobs:
     needs: [build_image, db_migrations, deploy_service]
     # always() rather than a !failure() guard: a cancelled or timed-out job must report failure.
     # A guard that only excludes failure() stays silent on exactly the runs worth alerting on.
-    if: ${{ always() && inputs.build_only != true }}
+    #
+    # Deliberately NOT also gated on `build_only`. The build-only rehearsal is the first push to a
+    # brand-new registry repository — the run most likely to fail, and the one whose failure is
+    # least likely to be watched live. Skipping the notification there would make the pipeline
+    # silent on exactly the run that exists to prove the pipeline works. `build_only` runs skip the
+    # migration and deploy jobs, and a skipped job is neither failure nor cancelled, so the status
+    # below still reads green when the build alone succeeded.
+    if: always()
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      DEPLOY_FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
+      # The outcome is stated in the title, not only in `status`. This action renders `title`
+      # verbatim and expresses `status` solely as the embed's colour bar — so a fixed
+      # "API deployed" caption on a failed run reads as a successful deploy in a mobile
+      # notification preview, where the colour is not visible at all.
       - uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'failure' || 'success' }}
-          title: "API deployed (staging)"
+          status: ${{ env.DEPLOY_FAILED == 'true' && 'failure' || 'success' }}
+          title: ${{ env.DEPLOY_FAILED == 'true' && 'API deploy FAILED (staging)' || (inputs.build_only == true && 'API image built and pushed (staging, build-only — not deployed)' || 'API deployed (staging)') }}
           description: "Commit: ${{ github.sha }}"

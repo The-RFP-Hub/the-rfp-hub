@@ -100,13 +100,11 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
 | `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
 | `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
-| `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` publishes nothing and exits non-zero. |
-| `S3_BUCKET` | — | Open-data export destination. Unset ⇒ export writes to `./exports` locally, no credentials needed. Set ⇒ export publishes to this S3 (or S3-compatible) bucket. |
-| `S3_PREFIX` | — | Optional key prefix inside the bucket. |
-| `S3_ENDPOINT` | — | Optional endpoint for an S3-compatible store (implies path-style addressing); leave unset for AWS S3 itself. |
-| `S3_PUBLIC_BASE_URL` | — | Optional public/CDN base the exported objects are served from, recorded in `dataset_snapshots.url`. No bucket is deployed yet, so this has no live value today. |
-| `AWS_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Standard AWS SDK credentials for the S3 export sink (also satisfied by an instance role). |
-| `RFPHUB_API_BASE` | `http://localhost:3001` | Read by the [`examples/`](../../examples) clients (curl/TypeScript/Python), not by the API itself — the base URL they call against. |
+
+This table is the whole config surface — every key `src/config.ts` and `scripts/*.ts` read, and no
+others. The export writes to a local `./exports` directory today; it has no cloud sink and no
+minimum-record floor, so there is nothing to configure for either. Both arrive with the open-data
+export work, which will add its keys here in the same change that adds the code that reads them.
 
 > **Migrations were regenerated for the v1.0.0 re-cut.** `src/db/migrations` starts from the
 > drizzle-kit-generated `0000_recut_v1_0_0` baseline; `0001_schema_vnext_org_flip` applies the
@@ -194,11 +192,17 @@ second image, no second build, and no separate migration image:
 | `node dist/server.js` | the long-running service (default `CMD`) | listens on `PORT` (3001), health at `/v1/health` |
 | `node dist/migrate.js` | the one-off migration job, before every rollout | drizzle-orm's migrator over `src/db/migrations` |
 | `node dist/seed.js --strict` | the scheduled refresh job | `--strict` fails the run on any non-conforming upstream record |
-| `node dist/export.js` | the scheduled refresh job, right after the seed | writes the open-data export; exits non-zero below `EXPORT_MIN_COUNT` |
+| `node dist/export.js` | the scheduled refresh job, right after the seed | writes the CC0 open-data export (JSON + CSV + `LICENSE`) to `./exports` **inside the container**, and records a `dataset_snapshots` row per file |
 
 The scheduled refresh runs them in order as a single command —
 `node dist/migrate.js && node dist/seed.js --strict && node dist/export.js` — so a failed migration
 or a rejected record stops the run before anything is published.
+
+> **`dist/export.js` writes to the container's own filesystem, which is discarded when the task
+> stops.** It has no cloud sink yet (see **Deferred** below), so scheduling it today refreshes the
+> database and then throws the export artifacts away, exiting `0`. That is a green job that
+> publishes nothing — do not stand the scheduled refresh up as evidence that the export pipeline
+> works until the upload sink lands.
 
 Locally the same three:
 
@@ -212,13 +216,14 @@ docker run --rm -p 3001:3001 -e DATABASE_URL=… rfp-hub-api           # then st
 **Env contract for all four.** Nothing is baked into the image and nothing is read from a `.env`
 file in production — `src/config.ts` reads `process.env` directly and never loads dotenv. Every
 value in the **Configuration** table above is supplied by the task definition the container is
-started from: secret values (`DATABASE_URL`, `SOURCE_API_URL`, and the S3 credentials if the export
-does not use an instance/task role) come from the deployment platform's secrets store; non-secret
-values (`PUBLIC_BASE_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`, `EXPORT_MIN_COUNT`,
-`S3_BUCKET`, `S3_PREFIX`, `S3_PUBLIC_BASE_URL`) are plain environment entries on the same task
-definition. Two consequences worth knowing: an image is not environment-specific and the same
-digest can be promoted between environments, and **changing a secret's value does not restart
-anything** — those references resolve at task start, so a rotation needs a forced new deployment.
+started from: the secret values (`DATABASE_URL`, `SOURCE_API_URL`) come from the deployment
+platform's secrets store; the non-secret values (`PUBLIC_BASE_URL`, `SOURCE_SYSTEM`,
+`SOURCE_PROGRAM_URL_BASE`) are plain environment entries on the same task definition. The table is
+exhaustive — a key that is not in it is not read by anything in this package, so putting it on a
+task definition has no effect. Two consequences worth knowing: an image is not environment-specific
+and the same digest can be promoted between environments, and **changing a secret's value does not
+restart anything** — those references resolve at task start, so a rotation needs a forced new
+deployment.
 
 > **Migrations must be backward-compatible with the revision already running.** The migration job
 > runs *before* the new service revision rolls out, and the rollout drains the old tasks gradually,
@@ -247,7 +252,8 @@ anything** — those references resolve at task start, so a rotation needs a for
 ## Deferred (later in M2 / beyond)
 
 The public URL itself (the pipelines above deploy the image, but the hostname is still being
-decided, so `PUBLIC_BASE_URL` has no live value yet); a public export bucket (the export runs, but
-no `S3_BUCKET` is deployed, so `S3_PUBLIC_BASE_URL` has no live value — see **Configuration**
-above); DAOIP-5 `grantPools` export adapter. The write API, auth, verification, dedup, and analytics
-are M3+ (see `docs/data-model.md`).
+decided, so `PUBLIC_BASE_URL` has no live value yet); **the export's cloud sink** — `scripts/export.ts`
+writes JSON + CSV + `LICENSE` to a local `./exports` directory and nothing uploads them anywhere, so
+there are no stable public URLs and no minimum-record floor guarding what gets published; DAOIP-5
+`grantPools` export adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
+`docs/data-model.md`).

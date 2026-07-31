@@ -201,10 +201,17 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     environment: production
+    env:
+      DEPLOY_FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
+      # The outcome is stated in the title, not only in `status`. This action renders `title`
+      # verbatim and expresses `status` solely as the embed's colour bar — so a fixed
+      # "API deployed (production)" caption on a run where the migration failed and the service was
+      # never touched reads as a successful production deploy in a mobile notification preview,
+      # where the colour is not visible at all.
       - uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          status: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'failure' || 'success' }}
-          title: "API deployed (production)"
+          status: ${{ env.DEPLOY_FAILED == 'true' && 'failure' || 'success' }}
+          title: ${{ env.DEPLOY_FAILED == 'true' && 'API deploy FAILED (production)' || 'API deployed (production)' }}
           description: "Commit: ${{ github.sha }}"
