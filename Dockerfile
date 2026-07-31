@@ -15,10 +15,12 @@
 # packages/api/README.md and packages/api/.env-example). In production, DATABASE_URL is required;
 # the process fails fast at startup if it's unset (see src/config.ts).
 #
-# The image defaults to starting the server. To run pending Drizzle migrations instead (e.g. as a
-# one-off job before rolling out a new revision), override the command:
+# The image defaults to starting the server. Every other entrypoint is the same image with the
+# command overridden — that is what the migration job and the scheduled export job do:
 #
-#   docker run --rm -e DATABASE_URL=... rfp-hub-api node dist/migrate.js
+#   docker run --rm -e DATABASE_URL=... rfp-hub-api node dist/migrate.js   # apply pending migrations
+#   docker run --rm -e DATABASE_URL=... rfp-hub-api node dist/seed.js --strict
+#   docker run --rm -e DATABASE_URL=... rfp-hub-api node dist/export.js
 #   docker run --rm -e DATABASE_URL=... rfp-hub-api                    # starts the server (default)
 
 FROM node:20-alpine AS base
@@ -45,13 +47,24 @@ COPY packages/api packages/api
 
 # @the-rfp-hub/standard and rfphub-validate are workspace deps the api package imports at build
 # and (for the standard's types/schema) runtime — build them first so the api build resolves their
-# dist. The api build itself compiles TWO entries with tsup: dist/server.js (the API process) and
-# dist/migrate.js (drizzle-orm's migrator + the same DATABASE_URL-driven config, for the migration
-# job above) — tsup.config.ts only declares the server entry for `pnpm build`, so this passes both
-# explicitly rather than editing that shared config for an image-only concern.
+# dist. The api build itself compiles FOUR entries with tsup, one per way this image is started:
+#
+#   dist/server.js   the API process (the default CMD)
+#   dist/migrate.js  drizzle-orm's migrator, run as a one-off job before a new revision rolls out
+#   dist/seed.js     the upstream ingest, run by the scheduled refresh job (accepts --strict)
+#   dist/export.js   the open-data export, run by the same scheduled job right after the seed
+#
+# tsup.config.ts only declares the server entry for `pnpm build` (the other three are dev-time `tsx`
+# scripts locally), so this passes all four explicitly rather than editing that shared config for an
+# image-only concern. Anything the scheduled job runs MUST be listed here — a command referencing a
+# dist file that was never compiled fails at task start, not at build time.
 RUN pnpm --filter @the-rfp-hub/standard build \
   && pnpm --filter rfphub-validate build \
-  && pnpm --filter @the-rfp-hub/api exec tsup --entry.server=src/server.ts --entry.migrate=scripts/migrate.ts
+  && pnpm --filter @the-rfp-hub/api exec tsup \
+    --entry.server=src/server.ts \
+    --entry.migrate=scripts/migrate.ts \
+    --entry.seed=scripts/seed.ts \
+    --entry.export=scripts/export.ts
 
 # Self-contained production install of just @the-rfp-hub/api + its workspace deps, materialized as
 # real files (not symlinks back into /repo) — the runtime stage below copies ONLY this directory,
@@ -66,6 +79,13 @@ RUN pnpm --filter @the-rfp-hub/api deploy --prod --legacy /prod/api
 FROM node:20-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
+
+# curl is a runtime dependency, not a debugging convenience: the orchestrator's container health
+# check is a shell command of the form `curl -f http://localhost:3001/v1/health || exit 1`. Without
+# curl that command exits 127, every task is marked unhealthy while actually serving fine, and the
+# deployment circuit breaker rolls back healthy revisions. Must be installed while still root, i.e.
+# above the USER line below.
+RUN apk --no-cache add curl
 
 RUN addgroup -S rfphub && adduser -S rfphub -G rfphub
 COPY --from=build --chown=rfphub:rfphub /prod/api ./

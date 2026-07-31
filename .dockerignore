@@ -16,6 +16,8 @@
 .env.local
 packages/api/exports/
 
-# Not needed to build or run the image.
+# Not needed to build or run the image. `deploy/` holds the CI-side rollout scripts — they run on
+# the runner, against the orchestrator's API, never inside the container.
 examples/
 adr/
+deploy/
