@@ -95,6 +95,7 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `DATABASE_URL` | `postgres://rfphub:rfphub@localhost:5432/rfphub` | Postgres connection string. **Required in production** — with `NODE_ENV=production` the process exits non-zero at startup if unset rather than silently using the localhost default (see `src/config.ts`). |
 | `PORT` | `3001` | HTTP port. A set-but-unusable value — empty, whitespace-only, non-numeric, or outside `1..65535` — falls back to the default rather than binding to `NaN` or to an ephemeral port (`Number("")` is `0`). |
 | `HOST` | `0.0.0.0` | HTTP bind address. |
+| `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this for shared database instances where connection budget is split across multiple services. Defaults to pg's own default (10). A set-but-unusable value — empty, whitespace-only, non-numeric, zero, or negative — falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url` (see `src/plugins/swagger.ts`). Relative by default — correct wherever the server happens to be hosted. Set to the API's public URL (e.g. `https://api.example.org`) once one exists. |
 | `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |

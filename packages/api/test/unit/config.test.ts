@@ -3,7 +3,7 @@
  * container contract depends on: the image EXPOSEs 3001 and every probe points at it.
  */
 import { describe, expect, it } from "vitest";
-import { readPort } from "../../src/config.js";
+import { readDbPoolMax, readPort } from "../../src/config.js";
 
 describe("readPort", () => {
   it("uses the default when PORT is unset", () => {
@@ -27,5 +27,28 @@ describe("readPort", () => {
 
   it("honors an explicit fallback", () => {
     expect(readPort("", 4000)).toBe(4000);
+  });
+});
+
+// Bounds the pg pool for shared database instances. Same defensive shape as readPort: an
+// empty/garbage/non-positive value must fall back to the default rather than disabling the bound.
+describe("readDbPoolMax", () => {
+  it("uses the default when DB_POOL_MAX is unset", () => {
+    expect(readDbPoolMax(undefined)).toBe(10);
+  });
+
+  it("honors a set value", () => {
+    expect(readDbPoolMax("5")).toBe(5);
+    expect(readDbPoolMax(" 5 ")).toBe(5);
+  });
+
+  it("falls back for a set-but-unusable value", () => {
+    for (const raw of ["", "   ", "0", "-1", "http", "5.5", "5abc"]) {
+      expect(readDbPoolMax(raw), JSON.stringify(raw)).toBe(10);
+    }
+  });
+
+  it("honors an explicit fallback", () => {
+    expect(readDbPoolMax("", 3)).toBe(3);
   });
 });

@@ -23,6 +23,12 @@ export interface AppConfig {
    * the API's public URL, e.g. `https://api.example.org`, once one exists — no domain yet.
    */
   publicBaseUrl: string;
+  /**
+   * Max size of the pg pool. Bound this for shared database instances where connection budget is
+   * split across multiple services. Defaults to 10 — pg's own default — so a fresh deployment
+   * with no shared-instance constraints needs no configuration.
+   */
+  dbPoolMax: number;
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -52,6 +58,21 @@ export function readPort(raw: string | undefined, fallback = DEFAULT_PORT): numb
 
 const port = readPort(process.env.PORT);
 
+const DEFAULT_DB_POOL_MAX = 10;
+
+/**
+ * A set-but-unusable DB_POOL_MAX falls back to the default (pg's own default of 10) rather than
+ * disabling the bound entirely — same defensive shape as `readPort`: `Number("")` is 0, NOT NaN,
+ * so an empty or whitespace-only value must be treated the same as an invalid one.
+ */
+export function readDbPoolMax(raw: string | undefined, fallback = DEFAULT_DB_POOL_MAX): number {
+  const parsed = Number((raw ?? "").trim());
+  const usable = Number.isInteger(parsed) && parsed > 0;
+  return usable ? parsed : fallback;
+}
+
+const dbPoolMax = readDbPoolMax(process.env.DB_POOL_MAX);
+
 export const config: AppConfig = {
   databaseUrl:
     process.env.DATABASE_URL ??
@@ -62,4 +83,5 @@ export const config: AppConfig = {
   sourceSystem: process.env.SOURCE_SYSTEM ?? "fundingmap",
   sourceProgramUrlBase: process.env.SOURCE_PROGRAM_URL_BASE ?? "",
   publicBaseUrl: process.env.PUBLIC_BASE_URL ?? "/",
+  dbPoolMax,
 };
