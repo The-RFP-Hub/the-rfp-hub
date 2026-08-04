@@ -10,6 +10,12 @@
 # All three arguments are required and none of them are baked in: every environment-specific name
 # reaches this script from the workflow, which reads it from a GitHub Environment secret/variable.
 #
+#   <task-family>          the migration task family: `rfp-hub-migration-staging` /
+#                          `rfp-hub-migration-production` (the workflow's ECS_MIGRATION_FAMILY).
+#   <cluster>              the ECS cluster (the workflow's ECS_CLUSTER secret — this repository
+#                          deliberately does not name it).
+#   <task-definition-arn>  the revision just registered by the workflow, or `family:revision`.
+#
 # Optional environment overrides:
 #   ECS_CAPACITY_PROVIDER  run on this capacity provider explicitly (weight 1)
 #   ECS_LAUNCH_TYPE        run on this launch type explicitly — mutually exclusive with the above
@@ -26,8 +32,8 @@
 
 set -euo pipefail
 
-TASK_FAMILY="${1:?Error: missing task family (arg 1) — example: app-migration-staging}"
-CLUSTER="${2:?Error: missing ECS cluster (arg 2) — example: my-cluster-staging}"
+TASK_FAMILY="${1:?Error: missing task family (arg 1) — example: rfp-hub-migration-staging}"
+CLUSTER="${2:?Error: missing ECS cluster (arg 2) — the ECS_CLUSTER environment secret}"
 TASK_DEFINITION="${3:?Error: missing task definition ARN or family:revision (arg 3)}"
 
 CAPACITY_PROVIDER="${ECS_CAPACITY_PROVIDER:-}"

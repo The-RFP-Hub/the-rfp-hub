@@ -11,13 +11,16 @@
 # reaches this script from the workflow, which reads it from a GitHub Environment secret/variable.
 #
 #   <expected-revision>  the numeric revision the service should now be on (previous + 1)
-#   <service>            example: my-service-staging-service
-#   <cluster>            example: my-cluster-staging
+#   <service>            the ECS service, which is the service task family plus `-service`:
+#                        `rfp-hub-staging-service` / `rfp-hub-production-service`. Not the family
+#                        itself — describe-services on a bare family name returns nothing.
+#   <cluster>            the ECS cluster (the workflow's ECS_CLUSTER secret — this repository
+#                        deliberately does not name it).
 
 set -euo pipefail
 
 EXPECTED_REVISION="${1:?Error: missing expected revision (arg 1) — example: 42}"
-SERVICE="${2:?Error: missing ECS service name (arg 2)}"
+SERVICE="${2:?Error: missing ECS service name (arg 2) — example: rfp-hub-staging-service}"
 CLUSTER="${3:?Error: missing ECS cluster (arg 3)}"
 
 # Validate the EXPECTED value before reading anything from AWS. If it arrived empty or as a

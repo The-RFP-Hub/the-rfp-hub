@@ -217,14 +217,28 @@ docker run --rm -p 3001:3001 -e DATABASE_URL=… rfp-hub-api           # then st
 **Env contract for all four.** Nothing is baked into the image and nothing is read from a `.env`
 file in production — `src/config.ts` reads `process.env` directly and never loads dotenv. Every
 value in the **Configuration** table above is supplied by the task definition the container is
-started from: the secret values (`DATABASE_URL`, `SOURCE_API_URL`) come from the deployment
-platform's secrets store; the non-secret values (`PUBLIC_BASE_URL`, `SOURCE_SYSTEM`,
-`SOURCE_PROGRAM_URL_BASE`) are plain environment entries on the same task definition. The table is
-exhaustive — a key that is not in it is not read by anything in this package, so putting it on a
-task definition has no effect. Two consequences worth knowing: an image is not environment-specific
-and the same digest can be promoted between environments, and **changing a secret's value does not
-restart anything** — those references resolve at task start, so a rotation needs a forced new
-deployment.
+started from, split two ways:
+
+| Where it comes from | Keys |
+|---|---|
+| The deployment platform's secrets store, referenced by the task definition | `DATABASE_URL`, `SOURCE_API_URL`, `SOURCE_PROGRAM_URL_BASE` |
+| Plain environment entries on the same task definition | `PUBLIC_BASE_URL`, `SOURCE_SYSTEM`, `DB_POOL_MAX` |
+
+`SOURCE_PROGRAM_URL_BASE` is on the secret side because it names the upstream registry, same as
+`SOURCE_API_URL`. `SOURCE_SYSTEM` is not: its value is the provenance namespace stamped on every
+public id (`<system>:<id>`), so it is visible to every consumer of this API anyway, and keeping it
+out of the secret makes it a one-line change rather than a secrets-store write.
+
+**Every key on the secret side is mandatory.** The runtime resolves the whole secret block before
+the container starts, so a missing key kills the task at startup rather than letting `src/config.ts`
+fall back to its own default. The defaults in the **Configuration** table are development defaults;
+they do not rescue a half-populated secret.
+
+The table is exhaustive — a key that is not in it is not read by anything in this package, so
+putting it on a task definition has no effect. Two consequences worth knowing: an image is not
+environment-specific and the same digest can be promoted between environments, and **changing a
+secret's value does not restart anything** — those references resolve at task start, so a rotation
+needs a forced new deployment.
 
 > **Migrations must be backward-compatible with the revision already running.** The migration job
 > runs *before* the new service revision rolls out, and the rollout drains the old tasks gradually,
@@ -248,7 +262,37 @@ deployment.
   job and gate on its exit code, roll the service onto the new revision and assert it actually
   moved, then notify. Deploys serialize rather than cancel each other. Every environment-specific
   value — registry repository, cluster, credentials, task families — comes from the matching GitHub
-  Environment, so neither file names a host, an account or a resource.
+  Environment; neither file names a host, an account or an organisation. Each workflow's header
+  block lists the secrets and variables its Environment must define, and the expected **shape** of
+  each value, because nothing in the run validates them and a wrong one fails late.
+
+### Names the deploy depends on
+
+These are the names the infrastructure creates, and the values the GitHub Environments must carry.
+They are safe to write down here: the component's resources are named for the component and carry
+no organisation token, which is exactly what lets the same vocabulary be used in both repositories.
+
+| GitHub Environment key | Kind | `staging` | `production` |
+|---|---|---|---|
+| `ECR_REPOSITORY` | secret | `staging-rfp-hub` | `production-rfp-hub` |
+| `ECS_SERVICE_FAMILY` | variable | `rfp-hub-staging` | `rfp-hub-production` |
+| `ECS_MIGRATION_FAMILY` | variable | `rfp-hub-migration-staging` | `rfp-hub-migration-production` |
+| `AWS_REGION` | variable | the region the cluster is in | the region the cluster is in |
+| `ECS_CLUSTER` | secret | the cluster name | the cluster name |
+
+Derived from those, and not configured anywhere:
+
+- **ECS service**: `<ECS_SERVICE_FAMILY>-service` — `rfp-hub-staging-service` / `rfp-hub-production-service`.
+- **Container name** in both task definitions: the family name, exactly.
+- **CloudWatch log groups**: `rfp-hub-<env>` (service), `rfp-hub-migration-<env>` (migration job),
+  `rfp-hub-nightly-<env>` (scheduled refresh).
+- **Secret id** holding the runtime config: `<env>/rfp-hub` — `staging/rfp-hub` / `production/rfp-hub`.
+  Its JSON keys are the secret-side rows of the env-contract table above, and every one of them is
+  mandatory.
+- **Export bucket** for the nightly refresh: `<env>-rfp-hub-exports`, public under the `exports/`
+  prefix (see **Deferred** — nothing writes to it yet).
+- **Container port** `3001`, health path `/v1/health` — the same path the container health check,
+  the load balancer and the external uptime check all use.
 
 ## Deferred (later in M2 / beyond)
 
@@ -258,3 +302,22 @@ writes JSON + CSV + `LICENSE` to a local `./exports` directory and nothing uploa
 there are no stable public URLs and no minimum-record floor guarding what gets published; DAOIP-5
 `grantPools` export adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
 `docs/data-model.md`).
+
+### Names reserved for the export sink
+
+The scheduled-refresh task definition already carries five environment entries for the sink, so that
+the infrastructure and this package agree on the vocabulary *before* the code that reads them exists.
+Nothing in `src/` or `scripts/` reads any of them today — they are inert, and listed here so the
+implementation adopts these exact names rather than inventing parallel ones:
+
+| Variable | Intended meaning |
+|---|---|
+| `AWS_REGION` | Region of the export bucket. |
+| `S3_BUCKET` | Destination bucket, `<env>-rfp-hub-exports`. |
+| `S3_PREFIX` | Key prefix to write under, `exports`. This is the only prefix the bucket policy makes publicly readable, so writing outside it publishes nothing. |
+| `S3_PUBLIC_BASE_URL` | Base URL to record in `dataset_snapshots.url` for each published object, in place of today's local path. |
+| `EXPORT_MIN_COUNT` | Floor for `seed --strict` / export: a run producing fewer records than this must exit non-zero instead of publishing a truncated dataset. |
+
+Until that lands, running the scheduled refresh writes the export into a container filesystem that
+is discarded when the task stops and exits `0` — a green job that publishes nothing. Do not read a
+green scheduled run as evidence the export pipeline works.

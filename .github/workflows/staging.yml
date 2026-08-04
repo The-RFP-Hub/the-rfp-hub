@@ -11,6 +11,25 @@
 #              DISCORD_WEBHOOK
 #   variables  AWS_REGION, ECS_SERVICE_FAMILY, ECS_MIGRATION_FAMILY
 #
+# Nothing here validates any of them, and every wrong value fails late and unhelpfully — an
+# unknown ECR repository fails at push, a wrong family fails at describe-task-definition, a
+# wrong service name fails after the migration has already run. So the expected shape of each:
+#
+#   ECR_REPOSITORY        the repository NAME on its own, never a full registry URI — the
+#                         registry host is prepended by the login step below. The repository is
+#                         created as `<env>-rfp-hub`, so: `staging-rfp-hub`. It must match
+#                         character for character, including the environment prefix.
+#   ECS_SERVICE_FAMILY    the service task family, `rfp-hub-staging`. Two things are derived
+#                         from it and are NOT separately configurable: the ECS service is this
+#                         value plus `-service` (`rfp-hub-staging-service`), and the container
+#                         inside the task definition is named this value exactly — which is why
+#                         it is passed as `container-name` to the render step.
+#   ECS_MIGRATION_FAMILY  the migration task family, `rfp-hub-migration-staging`; likewise the
+#                         container name in that task definition.
+#   AWS_REGION            the region the cluster and registry live in.
+#   ECS_CLUSTER           the cluster name. A secret rather than a variable because it is the
+#                         one value here that names shared, non-component infrastructure.
+#
 # Runtime configuration (DATABASE_URL and friends) is NOT set here and never passes through GitHub:
 # the task definition pulls it from the secrets store at task start. See packages/api/README.md.
 name: Deploy API (staging)
