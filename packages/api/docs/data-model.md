@@ -73,8 +73,11 @@ Each ⏳ table/feature below is annotated inline where it appears.
    snapshots are insert-only (no UPDATE/DELETE) — satisfies the M3 "append-only audit trail".
 6. **Editorial state is server-side.** `review_status` (pending/approved/rejected) is a column,
    never exposed in the public object; public reads filter to approved + listed.
-7. **Idempotent ingestion.** `(source_system, original_id)` is unique; the upstream→Hub outbox
-   is deduped by an event-id table so at-least-once delivery is safe.
+7. **Idempotent ingestion.** M2 ingest (seed/upsert) keys on the unique `public_id`.
+   `(source_system, original_id)` carries a **partial** unique index (`ux_opp_source`, only rows
+   where both are non-NULL — source-less community submissions stay unconstrained) as the
+   cross-system key for the M3 outbox, which is additionally deduped by an event-id table so
+   at-least-once delivery is safe.
 
 ## ERD
 
@@ -198,10 +201,13 @@ CREATE TABLE opportunities (
                      ) STORED,
 
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-  UNIQUE (source_system, original_id)                  -- idempotent ingest / cross-system key
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- cross-system key (M3 outbox/import): PARTIAL unique — only rows carrying BOTH a source system
+-- and an original id are deduped; source-less community submissions stay unconstrained.
+CREATE UNIQUE INDEX ux_opp_source ON opportunities (source_system, original_id)
+  WHERE source_system IS NOT NULL AND original_id IS NOT NULL;
 
 -- hot public query: approved + active
 CREATE INDEX ix_opp_public_live   ON opportunities (status, next_deadline_at)
@@ -478,7 +484,8 @@ CREATE TABLE dataset_snapshots (
   account has an `org_memberships` row for that org and the org is `verified` →
   `review_status='approved'` + run verification; else `'pending'` (community submit — no
   membership required). Every write inserts an `opportunity_audit` row.
-- **Ingestion (outbox):** upsert keyed by `(source_system, original_id)`, deduped by
+- **Ingestion (outbox, M3):** upsert keyed by `(source_system, original_id)` (the partial
+  `ux_opp_source` index; today's M2 ingest upserts on `public_id`), deduped by
   `ingestion_events.event_id`; `ingested_via='outbox'`. One-way only — the Hub never
   reads back into the source system.
 - **Verification (M3):** job fetches `application_url` (the re-cut's only link-back target — the
@@ -496,7 +503,7 @@ CREATE TABLE dataset_snapshots (
 ## Open questions / deferred
 
 - **Cross-system dedup** (Hub ETH ↔ an external aggregator's non-ETH registry) — deferred. The
-  `(source_system, original_id)` key + `opportunity_duplicates` give us hooks, but the
+  partial `(source_system, original_id)` index + `opportunity_duplicates` give us hooks, but the
   merge-precedence policy at the aggregation layer is unresolved.
 - **In-DB JSONB validation** of `type_data` — optional `pg_jsonschema` CHECK vs app-only.
 - **Taxonomy canonicalization** — `TEXT[]` now; a `taxonomy_terms` table (labels + aliases)

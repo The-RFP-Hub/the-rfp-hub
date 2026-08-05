@@ -1,0 +1,21 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-email",
+  "fundingType": "grant",
+  "title": "Contact email is not an email address",
+  "description": "The contact's email field carries spelled-out prose instead of an address, violating format: email — the only email-formatted field in the schema. An implementation that ignores formats accepts this document and is not conformant.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "contacts": [
+        {
+          "name": "A. Steward",
+          "email": "grants at example dot org"
+        }
+      ]
+    }
+  ],
+  "source": {},
+  "grant": {}
+}

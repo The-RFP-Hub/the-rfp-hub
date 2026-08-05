@@ -5,6 +5,9 @@
   "description": "RFP Hub public /v1/ REST API (Fastify + Postgres) serving the RFP Hub Standard.",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

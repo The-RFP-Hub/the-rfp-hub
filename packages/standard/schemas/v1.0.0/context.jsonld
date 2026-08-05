@@ -9,24 +9,38 @@
     "id": { "@id": "schema:identifier", "@protected": true },
     "fundingType": { "@id": "schema:additionalType", "@protected": true },
     "title": { "@id": "schema:name", "@protected": true },
-    "name": { "@id": "schema:name", "@protected": true },
     "description": { "@id": "schema:description", "@protected": true },
     "summary": { "@id": "schema:disambiguatingDescription", "@protected": true },
     "status": { "@id": "daoip5:isOpen", "@protected": true },
 
-    "sponsoringOrganizations": { "@id": "schema:funder", "@container": "@set", "@protected": true },
-    "operatingOrganizations": { "@id": "schema:sponsor", "@container": "@set", "@protected": true },
+    "sponsoringOrganizations": {
+      "@id": "schema:funder",
+      "@container": "@set",
+      "@protected": true,
+      "@context": { "title": null, "name": "schema:name" }
+    },
+    "operatingOrganizations": {
+      "@id": "schema:sponsor",
+      "@container": "@set",
+      "@protected": true,
+      "@context": { "title": null, "name": "schema:name" }
+    },
     "contacts": { "@id": "schema:contactPoint", "@container": "@set" },
     "role": "schema:roleName",
     "email": "schema:email",
-    "telegram": "schema:sameAs",
 
-    "source": "provenance",
+    "source": {
+      "@id": "provenance",
+      "@context": {
+        "id": null,
+        "createdAt": null,
+        "originalId": "schema:identifier",
+        "submittedAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" }
+      }
+    },
     "publisher": "schema:publisher",
     "submittedBy": "schema:contributor",
-    "submittedAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" },
     "ingestedVia": "ingestedVia",
-    "originalId": "schema:identifier",
     "verifiedAgainstSource": "verifiedAgainstSource",
     "verifiedAt": { "@id": "verifiedAt", "@type": "schema:DateTime" },
     "snapshotUrl": { "@id": "schema:archivedAt", "@type": "@id" },
@@ -35,7 +49,7 @@
     "website": { "@id": "schema:sameAs", "@type": "@id" },
     "logoUrl": { "@id": "schema:logo", "@type": "@id" },
     "bannerUrl": { "@id": "schema:image", "@type": "@id" },
-    "socialLinks": "schema:sameAs",
+    "socialLinks": "socialLinks",
     "resourceLinks": "schema:citation",
 
     "ecosystems": { "@id": "ecosystems", "@container": "@set" },
@@ -55,12 +69,16 @@
     "maxAward": "maxAward",
 
     "milestones": { "@id": "milestones", "@container": "@list" },
-    "amount": "schema:amount",
+    "amount": "schema:value",
     "criteria": "criteria",
 
-    "deadlines": { "@id": "deadlines", "@container": "@set", "@protected": true },
+    "deadlines": {
+      "@id": "deadlines",
+      "@container": "@set",
+      "@protected": true,
+      "@context": { "title": null, "label": "schema:name" }
+    },
     "date": { "@id": "daoip5:closeDate", "@type": "schema:DateTime" },
-    "label": "schema:name",
 
     "opensAt": { "@id": "schema:startDate", "@type": "schema:DateTime" },
     "postedAt": { "@id": "schema:datePublished", "@type": "schema:DateTime" },
@@ -73,6 +91,12 @@
     "accelerator": "accelerator",
     "vc_fund": "vc_fund",
     "rfp": "rfp",
+
+    "tracks": { "@id": "tracks", "@container": "@set" },
+    "prizes": { "@id": "prizes", "@container": "@set" },
+    "skills": { "@id": "skills", "@container": "@set" },
+    "stages": { "@id": "stages", "@container": "@set" },
+    "portfolio": { "@id": "portfolio", "@container": "@set" },
 
     "fundingMechanisms": { "@id": "daoip5:grantFundingMechanism", "@container": "@set" },
     "programModel": "programModel",

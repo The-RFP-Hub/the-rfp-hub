@@ -1,0 +1,14 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:no-block-bounty",
+  "fundingType": "bounty",
+  "title": "Missing the bounty block",
+  "description": "fundingType is 'bounty' but there is no bounty block, so opportunity[opportunity.fundingType] would not resolve. The grant branch of the discriminator is exercised by missing-matching-type-block.json; this case pins the same guarantee for a bounty.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {}
+}

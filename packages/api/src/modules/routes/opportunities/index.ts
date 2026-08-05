@@ -7,7 +7,10 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
   router.get(
     "/",
     {
+      // Serve (and document) the prefix itself — /v1/opportunities, no trailing slash.
+      prefixTrailingSlash: "no-slash",
       schema: {
+        operationId: "listOpportunities",
         tags: ["opportunities"],
         summary: "List opportunities (thin projection)",
         querystring: listQuerySchema,
@@ -27,6 +30,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
     "/schema",
     {
       schema: {
+        operationId: "getOpportunitySchema",
         tags: ["opportunities"],
         summary: "The RFP Hub Standard JSON Schema (application/schema+json)",
         response: {
@@ -45,6 +49,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
     "/:id",
     {
       schema: {
+        operationId: "getOpportunity",
         tags: ["opportunities"],
         summary: "Get one opportunity (full Standard object)",
         params: {

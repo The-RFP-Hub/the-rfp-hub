@@ -1,0 +1,21 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-deadline-type",
+  "fundingType": "grant",
+  "title": "Deadline type outside the fixed/rolling enum",
+  "description": "A deadline with type 'recurring', which is deliberately not in the enum: fixed and rolling are the only deadline kinds, and a recurring program is expressed by grant.recurring plus a rolling or fixed deadline. Also stands in for the other enums inside $defs (organization.type, ingestedVia, difficulty, stages, contactMethod, accelerator.stage).",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "deadlines": [
+    {
+      "type": "recurring",
+      "label": "application"
+    }
+  ],
+  "grant": {}
+}

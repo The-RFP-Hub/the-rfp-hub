@@ -1,0 +1,16 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-uri",
+  "fundingType": "grant",
+  "title": "applicationUrl is prose, not a URI",
+  "description": "applicationUrl carries free text instead of a URI, violating format: uri. The suite asserts formats because the schema means them as constraints: an implementation that treats format as annotation-only accepts this document and is not conformant. applicationUrl stands in for every uri-formatted field (website, logoUrl, bannerUrl, socialLinks.*, provenance.snapshotUrl).",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "applicationUrl": "apply on our website",
+  "grant": {}
+}

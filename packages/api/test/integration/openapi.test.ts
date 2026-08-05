@@ -9,13 +9,14 @@ import addFormats from "ajv-formats";
 import Ajv2020 from "ajv/dist/2020.js";
 import { eq, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
+import { describeWithDb } from "./db-gate.js";
 
-const run = process.env.DATABASE_URL ? describe : describe.skip;
+const run = describeWithDb;
 const OAS_ID = "https://rfphub.local/openapi.json";
 
 const FIXTURE: Opportunity = {
@@ -104,11 +105,11 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(doc.openapi).toBe("3.1.0");
     expect(doc.info?.title).toBeTruthy();
     for (const path of [
-      "/v1/opportunities/",
+      "/v1/opportunities",
       "/v1/opportunities/{id}",
       "/v1/opportunities/schema",
-      "/v1/stats/",
-      "/v1/health/",
+      "/v1/stats",
+      "/v1/health",
     ]) {
       expect(doc.paths?.[path]?.get, `documents GET ${path}`).toBeTruthy();
     }
@@ -123,13 +124,25 @@ run("OpenAPI 3.1 live-spec contract", () => {
       expect(doc.components?.schemas?.[name], `components has ${name}`).toBeTruthy();
     }
     // the error contract is published, too
-    expect(doc.paths["/v1/opportunities/"].get.responses["400"]).toBeTruthy();
+    expect(doc.paths["/v1/opportunities"].get.responses["400"]).toBeTruthy();
     expect(doc.paths["/v1/opportunities/{id}"].get.responses["404"]).toBeTruthy();
+    // no trailing-slash paths, and every operation carries a unique operationId
+    const operationIds: string[] = [];
+    for (const [path, ops] of Object.entries<Record<string, { operationId?: string }>>(doc.paths)) {
+      if (path !== "/") expect(path, `${path} has no trailing slash`).not.toMatch(/\/$/);
+      for (const [method, op] of Object.entries(ops)) {
+        expect(op.operationId, `GET-level operationId on ${method} ${path}`).toBeTruthy();
+        operationIds.push(op.operationId as string);
+      }
+    }
+    expect(new Set(operationIds).size).toBe(operationIds.length);
+    // and the info block declares the package's MIT license
+    expect(doc.info.license).toEqual({ name: "MIT", identifier: "MIT" });
   });
 
   it("publishes the re-cut filter surface, with the rolling-only exclusion documented", () => {
     const params: { name: string; description?: string; schema?: Record<string, unknown> }[] =
-      doc.paths["/v1/opportunities/"].get.parameters;
+      doc.paths["/v1/opportunities"].get.parameters;
     const byName = new Map(params.map((p) => [p.name, p]));
 
     expect([...byName.keys()]).toEqual(
@@ -190,7 +203,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
   });
 
   it("routes the list through OpportunitySummary and the detail through Opportunity", async () => {
-    expect(response200Ref("/v1/opportunities/")).toBe(
+    expect(response200Ref("/v1/opportunities")).toBe(
       `${OAS_ID}#/components/schemas/PaginatedOpportunities`,
     );
     expect(doc.components.schemas.PaginatedOpportunities.properties.items.items.$ref).toBe(
@@ -216,7 +229,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       url: "/v1/opportunities?ecosystem=OASTEST&limit=5",
     });
     expect(res.statusCode).toBe(200);
-    assertConformsTo("/v1/opportunities/", res.json());
+    assertConformsTo("/v1/opportunities", res.json());
   });
 
   it("GET /v1/opportunities/:id conforms to its declared 200 schema", async () => {
@@ -238,13 +251,13 @@ run("OpenAPI 3.1 live-spec contract", () => {
   it("GET /v1/stats conforms to its declared 200 schema", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/stats" });
     expect(res.statusCode).toBe(200);
-    assertConformsTo("/v1/stats/", res.json());
+    assertConformsTo("/v1/stats", res.json());
   });
 
   it("GET /v1/health conforms to its declared 200 schema", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/health" });
     expect(res.statusCode).toBe(200);
-    assertConformsTo("/v1/health/", res.json());
+    assertConformsTo("/v1/health", res.json());
   });
 
   it("honors the documented 400 (bad param) and 404 (missing) contracts", async () => {

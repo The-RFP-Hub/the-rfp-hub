@@ -11,11 +11,12 @@
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
+import { describeWithDb } from "./db-gate.js";
 
 const TAG = "FILTERTEST";
 const ORG_SLUGS = ["org-a", "org-b", "org-c", "org-d", "org-e"];
@@ -107,7 +108,7 @@ const FIXTURES: Opportunity[] = [
   },
 ];
 
-const run = process.env.DATABASE_URL ? describe : describe.skip;
+const run = describeWithDb;
 
 run("/v1/opportunities filters, sort & pagination", () => {
   let app: FastifyInstance;

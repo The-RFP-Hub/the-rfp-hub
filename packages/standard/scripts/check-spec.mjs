@@ -7,6 +7,11 @@
 //   2. VERSION DRIFT   — a version string hand-written somewhere disagrees with
 //                        spec.config.json. Everything derivable is stamped by codegen; this
 //                        catches the places a human can still type one.
+//   2b. IDENTITY SWEEP — a hand-written copy of a spec identifier (a schemas/v* URL in a
+//                        conformance fixture, an example, or doc prose; the vocab IRI in a
+//                        status note) that codegen does not own and would survive a domain
+//                        swap unchanged. Every identity-shaped URL anywhere in the package
+//                        must agree with spec.config.json, however it got there.
 //   3. NEUTRALITY      — an internal issue-tracker ID inside a CC0 artifact that is
 //                        designed to be embedded, forked and code-generated from. One leak
 //                        in a normative field description travels into every downstream copy.
@@ -142,6 +147,36 @@ if (registryIndex.specVersion !== want) {
   );
 }
 
+// ----------------------------------------------------- 2b. identity sweep ---
+// Rule 2 checks the places codegen stamps. This sweeps everything else: any URL that is
+// shaped like a spec identifier — a schema-directory URL or the vocabulary IRI — must be
+// derived from spec.config.json, wherever it appears (fixtures, examples, doc prose).
+// A domain swap that misses one of these is exactly the halfway state ARTIFACTS.md rules out.
+const URL_TOKEN = /https?:\/\/[^\s"'`<>\\)\]]+/g;
+const trimUrl = (u) => u.replace(/[.,;:!?'"`]+$/, "");
+
+function sweepIdentityUrls(file, text) {
+  for (const raw of text.match(URL_TOKEN) ?? []) {
+    const url = trimUrl(raw);
+    if (/\/schemas\/v\d/.test(url) && !url.startsWith(`${spec.baseUrl}/schemas/v`)) {
+      fail(
+        "identity-sweep",
+        `${relative(pkgRoot, file)} carries schema URL '${url}', which is not under '${spec.baseUrl}/schemas/'`,
+      );
+    }
+    if (
+      url.includes("/ns/draft/rfp") &&
+      !url.startsWith(spec.vocabIri) &&
+      `${url}#` !== spec.vocabIri
+    ) {
+      fail(
+        "identity-sweep",
+        `${relative(pkgRoot, file)} carries vocab IRI '${url}', expected '${spec.vocabIri}'`,
+      );
+    }
+  }
+}
+
 // --------------------------------------------------------- 3. neutrality ----
 const TRACKER_ID = /\bDEV-\d+\b/g;
 // The project does not own the domain this standard's identifiers used to be minted on. An
@@ -168,6 +203,7 @@ function walk(dir, out = []) {
 
 for (const file of walk(pkgRoot)) {
   const text = readText(file);
+  sweepIdentityUrls(file, text);
   const hits = text.match(TRACKER_ID);
   if (hits) {
     fail(
@@ -198,7 +234,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `✓ check-spec: context covers ${topLevelProperties.length} top-level terms, ` +
-    `identifiers all stamped from spec.config.json (${spec.baseUrl}), ` +
-    `version strings agree on ${want}, no tracker IDs or unowned-domain URLs`,
+  `✓ check-spec: context covers ${topLevelProperties.length} top-level terms, identifiers all stamped from spec.config.json (${spec.baseUrl}), identity sweep found no stray schema/vocab URLs, version strings agree on ${want}, no tracker IDs or unowned-domain URLs`,
 );

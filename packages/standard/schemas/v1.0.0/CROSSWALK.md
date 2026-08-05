@@ -9,7 +9,9 @@ Standard v1.0.0 maps onto both, so a consumer can translate between them.
 outside the release cycle.
 
 - **schema.org/Grant** is intentionally minimal (a handful of properties on `Thing` + `funder`,
-  `sponsor`, `amount`, `fundedItem`). Every one of its fields has a clean RFP Hub equivalent.
+  `sponsor`, `amount`, `fundedItem`). Every one of its fields has a clean RFP Hub equivalent
+  except `fundedItem`: a Grant links to the thing it funded, and an opportunity predates its
+  awards, so there is deliberately nothing to map it to.
 - **DAOIP-5** is a JSON-LD family of objects: **Grant System** (the administering body),
   **Grant Pool** (an open funding opportunity), **Project**, **Application**. The RFP Hub
   **Opportunity** is closest to a **Grant Pool**; our **Organization** ≈ a **Grant System**.
@@ -86,7 +88,7 @@ had, if it had any, was already lost before it reached us.
 |---|---|---|
 | `applicationUrl` | `url` | `applicationsURI` |
 | `website` | `sameAs` | — (`governanceURI` is a different thing) |
-| `socialLinks` | `sameAs` | — |
+| `socialLinks` | — (a platform-keyed object, not a list of `sameAs` URLs; resolves under the RFP Hub vocabulary) | — |
 | `resourceLinks` | `citation` (loose) | — |
 | `eligibility` (open key→value map) | `eligibleCustomerType` (loose) | — |
 | `prerequisites` | `competencyRequired` (loose) | — |
@@ -106,15 +108,20 @@ had, if it had any, was already lost before it reached us.
 | `source.submittedBy` | `contributor` | — |
 | `source.submittedAt` | `dateCreated` | — |
 | `source.snapshotUrl` | `archivedAt` | — |
-| `source.ingestedVia` / `originalId` / `verifiedAgainstSource` / `verifiedAt` | — | — (RFP Hub provenance extension) |
+| `source.originalId` | `identifier` (scoped to the provenance object in the context) | — |
+| `source.ingestedVia` / `verifiedAgainstSource` / `verifiedAt` | — | — (RFP Hub provenance extension) |
 | `extensions` | — | `extensions` |
 
 **Cardinality divergence.** `grant.fundingMechanisms` is an array (mechanisms co-occur — a fixed
 grant plus a matching grant in the same program); DAOIP-5's `grantFundingMechanism` is a scalar.
 Export takes the first element or joins them; either choice loses information, so the export
-adapter should pick one and document it. Value-level alignment is unchanged: `retroactive`,
-`proactive`, `streaming`, `quadratic`, `matching`, `other` map onto DAOIP-5's vocabulary
-("Retroactive", "Direct Grants", "Quadratic Funding", …).
+adapter should pick one and document it. Value-level alignment is partial, not one-to-one:
+`retroactive` → `"Retro Funding"`, `quadratic` → `"Quadratic Funding"`,
+`streaming` → `"Streaming Quadratic Funding"` (nearest), `proactive` → `"Direct Grants"`
+(nearest) — while `matching` and `other` have **no counterpart** in DAOIP-5's
+`grantFundingMechanism` enum and an export adapter must drop them or carry them in
+`extensions`. Quote DAOIP-5's values exactly as its spec spells them; the enum is theirs,
+not ours.
 
 ### Type blocks beyond both standards
 
@@ -129,8 +136,19 @@ not domain fields; they have no crosswalk row.
 ## Alignment status
 
 - ✅ **Crosswalk verified** against the published DAOIP-5 spec (Grant System + Grant Pool
-  objects) and schema.org/Grant. **Every schema.org/Grant property and every DAOIP-5 Grant Pool
-  field still has an RFP Hub equivalent** — alignment survived the re-cut in that direction.
+  objects) and schema.org/Grant. Every schema.org/Grant property except `fundedItem` has an
+  RFP Hub equivalent (see above). **The reverse direction is not complete and this document
+  does not claim it is** — the DAOIP-5 Grant Pool fields with no RFP Hub field are listed
+  below, each a deliberate absence rather than an oversight:
+
+  | DAOIP-5 Grant Pool field | RFP Hub disposition |
+  |---|---|
+  | `governanceURI` | — (no governance-document slot; a publisher can use `resourceLinks`) |
+  | `attestationIssuersURI` | — (attestations are out of scope for v1.0.0) |
+  | `requiredCredentials` | — (nearest is the open `eligibility` map, and only loosely) |
+  | `totalGrantPoolSizeInUSD` | — (derivable at export when `funding.currency` is USD; never stored) |
+  | `email` | `organization.contacts[].email` (loose — theirs is pool-level) |
+  | `image` / `coverImage` | `logoUrl` / `bannerUrl` (loose — theirs are pool-level, ours program-level) |
 - ⚠️ **The earlier claim that "no v1.0.0 field had to change to align" no longer holds, and
   should not be repeated.** Fields *did* change — not to chase alignment, but because the
   2026-07-27 design decisions re-cut the shape. Three mappings were reissued as a direct
@@ -189,6 +207,20 @@ The example below is a conforming RFP Hub opportunity:
 A JSON-LD processor expands this to a `schema:Grant` with `schema:identifier` / `schema:name` /
 `schema:description` / `schema:funder` / `schema:url`, with `budget` under
 `daoip5:totalGrantPoolSize` and `fundingMechanisms` under `daoip5:grantFundingMechanism`.
+
+Two processing guarantees and one caveat, all verified against jsonld.js:
+
+- **One term per IRI, per scope.** Keys that share a target IRI (`title` and organisation
+  `name` both mean `schema:name`; `id` and `source.originalId` both mean `schema:identifier`;
+  `source.submittedAt` and `createdAt` both mean `schema:dateCreated`) are disambiguated with
+  property-scoped contexts, so `expand` → `compact` with this context reproduces the original
+  document shape and the result still validates against the schema.
+- **Arrays stay arrays.** Every array-valued field carries `@container` (`@set`, or `@list`
+  for `milestones`), so a one-element array does not collapse to a bare object on compaction.
+- **`null` does not survive JSON-LD processing.** The JSON-LD spec defines a `null` value as
+  property removal, so the schema's distinction between *explicitly unknown* (`null`) and
+  *absent* exists at the JSON Schema layer only. A consumer that needs it must read the plain
+  JSON document, not the expanded form.
 
 Verify it yourself:
 

@@ -36,7 +36,7 @@ building any of them before its trigger is carrying cost for no reader.
 
 | Artifact | What it would be | Trigger |
 |---|---|---|
-| **Zod schemas** | Runtime-parsing schemas for TypeScript consumers, generated from the JSON Schema — never hand-written. | A consumer needs runtime parsing that the ajv path does not already cover. (The root README has promised these; this row is that promise, scheduled honestly.) |
+| **Zod schemas** | Runtime-parsing schemas for TypeScript consumers, generated from the JSON Schema — never hand-written. | A consumer needs runtime parsing that the ajv path does not already cover. (A pre-re-cut root README promised these; the promise now lives only in this row, scheduled honestly.) |
 | **Pydantic models** | The same for Python consumers. | The first Python consumer. Adding a Python toolchain to a pnpm monorepo before then is pure carrying cost. |
 | **`vocabulary.ttl`** | RDFS/OWL in Turtle — the only format that can state "this field **is** that schema.org property" via `owl:equivalentProperty`, rather than the informal assertion `context.jsonld` makes today. ~200 lines, and the source any other RDF serialization would be generated from. | A consumer asks for it. Not before — see the RDF decline below. |
 | **DAOIP-5 `grantPools` export adapter** | A one-way output adapter emitting grant-type opportunities as DAOIP-5 `grantPools` JSON, applying the three cardinality reductions documented in [`CROSSWALK.md`](./schemas/v1.0.0/CROSSWALK.md). Emits the object shape directly — DAOIP-5's own `@context` does not resolve. | A named consumer wants DAOIP-5 output. It is the only serialization in this niche with a real audience. |

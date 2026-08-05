@@ -1,0 +1,16 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-datetime",
+  "fundingType": "grant",
+  "title": "opensAt is not an RFC 3339 timestamp",
+  "description": "opensAt carries prose instead of an RFC 3339 date-time, violating format: date-time. Stands in for every date-time-formatted field (postedAt, createdAt, updatedAt, deadlines[].date, provenance.submittedAt, provenance.verifiedAt): an implementation that ignores formats accepts this document and is not conformant.",
+  "status": "upcoming",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "opensAt": "next Tuesday",
+  "grant": {}
+}
