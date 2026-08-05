@@ -53,8 +53,10 @@ Mechanical, and lossless where a real value existed. Each move follows a row in 
   `endDate` all folded into `deadlines[]` with labels `registration` / `submission` /
   `event start` / `event end`; `closesAt` and `rfp.proposalDeadline` folded in as `application`.
   Across the corpus this produced **28 `application`, 18 `registration`, 19 `event start` and 19
-  `event end`** entries — which is exactly why a consumer must select by label: on 19 of these
-  documents `deadlines[0]` is an event boundary, not a deadline.
+  `event end`** entries — which is exactly why a consumer must select by label: 19 of these
+  documents carry event boundaries alongside the application deadline (on 7 of them the
+  earliest-dated entry is an event boundary rather than a deadline), and array order carries no
+  meaning at all.
 - **`funding.totalBudget` → `budget`**, `amountDistributed` → `allocated`. Only one document had
   a non-zero `funding.awardsToDate`, a field with no successor; that value was preserved under
   **`extensions`** rather than deleted. It is the only fixture using `extensions`.
@@ -93,9 +95,10 @@ standard, and neither is normative.
 | **vc_fund** | **0** | — |
 
 > ⚠️ **`vc_fund` coverage gap:** there are **zero** VC-fund entries in the source data, so the
-> `vc_fund` block still cannot be benchmarked against real data. It is covered by the conformance
-> suite only; real VC-fund entries should be added during later seeding. `rfp` is also thin
-> (2 entries) — worth expanding given this is the *RFP* Hub.
+> `vc_fund` block still cannot be benchmarked against real data. Its only coverage is the
+> conformance suite — [`conformance/v1.0.0/pass/vc-fund.json`](../../conformance/v1.0.0/pass/vc-fund.json)
+> exercises the full block — and real VC-fund entries should be added during later seeding.
+> `rfp` is also thin (2 entries) — worth expanding given this is the *RFP* Hub.
 
 ## Benchmark fixture set
 
@@ -105,7 +108,9 @@ They serve as (a) the real-data validation corpus, (b) golden inputs for the `rf
 CLI, and (c) realistic seed candidates for the public dataset. They are **examples, not
 conformance cases** — the pass/fail rule documents live in
 [`conformance/v1.0.0/`](../../conformance/v1.0.0). The single best all-round benchmark entry is
-**Prezenti Boost Pool S2** (`fundingmap:1459`) — open, future deadline, and high fill.
+**Prezenti Boost Pool S2** (`fundingmap:1459`) — open at pull time and high fill. (Its single
+application deadline, 2026-06-30, has since passed: fixtures are a snapshot of the original
+pull, not live state, so a stale `status`/deadline pair here is expected rather than an error.)
 
 ### Top 15 by FILL (most complete entries, original pull)
 

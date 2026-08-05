@@ -7,8 +7,10 @@
 An open, neutral aggregation layer and **standard** for **Ethereum-ecosystem funding
 opportunities** — grants, hackathons, bounties, accelerators, VC funds, and RFPs. It indexes,
 verifies, and distributes opportunities through a standard format, a public API, open data
-exports, and agent-friendly tooling — and every entry carries an **application link** that sends
-you to the opportunity's own submission channel to apply.
+exports, and agent-friendly tooling — and each entry's **application link** sends you to the
+opportunity's own submission channel to apply. (That guarantee is ingestion policy on the Hub's
+own data; the schema itself leaves `applicationUrl` optional, so third-party documents may omit
+it.)
 
 That link (`applicationUrl`) is the single link-back target in the standard, and it carries
 whatever the submission channel actually is — an application portal, a form, or a forum thread

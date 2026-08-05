@@ -8,6 +8,45 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 
 ---
 
+## v1.0.0 corrections while draft (2026-08-05)
+
+The schema is byte-for-byte unchanged. Everything below is a correction to the artifacts
+around it, made under the draft-maturity rule in `PROCESS.md` after a full compatibility
+audit of the standard against its own claims.
+
+- **Context** — `context.jsonld` de-aliased so that every target IRI has exactly one term per
+  scope: organisation/contact `name`, deadline `label`, `source.originalId` and
+  `source.submittedAt` moved into property-scoped contexts (JSON-LD 1.1); `amount` now maps to
+  `schema:value` instead of colliding with `funding` on `schema:amount`; `socialLinks` (a
+  platform-keyed object, never a valid `sameAs` value) and contact `telegram` (a handle, not a
+  URL) moved to the RFP Hub vocabulary. Every array-valued field now carries `@container`
+  (`tracks`, `prizes`, `skills`, `stages`, `portfolio` were missing theirs, so one-element
+  arrays collapsed on compaction). Result, verified with jsonld.js over the full corpus:
+  `expand` → `compact` reproduces every document's original shape and the output still
+  validates against the schema. Previously compaction rewrote `title`→`name` and
+  `funding`→`amount`, producing documents that violated the standard's own schema.
+- **Conformance** — suite grown from 8 pass / 13 fail to **11 pass / 24 fail**. New pass
+  cases exercise the previously untouched `vc_fund` block and the single-instance `bounty` and
+  `accelerator` blocks. New fail cases assert `format` (`uri`, `date-time`, `email`) as a
+  constraint, both `pattern` constraints (`id`, `organization.slug`), a `$defs` enum
+  (`deadline.type`), and the missing-type-block rule for all five previously untested
+  discriminator branches.
+- **Tooling** — `check-spec` gains an **identity sweep**: any URL shaped like a spec
+  identifier, anywhere in the package (fixtures, examples, doc prose), must agree with
+  `spec.config.json`, closing the hand-written-copy gap a domain swap would have missed.
+  The **spec-freeze gate** now covers a frozen version's `conformance/v*/` directory, the
+  meta-schema, `registries/entry.schema.json`, and the identity fields of `spec.config.json`,
+  and runs on pushes to `main` as a tripwire as well as on PRs.
+- **Docs** — `CROSSWALK.md`: the reverse-direction completeness claim was false and is
+  replaced by an explicit table of DAOIP-5 Grant Pool fields with no RFP Hub equivalent;
+  DAOIP-5 mechanism values are now quoted as that spec spells them (`"Retro Funding"`, not
+  `"Retroactive"`); documented that JSON-LD processing erases `null` (null-vs-absent is a
+  JSON-Schema-layer distinction only). `BENCHMARK.md`: corrected the `deadlines[0]` statistic
+  and the stale "future deadline" fixture note. `conformance/README.md`: corrected the
+  reference-run path and documented the format-assertion requirement. ADR 0001 carries an
+  erratum on its `$id`-path claim, and its follow-ups now record that `$id`/`@context`
+  dereference.
+
 ## Spec v1.0.0 re-cut in place (2026-07-27)
 
 **v1.0.0 was re-cut in place: the contents published under this version string differ from
@@ -195,7 +234,7 @@ by every downstream fork of a CC0 artifact.
 - **`scripts/codegen.mjs`** extended to stamp that identity into the schema `$id`, the
   `specVersion` constant, the schema description, the context's `@vocab` and `SPEC_VERSION` —
   and to generate `registries/index.json`, `schemas/index.json` and the `FIELDS.md` field
-  tables alongside the TypeScript types. `codegen:check` covers all seven artifacts.
+  tables alongside the TypeScript types. `codegen:check` covers every generated artifact.
 - **`scripts/check-spec.mjs`** (`pnpm check`) — publication rules: context↔schema drift,
   version-string agreement against `spec.config.json`, and the source-neutrality lint.
 - **`registries/`** — `eligibility-keys`, `deadline-labels` and `program-models`, plus

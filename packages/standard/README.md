@@ -26,10 +26,11 @@ const opp: Opportunity = {
 };
 ```
 
-The raw schema file is also published and importable directly:
+The raw schema file is also published and importable directly (the import attribute is
+required under `module: nodenext`, and harmless elsewhere):
 
 ```ts
-import schema from "@the-rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json";
+import schema from "@the-rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json" with { type: "json" };
 ```
 
 ## What this package ships

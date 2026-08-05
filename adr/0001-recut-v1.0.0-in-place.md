@@ -143,10 +143,25 @@ Three mitigations are part of the decision, not follow-ups to it:
 ## Follow-ups
 
 - **Done:** freeze mechanism — [`.github/workflows/spec-freeze.yml`](../.github/workflows/spec-freeze.yml)
-  fails any PR touching a `schemas/v*/` directory that contains a `FROZEN` marker. The marker is
-  deliberately **not** present yet; it lands with the promotion to `stable`, which is the moment
-  the rule above starts to bite.
+  fails any PR touching a frozen version's normative artifacts: its `schemas/v*/` and
+  `conformance/v*/` directories, and — while any version is frozen — the meta-schema, the
+  registry entry schema, and the identity fields of `spec.config.json`. A push trigger on `main`
+  turns direct-push bypasses red after the fact. The `FROZEN` marker is deliberately **not**
+  present yet; it lands with the promotion to `stable`, which is the moment the rule above
+  starts to bite.
 - **Done:** `PROCESS.md`, `GOVERNANCE.md`, `NORMATIVE.md` and per-version `STATUS.md` written and
   shipped alongside the re-cut, so the policy is not retrofitted after the exception.
-- **Open:** the `$id` and `@context` hosts still do not dereference. Until they do, "the schema at
-  this URL" remains a promise rather than a fact.
+- **Done (2026-08-05):** the `$id` and `@context` URLs now dereference — they are
+  `raw.githubusercontent.com` URLs on the default branch, resolving to exactly the shipped
+  bytes. The remaining limitation is Content-Type (`text/plain` rather than
+  `application/schema+json`); see `STATUS.md`. The canonical-domain decision itself stays open.
+
+## Erratum (2026-08-05)
+
+The decision-outcome sentence above says "the `$id` path is unchanged". That overstates what
+Option 3 preserved: the re-cut kept `specVersion` at `1.0.0` and the `schemas/v1.0.0/`
+directory path, but the `$id` itself changed entirely — from the unowned placeholder domain to
+the dereferenceable `raw.githubusercontent.com` URL (host and path both changed; only the
+`v1.0.0` segment survived). The accurate record is the **Identifiers** section of
+[`CHANGELOG.md`](../packages/standard/CHANGELOG.md). The decision this ADR records — re-cut in
+place, no version bump — is unaffected.
