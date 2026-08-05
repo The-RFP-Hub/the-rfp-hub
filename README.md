@@ -33,12 +33,6 @@ JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 - Validated against real-world funding data: [`BENCHMARK.md`](./packages/standard/schemas/v1.0.0/BENCHMARK.md)
 - What's normative vs. informative: [`NORMATIVE.md`](./packages/standard/NORMATIVE.md)
 
-> ⚠️ **v1.0.0 was re-cut in place on 2026-07-27.** Documents published under this version string
-> before that date do not validate against it. This was done once, deliberately, before anyone
-> had adopted it — see the
-> [field mapping table](./packages/standard/CHANGELOG.md#field-mapping-old--new) for what moved
-> where, and [`adr/0001`](./adr/0001-recut-v1.0.0-in-place.md) for why.
-
 Validate anything against it:
 
 ```bash

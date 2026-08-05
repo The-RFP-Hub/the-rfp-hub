@@ -1,6 +1,6 @@
 # 0002. The v-next field re-cut — what changed in the data model and why
 
-- **Status:** accepted
+- **Status:** accepted — decisions #11 (sponsoring primacy/minItems), #14 (extensions asymmetry), #17's monetaryAmount def, #21 (eligibility map + registry) and #22 (resourceLinks) superseded by [0004](./0004-second-draft-revision-org-swap-and-closure.md); decision #3 (one sibling block per fundingType — the `opportunity[opportunity.fundingType]` access pattern) superseded by [0005](./0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md)
 - **Deciders:** project leadership + standard maintainers
 - **Date:** 2026-07-27
 - **Supersedes:** —
