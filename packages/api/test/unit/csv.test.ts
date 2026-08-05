@@ -37,20 +37,21 @@ describe("toCsv", () => {
     title: "Title, with comma",
     description: "d",
     status: "open",
-    sponsoringOrganizations: [
+    operatingOrganizations: [
       { name: "Primary Org", slug: "primary-org" },
       { name: "Second Org", slug: "second-org" },
     ],
+    sponsoringOrganizations: [{ name: "Backer Org", slug: "backer-org" }],
     source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: ["Ethereum", "Base"],
     categories: ["DeFi"],
-    funding: { minAward: 100, maxAward: 500, budget: 9000, allocated: 4000, currency: "USD" },
+    fundingInfo: { minAward: 100, maxAward: 500, budget: 9000, allocated: 4000, currency: "USD" },
     applicationUrl: "https://example.com/1",
     deadlines: [
-      { type: "fixed", date: "2999-12-31T00:00:00.000Z", label: "application" },
-      { type: "fixed", date: "2000-01-01T00:00:00.000Z", label: "registration" },
+      { deadlineType: "fixed", date: "2999-12-31T00:00:00.000Z", label: "application" },
+      { deadlineType: "fixed", date: "2000-01-01T00:00:00.000Z", label: "registration" },
     ],
-    grant: {},
+    fundingDetails: { fundingType: "grant" },
   } as Opportunity;
 
   it("writes a header row + one row per item, joining arrays with |", () => {
@@ -63,11 +64,12 @@ describe("toCsv", () => {
     expect(lines[1]).toContain("https://example.com/1");
   });
 
-  it("uses sponsoringOrganizations[0] as the display organization", () => {
+  it("uses operatingOrganizations[0] as the display organization", () => {
     const row = toCsv([opp]).trimEnd().split("\n")[1] as string;
     expect(row).toContain("Primary Org");
     expect(row).toContain("primary-org");
     expect(row).not.toContain("Second Org");
+    expect(row).not.toContain("Backer Org"); // sponsors are not the display org
   });
 
   it("flattens deadlines[] to the derived nextDeadlineAt, skipping past entries", () => {
@@ -81,7 +83,7 @@ describe("toCsv", () => {
     const rolling = {
       ...opp,
       title: "Rolling program",
-      deadlines: [{ type: "rolling", label: "application" }],
+      deadlines: [{ deadlineType: "rolling", label: "application" }],
     } as Opportunity;
     const cells = (toCsv([rolling]).trimEnd().split("\n")[1] as string).split(",");
     expect(cells[CSV_COLUMNS.indexOf("nextDeadlineAt")]).toBe("");

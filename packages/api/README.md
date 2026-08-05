@@ -9,21 +9,24 @@ milestone **M2**.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/opportunities` | List (thin projection). Filters: `fundingType`, `status`, `ecosystem`, `network`, `category`, `tag`, `organization`, `minAward`, `maxAward`, `deadlineAfter`, `deadlineBefore`, `q`; `sort` (`nextDeadlineAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
+| `GET` | `/v1/opportunities` | List (thin projection). Filters: `fundingType`, `status`, `ecosystem`, `category`, `organization`, `minAward`, `maxAward`, `deadlineAfter`, `deadlineBefore`, `q`; `sort` (`nextDeadlineAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
 | `GET` | `/v1/opportunities/:id` | One full Standard object (e.g. `fundingmap:1459`); `404` if not found. |
 | `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served verbatim as `application/schema+json`. |
 | `GET` | `/v1/stats` | Totals + breakdowns by funding type/status/ecosystem. |
 | `GET` | `/v1/health` | Liveness + DB readiness. |
 | `GET` | `/v1/docs` | Swagger UI (OpenAPI 3.1). |
 
-Public reads return only `review_status = 'approved' AND is_listed` rows. List responses omit the
-`opportunity[fundingType]` block and `extensions` (a delivery optimization; see the Standard's
-FIELDS.md).
+Public reads return only `review_status = 'approved' AND is_listed` rows. List responses omit
+`fundingDetails` — the type-specific details slot, a tagged union whose own required `fundingType`
+tag names its shape — as a delivery optimization (see the Standard's FIELDS.md); the detail
+endpoint serves it in full. Storage keeps the payload **tag-free** in the `type_data` jsonb column
+(the tag is derivable from `funding_type`) and reattaches the tag on read, so the served tag can
+never disagree with the top-level discriminator.
 
 ### Deadlines, sorting and the rolling-only exclusion
 
-The Standard has no deadline scalar — `deadlines[]` holds `{type: 'fixed' | 'rolling', date?,
-label?}` entries and consumers must select by label, never by array position. The API therefore
+The Standard has no deadline scalar — `deadlines[]` holds `{deadlineType: 'fixed' | 'rolling',
+date?, label?}` entries and consumers must select by label, never by array position. The API therefore
 derives **`nextDeadlineAt`**: the earliest `fixed` deadline still in the future, stored in an
 indexed column and recomputed on every write.
 
@@ -42,7 +45,8 @@ The API is pre-adoption, so the re-cut renames are applied without a back-compat
 | `?type=` | `?fundingType=` |
 | `?sort=closesAt` | `?sort=nextDeadlineAt` (also the new default) |
 | — | `?deadlineAfter=` / `?deadlineBefore=` (RFC 3339) |
-| `?organization=` (issuer FK) | `?organization=` — now matches **any** entry in `sponsoringOrganizations`, not only the primary `[0]` |
+| `?organization=` (issuer FK) | `?organization=` — now matches **any** entry in `operatingOrganizations` OR `sponsoringOrganizations`, not only the primary `operatingOrganizations[0]` |
+| `?network=` / `?tag=` | removed — the Standard dropped `networks`/`tags` (`?ecosystem=` and `?category=` remain) |
 | `/v1/stats` → `byType` | `/v1/stats` → `byFundingType` |
 
 ## Local development
@@ -61,12 +65,12 @@ pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 Config is read from the environment (see `.env-example`): `DATABASE_URL`, `PORT`, `HOST`, and the
 seed source (`SOURCE_API_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`).
 
-> **Migrations were regenerated for the v1.0.0 re-cut.** `src/db/migrations` is a single
-> drizzle-kit-generated `0000_recut_v1_0_0` migration, not a rename chain on top of the
-> pre-re-cut schema — nothing had been published from this database, and keeping the directory
-> pure drizzle-kit output beats hand-writing a rename script. **If you have a database from
-> before the re-cut, drop it and re-migrate**, then re-run the seed; every row is re-derivable
-> from the upstream source. Regenerate after a schema change with
+> **Migrations were regenerated for the v1.0.0 re-cut.** `src/db/migrations` starts from the
+> drizzle-kit-generated `0000_recut_v1_0_0` baseline; `0001_schema_vnext_org_flip` applies the
+> schema v-next changes (org-array flip, `networks`/`tags`/`extensions` removal, eligibility →
+> text, the renames) forward-only on top of it. `0001` rewrites DDL but NOT pre-existing jsonb
+> payloads — **after migrating a database that already has data, re-run the seed**; every row is
+> re-derivable from the upstream source. Regenerate after a schema change with
 > `pnpm --filter @the-rfp-hub/api db:generate`.
 
 ## Architecture
@@ -91,8 +95,8 @@ registration lives in `routes/<module>/index.ts`.
 ## Tests
 
 - **unit** (`test/unit`, no DB): mappers round-tripped against the committed Standard examples,
-  the `deadlines.ts` derivations (`nextDeadlineAt` / auto-close), the ingest guards
-  (one-block-per-`fundingType`, self-identification stripping), `map-program`
+  the `deadlines.ts` derivations (`nextDeadlineAt` / auto-close), the ingest normalization
+  (`fundingDetails` tag stripping/reattachment, self-identification stripping), `map-program`
   old-upstream→re-cut-Standard, query-param parsing, CSV serialization.
 - **integration** (`test/integration`, gated on `DATABASE_URL`): each endpoint via `app.inject()`
   against Postgres, with isolated self-cleaning fixtures.

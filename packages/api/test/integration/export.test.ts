@@ -29,12 +29,14 @@ run("open-data export", () => {
         title: "Export Fixture",
         description: "d",
         status: "open",
-        sponsoringOrganizations: [{ name: "Export Org", slug: "export-org" }],
+        operatingOrganizations: [{ name: "Export Org", slug: "export-org" }],
         source: { ingestedVia: "import", verifiedAgainstSource: null },
         ecosystems: ["EXPORTTEST"],
-        funding: { budget: 12345, currency: "USD" },
-        deadlines: [{ type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
-        grant: {},
+        fundingInfo: { budget: 12345, currency: "USD" },
+        deadlines: [
+          { deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" },
+        ],
+        fundingDetails: { fundingType: "grant" },
       } satisfies Opportunity,
       { reviewStatus: "approved", isListed: true },
     );
@@ -60,8 +62,8 @@ run("open-data export", () => {
     expect(exported).toBeTruthy();
     // the JSON export carries the full re-cut shape, including the deadlines array
     expect(exported.fundingType).toBe("grant");
-    expect(exported.sponsoringOrganizations[0].slug).toBe("export-org");
-    expect(exported.funding).toEqual({ budget: 12345, currency: "USD" });
+    expect(exported.operatingOrganizations[0].slug).toBe("export-org");
+    expect(exported.fundingInfo).toEqual({ budget: 12345, currency: "USD" });
     expect(exported.deadlines).toHaveLength(1);
     expect(exported).not.toHaveProperty("closesAt");
 

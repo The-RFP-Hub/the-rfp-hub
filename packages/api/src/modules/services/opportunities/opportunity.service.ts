@@ -40,10 +40,8 @@ export interface OpportunityQuery {
   fundingType?: FundingType[];
   status?: OpportunityStatus[];
   ecosystem?: string[];
-  network?: string[];
   category?: string[];
-  tag?: string[];
-  /** Sponsoring-organization slug — matches ANY sponsor, not only the primary one. */
+  /** Organization slug — matches ANY operating OR sponsoring organization, not only the primary one. */
   organization?: string;
   minAward?: number;
   maxAward?: number;
@@ -95,12 +93,10 @@ export class OpportunityService {
     if (q.fundingType?.length) where.push(inArray(opportunities.fundingType, q.fundingType));
     if (q.status?.length) where.push(inArray(opportunities.status, q.status));
     if (q.ecosystem?.length) where.push(arrayOverlaps(opportunities.ecosystems, q.ecosystem));
-    if (q.network?.length) where.push(arrayOverlaps(opportunities.networks, q.network));
     if (q.category?.length) where.push(arrayOverlaps(opportunities.categories, q.category));
-    if (q.tag?.length) where.push(arrayOverlaps(opportunities.tags, q.tag));
-    // ANY sponsoring organization, via the denormalized GIN-indexed slug array.
+    // ANY operating OR sponsoring organization, via the denormalized GIN-indexed slug array.
     if (q.organization) {
-      where.push(arrayOverlaps(opportunities.sponsorSlugs, [q.organization]));
+      where.push(arrayOverlaps(opportunities.orgSlugs, [q.organization]));
     }
     // Include the same-side bound so a row that sets only one of min/max/budget still matches.
     if (q.minAward !== undefined) {
@@ -182,9 +178,10 @@ export class OpportunityService {
 
   // ── write path (used by the seed loader, not exposed as a route in M2) ─────────────
   /**
-   * Ingest one Standard object. Rejects a record carrying a block that does not match its
-   * `fundingType` (the re-cut forbids non-matching blocks), keeps the organization directory in
-   * sync, and derives `next_deadline_at` from `deadlines[]` on the way in.
+   * Ingest one Standard object. Stores `fundingDetails` tag-free as `type_data` (the read path
+   * reattaches the tag from the `funding_type` column, so a mismatched inner tag cannot survive
+   * ingest), keeps the organization directory in sync, and derives `next_deadline_at` from
+   * `deadlines[]` on the way in. Callers validate upstream (the seed's `gateForSeed`).
    */
   async upsertFromStandard(
     std: Opportunity,
@@ -218,7 +215,7 @@ export class OpportunityService {
         target: organizations.slug,
         set: {
           name: org.name,
-          type: org.type,
+          orgType: org.orgType,
           description: org.description,
           website: org.website,
           logoUrl: org.logoUrl,

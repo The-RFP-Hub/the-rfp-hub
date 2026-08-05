@@ -2,21 +2,15 @@
  * PURE mappers between DB rows and the RFP Hub Standard object — no DB access, fully unit-testable.
  *
  * - `toStandard(row)`  — read path (detail): full, schema-valid `Opportunity`.
- * - `toSummary(row)`   — read path (list): thin `OpportunitySummary` projection, omits the
- *                          `opportunity[fundingType]` block + `extensions` per FIELDS.md
- *                          "Delivery (API list vs detail)".
+ * - `toSummary(row)`   — read path (list): thin `OpportunitySummary` projection, omits
+ *                          `fundingDetails` per FIELDS.md "Delivery (API list vs detail)".
  * - `fromStandard(std)` — write path: Standard → { organization directory inserts, opp insert }.
  *
  * Since the re-cut the organizations an opportunity names are ARRAYS with semantic order, stored
  * verbatim on the opportunity row as jsonb, so the read mappers no longer take an organization row.
+ * `operatingOrganizations` is the required, primary array — entry [0] is the display org.
  */
-import type {
-  Deadline,
-  Funding,
-  Milestone,
-  Opportunity,
-  Organization,
-} from "@the-rfp-hub/standard";
+import type { Deadline, Funding, Milestone, Opportunity } from "@the-rfp-hub/standard";
 import type { OpportunityInsert, OpportunityRow, OrganizationInsert } from "../../db/schema.js";
 import { nextDeadlineAt } from "../shared/deadlines.js";
 
@@ -26,23 +20,10 @@ type RemoveIndex<T> = {
 };
 
 /**
- * Thin list projection type — a full Opportunity minus the six type-specific blocks and
- * `extensions` (a delivery concern, per FIELDS.md "Delivery (API list vs detail)").
+ * Thin list projection type — a full Opportunity minus the type-specific `fundingDetails` slot
+ * (a delivery concern, per FIELDS.md "Delivery (API list vs detail)").
  */
-export type OpportunitySummary = Omit<
-  RemoveIndex<Opportunity>,
-  "grant" | "hackathon" | "bounty" | "accelerator" | "vc_fund" | "rfp" | "extensions"
->;
-
-/** The six `fundingType` values — also the six type-block keys. */
-export const FUNDING_TYPES = [
-  "grant",
-  "hackathon",
-  "bounty",
-  "accelerator",
-  "vc_fund",
-  "rfp",
-] as const;
+export type OpportunitySummary = Omit<RemoveIndex<Opportunity>, "fundingDetails">;
 
 // ── small helpers ────────────────────────────────────────────────────────────────
 /** Drop keys whose value is `undefined` (keeps `false`/`0`/`""`/`null`), returning a new object. */
@@ -64,10 +45,6 @@ function iso(d: Date | null): string | undefined {
 /** [] → undefined (so empty arrays are omitted from the Standard object) */
 function arr<T>(a: T[] | null | undefined): T[] | undefined {
   return Array.isArray(a) && a.length ? [...a] : undefined;
-}
-/** {} → undefined */
-function obj<T extends Record<string, unknown>>(o: T | null | undefined): T | undefined {
-  return o && Object.keys(o).length ? o : undefined;
 }
 
 function sourceOf(r: OpportunityRow): Record<string, unknown> {
@@ -96,7 +73,7 @@ function fundingOf(r: OpportunityRow): Funding | undefined {
   return Object.keys(f).length ? (f as Funding) : undefined;
 }
 
-/** Common fields shared by list and detail (everything except the type block + extensions). */
+/** Common fields shared by list and detail (everything except the type block). */
 function baseOf(row: OpportunityRow): Record<string, unknown> {
   return compact({
     specVersion: row.specVersion,
@@ -106,23 +83,21 @@ function baseOf(row: OpportunityRow): Record<string, unknown> {
     description: row.description,
     summary: row.summary ?? undefined,
     status: row.status,
-    sponsoringOrganizations: row.sponsoringOrganizations,
-    operatingOrganizations: arr(row.operatingOrganizations),
+    sponsoringOrganizations: arr(row.sponsoringOrganizations),
+    operatingOrganizations: row.operatingOrganizations,
     source: sourceOf(row),
     ecosystems: arr(row.ecosystems),
-    networks: arr(row.networks),
     categories: arr(row.categories),
-    tags: arr(row.tags),
-    eligibility: obj(row.eligibility),
+    eligibility: row.eligibility ?? undefined,
     prerequisites: row.prerequisites ?? undefined,
-    resourceLinks: row.resourceLinks ?? undefined,
+    additionalReferences: row.additionalReferences ?? undefined,
     serviceAgreement: row.serviceAgreement ?? undefined,
     applicationUrl: row.applicationUrl ?? undefined,
     website: row.website ?? undefined,
     logoUrl: row.logoUrl ?? undefined,
     bannerUrl: row.bannerUrl ?? undefined,
-    socialLinks: obj(row.socialLinks),
-    funding: fundingOf(row),
+    socialLinks: arr(row.socialLinks),
+    fundingInfo: fundingOf(row),
     milestones: arr(row.milestones),
     opensAt: iso(row.opensAt),
     deadlines: arr(row.deadlines),
@@ -135,14 +110,13 @@ function baseOf(row: OpportunityRow): Record<string, unknown> {
 /** Full, schema-valid Standard object (detail endpoint, exports, snapshots). */
 export function toStandard(row: OpportunityRow): Opportunity {
   const out = baseOf(row);
-  // type-specific block lives under a key equal to `fundingType` (grant→grant, vc_fund→vc_fund, …).
-  out[row.fundingType] = row.typeData ?? {};
-  const ext = obj(row.extensions);
-  if (ext) out.extensions = ext;
+  // `typeData` is stored TAG-FREE (see fromStandard); the read path reattaches the `fundingType`
+  // tag from the column, so the served tag can never disagree with the top-level discriminator.
+  out.fundingDetails = { fundingType: row.fundingType, ...(row.typeData ?? {}) };
   return out as Opportunity;
 }
 
-/** Thin list projection — omits the type block + extensions (a delivery concern, not a schema). */
+/** Thin list projection — omits `fundingDetails` (a delivery concern, not a schema). */
 export function toSummary(row: OpportunityRow): OpportunitySummary {
   return baseOf(row) as OpportunitySummary;
 }
@@ -163,59 +137,25 @@ function dateOrNull(v: string | null | undefined): Date | null {
 function dateOrUndef(v: string | null | undefined): Date | undefined {
   return v ? new Date(v) : undefined;
 }
-export function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "org"
-  );
-}
-
-/** The directory key for an organization: its own slug, or one derived from its display name. */
-export function orgSlug(o: Organization): string {
-  return o.slug ?? slugify(o.name);
-}
-
 /**
- * INGEST GUARD — the re-cut made "one block per funding type" a schema guarantee: the matching
- * block is required and every non-matching block is FORBIDDEN. Enforce it at the write boundary
- * so a malformed record can never be stored (the read path serves `row.typeData` under whatever
- * `fundingType` says, and would silently lose a second block).
- */
-export function assertSingleTypeBlock(std: Opportunity): void {
-  const record = std as Record<string, unknown>;
-  if (record[std.fundingType] === undefined) {
-    throw new Error(
-      `opportunity '${std.id}' has fundingType '${std.fundingType}' but no matching '${std.fundingType}' block`,
-    );
-  }
-  const extra = FUNDING_TYPES.filter((t) => t !== std.fundingType && record[t] !== undefined);
-  if (extra.length) {
-    throw new Error(
-      `opportunity '${std.id}' has fundingType '${std.fundingType}' but also carries: ${extra.join(", ")}`,
-    );
-  }
-}
-
-/**
- * The organization-directory rows an opportunity implies — every sponsoring AND operating
- * organization, deduped by slug. These keep `organizations` a complete directory; the opportunity's
- * own (order-significant) arrays are stored on the opportunity row itself.
+ * The organization-directory rows an opportunity implies — every operating AND sponsoring
+ * organization, deduped by slug (a Standard-required field since the re-cut). These keep
+ * `organizations` a complete directory; the opportunity's own (order-significant) arrays are
+ * stored on the opportunity row itself.
  */
 export function organizationInserts(std: Opportunity): OrganizationInsert[] {
-  const all = [...std.sponsoringOrganizations, ...(std.operatingOrganizations ?? [])];
+  const all = [...std.operatingOrganizations, ...(std.sponsoringOrganizations ?? [])];
   const bySlug = new Map<string, OrganizationInsert>();
   for (const o of all) {
-    bySlug.set(orgSlug(o), {
-      slug: orgSlug(o),
+    bySlug.set(o.slug, {
+      slug: o.slug,
       name: o.name,
-      type: o.type ?? null,
+      orgType: o.orgType ?? null,
       description: o.description ?? null,
       website: o.website ?? null,
       logoUrl: o.logoUrl ?? null,
       bannerUrl: o.bannerUrl ?? null,
-      socialLinks: (o.socialLinks ?? {}) as Record<string, string>,
+      socialLinks: o.socialLinks ?? [],
       ecosystems: o.ecosystems ?? [],
       contacts: o.contacts ?? [],
     });
@@ -227,8 +167,9 @@ export function organizationInserts(std: Opportunity): OrganizationInsert[] {
  * Standard object → DB inserts.
  *
  * Absorbs the whole re-cut shape: `fundingType`, the organization arrays (+ the denormalized
- * `sponsorSlugs` lookup key), `deadlines[]` and the derived `nextDeadlineAt`, the renamed funding
- * envelope, and the new optional blocks. The three self-identification properties
+ * `orgSlugs` lookup key, the UNION of operating + sponsoring slugs), `deadlines[]` and the derived
+ * `nextDeadlineAt`, the renamed funding envelope, and the new optional blocks. The three
+ * self-identification properties
  * (`$schema`/`@context`/`@type`) are ACCEPTED and STRIPPED — they describe the document, not the
  * opportunity, so they are never persisted or re-emitted.
  */
@@ -239,10 +180,14 @@ export function fromStandard(
   orgs: OrganizationInsert[];
   opp: OpportunityInsertData;
 } {
-  assertSingleTypeBlock(std);
-
   const s = std.source ?? {};
-  const typeBlock = (std as Record<string, unknown>)[std.fundingType];
+  // `fundingDetails` is a tagged union — its required inner `fundingType` tag equals the
+  // top-level discriminator (the Standard's binding allOf keeps the two in step). The tag is
+  // STRIPPED before storage: `typeData` stays a tag-free jsonb payload, because the tag is
+  // derivable from the `fundingType` column and storing it twice would let the copies disagree.
+  // `toStandard` reattaches it on read.
+  const details: Record<string, unknown> = { ...std.fundingDetails };
+  const { fundingType: _detailsTag, ...typeData } = details;
   const deadlines = (std.deadlines ?? []) as Deadline[];
 
   const opp: OpportunityInsertData = {
@@ -253,27 +198,29 @@ export function fromStandard(
     title: std.title,
     description: std.description,
     summary: std.summary ?? null,
-    sponsoringOrganizations: std.sponsoringOrganizations,
-    operatingOrganizations: std.operatingOrganizations ?? [],
-    sponsorSlugs: std.sponsoringOrganizations.map(orgSlug),
+    sponsoringOrganizations: std.sponsoringOrganizations ?? [],
+    operatingOrganizations: std.operatingOrganizations,
+    orgSlugs: [
+      ...new Set(
+        [...std.operatingOrganizations, ...(std.sponsoringOrganizations ?? [])].map((o) => o.slug),
+      ),
+    ],
     applicationUrl: std.applicationUrl ?? null,
     website: std.website ?? null,
     logoUrl: std.logoUrl ?? null,
     bannerUrl: std.bannerUrl ?? null,
-    socialLinks: (std.socialLinks ?? {}) as Record<string, string>,
+    socialLinks: std.socialLinks ?? [],
     ecosystems: std.ecosystems ?? [],
-    networks: std.networks ?? [],
     categories: std.categories ?? [],
-    tags: std.tags ?? [],
-    eligibility: std.eligibility ?? {},
+    eligibility: std.eligibility ?? null,
     prerequisites: std.prerequisites ?? null,
-    resourceLinks: std.resourceLinks ?? null,
+    additionalReferences: std.additionalReferences ?? null,
     serviceAgreement: std.serviceAgreement ?? null,
-    currency: std.funding?.currency ?? null,
-    minAward: numStr(std.funding?.minAward),
-    maxAward: numStr(std.funding?.maxAward),
-    budget: numStr(std.funding?.budget),
-    allocated: numStr(std.funding?.allocated),
+    currency: std.fundingInfo?.currency ?? null,
+    minAward: numStr(std.fundingInfo?.minAward),
+    maxAward: numStr(std.fundingInfo?.maxAward),
+    budget: numStr(std.fundingInfo?.budget),
+    allocated: numStr(std.fundingInfo?.allocated),
     milestones: (std.milestones ?? []) as Milestone[],
     opensAt: dateOrNull(std.opensAt),
     deadlines,
@@ -281,8 +228,7 @@ export function fromStandard(
     postedAt: dateOrNull(std.postedAt), // (read mapper emits postedAt; keep the inverse symmetric)
     createdAt: dateOrUndef(std.createdAt), // omit → DB default now()
     updatedAt: dateOrUndef(std.updatedAt),
-    typeData: (typeBlock as Record<string, unknown>) ?? {},
-    extensions: std.extensions ?? {},
+    typeData,
     sourcePublisher: s.publisher ?? null,
     sourceSubmittedBy: s.submittedBy ?? null,
     sourceSubmittedAt: dateOrNull(s.submittedAt),

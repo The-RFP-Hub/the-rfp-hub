@@ -26,11 +26,11 @@ const FIXTURE: Opportunity = {
   title: "OpenAPI fixture",
   description: "d",
   status: "open",
-  sponsoringOrganizations: [{ name: "OAS Org", slug: "oas-org" }],
+  operatingOrganizations: [{ name: "OAS Org", slug: "oas-org" }],
   source: { ingestedVia: "import", verifiedAgainstSource: null },
   ecosystems: ["OASTEST"],
-  deadlines: [{ type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
-  grant: {},
+  deadlines: [{ deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
+  fundingDetails: { fundingType: "grant" },
 };
 
 /** Deep-copy the served components, dropping any nested `$id` (which would hijack pointer refs). */
@@ -166,10 +166,11 @@ run("OpenAPI 3.1 live-spec contract", () => {
   it("declares the Opportunity component in the re-cut shape", () => {
     const opportunity = doc.components.schemas.Opportunity;
     expect(opportunity.required).toEqual(
-      expect.arrayContaining(["fundingType", "sponsoringOrganizations"]),
+      expect.arrayContaining(["fundingType", "operatingOrganizations", "fundingDetails"]),
     );
     expect(opportunity.required).not.toContain("type");
     expect(opportunity.required).not.toContain("organization");
+    expect(opportunity.required).not.toContain("sponsoringOrganizations"); // optional now
     expect(opportunity.properties.deadlines).toBeTruthy();
     expect(opportunity.properties.closesAt).toBeUndefined();
   });
@@ -177,11 +178,17 @@ run("OpenAPI 3.1 live-spec contract", () => {
   it("publishes detail (Opportunity) and list (OpportunitySummary) as distinct components", () => {
     const detail = doc.components.schemas.Opportunity;
     const summary = doc.components.schemas.OpportunitySummary;
-    const blocks = ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"];
+    const fundingTypes = ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"];
 
-    // the detail object carries every type block plus `extensions`; the thin projection has neither
-    for (const block of [...blocks, "extensions"]) {
-      expect(detail.properties[block], `Opportunity declares ${block}`).toBeTruthy();
+    // the detail object carries the single fundingDetails slot; the thin projection omits it,
+    // and neither declares the six pre-fundingDetails per-type block properties
+    expect(detail.properties.fundingDetails, "Opportunity declares fundingDetails").toBeTruthy();
+    expect(
+      summary.properties.fundingDetails,
+      "OpportunitySummary omits fundingDetails",
+    ).toBeUndefined();
+    for (const block of fundingTypes) {
+      expect(detail.properties[block], `Opportunity has no legacy ${block} block`).toBeUndefined();
       expect(summary.properties[block], `OpportunitySummary omits ${block}`).toBeUndefined();
     }
     // everything else is shared — including the fields the served object carries beyond the core
@@ -196,9 +203,13 @@ run("OpenAPI 3.1 live-spec contract", () => {
       expect(detail.properties[field], `Opportunity declares ${field}`).toBeTruthy();
       expect(summary.properties[field], `OpportunitySummary declares ${field}`).toBeTruthy();
     }
-    expect(summary.required).toEqual(detail.required);
+    // the summary requires everything the detail does EXCEPT the omitted fundingDetails slot
+    expect(detail.required).toContain("fundingDetails");
+    expect(summary.required).toEqual(
+      detail.required.filter((name: string) => name !== "fundingDetails"),
+    );
     // enums are the Standard's, not a hand-kept copy (test/unit/openapi-drift.test.ts diffs them)
-    expect(detail.properties.fundingType.enum).toEqual(blocks);
+    expect(detail.properties.fundingType.enum).toEqual(fundingTypes);
     expect(detail.properties.status.enum).toEqual(["upcoming", "open", "closed", "archived"]);
   });
 
@@ -213,14 +224,14 @@ run("OpenAPI 3.1 live-spec contract", () => {
       `${OAS_ID}#/components/schemas/Opportunity`,
     );
 
-    // and the split is real, not merely declared: the list drops the type block, the detail keeps it
+    // and the split is real, not merely declared: the list drops fundingDetails, the detail keeps it
     const list = await app.inject({
       method: "GET",
       url: "/v1/opportunities?ecosystem=OASTEST&limit=5",
     });
-    expect(list.json().items[0].grant).toBeUndefined();
+    expect(list.json().items[0].fundingDetails).toBeUndefined();
     const one = await app.inject({ method: "GET", url: "/v1/opportunities/otest:1" });
-    expect(one.json().grant).toEqual({});
+    expect(one.json().fundingDetails).toEqual({ fundingType: "grant" });
   });
 
   it("GET /v1/opportunities conforms to its declared 200 schema", async () => {

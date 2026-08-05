@@ -2,8 +2,8 @@
  * PURE deadline derivations over the Standard's `deadlines[]` array — no DB/HTTP, unit-tested.
  *
  * The re-cut removed the single `closesAt` scalar and replaced it with an array of
- * `{type: 'fixed' | 'rolling', date?, label?}` entries. Nothing sortable survived that change, so
- * the API derives two things from the array:
+ * `{deadlineType: 'fixed' | 'rolling', date?, label?}` entries. Nothing sortable survived that
+ * change, so the API derives two things from the array:
  *
  * 1. **`nextDeadlineAt`** — the earliest FUTURE `fixed` deadline. This is the sort/filter key that
  *    replaces `closesAt`. It is NULL for a record whose deadlines are rolling-only, all in the
@@ -30,7 +30,7 @@ function dateOf(d: Deadline): Date | null {
 function fixedDates(deadlines: Deadline[] | null | undefined): Date[] {
   if (!Array.isArray(deadlines)) return [];
   return deadlines
-    .filter((d) => d?.type === "fixed")
+    .filter((d) => d?.deadlineType === "fixed")
     .map(dateOf)
     .filter((d): d is Date => d !== null)
     .sort((a, b) => a.getTime() - b.getTime());
@@ -38,7 +38,7 @@ function fixedDates(deadlines: Deadline[] | null | undefined): Date[] {
 
 /** Whether the record accepts applications on a rolling basis. */
 export function hasRollingDeadline(deadlines: Deadline[] | null | undefined): boolean {
-  return Array.isArray(deadlines) && deadlines.some((d) => d?.type === "rolling");
+  return Array.isArray(deadlines) && deadlines.some((d) => d?.deadlineType === "rolling");
 }
 
 /**

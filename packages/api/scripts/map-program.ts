@@ -12,17 +12,28 @@
  * conversion lives (the same rules the Standard's own examples were regenerated with):
  *
  *   type                       → fundingType
- *   organization (single)      → sponsoringOrganizations[0]   (rfp.issuingOrganization wins the name)
- *   deadline / metadata.endsAt → deadlines[{type:'fixed', date, label:'application'}]
+ *   organization (single)      → operatingOrganizations[0]   (rfp.issuingOrganization wins the
+ *                                name; the upstream org RUNS the program, so it is the operator —
+ *                                sponsoringOrganizations stays absent for ingested records)
+ *   deadline / metadata.endsAt → deadlines[{deadlineType:'fixed', date, label:'application'}]
  *   hackathon.registrationDeadline / submissionDeadline / startDate / endDate
  *                              → deadlines[… label 'registration' | 'submission' | 'event start' | 'event end']
  *   accelerator.applicationDeadline, rfp.proposalDeadline
  *                              → deadlines[… label 'application']
- *   funding.totalBudget        → funding.budget      (rfp.budget folds into the same envelope)
- *   grant.fundingMechanism     → grant.fundingMechanisms[]
+ *   funding.totalBudget        → fundingInfo.budget  (rfp.budget folds into the same envelope)
+ *   metadata.socialLinks (map) → socialLinks[{platform, url}]
+ *   metadata.networks / grantTypes → dropped (the Standard removed networks/tags; accepted loss)
+ *   grant.fundingMechanism     → fundingDetails.fundingMechanisms[]
+ *   <type>Metadata blob        → fundingDetails { fundingType: <type>, …whitelisted keys }
  *   source.url                 → removed; the program URL now feeds `applicationUrl`
  */
-import type { Deadline, FundingType, Opportunity, OpportunityStatus } from "@the-rfp-hub/standard";
+import type {
+  Deadline,
+  FundingType,
+  Opportunity,
+  OpportunityStatus,
+  SocialLink,
+} from "@the-rfp-hub/standard";
 
 export interface RegistryCommunity {
   uid?: string;
@@ -51,8 +62,6 @@ export interface RegistryProgram {
     endsAt?: string | null;
     categories?: string[];
     ecosystems?: string[];
-    networks?: string[];
-    grantTypes?: string[];
     organizations?: string[];
     minGrantSize?: number | string | null;
     maxGrantSize?: number | string | null;
@@ -116,7 +125,15 @@ const BLOCK_DEADLINE_LABELS: Partial<Record<FundingType, Record<string, string>>
   rfp: { proposalDeadline: "application" },
 };
 
-const SOCIAL_KEYS = ["twitter", "discord", "github", "telegram", "farcaster", "forum", "blog"];
+const SOCIAL_KEYS: SocialLink["platform"][] = [
+  "twitter",
+  "discord",
+  "github",
+  "telegram",
+  "farcaster",
+  "forum",
+  "blog",
+];
 
 const nonEmpty = (s: unknown): s is string => typeof s === "string" && s.trim().length > 0;
 
@@ -303,10 +320,14 @@ function statusOf(p: RegistryProgram): OpportunityStatus {
   return p.isActive ? "open" : "closed";
 }
 
-function socialLinksOf(src: Record<string, string> | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
+/** Upstream `{platform: url}` map → the Standard's `socialLinks[]` entries (valid URLs only). */
+function socialLinksOf(src: Record<string, string> | undefined): SocialLink[] {
+  const out: SocialLink[] = [];
   if (!src) return out;
-  for (const k of SOCIAL_KEYS) if (nonEmpty(src[k])) out[k] = src[k];
+  for (const platform of SOCIAL_KEYS) {
+    const url = validUri(src[platform]);
+    if (url) out.push({ platform, url });
+  }
   return out;
 }
 
@@ -342,7 +363,7 @@ function deadlinesOf(
   const entries: Deadline[] = [];
   const push = (value: unknown, label: string): void => {
     const date = isoDate(value);
-    if (date) entries.push({ type: "fixed", date, label });
+    if (date) entries.push({ deadlineType: "fixed", date, label });
   };
 
   // The single upstream deadline is the application deadline (metadata.endsAt is the fallback).
@@ -354,7 +375,7 @@ function deadlinesOf(
   const seen = new Set<string>();
   return entries
     .filter((d) => {
-      const key = `${d.type}|${d.date}|${d.label}`;
+      const key = `${d.deadlineType}|${d.date}|${d.label}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -412,7 +433,7 @@ export function mapProgram(
   );
 
   // `rfp.issuingOrganization` was free text describing the real issuer — it now names the primary
-  // sponsoring organization, which is strictly better than the title-derived fallback.
+  // operating organization, which is strictly better than the title-derived fallback.
   const issuing = fundingType === "rfp" ? rawBlock.issuingOrganization : undefined;
   const orgName = (nonEmpty(issuing) ? issuing : title).slice(0, 256); // Standard caps name at 256
 
@@ -446,7 +467,10 @@ export function mapProgram(
         ? md.shortDescription.slice(0, 500)
         : undefined,
     status: statusOf(p),
-    sponsoringOrganizations: [
+    // The upstream org RUNS the program, so it is the operator ("the real deal"); the Standard
+    // requires operatingOrganizations (minItems 1) and slug (synthesized — upstream has none).
+    // sponsoringOrganizations is deliberately NOT emitted for ingested records.
+    operatingOrganizations: [
       compact({
         name: orgName,
         slug: slugify(nonEmpty(communitySlug) ? communitySlug : orgName),
@@ -461,9 +485,7 @@ export function mapProgram(
       verifiedAgainstSource: null,
     }),
     ecosystems,
-    networks: cleanArr(md.networks),
     categories: cleanArr(md.categories),
-    tags: cleanArr(md.grantTypes),
     applicationUrl:
       validUri(p.submissionUrl) ??
       validUri(sl?.grantsSite) ??
@@ -472,17 +494,18 @@ export function mapProgram(
     website: validUri(md.website) ?? validUri(sl?.website),
     logoUrl: validUri(md.logoImg),
     bannerUrl: validUri(md.bannerImg),
-    socialLinks: Object.keys(social).length ? social : undefined,
-    funding: Object.keys(funding).length ? funding : undefined,
+    socialLinks: social.length ? social : undefined,
+    fundingInfo: Object.keys(funding).length ? funding : undefined,
     opensAt: isoDate(md.startsAt),
     deadlines: deadlinesOf(p, fundingType, rawBlock),
     createdAt: isoDate(p.createdAt),
     updatedAt: isoDate(p.updatedAt),
   });
 
-  // required type-specific block under the `fundingType` key (may be {} for grants), and NO other
-  // type block — the re-cut forbids them.
-  out[fundingType] = typeBlockOf(p, fundingType, rawBlock);
+  // required `fundingDetails` slot: the type-specific payload, self-described by its required
+  // `fundingType` tag (which must equal the top-level discriminator — the binding allOf enforces it).
+  // For grants it may carry nothing beyond the tag.
+  out.fundingDetails = { fundingType, ...typeBlockOf(p, fundingType, rawBlock) };
   // source.verifiedAgainstSource must survive compaction of `null` — re-add explicitly
   (out.source as Record<string, unknown>).verifiedAgainstSource = null;
 

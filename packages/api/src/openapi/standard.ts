@@ -11,7 +11,8 @@
  *   ingest-time constraints would turn a stricter Standard into a serialization failure;
  * - `$defs` (organization, provenance, deadline, funding, …): they are not registered as OpenAPI
  *   components, and the serializer must pass those sub-objects through untouched, so every `$ref`
- *   is served as a permissive object;
+ *   is served as a permissive object — and a `oneOf` over such refs (`fundingDetails`, the tagged
+ *   union of the six detail shapes) collapses to the same permissive object;
  * - delivery concerns the Standard cannot know (list vs detail) — `schemas.ts` annotates those.
  */
 import { opportunitySchema } from "@the-rfp-hub/standard";
@@ -30,21 +31,15 @@ export const STANDARD_REQUIRED: readonly string[] = Object.freeze([
   ...(standard.required as string[]),
 ]);
 
-/** The `enum` a Standard property declares. Throws at boot if that property ever loses its enum. */
-export function standardEnum(name: string): string[] {
-  const values = standardProperties[name]?.enum;
-  if (!Array.isArray(values)) {
-    throw new Error(`the Standard's '${name}' property declares no enum`);
-  }
-  return [...values] as string[];
-}
-
 /** A `$ref` into the Standard's `$defs`, served as a pass-through object (see the file header). */
 const PASSTHROUGH_OBJECT = { type: "object", additionalProperties: true } as const;
 
 /** Structural shape of a Standard subschema: type/format/items/additionalProperties only. */
 function shapeOf(subschema: JsonSchema): JsonSchema {
   if (typeof subschema.$ref === "string") return { ...PASSTHROUGH_OBJECT };
+  // A tagged union whose branches are all `$defs` refs (fundingDetails) is a union of
+  // pass-through objects, i.e. a pass-through object.
+  if (Array.isArray(subschema.oneOf)) return { ...PASSTHROUGH_OBJECT };
   if (subschema.type === "array") {
     const items = shapeOf((subschema.items ?? {}) as JsonSchema);
     return typeof subschema.minItems === "number"

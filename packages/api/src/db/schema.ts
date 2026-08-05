@@ -11,7 +11,7 @@
  * Column names are written camelCase here and mapped to snake_case in SQL via Drizzle
  * `casing: "snake_case"` (configured in drizzle.config.ts and the runtime client).
  */
-import type { Contact, Deadline, Milestone, Organization } from "@the-rfp-hub/standard";
+import type { Contact, Deadline, Milestone, Organization, SocialLink } from "@the-rfp-hub/standard";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -39,6 +39,7 @@ export interface StoredOrganization extends Organization {}
 export interface StoredContact extends Contact {}
 export interface StoredDeadline extends Deadline {}
 export interface StoredMilestone extends Milestone {}
+export interface StoredSocialLink extends SocialLink {}
 
 // ── Enums ──────────────────────────────────────────────────────────────────────
 /** The Standard's `fundingType` discriminator (six values, unchanged by the re-cut). */
@@ -86,12 +87,12 @@ export const organizations = pgTable("organizations", {
   id: bigint({ mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
   slug: text().notNull().unique(),
   name: text().notNull(),
-  type: orgType(),
+  orgType: orgType(),
   description: text(),
   website: text(),
   logoUrl: text(),
   bannerUrl: text(),
-  socialLinks: jsonb().$type<Record<string, string>>().notNull().default({}),
+  socialLinks: jsonb().$type<StoredSocialLink[]>().notNull().default([]),
   ecosystems: text().array().notNull().default(sql`'{}'`),
   contacts: jsonb().$type<StoredContact[]>().notNull().default([]),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -114,30 +115,30 @@ export const opportunities = pgTable(
 
     // Organizations are arrays with SEMANTIC ORDER ([0] = primary/display) and each may carry
     // `contacts[]`, so they are stored verbatim as jsonb and served back unchanged.
-    // No DB default: the Standard requires minItems 1, so every insert must supply it.
-    sponsoringOrganizations: jsonb().$type<StoredOrganization[]>().notNull(),
-    operatingOrganizations: jsonb().$type<StoredOrganization[]>().notNull().default([]),
-    // Denormalized, GIN-indexed lookup key for the `organization` filter: one entry per SPONSORING
-    // organization (`slug`, or a slugified `name` when the publisher omitted one). Maintained on
-    // write — the filter therefore matches ANY sponsor, not just the primary one.
-    sponsorSlugs: text().array().notNull().default(sql`'{}'`),
+    // `operatingOrganizations` is THE primary array ([0] = display org): the Standard requires it
+    // with minItems 1, so it has no DB default — every insert must supply it. Sponsors are
+    // optional and may be empty, hence the `[]` default.
+    sponsoringOrganizations: jsonb().$type<StoredOrganization[]>().notNull().default([]),
+    operatingOrganizations: jsonb().$type<StoredOrganization[]>().notNull(),
+    // Denormalized, GIN-indexed lookup key for the `organization` filter: the UNION of every
+    // operating AND sponsoring organization slug (slug is Standard-required). Maintained on
+    // write — the filter therefore matches either role, not just the primary [0] entry.
+    orgSlugs: text().array().notNull().default(sql`'{}'`),
 
     applicationUrl: text(),
     website: text(),
     logoUrl: text(),
     bannerUrl: text(),
-    socialLinks: jsonb().$type<Record<string, string>>().notNull().default({}),
+    socialLinks: jsonb().$type<StoredSocialLink[]>().notNull().default([]),
 
     // classification (open lists) — filtered via GIN
     ecosystems: text().array().notNull().default(sql`'{}'`),
-    networks: text().array().notNull().default(sql`'{}'`),
     categories: text().array().notNull().default(sql`'{}'`),
-    tags: text().array().notNull().default(sql`'{}'`),
 
-    // open key→value eligibility map + free-text qualifiers (not filterable by design)
-    eligibility: jsonb().$type<Record<string, string>>().notNull().default({}),
+    // free-flow eligibility text + free-text qualifiers (not filterable by design)
+    eligibility: text(),
     prerequisites: text(),
-    resourceLinks: text(),
+    additionalReferences: text(),
     serviceAgreement: text(),
 
     // funding envelope
@@ -153,7 +154,7 @@ export const opportunities = pgTable(
 
     // dates
     opensAt: timestamp({ withTimezone: true }),
-    /** Every deadline / event boundary, each `{type: fixed|rolling, date?, label?}`. */
+    /** Every deadline / event boundary, each `{deadlineType: fixed|rolling, date?, label?}`. */
     deadlines: jsonb().$type<StoredDeadline[]>().notNull().default([]),
     /**
      * DERIVED + DENORMALIZED: the earliest FUTURE `fixed` deadline, or NULL when the record has
@@ -164,9 +165,8 @@ export const opportunities = pgTable(
     nextDeadlineAt: timestamp({ withTimezone: true }),
     postedAt: timestamp({ withTimezone: true }),
 
-    // discriminated-union payload (served under the `fundingType` key) + escape hatch
+    // discriminated-union payload (served under the `fundingType` key)
     typeData: jsonb().$type<Record<string, unknown>>().notNull().default({}),
-    extensions: jsonb().$type<Record<string, unknown>>().notNull().default({}),
 
     // provenance — since the re-cut the Standard's `source` has NO required field (source.url was
     // removed outright); `applicationUrl` is the single link-back target.
@@ -198,10 +198,8 @@ export const opportunities = pgTable(
     index("ix_opp_award").on(t.minAward, t.maxAward),
     index("ix_opp_updated").on(t.updatedAt.desc()),
     index("gin_opp_ecosystems").using("gin", t.ecosystems),
-    index("gin_opp_networks").using("gin", t.networks),
     index("gin_opp_categories").using("gin", t.categories),
-    index("gin_opp_tags").using("gin", t.tags),
-    index("gin_opp_sponsors").using("gin", t.sponsorSlugs),
+    index("gin_opp_org_slugs").using("gin", t.orgSlugs),
     // cross-system idempotency key (M3 outbox/import). PARTIAL: only rows that carry BOTH a source
     // system and original id are deduped; source-less community submissions stay unconstrained
     // (a plain unique would let NULL rows coexist, but this makes the intent explicit).

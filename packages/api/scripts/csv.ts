@@ -41,8 +41,8 @@ export function csvCell(v: unknown): string {
 
 export function toCsv(items: Opportunity[]): string {
   const rows = items.map((o) => {
-    // sponsoringOrganizations[0] is the primary/display organization (array order is semantic).
-    const primary = o.sponsoringOrganizations?.[0];
+    // operatingOrganizations[0] is the primary/display organization (array order is semantic).
+    const primary = o.operatingOrganizations?.[0];
     const next = nextDeadlineAt(o.deadlines);
     return [
       o.id,
@@ -53,14 +53,14 @@ export function toCsv(items: Opportunity[]): string {
       primary?.slug,
       (o.ecosystems ?? []).join("|"),
       (o.categories ?? []).join("|"),
-      o.funding?.currency,
-      o.funding?.minAward,
-      o.funding?.maxAward,
-      o.funding?.budget,
-      o.funding?.allocated,
+      o.fundingInfo?.currency,
+      o.fundingInfo?.minAward,
+      o.fundingInfo?.maxAward,
+      o.fundingInfo?.budget,
+      o.fundingInfo?.allocated,
       o.opensAt,
       next ? next.toISOString() : "",
-      (o.deadlines ?? []).some((d) => d.type === "rolling"),
+      (o.deadlines ?? []).some((d) => d.deadlineType === "rolling"),
       o.applicationUrl,
     ]
       .map(csvCell)
