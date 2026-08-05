@@ -112,6 +112,10 @@ function describe(e: ErrorObject): string {
   } else if (e.keyword === "const") {
     const { allowedValue } = e.params as { allowedValue?: unknown };
     if (allowedValue !== undefined) msg += `: ${JSON.stringify(allowedValue)}`;
+  } else if (e.keyword === "pattern") {
+    const { pattern } = e.params as { pattern?: string };
+    // The UTC mandate is the one pattern a publisher will actually hit; say what it means.
+    if (pattern === "Z$") msg = "must be an RFC 3339 timestamp in UTC, ending in 'Z'";
   }
   return msg;
 }

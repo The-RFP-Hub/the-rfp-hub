@@ -11,7 +11,7 @@ milestone **M2**.
 |---|---|---|
 | `GET` | `/v1/opportunities` | List (thin projection). Filters: `fundingType`, `status`, `ecosystem`, `category`, `organization`, `minAward`, `maxAward`, `deadlineAfter`, `deadlineBefore`, `q`; `sort` (`nextDeadlineAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
 | `GET` | `/v1/opportunities/:id` | One full Standard object (e.g. `fundingmap:1459`); `404` if not found. |
-| `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served verbatim as `application/schema+json`. |
+| `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served as `application/schema+json` — semantically identical to the published file (re-serialized, so key order may differ from the raw bytes). |
 | `GET` | `/v1/stats` | Totals + breakdowns by funding type/status/ecosystem. |
 | `GET` | `/v1/health` | Liveness + DB readiness. |
 | `GET` | `/v1/docs` | Swagger UI (OpenAPI 3.1). |
