@@ -49,7 +49,10 @@ The promotion gate is deliberately **one publisher and one consumer**, not the f
 bar larger projects use. At this size, five implementations is a gate nothing ever passes, and an
 unpassable gate means everything stays experimental forever, which tells a reader nothing.
 
-Fields currently at `provisional`: `serviceAgreement`, `milestones[]`, `grant.programModel`.
+Fields currently at `provisional`: none. The three that carried the marker (`serviceAgreement`,
+`milestones[]`, `programModel`) were promoted to `stable` on 2026-08-05, the maintainers
+accepting the M1 research round — the decision interviews, plus the real third-party RFP that
+motivated `milestones[]` — as the verification the gate asks for (recorded in `CHANGELOG.md`).
 
 ---
 

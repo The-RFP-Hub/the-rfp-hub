@@ -237,13 +237,7 @@ describe("schema file conventions", () => {
 describe("stability annotations", () => {
   const schema = readJson(schemaPath);
 
-  it("marks the single-source-evidenced additions provisional", () => {
-    expect(schema.properties.serviceAgreement["x-stability"]).toBe("provisional");
-    expect(schema.properties.milestones["x-stability"]).toBe("provisional");
-    expect(schema.$defs.grant.properties.programModel["x-stability"]).toBe("provisional");
-  });
-
-  it("treats everything else as stable", () => {
+  it("carries no provisional fields — the 2026-08-05 promotion emptied the stage", () => {
     const provisional: string[] = [];
     const walk = (node: unknown, path: string) => {
       if (!node || typeof node !== "object") return;
@@ -252,7 +246,13 @@ describe("stability annotations", () => {
       for (const [k, v] of Object.entries(rec)) walk(v, `${path}/${k}`);
     };
     walk(schema, "");
-    expect(provisional).toHaveLength(3);
+    expect(provisional).toEqual([]);
+  });
+
+  it("keeps the promoted fields present and unannotated (absence means stable)", () => {
+    expect(schema.properties.serviceAgreement["x-stability"]).toBeUndefined();
+    expect(schema.properties.milestones["x-stability"]).toBeUndefined();
+    expect(schema.$defs.grant.properties.programModel["x-stability"]).toBeUndefined();
   });
 });
 

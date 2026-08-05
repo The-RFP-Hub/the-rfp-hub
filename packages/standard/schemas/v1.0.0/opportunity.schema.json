@@ -128,7 +128,6 @@
     },
     "serviceAgreement": {
       "type": ["string", "null"],
-      "x-stability": "provisional",
       "x-since": "1.0.0",
       "description": "Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design.",
       "examples": [
@@ -170,7 +169,6 @@
     "milestones": {
       "type": "array",
       "items": { "$ref": "#/$defs/milestone" },
-      "x-stability": "provisional",
       "x-since": "1.0.0",
       "description": "Optional milestone sequence, valid on any fundingType. Array order is the milestone sequence — there is no order or index field. Milestone-based payment is expressed by this array together with grant.milestoneBased; there is no separate payment-schedule concept.",
       "$comment": "Deliberately not uniqueItems: every property of a milestone is optional, so two sparsely-populated entries can legitimately be byte-identical while denoting different milestones distinguished only by position."
@@ -491,7 +489,6 @@
         },
         "programModel": {
           "type": ["string", "null"],
-          "x-stability": "provisional",
           "x-since": "1.0.0",
           "description": "The operating model of the program, as distinct from the funding instrument. An open list rather than a closed enum — conventional values are published in registries/program-models.json, and a publisher's own vocabulary is valid without a schema change.",
           "examples": ["grant", "program", "infra", "incentives"]

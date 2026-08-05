@@ -198,6 +198,14 @@ Every change below is listed under the bidirectional definition in `PROCESS.md` 
 - `$defs/socialLinks` → `$defs/socialLink` — the def rename half of the socialLinks change;
   instances never reference `$defs` names.
 
+**Stability promotions (not breaking — annotations only, validation byte-identical):**
+`serviceAgreement`, `milestones[]` and `programModel` lose their `x-stability: provisional`
+markers and become `stable` — the last provisional fields in the schema. The promotion gate
+asks that the field be verified beyond its original narrow evidence; the maintainers accepted
+the M1 research round as that verification: all three trace to the decision interviews, and
+`milestones[]` additionally to the real third-party RFP that motivated it. From this date the
+three carry the full stable warranty — changing or removing them takes a new spec version.
+
 **Also:** with `organization.type` → `orgType` and `deadline.type` → `deadlineType`, the
 rename family that began with `type` → `fundingType` is complete — **no property named `type`
 remains anywhere in the schema.** And `specVersion` stays `const: "1.0.0"`: the spec axis does

@@ -24,10 +24,12 @@ may still change without a new version directory while this maturity holds. Prom
 `stable` freezes this directory: a `FROZEN` marker file lands in it and CI rejects any PR that
 edits it thereafter — see [`PROCESS.md`](../../PROCESS.md).
 
-Feature-level maturity is finer-grained than document-level maturity. Several fields in this
-version are annotated `x-stability: provisional` in the schema (`serviceAgreement`,
-`milestones[]`, `grant.programModel`) — they rest on narrower evidence than the rest and are the
-most likely to change. Everything else is `x-stability: stable`.
+Feature-level maturity is finer-grained than document-level maturity. No field in this version
+is currently annotated `x-stability: provisional`: the three fields that carried the marker
+(`serviceAgreement`, `milestones[]`, `programModel`) were promoted to `stable` on 2026-08-05 —
+each traces to the M1 research round (the decision interviews, and for `milestones[]` a real
+third-party RFP that required it), which the maintainers accepted as the verification the
+promotion gate asks for. The `provisional` stage itself remains available for future additions.
 
 ## The honest paragraph
 
