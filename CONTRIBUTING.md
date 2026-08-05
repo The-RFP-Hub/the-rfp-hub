@@ -90,6 +90,20 @@ fixes. Structural decisions get an ADR — see [`adr/`](./adr) and its
 - CI must be green: **codegen:check · typecheck · build · test · lint**.
 - For user-facing changes, add a changeset: `pnpm changeset`.
 
+## Releases
+
+- **Changesets manage versions only.** `.changeset/config.json` sets `"changelog": false`
+  deliberately: `changeset version` bumps package versions but writes no changelog files.
+- **npm release notes live in GitHub Releases**, not in per-package changelog files.
+- **`packages/standard/CHANGELOG.md` is spec-axis only.** It documents changes to the *data
+  contract* (the spec version), ships in the npm tarball, and must never receive
+  auto-generated npm release notes.
+- **Publishing MUST go through pnpm** (`pnpm publish`, or `pnpm changeset publish` invoked via
+  pnpm). pnpm rewrites `workspace:*` dependency ranges to real semver ranges at pack time;
+  `npm publish` / `npm pack` does not, and ships a tarball with a broken
+  `"@the-rfp-hub/standard": "workspace:*"` dependency — this has actually happened to
+  `rfphub-validate`.
+
 ## Licensing of contributions
 
 By submitting a contribution you agree it is licensed under the license of the package it

@@ -9,9 +9,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./schemas/*": "./schemas/*",
     "./registries/*": "./registries/*",
@@ -33,6 +38,9 @@
     "LICENSE"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "codegen": "node scripts/codegen.mjs",
     "codegen:check": "node scripts/codegen.mjs --check",
