@@ -1,6 +1,6 @@
 {
   "name": "rfphub-validate",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Validate funding opportunities against the RFP Hub Standard (CLI + typed library).",
   "license": "MIT",
   "type": "module",
