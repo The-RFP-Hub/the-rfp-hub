@@ -1,13 +1,36 @@
 # Mechanises the one rule the standard's own history makes it hardest to keep.
 #
-# A published spec version is frozen: `packages/standard/schemas/v<version>/` must never be
-# edited again once it is declared stable. That rule is enforced here rather than by memory,
-# because the reasoning that justified re-cutting v1.0.0 in place ("nobody has adopted it yet")
+# A published spec version is frozen: once it is declared stable, the artifacts that define
+# it must never be edited again. That rule is enforced here rather than by memory, because
+# the reasoning that justified re-cutting v1.0.0 in place ("nobody has adopted it yet")
 # will feel true again next time, and the second time it will not be defensible.
 #
-# A version directory is frozen when it contains a `FROZEN` marker file. The marker lands in the
-# commit that declares the version stable — it is deliberately NOT present today, while v1.0.0's
-# maturity is still `draft`.
+# What freezing covers — everything that operationally defines a version's conformance:
+#   - packages/standard/schemas/v<version>/           (the schema, context, docs of record)
+#   - packages/standard/conformance/v<version>/       (the pass/fail cases ARE the observable
+#                                                      meaning of conformance; NORMATIVE.md)
+#   and, while ANY version is frozen, the versionless normative artifacts a frozen version
+#   rests on:
+#   - packages/standard/meta/                          (the meta-schema the schema validates
+#                                                      against — changing it changes what the
+#                                                      frozen schema is allowed to mean)
+#   - packages/standard/registries/entry.schema.json   (the contract registry entries obey)
+#   - spec.config.json identity fields (baseUrl, vocabIri) — codegen re-stamps every $id from
+#     them, so editing them rewrites frozen bytes. Non-identity fields (specVersion,
+#     schemaDir, status, recutDate) stay editable: cutting a NEW version must not trip the
+#     gate for an old one.
+#
+# A version is frozen when packages/standard/schemas/v<version>/ contains a FROZEN marker
+# file — the single marker for that version's schema AND conformance directories. The marker
+# lands in the commit that declares the version stable; it is deliberately NOT present today,
+# while v1.0.0's maturity is still `draft`.
+#
+# Markers are read from the BASE ref, so deleting a FROZEN file in the same PR is not a way
+# through the gate. What this job cannot defend against is repo configuration: it must be a
+# required status check (a deleted required workflow blocks merge as "expected"), main must
+# require PRs, and .github/workflows/ should be CODEOWNERS-protected — none of which is
+# expressible from inside the tree. The push trigger below is the tripwire for direct pushes:
+# it cannot block them, but it turns main red so the bypass is at least loud.
 #
 # See packages/standard/PROCESS.md and adr/0001-recut-v1.0.0-in-place.md.
 name: Spec freeze
@@ -16,6 +39,18 @@ on:
   pull_request:
     paths:
       - "packages/standard/schemas/v*/**"
+      - "packages/standard/conformance/v*/**"
+      - "packages/standard/meta/**"
+      - "packages/standard/registries/entry.schema.json"
+      - "packages/standard/spec.config.json"
+  push:
+    branches: [main]
+    paths:
+      - "packages/standard/schemas/v*/**"
+      - "packages/standard/conformance/v*/**"
+      - "packages/standard/meta/**"
+      - "packages/standard/registries/entry.schema.json"
+      - "packages/standard/spec.config.json"
 
 jobs:
   frozen:
@@ -27,42 +62,79 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check changed spec directories against their FROZEN markers
+      - name: Check changed normative artifacts against FROZEN markers
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
 
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- 'packages/standard/schemas/v*' || true)
-          if [ -z "$changed" ]; then
-            echo "✓ no spec version directory touched"
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "✓ no base to compare against (branch creation) — nothing to check"
             exit 0
           fi
 
-          # One entry per touched version directory.
-          dirs=$(printf '%s\n' "$changed" \
-            | sed -n 's|^\(packages/standard/schemas/v[^/]*\)/.*$|\1|p' \
-            | sort -u)
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- \
+            'packages/standard/schemas/v*' \
+            'packages/standard/conformance/v*' \
+            'packages/standard/meta' \
+            'packages/standard/registries/entry.schema.json' \
+            'packages/standard/spec.config.json' || true)
+          if [ -z "$changed" ]; then
+            echo "✓ no normative spec artifact touched"
+            exit 0
+          fi
 
           violations=0
-          for dir in $dirs; do
+
+          # --- versioned directories: schemas/vX and conformance/vX share schemas/vX/FROZEN ---
+          versions=$(printf '%s\n' "$changed" \
+            | sed -nE 's#^packages/standard/(schemas|conformance)/(v[^/]*)/.*$#\2#p' \
+            | sort -u)
+          for ver in $versions; do
             # Read the marker from the BASE ref, not the head: deleting FROZEN in the same PR
             # must not be a way through the gate.
-            if git cat-file -e "$BASE_SHA:$dir/FROZEN" 2>/dev/null; then
-              echo "✗ $dir is FROZEN and this PR edits it:"
-              printf '%s\n' "$changed" | grep "^$dir/" | sed 's/^/    /'
+            if git cat-file -e "$BASE_SHA:packages/standard/schemas/$ver/FROZEN" 2>/dev/null; then
+              echo "✗ $ver is FROZEN and this change edits its normative artifacts:"
+              printf '%s\n' "$changed" \
+                | grep -E "^packages/standard/(schemas|conformance)/$ver/" | sed 's/^/    /'
               violations=$((violations + 1))
             else
-              echo "✓ $dir is not frozen"
+              echo "✓ $ver is not frozen"
             fi
           done
+
+          # --- versionless normative artifacts: locked while ANY version is frozen ---
+          any_frozen=$(git ls-tree -r --name-only "$BASE_SHA" -- packages/standard/schemas \
+            | grep -c '/FROZEN$' || true)
+          versionless=$(printf '%s\n' "$changed" \
+            | grep -E '^packages/standard/(meta/|registries/entry\.schema\.json)' || true)
+          if [ "$any_frozen" -gt 0 ] && [ -n "$versionless" ]; then
+            echo "✗ a frozen version exists and this change edits versionless normative artifacts:"
+            printf '%s\n' "$versionless" | sed 's/^/    /'
+            violations=$((violations + 1))
+          fi
+
+          # --- spec.config.json identity fields: locked while ANY version is frozen ---
+          if [ "$any_frozen" -gt 0 ] && printf '%s\n' "$changed" | grep -q '^packages/standard/spec.config.json$'; then
+            base_id=$(git show "$BASE_SHA:packages/standard/spec.config.json" | jq -r '[.baseUrl, .vocabIri] | join(" ")')
+            head_id=$(git show "$HEAD_SHA:packages/standard/spec.config.json" | jq -r '[.baseUrl, .vocabIri] | join(" ")')
+            if [ "$base_id" != "$head_id" ]; then
+              echo "✗ a frozen version exists and this change edits spec.config.json identity fields:"
+              echo "    base: $base_id"
+              echo "    head: $head_id"
+              violations=$((violations + 1))
+            else
+              echo "✓ spec.config.json touched, but identity fields (baseUrl, vocabIri) are unchanged"
+            fi
+          fi
 
           if [ "$violations" -gt 0 ]; then
             cat <<'MSG'
 
-          A published spec version directory is immutable once frozen. Breaking changes take a
-          NEW version directory; the previous one stays published and unedited, forever.
+          A published spec version is immutable once frozen — the schema directory, its
+          conformance suite, and the versionless artifacts it rests on. Breaking changes take
+          a NEW version directory; the previous one stays published and unedited, forever.
 
           If this is an editorial correction to an informative document, it belongs outside the
           version directory or in a new version — see packages/standard/NORMATIVE.md.
@@ -72,4 +144,4 @@ jobs:
             exit 1
           fi
 
-          echo "✓ no frozen spec version was modified"
+          echo "✓ no frozen spec artifact was modified"
