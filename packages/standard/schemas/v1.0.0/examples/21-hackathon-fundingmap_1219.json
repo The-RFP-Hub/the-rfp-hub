@@ -36,6 +36,7 @@
   "applicationUrl": "https://knowledgequarry-2026.devfolio.co",
   "website": "https://knowledgequarry-2026.devfolio.co",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 6356
   },
   "opensAt": "2026-04-01T00:00:00.000Z",
@@ -70,8 +71,7 @@
     "prizes": [
       {
         "track": null,
-        "amount": 6356,
-        "currency": "USD"
+        "amount": 6356
       }
     ],
     "teamSize": {

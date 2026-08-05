@@ -75,7 +75,7 @@ const FIXTURES: Opportunity[] = [
     ecosystems: [TAG],
     fundingInfo: { minAward: 50, currency: "USD" }, // only a min
     deadlines: [{ deadlineType: "fixed", date: "2999-03-01T00:00:00.000Z", label: "application" }],
-    fundingDetails: { fundingType: "bounty", reward: { amount: 50, currency: "USD" } },
+    fundingDetails: { fundingType: "bounty", reward: 50 },
   },
   {
     // ROLLING-ONLY → nextDeadlineAt is null: sorts last, excluded from deadline windows.

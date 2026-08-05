@@ -1,6 +1,6 @@
 # 0004. Revise draft v1.0.0 in place a second time — swap the organisation roles, close the top level, retire the eligibility registry
 
-- **Status:** accepted
+- **Status:** accepted — decision #15's two inlined `{amount, currency}` shapes, and its note that ADR-0002 #17's single-currency scoping "survives verbatim", overtaken by [0006](./0006-document-wide-single-currency.md) (every monetary amount is now denominated in the document-wide `fundingInfo.currency`)
 - **Deciders:** standard maintainers
 - **Date:** 2026-08-05
 - **Supersedes:** [ADR-0002](./0002-v-next-field-recut.md) **in part** — decisions #11

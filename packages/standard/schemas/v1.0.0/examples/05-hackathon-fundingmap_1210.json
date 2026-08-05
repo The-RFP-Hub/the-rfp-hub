@@ -35,6 +35,7 @@
   "applicationUrl": "https://hackbyte4.devfolio.co",
   "website": "https://www.hackbyte.in/",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 10257
   },
   "opensAt": "2026-04-03T13:30:00.000Z",
@@ -69,33 +70,27 @@
     "prizes": [
       {
         "track": null,
-        "amount": 100,
-        "currency": "USD"
+        "amount": 100
       },
       {
         "track": null,
-        "amount": 4,
-        "currency": "USD"
+        "amount": 4
       },
       {
         "track": null,
-        "amount": 1,
-        "currency": "USD"
+        "amount": 1
       },
       {
         "track": null,
-        "amount": 2,
-        "currency": "USD"
+        "amount": 2
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       },
       {
         "track": null,
-        "amount": 150,
-        "currency": "USD"
+        "amount": 150
       }
     ],
     "teamSize": {

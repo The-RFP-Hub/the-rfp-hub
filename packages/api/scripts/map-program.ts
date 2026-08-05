@@ -24,6 +24,9 @@
  *   metadata.socialLinks (map) → socialLinks[{platform, url}]
  *   metadata.networks / grantTypes → dropped (the Standard removed networks/tags; accepted loss)
  *   grant.fundingMechanism     → fundingDetails.fundingMechanisms[]
+ *   per-item {amount, currency} money (bounty.reward, prizes[], accelerator.funding, checkSize)
+ *                              → plain numbers; an upstream per-item currency hoists into the
+ *                                document-wide fundingInfo.currency (which wins on disagreement)
  *   <type>Metadata blob        → fundingDetails { fundingType: <type>, …whitelisted keys }
  *   source.url                 → removed; the program URL now feeds `applicationUrl`
  */
@@ -181,41 +184,68 @@ function validUri(v: unknown): string | undefined {
   }
 }
 
-/** A prize with a numeric amount and a currency (defaults USD); dropped if amount isn't numeric. */
-function coercePrize(p: unknown): Record<string, unknown> | undefined {
+/**
+ * A currency found on an upstream per-item money shape (prize/reward/funding/checkSize). The
+ * re-cut Standard has no per-type currency slot — every amount is denominated in the document-wide
+ * `fundingInfo.currency` — so these are reported for hoisting there, never emitted in the details.
+ */
+type CurrencyHoist = (currency: string | undefined) => void;
+
+/**
+ * Upstream money in any shape — a plain number, "110 USDC", or the pre-re-cut
+ * `{amount, currency}` object — → `{amount?, currency?}`. Amount is undefined if non-numeric.
+ */
+function moneyOf(v: unknown): { amount?: number; currency?: string } {
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>;
+    const amount = num(o.amount);
+    if (amount === undefined) return {};
+    return { amount, currency: nonEmpty(o.currency) ? o.currency : undefined };
+  }
+  return parseAmount(v);
+}
+
+/**
+ * A prize with a numeric amount (dropped if the amount isn't numeric). The re-cut prize shape is
+ * `{track?, amount}` — an upstream per-prize currency is hoisted, not emitted.
+ */
+function coercePrize(p: unknown, hoist: CurrencyHoist): Record<string, unknown> | undefined {
   if (!p || typeof p !== "object") return undefined;
   const o = p as Record<string, unknown>;
   const amount = num(o.amount);
   if (amount === undefined) return undefined;
-  const out: Record<string, unknown> = {
-    amount,
-    currency: nonEmpty(o.currency) ? o.currency : "USD",
-  };
+  hoist(nonEmpty(o.currency) ? o.currency : undefined);
+  const out: Record<string, unknown> = { amount };
   if (o.track !== undefined) out.track = o.track;
   return out;
 }
 
-/** Coerce a `{amount, currency}` money object; drop if amount isn't numeric. */
-function coerceMoney(v: unknown): { amount: number; currency: string } | undefined {
-  if (!v || typeof v !== "object") return undefined;
-  const o = v as Record<string, unknown>;
-  const amount = num(o.amount);
+/**
+ * Coerce upstream money to the plain number the re-cut expects for `bounty.reward` and
+ * `accelerator.funding`; an upstream currency is hoisted. Undefined if the amount isn't numeric.
+ */
+function coerceAmount(v: unknown, hoist: CurrencyHoist): number | undefined {
+  const { amount, currency } = moneyOf(v);
   if (amount === undefined) return undefined;
-  return { amount, currency: nonEmpty(o.currency) ? o.currency : "USD" };
+  hoist(currency);
+  return amount;
 }
 
 const BLOCK_NUM_KEYS = ["programDurationWeeks", "batchSize"];
 
-/** Coerce a `{min?, max?, currency?}` numeric range (checkSize); undefined if nothing survives. */
-function coerceRange(v: unknown): Record<string, unknown> | undefined {
+/**
+ * Coerce a `{min?, max?}` numeric range (checkSize); undefined if no bound survives. The re-cut
+ * amountRange carries no currency — an upstream one is hoisted instead.
+ */
+function coerceRange(v: unknown, hoist: CurrencyHoist): Record<string, unknown> | undefined {
   if (!v || typeof v !== "object") return undefined;
   const r = v as Record<string, unknown>;
+  if (nonEmpty(r.currency)) hoist(r.currency);
   const out: Record<string, unknown> = {};
   const mn = num(r.min);
   const mx = num(r.max);
   if (mn !== undefined) out.min = mn;
   if (mx !== undefined) out.max = mx;
-  if (nonEmpty(r.currency)) out.currency = r.currency;
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -259,23 +289,28 @@ function enumArray(v: unknown, values: string[]): string[] | undefined {
 }
 
 /** Coerce type-block fields to the Standard's expected shapes; drop any value that can't conform. */
-function normalizeBlock(src: Record<string, unknown>): Record<string, unknown> {
+function normalizeBlock(
+  src: Record<string, unknown>,
+  hoist: CurrencyHoist,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(src)) {
     if (BLOCK_NUM_KEYS.includes(k)) {
       const n = num(v);
       if (n !== undefined) out[k] = n;
     } else if (k === "prizes" && Array.isArray(v)) {
-      const prizes = v.map(coercePrize).filter((x): x is Record<string, unknown> => Boolean(x));
+      const prizes = v
+        .map((p) => coercePrize(p, hoist))
+        .filter((x): x is Record<string, unknown> => Boolean(x));
       if (prizes.length) out[k] = prizes;
     } else if (k === "reward" || k === "funding") {
-      const money = coerceMoney(v);
-      if (money) out[k] = money;
+      const amount = coerceAmount(v, hoist);
+      if (amount !== undefined) out[k] = amount;
     } else if (k === "teamSize") {
       const ts = coerceTeamSize(v);
       if (ts) out[k] = ts;
     } else if (k === "checkSize") {
-      const range = coerceRange(v);
+      const range = coerceRange(v, hoist);
       if (range) out[k] = range;
     } else if (k === "fundingMechanisms") {
       const mechanisms = enumArray(v, FUNDING_MECHANISMS);
@@ -387,6 +422,7 @@ function typeBlockOf(
   p: RegistryProgram,
   type: FundingType,
   rawBlock: Record<string, unknown>,
+  hoist: CurrencyHoist,
 ): Record<string, unknown> {
   const picked: Record<string, unknown> = {};
   for (const k of TYPE_BLOCK_KEYS[type]) {
@@ -398,11 +434,12 @@ function typeBlockOf(
     const legacy = rawBlock.fundingMechanism;
     if (legacy !== undefined && legacy !== null && legacy !== "") picked.fundingMechanisms = legacy;
   }
-  const out = normalizeBlock(picked);
-  // bounty.reward is required by the Standard — synthesize from the budget if absent.
-  if (type === "bounty" && !out.reward) {
-    const { amount, currency } = parseAmount(p.metadata?.programBudget);
-    if (amount !== undefined) out.reward = { amount, currency: currency ?? "USD" };
+  const out = normalizeBlock(picked, hoist);
+  // bounty.reward is required by the Standard — synthesize from the budget if absent (a plain
+  // number now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram).
+  if (type === "bounty" && out.reward === undefined) {
+    const { amount } = parseAmount(p.metadata?.programBudget);
+    if (amount !== undefined) out.reward = amount;
   }
   return out;
 }
@@ -437,11 +474,26 @@ export function mapProgram(
   const issuing = fundingType === "rfp" ? rawBlock.issuingOrganization : undefined;
   const orgName = (nonEmpty(issuing) ? issuing : title).slice(0, 256); // Standard caps name at 256
 
+  // Per-item currencies the upstream still sends inside prize/reward/funding/checkSize shapes.
+  // First one seen wins among themselves; document-level sources outrank them all (below).
+  let detailCurrency: string | undefined;
+  const hoist: CurrencyHoist = (c) => {
+    detailCurrency ??= c;
+  };
+  const detailsBlock = typeBlockOf(p, fundingType, rawBlock, hoist);
+
   const budget = parseAmount(md.programBudget);
   // `rfp.budget` ({amount, currency}) folds into the shared top-level funding envelope.
-  const rfpBudget = fundingType === "rfp" ? coerceMoney(rawBlock.budget) : undefined;
+  const rfpBudget = fundingType === "rfp" ? moneyOf(rawBlock.budget) : undefined;
   const funding = compact({
-    currency: budget.currency ?? rfpBudget?.currency,
+    // Ingest normalization: the re-cut Standard denominates EVERY monetary amount in the document
+    // in the single fundingInfo.currency — no per-type currency exists. So an upstream per-item
+    // currency (prize/reward/funding/checkSize) is hoisted here when no document-level currency
+    // (programBudget / rfp.budget) established one. When they disagree, the document-level
+    // currency wins: the Standard cannot express the disagreement, so ingestion normalizes to the
+    // document-wide denomination and keeps the amounts rather than dropping them (best-effort
+    // fidelity — the seed gate would otherwise lose the whole record over a label).
+    currency: budget.currency ?? rfpBudget?.currency ?? detailCurrency,
     minAward: num(md.minGrantSize),
     maxAward: num(md.maxGrantSize),
     budget: budget.amount ?? rfpBudget?.amount,
@@ -505,7 +557,7 @@ export function mapProgram(
   // required `fundingDetails` slot: the type-specific payload, self-described by its required
   // `fundingType` tag (which must equal the top-level discriminator — the binding allOf enforces it).
   // For grants it may carry nothing beyond the tag.
-  out.fundingDetails = { fundingType, ...typeBlockOf(p, fundingType, rawBlock) };
+  out.fundingDetails = { fundingType, ...detailsBlock };
   // source.verifiedAgainstSource must survive compaction of `null` — re-add explicitly
   (out.source as Record<string, unknown>).verifiedAgainstSource = null;
 

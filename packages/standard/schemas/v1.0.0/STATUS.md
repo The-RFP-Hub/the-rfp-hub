@@ -61,14 +61,21 @@ plus zero known adopters, no longer unpublishedness. See
 **A third in-place revision landed the same day, after the second.** Every temporal field now
 requires UTC with a trailing `Z` (`pattern: "Z$"` beside `format: "date-time"` at all seven
 sites), and the six sibling type-block properties plus their 93-line exclusivity `allOf` were
-replaced by one required `fundingDetails` object — a `oneOf` over the six unchanged detail
+replaced by one required `fundingDetails` object — a `oneOf` over the six detail
 shapes, each self-described by a required `fundingType` tag that a binding `allOf` keeps equal
 to the top-level discriminator. The `opportunity[opportunity.fundingType]` access pattern is
-superseded. The 39 valid corpus documents were rewritten by script with zero validity changes,
-and zero temporal values needed converting. This batch rides the same draft-window permission
-as the second revision and adds no new reconciliation argument; its structural record is
+superseded. In the same batch the single-currency rule became **document-wide**:
+`fundingInfo.currency` denominates every monetary amount, and the per-type currency fields are
+gone — `bounty.reward` and `accelerator.funding` are plain numbers, `prizes[]` entries and
+`checkSize` lost their `currency` keys. The 39 valid corpus documents were rewritten by script
+with zero validity changes, zero temporal values needed converting, and the currency hoist was
+conflict-free (no document used a second currency). This batch rides the same draft-window
+permission as the second revision and adds no new reconciliation argument; its structural
+records are
 [`adr/0005`](../../../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md),
-which supersedes ADR-0002 #3.
+which supersedes ADR-0002 #3, and
+[`adr/0006`](../../../../adr/0006-document-wide-single-currency.md), which supersedes
+ADR-0002 #17.
 
 - **Full rationale and the alternatives considered:**
   [`adr/0001-recut-v1.0.0-in-place.md`](../../../../adr/0001-recut-v1.0.0-in-place.md) (the
@@ -113,8 +120,9 @@ change is a version bump regardless of maturity.
 - **Anyone holding pre-2026-08-05 documents holds an invalid shape with no automated signal** —
   `specVersion` reads `1.0.0` on every side of every in-place change, exactly as it did
   across the re-cut. That now includes documents shaped by the *second* 2026-08-05 revision
-  but not the third: a document carrying a sibling type block (`"grant": {…}`) or a non-`Z`
-  timestamp fails against the current bytes. The three field-mapping tables in `CHANGELOG.md`
+  but not the third: a document carrying a sibling type block (`"grant": {…}`), a non-`Z`
+  timestamp, or a per-type currency key (a prize's own `currency`, a `{amount, currency}`
+  reward) fails against the current bytes. The three field-mapping tables in `CHANGELOG.md`
   are the remedy. The `eligibility-keys` registry no longer exists; its retired key
   definitions live in the CHANGELOG record and git history only.
 - **Raw `oneOf` errors are verbose by construction.** A wrong field inside `fundingDetails`

@@ -50,7 +50,7 @@ run("/v1 API", () => {
         fundingDetails: {
           fundingType: "hackathon",
           online: true,
-          prizes: [{ amount: 1000, currency: "USD" }],
+          prizes: [{ amount: 1000 }],
         },
         operatingOrganizations: [{ name: "Operator Ltd", slug: "test-operator" }],
         sponsoringOrganizations: [{ name: "Test Org", slug: "test-org" }],

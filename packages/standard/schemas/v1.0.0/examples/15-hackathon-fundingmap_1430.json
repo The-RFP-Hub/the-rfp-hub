@@ -35,6 +35,7 @@
   "applicationUrl": "https://paygentic-week4.devfolio.co",
   "website": "https://discord.gg/locus",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 1000
   },
   "opensAt": "2026-05-02T00:30:00.000Z",
@@ -69,18 +70,15 @@
     "prizes": [
       {
         "track": null,
-        "amount": 600,
-        "currency": "USD"
+        "amount": 600
       },
       {
         "track": null,
-        "amount": 300,
-        "currency": "USD"
+        "amount": 300
       },
       {
         "track": null,
-        "amount": 100,
-        "currency": "USD"
+        "amount": 100
       }
     ],
     "teamSize": {

@@ -36,6 +36,7 @@
   "applicationUrl": "https://www.deepsurge.xyz/evefrontier2026",
   "website": "https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 52500,
     "maxAward": 15000
   },
@@ -71,8 +72,7 @@
     "prizes": [
       {
         "track": null,
-        "amount": 80000,
-        "currency": "USD"
+        "amount": 80000
       }
     ],
     "teamSize": {

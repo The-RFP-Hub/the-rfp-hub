@@ -34,6 +34,7 @@
   "applicationUrl": "https://rns-hackoverflow-2.devfolio.co",
   "website": "https://rns-hackoverflow-2.devfolio.co",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 350
   },
   "opensAt": "2026-07-17T03:30:00.000Z",
@@ -68,13 +69,11 @@
     "prizes": [
       {
         "track": null,
-        "amount": 100,
-        "currency": "USD"
+        "amount": 100
       },
       {
         "track": null,
-        "amount": 250,
-        "currency": "USD"
+        "amount": 250
       }
     ],
     "teamSize": {

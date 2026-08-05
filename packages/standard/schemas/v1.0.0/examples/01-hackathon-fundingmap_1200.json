@@ -34,6 +34,7 @@
   "applicationUrl": "https://electrothon-8.devfolio.co",
   "website": "https://electrothon-8.devfolio.co",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 113565
   },
   "opensAt": "2026-03-13T06:30:00.000Z",
@@ -68,118 +69,95 @@
     "prizes": [
       {
         "track": null,
-        "amount": 100,
-        "currency": "USD"
+        "amount": 100
       },
       {
         "track": null,
-        "amount": 40000,
-        "currency": "USD"
+        "amount": 40000
       },
       {
         "track": null,
-        "amount": 30000,
-        "currency": "USD"
+        "amount": 30000
       },
       {
         "track": null,
-        "amount": 20000,
-        "currency": "USD"
+        "amount": 20000
       },
       {
         "track": null,
-        "amount": 4500,
-        "currency": "USD"
+        "amount": 4500
       },
       {
         "track": null,
-        "amount": 4500,
-        "currency": "USD"
+        "amount": 4500
       },
       {
         "track": null,
-        "amount": 4500,
-        "currency": "USD"
+        "amount": 4500
       },
       {
         "track": null,
-        "amount": 50,
-        "currency": "USD"
+        "amount": 50
       },
       {
         "track": null,
-        "amount": 5250,
-        "currency": "USD"
+        "amount": 5250
       },
       {
         "track": null,
-        "amount": 200,
-        "currency": "USD"
+        "amount": 200
       },
       {
         "track": null,
-        "amount": 250,
-        "currency": "USD"
+        "amount": 250
       },
       {
         "track": null,
-        "amount": 2,
-        "currency": "USD"
+        "amount": 2
       },
       {
         "track": null,
-        "amount": 1,
-        "currency": "USD"
+        "amount": 1
       },
       {
         "track": null,
-        "amount": 6,
-        "currency": "USD"
+        "amount": 6
       },
       {
         "track": null,
-        "amount": 200,
-        "currency": "USD"
+        "amount": 200
       },
       {
         "track": null,
-        "amount": 700,
-        "currency": "USD"
+        "amount": 700
       },
       {
         "track": null,
-        "amount": 150,
-        "currency": "USD"
+        "amount": 150
       },
       {
         "track": null,
-        "amount": 1,
-        "currency": "USD"
+        "amount": 1
       },
       {
         "track": null,
-        "amount": 500,
-        "currency": "USD"
+        "amount": 500
       },
       {
         "track": null,
-        "amount": 50,
-        "currency": "USD"
+        "amount": 50
       },
       {
         "track": null,
-        "amount": 600,
-        "currency": "USD"
+        "amount": 600
       },
       {
         "track": null,
-        "amount": 2000,
-        "currency": "USD"
+        "amount": 2000
       },
       {
         "track": null,
-        "amount": 5,
-        "currency": "USD"
+        "amount": 5
       }
     ],
     "teamSize": {

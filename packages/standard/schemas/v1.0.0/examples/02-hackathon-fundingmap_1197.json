@@ -35,6 +35,7 @@
   "applicationUrl": "https://hackanova-5-0.devfolio.co",
   "website": "https://www.tsdw.in/",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 140348
   },
   "opensAt": "2026-03-13T04:30:00.000Z",
@@ -69,58 +70,47 @@
     "prizes": [
       {
         "track": null,
-        "amount": 50000,
-        "currency": "USD"
+        "amount": 50000
       },
       {
         "track": null,
-        "amount": 35000,
-        "currency": "USD"
+        "amount": 35000
       },
       {
         "track": null,
-        "amount": 25000,
-        "currency": "USD"
+        "amount": 25000
       },
       {
         "track": null,
-        "amount": 20000,
-        "currency": "USD"
+        "amount": 20000
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       },
       {
         "track": null,
-        "amount": 300,
-        "currency": "USD"
+        "amount": 300
       },
       {
         "track": null,
-        "amount": 2,
-        "currency": "USD"
+        "amount": 2
       },
       {
         "track": null,
-        "amount": 1,
-        "currency": "USD"
+        "amount": 1
       },
       {
         "track": null,
-        "amount": 6,
-        "currency": "USD"
+        "amount": 6
       },
       {
         "track": null,
-        "amount": 19,
-        "currency": "USD"
+        "amount": 19
       },
       {
         "track": null,
-        "amount": 20,
-        "currency": "USD"
+        "amount": 20
       }
     ],
     "teamSize": {

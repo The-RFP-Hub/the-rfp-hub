@@ -33,6 +33,7 @@
   "applicationUrl": "https://ethglobal.com/events/newyork2026",
   "website": "https://ethglobal.com/events/newyork2026",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 75000
   },
   "opensAt": "2026-06-12T12:00:00.000Z",
@@ -67,28 +68,23 @@
     "prizes": [
       {
         "track": null,
-        "amount": 20000,
-        "currency": "USD"
+        "amount": 20000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       }
     ]
   }

@@ -36,6 +36,7 @@
   ],
   "applicationUrl": "https://forms.clickup.com/9018573221/f/8crt0d5-26918/BWOVOFB8AMT993WNEF",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 50
   },
   "opensAt": "2026-03-15T00:00:00.000Z",
@@ -56,9 +57,6 @@
     "stage": "pre-seed",
     "location": "Remote",
     "online": null,
-    "funding": {
-      "amount": 50000,
-      "currency": "USD"
-    }
+    "funding": 50000
   }
 }

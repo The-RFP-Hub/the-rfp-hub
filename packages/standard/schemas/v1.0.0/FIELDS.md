@@ -197,11 +197,11 @@ One social or community link: the platform it lives on and its full URL.
 
 ### `funding`
 
-The program-level funding envelope. Single-currency by design, and that rule is scoped to this envelope only: bounty.reward, hackathon.prizes[].currency and accelerator.funding each keep their own currency, because a prize pool may legitimately be denominated differently from the program budget. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.
+The program-level funding envelope. Single-currency by design, and that rule is document-wide: fundingInfo.currency denominates every monetary amount in the document — budget, allocated, minAward and maxAward here, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize. No sub-block carries a currency of its own. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol for the amounts below, and for milestones[].amount. | — |
+| `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol denominating every monetary amount in the document: the amounts below, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize. | — |
 | `budget` | number\|null, ≥0 |  | Total program budget in major units. | — |
 | `allocated` | number\|null, ≥0 |  | Amount committed to date in major units — committed, not necessarily disbursed. Disbursement and delivery are not modelled. | — |
 | `minAward` | number\|null, ≥0 |  | Minimum individual award in major units. | — |
@@ -209,13 +209,12 @@ The program-level funding envelope. Single-currency by design, and that rule is 
 
 ### `amountRange`
 
-A lower and upper bound with a shared currency. Either bound may be absent, expressing an open-ended range.
+A lower and upper bound, denominated in the document-wide fundingInfo.currency. Either bound may be absent, expressing an open-ended range.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `min` | number\|null, ≥0 |  | Lower bound in major units. | — |
-| `max` | number\|null, ≥0 |  | Upper bound in major units. | — |
-| `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol for both bounds. | — |
+| `min` | number\|null, ≥0 |  | Lower bound in major units of fundingInfo.currency. | — |
+| `max` | number\|null, ≥0 |  | Upper bound in major units of fundingInfo.currency. | — |
 
 ### `deadline`
 
@@ -234,7 +233,7 @@ One milestone in an opportunity's milestone sequence. Every property is optional
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `title` | string\|null |  | Short name of the milestone. | — |
-| `amount` | number\|null, ≥0 |  | Payment for this milestone in major units, denominated in the top-level fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
+| `amount` | number\|null, ≥0 |  | Payment for this milestone in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
 | `criteria` | string\|null |  | Free-text acceptance criteria, including any due date. | — |
 
 ### `grant`
@@ -259,18 +258,17 @@ The fundingDetails payload when fundingType is 'hackathon': hackathon-specific a
 | `location` | string\|null |  | Physical location, or null for a fully online event. | — |
 | `online` | boolean\|null |  | Whether the event is also, or only, held online. | — |
 | `tracks` | string[], unique |  | Named tracks or themes participants can build against. | — |
-| `prizes` | [`prize`](#prize)[] |  | The prize pool, one entry per prize. Each prize carries its own currency. | — |
+| `prizes` | [`prize`](#prize)[] |  | The prize pool, one entry per prize, denominated in the document-wide fundingInfo.currency. | — |
 | `teamSize` | [`teamSize`](#teamsize) |  | Permitted team size range. | — |
 
 ### `prize`
 
-A single hackathon prize, optionally attributed to a track.
+A single hackathon prize, optionally attributed to a track. Denominated in the document-wide fundingInfo.currency, like every monetary amount in the document.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `track` | string\|null |  | Track this prize belongs to, where prizes are tracked separately. | — |
-| `amount` | number, ≥0 | ✅ | Prize amount in major units. | — |
-| `currency` | string, ≤16 | ✅ | ISO 4217 code or token symbol for this prize. | — |
+| `amount` | number, ≥0 | ✅ | Prize amount in major units of fundingInfo.currency. | — |
 
 ### `teamSize`
 
@@ -288,7 +286,7 @@ The fundingDetails payload when fundingType is 'bounty': bounty-specific attribu
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `fundingType` | `bounty` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
-| `reward` | object | ✅ | The reward paid on completion. Carries its own currency. | — |
+| `reward` | number, ≥0 | ✅ | The reward paid on completion, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
 | `difficulty` | `beginner` \| `intermediate` \| `advanced`\|null |  | Self-assessed difficulty, as a hint to applicants. | — |
 | `skills` | string[], unique |  | Skills the task calls for. Free text. | — |
 | `platform` | string\|null |  | Platform hosting the bounty. | — |
@@ -303,7 +301,7 @@ The fundingDetails payload when fundingType is 'accelerator': accelerator-specif
 | `programDurationWeeks` | integer\|null, ≥0 |  | Length of the program in weeks. | — |
 | `batchSize` | integer\|null, ≥0 |  | Number of teams accepted per cohort. | — |
 | `equity` | string\|null |  | Equity taken, expressed as a string because programs state it in incomparable ways. | — |
-| `funding` | object |  | Investment or stipend offered per team. Carries its own currency. | — |
+| `funding` | number\|null, ≥0 |  | Investment or stipend offered per team, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
 | `stage` | `pre-seed` \| `seed` \| `series-a`\|null |  | Company stage the program targets. | — |
 | `location` | string\|null |  | Physical location, or null for a fully remote program. | — |
 | `online` | boolean\|null |  | Whether the program is also, or only, run remotely. | — |
@@ -315,7 +313,7 @@ The fundingDetails payload when fundingType is 'vc_fund': venture-fund-specific 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `fundingType` | `vc_fund` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
-| `checkSize` | [`amountRange`](#amountrange) |  | Typical investment size, as a range. | — |
+| `checkSize` | [`amountRange`](#amountrange) |  | Typical investment size, as a range denominated in the document-wide fundingInfo.currency. | — |
 | `stages` | (`pre-seed` \| `seed` \| `series-a` \| `series-b+` \| `growth`)[], unique |  | Investment stages the fund participates in. | — |
 | `thesis` | string\|null |  | Investment thesis, in the fund's own words. | — |
 | `portfolio` | string[], unique |  | Named portfolio companies, where the fund publishes them. | — |
@@ -349,9 +347,9 @@ schema-enforced**. Each is stated here because otherwise publishers guess and th
 | **`prerequisites` vs. `rfp.requirements`** | **`prerequisites` = what a *proposal* must contain** (track record, approach, milestone plan, disclosures). **`rfp.requirements` = what the *work* must deliver.** Application-content vs. work-content. |
 | **The three free-text siblings** | `prerequisites`, `additionalReferences` and `serviceAgreement` are all optional top-level strings and will be used interchangeably unless the boundary is written down — see below. |
 | **`deadlines[]` selection** | Select by `label`, **never by array position**. |
-| **`milestones[].amount` currency** | Optional, and it **MUST** follow the top-level `fundingInfo.currency` — a stated rule of the standard, not a soft convention. Schema-unenforceable (it crosses objects), so ingest **warns**. |
+| **`milestones[].amount` currency** | Optional, and it **MUST** follow the document-wide `fundingInfo.currency`, like every other monetary amount — a stated rule of the standard, not a soft convention. Schema-unenforceable (it crosses objects), so ingest **warns**. |
 | **Milestone due dates** | There is no milestone date field. Where a publisher has due dates, they go in `criteria` as free text. |
-| **Single-currency scope** | The single-currency rule governs the **program-level `fundingInfo` envelope only**; the bounty `reward`, each hackathon `prizes[]` entry and the accelerator `funding` (all under `fundingDetails`) each keep their own currency. |
+| **Single-currency scope** | The single-currency rule is **document-wide**: `fundingInfo.currency` denominates all six denominated sites — the envelope amounts (`budget`, `allocated`, `minAward`, `maxAward`), `milestones[].amount`, the bounty `reward`, each `prizes[].amount`, the accelerator `funding` and the `checkSize` bounds. **No sub-block carries a currency of its own** (per-type currency fields were removed on 2026-08-05, [`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)). |
 
 ### The three free-text siblings
 
@@ -411,31 +409,43 @@ cost of one unified date model.
 sequence** — there is no `order`/`index` field, exactly as `operatingOrganizations[0]` carries
 "primary".
 
-- `milestones[].amount` **MUST** be denominated in the top-level `fundingInfo.currency`. A
-  milestone cannot be paid in a different asset from the envelope. JSON Schema cannot express
-  this — the two live in different objects — so **ingest warns** when `milestones[].amount` is
-  present and `fundingInfo.currency` is absent.
+- `milestones[].amount` **MUST** be denominated in the document-wide `fundingInfo.currency`,
+  like every monetary amount in the document. A milestone cannot be paid in a different asset
+  from the envelope. JSON Schema cannot express this — the two live in different objects — so
+  **ingest warns** when `milestones[].amount` is present and `fundingInfo.currency` is absent.
 - There is **no milestone date field**. Due dates go into `criteria` as free text, consistent
   with every other free-text decision in the standard.
 - Milestone-based payment *is* `milestones[]` plus `grant.milestoneBased`. There is no separate
   payment-schedule concept.
 
-### Single currency — envelope only
+### Single currency — document-wide
 
-The program-level `fundingInfo` envelope is **single-currency**: one `currency` scalar governs
-`budget`, `allocated`, `minAward`, `maxAward` and `milestones[].amount`. There is no
-`amounts[]`, no multi-asset envelope.
+The standard is **single-currency end to end**: the one `fundingInfo.currency` scalar
+denominates **every monetary amount in the document**. The six denominated sites are the
+envelope amounts (`budget`, `allocated`, `minAward`, `maxAward`), `milestones[].amount`, the
+bounty `reward`, each hackathon `prizes[].amount`, the accelerator `funding` and the `vc_fund`
+`checkSize` bounds. There is no `amounts[]`, no multi-asset envelope, and **no sub-block
+currency**: the per-type currency fields (`reward.currency`, `prizes[].currency`,
+`funding.currency`, `checkSize.currency`) were removed on 2026-08-05
+([`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)) — until then the rule
+was deliberately scoped to the envelope, and the corpus showed the scoping carrying no
+information (zero documents used a second currency).
 
-That rule is **scoped to the envelope**. The bounty `reward`, each hackathon `prizes[]` entry
-and the accelerator `funding` — all payloads of `fundingDetails` — carry their own currency,
-because a prize pool can legitimately be denominated differently from the program budget. The
-standard is single-currency *at the envelope*, not end to end — this is a deliberate boundary,
-not an oversight.
+The denomination rule **crosses objects** — the amounts and the currency live in different
+objects — so JSON Schema cannot enforce it. It remains a stated rule of the standard, not a
+soft convention, and the validator's **advisory tier warns** whenever a denominated amount is
+present and `fundingInfo.currency` is absent.
 
-Known cost, stated plainly: a program with **simultaneous caps in two assets** (e.g. a stablecoin
-cap *and* a governance-token cap on the same round) cannot express both. Pick the primary
-currency and put the second in `description` — since the 2026-08-05 revision there is no
-`extensions` fallback. Lossy, and not filterable.
+Known costs, stated plainly:
+
+- A **prize pool or reward denominated differently from the program budget** — ETH prizes on
+  a USD budget — is inexpressible, not merely discouraged. A publisher with that need must
+  publish per-currency entries (one document per denomination) or convert into the envelope
+  currency.
+- A program with **simultaneous caps in two assets** (e.g. a stablecoin cap *and* a
+  governance-token cap on the same round) cannot express both. Pick the primary currency and
+  put the second in `description` — since the 2026-08-05 revision there is no `extensions`
+  fallback. Lossy, and not filterable.
 
 ### `fundingInfo.allocated` is committed, not disbursed
 
@@ -522,7 +532,8 @@ An **implementation** conforms with respect to the published suite when every do
 [`conformance/v1.0.0/fail/`](../../conformance/v1.0.0/fail) does not. The suite asserts nothing
 about which error is reported, how many, or in what order. Passing it is **evidence of
 conformance, not a definition of it** — the schema is the definition. Warnings from the advisory
-tier (unregistered registry values, milestone amounts with no envelope currency) do **not** affect
+tier (unregistered registry values, monetary amounts present with no `fundingInfo.currency` to
+denominate them) do **not** affect
 conformance; a conforming document may raise warnings, which is the point of the split.
 
 ---

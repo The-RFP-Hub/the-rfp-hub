@@ -33,6 +33,7 @@
   "applicationUrl": "https://ethglobal.com/events/lisbon2026",
   "website": "https://ethglobal.com/events/lisbon2026",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 60000
   },
   "opensAt": "2026-07-24T12:00:00.000Z",
@@ -67,28 +68,23 @@
     "prizes": [
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       },
       {
         "track": null,
-        "amount": 5000,
-        "currency": "USD"
+        "amount": 5000
       }
     ]
   }

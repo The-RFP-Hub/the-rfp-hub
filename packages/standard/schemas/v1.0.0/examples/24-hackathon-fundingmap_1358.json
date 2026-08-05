@@ -40,6 +40,7 @@
     }
   ],
   "fundingInfo": {
+    "currency": "USD",
     "budget": 50000
   },
   "opensAt": "2026-09-04T12:00:00.000Z",
@@ -74,8 +75,7 @@
     "prizes": [
       {
         "track": null,
-        "amount": 50000,
-        "currency": "USD"
+        "amount": 50000
       }
     ]
   }

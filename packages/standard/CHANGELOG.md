@@ -14,9 +14,12 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 2026-08-05, and this entry sits above the second because entries are ordered
 newest-change-first, not because the date differs. Both ride the same draft-window permission
 argued in [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md); the
-structural record for **this** batch is
+structural records for **this** batch are
 [`adr/0005`](../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md),
-which supersedes ADR-0002 #3 (the `opportunity[opportunity.fundingType]` access pattern). A
+which supersedes ADR-0002 #3 (the `opportunity[opportunity.fundingType]` access pattern), and
+[`adr/0006`](../../adr/0006-document-wide-single-currency.md), which supersedes ADR-0002 #17
+(the envelope-only scoping of the single-currency rule — every monetary amount is now
+denominated in the document-wide `fundingInfo.currency`). A
 document valid against this morning's second-revision bytes is **not** necessarily valid
 against these.
 
@@ -37,6 +40,14 @@ Every change below is listed under the bidirectional definition in `PROCESS.md`.
 - **Each detail shape requires its `fundingType` tag** (`const`, first property): a details
   object without the tag, or with a tag naming a different shape than the top-level
   `fundingType`, now fails. (For a `bounty`, `reward` remains required alongside the tag.)
+- **The per-type currency keys are removed** ([`adr/0006`](../../adr/0006-document-wide-single-currency.md)):
+  `hackathon.prizes[].currency` and `vc_fund.checkSize.currency` no longer exist, and because
+  the objects that carried them are closed, a document still carrying one now fails on
+  `additionalProperties`. `fundingInfo.currency` denominates **every** monetary amount in the
+  document — the envelope amounts, `milestones[].amount`, the bounty `reward`, each
+  `prizes[].amount`, the accelerator `funding` and the `checkSize` bounds. The denomination
+  rule still crosses objects, so it remains schema-unenforceable; the advisory tier warns
+  (see Tooling).
 
 **Breaking — structural** (the shape itself moves; breaking for instances in both directions):
 
@@ -51,6 +62,12 @@ Every change below is listed under the bidirectional definition in `PROCESS.md`.
 - The `opportunity[opportunity.fundingType]` guarantee is **superseded**: the details now live
   at `opportunity.fundingDetails`, and `fundingDetails.fundingType` names the shape.
   Consumers may dispatch on either tag; the binding `allOf` guarantees they agree.
+- **`bounty.reward` and `accelerator.funding` change shape** with the currency unification:
+  the inlined `{amount, currency}` objects (both properties required) become a **plain
+  required number** (`reward`) and a **plain nullable number** (`funding`), denominated in
+  `fundingInfo.currency`. Breaking in both directions: the old object shape no longer
+  validates, and the new number shape was previously invalid. Bounty's required-reward
+  guarantee is unchanged.
 
 ### Context
 
@@ -61,6 +78,10 @@ Every change below is listed under the bidirectional definition in `PROCESS.md`.
   now lives. All other nested terms (`fundingMechanisms → daoip5:grantFundingMechanism`,
   `tracks`, `prizes`, …) are top-level context terms and keep working at the new depth
   unchanged.
+- The currency unification needs no context change: the `currency → schema:currency` term now
+  has exactly one instantiation site (`fundingInfo.currency`), and the `amount → schema:value`
+  term continues to cover milestone and prize amounts. The removed per-type currency keys
+  simply stop instantiating the shared term.
 
 ### Tooling
 
@@ -75,19 +96,27 @@ Every change below is listed under the bidirectional definition in `PROCESS.md`.
 - Package API (npm axis, semver-major for `@the-rfp-hub/standard`): new `Timestamp`
   (`string | null`) and `FundingDetails` (`Opportunity["fundingDetails"]`) type exports;
   `DetailsByFundingType` survives with its docs rewritten for the tagged shape; the generated
-  `Opportunity` type follows every schema change above.
+  `Opportunity` type follows every schema change above, including the currency unification —
+  `reward` and `funding` become plain number types, and the generated `Prize` and `AmountRange`
+  shapes lose their `currency` members.
 - `codegen.mjs`: `typeExpr()` gains a `oneOf` branch (renders the union in the `FIELDS.md`
   tables); the conditionally-required annotation machinery stays but currently marks nothing —
   `fundingDetails` is unconditionally required.
-- **Conformance suite: 29 fail cases become 26.** The six `missing-matching-type-block-*`
+- **Conformance suite: 29 fail cases become 27.** The six `missing-matching-type-block-*`
   cases collapse into one `missing-fundingdetails`; `one-block-per-fundingtype` is **retired
   as unrepresentable** (there is no second slot to fill); new cases pin the tag rules
-  (`fundingdetails-tag-mismatch`, `fundingdetails-missing-tag`) and the UTC mandate
-  (`opensat-non-utc-offset` — a valid RFC 3339 offset form that must now be rejected).
+  (`fundingdetails-tag-mismatch`, `fundingdetails-missing-tag`), the UTC mandate
+  (`opensat-non-utc-offset` — a valid RFC 3339 offset form that must now be rejected), and the
+  document-wide currency rule (`prize-with-currency` — a prize carrying its own `currency` key
+  fails on `additionalProperties`).
   The 11 pass cases are unchanged in count and filename; every document in `pass/` and
   `examples/` was rewritten to the `fundingDetails` shape by script
   (`o.fundingDetails = {fundingType: t, ...o[t]}`), losslessly — **0 of the 39 changed
-  validity**, and no temporal value needed touching.
+  validity**, and no temporal value needed touching. The currency unification then rewrote the
+  25 documents carrying per-type currency keys: each held exactly **one** distinct currency
+  value, so it was hoisted into `fundingInfo.currency` (24 hoists — one document already named
+  it there) and 97 per-type currency keys were stripped. **Zero conflicts existed** in the
+  corpus; the conversion is lossless.
 - `rfphub-validate`: the failure texture changes — old-shape documents now report
   `additionalProperties` + missing `fundingDetails` instead of the retired one-block rule.
   `humanizeErrors` gains tag-aware `oneOf` filtering (`explainOneOf()`: the instance's
@@ -97,24 +126,36 @@ Every change below is listed under the bidirectional definition in `PROCESS.md`.
   `date-time` declarations byte-identical, the equality guard that makes the inline
   declarations a single point of truth without a shared `$ref`. Consumers reading **raw** ajv
   errors still see the full `oneOf` branch fan-out — an accepted cost recorded in `adr/0005`.
+  The **milestone-amount advisory check generalises** with the currency unification: it now
+  warns on *any* monetary amount present without a `fundingInfo.currency` to denominate it —
+  the envelope's own amounts, milestone amounts, and the `fundingDetails` amounts (reward,
+  prize amounts, accelerator funding, checkSize bounds) — since the document-wide rule crosses
+  objects at every site and warning remains its only enforcement. Consumers filtering on the
+  old milestone-scoped warning code should switch to the generalised one.
 
 ### Docs
 
 - `FIELDS.md` hand sections: the one-line "RFC 3339 / ISO 8601" claim is replaced by a real
   **Dates and times** convention section (RFC 3339 is a *profile* of ISO 8601; UTC-`Z`
   mandatory; lexicographic sort is chronological; local time deliberately unrepresentable;
-  IXDTF named as future work, not adopted), and the type-block narrative is rewritten for
-  `fundingDetails` self-description. `CROSSWALK.md` re-keys the detail-payload rows and its
-  JSON-LD worked example; `BENCHMARK.md` records the third (scripted, lossless) conversion;
-  `STATUS.md` gains the third-revision row and paragraph; both package READMEs move their
-  examples to the new shape.
-- The structural record is
+  IXDTF named as future work, not adopted), the type-block narrative is rewritten for
+  `fundingDetails` self-description, and the "single currency — envelope only" section becomes
+  the **document-wide** rule, naming all six denominated sites. `CROSSWALK.md` re-keys the
+  detail-payload rows and its JSON-LD worked example, and re-words its money rows for the
+  plain-number amounts; `BENCHMARK.md` records the third (scripted, lossless) conversion and
+  the currency hoist; `STATUS.md` gains the third-revision row and paragraph; both package
+  READMEs move their examples to the new shape.
+- The structural records are
   [`adr/0005`](../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md):
   the survey evidence (every modern standard uses RFC 3339 strings; RFC 8984 §1.4 and AS2 §2.3
   state the identical `Z` rule), the rejected options (structured date object, shared
   timestamp `$def`, `if`/`then` selection, open bag, top-level `oneOf`), and the accepted
   costs — `oneOf` error verbosity, a fourth corpus touch in ten days, no narrowing gain for
-  quicktype consumers.
+  quicktype consumers — and
+  [`adr/0006`](../../adr/0006-document-wide-single-currency.md): the corpus evidence for the
+  document-wide currency (zero mismatches, 24 hoists), the rejected options (keep the
+  envelope-only scoping; per-amount currency objects), and the accepted cost — a prize pool or
+  reward can no longer be denominated differently from the programme budget.
 
 #### Field mapping (old → new) — third draft revision
 
@@ -130,6 +171,10 @@ holding older data chains the earlier tables' rows through these.
 | `vc_fund` (sibling block) | `fundingDetails` with `fundingType: "vc_fund"` | reshaped | Same recipe. |
 | `rfp` (sibling block) | `fundingDetails` with `fundingType: "rfp"` | reshaped | Same recipe (`rfp.scope` → `fundingDetails.scope`, `rfp.requirements` → `fundingDetails.requirements`). |
 | `opensAt` / `postedAt` / `createdAt` / `updatedAt` / `deadlines[].date` / `source.submittedAt` / `source.verifiedAt` (any RFC 3339 offset) | same fields, **UTC `Z` mandatory** (`pattern: "Z$"`) | tightened | A value with a numeric offset must be converted to UTC (`2026-08-15T23:59:59+02:00` → `2026-08-15T21:59:59Z`); lowercase `z` must be uppercased. `null` semantics unchanged. |
+| `bounty.reward` (`{amount, currency}`, both required) | `fundingDetails.reward` (plain required number) | reshaped | [`adr/0006`](../../adr/0006-document-wide-single-currency.md). Migrate: `reward = reward.amount`, hoist the currency into `fundingInfo.currency`. Denominated in the document-wide currency; the old object shape no longer validates. |
+| `hackathon.prizes[].currency` | — (hoisted into `fundingInfo.currency`) | removed | Entries become `{track, amount}`; a stray `currency` key fails on `additionalProperties` (`fail/prize-with-currency.json`). Prizes denominated differently from the envelope are inexpressible — split into per-currency documents or convert. |
+| `accelerator.funding` (`{amount, currency}`, both required) | `fundingDetails.funding` (plain nullable number) | reshaped | Same recipe as `reward`: `funding = funding.amount`, hoist the currency. The JSON-LD `funding → schema:amount` scoped mapping is unchanged. |
+| `vc_fund.checkSize.currency` | — (hoisted into `fundingInfo.currency`) | removed | `checkSize` becomes `{min, max}`; a stray `currency` key fails on `additionalProperties`. |
 
 ## Spec v1.0.0 second draft revision (2026-08-05)
 

@@ -62,7 +62,7 @@ describe("mapProgram", () => {
     expect(o.fundingInfo?.budget).toBe(2026);
     expect(o.fundingInfo?.currency).toBe("USD");
     const hackathon = details(o, "hackathon");
-    expect(hackathon.prizes).toEqual([{ amount: 2026, currency: "USD" }]);
+    expect(hackathon.prizes).toEqual([{ amount: 2026 }]); // no per-prize currency in the re-cut
     expect(hackathon.teamSize).toEqual({ min: 1, max: 5 }); // int, no currency
   });
 
@@ -88,8 +88,71 @@ describe("mapProgram", () => {
     // source.url is gone; the program page now backs applicationUrl, the single link-back target
     expect(o.applicationUrl).toBe("https://example.org/programs/9999");
     const bounty = details(o, "bounty");
-    expect(bounty.reward).toEqual({ amount: 110, currency: "USDC" });
+    expect(bounty.reward).toBe(110); // plain number — denominated by fundingInfo.currency
+    expect(o.fundingInfo?.currency).toBe("USDC"); // parsed from "110 USDC"
     expect(bounty.difficulty).toBeUndefined(); // invalid enum dropped
+  });
+
+  it("hoists an upstream per-item currency into fundingInfo.currency when none is set", () => {
+    // No programBudget / rfp.budget currency — the reward's own currency is the only signal.
+    const o = mapProgram(
+      {
+        programId: "42",
+        type: "bounty",
+        isActive: true,
+        metadata: { title: "Hoist Bounty", description: "d" },
+        bountyMetadata: { reward: { amount: 250, currency: "OP" } },
+      },
+      { programUrlBase: BASE },
+    );
+    expect(validateOpportunity(o).valid).toBe(true);
+    expect(details(o, "bounty").reward).toBe(250);
+    expect(o.fundingInfo).toEqual({ currency: "OP" }); // hoisted, not dropped
+  });
+
+  it("prefers the document-level currency over a disagreeing per-item one, keeping the amount", () => {
+    // fundingInfo.currency (from programBudget "1000 USD") disagrees with the reward's "OP".
+    // The Standard cannot express the disagreement, so ingestion normalizes to the document-wide
+    // currency — and the amount survives rather than being dropped.
+    const o = mapProgram(
+      {
+        programId: "43",
+        type: "bounty",
+        isActive: true,
+        metadata: { title: "Clash Bounty", description: "d", programBudget: "1000 USD" },
+        bountyMetadata: { reward: { amount: 250, currency: "OP" } },
+      },
+      { programUrlBase: BASE },
+    );
+    expect(validateOpportunity(o).valid).toBe(true);
+    expect(o.fundingInfo).toEqual({ budget: 1000, currency: "USD" }); // document level wins
+    expect(details(o, "bounty").reward).toBe(250); // amount kept
+  });
+
+  it("hoists a checkSize currency and strips it from the emitted range", () => {
+    const o = mapProgram(
+      {
+        ...vcProgram,
+        vcFundMetadata: { checkSize: { min: 50000, max: 500000, currency: "EUR" } },
+      },
+      { programUrlBase: BASE },
+    );
+    expect(validateOpportunity(o).valid).toBe(true);
+    expect(details(o, "vc_fund").checkSize).toEqual({ min: 50000, max: 500000 });
+    expect(o.fundingInfo?.currency).toBe("EUR");
+  });
+
+  it("coerces accelerator.funding to a plain number from the legacy money object", () => {
+    const o = mapProgram(
+      {
+        ...acceleratorProgram,
+        acceleratorMetadata: { funding: { amount: 100000, currency: "USD" } },
+      },
+      { programUrlBase: BASE },
+    );
+    expect(validateOpportunity(o).valid).toBe(true);
+    expect(details(o, "accelerator").funding).toBe(100000);
+    expect(o.fundingInfo?.currency).toBe("USD");
   });
 
   it("still validates with no program-url base, since source has no required member", () => {

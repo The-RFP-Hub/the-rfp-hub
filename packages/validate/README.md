@@ -42,19 +42,21 @@ deliberately leaves open, and never make a document non-conformant on their own:
 |---|---|
 | `unregistered-deadline-label` | a `deadlines[].label` is not in `registries/deadline-labels.json` |
 | `unregistered-program-model` | `fundingDetails.programModel` is not in `registries/program-models.json` |
-| `milestone-amount-without-currency` | a `milestones[].amount` is present with no `fundingInfo.currency` to denominate it |
+| `amount-without-currency` | a monetary amount — an envelope amount, a `milestones[].amount`, or a `fundingDetails` amount (bounty reward, prize amount, accelerator funding, checkSize bound) — is present with no `fundingInfo.currency` to denominate it |
 
 The split is the point. A closed enum built from one publisher's vocabulary would force every
 other publisher into it, so those fields stay open — and the registries would be documentation
 nobody reads if nothing ever checked them. Text output is count-phrased ("3 of 40 entries use
 an unregistered deadline label") so the summary reads as coverage rather than noise. The last
-check exists because its rule is real but crosses two objects, which JSON Schema cannot express:
-a milestone amount MUST follow the top-level envelope currency, and warning is the only
-enforcement that rule has.
+check exists because its rule is real but crosses objects, which JSON Schema cannot express:
+every monetary amount in a document MUST be denominated in the top-level `fundingInfo.currency`,
+and warning is the only enforcement that rule has.
 
 (An `unregistered-eligibility-key` check shipped until 2026-08-05, when `eligibility` became
 free text and its registry was retired; consumers filtering on that warning code will no longer
-see it.)
+see it. The currency check was scoped to milestones — code `milestone-amount-without-currency` —
+until the same date, when the single-currency rule became document-wide; consumers filtering on
+the old code should switch to the new one.)
 
 Pass `--strict` in CI once your data is clean, to keep it clean.
 

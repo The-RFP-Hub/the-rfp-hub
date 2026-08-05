@@ -48,7 +48,12 @@ both named below. The second 2026-08-05 conversion (third revision) was a ~15-li
 rewriting each document's sibling type block into the tagged `fundingDetails` object
 (`o.fundingDetails = {fundingType: t, ...o[t]}`) — **lossless, zero validity changes across
 the corpus**, and the new UTC-`Z` date mandate cost nothing because every temporal value in
-these documents already ended in `Z`.
+these documents already ended in `Z`. The same batch's **currency unification**
+([`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)) was equally lossless
+here: every document carrying per-type currency keys used exactly **one** distinct currency
+value, so it was hoisted into `fundingInfo.currency` and the per-amount `currency` keys were
+stripped (one hackathon fixture repeated `"USD"` across 23 prizes) — **zero conflicts**, no
+document lost a denomination.
 Each move follows a row in one of the
 [field mapping tables](../../CHANGELOG.md#field-mapping-old--new):
 

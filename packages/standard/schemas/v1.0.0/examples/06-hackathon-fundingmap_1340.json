@@ -34,6 +34,7 @@
   "applicationUrl": "https://hackhelix1.devfolio.co",
   "website": "https://hackhelix1.devfolio.co",
   "fundingInfo": {
+    "currency": "USD",
     "budget": 100020
   },
   "opensAt": "2026-04-18T06:30:00.000Z",
@@ -68,28 +69,23 @@
     "prizes": [
       {
         "track": null,
-        "amount": 50000,
-        "currency": "USD"
+        "amount": 50000
       },
       {
         "track": null,
-        "amount": 30000,
-        "currency": "USD"
+        "amount": 30000
       },
       {
         "track": null,
-        "amount": 20000,
-        "currency": "USD"
+        "amount": 20000
       },
       {
         "track": null,
-        "amount": 10,
-        "currency": "USD"
+        "amount": 10
       },
       {
         "track": null,
-        "amount": 10,
-        "currency": "USD"
+        "amount": 10
       }
     ],
     "teamSize": {

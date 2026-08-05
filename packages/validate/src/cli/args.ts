@@ -23,7 +23,7 @@ Inputs:
 
 Two tiers are reported. SCHEMA ERRORS are hard conformance failures. ADVISORY WARNINGS
 cover what the schema deliberately leaves open — unregistered deadline labels and
-programModel values, and milestone amounts with no envelope currency to denominate
+programModel values, and monetary amounts with no envelope currency to denominate
 them. Warnings never make a document non-conformant unless you pass --strict.
 
 Options:

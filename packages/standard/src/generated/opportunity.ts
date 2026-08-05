@@ -255,7 +255,7 @@ export interface Provenance {
  */
 export interface FundingEnvelope {
   /**
-   * ISO 4217 code or token symbol for the amounts below, and for milestones[].amount.
+   * ISO 4217 code or token symbol denominating every monetary amount in the document: the amounts below, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize.
    */
   currency?: string | null;
   /**
@@ -284,7 +284,7 @@ export interface Milestone {
    */
   title?: string | null;
   /**
-   * Payment for this milestone in major units, denominated in the top-level fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
+   * Payment for this milestone in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
    */
   amount?: number | null;
   /**
@@ -355,13 +355,13 @@ export interface HackathonDetails {
    */
   tracks?: string[];
   /**
-   * The prize pool, one entry per prize. Each prize carries its own currency.
+   * The prize pool, one entry per prize, denominated in the document-wide fundingInfo.currency.
    */
   prizes?: HackathonPrize[];
   teamSize?: TeamSizeRange;
 }
 /**
- * A single hackathon prize, optionally attributed to a track.
+ * A single hackathon prize, optionally attributed to a track. Denominated in the document-wide fundingInfo.currency, like every monetary amount in the document.
  */
 export interface HackathonPrize {
   /**
@@ -369,13 +369,9 @@ export interface HackathonPrize {
    */
   track?: string | null;
   /**
-   * Prize amount in major units.
+   * Prize amount in major units of fundingInfo.currency.
    */
   amount: number;
-  /**
-   * ISO 4217 code or token symbol for this prize.
-   */
-  currency: string;
 }
 /**
  * Permitted team size range.
@@ -399,18 +395,9 @@ export interface BountyDetails {
    */
   fundingType: "bounty";
   /**
-   * The reward paid on completion. Carries its own currency.
+   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
    */
-  reward: {
-    /**
-     * Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents.
-     */
-    amount: number;
-    /**
-     * ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC.
-     */
-    currency: string;
-  };
+  reward: number;
   /**
    * Self-assessed difficulty, as a hint to applicants.
    */
@@ -445,18 +432,9 @@ export interface AcceleratorDetails {
    */
   equity?: string | null;
   /**
-   * Investment or stipend offered per team. Carries its own currency.
+   * Investment or stipend offered per team, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
    */
-  funding?: {
-    /**
-     * Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents.
-     */
-    amount: number;
-    /**
-     * ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC.
-     */
-    currency: string;
-  };
+  funding?: number | null;
   /**
    * Company stage the program targets.
    */
@@ -501,21 +479,17 @@ export interface VCFundDetails {
   activelyInvesting?: boolean | null;
 }
 /**
- * Typical investment size, as a range.
+ * Typical investment size, as a range denominated in the document-wide fundingInfo.currency.
  */
 export interface AmountRange {
   /**
-   * Lower bound in major units.
+   * Lower bound in major units of fundingInfo.currency.
    */
   min?: number | null;
   /**
-   * Upper bound in major units.
+   * Upper bound in major units of fundingInfo.currency.
    */
   max?: number | null;
-  /**
-   * ISO 4217 code or token symbol for both bounds.
-   */
-  currency?: string | null;
 }
 /**
  * The fundingDetails payload when fundingType is 'rfp': RFP-specific attributes. The issuing organisation is operatingOrganizations[0], the budget is the top-level fundingInfo envelope, and the proposal deadline is a deadlines entry labelled 'application'.

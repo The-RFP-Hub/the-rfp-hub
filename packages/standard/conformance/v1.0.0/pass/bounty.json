@@ -3,7 +3,7 @@
   "id": "conformance:bounty",
   "fundingType": "bounty",
   "title": "Fully-populated bounty entry",
-  "description": "Exercises the bounty block: the required reward as an inline amount/currency object with its own currency independent of any program envelope, the difficulty enum, a skills list, and the hosting platform. Paired with a rolling application deadline, the common shape for open bounty boards.",
+  "description": "Exercises the bounty block: the required reward as a plain number denominated in the document-wide fundingInfo.currency, the difficulty enum, a skills list, and the hosting platform. Paired with a rolling application deadline, the common shape for open bounty boards.",
   "status": "open",
   "sponsoringOrganizations": [
     {
@@ -20,6 +20,9 @@
     }
   ],
   "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
   "deadlines": [
     {
       "deadlineType": "rolling",
@@ -28,10 +31,7 @@
   ],
   "fundingDetails": {
     "fundingType": "bounty",
-    "reward": {
-      "amount": 5000,
-      "currency": "USDC"
-    },
+    "reward": 5000,
     "difficulty": "intermediate",
     "skills": [
       "Solidity",

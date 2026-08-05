@@ -385,12 +385,12 @@
       "type": "object",
       "title": "Funding envelope",
       "additionalProperties": false,
-      "description": "The program-level funding envelope. Single-currency by design, and that rule is scoped to this envelope only: bounty.reward, hackathon.prizes[].currency and accelerator.funding each keep their own currency, because a prize pool may legitimately be denominated differently from the program budget. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.",
+      "description": "The program-level funding envelope. Single-currency by design, and that rule is document-wide: fundingInfo.currency denominates every monetary amount in the document — budget, allocated, minAward and maxAward here, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize. No sub-block carries a currency of its own. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.",
       "properties": {
         "currency": {
           "type": ["string", "null"],
           "maxLength": 16,
-          "description": "ISO 4217 code or token symbol for the amounts below, and for milestones[].amount.",
+          "description": "ISO 4217 code or token symbol denominating every monetary amount in the document: the amounts below, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize.",
           "examples": ["USD", "OP"]
         },
         "budget": { "type": ["number", "null"], "minimum": 0, "description": "Total program budget in major units." },
@@ -407,11 +407,10 @@
       "type": "object",
       "title": "Amount range",
       "additionalProperties": false,
-      "description": "A lower and upper bound with a shared currency. Either bound may be absent, expressing an open-ended range.",
+      "description": "A lower and upper bound, denominated in the document-wide fundingInfo.currency. Either bound may be absent, expressing an open-ended range.",
       "properties": {
-        "min": { "type": ["number", "null"], "minimum": 0, "description": "Lower bound in major units." },
-        "max": { "type": ["number", "null"], "minimum": 0, "description": "Upper bound in major units." },
-        "currency": { "type": ["string", "null"], "maxLength": 16, "description": "ISO 4217 code or token symbol for both bounds." }
+        "min": { "type": ["number", "null"], "minimum": 0, "description": "Lower bound in major units of fundingInfo.currency." },
+        "max": { "type": ["number", "null"], "minimum": 0, "description": "Upper bound in major units of fundingInfo.currency." }
       }
     },
     "deadline": {
@@ -457,7 +456,7 @@
         "amount": {
           "type": ["number", "null"],
           "minimum": 0,
-          "description": "Payment for this milestone in major units, denominated in the top-level fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
+          "description": "Payment for this milestone in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
         },
         "criteria": { "type": ["string", "null"], "description": "Free-text acceptance criteria, including any due date." }
       },
@@ -524,7 +523,7 @@
         "prizes": {
           "type": "array",
           "items": { "$ref": "#/$defs/prize" },
-          "description": "The prize pool, one entry per prize. Each prize carries its own currency.",
+          "description": "The prize pool, one entry per prize, denominated in the document-wide fundingInfo.currency.",
           "$comment": "Deliberately not uniqueItems: identical prizes are routine — several equal-value track prizes, or repeated runner-up awards — so uniqueness would reject real data."
         },
         "teamSize": { "$ref": "#/$defs/teamSize", "description": "Permitted team size range." }
@@ -534,12 +533,11 @@
       "type": "object",
       "title": "Hackathon prize",
       "additionalProperties": false,
-      "required": ["amount", "currency"],
-      "description": "A single hackathon prize, optionally attributed to a track.",
+      "required": ["amount"],
+      "description": "A single hackathon prize, optionally attributed to a track. Denominated in the document-wide fundingInfo.currency, like every monetary amount in the document.",
       "properties": {
         "track": { "type": ["string", "null"], "description": "Track this prize belongs to, where prizes are tracked separately." },
-        "amount": { "type": "number", "minimum": 0, "description": "Prize amount in major units." },
-        "currency": { "type": "string", "minLength": 1, "maxLength": 16, "description": "ISO 4217 code or token symbol for this prize." }
+        "amount": { "type": "number", "minimum": 0, "description": "Prize amount in major units of fundingInfo.currency." }
       }
     },
     "teamSize": {
@@ -561,23 +559,9 @@
       "properties": {
         "fundingType": { "const": "bounty", "description": "Names this block's shape; equals the top-level fundingType." },
         "reward": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["amount", "currency"],
-          "description": "The reward paid on completion. Carries its own currency.",
-          "properties": {
-            "amount": {
-              "type": "number",
-              "minimum": 0,
-              "description": "Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents."
-            },
-            "currency": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 16,
-              "description": "ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC."
-            }
-          }
+          "type": "number",
+          "minimum": 0,
+          "description": "The reward paid on completion, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
         },
         "difficulty": {
           "type": ["string", "null"],
@@ -614,23 +598,9 @@
           "examples": ["5%", "none", "up to 7% SAFE"]
         },
         "funding": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["amount", "currency"],
-          "description": "Investment or stipend offered per team. Carries its own currency.",
-          "properties": {
-            "amount": {
-              "type": "number",
-              "minimum": 0,
-              "description": "Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents."
-            },
-            "currency": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 16,
-              "description": "ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC."
-            }
-          }
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Investment or stipend offered per team, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
         },
         "stage": {
           "type": ["string", "null"],
@@ -649,7 +619,7 @@
       "description": "The fundingDetails payload when fundingType is 'vc_fund': venture-fund-specific attributes. A fund is an ongoing source of capital rather than a round, so it carries no deadline of its own.",
       "properties": {
         "fundingType": { "const": "vc_fund", "description": "Names this block's shape; equals the top-level fundingType." },
-        "checkSize": { "$ref": "#/$defs/amountRange", "description": "Typical investment size, as a range." },
+        "checkSize": { "$ref": "#/$defs/amountRange", "description": "Typical investment size, as a range denominated in the document-wide fundingInfo.currency." },
         "stages": {
           "type": "array",
           "items": { "type": "string", "enum": ["pre-seed", "seed", "series-a", "series-b+", "growth"] },

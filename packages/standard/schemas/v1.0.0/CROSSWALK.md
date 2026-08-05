@@ -68,10 +68,19 @@ own: operating = who actually runs the process = the entity consumers need first
 | `fundingInfo.allocated` (committed to date) | — | — |
 | `fundingInfo.minAward` / `maxAward` | — | — |
 | `milestones[]` | — | — (no Grant Pool equivalent) |
-| `fundingDetails.reward` (bounty), `fundingDetails.prizes[]` (hackathon), `fundingDetails.funding` (accelerator) | `amount` (loosely) | — |
+| `fundingDetails.reward` (bounty), `fundingDetails.prizes[].amount` (hackathon), `fundingDetails.funding` (accelerator) | `amount` (loosely) | — |
+
+**Denomination.** Since the 2026-08-05 currency unification
+([`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)), the detail amounts in the
+last row are **plain numbers** — they carry no currency of their own, and `fundingInfo.currency`
+denominates every monetary amount in the document. An exporter forming a schema.org
+`MonetaryAmount` from any of them pairs the number with `fundingInfo.currency`; an importer
+holding a differently-denominated source amount must convert it or split the record, because a
+second currency is inexpressible here.
 
 **Cardinality divergence.** DAOIP-5's `totalGrantPoolSize` is an **array** of
-`{amount, denomination}`; the RFP Hub envelope is **single-currency by design**. Exporting to
+`{amount, denomination}`; the RFP Hub envelope — like the whole document since the currency
+unification — is **single-currency by design**. Exporting to
 DAOIP-5 emits a one-element array. Importing from DAOIP-5 takes the primary amount and must put
 any further denominations in `description` prose — since the 2026-08-05 revision there is no
 `extensions` overflow slot, so the import **drops** what prose does not carry. That direction
@@ -147,9 +156,10 @@ The `hackathon`, `bounty`, `accelerator` and `vc_fund` payloads of `fundingDetai
 **no equivalent** in either standard.
 DAOIP-5 models grants; schema.org models `Grant`. Everything inside those four shapes —
 tracks, prizes, team sizes, check sizes, investment stages, equity, batch size — is an RFP Hub
-extension and does not round-trip. (The shapes themselves are unchanged by the third
-2026-08-05 revision: they moved under the single tagged `fundingDetails` key, they did not
-change fields.)
+extension and does not round-trip. (The third 2026-08-05 revision moved these shapes under the
+single tagged `fundingDetails` key and, with the currency unification, changed their money
+fields: `reward` and `funding` are plain numbers, and `prizes[]` entries and `checkSize` no
+longer carry a `currency` key — see [`adr/0006`](../../../../adr/0006-document-wide-single-currency.md).)
 
 Self-identification keys (`$schema`, `@context`, `@type`) are JSON Schema and JSON-LD machinery,
 not domain fields; they have no crosswalk row.
@@ -201,7 +211,12 @@ not domain fields; they have no crosswalk row.
   `daoip5:grantFundingMechanism` at its new depth), the accelerator `funding → schema:amount`
   scoped mapping re-homed under `fundingDetails`, and the new `fundingType` tag inside the
   payload expands under `schema:additionalType`, exactly like the top-level discriminator
-  whose value it repeats. Temporal values are additionally UTC-`Z` only.
+  whose value it repeats. Temporal values are additionally UTC-`Z` only. The same batch's
+  **currency unification** ([`adr/0006`](../../../../adr/0006-document-wide-single-currency.md))
+  changed value shapes without moving terms either: `reward` and `funding` are plain numbers
+  under their unchanged IRIs, the per-type `currency` keys are gone, and
+  `fundingInfo.currency` (`schema:currency`) is now the document's only currency site — a
+  schema.org or DAOIP-5 exporter pairs it with each amount.
 
   See the [field mapping tables](../../CHANGELOG.md#field-mapping-old--new) for the full
   field-by-field record, and

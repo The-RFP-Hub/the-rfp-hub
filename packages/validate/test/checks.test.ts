@@ -79,25 +79,103 @@ describe("unregistered-program-model", () => {
   });
 });
 
-describe("milestone-amount-without-currency", () => {
-  it("stays quiet when the envelope names a currency", () => {
-    const doc = { ...base, fundingInfo: { currency: "USD" }, milestones: [{ amount: 1000 }] };
+describe("amount-without-currency", () => {
+  it("stays quiet when the envelope names a currency, whatever amounts are present", () => {
+    const doc = {
+      ...base,
+      fundingType: "hackathon" as const,
+      fundingInfo: { currency: "USD", budget: 50000, minAward: 100, maxAward: 10000 },
+      fundingDetails: { fundingType: "hackathon" as const, prizes: [{ amount: 5000 }] },
+      milestones: [{ amount: 1000 }],
+    };
     expect(codes(doc)).toEqual([]);
   });
 
-  it("fires per amount when there is no envelope currency", () => {
+  it("stays quiet when no monetary amount is present at all", () => {
+    expect(codes({ ...base, fundingInfo: { budget: null } })).toEqual([]);
+    expect(codes(base)).toEqual([]);
+  });
+
+  it("fires per milestone amount, with a precise instancePath", () => {
     const doc = { ...base, milestones: [{ amount: 1000 }, { title: "no amount" }, { amount: 2 }] };
     const warnings = runChecks(doc);
     expect(warnings.map((w) => w.code)).toEqual([
-      "milestone-amount-without-currency",
-      "milestone-amount-without-currency",
+      "amount-without-currency",
+      "amount-without-currency",
     ]);
-    expect(warnings[0]?.instancePath).toBe("/milestones/0/amount");
+    expect(warnings.map((w) => w.instancePath)).toEqual([
+      "/milestones/0/amount",
+      "/milestones/2/amount",
+    ]);
   });
 
-  it("fires when fundingInfo exists but carries no currency", () => {
-    const doc = { ...base, fundingInfo: { budget: 10 }, milestones: [{ amount: 1000 }] };
-    expect(codes(doc)).toEqual(["milestone-amount-without-currency"]);
+  it("fires on the envelope's own amounts when fundingInfo carries no currency", () => {
+    const doc = {
+      ...base,
+      fundingInfo: { budget: 100, allocated: 40, minAward: 1, maxAward: 10 },
+    };
+    const warnings = runChecks(doc);
+    expect(warnings.map((w) => w.instancePath)).toEqual([
+      "/fundingInfo/budget",
+      "/fundingInfo/allocated",
+      "/fundingInfo/minAward",
+      "/fundingInfo/maxAward",
+    ]);
+    expect(warnings[0]?.code).toBe("amount-without-currency");
+  });
+
+  it("fires on a bounty reward", () => {
+    const doc = {
+      ...base,
+      fundingType: "bounty" as const,
+      fundingDetails: { fundingType: "bounty" as const, reward: 500 },
+    };
+    const warnings = runChecks(doc);
+    expect(warnings.map((w) => w.instancePath)).toEqual(["/fundingDetails/reward"]);
+    expect(warnings[0]?.message).toContain("bounty reward 500");
+  });
+
+  it("fires on accelerator funding, ignoring an explicit null", () => {
+    const details = { fundingType: "accelerator" as const, funding: 120000 };
+    const doc = { ...base, fundingType: "accelerator" as const, fundingDetails: details };
+    expect(runChecks(doc).map((w) => w.instancePath)).toEqual(["/fundingDetails/funding"]);
+    expect(codes({ ...doc, fundingDetails: { ...details, funding: null } })).toEqual([]);
+  });
+
+  it("fires per hackathon prize amount", () => {
+    const doc = {
+      ...base,
+      fundingType: "hackathon" as const,
+      fundingDetails: {
+        fundingType: "hackathon" as const,
+        prizes: [{ track: "DeFi", amount: 5000 }, { amount: 2500 }],
+      },
+    };
+    expect(runChecks(doc).map((w) => w.instancePath)).toEqual([
+      "/fundingDetails/prizes/0/amount",
+      "/fundingDetails/prizes/1/amount",
+    ]);
+  });
+
+  it("fires per present checkSize bound", () => {
+    const doc = {
+      ...base,
+      fundingType: "vc_fund" as const,
+      fundingDetails: { fundingType: "vc_fund" as const, checkSize: { min: 50000, max: null } },
+    };
+    expect(runChecks(doc).map((w) => w.instancePath)).toEqual(["/fundingDetails/checkSize/min"]);
+  });
+
+  it("is silenced along with the rest of the advisory tier by checks: false", () => {
+    const doc = {
+      ...base,
+      fundingType: "bounty" as const,
+      fundingDetails: { fundingType: "bounty" as const, reward: 500 },
+    };
+    expect(validateOpportunity(doc).warnings.map((w) => w.code)).toEqual([
+      "amount-without-currency",
+    ]);
+    expect(validateOpportunity(doc, { checks: false }).warnings).toEqual([]);
   });
 });
 

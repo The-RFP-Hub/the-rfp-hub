@@ -58,7 +58,8 @@ export const hackathonProgram: RegistryProgram = {
     registrationDeadline: "2026-05-20T18:29:00.000Z",
     submissionDeadline: "2026-06-29T18:29:00.000Z",
     location: "Online",
-    // upstream sometimes sends amount as a string and float team bounds — must be coerced
+    // upstream sometimes sends amount as a string and float team bounds — must be coerced;
+    // the per-prize currency has no re-cut slot and hoists into fundingInfo.currency
     prizes: [{ amount: "2026", currency: "USD" }],
     teamSize: { min: "1", max: 5.0 },
   },
@@ -73,6 +74,7 @@ export const messyProgram: RegistryProgram = {
   communities: [],
   metadata: { title: "Messy Bounty", description: "", programBudget: "110 USDC" },
   bountyMetadata: {
+    // pre-re-cut money object → plain number reward; the currency hoists to fundingInfo.currency
     reward: { amount: "110", currency: "USDC" },
     skills: ["Content"],
     difficulty: "expert", // not in the Standard enum → must be dropped

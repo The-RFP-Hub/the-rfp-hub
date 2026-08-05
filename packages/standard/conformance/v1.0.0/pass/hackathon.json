@@ -64,13 +64,11 @@
     "prizes": [
       {
         "track": "DeFi",
-        "amount": 25000,
-        "currency": "USD"
+        "amount": 25000
       },
       {
         "track": "Infra",
-        "amount": 25000,
-        "currency": "USD"
+        "amount": 25000
       }
     ],
     "teamSize": {
