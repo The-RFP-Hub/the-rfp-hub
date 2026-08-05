@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "RNS Hack_Overflow 2.0",
+      "slug": "rns-hack-overflow-2-0",
+      "website": "https://rns-hackoverflow-2.devfolio.co"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "RNS Hack_Overflow 2.0",
+      "slug": "rns-hack-overflow-2-0",
       "website": "https://rns-hackoverflow-2.devfolio.co"
     }
   ],
@@ -25,35 +33,36 @@
   ],
   "applicationUrl": "https://rns-hackoverflow-2.devfolio.co",
   "website": "https://rns-hackoverflow-2.devfolio.co",
-  "funding": {
+  "fundingInfo": {
     "budget": 350
   },
   "opensAt": "2026-07-17T03:30:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-09T18:29:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-09T18:29:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-17T03:30:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-08-14T03:45:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-09T20:29:40.000Z",
   "updatedAt": "2026-03-11T01:07:17.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "RNS INSTITUTE OF TECHNOLOGY, RNS Farms Road, Channasandra, Rajarajeshwari Nagar, Bengaluru, Karnataka, India",
     "online": null,
     "prizes": [

@@ -10,23 +10,26 @@ These define the standard. A claim of conformance is a claim about these files.
 | Artifact | What it governs |
 |---|---|
 | [`schemas/v1.0.0/opportunity.schema.json`](./schemas/v1.0.0/opportunity.schema.json) | **The definition.** A document conforms to v1.0.0 when it validates against this file. |
-| [`registries/`](./registries) — the **registered values** | The conventional values of the three open vocabularies the standard governs by registry: `eligibility` keys, `deadlines[].label`, `grant.programModel`. See the important qualification below. |
+| [`registries/`](./registries) — the **registered values** | The conventional values of the two open vocabularies the standard governs by registry: `deadlines[].label` and `fundingDetails.programModel` (the grant payload). See the important qualification below. |
 | [`conformance/v1.0.0/`](./conformance/v1.0.0) | The published pass/fail cases. An implementation is conformant with respect to the suite when it accepts everything in `pass/` and rejects everything in `fail/`. |
 | [`spec.config.json`](./spec.config.json) | The spec's identity — version, `$id`, vocabulary IRI, maturity. |
 | [`schemas/v1.0.0/context.jsonld`](./schemas/v1.0.0/context.jsonld) | The term IRIs a document expands to when read as linked data. |
 
 **The qualification on registries.** A registry is normative about **what a value means**, not
 about **which values are allowed**. The schema deliberately keeps these fields open: an
-unregistered deadline label, eligibility key or program model is **valid data** and produces a
-*warning*, never a validation error. Registering a value fixes its meaning so two publishers
-using it mean the same thing. Entries are never deleted — see [`PROCESS.md`](./PROCESS.md).
+unregistered deadline label or program model is **valid data** and produces a *warning*, never
+a validation error. Registering a value fixes its meaning so two publishers using it mean the
+same thing. Entries are never deleted — see [`PROCESS.md`](./PROCESS.md), which also records
+the one narrow exception at the registry level: a whole registry may be retired only while its
+governing spec version is `draft`, which is how the former `eligibility-keys` registry left
+when `eligibility` became free text (2026-08-05, ADR-0004).
 
-**Why only three.** `ecosystems` and `networks` are open lists too, and deliberately have **no**
-registry. That distinction above is a fine one, and a registry over a list of chain names would
-be read as an allowed-values list no matter how this document words it — while also putting a
-review step in front of a newly launched chain for no interoperability gain. The three
-vocabularies that *are* registry-governed are the ones where two publishers writing different
-strings for the same concept produces genuinely uncomparable data.
+**Why only two.** `ecosystems` is an open list too, and deliberately has **no** registry. That
+distinction above is a fine one, and a registry over a list of chain names would be read as an
+allowed-values list no matter how this document words it — while also putting a review step in
+front of a newly launched chain for no interoperability gain. The two vocabularies that *are*
+registry-governed are the ones where two publishers writing different strings for the same
+concept produce genuinely uncomparable data.
 
 **The qualification on the conformance suite.** Passing the suite is **evidence of conformance,
 not the definition of it**. The schema is the definition. The suite asserts nothing about which
@@ -54,7 +57,7 @@ These explain the standard. They are corrigible, and correcting them is not a sp
 
    One deliberate exception, stated in both places: a handful of rules in FIELDS.md are
    **normative in intent but not schema-expressible** — the clearest is that
-   `milestones[].amount` must be denominated in `funding.currency`, a dependency that crosses two
+   `milestones[].amount` must be denominated in `fundingInfo.currency`, a dependency that crosses two
    objects. Those are enforced by the validator's advisory tier and by ingestion policy, and each
    one is labelled as such at the point it is stated. They are requirements on *publishers*, not
    conditions of schema validity.

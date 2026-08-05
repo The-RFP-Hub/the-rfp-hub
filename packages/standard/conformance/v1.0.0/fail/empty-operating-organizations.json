@@ -1,0 +1,13 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:empty-operating",
+  "fundingType": "grant",
+  "title": "Empty operating organisations array",
+  "description": "operatingOrganizations is present but empty. It replaced sponsoringOrganizations as the required organisation array, and minItems is 1: entry 0 is semantically the primary organisation — the one to display — so [] asserts nothing and does not validate.",
+  "status": "open",
+  "operatingOrganizations": [],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

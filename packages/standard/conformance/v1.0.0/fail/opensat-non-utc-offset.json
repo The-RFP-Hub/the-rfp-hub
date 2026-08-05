@@ -1,0 +1,25 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:non-utc-offset",
+  "fundingType": "grant",
+  "title": "opensAt carries a non-UTC offset",
+  "description": "opensAt is 2026-08-15T23:59:59+02:00 — a valid RFC 3339 date-time, so format alone accepts it, but the standard additionally requires UTC with a trailing uppercase 'Z' (pattern Z$). A single timezone representation keeps temporal values lexicographically sortable into chronological order (RFC 3339 §5.1); mixed offsets silently break plain string sorting. Stands in for every date-time field: numeric offsets, the -00:00 unknown-offset convention and lowercase 'z' are all rejected.",
+  "status": "upcoming",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "opensAt": "2026-08-15T23:59:59+02:00",
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

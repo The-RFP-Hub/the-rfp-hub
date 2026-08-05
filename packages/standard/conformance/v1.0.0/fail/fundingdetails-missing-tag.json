@@ -1,0 +1,22 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:no-tag",
+  "fundingType": "grant",
+  "title": "fundingDetails without its fundingType tag",
+  "description": "fundingDetails is an empty object with no inner fundingType tag. Every branch of the fundingDetails oneOf requires the tag, so an untagged object matches zero branches and the oneOf fails; the binding allOf's grant branch fails on the same missing tag. The tag is what keeps the six all-optional detail shapes disjoint — without it an empty object would be ambiguous between five of them.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {}
+}

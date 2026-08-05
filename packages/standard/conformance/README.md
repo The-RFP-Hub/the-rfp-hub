@@ -46,7 +46,7 @@ annotation-only by default, but this standard means it as a constraint, the fail
 it, and an implementation must therefore validate with format assertion enabled (the reference
 validator uses `ajv-formats`). They do
 not cover the advisory checks (`packages/validate/src/checks/`), which report *warnings* about
-things the schema deliberately leaves open: unregistered eligibility keys, unregistered
+things the schema deliberately leaves open: unregistered
 deadline labels, unregistered program models, and milestone amounts with no envelope currency.
 A document may be conformant and still raise warnings; that is the point of the split.
 

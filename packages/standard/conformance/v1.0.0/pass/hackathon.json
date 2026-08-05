@@ -8,45 +8,59 @@
   "sponsoringOrganizations": [
     {
       "name": "Example Events",
-      "type": "company"
+      "slug": "example-events",
+      "orgType": "company"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Events",
+      "slug": "example-events",
+      "orgType": "company"
     }
   ],
   "source": {
     "ingestedVia": "import",
     "originalId": "evt-1"
   },
-  "ecosystems": ["Ethereum"],
+  "ecosystems": [
+    "Ethereum"
+  ],
   "applicationUrl": "https://example.org/hack",
-  "funding": {
+  "fundingInfo": {
     "currency": "USD",
     "budget": 100000
   },
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-01T23:59:59.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-10T12:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-12T12:00:00.000Z",
       "label": "submission"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-12T18:00:00.000Z",
       "label": "event end"
     }
   ],
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Berlin, Germany",
     "online": true,
-    "tracks": ["DeFi", "Infra"],
+    "tracks": [
+      "DeFi",
+      "Infra"
+    ],
     "prizes": [
       {
         "track": "DeFi",

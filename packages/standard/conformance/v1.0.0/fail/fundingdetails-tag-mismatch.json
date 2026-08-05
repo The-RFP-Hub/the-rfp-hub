@@ -1,0 +1,26 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:tag-mismatch",
+  "fundingType": "grant",
+  "title": "fundingDetails tag disagrees with the top-level fundingType",
+  "description": "The top-level fundingType says 'grant' but fundingDetails is a well-formed hackathon block: tagged 'hackathon' and carrying hackathon-legal fields. The fundingDetails oneOf alone accepts it, so the rejection comes from the binding allOf, whose grant branch pins fundingDetails to the grant shape (fundingDetails.fundingType const 'grant'). The two tags must always agree — a consumer filtering on the top-level fundingType must never receive a differently-shaped payload.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "hackathon",
+    "location": "Berlin",
+    "online": false
+  }
+}

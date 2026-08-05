@@ -16,19 +16,6 @@
       ],
       "deprecated": []
     },
-    "eligibility-keys": {
-      "file": "eligibility-keys.json",
-      "count": 6,
-      "active": [
-        "compliance",
-        "entityType",
-        "geography",
-        "jurisdiction",
-        "sector",
-        "stage"
-      ],
-      "deprecated": []
-    },
     "program-models": {
       "file": "program-models.json",
       "count": 4,

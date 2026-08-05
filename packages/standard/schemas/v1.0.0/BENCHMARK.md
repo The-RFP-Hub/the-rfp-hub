@@ -6,11 +6,12 @@ funding aggregator's public API, plus a ranked benchmark set for schema/CLI test
 **This document is informative** ([`NORMATIVE.md`](../../NORMATIVE.md)). It records a
 measurement, not a rule.
 
-> ⚠️ **Two measurements, two shapes.** The 311-entry pull below was run against the schema **as
-> it stood before the 2026-07-27 in-place re-cut**, and has **not** been re-run. The 28 committed
-> example documents **have** been converted to the re-cut shape and re-validated. Read the
-> corpus-wide numbers as evidence about the data model, and the fixture numbers as evidence about
-> the current schema. See the [field mapping table](../../CHANGELOG.md#field-mapping-old--new).
+> ⚠️ **Two measurements, two shapes.** The 311-entry pull below was run against an earlier
+> draft of the schema and has **not** been re-run. The 28 committed example documents **have**
+> been converted through each draft revision and re-validated after each conversion. Read the
+> corpus-wide numbers as evidence about the data model, and the fixture numbers as evidence
+> about the current schema. See the
+> [field mapping tables](../../CHANGELOG.md#field-mapping-old--new).
 
 ## Result
 
@@ -18,7 +19,7 @@ measurement, not a rule.
 |---|---|---|
 | Unique entries pulled | **311** | pre-re-cut shape |
 | Mapped to source-neutral examples + validated | **289 / 289 valid (0 failures)** | pre-re-cut shape |
-| Curated benchmark fixtures | **28** (in [`examples/`](./examples)) | **re-cut shape — 28/28 valid** |
+| Curated benchmark fixtures | **28** (in [`examples/`](./examples)) | **current shape (2026-08-05 third revision) — 28/28 valid** |
 | Funding types covered by fixtures | grant, hackathon, bounty, accelerator, rfp | — |
 
 289 of the 311 pulled entries mapped to public-source, source-neutral examples and all validated
@@ -26,29 +27,46 @@ with 0 failures — evidence that the data model is faithful to a real funding c
 remaining ~22 were set aside for lacking a public original-posting URL or to keep the sample free
 of any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace.
 
-The **28 committed fixtures are the live claim**: they were converted field-by-field to the
-re-cut shape and all 28 validate against the current
-[`opportunity.schema.json`](./opportunity.schema.json).
+The **28 committed fixtures are the live claim**: they were converted field-by-field through
+each draft revision, and all 28 validate against the
+current [`opportunity.schema.json`](./opportunity.schema.json). The conversion is not
+purely mechanical and the claim should be read with that in mind: organisation `slug`s are
+**invented data** (derived from names, not carried from the source), and the `tags`/`networks`
+values the source did carry were dropped (see below). The third conversion, by contrast, was
+a pure script rewrite and lossless (see below).
 
 ```bash
 npx rfphub-validate packages/standard/schemas/v1.0.0/examples
 # 28 passed, 0 failed
 ```
 
-## What the re-cut conversion did to these 28 documents
+## What the three conversions did to these 28 documents
 
-Mechanical, and lossless where a real value existed. Each move follows a row in the
-[field mapping table](../../CHANGELOG.md#field-mapping-old--new):
+The 2026-07-27 conversion was mechanical, and lossless where a real value existed. The first
+2026-08-05 conversion (second revision) was mostly renames — plus one invention and one loss,
+both named below. The second 2026-08-05 conversion (third revision) was a ~15-line script
+rewriting each document's sibling type block into the tagged `fundingDetails` object
+(`o.fundingDetails = {fundingType: t, ...o[t]}`) — **lossless, zero validity changes across
+the corpus**, and the new UTC-`Z` date mandate cost nothing because every temporal value in
+these documents already ended in `Z`.
+Each move follows a row in one of the
+[field mapping tables](../../CHANGELOG.md#field-mapping-old--new):
 
 - **`type` → `fundingType`**, and each document's type block re-keyed to match. No document
   carried a second, non-matching type block, so the newly enforced one-block-per-type rule cost
   nothing here.
-- **`organization` → `sponsoringOrganizations[0]`** — a wrap, no data change. No fixture needed
-  `operatingOrganizations`.
+- **`organization` → `sponsoringOrganizations[0]`** — a wrap, no data change at the time. The
+  2026-08-05 revision made `operatingOrganizations` the required primary array, so **that same
+  wrapped organisation now feeds both arrays**: each example carries it as
+  `operatingOrganizations[0]` (the display/issuing slot) and as `sponsoringOrganizations[0]`
+  (the backer), because the source corpus never distinguished the two roles. Every organisation
+  also gained a now-required `slug` — **invented data**, derived from the organisation's name,
+  not carried from the source.
 - **`source.url` has no successor.** Where a document had no `applicationUrl`, the old source URL
   became the `applicationUrl` — it was the only link-back target left. Where `applicationUrl`
-  already pointed somewhere else, the source URL was preserved in **`resourceLinks`** rather than
-  dropped: **6 of the 28 documents** carry one for that reason.
+  already pointed somewhere else, the source URL was preserved in **`additionalReferences`**
+  (named `resourceLinks` until 2026-08-05) rather than dropped: **6 of the 28 documents** carry
+  one for that reason.
 - **Hackathon date folding.** `registrationDeadline`, `submissionDeadline`, `startDate` and
   `endDate` all folded into `deadlines[]` with labels `registration` / `submission` /
   `event start` / `event end`; `closesAt` and `rfp.proposalDeadline` folded in as `application`.
@@ -56,10 +74,17 @@ Mechanical, and lossless where a real value existed. Each move follows a row in 
   `event end`** entries — which is exactly why a consumer must select by label: 19 of these
   documents carry event boundaries alongside the application deadline (on 7 of them the
   earliest-dated entry is an event boundary rather than a deadline), and array order carries no
-  meaning at all.
-- **`funding.totalBudget` → `budget`**, `amountDistributed` → `allocated`. Only one document had
-  a non-zero `funding.awardsToDate`, a field with no successor; that value was preserved under
-  **`extensions`** rather than deleted. It is the only fixture using `extensions`.
+  meaning at all. The 2026-08-05 `type` → `deadlineType` rename touched every entry and
+  **changed none of these label counts**.
+- **`funding.totalBudget` → `budget`**, `amountDistributed` → `allocated` (the envelope itself
+  is `fundingInfo` since 2026-08-05). Only one document had a non-zero `funding.awardsToDate`,
+  a field with no successor; the 2026-07-27 conversion preserved that value under `extensions`
+  rather than deleting it. **The 2026-08-05 revision removed `extensions` with no replacement,
+  and that datum was dropped with it** — the earlier "preserved rather than deleted" note no
+  longer holds, and the retraction is recorded in the CHANGELOG. The examples' `tags` values
+  (10 documents) and `networks` values (3 documents) were likewise dropped with their fields,
+  not folded into `categories`/`ecosystems` — they were uncurated source-system noise, which is
+  why the fields went.
 - No fixture exercises `milestones[]`, `eligibility`, `serviceAgreement` or `prerequisites` —
   the source corpus carries none of them. Those fields are exercised by the
   [conformance suite](../../conformance/v1.0.0), not by this benchmark.
@@ -72,8 +97,9 @@ Mechanical, and lossless where a real value existed. Each move follows a row in 
   are dropped (the standard is source-agnostic).
 - **Validation:** ajv 8 (`ajv/dist/2020`) + `ajv-formats`, `strict: true, strictRequired: false`.
 - **Fill score** — count of *populated* Standard fields (scalar leaves + non-empty arrays and
-  their items), excluding the always-present `specVersion`/`id`/type discriminator and
-  `extensions`. Higher = richer entry, better for exercising schema breadth.
+  their items), excluding the always-present `specVersion`/`id`/type discriminator and the
+  then-extant `extensions` object (a field the 2026-08-05 revision removed, so the exclusion
+  is vacuous going forward). Higher = richer entry, better for exercising schema breadth.
 - **Activity score** — `status` weight (`open` 4 / `upcoming` 3 / `closed` 1 / `archived` 0)
   `+3` if the application deadline is in the future, `+1` if `opensAt` is in the future,
   `+` recency (up to `+4`, linearly decaying over 1 year from `updatedAt`). *(Computed on the
@@ -95,9 +121,10 @@ standard, and neither is normative.
 | **vc_fund** | **0** | — |
 
 > ⚠️ **`vc_fund` coverage gap:** there are **zero** VC-fund entries in the source data, so the
-> `vc_fund` block still cannot be benchmarked against real data. Its only coverage is the
+> `vc_fund` details shape still cannot be benchmarked against real data. Its only coverage is the
 > conformance suite — [`conformance/v1.0.0/pass/vc-fund.json`](../../conformance/v1.0.0/pass/vc-fund.json)
-> exercises the full block — and real VC-fund entries should be added during later seeding.
+> exercises the full payload (in the `fundingDetails` form since the third 2026-08-05
+> revision) — and real VC-fund entries should be added during later seeding.
 > `rfp` is also thin (2 entries) — worth expanding given this is the *RFP* Hub.
 
 ## Benchmark fixture set

@@ -1,0 +1,21 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:no-details",
+  "fundingType": "grant",
+  "title": "Missing fundingDetails",
+  "description": "fundingDetails is a required top-level property and is absent. One case covers all six funding types, because the requirement no longer depends on the fundingType value — fundingDetails is unconditionally required at the root. Replaces the six pre-fundingDetails missing-matching-type-block cases.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {}
+}

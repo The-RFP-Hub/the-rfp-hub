@@ -7,19 +7,35 @@
   "status": "open",
   "sponsoringOrganizations": [
     {
-      "name": "Example Foundation"
+      "name": "Example Foundation",
+      "slug": "example-foundation"
     },
     {
-      "name": "Matching Partner"
+      "name": "Matching Partner",
+      "slug": "matching-partner"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    },
+    {
+      "name": "Matching Partner",
+      "slug": "matching-partner"
     }
   ],
   "source": {},
-  "funding": {
+  "fundingInfo": {
     "currency": "USD",
     "budget": 500000
   },
-  "grant": {
-    "fundingMechanisms": ["proactive", "matching"],
+  "fundingDetails": {
+    "fundingType": "grant",
+    "fundingMechanisms": [
+      "proactive",
+      "matching"
+    ],
     "programModel": "program",
     "milestoneBased": true,
     "recurring": false

@@ -1,0 +1,18 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:no-operator",
+  "fundingType": "grant",
+  "title": "No operating organisations",
+  "description": "operatingOrganizations replaced sponsoringOrganizations as the required organisation array: a record must always name the party running the process, with entry 0 as the primary organisation. A valid sponsoringOrganizations array does not satisfy the requirement — sponsors are optional context, not the operator.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

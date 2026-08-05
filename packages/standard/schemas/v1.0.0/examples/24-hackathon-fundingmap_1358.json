@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "ETHOnline 2026",
+      "slug": "ethonline-2026",
+      "website": "https://ethglobal.com/events/ethonline2026"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ETHOnline 2026",
+      "slug": "ethonline-2026",
       "website": "https://ethglobal.com/events/ethonline2026"
     }
   ],
@@ -23,43 +31,44 @@
   "categories": [
     "Hackathon"
   ],
-  "tags": [
-    "Hackathons"
-  ],
   "applicationUrl": "https://ethglobal.com/events/ethonline2026",
   "website": "https://ethglobal.com/events/ethonline2026",
-  "socialLinks": {
-    "twitter": "https://x.com/ETHGlobal"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/ETHGlobal"
+    }
+  ],
+  "fundingInfo": {
     "budget": 50000
   },
   "opensAt": "2026-09-04T12:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-13T23:59:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-06T17:00:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-04T12:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-16T23:59:59.999Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-04-06T00:01:32.000Z",
   "updatedAt": "2026-04-14T00:02:09.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Remote",
     "online": null,
     "prizes": [

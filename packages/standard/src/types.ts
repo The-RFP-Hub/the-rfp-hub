@@ -11,10 +11,9 @@ import type {
   GrantDetails as GenGrantDetails,
   HackathonDetails as GenHackathonDetails,
   Milestone as GenMilestone,
-  MonetaryAmount as GenMonetaryAmount,
   Organization as GenOrganization,
   Provenance as GenProvenance,
-  SocialLinks as GenSocialLinks,
+  SocialLink as GenSocialLink,
   HackathonPrize,
   RFPDetails,
   RFPHubOpportunity,
@@ -25,21 +24,26 @@ import type {
 /** A funding opportunity conforming to the RFP Hub Standard. */
 export type Opportunity = RFPHubOpportunity;
 
-/** The six funding types. The value is also the key of the opportunity's type block. */
+/** An RFC 3339 date-time in UTC, or null when unknown. */
+export type Timestamp = string | null;
+
+/** The six funding types. The same value appears as `fundingDetails.fundingType`, the tag of the details payload. */
 export type FundingType = Opportunity["fundingType"];
+
+/** The type-specific details payload: a discriminated union over the six detail shapes, tagged by `fundingType`. */
+export type FundingDetails = Opportunity["fundingDetails"];
 /** Public lifecycle status. */
 export type OpportunityStatus = Opportunity["status"];
 /** How an entry entered the Hub. */
 export type IngestionMethod = NonNullable<GenProvenance["ingestedVia"]>;
 /** Whether a deadline is a fixed point in time or an open-ended window. */
-export type DeadlineType = GenDeadline["type"];
+export type DeadlineType = GenDeadline["deadlineType"];
 
 export type Organization = GenOrganization;
 export type Contact = GenContact;
 export type Provenance = GenProvenance;
 export type Funding = FundingEnvelope;
-export type SocialLinks = GenSocialLinks;
-export type MonetaryAmount = GenMonetaryAmount;
+export type SocialLink = GenSocialLink;
 export type AmountRange = GenAmountRange;
 export type Deadline = GenDeadline;
 export type Milestone = GenMilestone;
@@ -54,10 +58,10 @@ export type VcFundDetails = VCFundDetails;
 export type RfpDetails = RFPDetails;
 
 /**
- * Map from a `fundingType` to the shape of `opportunity[fundingType]`.
+ * Map from a `fundingType` to the shape of `fundingDetails` on an opportunity of that type.
  *
- * The re-cut makes this a guarantee rather than an expectation: the matching block is
- * required AND every non-matching block is forbidden, so a record can never carry two.
+ * The binding allOf makes this a guarantee rather than an expectation: `fundingDetails`
+ * always carries the shape the top-level `fundingType` names, and its own tag agrees.
  */
 export interface DetailsByFundingType {
   grant: GrantDetails;

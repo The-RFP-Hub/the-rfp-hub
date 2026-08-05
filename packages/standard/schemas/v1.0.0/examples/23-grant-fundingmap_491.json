@@ -7,7 +7,14 @@
   "status": "closed",
   "sponsoringOrganizations": [
     {
-      "name": "Sonic Labs Boom Bounty program"
+      "name": "Sonic Labs Boom Bounty program",
+      "slug": "sonic-labs-boom-bounty-program"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Sonic Labs Boom Bounty program",
+      "slug": "sonic-labs-boom-bounty-program"
     }
   ],
   "source": {
@@ -18,9 +25,6 @@
   "ecosystems": [
     "Fantom"
   ],
-  "networks": [
-    "EVM"
-  ],
   "categories": [
     "DeFi",
     "Lend/Borrow",
@@ -28,16 +32,22 @@
     "NFT",
     "GameFi"
   ],
-  "tags": [
-    "Bounties"
-  ],
   "applicationUrl": "https://blog.soniclabs.com/sonic-gems-and-sonic-boom-bounty-program/",
-  "socialLinks": {
-    "twitter": "https://x.com/0xSonicLabs",
-    "discord": "https://discord.gg/3Ynr2QDSnB",
-    "blog": "https://blog.soniclabs.com/"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/0xSonicLabs"
+    },
+    {
+      "platform": "discord",
+      "url": "https://discord.gg/3Ynr2QDSnB"
+    },
+    {
+      "platform": "blog",
+      "url": "https://blog.soniclabs.com/"
+    }
+  ],
+  "fundingInfo": {
     "budget": 0,
     "allocated": 0,
     "minAward": 0,
@@ -46,12 +56,14 @@
   "opensAt": "2024-08-19T20:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2024-10-31T20:00:00.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2024-08-29T11:26:52.000Z",
   "updatedAt": "2024-08-29T11:28:06.000Z",
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

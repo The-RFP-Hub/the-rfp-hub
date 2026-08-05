@@ -29,7 +29,7 @@ export type RFPHubOpportunity = {
    */
   id: string;
   /**
-   * The kind of funding opportunity, and the structural discriminator of the standard. Every entry carries a type-specific object under a key equal to this value ('hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.fundingType]`. The matching block is required and no other type block may be present; for grants the block may be empty.
+   * The kind of funding opportunity, and the structural discriminator of the standard. Every entry carries its type-specific details in `fundingDetails`, whose own `fundingType` tag names that object's shape and always equals this field — the binding allOf below keeps the two in step — so consumers can dispatch on either tag. For grants the details may carry nothing beyond the tag.
    */
   fundingType: "grant" | "hackathon" | "bounty" | "accelerator" | "vc_fund" | "rfp";
   /**
@@ -49,38 +49,28 @@ export type RFPHubOpportunity = {
    */
   status: "upcoming" | "open" | "closed" | "archived";
   /**
-   * The organisations issuing or backing the opportunity. Array order is semantic: entry 0 is the primary organisation and the one to display. This is the issuer or backer, not necessarily the source of funds — for donor-funded models the money's origin is deliberately not modelled, and the party running the process belongs in operatingOrganizations instead.
+   * The organisations issuing or backing the opportunity — the issuer or backer, not necessarily the source of funds, because for donor-funded models the money's origin is deliberately not modelled. Optional, and may be absent or empty, when the operator is the only party to name or the backer is not published. The party running the process belongs in operatingOrganizations instead.
+   */
+  sponsoringOrganizations?: Organization[];
+  /**
+   * The organisations that actually run the opportunity — intake, process and the application funnel, whether on their own behalf or a sponsor's. Array order is semantic: entry 0 is the primary organisation and the one to display.
    *
    * @minItems 1
    */
-  sponsoringOrganizations: [Organization, ...Organization[]];
-  /**
-   * The organisations that actually run intake and process — for example an operator running the application funnel on a funder's behalf. May be absent or empty when the sponsor also operates.
-   */
-  operatingOrganizations?: Organization[];
+  operatingOrganizations: [Organization, ...Organization[]];
   source: Provenance;
   /**
    * Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped, but this is an open, extensible list — not a closed enum, and deliberately not registry-governed either — so L2s and ETH-adjacent ecosystems are first-class and a newly launched one needs no process.
    */
   ecosystems?: string[];
   /**
-   * Specific networks or chains the funding is denominated on or deployed to. A plain open list, deliberately not registry-governed, so a newly launched chain is expressible immediately.
-   */
-  networks?: string[];
-  /**
    * Topical categories. Free text.
    */
   categories?: string[];
   /**
-   * Free-form tags for search and faceting.
+   * Free text describing who may apply — stage, geography, jurisdiction, entity requirements, compliance constraints — in the publisher's own words. Deliberately unstructured: eligibility criteria vary too much across publishers to be comparable as data, so this field is for reading, not faceting.
    */
-  tags?: string[];
-  /**
-   * Open key-value map of eligibility criteria. Publishers choose their own keys and write plain-string values; there are no fixed or required keys. Conventional keys (stage, geography, jurisdiction, sector, entityType, compliance) are published in registries/eligibility-keys.json — using them keeps the field comparable across publishers, and unregistered keys stay valid.
-   */
-  eligibility?: {
-    [k: string]: string;
-  };
+  eligibility?: string | null;
   /**
    * Free text describing what a proposal must contain to be considered — track record, approach, milestone plan, disclosures. Distinct from rfp.requirements, which describes what the work must deliver.
    */
@@ -88,7 +78,7 @@ export type RFPHubOpportunity = {
   /**
    * A single free-form string of supporting links and references — guidelines, past rounds, forum threads, original postings. Deliberately one string rather than an array of URIs, because publishers paste what they have.
    */
-  resourceLinks?: string | null;
+  additionalReferences?: string | null;
   /**
    * Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design.
    */
@@ -109,14 +99,17 @@ export type RFPHubOpportunity = {
    * URL of a banner or hero image.
    */
   bannerUrl?: string | null;
-  socialLinks?: SocialLinks1;
-  funding?: FundingEnvelope;
+  /**
+   * Social and community links for the opportunity or program, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected.
+   */
+  socialLinks?: SocialLink[];
+  fundingInfo?: FundingEnvelope;
   /**
    * Optional milestone sequence, valid on any fundingType. Array order is the milestone sequence — there is no order or index field. Milestone-based payment is expressed by this array together with grant.milestoneBased; there is no separate payment-schedule concept.
    */
   milestones?: Milestone[];
   /**
-   * RFC 3339 timestamp when applications open.
+   * RFC 3339 timestamp in UTC (trailing 'Z') for when applications open. null means unknown.
    */
   opensAt?: string | null;
   /**
@@ -124,29 +117,21 @@ export type RFPHubOpportunity = {
    */
   deadlines?: Deadline[];
   /**
-   * RFC 3339 timestamp when the opportunity was first publicly announced at the source.
+   * RFC 3339 timestamp in UTC (trailing 'Z') for when the opportunity was first publicly announced at the source. null means unknown.
    */
   postedAt?: string | null;
   /**
-   * RFC 3339 timestamp when this entry was created in the Hub.
+   * RFC 3339 timestamp in UTC (trailing 'Z') for when this entry was created in the Hub. null means unknown.
    */
   createdAt?: string | null;
   /**
-   * RFC 3339 timestamp when this entry was last modified in the Hub.
+   * RFC 3339 timestamp in UTC (trailing 'Z') for when this entry was last modified in the Hub. null means unknown.
    */
   updatedAt?: string | null;
-  grant?: GrantDetails;
-  hackathon?: HackathonDetails;
-  bounty?: BountyDetails;
-  accelerator?: AcceleratorDetails;
-  vc_fund?: VCFundDetails;
-  rfp?: RFPDetails;
   /**
-   * Namespace for publisher- or integrator-specific data not covered by the standard. Keys are conventionally namespaced, for example 'mysource.internalId'. Contents are not validated by this schema.
+   * The type-specific details for this opportunity: exactly one of the six detail shapes, self-described by its own required `fundingType` tag, which names the shape and equals the top-level `fundingType` (the binding allOf below keeps the two in step).
    */
-  extensions?: {
-    [k: string]: unknown;
-  };
+  fundingDetails: GrantDetails | HackathonDetails | BountyDetails | AcceleratorDetails | VCFundDetails | RFPDetails;
 };
 
 /**
@@ -160,11 +145,11 @@ export interface Organization {
   /**
    * Lowercase URL-safe identifier, and also the organisation's namespace.
    */
-  slug?: string | null;
+  slug: string;
   /**
    * Kind of entity.
    */
-  type?: "foundation" | "dao" | "company" | "protocol" | "program" | "individual" | "other" | null;
+  orgType?: "foundation" | "dao" | "company" | "protocol" | "program" | "individual" | "other";
   /**
    * Short description of the organisation.
    */
@@ -181,7 +166,10 @@ export interface Organization {
    * URL of the organisation's banner or hero image.
    */
   bannerUrl?: string | null;
-  socialLinks?: SocialLinks;
+  /**
+   * Social and community links for the organisation, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected.
+   */
+  socialLinks?: SocialLink[];
   /**
    * Ethereum-family ecosystems the organisation operates in. Same open list as the top-level field.
    */
@@ -192,37 +180,17 @@ export interface Organization {
   contacts?: Contact[];
 }
 /**
- * Social and community links for the organisation.
+ * One social or community link: the platform it lives on and its full URL.
  */
-export interface SocialLinks {
+export interface SocialLink {
   /**
-   * Link to the X/Twitter profile.
+   * Which service the link points at. 'twitter' covers X/Twitter; 'forum' is the governance or community forum; 'blog' is the blog or announcements feed.
    */
-  twitter?: string | null;
+  platform: "twitter" | "discord" | "github" | "telegram" | "farcaster" | "forum" | "blog";
   /**
-   * Discord server invite or channel link.
+   * Full URL of the profile, server, group or feed — a link, not a handle.
    */
-  discord?: string | null;
-  /**
-   * Link to the GitHub organisation or repository.
-   */
-  github?: string | null;
-  /**
-   * Link to the Telegram group or channel.
-   */
-  telegram?: string | null;
-  /**
-   * Link to the Farcaster profile or channel.
-   */
-  farcaster?: string | null;
-  /**
-   * Link to the governance or community forum.
-   */
-  forum?: string | null;
-  /**
-   * Link to the blog or announcements feed.
-   */
-  blog?: string | null;
+  url: string;
 }
 /**
  * A named contact route into the organisation. Every property is optional and there is no minimum-one-identifier constraint, so `{}` validates — deliberately, because not every publisher can or will name a person.
@@ -237,7 +205,7 @@ export interface Contact {
    */
   role?: string | null;
   /**
-   * Telegram handle. A handle rather than a URL — unlike socialLinks.telegram, which is a link.
+   * Telegram handle. A handle rather than a URL — unlike a socialLinks entry with platform 'telegram', which is a link.
    */
   telegram?: string | null;
   /**
@@ -258,7 +226,7 @@ export interface Provenance {
    */
   submittedBy?: string | null;
   /**
-   * RFC 3339 timestamp of when the entry was submitted or published to the Hub. Pairs with submittedBy.
+   * RFC 3339 timestamp in UTC (trailing 'Z') for when the entry was submitted or published to the Hub. Pairs with submittedBy. null means unknown.
    */
   submittedAt?: string | null;
   /**
@@ -274,46 +242,13 @@ export interface Provenance {
    */
   verifiedAgainstSource?: boolean | null;
   /**
-   * RFC 3339 timestamp of the last verification. Record-level only — there is no per-field freshness.
+   * RFC 3339 timestamp in UTC (trailing 'Z') for the last verification. Record-level only — there is no per-field freshness. null means unknown.
    */
   verifiedAt?: string | null;
   /**
    * IPFS or archived snapshot of the opportunity taken at verification time.
    */
   snapshotUrl?: string | null;
-}
-/**
- * Social and community links for the opportunity or program.
- */
-export interface SocialLinks1 {
-  /**
-   * Link to the X/Twitter profile.
-   */
-  twitter?: string | null;
-  /**
-   * Discord server invite or channel link.
-   */
-  discord?: string | null;
-  /**
-   * Link to the GitHub organisation or repository.
-   */
-  github?: string | null;
-  /**
-   * Link to the Telegram group or channel.
-   */
-  telegram?: string | null;
-  /**
-   * Link to the Farcaster profile or channel.
-   */
-  farcaster?: string | null;
-  /**
-   * Link to the governance or community forum.
-   */
-  forum?: string | null;
-  /**
-   * Link to the blog or announcements feed.
-   */
-  blog?: string | null;
 }
 /**
  * Program-level funding envelope: single currency, total budget, amount committed to date, and the per-award range.
@@ -349,7 +284,7 @@ export interface Milestone {
    */
   title?: string | null;
   /**
-   * Payment for this milestone in major units, denominated in the top-level funding.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and funding.currency is absent.
+   * Payment for this milestone in major units, denominated in the top-level fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
    */
   amount?: number | null;
   /**
@@ -364,9 +299,9 @@ export interface Deadline {
   /**
    * Whether this deadline is a fixed point in time or an open-ended rolling window.
    */
-  type: "fixed" | "rolling";
+  deadlineType: "fixed" | "rolling";
   /**
-   * RFC 3339 timestamp. Required and non-null when type is 'fixed', enforced by the if/then below; meaningless, and normally omitted, when type is 'rolling'.
+   * RFC 3339 timestamp in UTC (trailing 'Z'). Required and non-null when deadlineType is 'fixed', enforced by the if/then below; meaningless, and normally omitted, when deadlineType is 'rolling'.
    */
   date?: string | null;
   /**
@@ -375,9 +310,13 @@ export interface Deadline {
   label?: string | null;
 }
 /**
- * Grant-specific fields. Required, possibly as an empty object, when fundingType is 'grant'; forbidden otherwise.
+ * The fundingDetails payload when fundingType is 'grant': grant-specific attributes not covered by the core fields. May carry nothing beyond its fundingType tag, because core funding and date fields live at the top level.
  */
 export interface GrantDetails {
+  /**
+   * Names this block's shape; equals the top-level fundingType.
+   */
+  fundingType: "grant";
   /**
    * How funds are allocated. An array because mechanisms co-occur: a funder can offer a fixed grant and a matching grant in the same program.
    */
@@ -396,9 +335,13 @@ export interface GrantDetails {
   recurring?: boolean | null;
 }
 /**
- * Hackathon-specific fields. Required when fundingType is 'hackathon'; forbidden otherwise.
+ * The fundingDetails payload when fundingType is 'hackathon': hackathon-specific attributes. All dates — registration, submission, event start and event end — live in the shared top-level deadlines array, distinguished by label.
  */
 export interface HackathonDetails {
+  /**
+   * Names this block's shape; equals the top-level fundingType.
+   */
+  fundingType: "hackathon";
   /**
    * Physical location, or null for a fully online event.
    */
@@ -448,10 +391,26 @@ export interface TeamSizeRange {
   max?: number | null;
 }
 /**
- * Bounty-specific fields. Required when fundingType is 'bounty'; forbidden otherwise.
+ * The fundingDetails payload when fundingType is 'bounty': bounty-specific attributes. A bounty is a single scoped task with a stated reward, so the reward is the one required field beyond the fundingType tag.
  */
 export interface BountyDetails {
-  reward: MonetaryAmount;
+  /**
+   * Names this block's shape; equals the top-level fundingType.
+   */
+  fundingType: "bounty";
+  /**
+   * The reward paid on completion. Carries its own currency.
+   */
+  reward: {
+    /**
+     * Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents.
+     */
+    amount: number;
+    /**
+     * ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC.
+     */
+    currency: string;
+  };
   /**
    * Self-assessed difficulty, as a hint to applicants.
    */
@@ -466,22 +425,13 @@ export interface BountyDetails {
   platform?: string | null;
 }
 /**
- * The reward paid on completion. Carries its own currency.
- */
-export interface MonetaryAmount {
-  /**
-   * Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents.
-   */
-  amount: number;
-  /**
-   * ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC.
-   */
-  currency: string;
-}
-/**
- * Accelerator-specific fields. Required when fundingType is 'accelerator'; forbidden otherwise.
+ * The fundingDetails payload when fundingType is 'accelerator': accelerator-specific attributes. The application deadline lives in the shared top-level deadlines array with label 'application'.
  */
 export interface AcceleratorDetails {
+  /**
+   * Names this block's shape; equals the top-level fundingType.
+   */
+  fundingType: "accelerator";
   /**
    * Length of the program in weeks.
    */
@@ -494,7 +444,19 @@ export interface AcceleratorDetails {
    * Equity taken, expressed as a string because programs state it in incomparable ways.
    */
   equity?: string | null;
-  funding?: MonetaryAmount1;
+  /**
+   * Investment or stipend offered per team. Carries its own currency.
+   */
+  funding?: {
+    /**
+     * Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents.
+     */
+    amount: number;
+    /**
+     * ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC.
+     */
+    currency: string;
+  };
   /**
    * Company stage the program targets.
    */
@@ -509,22 +471,13 @@ export interface AcceleratorDetails {
   online?: boolean | null;
 }
 /**
- * Investment or stipend offered per team. Carries its own currency.
- */
-export interface MonetaryAmount1 {
-  /**
-   * Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents.
-   */
-  amount: number;
-  /**
-   * ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC.
-   */
-  currency: string;
-}
-/**
- * VC-fund-specific fields. Required when fundingType is 'vc_fund'; forbidden otherwise.
+ * The fundingDetails payload when fundingType is 'vc_fund': venture-fund-specific attributes. A fund is an ongoing source of capital rather than a round, so it carries no deadline of its own.
  */
 export interface VCFundDetails {
+  /**
+   * Names this block's shape; equals the top-level fundingType.
+   */
+  fundingType: "vc_fund";
   checkSize?: AmountRange;
   /**
    * Investment stages the fund participates in.
@@ -565,9 +518,13 @@ export interface AmountRange {
   currency?: string | null;
 }
 /**
- * RFP-specific fields. Required when fundingType is 'rfp'; forbidden otherwise.
+ * The fundingDetails payload when fundingType is 'rfp': RFP-specific attributes. The issuing organisation is operatingOrganizations[0], the budget is the top-level fundingInfo envelope, and the proposal deadline is a deadlines entry labelled 'application'.
  */
 export interface RFPDetails {
+  /**
+   * Names this block's shape; equals the top-level fundingType.
+   */
+  fundingType: "rfp";
   /**
    * Scope of work, as one free-text field. In-scope and out-of-scope prose both live here.
    */

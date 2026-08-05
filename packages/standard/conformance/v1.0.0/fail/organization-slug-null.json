@@ -1,0 +1,18 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:org-slug-null",
+  "fundingType": "grant",
+  "title": "Organisation slug is null",
+  "description": "The operating organisation's slug is null. The pre-re-cut schema tolerated null slugs; slug is now a required non-null string, because a null namespace is no namespace at all.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": null
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

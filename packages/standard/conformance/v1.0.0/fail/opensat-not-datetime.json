@@ -3,14 +3,23 @@
   "id": "conformance:bad-datetime",
   "fundingType": "grant",
   "title": "opensAt is not an RFC 3339 timestamp",
-  "description": "opensAt carries prose instead of an RFC 3339 date-time, violating format: date-time. Stands in for every date-time-formatted field (postedAt, createdAt, updatedAt, deadlines[].date, provenance.submittedAt, provenance.verifiedAt): an implementation that ignores formats accepts this document and is not conformant.",
+  "description": "opensAt is shaped like a UTC timestamp — it even ends in 'Z', so the pattern requiring UTC passes — but month 13 and hour 99 do not exist, so it is not an RFC 3339 date-time and format: date-time rejects it. Stands in for every date-time-formatted field (postedAt, createdAt, updatedAt, deadlines[].date, provenance.submittedAt, provenance.verifiedAt): an implementation that ignores formats accepts this document and is not conformant. The non-UTC-offset rule has its own case, opensat-non-utc-offset.",
   "status": "upcoming",
   "sponsoringOrganizations": [
     {
-      "name": "Example Foundation"
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
     }
   ],
   "source": {},
-  "opensAt": "next Tuesday",
-  "grant": {}
+  "opensAt": "2026-13-45T99:99:99.000Z",
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

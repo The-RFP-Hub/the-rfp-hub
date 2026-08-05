@@ -10,7 +10,15 @@
     {
       "name": "Example Foundation",
       "slug": "example-foundation",
-      "type": "foundation",
+      "orgType": "foundation",
+      "website": "https://example.org"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation",
+      "orgType": "foundation",
       "website": "https://example.org"
     }
   ],
@@ -19,10 +27,15 @@
     "ingestedVia": "publisher_api",
     "verifiedAgainstSource": null
   },
-  "ecosystems": ["Ethereum", "Optimism"],
-  "categories": ["Developer Tooling"],
+  "ecosystems": [
+    "Ethereum",
+    "Optimism"
+  ],
+  "categories": [
+    "Developer Tooling"
+  ],
   "applicationUrl": "https://example.org/apply",
-  "funding": {
+  "fundingInfo": {
     "currency": "USD",
     "budget": 250000,
     "allocated": 40000,
@@ -32,13 +45,16 @@
   "opensAt": "2026-01-01T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-12-31T23:59:59.000Z",
       "label": "application"
     }
   ],
-  "grant": {
-    "fundingMechanisms": ["proactive"],
+  "fundingDetails": {
+    "fundingType": "grant",
+    "fundingMechanisms": [
+      "proactive"
+    ],
     "milestoneBased": true,
     "recurring": false
   }

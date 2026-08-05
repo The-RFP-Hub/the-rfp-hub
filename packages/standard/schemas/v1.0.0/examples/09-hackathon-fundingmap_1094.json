@@ -8,6 +8,14 @@
   "sponsoringOrganizations": [
     {
       "name": "ETHGlobal New York 2026",
+      "slug": "ethglobal-new-york-2026",
+      "website": "https://ethglobal.com/events/newyork2026"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ETHGlobal New York 2026",
+      "slug": "ethglobal-new-york-2026",
       "website": "https://ethglobal.com/events/newyork2026"
     }
   ],
@@ -22,40 +30,38 @@
   "categories": [
     "Hackathon"
   ],
-  "tags": [
-    "Hackathons"
-  ],
   "applicationUrl": "https://ethglobal.com/events/newyork2026",
   "website": "https://ethglobal.com/events/newyork2026",
-  "funding": {
+  "fundingInfo": {
     "budget": 75000
   },
   "opensAt": "2026-06-12T12:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-06-14T23:59:59.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-30T03:59:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-06-12T12:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-06-14T23:59:59.999Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-06T14:11:44.000Z",
   "updatedAt": "2026-06-15T00:02:11.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "New York City, United States",
     "online": null,
     "prizes": [

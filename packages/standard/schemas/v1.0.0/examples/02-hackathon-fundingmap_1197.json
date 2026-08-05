@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "HACKANOVA 5.O",
+      "slug": "hackanova-5-o",
+      "website": "https://www.tsdw.in/"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "HACKANOVA 5.O",
+      "slug": "hackanova-5-o",
       "website": "https://www.tsdw.in/"
     }
   ],
@@ -23,38 +31,39 @@
   "categories": [
     "Hackathon"
   ],
-  "resourceLinks": "Original posting: https://www.tsdw.in/",
+  "additionalReferences": "Original posting: https://www.tsdw.in/",
   "applicationUrl": "https://hackanova-5-0.devfolio.co",
   "website": "https://www.tsdw.in/",
-  "funding": {
+  "fundingInfo": {
     "budget": 140348
   },
   "opensAt": "2026-03-13T04:30:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-10T12:30:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-10T12:30:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-13T04:30:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-14T16:00:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-13T13:16:36.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Thakur College of Engineering and Technology, Thakur Road, ठाकुर, Thakur Village, Kandivali East, Mumbai, Maharashtra, India",
     "online": null,
     "prizes": [

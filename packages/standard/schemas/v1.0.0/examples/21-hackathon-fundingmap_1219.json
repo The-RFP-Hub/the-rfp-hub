@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "KnowledgeQuarry: Data Science Challenge",
+      "slug": "knowledgequarry-data-science-challenge",
+      "website": "https://knowledgequarry-2026.devfolio.co"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "KnowledgeQuarry: Data Science Challenge",
+      "slug": "knowledgequarry-data-science-challenge",
       "website": "https://knowledgequarry-2026.devfolio.co"
     }
   ],
@@ -27,35 +35,36 @@
   ],
   "applicationUrl": "https://knowledgequarry-2026.devfolio.co",
   "website": "https://knowledgequarry-2026.devfolio.co",
-  "funding": {
+  "fundingInfo": {
     "budget": 6356
   },
   "opensAt": "2026-04-01T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-29T18:29:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-29T18:29:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-01T00:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-10T09:30:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-30T00:01:54.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Cluster Innovation Centre, University of Delhi, GC Narang Road, Delhi, India",
     "online": null,
     "prizes": [

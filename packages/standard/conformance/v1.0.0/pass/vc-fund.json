@@ -9,19 +9,34 @@
     {
       "name": "Example Ventures",
       "slug": "example-ventures",
-      "type": "company"
+      "orgType": "company"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Ventures",
+      "slug": "example-ventures",
+      "orgType": "company"
     }
   ],
   "source": {},
-  "vc_fund": {
+  "fundingDetails": {
+    "fundingType": "vc_fund",
     "checkSize": {
       "min": 100000,
       "max": 2000000,
       "currency": "USD"
     },
-    "stages": ["pre-seed", "seed", "series-a"],
+    "stages": [
+      "pre-seed",
+      "seed",
+      "series-a"
+    ],
     "thesis": "Ethereum-native infrastructure and developer tooling, entering at the first institutional check.",
-    "portfolio": ["Example Rollup", "Example Wallet"],
+    "portfolio": [
+      "Example Rollup",
+      "Example Wallet"
+    ],
     "contactMethod": "intro-only",
     "activelyInvesting": true
   }

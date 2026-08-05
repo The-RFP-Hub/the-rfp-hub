@@ -19,7 +19,7 @@
     "type": { "const": "object" },
     "additionalProperties": {
       "const": false,
-      "description": "The top level is closed. Instances extend through the `extensions` object, not through unknown keys."
+      "description": "The top level is closed; unknown keys are rejected. There is no extension mechanism — a new field requires a spec release."
     },
     "required": {
       "type": "array",

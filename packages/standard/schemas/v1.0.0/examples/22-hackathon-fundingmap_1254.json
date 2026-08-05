@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "TON AI Agent Hackathon",
+      "slug": "ton-ai-agent-hackathon",
+      "website": "https://identityhub.app/contests/ai-hackathon"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "TON AI Agent Hackathon",
+      "slug": "ton-ai-agent-hackathon",
       "website": "https://identityhub.app/contests/ai-hackathon"
     }
   ],
@@ -26,35 +34,36 @@
   ],
   "applicationUrl": "https://identityhub.app/contests/ai-hackathon",
   "website": "https://identityhub.app/contests/ai-hackathon",
-  "funding": {
+  "fundingInfo": {
     "budget": 20000
   },
   "opensAt": "2026-03-11T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-25T23:59:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-25T23:59:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-11T00:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-25T23:59:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-12T19:59:39.000Z",
   "updatedAt": "2026-03-26T00:02:10.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Virtual",
     "online": null,
     "tracks": [

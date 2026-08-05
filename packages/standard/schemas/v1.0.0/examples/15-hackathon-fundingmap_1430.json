@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "Locus' Paygentic Hackathon - #4",
+      "slug": "locus-paygentic-hackathon-4",
+      "website": "https://discord.gg/locus"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Locus' Paygentic Hackathon - #4",
+      "slug": "locus-paygentic-hackathon-4",
       "website": "https://discord.gg/locus"
     }
   ],
@@ -23,38 +31,39 @@
   "categories": [
     "Hackathon"
   ],
-  "resourceLinks": "Original posting: https://discord.gg/locus",
+  "additionalReferences": "Original posting: https://discord.gg/locus",
   "applicationUrl": "https://paygentic-week4.devfolio.co",
   "website": "https://discord.gg/locus",
-  "funding": {
+  "fundingInfo": {
     "budget": 1000
   },
   "opensAt": "2026-05-02T00:30:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-05T06:59:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-05T06:59:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-02T00:30:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-07T06:59:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-05-01T14:52:54.000Z",
   "updatedAt": "2026-05-06T00:05:42.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Online",
     "online": null,
     "prizes": [

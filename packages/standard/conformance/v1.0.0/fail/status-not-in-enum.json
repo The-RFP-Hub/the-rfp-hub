@@ -7,9 +7,18 @@
   "status": "Active",
   "sponsoringOrganizations": [
     {
-      "name": "Example Foundation"
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
     }
   ],
   "source": {},
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

@@ -1,0 +1,23 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:social-no-url",
+  "fundingType": "grant",
+  "title": "Social link without a url",
+  "description": "A social link naming a platform but no url. Both properties of a socialLinks entry are required: an entry is one platform and one full URL, and a platform without a link asserts nothing a consumer can render.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "socialLinks": [
+    {
+      "platform": "twitter"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

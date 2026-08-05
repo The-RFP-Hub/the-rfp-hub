@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "Electrothon 8.0",
+      "slug": "electrothon-8-0",
+      "website": "https://electrothon-8.devfolio.co"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Electrothon 8.0",
+      "slug": "electrothon-8-0",
       "website": "https://electrothon-8.devfolio.co"
     }
   ],
@@ -25,35 +33,36 @@
   ],
   "applicationUrl": "https://electrothon-8.devfolio.co",
   "website": "https://electrothon-8.devfolio.co",
-  "funding": {
+  "fundingInfo": {
     "budget": 113565
   },
   "opensAt": "2026-03-13T06:30:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-10T18:29:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-10T18:29:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-13T06:30:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-15T04:30:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-13T13:16:36.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "National Institute of Technology, Hamirpur, NIT, Hamirpur, Himachal Pradesh, India",
     "online": null,
     "prizes": [
