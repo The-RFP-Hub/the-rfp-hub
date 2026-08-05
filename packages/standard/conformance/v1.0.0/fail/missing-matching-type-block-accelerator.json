@@ -1,0 +1,14 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:no-block-accelerator",
+  "fundingType": "accelerator",
+  "title": "Missing the accelerator block",
+  "description": "fundingType is 'accelerator' but there is no accelerator block, so opportunity[opportunity.fundingType] would not resolve. The grant branch of the discriminator is exercised by missing-matching-type-block.json; this case pins the same guarantee for an accelerator.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {}
+}

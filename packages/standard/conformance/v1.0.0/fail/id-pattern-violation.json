@@ -1,0 +1,15 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance id with spaces!",
+  "fundingType": "grant",
+  "title": "id violates its character pattern",
+  "description": "The id carries spaces and punctuation outside ^[A-Za-z0-9._:-]+$. Identifiers travel into URLs, file names and cross-references, so the pattern is a hard constraint, not a style suggestion.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "grant": {}
+}

@@ -18,7 +18,9 @@ Every file is a complete opportunity document. **Each file is named after the ru
 exercises**, not after the record it contains: a red CI run therefore names the violated
 constraint (`fail/deadline-fixed-without-date.json`) rather than a fixture number. Each
 document's own `description` field explains what the case is testing and why the rule exists,
-so the file is readable on its own.
+so the file is readable on its own. (The one exception is
+`fail/missing-required-properties.json`, which cannot carry a `description` — omitting it is
+the case.)
 
 ## Running the suite
 
@@ -27,7 +29,8 @@ validates against `schemas/<version>/opportunity.schema.json` and every document
 does not. Nothing else is asserted: the suite says nothing about which error is reported, how
 many errors are reported, or in what order.
 
-The reference run lives in `packages/validate/test/conformance.test.ts`.
+The reference run lives in `packages/validate/test/validate.test.ts` (the
+"conformance suite — pass/ / fail/" describe blocks).
 
 ```bash
 pnpm --filter rfphub-validate test
@@ -37,7 +40,11 @@ npx rfphub-validate node_modules/@the-rfp-hub/standard/conformance/v1.0.0/pass
 
 ## Scope
 
-These cases cover **schema validity only** — the hard constraints in the JSON Schema. They do
+These cases cover **schema validity only** — the hard constraints in the JSON Schema. That
+includes `format` (`uri`, `date-time`, `email`): JSON Schema 2020-12 makes `format`
+annotation-only by default, but this standard means it as a constraint, the fail suite asserts
+it, and an implementation must therefore validate with format assertion enabled (the reference
+validator uses `ajv-formats`). They do
 not cover the advisory checks (`packages/validate/src/checks/`), which report *warnings* about
 things the schema deliberately leaves open: unregistered eligibility keys, unregistered
 deadline labels, unregistered program models, and milestone amounts with no envelope currency.

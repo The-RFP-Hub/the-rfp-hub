@@ -1,0 +1,31 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty",
+  "fundingType": "bounty",
+  "title": "Fully-populated bounty entry",
+  "description": "Exercises the bounty block: the required reward as a monetaryAmount with its own currency independent of any program envelope, the difficulty enum, a skills list, and the hosting platform. Paired with a rolling application deadline, the common shape for open bounty boards.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "type": "protocol"
+    }
+  ],
+  "source": {},
+  "deadlines": [
+    {
+      "type": "rolling",
+      "label": "application"
+    }
+  ],
+  "bounty": {
+    "reward": {
+      "amount": 5000,
+      "currency": "USDC"
+    },
+    "difficulty": "intermediate",
+    "skills": ["Solidity", "Formal verification"],
+    "platform": "Example Bounty Board"
+  }
+}
