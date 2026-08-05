@@ -3,31 +3,39 @@
   "id": "conformance:accelerator",
   "fundingType": "accelerator",
   "title": "Fully-populated accelerator entry",
-  "description": "Exercises the accelerator block: cohort mechanics (programDurationWeeks, batchSize), the free-text equity field, per-team funding as a monetaryAmount with its own currency, the stage enum, and the location/online pair. The application deadline lives in the shared top-level deadlines array with label 'application'.",
+  "description": "Exercises the accelerator block: cohort mechanics (programDurationWeeks, batchSize), the free-text equity field, per-team funding as a plain number denominated in the document-wide fundingInfo.currency, the stage enum, and the location/online pair. The application deadline lives in the shared top-level deadlines array with label 'application'.",
   "status": "open",
   "sponsoringOrganizations": [
     {
       "name": "Example Accelerator",
       "slug": "example-accelerator",
-      "type": "program"
+      "orgType": "program"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Accelerator",
+      "slug": "example-accelerator",
+      "orgType": "program"
     }
   ],
   "source": {},
+  "fundingInfo": {
+    "currency": "USD"
+  },
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-10-15T23:59:59.000Z",
       "label": "application"
     }
   ],
-  "accelerator": {
+  "fundingDetails": {
+    "fundingType": "accelerator",
     "programDurationWeeks": 12,
     "batchSize": 20,
     "equity": "up to 7% SAFE",
-    "funding": {
-      "amount": 100000,
-      "currency": "USD"
-    },
+    "funding": 100000,
     "stage": "pre-seed",
     "location": "Berlin",
     "online": true

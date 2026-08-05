@@ -1,0 +1,19 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-orgtype",
+  "fundingType": "grant",
+  "title": "orgType outside its enum",
+  "description": "The operating organisation's orgType is 'collective', outside the enum (foundation, dao, company, protocol, program, individual, other). orgType — renamed from 'type' — is optional but closed; 'other' is the catch-all for anything unlisted.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation",
+      "orgType": "collective"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

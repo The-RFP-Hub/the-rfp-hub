@@ -46,8 +46,6 @@ function standardProperty(name: string): JsonSchema {
   return schema;
 }
 
-const fundingTypes = standardProperty("fundingType").enum as string[];
-
 const byId = new Map(responseSchemas.map((schema) => [schema.$id, schema as JsonSchema]));
 
 function component(id: string): JsonSchema {
@@ -116,11 +114,10 @@ describe("OpenAPI components vs the mapper (drift guard)", () => {
     expect(declaredKeys("OpportunitySummary")).toEqual([...emittedKeys(toSummary)].sort());
   });
 
-  it("declares exactly the keys `toStandard` emits, plus every type block", () => {
-    // Only the type block matching an entry's `fundingType` is ever emitted, so no single corpus
-    // covers all six; the six names are the `fundingType` enum, and all six are declared.
-    const expected = new Set([...emittedKeys(toStandard), ...fundingTypes]);
-    expect(declaredKeys("Opportunity")).toEqual([...expected].sort());
+  it("declares exactly the keys `toStandard` emits", () => {
+    // Every entry emits the same `fundingDetails` slot (the union is inside it), so the corpus
+    // covers the full detail shape directly — no per-type special case needed.
+    expect(declaredKeys("Opportunity")).toEqual([...emittedKeys(toStandard)].sort());
   });
 
   for (const { file, row } of rows) {
@@ -134,10 +131,9 @@ describe("OpenAPI components vs the mapper (drift guard)", () => {
     });
   }
 
-  it("keeps the list projection thin: no type block, no extensions", () => {
+  it("keeps the list projection thin: no fundingDetails", () => {
     const summary = declaredKeys("OpportunitySummary");
-    for (const type of fundingTypes) expect(summary).not.toContain(type);
-    expect(summary).not.toContain("extensions");
+    expect(summary).not.toContain("fundingDetails");
     expect(component("OpportunitySummary").additionalProperties).toBe(false);
   });
 
@@ -158,7 +154,13 @@ describe("OpenAPI components vs the Standard (derivation guard)", () => {
     });
 
     it(`${id} requires exactly what the Standard requires`, () => {
-      expect(component(id).required).toEqual(standard.required);
+      // The summary is the one deliberate deviation: it omits `fundingDetails` (a delivery
+      // projection), so it cannot require it. Everything else tracks the Standard byte for byte.
+      const expected =
+        id === "OpportunitySummary"
+          ? (standard.required as string[]).filter((name) => name !== "fundingDetails")
+          : standard.required;
+      expect(component(id).required).toEqual(expected);
     });
 
     it(`${id} declares only Standard properties`, () => {

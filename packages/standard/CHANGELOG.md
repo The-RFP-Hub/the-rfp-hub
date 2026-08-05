@@ -8,6 +8,334 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 
 ---
 
+## Spec v1.0.0 third draft revision (2026-08-05)
+
+**Same day as the second draft revision, applied after it** — two revision batches landed on
+2026-08-05, and this entry sits above the second because entries are ordered
+newest-change-first, not because the date differs. Both ride the same draft-window permission
+argued in [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md); the
+structural records for **this** batch are
+[`adr/0005`](../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md),
+which supersedes ADR-0002 #3 (the `opportunity[opportunity.fundingType]` access pattern), and
+[`adr/0006`](../../adr/0006-document-wide-single-currency.md), which supersedes ADR-0002 #17
+(the envelope-only scoping of the single-currency rule — every monetary amount is now
+denominated in the document-wide `fundingInfo.currency`). A
+document valid against this morning's second-revision bytes is **not** necessarily valid
+against these.
+
+Every change below is listed under the bidirectional definition in `PROCESS.md`.
+
+### Schema
+
+**Breaking — tightenings** (previously valid documents now fail):
+
+- **All seven `date-time` sites gain `"pattern": "Z$"`** (`opensAt`, `postedAt`, `createdAt`,
+  `updatedAt`, `deadlines[].date`, `source.submittedAt`, `source.verifiedAt`): every temporal
+  value must be an RFC 3339 `date-time` in UTC with a trailing uppercase `Z`. A previously
+  valid document carrying `+02:00`, the `-00:00` unknown-offset convention, or lowercase
+  `t`/`z` now fails. Zero committed documents were affected — all 182 temporal values in the
+  corpus already complied.
+- **`fundingDetails` is required**, joining the required set after `source`. A document
+  without it — including every document in the old six-sibling-block shape — now fails.
+- **Each detail shape requires its `fundingType` tag** (`const`, first property): a details
+  object without the tag, or with a tag naming a different shape than the top-level
+  `fundingType`, now fails. (For a `bounty`, `reward` remains required alongside the tag.)
+- **The per-type currency keys are removed** ([`adr/0006`](../../adr/0006-document-wide-single-currency.md)):
+  `hackathon.prizes[].currency` and `vc_fund.checkSize.currency` no longer exist, and because
+  the objects that carried them are closed, a document still carrying one now fails on
+  `additionalProperties`. `fundingInfo.currency` denominates **every** monetary amount in the
+  document — the envelope amounts, `milestones[].amount`, the bounty `reward`, each
+  `prizes[].amount`, the accelerator `funding` and the `checkSize` bounds. The denomination
+  rule still crosses objects, so it remains schema-unenforceable; the advisory tier warns
+  (see Tooling).
+
+**Breaking — structural** (the shape itself moves; breaking for instances in both directions):
+
+- **The six top-level type-block properties (`grant`, `hackathon`, `bounty`, `accelerator`,
+  `vc_fund`, `rfp`) are removed**, together with the 93-line six-branch exclusivity `allOf`
+  that enforced one-matching-block. They are replaced by **`fundingDetails`**: a `oneOf` over
+  the six unchanged detail `$defs`, each now self-described by its required `fundingType`
+  `const` tag, with a compact binding `allOf` keeping the inner tag equal to the top-level
+  `fundingType`. An old-shape document fails on **`additionalProperties`** (its sibling block
+  is an unknown key) **and** the missing required `fundingDetails`. Carrying two type blocks
+  stops being a rule the schema enforces and becomes a shape it cannot represent.
+- The `opportunity[opportunity.fundingType]` guarantee is **superseded**: the details now live
+  at `opportunity.fundingDetails`, and `fundingDetails.fundingType` names the shape.
+  Consumers may dispatch on either tag; the binding `allOf` guarantees they agree.
+- **`bounty.reward` and `accelerator.funding` change shape** with the currency unification:
+  the inlined `{amount, currency}` objects (both properties required) become a **plain
+  required number** (`reward`) and a **plain nullable number** (`funding`), denominated in
+  `fundingInfo.currency`. Breaking in both directions: the old object shape no longer
+  validates, and the new number shape was previously invalid. Bounty's required-reward
+  guarantee is unchanged.
+
+### Context
+
+- The six type-block terms are removed with their properties (the orphan-term drift check
+  forces it); **`fundingDetails`** is added, resolving in the RFP Hub vocabulary. The
+  `accelerator`-scoped `funding → schema:amount` mapping (introduced in the second revision)
+  is re-homed under `fundingDetails`'s property-scoped context, where the accelerator payload
+  now lives. All other nested terms (`fundingMechanisms → daoip5:grantFundingMechanism`,
+  `tracks`, `prizes`, …) are top-level context terms and keep working at the new depth
+  unchanged.
+- The currency unification needs no context change: the `currency → schema:currency` term now
+  has exactly one instantiation site (`fundingInfo.currency`), and the `amount → schema:value`
+  term continues to cover milestone and prize amounts. The removed per-type currency keys
+  simply stop instantiating the shared term.
+
+### Tooling
+
+- **Generated TypeScript**: `fundingDetails` is a **real discriminated union**
+  (`GrantDetails | HackathonDetails | BountyDetails | AcceleratorDetails | VCFundDetails |
+  RFPDetails`, each carrying its literal `fundingType`), so
+  `if (o.fundingDetails.fundingType === "grant")` finally narrows — the ADR-0002 #3 promise,
+  upgraded from runtime to compile time. Honest caveat from `adr/0005`: the root
+  `{[k: string]: unknown}` index signature **persists** (the binding `allOf` trips
+  `json-schema-to-typescript` as the old `allOf` did), so consumers keeping an index-free
+  view still need a `RemoveIndex`-style helper.
+- Package API (npm axis, semver-major for `@the-rfp-hub/standard`): new `Timestamp`
+  (`string | null`) and `FundingDetails` (`Opportunity["fundingDetails"]`) type exports;
+  `DetailsByFundingType` survives with its docs rewritten for the tagged shape; the generated
+  `Opportunity` type follows every schema change above, including the currency unification —
+  `reward` and `funding` become plain number types, and the generated `Prize` and `AmountRange`
+  shapes lose their `currency` members.
+- `codegen.mjs`: `typeExpr()` gains a `oneOf` branch (renders the union in the `FIELDS.md`
+  tables); the conditionally-required annotation machinery stays but currently marks nothing —
+  `fundingDetails` is unconditionally required.
+- **Conformance suite: 29 fail cases become 27.** The six `missing-matching-type-block-*`
+  cases collapse into one `missing-fundingdetails`; `one-block-per-fundingtype` is **retired
+  as unrepresentable** (there is no second slot to fill); new cases pin the tag rules
+  (`fundingdetails-tag-mismatch`, `fundingdetails-missing-tag`), the UTC mandate
+  (`opensat-non-utc-offset` — a valid RFC 3339 offset form that must now be rejected), and the
+  document-wide currency rule (`prize-with-currency` — a prize carrying its own `currency` key
+  fails on `additionalProperties`).
+  The 11 pass cases are unchanged in count and filename; every document in `pass/` and
+  `examples/` was rewritten to the `fundingDetails` shape by script
+  (`o.fundingDetails = {fundingType: t, ...o[t]}`), losslessly — **0 of the 39 changed
+  validity**, and no temporal value needed touching. The currency unification then rewrote the
+  25 documents carrying per-type currency keys: each held exactly **one** distinct currency
+  value, so it was hoisted into `fundingInfo.currency` (24 hoists — one document already named
+  it there) and 97 per-type currency keys were stripped. **Zero conflicts existed** in the
+  corpus; the conversion is lossless.
+- `rfphub-validate`: the failure texture changes — old-shape documents now report
+  `additionalProperties` + missing `fundingDetails` instead of the retired one-block rule.
+  `humanizeErrors` gains tag-aware `oneOf` filtering (`explainOneOf()`: the instance's
+  `fundingDetails.fundingType` tag selects the one branch whose errors are reported, and a
+  missing or mismatched tag is one line); `explainNot()` is deleted with the `not` construct
+  it explained — no `not` remains anywhere in the schema. A new CI test pins all seven
+  `date-time` declarations byte-identical, the equality guard that makes the inline
+  declarations a single point of truth without a shared `$ref`. Consumers reading **raw** ajv
+  errors still see the full `oneOf` branch fan-out — an accepted cost recorded in `adr/0005`.
+  The **milestone-amount advisory check generalises** with the currency unification: it now
+  warns on *any* monetary amount present without a `fundingInfo.currency` to denominate it —
+  the envelope's own amounts, milestone amounts, and the `fundingDetails` amounts (reward,
+  prize amounts, accelerator funding, checkSize bounds) — since the document-wide rule crosses
+  objects at every site and warning remains its only enforcement. Consumers filtering on the
+  old milestone-scoped warning code should switch to the generalised one.
+
+### Docs
+
+- `FIELDS.md` hand sections: the one-line "RFC 3339 / ISO 8601" claim is replaced by a real
+  **Dates and times** convention section (RFC 3339 is a *profile* of ISO 8601; UTC-`Z`
+  mandatory; lexicographic sort is chronological; local time deliberately unrepresentable;
+  IXDTF named as future work, not adopted), the type-block narrative is rewritten for
+  `fundingDetails` self-description, and the "single currency — envelope only" section becomes
+  the **document-wide** rule, naming all six denominated sites. `CROSSWALK.md` re-keys the
+  detail-payload rows and its JSON-LD worked example, and re-words its money rows for the
+  plain-number amounts; `BENCHMARK.md` records the third (scripted, lossless) conversion and
+  the currency hoist; `STATUS.md` gains the third-revision row and paragraph; both package
+  READMEs move their examples to the new shape.
+- The structural records are
+  [`adr/0005`](../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md):
+  the survey evidence (every modern standard uses RFC 3339 strings; RFC 8984 §1.4 and AS2 §2.3
+  state the identical `Z` rule), the rejected options (structured date object, shared
+  timestamp `$def`, `if`/`then` selection, open bag, top-level `oneOf`), and the accepted
+  costs — `oneOf` error verbosity, a fourth corpus touch in ten days, no narrowing gain for
+  quicktype consumers — and
+  [`adr/0006`](../../adr/0006-document-wide-single-currency.md): the corpus evidence for the
+  document-wide currency (zero mismatches, 24 hoists), the rejected options (keep the
+  envelope-only scoping; per-amount currency objects), and the accepted cost — a prize pool or
+  reward can no longer be denominated differently from the programme budget.
+
+#### Field mapping (old → new) — third draft revision
+
+Continues the two tables below; the same rule applies — **no row is ever removed.** A reader
+holding older data chains the earlier tables' rows through these.
+
+| Old | New | Kind | Note |
+|---|---|---|---|
+| `grant` (sibling block) | `fundingDetails` with `fundingType: "grant"` | reshaped | Same fields, one new required tag. Migrate: `fundingDetails = {fundingType: "grant", ...grant}`, delete the sibling. |
+| `hackathon` (sibling block) | `fundingDetails` with `fundingType: "hackathon"` | reshaped | Same recipe. Nested paths move (`hackathon.prizes` → `fundingDetails.prizes`, …). |
+| `bounty` (sibling block) | `fundingDetails` with `fundingType: "bounty"` | reshaped | Same recipe; `reward` stays required (`fundingDetails.reward`). |
+| `accelerator` (sibling block) | `fundingDetails` with `fundingType: "accelerator"` | reshaped | Same recipe; `accelerator.funding` → `fundingDetails.funding`, its JSON-LD mapping re-homed with it. |
+| `vc_fund` (sibling block) | `fundingDetails` with `fundingType: "vc_fund"` | reshaped | Same recipe. |
+| `rfp` (sibling block) | `fundingDetails` with `fundingType: "rfp"` | reshaped | Same recipe (`rfp.scope` → `fundingDetails.scope`, `rfp.requirements` → `fundingDetails.requirements`). |
+| `opensAt` / `postedAt` / `createdAt` / `updatedAt` / `deadlines[].date` / `source.submittedAt` / `source.verifiedAt` (any RFC 3339 offset) | same fields, **UTC `Z` mandatory** (`pattern: "Z$"`) | tightened | A value with a numeric offset must be converted to UTC (`2026-08-15T23:59:59+02:00` → `2026-08-15T21:59:59Z`); lowercase `z` must be uppercased. `null` semantics unchanged. |
+| `bounty.reward` (`{amount, currency}`, both required) | `fundingDetails.reward` (plain required number) | reshaped | [`adr/0006`](../../adr/0006-document-wide-single-currency.md). Migrate: `reward = reward.amount`, hoist the currency into `fundingInfo.currency`. Denominated in the document-wide currency; the old object shape no longer validates. |
+| `hackathon.prizes[].currency` | — (hoisted into `fundingInfo.currency`) | removed | Entries become `{track, amount}`; a stray `currency` key fails on `additionalProperties` (`fail/prize-with-currency.json`). Prizes denominated differently from the envelope are inexpressible — split into per-currency documents or convert. |
+| `accelerator.funding` (`{amount, currency}`, both required) | `fundingDetails.funding` (plain nullable number) | reshaped | Same recipe as `reward`: `funding = funding.amount`, hoist the currency. The JSON-LD `funding → schema:amount` scoped mapping is unchanged. |
+| `vc_fund.checkSize.currency` | — (hoisted into `fundingInfo.currency`) | removed | `checkSize` becomes `{min, max}`; a stray `currency` key fails on `additionalProperties`. |
+
+## Spec v1.0.0 second draft revision (2026-08-05)
+
+*(Ordering note: a third draft revision landed later the same day — it is the entry above.
+This entry describes the state between the two.)*
+
+**Draft v1.0.0 was revised in place a second time.** The 2026-07-27 entry below says
+"in-place re-cuts end here"; that sentence is not edited and is not quietly ignored — it is
+superseded, on the record, by [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md).
+The short form: the vow governed re-cutting bytes that had been published as final; this
+revision exercises the standing `PROCESS.md` rule that a version directory may be edited in
+place **only while its maturity is `draft` and no external consumer has adopted it**. Both
+conditions hold (maturity `draft`, zero known adopters), one leg of the original basis does
+not (the npm package is published now, at 1.0.x), and the whole permission ends at promotion
+to `stable`, when the `FROZEN` marker lands. A document valid against the 2026-07-27 bytes is
+**not** valid against these.
+
+Every change below is listed under the bidirectional definition in `PROCESS.md` — removals
+**and** loosenings both count as breaking.
+
+### Schema
+
+**Breaking — tightenings** (previously valid documents now fail):
+
+- `operatingOrganizations` is now **required, `minItems: 1`, and the primary array**: `[0]` is
+  the primary/display organisation, including the issuing organisation of an `rfp`. A document
+  without it — every document under the previous shape's common case — no longer validates.
+- `networks` **removed**. The top level is closed, so a document carrying it now fails rather
+  than being ignored. No successor; `ecosystems` is the nearest concept.
+- `tags` **removed**. Same mechanics. No successor; `categories` is the nearest concept.
+- `extensions` **removed, and nothing replaces it**. The top level is now fully closed with
+  **no extension mechanism** — a new field requires a spec release. This retracts the
+  2026-07-27 promise that the one non-zero `funding.awardsToDate` was "rehomed rather than
+  lost" under `extensions`: **that value is now lost.**
+- `eligibility` no longer accepts an object — the open key→value map is gone (see also the
+  loosening half below).
+- `socialLinks` reshaped: the platform-keyed object (`{twitter?, discord?, …}`) becomes an
+  **array of `{platform, url}` entries** (`$defs/socialLink`; `platform` a required seven-value
+  enum, `url` a required URI, `uniqueItems` on whole entries). Old-shape objects fail; the new
+  shape can express what the old could not — several URLs on one platform.
+- `organization.slug` is **required and non-null** (it is the organisation's namespace). Every
+  organisation object without one — most of the previous corpus — now fails.
+- `organization.type` → `orgType`, and `null` is dropped from both the type union and the
+  enum. An org carrying the old key, or `"type": null`, now fails; absence remains valid.
+- `deadlines[].type` → `deadlineType` (property, `required`, `if`/`then` and examples). Old
+  deadline entries fail on the unknown key **and** the missing required one.
+- `resourceLinks` → `additionalReferences` (pure rename; still one free-form string).
+- `funding` → `fundingInfo` (pure rename; nested paths follow — `fundingInfo.currency`, etc.
+  `accelerator.funding` keeps its name and is not this field).
+
+**Breaking — loosenings** (previously invalid documents now validate):
+
+- `sponsoringOrganizations` is now **optional** (was required, `minItems: 1`, `[0]` primary).
+  A document that omits it — previously a hard failure — now validates. Its `[0]`-is-primary
+  semantics move to `operatingOrganizations`; it remains the issuer/backer, not necessarily
+  the source of funds.
+- `eligibility` **accepts free text** (`string | null`) — a string here used to be rejected.
+  Deliberately unstructured: for reading, not faceting. The `eligibility-keys` registry is
+  retired with the shape (see Tooling).
+
+**Not breaking for instances** (validation is byte-identical; package-axis only):
+
+- `$defs/monetaryAmount` removed; its `{amount, currency}` shape (both required) is **inlined**
+  at its two use sites, `bounty.reward` and `accelerator.funding`. Bounty's required-reward
+  guarantee and the envelope-only single-currency scoping are unchanged.
+- `$defs/socialLinks` → `$defs/socialLink` — the def rename half of the socialLinks change;
+  instances never reference `$defs` names.
+
+**Stability promotions (not breaking — annotations only, validation byte-identical):**
+`serviceAgreement`, `milestones[]` and `programModel` lose their `x-stability: provisional`
+markers and become `stable` — the last provisional fields in the schema. The promotion gate
+asks that the field be verified beyond its original narrow evidence; the maintainers accepted
+the M1 research round as that verification: all three trace to the decision interviews, and
+`milestones[]` additionally to the real third-party RFP that motivated it. From this date the
+three carry the full stable warranty — changing or removing them takes a new spec version.
+
+**Also:** with `organization.type` → `orgType` and `deadline.type` → `deadlineType`, the
+rename family that began with `type` → `fundingType` is complete — **no property named `type`
+remains anywhere in the schema.** And `specVersion` stays `const: "1.0.0"`: the spec axis does
+not move for a draft revision (that is what this entry's title records).
+
+### Context
+
+- Terms for the removed fields deleted: `networks`, `tags`, and `extensions` — the latter was
+  the standard's only 1:1 same-name DAOIP-5 mapping (`daoip5:extensions`), and that alignment
+  point is lost with it.
+- `resourceLinks` → `additionalReferences` (still `schema:citation`); `funding` → `fundingInfo`
+  (still `schema:amount`). The stale `funding` term was removed by hand: the context-drift
+  check cannot catch it because `accelerator.funding` keeps that property name alive in the
+  schema. `accelerator` gains a property-scoped context preserving its `funding → schema:amount`
+  mapping, which previously rode on the shared top-level term.
+- `socialLinks` gains a property-scoped context for the new entry shape: each entry's `url`
+  maps to `schema:url` (typed `@id`); `platform` resolves in the RFP Hub vocabulary. The old
+  keyed object mapped to nothing per-link.
+- The organisation terms **do not move**: `sponsoringOrganizations → schema:funder` (clean),
+  `operatingOrganizations → schema:sponsor` (loose). The role swap therefore puts the loose
+  mapping on the required primary array and the clean `funder` mapping on an optional one — an
+  accepted cost, argued in `CROSSWALK.md` and `adr/0004`.
+
+### Tooling
+
+- **`registries/eligibility-keys.json` is deleted — the registry is retired**, not
+  entry-deprecated: its governed field no longer exists, no successor values can exist for
+  `replacedBy` to point at, and codegen rejects a registry that governs no field. The
+  never-delete rule governs *entries*; a new `PROCESS.md` rule records the precedent: **a
+  registry may be retired only while its governing spec version is `draft`.** The six retired
+  key definitions (`stage`, `geography`, `jurisdiction`, `sector`, `entityType`, `compliance`)
+  remain recoverable from git history and this record. `registries/index.json` regenerated to
+  the two remaining vocabularies.
+- Package API (npm axis, semver-major for `@the-rfp-hub/standard`): `RegistryName` narrows to
+  `"deadline-labels" | "program-models"`; the `MonetaryAmount` type export is removed; the
+  `SocialLinks` type becomes `SocialLink` (one entry); `DeadlineType` re-derives from
+  `deadlineType`; the generated `Opportunity` type follows every schema change above.
+- `codegen.mjs`: `REGISTRY_FOR_FIELD` drops `eligibility`; `DEF_ORDER` follows the def
+  rename/removal. The meta-schema's stated rationale for `additionalProperties: false` is
+  rewritten — it used to say instances extend through `extensions`; it now says there is no
+  extension mechanism.
+- `rfphub-validate`: the `unregistered-eligibility-key` advisory check is deleted (its subject
+  is gone — external consumers filtering on that warning code lose it); the
+  milestone-amount-without-currency check reads `fundingInfo.currency`.
+- Conformance and examples move in lockstep in the same PR: the
+  `empty-sponsoring-organizations` and `missing-sponsoring-organizations` fail cases are
+  retired (those documents are now valid) and the guards move to new
+  `empty-operating-organizations` / `missing-operating-organizations` cases; the eligibility
+  fixture is re-cut for the string type (`eligibility-not-string`); new fail cases pin the
+  slug requirement, the non-null `orgType` enum, the `deadlineType` enum and the
+  `socialLink` entry shape; every fixture and example organisation gains a slug and every
+  deadline entry the `deadlineType` key.
+
+### Docs
+
+- `FIELDS.md` hand sections, `CROSSWALK.md`, `BENCHMARK.md`, `STATUS.md`, `NORMATIVE.md`,
+  `PROCESS.md` and both package READMEs updated for the new shape; `PROCESS.md` additionally
+  gains the registry-retirement rule and loses the "belongs in `extensions`" remedy from the
+  registration criteria (platform-specific values now simply do not belong in the standard —
+  propose a field instead).
+- The structural record is [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md),
+  which supersedes ADR-0002 decisions #11, #14, #21, #22 and the `monetaryAmount` def in part,
+  and reconciles this revision with the once-only language on the record.
+
+#### Field mapping (old → new) — second draft revision
+
+Continues the 2026-07-27 table below; the same rule applies — **no row is ever removed.** A
+reader holding 2026-07-27-shaped data chains that table's rows through these.
+
+| Old | New | Kind | Note |
+|---|---|---|---|
+| `sponsoringOrganizations` (required, `minItems: 1`, `[0]` primary) | `sponsoringOrganizations` (optional) | reshaped | Role demoted: still the issuer/backer, no longer the primary array and no longer required. A loosening — breaking under the bidirectional rule. |
+| `operatingOrganizations` (optional) | `operatingOrganizations` (required, `minItems: 1`, `[0]` primary/display) | reshaped | Role promoted: who runs the process is the entity consumers need. Migrating 2026-07-27 data: copy `sponsoringOrganizations[0]` here when no distinct operator is known. |
+| `networks` | — | removed | No successor. Nearest concept is `ecosystems`; values were not folded. |
+| `tags` | — | removed | No successor. Nearest concept is `categories`; fixture tag values were dropped, not folded. |
+| `extensions` | — | removed | **No successor and no extension mechanism** — a new field requires a spec release. Retracts the 2026-07-27 note that `awardsToDate` was "rehomed rather than lost": it is lost. |
+| `eligibility` (open key→value map) | `eligibility` (free text) | reshaped | **Semantics change.** A converter must flatten pairs into prose — lossy and one-way. The `eligibility-keys` registry is retired. |
+| `resourceLinks` | `additionalReferences` | renamed | Pure rename; still deliberately one free-form string. |
+| `funding` | `fundingInfo` | renamed | Pure rename; all nested paths follow (`funding.currency` → `fundingInfo.currency`, …). `accelerator.funding` is unaffected. |
+| `socialLinks` (platform-keyed object) | `socialLinks[]` of `{platform, url}` | reshaped | One entry per link; `platform` is a closed enum, `url` required. Migrate each old key→value pair to one entry. |
+| `organization.type` | `organization.orgType` | reshaped | Rename **and** `null` dropped from union and enum; still optional — absence is the unknown state. |
+| `organization.slug` (optional, nullable) | `organization.slug` (required, non-null) | reshaped | Tightening: the slug is the organisation's namespace. |
+| `deadlines[].type` | `deadlines[].deadlineType` | renamed | Completes the `type` rename family. The 2026-07-27 `closesAt` row's migration recipe now lands here: `[{deadlineType: "fixed", date, label: "application"}]`. |
+| `$defs/monetaryAmount` | inlined at `bounty.reward`, `accelerator.funding` | removed (def) | Instance-invisible; `{amount, currency}` both stay required at both sites. Package-axis: the `MonetaryAmount` type export is gone. |
+
 ## v1.0.0 corrections while draft (2026-08-05)
 
 The schema is byte-for-byte unchanged. Everything below is a correction to the artifacts

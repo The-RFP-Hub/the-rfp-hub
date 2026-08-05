@@ -45,10 +45,13 @@ describe("conformance suite — fail/", () => {
 
   it("covers the cases the re-cut is required to reject", () => {
     const names = cases.map((c) => c.name);
-    expect(names).toContain("one-block-per-fundingtype.json");
+    expect(names).toContain("missing-fundingdetails.json");
+    expect(names).toContain("fundingdetails-missing-tag.json");
+    expect(names).toContain("fundingdetails-tag-mismatch.json");
+    expect(names).toContain("opensat-non-utc-offset.json");
     expect(names).toContain("deadline-fixed-without-date.json");
     expect(names).toContain("deadline-fixed-date-null.json");
-    expect(names).toContain("missing-sponsoring-organizations.json");
+    expect(names).toContain("missing-operating-organizations.json");
     expect(names).toContain("unknown-top-level-property.json");
     expect(names).toContain("wrong-fundingtype-value.json");
   });
@@ -63,31 +66,37 @@ describe("conformance suite — fail/", () => {
   }
 });
 
-/** D20 in both directions: the matching block is required AND every other one is forbidden. */
-describe("one block per fundingType (D20)", () => {
+/** D20 in both directions: fundingDetails is required AND its tag must equal fundingType. */
+describe("fundingDetails carries exactly the declared shape (D20)", () => {
   const base = {
     specVersion: "1.0.0",
     id: "d20",
     title: "T",
     description: "D",
     status: "open" as const,
-    sponsoringOrganizations: [{ name: "Org" }],
+    operatingOrganizations: [{ name: "Org", slug: "org" }],
     source: {},
   };
 
-  it("accepts the matching block alone", () => {
-    expect(validateOpportunity({ ...base, fundingType: "grant", grant: {} }).valid).toBe(true);
+  it("accepts a fundingDetails tagged with the declared fundingType", () => {
+    const doc = { ...base, fundingType: "grant", fundingDetails: { fundingType: "grant" } };
+    expect(validateOpportunity(doc).valid).toBe(true);
   });
 
-  it("rejects a matching block plus any other block", () => {
-    for (const extra of ["hackathon", "bounty", "accelerator", "vc_fund", "rfp"]) {
-      const doc = { ...base, fundingType: "grant", grant: {}, [extra]: {} };
-      expect(validateOpportunity(doc).valid, `grant + ${extra} must fail`).toBe(false);
+  it("rejects a fundingDetails tagged with any other fundingType", () => {
+    for (const other of ["hackathon", "bounty", "accelerator", "vc_fund", "rfp"]) {
+      const doc = { ...base, fundingType: "grant", fundingDetails: { fundingType: other } };
+      expect(validateOpportunity(doc).valid, `grant + ${other} details must fail`).toBe(false);
     }
   });
 
-  it("rejects a non-matching block on its own", () => {
-    expect(validateOpportunity({ ...base, fundingType: "grant", rfp: {} }).valid).toBe(false);
+  it("rejects a missing fundingDetails", () => {
+    expect(validateOpportunity({ ...base, fundingType: "grant" }).valid).toBe(false);
+  });
+
+  it("rejects an untagged fundingDetails", () => {
+    const doc = { ...base, fundingType: "grant", fundingDetails: {} };
+    expect(validateOpportunity(doc).valid).toBe(false);
   });
 });
 

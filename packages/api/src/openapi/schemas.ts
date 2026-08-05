@@ -13,7 +13,7 @@
  * drift-guard test in test/unit/openapi-drift.test.ts is what makes sure it also gets DOCUMENTED).
  * `OpportunitySummary` is the opposite case — a server-controlled projection with a closed shape.
  */
-import { STANDARD_REQUIRED, detailOnly, standardEnum, standardProperty } from "./standard.js";
+import { STANDARD_REQUIRED, detailOnly, standardProperty } from "./standard.js";
 
 /** Every property `toSummary` emits — the fields shared by the list and detail projections. */
 const summaryProperties = {
@@ -28,19 +28,17 @@ const summaryProperties = {
   operatingOrganizations: standardProperty("operatingOrganizations"),
   source: standardProperty("source"),
   ecosystems: standardProperty("ecosystems"),
-  networks: standardProperty("networks"),
   categories: standardProperty("categories"),
-  tags: standardProperty("tags"),
   eligibility: standardProperty("eligibility"),
   prerequisites: standardProperty("prerequisites"),
-  resourceLinks: standardProperty("resourceLinks"),
+  additionalReferences: standardProperty("additionalReferences"),
   serviceAgreement: standardProperty("serviceAgreement"),
   applicationUrl: standardProperty("applicationUrl"),
   website: standardProperty("website"),
   logoUrl: standardProperty("logoUrl"),
   bannerUrl: standardProperty("bannerUrl"),
   socialLinks: standardProperty("socialLinks"),
-  funding: standardProperty("funding"),
+  fundingInfo: standardProperty("fundingInfo"),
   milestones: standardProperty("milestones"),
   opensAt: standardProperty("opensAt"),
   deadlines: standardProperty("deadlines"),
@@ -50,35 +48,35 @@ const summaryProperties = {
 };
 
 /**
- * The six type-specific blocks, keyed by `fundingType` value. Exactly one is present on any given
- * entry — which one is a runtime fact (`opportunity[opportunity.fundingType]`), so all six are
- * declared as optional properties rather than modelled as a union.
+ * The type-specific details, a single required slot: the Standard models `fundingDetails` as a
+ * `oneOf` tagged union over the six detail shapes, each self-described by its required
+ * `fundingType` tag (equal to the top-level `fundingType`). The derivation serves it as a
+ * pass-through object, like every other `$defs`-backed sub-object.
  */
-const typeBlockProperties = Object.fromEntries(
-  standardEnum("fundingType").map((type) => [type, detailOnly(standardProperty(type))]),
-);
+const fundingDetailsProperty = detailOnly(standardProperty("fundingDetails"));
 
 export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
   {
     $id: "Opportunity",
     type: "object",
     description:
-      "A full RFP Hub Standard opportunity, as served by GET /v1/opportunities/{id}: the shared fields plus the block named by `fundingType` and any publisher `extensions`.",
+      "A full RFP Hub Standard opportunity, as served by GET /v1/opportunities/{id}: the shared fields plus `fundingDetails`, whose own `fundingType` tag names its shape.",
     additionalProperties: true,
     required: [...STANDARD_REQUIRED],
     properties: {
       ...summaryProperties,
-      ...typeBlockProperties,
-      extensions: detailOnly(standardProperty("extensions")),
+      fundingDetails: fundingDetailsProperty,
     },
   },
   {
     $id: "OpportunitySummary",
     type: "object",
     description:
-      "The thin list projection served by GET /v1/opportunities: a Standard opportunity minus the type-specific block and `extensions`. Fetch the detail endpoint for those.",
+      "The thin list projection served by GET /v1/opportunities: a Standard opportunity minus `fundingDetails`. Fetch the detail endpoint for that.",
     additionalProperties: false,
-    required: [...STANDARD_REQUIRED],
+    // The Standard requires `fundingDetails`; the summary is the one deliberate deviation — it is
+    // a server-controlled projection that omits that slot, so it cannot require it either.
+    required: STANDARD_REQUIRED.filter((name) => name !== "fundingDetails"),
     properties: { ...summaryProperties },
   },
   {

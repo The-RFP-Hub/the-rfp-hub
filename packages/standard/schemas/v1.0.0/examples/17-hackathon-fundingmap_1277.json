@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "ETHGlobal Open Agents",
+      "slug": "ethglobal-open-agents",
+      "website": "https://ethglobal.com/events/openagents"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ETHGlobal Open Agents",
+      "slug": "ethglobal-open-agents",
       "website": "https://ethglobal.com/events/openagents"
     }
   ],
@@ -25,50 +33,51 @@
     "AI",
     "Infrastructure"
   ],
-  "tags": [
-    "Hackathons"
-  ],
   "applicationUrl": "https://ethglobal.com/events/openagents",
   "website": "https://ethglobal.com/events/openagents",
-  "socialLinks": {
-    "twitter": "https://x.com/ETHGlobal"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/ETHGlobal"
+    }
+  ],
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 50000
   },
   "opensAt": "2026-04-24T12:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-06T23:59:59.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-24T17:00:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-24T12:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-06T23:59:59.999Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-20T00:01:31.000Z",
   "updatedAt": "2026-05-07T00:05:55.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Remote",
     "online": null,
     "prizes": [
       {
         "track": null,
-        "amount": 50000,
-        "currency": "USD"
+        "amount": 50000
       }
     ]
   }

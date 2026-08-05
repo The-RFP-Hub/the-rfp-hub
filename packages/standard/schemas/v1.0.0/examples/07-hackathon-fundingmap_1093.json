@@ -8,6 +8,14 @@
   "sponsoringOrganizations": [
     {
       "name": "ETHGlobal Lisbon 2026",
+      "slug": "ethglobal-lisbon-2026",
+      "website": "https://ethglobal.com/events/lisbon2026"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ETHGlobal Lisbon 2026",
+      "slug": "ethglobal-lisbon-2026",
       "website": "https://ethglobal.com/events/lisbon2026"
     }
   ],
@@ -22,67 +30,61 @@
   "categories": [
     "Hackathon"
   ],
-  "tags": [
-    "Hackathons"
-  ],
   "applicationUrl": "https://ethglobal.com/events/lisbon2026",
   "website": "https://ethglobal.com/events/lisbon2026",
-  "funding": {
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 60000
   },
   "opensAt": "2026-07-24T12:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-26T23:59:59.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-10T22:59:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-24T12:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-07-26T23:59:59.999Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-06T14:11:38.000Z",
   "updatedAt": "2026-03-09T14:24:34.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Lisbon, Portugal",
     "online": null,
     "prizes": [
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       },
       {
         "track": null,
-        "amount": 5000,
-        "currency": "USD"
+        "amount": 5000
       }
     ]
   }

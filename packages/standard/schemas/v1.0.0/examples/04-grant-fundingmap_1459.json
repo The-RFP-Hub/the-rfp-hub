@@ -12,6 +12,12 @@
       "slug": "celo"
     }
   ],
+  "operatingOrganizations": [
+    {
+      "name": "Prezenti Boost Pool S2",
+      "slug": "celo"
+    }
+  ],
   "source": {
     "publisher": "celo",
     "ingestedVia": "import",
@@ -42,13 +48,25 @@
     "Yield Farming"
   ],
   "applicationUrl": "https://prezenti.xyz/grants",
-  "socialLinks": {
-    "twitter": "https://x.com/prezenti_grants",
-    "discord": "https://discord.gg/YCgGjFaP7f",
-    "forum": "https://forum.celo.org/search?q=Prezenti",
-    "blog": "https://forum.celo.org/search?q=Prezenti"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/prezenti_grants"
+    },
+    {
+      "platform": "discord",
+      "url": "https://discord.gg/YCgGjFaP7f"
+    },
+    {
+      "platform": "forum",
+      "url": "https://forum.celo.org/search?q=Prezenti"
+    },
+    {
+      "platform": "blog",
+      "url": "https://forum.celo.org/search?q=Prezenti"
+    }
+  ],
+  "fundingInfo": {
     "budget": 70000,
     "minAward": 5000,
     "maxAward": 5000
@@ -56,12 +74,14 @@
   "opensAt": "2026-02-25T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-06-30T23:59:00.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2026-05-04T20:43:34.000Z",
   "updatedAt": "2026-05-18T17:16:27.000Z",
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

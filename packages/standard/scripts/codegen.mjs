@@ -174,7 +174,6 @@ const versionsIndex = {
       version: spec.specVersion,
       path: spec.schemaDir.replace(/^schemas\//, ""),
       status: spec.status,
-      ...(spec.recutDate ? { recut: spec.recutDate } : {}),
     },
   ],
   latest: spec.specVersion,
@@ -190,7 +189,6 @@ const FIELDS_END = "<!-- END generated:fields -->";
 
 /** Fields whose *values* are governed by an open vocabulary in registries/. */
 const REGISTRY_FOR_FIELD = {
-  eligibility: "eligibility-keys",
   "deadline.label": "deadline-labels",
   "grant.programModel": "program-models",
 };
@@ -219,9 +217,8 @@ const DEF_ORDER = [
   "organization",
   "contact",
   "provenance",
-  "socialLinks",
+  "socialLink",
   "funding",
-  "monetaryAmount",
   "amountRange",
   "deadline",
   "milestone",
@@ -264,6 +261,7 @@ function typeExpr(node) {
     return `[\`${name}\`](${anchor(name)})`;
   }
   if (node.anyOf) return node.anyOf.map(typeExpr).join(" \\| ");
+  if (node.oneOf) return node.oneOf.map(typeExpr).join(" \\| ");
   const types = Array.isArray(node.type) ? node.type : node.type ? [node.type] : [];
   const nullable = types.includes("null");
   const base = types.filter((t) => t !== "null");
@@ -291,7 +289,7 @@ function constraintsExpr(node) {
   return c.length > 0 ? `, ${c.join(", ")}` : "";
 }
 
-/** Property names the six if/then branches make conditionally required. */
+/** Property names any allOf if/then branch makes conditionally required. The binding branches currently add none — fundingDetails is unconditionally required — but the machinery stays so a future conditional requirement renders as 'cond.' again. */
 const conditionalProps = new Set(
   (schemaObj.allOf ?? []).flatMap((branch) => branch.then?.required ?? []),
 );

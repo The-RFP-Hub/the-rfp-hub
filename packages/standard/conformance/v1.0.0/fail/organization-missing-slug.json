@@ -1,0 +1,17 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:org-no-slug",
+  "fundingType": "grant",
+  "title": "Organisation without a slug",
+  "description": "The operating organisation carries a name but no slug. slug is now required on every organisation: it is the organisation's namespace and directory key — provenance.publisher references it — so an organisation without one cannot be addressed.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation"
+    }
+  ],
+  "source": {},
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

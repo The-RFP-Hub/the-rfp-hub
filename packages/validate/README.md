@@ -40,18 +40,23 @@ deliberately leaves open, and never make a document non-conformant on their own:
 
 | Check | Fires when |
 |---|---|
-| `unregistered-eligibility-key` | an `eligibility` key is not in `registries/eligibility-keys.json` |
 | `unregistered-deadline-label` | a `deadlines[].label` is not in `registries/deadline-labels.json` |
-| `unregistered-program-model` | `grant.programModel` is not in `registries/program-models.json` |
-| `milestone-amount-without-currency` | a `milestones[].amount` is present with no `funding.currency` to denominate it |
+| `unregistered-program-model` | `fundingDetails.programModel` is not in `registries/program-models.json` |
+| `amount-without-currency` | a monetary amount — an envelope amount, a `milestones[].amount`, or a `fundingDetails` amount (bounty reward, prize amount, accelerator funding, checkSize bound) — is present with no `fundingInfo.currency` to denominate it |
 
 The split is the point. A closed enum built from one publisher's vocabulary would force every
 other publisher into it, so those fields stay open — and the registries would be documentation
 nobody reads if nothing ever checked them. Text output is count-phrased ("3 of 40 entries use
-an unregistered eligibility key") so the summary reads as coverage rather than noise. The last
-check exists because its rule is real but crosses two objects, which JSON Schema cannot express:
-a milestone amount MUST follow the top-level envelope currency, and warning is the only
-enforcement that rule has.
+an unregistered deadline label") so the summary reads as coverage rather than noise. The last
+check exists because its rule is real but crosses objects, which JSON Schema cannot express:
+every monetary amount in a document MUST be denominated in the top-level `fundingInfo.currency`,
+and warning is the only enforcement that rule has.
+
+(An `unregistered-eligibility-key` check shipped until 2026-08-05, when `eligibility` became
+free text and its registry was retired; consumers filtering on that warning code will no longer
+see it. The currency check was scoped to milestones — code `milestone-amount-without-currency` —
+until the same date, when the single-currency rule became document-wide; consumers filtering on
+the old code should switch to the new one.)
 
 Pass `--strict` in CI once your data is clean, to keep it clean.
 
@@ -81,28 +86,30 @@ tier), `SPEC_VERSION`, and the `Opportunity` type (re-exported from `@the-rfp-hu
 
 `errors` are raw ajv `ErrorObject`s. `humanizeErrors(errors, instance)` renders them as lines
 naming the rule that failed. **Pass the instance as the second argument** where you have it —
-it is optional, but without it the one-block-per-`fundingType` rule cannot name the block that
-should not be there:
+it is optional, but without it a failed `fundingDetails` cannot be reduced to the one shape
+its `fundingType` tag names:
 
 ```
-(root) carries a type block that does not match fundingType: 'rfp'. Only the 'grant' block may be present.
-(root) must NOT have additional properties: 'chainID'
+/fundingDetails grant details: unknown field 'recuring'
+fundingDetails.fundingType 'hackathon' does not match the opportunity's fundingType 'grant'
 /status must be equal to one of the allowed values: upcoming, open, closed, archived
 ```
 
-Two things happen behind that. ajv reports the schema's `not` construct as `must NOT be valid`,
-which is true and useless, so it is replaced with the rule's actual name; and ajv reports every
-`if`/`then` failure twice — once for the real constraint and once for a wrapper reading
-`must match "then" schema` — so the wrapper is dropped. The CLI does both automatically.
+Two things happen behind that. When `fundingDetails` fails its `oneOf`, ajv reports every
+branch's errors; the instance's own `fundingType` tag says which shape was meant, so only that
+branch's errors are kept (and a missing or mismatched tag is reported as a single line). And
+ajv reports every `if`/`then` failure twice — once for the real constraint and once for a
+wrapper reading `must match "then" schema` — so the wrapper is dropped. The CLI does both
+automatically.
 
 ## How it validates
 
 ajv (`ajv/dist/2020`) + `ajv-formats` with the configuration the standard is authored
-against: draft 2020-12, `strict: true`, `strictRequired: false` (so the conditional
-type-block pattern — `opportunity[opportunity.fundingType]` — is permitted), plus the
-standard's `x-stability` / `x-since` / `x-deprecated` annotation keywords declared so strict
-mode accepts them. The same `createValidator()` is reused by the API and tests, so validation
-is identical everywhere.
+against: draft 2020-12, `strict: true`, `strictRequired: false` (so applicator subschemas —
+the `fundingDetails` binding `allOf`, the deadline `if`/`then` — may require properties they
+re-reference rather than declare), plus the standard's `x-stability` / `x-since` /
+`x-deprecated` annotation keywords declared so strict mode accepts them. The same
+`createValidator()` is reused by the API and tests, so validation is identical everywhere.
 
 The test suite runs the standard's own conformance suite
 (`@the-rfp-hub/standard/conformance/v1.0.0/{pass,fail}/`) rather than private fixtures, so the

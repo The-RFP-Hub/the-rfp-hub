@@ -7,7 +7,14 @@
   "status": "closed",
   "sponsoringOrganizations": [
     {
-      "name": "Prezenti Mint Round"
+      "name": "Prezenti Mint Round",
+      "slug": "prezenti-mint-round"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Prezenti Mint Round",
+      "slug": "prezenti-mint-round"
     }
   ],
   "source": {
@@ -16,9 +23,6 @@
     "verifiedAgainstSource": null
   },
   "ecosystems": [
-    "Celo"
-  ],
-  "networks": [
     "Celo"
   ],
   "categories": [
@@ -32,15 +36,18 @@
     "Research",
     "Yield Farming"
   ],
-  "tags": [
-    "Direct Grants"
-  ],
   "applicationUrl": "https://prezenti.xyz",
-  "socialLinks": {
-    "twitter": "https://x.com/prezenti_grants",
-    "discord": "https://discord.gg/wW9U6yeghq"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/prezenti_grants"
+    },
+    {
+      "platform": "discord",
+      "url": "https://discord.gg/wW9U6yeghq"
+    }
+  ],
+  "fundingInfo": {
     "budget": 160000,
     "allocated": 1129670,
     "minAward": 2000,
@@ -49,17 +56,15 @@
   "opensAt": "2024-10-01T07:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2024-11-30T08:00:00.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2024-09-19T18:02:23.000Z",
   "updatedAt": "2026-05-18T13:37:50.000Z",
-  "grant": {
+  "fundingDetails": {
+    "fundingType": "grant",
     "recurring": true
-  },
-  "extensions": {
-    "fundingmap.awardsToDate": 72
   }
 }

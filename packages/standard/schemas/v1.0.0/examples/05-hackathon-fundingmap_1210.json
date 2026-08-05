@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "HackByte 4․0",
+      "slug": "hackbyte-4-0",
+      "website": "https://www.hackbyte.in/"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "HackByte 4․0",
+      "slug": "hackbyte-4-0",
       "website": "https://www.hackbyte.in/"
     }
   ],
@@ -23,70 +31,66 @@
   "categories": [
     "Hackathon"
   ],
-  "resourceLinks": "Original posting: https://www.hackbyte.in/",
+  "additionalReferences": "Original posting: https://www.hackbyte.in/",
   "applicationUrl": "https://hackbyte4.devfolio.co",
   "website": "https://www.hackbyte.in/",
-  "funding": {
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 10257
   },
   "opensAt": "2026-04-03T13:30:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-18T18:29:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-18T18:29:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-03T13:30:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-05T02:30:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-09T20:29:39.000Z",
   "updatedAt": "2026-03-19T00:03:44.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "IIITDM Jabalpur, Airport Road, PDPM IIITDM Jabalpur Campus, Khamaria, Jabalpur, Madhya Pradesh, India",
     "online": null,
     "prizes": [
       {
         "track": null,
-        "amount": 100,
-        "currency": "USD"
+        "amount": 100
       },
       {
         "track": null,
-        "amount": 4,
-        "currency": "USD"
+        "amount": 4
       },
       {
         "track": null,
-        "amount": 1,
-        "currency": "USD"
+        "amount": 1
       },
       {
         "track": null,
-        "amount": 2,
-        "currency": "USD"
+        "amount": 2
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       },
       {
         "track": null,
-        "amount": 150,
-        "currency": "USD"
+        "amount": 150
       }
     ],
     "teamSize": {

@@ -1,17 +1,30 @@
 import { opportunitySchema } from "@the-rfp-hub/standard";
-import type { ErrorObject } from "ajv";
+import type { ErrorObject, ValidateFunction } from "ajv";
+import { createValidator } from "./validator.js";
+
+const schema = opportunitySchema as {
+  $schema?: string;
+  properties?: Record<string, { enum?: unknown }>;
+  $defs?: Record<string, { properties?: Record<string, { const?: unknown }> }>;
+};
 
 /**
- * The type-block keys, which by the standard's own invariant are exactly the `fundingType`
- * values. Read from the schema rather than hardcoded, so a seventh type could never make this
- * message silently wrong.
+ * The `fundingType` values, which by the standard's own invariant are exactly the tags of the
+ * `fundingDetails` shapes. Read from the schema rather than hardcoded, so a seventh type could
+ * never make these messages silently wrong.
  */
-const TYPE_BLOCKS: readonly string[] = (() => {
-  const props = (opportunitySchema as { properties?: Record<string, { enum?: unknown }> })
-    .properties;
-  const values = props?.fundingType?.enum;
+const FUNDING_TYPES: readonly string[] = (() => {
+  const values = schema.properties?.fundingType?.enum;
   return Array.isArray(values) ? (values as string[]) : [];
 })();
+
+/** Tag value → `$defs` name (e.g. 'vc_fund' → 'vcFund'), read from each def's `const` tag. */
+const DEF_BY_TAG: ReadonlyMap<string, string> = new Map(
+  Object.entries(schema.$defs ?? {}).flatMap(([name, def]) => {
+    const tag = def.properties?.fundingType?.const;
+    return typeof tag === "string" ? ([[tag, name]] as const) : [];
+  }),
+);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -26,32 +39,68 @@ function isRedundantIfWrapper(e: ErrorObject): boolean {
   return e.keyword === "if" && (e.params as { failingKeyword?: string }).failingKeyword != null;
 }
 
-/**
- * `not` produces "must NOT be valid", which is true and useless. Every `not` in this schema is
- * the one-block-per-fundingType rule, so say that instead — and name the offending block when
- * the instance is available.
- */
-function explainNot(e: ErrorObject, data: unknown): string | undefined {
-  if (e.keyword !== "not") return undefined;
-  if (!/^#\/allOf\/\d+\/then\/not$/.test(e.schemaPath)) return undefined;
-
-  const declared = isRecord(data) && typeof data.fundingType === "string" ? data.fundingType : null;
-  const extras = isRecord(data)
-    ? TYPE_BLOCKS.filter((k) => k !== declared && Object.hasOwn(data, k))
-    : [];
-
-  const offending = extras.length > 0 ? `: ${extras.map((k) => `'${k}'`).join(", ")}` : "";
-  const expected = declared ? ` Only the '${declared}' block may be present.` : "";
-  return `carries a type block that does not match fundingType${offending}.${expected}`;
+function isFundingDetailsError(e: ErrorObject): boolean {
+  return e.instancePath === "/fundingDetails" || e.instancePath.startsWith("/fundingDetails/");
 }
 
-/** Render a single ajv error as a concise, human-readable line naming the rule that failed. */
-export function humanizeError(e: ErrorObject, data?: unknown): string {
-  const where = e.instancePath?.length ? e.instancePath : "(root)";
+/**
+ * Per-shape validators, compiled lazily against the schema's own `$defs`. ajv's error spray for
+ * a failed `fundingDetails` mixes every `oneOf` branch, and its schemaPaths do not reliably name
+ * the branch they came from — re-validating against the tagged shape alone is what lets the
+ * report carry only the errors that were meant.
+ */
+const branchValidators = new Map<string, ValidateFunction>();
+function branchValidator(tag: string): ValidateFunction | undefined {
+  const def = DEF_BY_TAG.get(tag);
+  if (!def) return undefined;
+  let validate = branchValidators.get(tag);
+  if (!validate) {
+    validate = createValidator({
+      $schema: schema.$schema,
+      $defs: schema.$defs,
+      $ref: `#/$defs/${def}`,
+    });
+    branchValidators.set(tag, validate);
+  }
+  return validate;
+}
 
-  const notMessage = explainNot(e, data);
-  if (notMessage) return `${where} ${notMessage}`;
+/**
+ * A failing `fundingDetails` makes ajv report every branch of the `oneOf`, burying the message
+ * that matters. The instance's own `fundingType` tag says which shape was meant: keep only that
+ * branch's errors — and when the tag itself is the problem, say exactly that in one line.
+ */
+function explainOneOf(errors: readonly ErrorObject[], data: unknown): string[] | undefined {
+  if (!errors.some(isFundingDetailsError)) return undefined;
+  if (!isRecord(data) || !isRecord(data.fundingDetails)) return undefined;
 
+  const tag = data.fundingDetails.fundingType;
+  if (typeof tag !== "string" || !FUNDING_TYPES.includes(tag)) {
+    return [
+      `/fundingDetails must carry a fundingType tag naming its shape (one of: ${FUNDING_TYPES.join(", ")})`,
+    ];
+  }
+
+  const declared = data.fundingType;
+  if (typeof declared === "string" && FUNDING_TYPES.includes(declared) && declared !== tag) {
+    return [
+      `fundingDetails.fundingType '${tag}' does not match the opportunity's fundingType '${declared}'`,
+    ];
+  }
+
+  const validate = branchValidator(tag);
+  if (!validate || validate(data.fundingDetails)) return undefined;
+  return (validate.errors ?? []).map((e) => {
+    const msg =
+      e.keyword === "additionalProperties"
+        ? `unknown field '${(e.params as { additionalProperty: string }).additionalProperty}'`
+        : describe(e);
+    return `/fundingDetails${e.instancePath} ${tag} details: ${msg}`;
+  });
+}
+
+/** The message part of a humanized line, naming the values ajv leaves in `params`. */
+function describe(e: ErrorObject): string {
   let msg = e.message ?? "is invalid";
   // ajv's "required" message already names the property; only augment where it doesn't.
   if (e.keyword === "additionalProperties") {
@@ -63,18 +112,30 @@ export function humanizeError(e: ErrorObject, data?: unknown): string {
   } else if (e.keyword === "const") {
     const { allowedValue } = e.params as { allowedValue?: unknown };
     if (allowedValue !== undefined) msg += `: ${JSON.stringify(allowedValue)}`;
+  } else if (e.keyword === "pattern") {
+    const { pattern } = e.params as { pattern?: string };
+    // The UTC mandate is the one pattern a publisher will actually hit; say what it means.
+    if (pattern === "Z$") msg = "must be an RFC 3339 timestamp in UTC, ending in 'Z'";
   }
-  return `${where} ${msg}`;
+  return msg;
+}
+
+/** Render a single ajv error as a concise, human-readable line naming the rule that failed. */
+export function humanizeError(e: ErrorObject): string {
+  const where = e.instancePath?.length ? e.instancePath : "(root)";
+  return `${where} ${describe(e)}`;
 }
 
 /**
  * Render a list of ajv errors as human-readable lines.
  *
- * Pass the validated instance when you have it: it lets the one-block-per-fundingType rule name
- * the block that should not be there, instead of ajv's bare "must NOT be valid".
+ * Pass the validated instance when you have it: it lets a failed `fundingDetails` be reported
+ * as the one shape its tag names, instead of ajv's every-branch `oneOf` spray.
  */
 export function humanizeErrors(errors: readonly ErrorObject[], data?: unknown): string[] {
   const meaningful = errors.filter((e) => !isRedundantIfWrapper(e));
   const kept = meaningful.length > 0 ? meaningful : errors;
-  return kept.map((e) => humanizeError(e, data));
+  const detailLines = explainOneOf(kept, data);
+  if (!detailLines) return kept.map(humanizeError);
+  return [...detailLines, ...kept.filter((e) => !isFundingDetailsError(e)).map(humanizeError)];
 }

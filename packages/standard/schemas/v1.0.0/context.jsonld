@@ -49,19 +49,24 @@
     "website": { "@id": "schema:sameAs", "@type": "@id" },
     "logoUrl": { "@id": "schema:logo", "@type": "@id" },
     "bannerUrl": { "@id": "schema:image", "@type": "@id" },
-    "socialLinks": "socialLinks",
-    "resourceLinks": "schema:citation",
+    "socialLinks": {
+      "@id": "socialLinks",
+      "@container": "@set",
+      "@context": {
+        "platform": "socialPlatform",
+        "url": { "@id": "schema:url", "@type": "@id" }
+      }
+    },
+    "additionalReferences": "schema:citation",
 
     "ecosystems": { "@id": "ecosystems", "@container": "@set" },
-    "networks": { "@id": "networks", "@container": "@set" },
     "categories": { "@id": "schema:about", "@container": "@set" },
-    "tags": { "@id": "schema:keywords", "@container": "@set" },
 
     "eligibility": { "@id": "schema:eligibleCustomerType", "@protected": true },
     "prerequisites": "schema:competencyRequired",
     "serviceAgreement": "serviceAgreement",
 
-    "funding": { "@id": "schema:amount", "@protected": true },
+    "fundingInfo": { "@id": "schema:amount", "@protected": true },
     "currency": "schema:currency",
     "budget": { "@id": "daoip5:totalGrantPoolSize", "@protected": true },
     "allocated": "allocated",
@@ -85,12 +90,10 @@
     "createdAt": { "@id": "schema:dateCreated", "@type": "schema:DateTime" },
     "updatedAt": { "@id": "schema:dateModified", "@type": "schema:DateTime" },
 
-    "grant": "grant",
-    "hackathon": "hackathon",
-    "bounty": "bounty",
-    "accelerator": "accelerator",
-    "vc_fund": "vc_fund",
-    "rfp": "rfp",
+    "fundingDetails": {
+      "@id": "fundingDetails",
+      "@context": { "funding": "schema:amount" }
+    },
 
     "tracks": { "@id": "tracks", "@container": "@set" },
     "prizes": { "@id": "prizes", "@container": "@set" },
@@ -103,8 +106,6 @@
     "milestoneBased": "milestoneBased",
     "recurring": "recurring",
     "scope": "scope",
-    "requirements": { "@id": "requirements", "@container": "@set" },
-
-    "extensions": { "@id": "daoip5:extensions", "@protected": true }
+    "requirements": { "@id": "requirements", "@container": "@set" }
   }
 }

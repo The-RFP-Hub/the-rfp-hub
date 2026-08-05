@@ -1,0 +1,37 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:prize-currency",
+  "fundingType": "hackathon",
+  "title": "Prize carrying its own currency key",
+  "description": "Every monetary amount in a document is denominated in the single document-wide fundingInfo.currency — prizes carry no currency of their own. This prize's 'currency' key is therefore an unknown property, and the closed prize object rejects it via additionalProperties. The envelope currency is present and the prize amount is otherwise well-formed, so the stray key is the single defect.",
+  "status": "upcoming",
+  "sponsoringOrganizations": [
+    {
+      "name": "Example Events",
+      "slug": "example-events",
+      "orgType": "company"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Events",
+      "slug": "example-events",
+      "orgType": "company"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USD",
+    "budget": 50000
+  },
+  "fundingDetails": {
+    "fundingType": "hackathon",
+    "prizes": [
+      {
+        "track": "DeFi",
+        "amount": 25000,
+        "currency": "USD"
+      }
+    ]
+  }
+}

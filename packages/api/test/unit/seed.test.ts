@@ -35,21 +35,40 @@ describe("gateForSeed", () => {
     expect(rejected[0]?.errors.join(" ")).toContain("/status");
   });
 
-  it("names the one-block-per-fundingType rule when a record carries two blocks", () => {
+  it("rejects a fundingDetails tag that disagrees with the top-level fundingType", () => {
+    // Two type blocks are UNREPRESENTABLE since the single fundingDetails slot; the residual
+    // failure mode is a details payload tagged as another type — the binding allOf rejects it.
     const good = mapProgram(grantProgram, { programUrlBase: BASE });
-    const twoBlocks = { ...good, id: "fundingmap:two", rfp: { scope: "x" } } as Opportunity;
-    const { rejected } = gateForSeed([twoBlocks]);
-    expect(rejected[0]?.errors.join(" ")).toContain("does not match fundingType");
+    const mismatched = {
+      ...good,
+      id: "fundingmap:mismatch",
+      fundingDetails: { fundingType: "rfp", scope: "x" },
+    } as unknown as Opportunity;
+    const { rejected } = gateForSeed([mismatched]);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.errors.join(" ")).toContain("does not match the opportunity's fundingType");
   });
 
   it("does not let advisory warnings reject a record", () => {
     const good = mapProgram(grantProgram, { programUrlBase: BASE });
     const warns = {
       ...good,
-      eligibility: { projectStage: "seed" },
-      deadlines: [{ type: "rolling" as const, label: "whenever" }],
+      eligibility: "Seed-stage teams only.",
+      deadlines: [{ deadlineType: "rolling" as const, label: "whenever" }],
     } as Opportunity;
     expect(gateForSeed([warns]).rejected).toEqual([]);
+  });
+
+  it("hard-rejects the pre-re-cut eligibility OBJECT — eligibility is free text now", () => {
+    const good = mapProgram(grantProgram, { programUrlBase: BASE });
+    const objectEligibility = {
+      ...good,
+      id: "fundingmap:object-eligibility",
+      eligibility: { projectStage: "seed" },
+    } as unknown as Opportunity;
+    const { rejected } = gateForSeed([objectEligibility]);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.errors.join(" ")).toContain("/eligibility");
   });
 
   it("prints every rejection with its id", () => {

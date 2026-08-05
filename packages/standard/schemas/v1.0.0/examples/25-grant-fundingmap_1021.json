@@ -12,6 +12,12 @@
       "slug": "refi-colombia-community"
     }
   ],
+  "operatingOrganizations": [
+    {
+      "name": "Localism Mini Grant Round 01 | Colombia",
+      "slug": "refi-colombia-community"
+    }
+  ],
   "source": {
     "publisher": "refi-colombia-community",
     "ingestedVia": "import",
@@ -21,21 +27,21 @@
   "ecosystems": [
     "Celo"
   ],
-  "networks": [
-    "Celo"
-  ],
   "categories": [
     "Communities"
   ],
-  "tags": [
-    "Direct Grants"
-  ],
   "applicationUrl": "https://t.me/reficolombia",
-  "socialLinks": {
-    "twitter": "https://x.com/RefiColombia",
-    "telegram": "https://t.me/reficolombia"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/RefiColombia"
+    },
+    {
+      "platform": "telegram",
+      "url": "https://t.me/reficolombia"
+    }
+  ],
+  "fundingInfo": {
     "budget": 4500,
     "allocated": 0,
     "minAward": 750,
@@ -44,14 +50,15 @@
   "opensAt": "2026-01-15T05:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-02-07T23:59:00.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2026-01-03T21:58:12.000Z",
   "updatedAt": "2026-02-02T17:28:21.000Z",
-  "grant": {
+  "fundingDetails": {
+    "fundingType": "grant",
     "recurring": true
   }
 }

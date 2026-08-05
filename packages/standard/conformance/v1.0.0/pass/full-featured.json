@@ -4,14 +4,14 @@
   "id": "conformance:full",
   "fundingType": "rfp",
   "title": "OPSEC Ratings System & Coalition",
-  "description": "A milestone-paid RFP with no application portal, multiple labelled deadlines, structured eligibility and a service-agreement arrangement. Exercises every field the re-cut added.",
+  "description": "A milestone-paid RFP with no application portal, multiple labelled deadlines, free-text eligibility and a service-agreement arrangement. Exercises every optional top-level field the standard defines: distinct sponsoring and operating organisations (each with its required slug), socialLinks as platform/url entries, the fundingInfo envelope, and the additionalReferences string.",
   "summary": "Milestone-paid RFP run by an operator on a sponsor's behalf.",
   "status": "open",
   "sponsoringOrganizations": [
     {
       "name": "Example Foundation",
       "slug": "example-foundation",
-      "type": "foundation",
+      "orgType": "foundation",
       "description": "The issuing/backing entity. Not necessarily where the money comes from.",
       "website": "https://example.org",
       "ecosystems": [
@@ -28,13 +28,15 @@
       ]
     },
     {
-      "name": "Second Backer"
+      "name": "Second Backer",
+      "slug": "second-backer"
     }
   ],
   "operatingOrganizations": [
     {
       "name": "Example Operations Co",
-      "type": "company"
+      "slug": "example-operations-co",
+      "orgType": "company"
     }
   ],
   "source": {
@@ -51,36 +53,29 @@
     "Ethereum",
     "Optimism"
   ],
-  "networks": [
-    "optimism"
-  ],
   "categories": [
     "Public Goods",
     "Security"
   ],
-  "tags": [
-    "opsec",
-    "ratings"
-  ],
-  "eligibility": {
-    "stage": "Teams with a shipped product and a public track record",
-    "geography": "Global",
-    "jurisdiction": "Excludes OFAC-sanctioned jurisdictions",
-    "entityType": "Registered legal entity required before payout",
-    "compliance": "KYB and quarterly reporting required"
-  },
+  "eligibility": "stage: Teams with a shipped product and a public track record; geography: Global; jurisdiction: Excludes OFAC-sanctioned jurisdictions; entityType: Registered legal entity required before payout; compliance: KYB and quarterly reporting required",
   "prerequisites": "A proposal must include: prior track record, technical approach, a milestone plan with amounts, and disclosure of any conflicts.",
-  "resourceLinks": "Original forum posting: https://forum.example.org/t/opsec-rfp/1 · Prior round retrospective: https://example.org/retro",
+  "additionalReferences": "Original forum posting: https://forum.example.org/t/opsec-rfp/1 · Prior round retrospective: https://example.org/retro",
   "serviceAgreement": "Runs as a rolling ~12-month engagement rather than a one-off deliverable; renewal is decided at the end of each term by the sponsoring foundation.",
   "applicationUrl": "https://forum.example.org/t/opsec-rfp/1",
   "website": "https://example.org/opsec",
   "logoUrl": "https://example.org/logo.png",
   "bannerUrl": "https://example.org/banner.png",
-  "socialLinks": {
-    "twitter": "https://x.com/example",
-    "forum": "https://forum.example.org"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/example"
+    },
+    {
+      "platform": "forum",
+      "url": "https://forum.example.org"
+    }
+  ],
+  "fundingInfo": {
     "currency": "USD",
     "budget": 175000,
     "allocated": 50000,
@@ -107,31 +102,29 @@
   "opensAt": "2026-07-01T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-08-15T23:59:59.000Z",
       "label": "community feedback"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-30T23:59:59.000Z",
       "label": "application"
     },
     {
-      "type": "rolling",
+      "deadlineType": "rolling",
       "label": "reviewed quarterly after the first round"
     }
   ],
   "postedAt": "2026-06-28T12:00:00.000Z",
   "createdAt": "2026-07-01T09:00:00.000Z",
   "updatedAt": "2026-07-20T09:00:00.000Z",
-  "rfp": {
+  "fundingDetails": {
+    "fundingType": "rfp",
     "scope": "Design, publish and operate an operational-security ratings system. In scope: methodology, coalition governance, first ratings round. Out of scope: custody of user funds, paid placement of any kind.",
     "requirements": [
       "Methodology must be reproducible from public evidence.",
       "All ratings must be published under an open licence."
     ]
-  },
-  "extensions": {
-    "example.internalId": "RFP-2026-07"
   }
 }

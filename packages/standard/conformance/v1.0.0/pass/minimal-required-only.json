@@ -3,13 +3,16 @@
   "id": "conformance:minimal",
   "fundingType": "grant",
   "title": "Minimal conforming grant",
-  "description": "Carries exactly the eight required top-level properties plus the type block the discriminator demands. Nothing optional is present, and source is the empty object the re-cut permits.",
+  "description": "Carries exactly the nine required top-level properties, fundingDetails carrying nothing beyond its fundingType tag. operatingOrganizations is the required organisation array — one entry carrying the organisation's own required fields, name and slug — and sponsoringOrganizations is optional and absent. Nothing optional is present, and source is the empty object the standard permits.",
   "status": "open",
-  "sponsoringOrganizations": [
+  "operatingOrganizations": [
     {
-      "name": "Example Foundation"
+      "name": "Example Foundation",
+      "slug": "example-foundation"
     }
   ],
   "source": {},
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

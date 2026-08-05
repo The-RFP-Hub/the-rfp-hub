@@ -8,6 +8,7 @@
   "sponsoringOrganizations": [
     {
       "name": "Example Foundation",
+      "slug": "example-foundation",
       "contacts": [
         {
           "name": "A. Steward",
@@ -16,6 +17,14 @@
       ]
     }
   ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
   "source": {},
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

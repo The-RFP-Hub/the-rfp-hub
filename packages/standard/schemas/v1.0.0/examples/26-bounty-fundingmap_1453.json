@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "Internships: Colosseum Frontier",
+      "slug": "internships-colosseum-frontier",
+      "website": "https://superteam.fun/earn/listing/internships-colosseum-frontier"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Internships: Colosseum Frontier",
+      "slug": "internships-colosseum-frontier",
       "website": "https://superteam.fun/earn/listing/internships-colosseum-frontier"
     }
   ],
@@ -25,20 +33,22 @@
   ],
   "applicationUrl": "https://superteam.fun/earn/listing/internships-colosseum-frontier",
   "website": "https://superteam.fun/earn/listing/internships-colosseum-frontier",
-  "funding": {
+  "fundingInfo": {
+    "currency": "USDG",
     "budget": 1400
   },
   "opensAt": null,
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-05-15T22:59:59.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2026-05-01T14:53:40.000Z",
   "updatedAt": "2026-05-16T00:02:40.000Z",
-  "bounty": {
+  "fundingDetails": {
+    "fundingType": "bounty",
     "difficulty": null,
     "skills": [
       "Growth",
@@ -49,9 +59,6 @@
       "Backend"
     ],
     "platform": "Superteam Earn",
-    "reward": {
-      "amount": 1400,
-      "currency": "USDG"
-    }
+    "reward": 1400
   }
 }

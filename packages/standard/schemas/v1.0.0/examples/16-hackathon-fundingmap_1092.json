@@ -8,6 +8,14 @@
   "sponsoringOrganizations": [
     {
       "name": "ETHGlobal Tokyo 2026",
+      "slug": "ethglobal-tokyo-2026",
+      "website": "https://ethglobal.com/events/tokyo2026"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ETHGlobal Tokyo 2026",
+      "slug": "ethglobal-tokyo-2026",
       "website": "https://ethglobal.com/events/tokyo2026"
     }
   ],
@@ -22,57 +30,53 @@
   "categories": [
     "Hackathon"
   ],
-  "tags": [
-    "Hackathons"
-  ],
   "applicationUrl": "https://ethglobal.com/events/tokyo2026",
   "website": "https://ethglobal.com/events/tokyo2026",
-  "funding": {
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 35000
   },
   "opensAt": "2026-09-25T12:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-27T23:59:59.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-23T14:59:06.202Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-25T12:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-09-27T23:59:59.999Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-06T14:11:32.000Z",
   "updatedAt": "2026-03-09T14:24:32.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Tokyo, Japan",
     "online": null,
     "prizes": [
       {
         "track": null,
-        "amount": 15000,
-        "currency": "USD"
+        "amount": 15000
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       },
       {
         "track": null,
-        "amount": 10000,
-        "currency": "USD"
+        "amount": 10000
       }
     ]
   }

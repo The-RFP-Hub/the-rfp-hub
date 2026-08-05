@@ -1,0 +1,24 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bad-social-platform",
+  "fundingType": "grant",
+  "title": "Social link platform outside its enum",
+  "description": "A social link whose platform is 'myspace', outside the closed enum (twitter, discord, github, telegram, farcaster, forum, blog). socialLinks became an array of {platform, url} entries so the platform is typed data rather than a free object key — which makes the platform vocabulary a hard constraint.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "socialLinks": [
+    {
+      "platform": "myspace",
+      "url": "https://myspace.com/example"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}

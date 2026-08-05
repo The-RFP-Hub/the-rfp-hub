@@ -11,7 +11,9 @@ export {
 
 export type {
   Opportunity,
+  Timestamp,
   FundingType,
+  FundingDetails,
   OpportunityStatus,
   DeadlineType,
   IngestionMethod,
@@ -19,7 +21,7 @@ export type {
   Contact,
   Provenance,
   Funding,
-  SocialLinks,
+  SocialLink,
   Deadline,
   Milestone,
   GrantDetails,
@@ -29,7 +31,6 @@ export type {
   VcFundDetails,
   RfpDetails,
   Prize,
-  MonetaryAmount,
   AmountRange,
   TeamSize,
   DetailsByFundingType,

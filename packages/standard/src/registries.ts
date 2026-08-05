@@ -1,5 +1,4 @@
 import deadlineLabels from "../registries/deadline-labels.json";
-import eligibilityKeys from "../registries/eligibility-keys.json";
 import programModels from "../registries/program-models.json";
 
 /** One registered value in an open vocabulary. */
@@ -23,13 +22,12 @@ export type Registry = Readonly<Record<string, RegistryEntry>>;
  * keeps the values interoperable anyway: tooling warns on unregistered values without
  * rejecting them, so a publisher is never blocked and drift is still visible.
  *
- * `ecosystems` and `networks` are open too but deliberately have **no** registry. A registry
- * over a list of chain names reads as an allowed-values list no matter what the normative
- * document says, and it would put a process in front of a newly launched chain for no gain.
+ * `ecosystems` is open too but deliberately has **no** registry. A registry over a list of
+ * ecosystem names reads as an allowed-values list no matter what the normative document
+ * says, and it would put a process in front of a newly launched chain for no gain.
  */
 export const registries = {
   "deadline-labels": deadlineLabels as Registry,
-  "eligibility-keys": eligibilityKeys as Registry,
   "program-models": programModels as Registry,
 } as const satisfies Record<string, Registry>;
 

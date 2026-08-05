@@ -3,14 +3,23 @@
   "id": "conformance:bad-uri",
   "fundingType": "grant",
   "title": "applicationUrl is prose, not a URI",
-  "description": "applicationUrl carries free text instead of a URI, violating format: uri. The suite asserts formats because the schema means them as constraints: an implementation that treats format as annotation-only accepts this document and is not conformant. applicationUrl stands in for every uri-formatted field (website, logoUrl, bannerUrl, socialLinks.*, provenance.snapshotUrl).",
+  "description": "applicationUrl carries free text instead of a URI, violating format: uri. The suite asserts formats because the schema means them as constraints: an implementation that treats format as annotation-only accepts this document and is not conformant. applicationUrl stands in for every uri-formatted field (website, logoUrl, bannerUrl, socialLinks[].url, provenance.snapshotUrl).",
   "status": "open",
   "sponsoringOrganizations": [
     {
-      "name": "Example Foundation"
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
     }
   ],
   "source": {},
   "applicationUrl": "apply on our website",
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

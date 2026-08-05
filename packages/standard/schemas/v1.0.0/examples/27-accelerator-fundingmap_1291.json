@@ -8,7 +8,14 @@
   "status": "archived",
   "sponsoringOrganizations": [
     {
-      "name": "Incubation Program Batch 07"
+      "name": "Incubation Program Batch 07",
+      "slug": "incubation-program-batch-07"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Incubation Program Batch 07",
+      "slug": "incubation-program-batch-07"
     }
   ],
   "source": {
@@ -28,29 +35,28 @@
     "Infrastructure"
   ],
   "applicationUrl": "https://forms.clickup.com/9018573221/f/8crt0d5-26918/BWOVOFB8AMT993WNEF",
-  "funding": {
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 50
   },
   "opensAt": "2026-03-15T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-15T00:00:00.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2026-03-25T13:23:18.000Z",
   "updatedAt": "2026-04-15T00:02:13.000Z",
-  "accelerator": {
+  "fundingDetails": {
+    "fundingType": "accelerator",
     "programDurationWeeks": 3,
     "batchSize": null,
     "equity": null,
     "stage": "pre-seed",
     "location": "Remote",
     "online": null,
-    "funding": {
-      "amount": 50000,
-      "currency": "USD"
-    }
+    "funding": 50000
   }
 }

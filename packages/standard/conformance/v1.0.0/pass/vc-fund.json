@@ -3,25 +3,42 @@
   "id": "conformance:vc-fund",
   "fundingType": "vc_fund",
   "title": "Fully-populated VC fund entry",
-  "description": "Exercises every field of the vc_fund block — checkSize as an amountRange with both bounds and a currency, the stages enum, thesis, portfolio, the contactMethod enum, and activelyInvesting. A fund is an ongoing source of capital rather than a round, so the document carries no deadlines array at all.",
+  "description": "Exercises every field of the vc_fund block — checkSize as an amountRange with both bounds, denominated in the document-wide fundingInfo.currency, the stages enum, thesis, portfolio, the contactMethod enum, and activelyInvesting. A fund is an ongoing source of capital rather than a round, so the document carries no deadlines array at all.",
   "status": "open",
   "sponsoringOrganizations": [
     {
       "name": "Example Ventures",
       "slug": "example-ventures",
-      "type": "company"
+      "orgType": "company"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Ventures",
+      "slug": "example-ventures",
+      "orgType": "company"
     }
   ],
   "source": {},
-  "vc_fund": {
+  "fundingInfo": {
+    "currency": "USD"
+  },
+  "fundingDetails": {
+    "fundingType": "vc_fund",
     "checkSize": {
       "min": 100000,
-      "max": 2000000,
-      "currency": "USD"
+      "max": 2000000
     },
-    "stages": ["pre-seed", "seed", "series-a"],
+    "stages": [
+      "pre-seed",
+      "seed",
+      "series-a"
+    ],
     "thesis": "Ethereum-native infrastructure and developer tooling, entering at the first institutional check.",
-    "portfolio": ["Example Rollup", "Example Wallet"],
+    "portfolio": [
+      "Example Rollup",
+      "Example Wallet"
+    ],
     "contactMethod": "intro-only",
     "activelyInvesting": true
   }

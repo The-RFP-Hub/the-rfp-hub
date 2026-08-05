@@ -19,7 +19,7 @@ import { OpportunityService } from "../../src/modules/services/opportunities/opp
 import { describeWithDb } from "./db-gate.js";
 
 const TAG = "FILTERTEST";
-const ORG_SLUGS = ["org-a", "org-b", "org-c", "org-d", "org-e"];
+const ORG_SLUGS = ["org-a", "org-b", "org-c", "org-d", "org-e", "org-op"];
 
 const FIXTURES: Opportunity[] = [
   {
@@ -29,15 +29,14 @@ const FIXTURES: Opportunity[] = [
     title: "Alpha DeFi grant",
     description: "Grants for DeFi builders.",
     status: "open",
-    sponsoringOrganizations: [{ name: "Org A", slug: "org-a" }],
+    // OPERATING-only — no sponsors at all (sponsoringOrganizations is optional now).
+    operatingOrganizations: [{ name: "Org A", slug: "org-a" }],
     source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: [TAG, "Optimism"],
-    networks: ["optimism"],
     categories: ["DeFi"],
-    tags: ["retro"],
-    funding: { minAward: 1000, maxAward: 5000, currency: "USD" },
-    deadlines: [{ type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
-    grant: {},
+    fundingInfo: { minAward: 1000, maxAward: 5000, currency: "USD" },
+    deadlines: [{ deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
+    fundingDetails: { fundingType: "grant" },
   },
   {
     specVersion: "1.0.0",
@@ -46,36 +45,37 @@ const FIXTURES: Opportunity[] = [
     title: "Beta hackathon weekend",
     description: "A weekend build competition.",
     status: "open",
+    // Distinct operator and sponsor — the `organization` filter must match EITHER role.
+    operatingOrganizations: [{ name: "Org Op", slug: "org-op" }],
     sponsoringOrganizations: [{ name: "Org B", slug: "org-b" }],
     source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: [TAG],
-    networks: ["base"],
     categories: ["Gaming"],
-    tags: ["irl"],
-    funding: { budget: 200000, currency: "USD" }, // only a budget, no min/max
+    fundingInfo: { budget: 200000, currency: "USD" }, // only a budget, no min/max
     deadlines: [
-      { type: "fixed", date: "2999-06-01T00:00:00.000Z", label: "application" },
-      { type: "fixed", date: "2000-01-01T00:00:00.000Z", label: "event start" }, // past: ignored
+      { deadlineType: "fixed", date: "2999-06-01T00:00:00.000Z", label: "application" },
+      { deadlineType: "fixed", date: "2000-01-01T00:00:00.000Z", label: "event start" }, // past: ignored
     ],
-    hackathon: {},
+    fundingDetails: { fundingType: "hackathon" },
   },
   {
-    // TWO sponsors — the `organization` filter must match either, not just the primary [0].
+    // TWO sponsors — the `organization` filter must match either, not just the first one.
     specVersion: "1.0.0",
     id: "ftest:c",
     fundingType: "bounty",
     title: "Gamma bounty",
     description: "A small task.",
     status: "closed",
+    operatingOrganizations: [{ name: "Org D", slug: "org-d" }],
     sponsoringOrganizations: [
       { name: "Org D", slug: "org-d" },
       { name: "Org A", slug: "org-a" },
     ],
     source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: [TAG],
-    funding: { minAward: 50, currency: "USD" }, // only a min
-    deadlines: [{ type: "fixed", date: "2999-03-01T00:00:00.000Z", label: "application" }],
-    bounty: { reward: { amount: 50, currency: "USD" } },
+    fundingInfo: { minAward: 50, currency: "USD" }, // only a min
+    deadlines: [{ deadlineType: "fixed", date: "2999-03-01T00:00:00.000Z", label: "application" }],
+    fundingDetails: { fundingType: "bounty", reward: 50 },
   },
   {
     // ROLLING-ONLY → nextDeadlineAt is null: sorts last, excluded from deadline windows.
@@ -85,12 +85,12 @@ const FIXTURES: Opportunity[] = [
     title: "Delta tiny grant",
     description: "Micro grants, always open.",
     status: "open",
-    sponsoringOrganizations: [{ name: "Org C", slug: "org-c" }],
+    operatingOrganizations: [{ name: "Org C", slug: "org-c" }],
     source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: [TAG],
-    funding: { maxAward: 10, currency: "USD" }, // only a max — the single-bound regression case
-    deadlines: [{ type: "rolling", label: "application" }],
-    grant: {},
+    fundingInfo: { maxAward: 10, currency: "USD" }, // only a max — the single-bound regression case
+    deadlines: [{ deadlineType: "rolling", label: "application" }],
+    fundingDetails: { fundingType: "grant" },
   },
   {
     // PAST-ONLY fixed deadline → nextDeadlineAt is null as well.
@@ -100,11 +100,11 @@ const FIXTURES: Opportunity[] = [
     title: "Epsilon expired grant",
     description: "The window has closed.",
     status: "closed",
-    sponsoringOrganizations: [{ name: "Org E", slug: "org-e" }],
+    operatingOrganizations: [{ name: "Org E", slug: "org-e" }],
     source: { ingestedVia: "import", verifiedAgainstSource: null },
     ecosystems: [TAG],
-    deadlines: [{ type: "fixed", date: "2000-01-01T00:00:00.000Z", label: "application" }],
-    grant: {},
+    deadlines: [{ deadlineType: "fixed", date: "2000-01-01T00:00:00.000Z", label: "application" }],
+    fundingDetails: { fundingType: "grant" },
   },
 ];
 
@@ -162,16 +162,19 @@ run("/v1/opportunities filters, sort & pagination", () => {
     expect((await query("status=closed")).ids).toEqual(new Set(["ftest:c", "ftest:e"]));
   });
 
-  it("network / category / tag filters (array containment)", async () => {
-    expect((await query("network=optimism")).ids).toEqual(new Set(["ftest:a"]));
+  it("category filter (array containment)", async () => {
     expect((await query("category=DeFi")).ids).toEqual(new Set(["ftest:a"]));
-    expect((await query("tag=retro")).ids).toEqual(new Set(["ftest:a"]));
+    expect((await query("category=Gaming")).ids).toEqual(new Set(["ftest:b"]));
   });
 
-  it("organization filter matches ANY sponsoring organization, not only the primary one", async () => {
-    // ftest:c lists Org A second — it must still match.
+  it("organization filter matches operating AND sponsoring orgs, in any position", async () => {
+    // ftest:a operates under org-a; ftest:c lists Org A as its SECOND sponsor — both must match.
     expect((await query("organization=org-a")).ids).toEqual(new Set(["ftest:a", "ftest:c"]));
     expect((await query("organization=org-d")).ids).toEqual(new Set(["ftest:c"]));
+    // sponsoring-only match (org-b never operates anything)
+    expect((await query("organization=org-b")).ids).toEqual(new Set(["ftest:b"]));
+    // operating-only match (org-op never sponsors anything)
+    expect((await query("organization=org-op")).ids).toEqual(new Set(["ftest:b"]));
   });
 
   it("q search over title/description", async () => {
@@ -225,7 +228,7 @@ run("/v1/opportunities filters, sort & pagination", () => {
   it("serves deadlines[] back on the list projection", async () => {
     const { body } = await query("fundingType=grant&limit=50");
     const rolling = (body.items as Opportunity[]).find((o) => o.id === "ftest:d");
-    expect(rolling?.deadlines).toEqual([{ type: "rolling", label: "application" }]);
+    expect(rolling?.deadlines).toEqual([{ deadlineType: "rolling", label: "application" }]);
   });
 
   it("pagination: limit, totalPages, and an empty overflow page", async () => {

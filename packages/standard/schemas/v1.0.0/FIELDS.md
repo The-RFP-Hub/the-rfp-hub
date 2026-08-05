@@ -1,10 +1,8 @@
 # RFP Hub Standard v1.0.0 — Field Reference
 
-> **Maturity: `draft`.** This version was **re-cut in place on 2026-07-27** — documents published
-> under the string `1.0.0` before that date do not validate against it. See
-> [`STATUS.md`](./STATUS.md), the field-mapping table in
-> [`CHANGELOG.md`](../../CHANGELOG.md) and
-> [`adr/0001`](../../../../adr/0001-recut-v1.0.0-in-place.md).
+> **Maturity: `draft`.** While a version is draft its contents may still change; the revision
+> history lives in [`STATUS.md`](./STATUS.md), the field-mapping tables in
+> [`CHANGELOG.md`](../../CHANGELOG.md), and the reasoning in the [ADRs](../../../../adr).
 
 The **RFP Hub Standard** is a canonical, ecosystem-neutral representation of a funding
 opportunity in the Ethereum ecosystem. The normative artifact is
@@ -42,17 +40,19 @@ The Hub is **ETH-scoped**, not a multi-ecosystem catch-all. It does not attempt 
 Solana/Cosmos/other non-ETH ecosystems. However, `ecosystems` is an **open, extensible
 list — not a closed enum** — so the Ethereum L1 plus L2s and ETH-adjacent ecosystems
 (Optimism, Base, Arbitrum, Polygon, Scroll, zkSync, Linea, OP Stack, Celo, …) are all
-first-class. `ecosystems` and `networks` are deliberately **not** registry-governed: a registry
-over a list of chain names reads as an allowed-values list however carefully the normative
-document words it, and it would put a review step in front of a newly launched chain for no
-interoperability gain. Write the ecosystem's usual name.
+first-class. `ecosystems` is deliberately **not** registry-governed: a registry over a list of
+chain names reads as an allowed-values list however carefully the normative document words it,
+and it would put a review step in front of a newly launched chain for no interoperability gain.
+Write the ecosystem's usual name.
 
 ## Design principles
 
 1. **Source-agnostic.** The standard carries no source-system internal fields (on-chain ids,
-   internal primary keys, vendor-specific flags). Such data, if needed, goes under `extensions`
-   with namespaced keys (e.g. `mysource.internalId`). This keeps the standard neutral and
-   forkable — it isn't coupled to any one aggregator's schema.
+   internal primary keys, vendor-specific flags) — and since the 2026-08-05 revision there is
+   **no `extensions` object to smuggle them through**: such data is simply out of scope and
+   stays in the source system. This keeps the standard neutral and forkable — it isn't coupled
+   to any one aggregator's schema, and removed fields cannot survive their own removal in an
+   open bag.
 2. **Provenance is recorded, not validated.** `source` is a required object, but **every field
    inside it is optional** — `"source": {}` validates. There is no required source URL and no
    required provenance field of any kind. "Every entry is traceable to an original posting" is
@@ -62,19 +62,38 @@ interoperability gain. Write the ecosystem's usual name.
    record with empty provenance, because a validator is the wrong place to catch it. *(This
    replaces the earlier principle "every entry MUST carry a `source.url`" — that field no longer
    exists; see the field-mapping table in [`CHANGELOG.md`](../../CHANGELOG.md).)*
-3. **Closed core, open edges.** The top-level object and all type-specific blocks are
+3. **Closed core, open values.** The top-level object and every detail shape under
+   `fundingDetails` are
    `additionalProperties: false`, with three exceptions carved out for self-identification
-   (`$schema`, `@context`, `@type`). Arbitrary publisher/integrator data goes in the free-form
-   `extensions` object. Where a field is deliberately open **and its values need to be
-   comparable across publishers** — `eligibility` keys, `deadlines[].label`,
-   `grant.programModel` — the **schema stays permissive and a [registry](../../registries/)
-   fixes what each value means**. Registered values are normative; unregistered values remain
-   valid and raise a warning, never an error. `ecosystems` and `networks` are open with **no**
-   registry, deliberately: see [Scope](#scope).
+   (`$schema`, `@context`, `@type`). **There is no extension mechanism** — the free-form
+   `extensions` object was removed in the 2026-08-05 revision, and a new field now requires a
+   spec release. The openness that remains is in *values*, not keys: where a field is
+   deliberately open **and its values need to be comparable across publishers** —
+   `deadlines[].label`, the grant payload's `programModel` — the **schema stays permissive and a
+   [registry](../../registries/) fixes what each value means**. Registered values are
+   normative; unregistered values remain valid and raise a warning, never an error.
+   `ecosystems` is open with **no** registry, deliberately: see [Scope](#scope).
 4. **Alignment.** Concepts align with DAOIP-5 (Grants Metadata) and schema.org/Grant where
    practical, without inheriting their full surface area. See [CROSSWALK.md](./CROSSWALK.md).
 
-All date-time fields are **RFC 3339 / ISO 8601** strings.
+### Dates and times
+
+Every temporal field in this standard is a **string in RFC 3339 `date-time` form, in UTC**,
+with a trailing uppercase `Z`. Not "ISO 8601": RFC 3339 is a profile of ISO 8601 that removes
+most of its optionality, and the basic, week-date, ordinal and truncated ISO forms are not
+valid here. Numeric offsets (`+02:00`), the unknown-offset convention (`-00:00`), and
+lowercase `t`/`z` are all rejected.
+
+Fractional seconds are permitted and optional. `null` means "not known", and is distinct from
+the field being absent, which means "not provided".
+
+Two consequences follow. First, values sort lexicographically into chronological order
+(RFC 3339 §5.1) — a consumer may sort them as plain strings. Second, local-time intent is not
+representable: a publisher whose deadline is "23:59 local" converts to UTC before publishing.
+This is deliberate; see [`adr/0002`](../../../../adr/0002-v-next-field-recut.md) #9.
+
+The standard does not currently use RFC 9557 (IXDTF) suffixes such as `[Europe/London]`. They
+are not valid here today.
 
 ---
 
@@ -96,41 +115,33 @@ where one exists.
 | `@type` | string \| any[] |  | Optional JSON-LD type, or an array of types. Permitted so an instance can be consumed as linked data; ignored by validation. | — |
 | `specVersion` | `1.0.0` | ✅ | The RFP Hub Standard version this entry conforms to. Fixed at 1.0.0 for this schema. Consumers use it to select the correct validator. | — |
 | `id` | string, ≤128, `^[A-Za-z0-9._:-]+$` | ✅ | Stable, unique identifier for the opportunity within the Hub. Immutable once assigned. A namespaced form is recommended but not required. | — |
-| `fundingType` | `grant` \| `hackathon` \| `bounty` \| `accelerator` \| `vc_fund` \| `rfp` | ✅ | The kind of funding opportunity, and the structural discriminator of the standard. Every entry carries a type-specific object under a key equal to this value ('hackathon' → a 'hackathon' object, 'vc_fund' → a 'vc_fund' object), so consumers can always read `opportunity[opportunity.fundingType]`. The matching block is required and no other type block may be present; for grants the block may be empty. | — |
+| `fundingType` | `grant` \| `hackathon` \| `bounty` \| `accelerator` \| `vc_fund` \| `rfp` | ✅ | The kind of funding opportunity, and the structural discriminator of the standard. Every entry carries its type-specific details in `fundingDetails`, whose own `fundingType` tag names that object's shape and always equals this field — the binding allOf below keeps the two in step — so consumers can dispatch on either tag. For grants the details may carry nothing beyond the tag. | — |
 | `title` | string, ≤300 | ✅ | Human-readable name of the opportunity. | — |
 | `description` | string | ✅ | Full description of the opportunity. Markdown is permitted; consumers are advised to treat it as untrusted and sanitise before rendering. | — |
 | `summary` | string\|null, ≤500 |  | Optional short teaser (roughly one or two sentences) for list and card views. | — |
 | `status` | `upcoming` \| `open` \| `closed` \| `archived` | ✅ | Lifecycle status of the opportunity. 'upcoming' = announced but not yet accepting applications, and also the value for a pre-open posting — there is no 'draft' status; 'open' = currently accepting; 'closed' = no longer accepting; 'archived' = withdrawn or retired. Editorial and review state (pending, rejected) is not represented here — it is server-side metadata. | — |
-| `sponsoringOrganizations` | [`organization`](#organization)[], min 1 | ✅ | The organisations issuing or backing the opportunity. Array order is semantic: entry 0 is the primary organisation and the one to display. This is the issuer or backer, not necessarily the source of funds — for donor-funded models the money's origin is deliberately not modelled, and the party running the process belongs in operatingOrganizations instead. | — |
-| `operatingOrganizations` | [`organization`](#organization)[] |  | The organisations that actually run intake and process — for example an operator running the application funnel on a funder's behalf. May be absent or empty when the sponsor also operates. | — |
+| `sponsoringOrganizations` | [`organization`](#organization)[] |  | The organisations issuing or backing the opportunity — the issuer or backer, not necessarily the source of funds, because for donor-funded models the money's origin is deliberately not modelled. Optional, and may be absent or empty, when the operator is the only party to name or the backer is not published. The party running the process belongs in operatingOrganizations instead. | — |
+| `operatingOrganizations` | [`organization`](#organization)[], min 1 | ✅ | The organisations that actually run the opportunity — intake, process and the application funnel, whether on their own behalf or a sponsor's. Array order is semantic: entry 0 is the primary organisation and the one to display. | — |
 | `source` | [`provenance`](#provenance) | ✅ | Provenance of this entry. Required as an object, but every field inside it is optional, so `"source": {}` validates. Provenance completeness is a data-quality and ingestion-policy concern rather than a schema constraint. | — |
 | `ecosystems` | string[], unique |  | Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped, but this is an open, extensible list — not a closed enum, and deliberately not registry-governed either — so L2s and ETH-adjacent ecosystems are first-class and a newly launched one needs no process. | — |
-| `networks` | string[], unique |  | Specific networks or chains the funding is denominated on or deployed to. A plain open list, deliberately not registry-governed, so a newly launched chain is expressible immediately. | — |
 | `categories` | string[], unique |  | Topical categories. Free text. | — |
-| `tags` | string[], unique |  | Free-form tags for search and faceting. | — |
-| `eligibility` | object<string, string> |  | Open key-value map of eligibility criteria. Publishers choose their own keys and write plain-string values; there are no fixed or required keys. Conventional keys (stage, geography, jurisdiction, sector, entityType, compliance) are published in registries/eligibility-keys.json — using them keeps the field comparable across publishers, and unregistered keys stay valid. | [`eligibility-keys`](../../registries/eligibility-keys.json) |
+| `eligibility` | string\|null |  | Free text describing who may apply — stage, geography, jurisdiction, entity requirements, compliance constraints — in the publisher's own words. Deliberately unstructured: eligibility criteria vary too much across publishers to be comparable as data, so this field is for reading, not faceting. | — |
 | `prerequisites` | string\|null |  | Free text describing what a proposal must contain to be considered — track record, approach, milestone plan, disclosures. Distinct from rfp.requirements, which describes what the work must deliver. | — |
-| `resourceLinks` | string\|null |  | A single free-form string of supporting links and references — guidelines, past rounds, forum threads, original postings. Deliberately one string rather than an array of URIs, because publishers paste what they have. | — |
-| `serviceAgreement` | string\|null |  | Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design. **(provisional)** | — |
+| `additionalReferences` | string\|null |  | A single free-form string of supporting links and references — guidelines, past rounds, forum threads, original postings. Deliberately one string rather than an array of URIs, because publishers paste what they have. | — |
+| `serviceAgreement` | string\|null |  | Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design. | — |
 | `applicationUrl` | string(uri)\|null |  | URL where applicants submit or apply — the only URL that points at the opportunity itself, and therefore the only link-back target. It may carry whatever the submission channel is, including a forum thread when no portal exists; the URL's kind is not typed. Clarifications go in description. | — |
 | `website` | string(uri)\|null |  | Primary website for the opportunity or program. | — |
 | `logoUrl` | string(uri)\|null |  | URL of the program or organisation logo image. | — |
 | `bannerUrl` | string(uri)\|null |  | URL of a banner or hero image. | — |
-| `socialLinks` | [`socialLinks`](#sociallinks) |  | Social and community links for the opportunity or program. | — |
-| `funding` | [`funding`](#funding) |  | Program-level funding envelope: single currency, total budget, amount committed to date, and the per-award range. | — |
-| `milestones` | [`milestone`](#milestone)[] |  | Optional milestone sequence, valid on any fundingType. Array order is the milestone sequence — there is no order or index field. Milestone-based payment is expressed by this array together with grant.milestoneBased; there is no separate payment-schedule concept. **(provisional)** | — |
-| `opensAt` | string(date-time)\|null |  | RFC 3339 timestamp when applications open. | — |
+| `socialLinks` | [`socialLink`](#sociallink)[], unique |  | Social and community links for the opportunity or program, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected. | — |
+| `fundingInfo` | [`funding`](#funding) |  | Program-level funding envelope: single currency, total budget, amount committed to date, and the per-award range. | — |
+| `milestones` | [`milestone`](#milestone)[] |  | Optional milestone sequence, valid on any fundingType. Array order is the milestone sequence — there is no order or index field. Milestone-based payment is expressed by this array together with grant.milestoneBased; there is no separate payment-schedule concept. | — |
+| `opensAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for when applications open. null means unknown. | — |
 | `deadlines` | [`deadline`](#deadline)[], unique |  | All deadlines and event boundaries for the opportunity, each either a fixed date or rolling, distinguished by label. Consumers should select by label rather than by array position: the first entry may be a hackathon's start date rather than its application deadline. Conventional labels are published in registries/deadline-labels.json. (Selection-by-label is a consumer convention, not schema-enforceable; see FIELDS.md.) | — |
-| `postedAt` | string(date-time)\|null |  | RFC 3339 timestamp when the opportunity was first publicly announced at the source. | — |
-| `createdAt` | string(date-time)\|null |  | RFC 3339 timestamp when this entry was created in the Hub. | — |
-| `updatedAt` | string(date-time)\|null |  | RFC 3339 timestamp when this entry was last modified in the Hub. | — |
-| `grant` | [`grant`](#grant) | cond. | Grant-specific fields. Required, possibly as an empty object, when fundingType is 'grant'; forbidden otherwise. | — |
-| `hackathon` | [`hackathon`](#hackathon) | cond. | Hackathon-specific fields. Required when fundingType is 'hackathon'; forbidden otherwise. | — |
-| `bounty` | [`bounty`](#bounty) | cond. | Bounty-specific fields. Required when fundingType is 'bounty'; forbidden otherwise. | — |
-| `accelerator` | [`accelerator`](#accelerator) | cond. | Accelerator-specific fields. Required when fundingType is 'accelerator'; forbidden otherwise. | — |
-| `vc_fund` | [`vcFund`](#vcfund) | cond. | VC-fund-specific fields. Required when fundingType is 'vc_fund'; forbidden otherwise. | — |
-| `rfp` | [`rfp`](#rfp) | cond. | RFP-specific fields. Required when fundingType is 'rfp'; forbidden otherwise. | — |
-| `extensions` | object |  | Namespace for publisher- or integrator-specific data not covered by the standard. Keys are conventionally namespaced, for example 'mysource.internalId'. Contents are not validated by this schema. | — |
+| `postedAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for when the opportunity was first publicly announced at the source. null means unknown. | — |
+| `createdAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for when this entry was created in the Hub. null means unknown. | — |
+| `updatedAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for when this entry was last modified in the Hub. null means unknown. | — |
+| `fundingDetails` | [`grant`](#grant) \| [`hackathon`](#hackathon) \| [`bounty`](#bounty) \| [`accelerator`](#accelerator) \| [`vcFund`](#vcfund) \| [`rfp`](#rfp) | ✅ | The type-specific details for this opportunity: exactly one of the six detail shapes, self-described by its own required `fundingType` tag, which names the shape and equals the top-level `fundingType` (the binding allOf below keeps the two in step). | — |
 
 ### `organization`
 
@@ -139,13 +150,13 @@ An organisation sponsoring or operating the opportunity. Embedded on an opportun
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `name` | string, ≤256 | ✅ | Display name of the organisation. | — |
-| `slug` | string\|null, `^[a-z0-9-]+$` |  | Lowercase URL-safe identifier, and also the organisation's namespace. | — |
-| `type` | `foundation` \| `dao` \| `company` \| `protocol` \| `program` \| `individual` \| `other`\|null |  | Kind of entity. | — |
+| `slug` | string, `^[a-z0-9-]+$` | ✅ | Lowercase URL-safe identifier, and also the organisation's namespace. | — |
+| `orgType` | `foundation` \| `dao` \| `company` \| `protocol` \| `program` \| `individual` \| `other` |  | Kind of entity. | — |
 | `description` | string\|null |  | Short description of the organisation. | — |
 | `website` | string(uri)\|null |  | The organisation's primary website. | — |
 | `logoUrl` | string(uri)\|null |  | URL of the organisation's logo image. | — |
 | `bannerUrl` | string(uri)\|null |  | URL of the organisation's banner or hero image. | — |
-| `socialLinks` | [`socialLinks`](#sociallinks) |  | Social and community links for the organisation. | — |
+| `socialLinks` | [`socialLink`](#sociallink)[], unique |  | Social and community links for the organisation, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected. | — |
 | `ecosystems` | string[], unique |  | Ethereum-family ecosystems the organisation operates in. Same open list as the top-level field. | — |
 | `contacts` | [`contact`](#contact)[] |  | Named contact routes into the organisation. Optional, and every field of every entry is optional too. | — |
 
@@ -157,7 +168,7 @@ A named contact route into the organisation. Every property is optional and ther
 |---|---|:--:|---|---|
 | `name` | string\|null |  | The person's name. | — |
 | `role` | string\|null |  | Role in the program. | — |
-| `telegram` | string\|null |  | Telegram handle. A handle rather than a URL — unlike socialLinks.telegram, which is a link. | — |
+| `telegram` | string\|null |  | Telegram handle. A handle rather than a URL — unlike a socialLinks entry with platform 'telegram', which is a link. | — |
 | `email` | string(email)\|null |  | Email address. | — |
 
 ### `provenance`
@@ -168,57 +179,42 @@ How this entry reached the Hub and when it was last checked. Every field is opti
 |---|---|:--:|---|---|
 | `publisher` | string\|null |  | Namespace — an organisation slug — this entry was published under. Auto-approval requires the publishing account to be a member of this verified org. May differ from the sponsoring organisation. | — |
 | `submittedBy` | string\|null |  | Who submitted or published this entry: a public handle, an organisation slug, or 'community' for anonymous community submissions. The internal account identity is never exposed. This is the attribution carrier for data-partner credit. | — |
-| `submittedAt` | string(date-time)\|null |  | RFC 3339 timestamp of when the entry was submitted or published to the Hub. Pairs with submittedBy. | — |
+| `submittedAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for when the entry was submitted or published to the Hub. Pairs with submittedBy. null means unknown. | — |
 | `ingestedVia` | `publisher_api` \| `submission` \| `scrape` \| `import` \| `outbox`\|null |  | How this entry entered the Hub. 'outbox' is a one-way push from an upstream source system's outbox; 'import' is a backfill or seed import. Always set server-side by the ingestion layer. | — |
 | `originalId` | string\|null |  | Identifier of this opportunity in the source system. | — |
 | `verifiedAgainstSource` | boolean\|null |  | Whether the entry's fields were verified against the live opportunity by the verification-assist job. null means not yet checked. | — |
-| `verifiedAt` | string(date-time)\|null |  | RFC 3339 timestamp of the last verification. Record-level only — there is no per-field freshness. | — |
+| `verifiedAt` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z') for the last verification. Record-level only — there is no per-field freshness. null means unknown. | — |
 | `snapshotUrl` | string(uri)\|null |  | IPFS or archived snapshot of the opportunity taken at verification time. | — |
 
-### `socialLinks`
+### `socialLink`
 
-Social and community links. Every value is a full URL, not a handle.
+One social or community link: the platform it lives on and its full URL.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `twitter` | string(uri)\|null |  | Link to the X/Twitter profile. | — |
-| `discord` | string(uri)\|null |  | Discord server invite or channel link. | — |
-| `github` | string(uri)\|null |  | Link to the GitHub organisation or repository. | — |
-| `telegram` | string(uri)\|null |  | Link to the Telegram group or channel. | — |
-| `farcaster` | string(uri)\|null |  | Link to the Farcaster profile or channel. | — |
-| `forum` | string(uri)\|null |  | Link to the governance or community forum. | — |
-| `blog` | string(uri)\|null |  | Link to the blog or announcements feed. | — |
+| `platform` | `twitter` \| `discord` \| `github` \| `telegram` \| `farcaster` \| `forum` \| `blog` | ✅ | Which service the link points at. 'twitter' covers X/Twitter; 'forum' is the governance or community forum; 'blog' is the blog or announcements feed. | — |
+| `url` | string(uri) | ✅ | Full URL of the profile, server, group or feed — a link, not a handle. | — |
 
 ### `funding`
 
-The program-level funding envelope. Single-currency by design, and that rule is scoped to this envelope only: bounty.reward, hackathon.prizes[].currency and accelerator.funding each keep their own currency, because a prize pool may legitimately be denominated differently from the program budget. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.
+The program-level funding envelope. Single-currency by design, and that rule is document-wide: fundingInfo.currency denominates every monetary amount in the document — budget, allocated, minAward and maxAward here, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize. No sub-block carries a currency of its own. 'Remaining' is derived at the consumer layer as budget minus allocated, and never stored.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol for the amounts below, and for milestones[].amount. | — |
+| `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol denominating every monetary amount in the document: the amounts below, plus milestones[].amount, bounty.reward, hackathon.prizes[].amount, accelerator.funding and vcFund.checkSize. | — |
 | `budget` | number\|null, ≥0 |  | Total program budget in major units. | — |
 | `allocated` | number\|null, ≥0 |  | Amount committed to date in major units — committed, not necessarily disbursed. Disbursement and delivery are not modelled. | — |
 | `minAward` | number\|null, ≥0 |  | Minimum individual award in major units. | — |
 | `maxAward` | number\|null, ≥0 |  | Maximum individual award in major units. | — |
 
-### `monetaryAmount`
-
-A single amount with its own currency, used where a sub-block is denominated independently of the program envelope.
-
-| Field | Type | Req. | Description | Registry |
-|---|---|:--:|---|---|
-| `amount` | number, ≥0 | ✅ | Amount in major units of the currency, so 2000000 means 2,000,000 USD rather than cents. | — |
-| `currency` | string, ≤16 | ✅ | ISO 4217 fiat code such as USD or EUR, or a token symbol such as ETH, OP or USDC. | — |
-
 ### `amountRange`
 
-A lower and upper bound with a shared currency. Either bound may be absent, expressing an open-ended range.
+A lower and upper bound, denominated in the document-wide fundingInfo.currency. Either bound may be absent, expressing an open-ended range.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `min` | number\|null, ≥0 |  | Lower bound in major units. | — |
-| `max` | number\|null, ≥0 |  | Upper bound in major units. | — |
-| `currency` | string\|null, ≤16 |  | ISO 4217 code or token symbol for both bounds. | — |
+| `min` | number\|null, ≥0 |  | Lower bound in major units of fundingInfo.currency. | — |
+| `max` | number\|null, ≥0 |  | Upper bound in major units of fundingInfo.currency. | — |
 
 ### `deadline`
 
@@ -226,8 +222,8 @@ A single deadline or event boundary. A 'fixed' entry carries a date; 'rolling' m
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `type` | `fixed` \| `rolling` | ✅ | Whether this deadline is a fixed point in time or an open-ended rolling window. | — |
-| `date` | string(date-time)\|null |  | RFC 3339 timestamp. Required and non-null when type is 'fixed', enforced by the if/then below; meaningless, and normally omitted, when type is 'rolling'. | — |
+| `deadlineType` | `fixed` \| `rolling` | ✅ | Whether this deadline is a fixed point in time or an open-ended rolling window. | — |
+| `date` | string(date-time)\|null, `Z$` |  | RFC 3339 timestamp in UTC (trailing 'Z'). Required and non-null when deadlineType is 'fixed', enforced by the if/then below; meaningless, and normally omitted, when deadlineType is 'rolling'. | — |
 | `label` | string\|null, ≤120 |  | What this deadline is for. Free text; conventional values are published in registries/deadline-labels.json. This is how a consumer tells an application deadline from an event boundary. | [`deadline-labels`](../../registries/deadline-labels.json) |
 
 ### `milestone`
@@ -237,41 +233,42 @@ One milestone in an opportunity's milestone sequence. Every property is optional
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `title` | string\|null |  | Short name of the milestone. | — |
-| `amount` | number\|null, ≥0 |  | Payment for this milestone in major units, denominated in the top-level funding.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and funding.currency is absent. | — |
+| `amount` | number\|null, ≥0 |  | Payment for this milestone in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
 | `criteria` | string\|null |  | Free-text acceptance criteria, including any due date. | — |
 
 ### `grant`
 
-Grant-specific attributes not covered by the core fields. May be an empty object, because core funding and date fields live at the top level.
+The fundingDetails payload when fundingType is 'grant': grant-specific attributes not covered by the core fields. May carry nothing beyond its fundingType tag, because core funding and date fields live at the top level.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
+| `fundingType` | `grant` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
 | `fundingMechanisms` | (`retroactive` \| `proactive` \| `streaming` \| `quadratic` \| `matching` \| `other`)[], unique |  | How funds are allocated. An array because mechanisms co-occur: a funder can offer a fixed grant and a matching grant in the same program. | — |
-| `programModel` | string\|null |  | The operating model of the program, as distinct from the funding instrument. An open list rather than a closed enum — conventional values are published in registries/program-models.json, and a publisher's own vocabulary is valid without a schema change. **(provisional)** | [`program-models`](../../registries/program-models.json) |
+| `programModel` | string\|null |  | The operating model of the program, as distinct from the funding instrument. An open list rather than a closed enum — conventional values are published in registries/program-models.json, and a publisher's own vocabulary is valid without a schema change. | [`program-models`](../../registries/program-models.json) |
 | `milestoneBased` | boolean\|null |  | Whether disbursement is tied to milestones. Pairs with the top-level milestones array. | — |
 | `recurring` | boolean\|null |  | Whether the program runs in recurring rounds or seasons. | — |
 
 ### `hackathon`
 
-Hackathon-specific attributes. All dates — registration, submission, event start and event end — live in the shared top-level deadlines array, distinguished by label.
+The fundingDetails payload when fundingType is 'hackathon': hackathon-specific attributes. All dates — registration, submission, event start and event end — live in the shared top-level deadlines array, distinguished by label.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
+| `fundingType` | `hackathon` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
 | `location` | string\|null |  | Physical location, or null for a fully online event. | — |
 | `online` | boolean\|null |  | Whether the event is also, or only, held online. | — |
 | `tracks` | string[], unique |  | Named tracks or themes participants can build against. | — |
-| `prizes` | [`prize`](#prize)[] |  | The prize pool, one entry per prize. Each prize carries its own currency. | — |
+| `prizes` | [`prize`](#prize)[] |  | The prize pool, one entry per prize, denominated in the document-wide fundingInfo.currency. | — |
 | `teamSize` | [`teamSize`](#teamsize) |  | Permitted team size range. | — |
 
 ### `prize`
 
-A single hackathon prize, optionally attributed to a track.
+A single hackathon prize, optionally attributed to a track. Denominated in the document-wide fundingInfo.currency, like every monetary amount in the document.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `track` | string\|null |  | Track this prize belongs to, where prizes are tracked separately. | — |
-| `amount` | number, ≥0 | ✅ | Prize amount in major units. | — |
-| `currency` | string, ≤16 | ✅ | ISO 4217 code or token symbol for this prize. | — |
+| `amount` | number, ≥0 | ✅ | Prize amount in major units of fundingInfo.currency. | — |
 
 ### `teamSize`
 
@@ -284,36 +281,39 @@ Permitted team size, as an inclusive range. Either bound may be absent.
 
 ### `bounty`
 
-Bounty-specific attributes. A bounty is a single scoped task with a stated reward, so the reward is the one required field.
+The fundingDetails payload when fundingType is 'bounty': bounty-specific attributes. A bounty is a single scoped task with a stated reward, so the reward is the one required field beyond the fundingType tag.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `reward` | [`monetaryAmount`](#monetaryamount) | ✅ | The reward paid on completion. Carries its own currency. | — |
+| `fundingType` | `bounty` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
+| `reward` | number, ≥0 | ✅ | The reward paid on completion, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
 | `difficulty` | `beginner` \| `intermediate` \| `advanced`\|null |  | Self-assessed difficulty, as a hint to applicants. | — |
 | `skills` | string[], unique |  | Skills the task calls for. Free text. | — |
 | `platform` | string\|null |  | Platform hosting the bounty. | — |
 
 ### `accelerator`
 
-Accelerator-specific attributes. The application deadline lives in the shared top-level deadlines array with label 'application'.
+The fundingDetails payload when fundingType is 'accelerator': accelerator-specific attributes. The application deadline lives in the shared top-level deadlines array with label 'application'.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
+| `fundingType` | `accelerator` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
 | `programDurationWeeks` | integer\|null, ≥0 |  | Length of the program in weeks. | — |
 | `batchSize` | integer\|null, ≥0 |  | Number of teams accepted per cohort. | — |
 | `equity` | string\|null |  | Equity taken, expressed as a string because programs state it in incomparable ways. | — |
-| `funding` | [`monetaryAmount`](#monetaryamount) |  | Investment or stipend offered per team. Carries its own currency. | — |
+| `funding` | number\|null, ≥0 |  | Investment or stipend offered per team, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
 | `stage` | `pre-seed` \| `seed` \| `series-a`\|null |  | Company stage the program targets. | — |
 | `location` | string\|null |  | Physical location, or null for a fully remote program. | — |
 | `online` | boolean\|null |  | Whether the program is also, or only, run remotely. | — |
 
 ### `vcFund`
 
-Venture-fund-specific attributes. A fund is an ongoing source of capital rather than a round, so it carries no deadline of its own.
+The fundingDetails payload when fundingType is 'vc_fund': venture-fund-specific attributes. A fund is an ongoing source of capital rather than a round, so it carries no deadline of its own.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `checkSize` | [`amountRange`](#amountrange) |  | Typical investment size, as a range. | — |
+| `fundingType` | `vc_fund` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
+| `checkSize` | [`amountRange`](#amountrange) |  | Typical investment size, as a range denominated in the document-wide fundingInfo.currency. | — |
 | `stages` | (`pre-seed` \| `seed` \| `series-a` \| `series-b+` \| `growth`)[], unique |  | Investment stages the fund participates in. | — |
 | `thesis` | string\|null |  | Investment thesis, in the fund's own words. | — |
 | `portfolio` | string[], unique |  | Named portfolio companies, where the fund publishes them. | — |
@@ -322,10 +322,11 @@ Venture-fund-specific attributes. A fund is an ongoing source of capital rather 
 
 ### `rfp`
 
-RFP-specific attributes. The issuing organisation is sponsoringOrganizations[0], the budget is the top-level funding envelope, and the proposal deadline is a deadlines entry labelled 'application'.
+The fundingDetails payload when fundingType is 'rfp': RFP-specific attributes. The issuing organisation is operatingOrganizations[0], the budget is the top-level fundingInfo envelope, and the proposal deadline is a deadlines entry labelled 'application'.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
+| `fundingType` | `rfp` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
 | `scope` | string\|null |  | Scope of work, as one free-text field. In-scope and out-of-scope prose both live here. | — |
 | `requirements` | string[], unique |  | Free-text statements of what the work must deliver. RFP-only, and deliberately not split into hard and soft. What a proposal must contain goes in the top-level prerequisites instead. | — |
 
@@ -340,27 +341,28 @@ schema-enforced**. Each is stated here because otherwise publishers guess and th
 
 | Convention | Ruling |
 |---|---|
-| **`sponsoringOrganizations` ≠ source of funds** | It is the **issuer/backer**, not necessarily where the money comes from. For donor-funded models the party running the process belongs in `operatingOrganizations`, while `sponsoringOrganizations` carries the display/issuing entity. **The money's actual origin is deliberately not modelled.** |
+| **`operatingOrganizations` is the primary array** | Required, `minItems: 1`, and **`[0]` is the primary/display organisation** — the party that runs intake, process and the application funnel, and the issuing organisation of an `rfp`. Operating = who actually runs the process = the entity consumers need first. |
+| **`sponsoringOrganizations` ≠ source of funds** | Optional since the 2026-08-05 revision. It is the **issuer/backer** where one is published, not necessarily where the money comes from — **the money's actual origin is deliberately not modelled.** The party running the process belongs in `operatingOrganizations`. |
 | **`applicationUrl` = whatever the submission channel is** | Including a **forum thread** when no portal exists. Clarifications go in `description`. **There is no submission-channel field** — the URL's *kind* is not typed. |
 | **`prerequisites` vs. `rfp.requirements`** | **`prerequisites` = what a *proposal* must contain** (track record, approach, milestone plan, disclosures). **`rfp.requirements` = what the *work* must deliver.** Application-content vs. work-content. |
-| **The three free-text siblings** | `prerequisites`, `resourceLinks` and `serviceAgreement` are all optional top-level strings and will be used interchangeably unless the boundary is written down — see below. |
+| **The three free-text siblings** | `prerequisites`, `additionalReferences` and `serviceAgreement` are all optional top-level strings and will be used interchangeably unless the boundary is written down — see below. |
 | **`deadlines[]` selection** | Select by `label`, **never by array position**. |
-| **`milestones[].amount` currency** | Optional, and it **MUST** follow the top-level `funding.currency` — a stated rule of the standard, not a soft convention. Schema-unenforceable (it crosses objects), so ingest **warns**. |
+| **`milestones[].amount` currency** | Optional, and it **MUST** follow the document-wide `fundingInfo.currency`, like every other monetary amount — a stated rule of the standard, not a soft convention. Schema-unenforceable (it crosses objects), so ingest **warns**. |
 | **Milestone due dates** | There is no milestone date field. Where a publisher has due dates, they go in `criteria` as free text. |
-| **Single-currency scope** | The single-currency rule governs the **program-level `funding` envelope only**; `bounty.reward`, `hackathon.prizes[].currency` and `accelerator.funding` each keep their own currency. |
+| **Single-currency scope** | The single-currency rule is **document-wide**: `fundingInfo.currency` denominates all six denominated sites — the envelope amounts (`budget`, `allocated`, `minAward`, `maxAward`), `milestones[].amount`, the bounty `reward`, each `prizes[].amount`, the accelerator `funding` and the `checkSize` bounds. **No sub-block carries a currency of its own** (per-type currency fields were removed on 2026-08-05, [`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)). |
 
 ### The three free-text siblings
 
-`prerequisites`, `resourceLinks` and `serviceAgreement` are all optional top-level strings, and
-each has one job:
+`prerequisites`, `additionalReferences` and `serviceAgreement` are all optional top-level
+strings, and each has one job:
 
 - **`prerequisites`** — what an applicant must *put in the proposal* to be considered: track
   record, proposed approach, a milestone plan, conflict-of-interest disclosures. If the sentence
   starts "your application must include…", it belongs here.
-- **`resourceLinks`** — supporting material a reader may want *alongside* the listing:
-  guidelines, past rounds, forum threads, the original posting. Deliberately **one free-form
-  string, not an array of URIs** — publishers paste what they have. If the sentence is a link
-  with a label, it belongs here.
+- **`additionalReferences`** (named `resourceLinks` until 2026-08-05) — supporting material a
+  reader may want *alongside* the listing: guidelines, past rounds, forum threads, the original
+  posting. Deliberately **one free-form string, not an array of URIs** — publishers paste what
+  they have. If the sentence is a link with a label, it belongs here.
 - **`serviceAgreement`** — how a **long-term service engagement** works, where the opportunity is
   one. Valid on any `fundingType`: an `rfp` or a `grant` carrying it reads as a service
   engagement rather than a one-off award. **Presence of the field is the signal**; duration,
@@ -386,15 +388,15 @@ cost of one unified date model.
   `community feedback`, `registration`, `submission`, `event start`, `event end`. Labels stay
   free text; the registry keeps them comparable, and `rfphub-validate` warns on unregistered
   ones.
-- `date` is **required and non-null** when `type` is `"fixed"` (schema-enforced via `if`/`then`);
-  it is meaningless and normally omitted when `type` is `"rolling"`.
+- `date` is **required and non-null** when `deadlineType` is `"fixed"` (schema-enforced via
+  `if`/`then`); it is meaningless and normally omitted when `deadlineType` is `"rolling"`.
 - There is deliberately **no event-anchored or relative form** — *"opens on X, then 30 days"* is
   unexpressible. A publisher posts a fixed date when the window actually opens. An opportunity in
   that state carries either no entry or a `rolling` one.
 - There is deliberately **no `recurring` deadline type**. `grant.recurring` is the only carrier
   of a recurring-round concept.
 - **API consumers:** an array is not a sortable scalar. The recommended derivation is
-  `nextDeadlineAt` = the earliest future `type: "fixed"` date, computed at the API layer and
+  `nextDeadlineAt` = the earliest future `deadlineType: "fixed"` date, computed at the API layer and
   never stored in the standard. Records carrying only `rolling` entries have no such value; they
   sort last and are **excluded** from deadline-window filters — an exclusion that must be
   documented by the consumer, not left silent. A staleness job that auto-closes on a passed
@@ -404,35 +406,48 @@ cost of one unified date model.
 ### `milestones[]` and currency
 
 `milestones[]` is optional and valid on **any** `fundingType`. **Array order is the milestone
-sequence** — there is no `order`/`index` field, exactly as `sponsoringOrganizations[0]` carries
+sequence** — there is no `order`/`index` field, exactly as `operatingOrganizations[0]` carries
 "primary".
 
-- `milestones[].amount` **MUST** be denominated in the top-level `funding.currency`. A milestone
-  cannot be paid in a different asset from the envelope. JSON Schema cannot express this — the
-  two live in different objects — so **ingest warns** when `milestones[].amount` is present and
-  `funding.currency` is absent.
+- `milestones[].amount` **MUST** be denominated in the document-wide `fundingInfo.currency`,
+  like every monetary amount in the document. A milestone cannot be paid in a different asset
+  from the envelope. JSON Schema cannot express this — the two live in different objects — so
+  **ingest warns** when `milestones[].amount` is present and `fundingInfo.currency` is absent.
 - There is **no milestone date field**. Due dates go into `criteria` as free text, consistent
   with every other free-text decision in the standard.
 - Milestone-based payment *is* `milestones[]` plus `grant.milestoneBased`. There is no separate
   payment-schedule concept.
 
-### Single currency — envelope only
+### Single currency — document-wide
 
-The program-level `funding` envelope is **single-currency**: one `currency` scalar governs
-`budget`, `allocated`, `minAward`, `maxAward` and `milestones[].amount`. There is no
-`amounts[]`, no multi-asset envelope.
+The standard is **single-currency end to end**: the one `fundingInfo.currency` scalar
+denominates **every monetary amount in the document**. The six denominated sites are the
+envelope amounts (`budget`, `allocated`, `minAward`, `maxAward`), `milestones[].amount`, the
+bounty `reward`, each hackathon `prizes[].amount`, the accelerator `funding` and the `vc_fund`
+`checkSize` bounds. There is no `amounts[]`, no multi-asset envelope, and **no sub-block
+currency**: the per-type currency fields (`reward.currency`, `prizes[].currency`,
+`funding.currency`, `checkSize.currency`) were removed on 2026-08-05
+([`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)) — until then the rule
+was deliberately scoped to the envelope, and the corpus showed the scoping carrying no
+information (zero documents used a second currency).
 
-That rule is **scoped to the envelope**. `bounty.reward`, each `hackathon.prizes[].currency` and
-`accelerator.funding` carry their own currency, because a prize pool can legitimately be
-denominated differently from the program budget. The standard is single-currency *at the
-envelope*, not end to end — this is a deliberate boundary, not an oversight.
+The denomination rule **crosses objects** — the amounts and the currency live in different
+objects — so JSON Schema cannot enforce it. It remains a stated rule of the standard, not a
+soft convention, and the validator's **advisory tier warns** whenever a denominated amount is
+present and `fundingInfo.currency` is absent.
 
-Known cost, stated plainly: a program with **simultaneous caps in two assets** (e.g. a stablecoin
-cap *and* a governance-token cap on the same round) cannot express both. Pick the primary
-currency and put the second in `description`, or carry it under `extensions`. Both are lossy and
-neither is filterable.
+Known costs, stated plainly:
 
-### `funding.allocated` is committed, not disbursed
+- A **prize pool or reward denominated differently from the program budget** — ETH prizes on
+  a USD budget — is inexpressible, not merely discouraged. A publisher with that need must
+  publish per-currency entries (one document per denomination) or convert into the envelope
+  currency.
+- A program with **simultaneous caps in two assets** (e.g. a stablecoin cap *and* a
+  governance-token cap on the same round) cannot express both. Pick the primary currency and
+  put the second in `description` — since the 2026-08-05 revision there is no `extensions`
+  fallback. Lossy, and not filterable.
+
+### `fundingInfo.allocated` is committed, not disbursed
 
 `allocated` means money **committed to date** — not money paid out. Disbursement and delivery are
 deliberately not modelled. `remaining` is **derived** as `budget − allocated` at the consumer
@@ -442,16 +457,24 @@ There is no `raised` field. A donor-crowdfunded opportunity therefore asserts it
 regardless of how much has actually been raised, and a consumer cannot tell a fully-funded round
 from one that has raised nothing. Publishers can note it in `description`; it is not filterable.
 
-### Type blocks — one per opportunity
+### `fundingDetails` — one self-described details object per opportunity
 
-Every entry carries exactly one type-specific object under a key **equal to its `fundingType`
-value**, so a consumer can always read `opportunity[opportunity.fundingType]` — a `hackathon`
-entry has a `hackathon` object, a `vc_fund` entry has a `vc_fund` object.
+Every entry carries its type-specific details in the required **`fundingDetails`** object —
+one of six shapes (grant, hackathon, bounty, accelerator, vc_fund, rfp), **self-described by
+its own required `fundingType` tag**, which names the shape and always equals the top-level
+`fundingType`. A consumer reads `opportunity.fundingDetails` and dispatches on either tag; the
+schema's binding `allOf` guarantees the two agree, so a `?fundingType=grant` result can never
+carry a hackathon-shaped payload.
 
-The matching block is **required** for all six types (for grants it MAY be `{}`), and **no other
-type block may be present**: a `grant` record carrying an `rfp` object **fails validation**. This
-is enforced by the schema, not by convention, so `opportunity[opportunity.fundingType]` is a
-guarantee rather than an expectation.
+`fundingDetails` is **required** for all six types — for grants it MAY carry nothing beyond
+the tag (`{"fundingType": "grant"}`), because core funding and date fields live at the top
+level. Carrying a second type's details is not merely forbidden, it is **unrepresentable**:
+there is one slot, and the old sibling-block keys (`grant`, `rfp`, …) are unknown top-level
+properties that fail validation. This upgrades the pre-revision runtime convention
+(`opportunity[opportunity.fundingType]`, superseded by
+[`adr/0005`](../../../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md))
+to a guarantee the generated TypeScript can also see — `fundingDetails` is a discriminated
+union that narrows on its tag.
 
 Service agreements are **not** a seventh type — they are the top-level `serviceAgreement` field,
 orthogonal to `fundingType`.
@@ -493,8 +516,7 @@ derivation guidance above.
 
 The schema defines the **canonical, full** opportunity object — used for the detail endpoint,
 exports, snapshots, and agent payloads. For bandwidth, **list/search responses return a lighter
-projection**: core fields only, omitting the type-specific block
-(`opportunity[opportunity.fundingType]`) and `extensions`. Clients fetch the full object from the
+projection**: core fields only, omitting `fundingDetails`. Clients fetch the full object from the
 detail endpoint (`GET /v1/opportunities/:id`). This is an API-delivery concern — it does not
 change the object's canonical schema.
 
@@ -510,7 +532,8 @@ An **implementation** conforms with respect to the published suite when every do
 [`conformance/v1.0.0/fail/`](../../conformance/v1.0.0/fail) does not. The suite asserts nothing
 about which error is reported, how many, or in what order. Passing it is **evidence of
 conformance, not a definition of it** — the schema is the definition. Warnings from the advisory
-tier (unregistered registry values, milestone amounts with no envelope currency) do **not** affect
+tier (unregistered registry values, monetary amounts present with no `fundingInfo.currency` to
+denominate them) do **not** affect
 conformance; a conforming document may raise warnings, which is the point of the split.
 
 ---

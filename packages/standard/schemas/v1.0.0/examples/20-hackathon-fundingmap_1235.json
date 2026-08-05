@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "EVE Frontier x Sui Hackathon 2026",
+      "slug": "eve-frontier-x-sui-hackathon-2026",
+      "website": "https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "EVE Frontier x Sui Hackathon 2026",
+      "slug": "eve-frontier-x-sui-hackathon-2026",
       "website": "https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon"
     }
   ],
@@ -24,46 +32,47 @@
     "Upcoming Deadline",
     "Gaming"
   ],
-  "resourceLinks": "Original posting: https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon",
+  "additionalReferences": "Original posting: https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon",
   "applicationUrl": "https://www.deepsurge.xyz/evefrontier2026",
   "website": "https://evefrontier.com/en/news/eve-frontier-sui-2026-hackathon",
-  "funding": {
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 52500,
     "maxAward": 15000
   },
   "opensAt": "2026-03-11T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-31T00:00:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-31T23:59:00.000Z",
       "label": "registration"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-11T00:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-24T23:59:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-10T00:09:06.000Z",
   "updatedAt": "2026-03-31T00:02:00.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Virtual15",
     "online": null,
     "prizes": [
       {
         "track": null,
-        "amount": 80000,
-        "currency": "USD"
+        "amount": 80000
       }
     ],
     "teamSize": {

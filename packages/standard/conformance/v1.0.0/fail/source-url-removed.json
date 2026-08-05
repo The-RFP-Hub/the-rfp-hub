@@ -7,11 +7,20 @@
   "status": "open",
   "sponsoringOrganizations": [
     {
-      "name": "Example Foundation"
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
     }
   ],
   "source": {
     "url": "https://example.org/original-posting"
   },
-  "grant": {}
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
 }

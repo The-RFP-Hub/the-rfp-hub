@@ -12,8 +12,8 @@ import {
 } from "../../src/modules/shared/deadlines.js";
 
 const NOW = new Date("2026-07-01T00:00:00.000Z");
-const fixed = (date: string, label?: string): Deadline => ({ type: "fixed", date, label });
-const rolling = (label?: string): Deadline => ({ type: "rolling", label });
+const fixed = (date: string, label?: string): Deadline => ({ deadlineType: "fixed", date, label });
+const rolling = (label?: string): Deadline => ({ deadlineType: "rolling", label });
 
 describe("nextDeadlineAt", () => {
   it("returns the earliest fixed deadline still in the future", () => {
@@ -47,8 +47,8 @@ describe("nextDeadlineAt", () => {
 
   it("ignores unparseable or missing dates rather than throwing", () => {
     const d = [
-      { type: "fixed", date: "not a date" } as Deadline,
-      { type: "fixed" } as Deadline,
+      { deadlineType: "fixed", date: "not a date" } as Deadline,
+      { deadlineType: "fixed" } as Deadline,
       fixed("2026-08-01T00:00:00.000Z"),
     ];
     expect(nextDeadlineAt(d, NOW)?.toISOString()).toBe("2026-08-01T00:00:00.000Z");

@@ -9,6 +9,14 @@
   "sponsoringOrganizations": [
     {
       "name": "HashCash Hashathon",
+      "slug": "hashcash-hashathon",
+      "website": "https://hashcash.club/hashathon"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "HashCash Hashathon",
+      "slug": "hashcash-hashathon",
       "website": "https://hashcash.club/hashathon"
     }
   ],
@@ -25,33 +33,38 @@
   ],
   "applicationUrl": "https://hashcash.club/hashathon",
   "website": "https://hashcash.club/hashathon",
-  "socialLinks": {
-    "twitter": "https://x.com/clubhashcash"
-  },
-  "funding": {
+  "socialLinks": [
+    {
+      "platform": "twitter",
+      "url": "https://x.com/clubhashcash"
+    }
+  ],
+  "fundingInfo": {
+    "currency": "USD",
     "budget": 5000
   },
   "opensAt": "2026-04-01T00:00:00.000Z",
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-30T23:59:00.000Z",
       "label": "application"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-01T00:00:00.000Z",
       "label": "event start"
     },
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-04-30T23:59:00.000Z",
       "label": "event end"
     }
   ],
   "createdAt": "2026-03-27T20:58:42.000Z",
   "updatedAt": "2026-03-28T00:01:58.000Z",
-  "hackathon": {
+  "fundingDetails": {
+    "fundingType": "hackathon",
     "location": "Remote",
     "online": null,
     "tracks": [
@@ -64,8 +77,7 @@
     "prizes": [
       {
         "track": null,
-        "amount": 5000,
-        "currency": "USD"
+        "amount": 5000
       }
     ]
   }

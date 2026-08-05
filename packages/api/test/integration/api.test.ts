@@ -16,13 +16,13 @@ import { describeWithDb } from "./db-gate.js";
 const TAG = "TESTONLY";
 
 const fixture = (
-  over: Partial<Opportunity> & Pick<Opportunity, "id" | "fundingType">,
+  over: Partial<Opportunity> & Pick<Opportunity, "id" | "fundingType" | "fundingDetails">,
 ): Opportunity => ({
   specVersion: "1.0.0",
   title: `Fixture ${over.id}`,
   description: "Integration fixture.",
   status: "open",
-  sponsoringOrganizations: [{ name: "Test Org", slug: "test-org" }],
+  operatingOrganizations: [{ name: "Test Org", slug: "test-org" }],
   source: { ingestedVia: "import", verifiedAgainstSource: null },
   ecosystems: [TAG],
   ...over,
@@ -36,31 +36,47 @@ run("/v1 API", () => {
   beforeAll(async () => {
     const ctl = new OpportunityService();
     await ctl.upsertFromStandard(
-      fixture({ id: "itest:grant-1", fundingType: "grant", grant: {} }),
+      fixture({
+        id: "itest:grant-1",
+        fundingType: "grant",
+        fundingDetails: { fundingType: "grant" },
+      }),
       { reviewStatus: "approved", isListed: true },
     );
     await ctl.upsertFromStandard(
       fixture({
         id: "itest:hack-1",
         fundingType: "hackathon",
-        hackathon: { online: true, prizes: [{ amount: 1000, currency: "USD" }] },
+        fundingDetails: {
+          fundingType: "hackathon",
+          online: true,
+          prizes: [{ amount: 1000 }],
+        },
         operatingOrganizations: [{ name: "Operator Ltd", slug: "test-operator" }],
-        eligibility: { geography: "Global" },
+        sponsoringOrganizations: [{ name: "Test Org", slug: "test-org" }],
+        eligibility: "Global",
         milestones: [{ title: "Demo day", criteria: "Ship something" }],
-        deadlines: [{ type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" }],
+        deadlines: [
+          { deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" },
+        ],
       }),
       { reviewStatus: "approved", isListed: true },
     );
-    await ctl.upsertFromStandard(fixture({ id: "itest:hidden", fundingType: "grant", grant: {} }), {
-      reviewStatus: "approved",
-      isListed: false,
-    });
     await ctl.upsertFromStandard(
-      fixture({ id: "itest:pending", fundingType: "grant", grant: {} }),
-      {
-        reviewStatus: "pending",
-        isListed: true,
-      },
+      fixture({
+        id: "itest:hidden",
+        fundingType: "grant",
+        fundingDetails: { fundingType: "grant" },
+      }),
+      { reviewStatus: "approved", isListed: false },
+    );
+    await ctl.upsertFromStandard(
+      fixture({
+        id: "itest:pending",
+        fundingType: "grant",
+        fundingDetails: { fundingType: "grant" },
+      }),
+      { reviewStatus: "pending", isListed: true },
     );
 
     app = await buildApp();
@@ -94,8 +110,8 @@ run("/v1 API", () => {
       new Set(["itest:grant-1", "itest:hack-1"]),
     );
     expect(body).toMatchObject({ page: 1, limit: 20, totalPages: 1 });
-    // thin: no type-specific block in list items
-    for (const item of body.items) expect(item[item.fundingType]).toBeUndefined();
+    // thin: no type-specific details in list items
+    for (const item of body.items) expect(item.fundingDetails).toBeUndefined();
   });
 
   it("honors the fundingType filter", async () => {
@@ -108,19 +124,20 @@ run("/v1 API", () => {
     expect(body.items[0].id).toBe("itest:hack-1");
   });
 
-  it("GET /v1/opportunities/:id returns the full object with its type block", async () => {
+  it("GET /v1/opportunities/:id returns the full object with its fundingDetails", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/opportunities/itest:hack-1" });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.specVersion).toBe("1.0.0");
     expect(body.fundingType).toBe("hackathon");
-    expect(body.hackathon).toMatchObject({ online: true });
+    // the tag is reattached on read from the funding_type column (type_data is stored tag-free)
+    expect(body.fundingDetails).toMatchObject({ fundingType: "hackathon", online: true });
     expect(body.sponsoringOrganizations[0].name).toBe("Test Org");
     expect(body.operatingOrganizations[0].slug).toBe("test-operator");
-    expect(body.eligibility).toEqual({ geography: "Global" });
+    expect(body.eligibility).toBe("Global");
     expect(body.milestones).toHaveLength(1);
     expect(body.deadlines).toEqual([
-      { type: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" },
+      { deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" },
     ]);
     // removed by the re-cut — must not reappear
     expect(body).not.toHaveProperty("type");
@@ -182,9 +199,10 @@ run("/v1 API", () => {
     // the standard package ships, not a hardcoded URL that would need a second edit.
     expect(doc.$id).toBe((opportunitySchema as Record<string, unknown>).$id);
     expect(doc.title).toBe("RFP Hub Opportunity");
-    // it is the NEW schema: fundingType/sponsoringOrganizations in, type/organization/closesAt out
+    // it is the NEW schema: fundingType/operatingOrganizations in, type/organization/closesAt out
     expect(doc.required).toContain("fundingType");
-    expect(doc.required).toContain("sponsoringOrganizations");
+    expect(doc.required).toContain("operatingOrganizations");
+    expect(doc.required).not.toContain("sponsoringOrganizations"); // optional since the org flip
     expect(doc.properties.deadlines).toBeTruthy();
     expect(doc.properties.type).toBeUndefined();
     expect(doc.properties.organization).toBeUndefined();
@@ -209,16 +227,22 @@ run("/v1 API", () => {
     expect(Number.isNaN(Date.parse(body.lastUpdatedAt))).toBe(false);
   });
 
-  it("rejects at ingest a record carrying a block that does not match its fundingType", async () => {
+  it("never stores or serves a stray legacy top-level type block", async () => {
+    // Two type blocks became UNREPRESENTABLE with the single `fundingDetails` slot, so the old
+    // reject-at-ingest guard is gone; a legacy-shaped extra key is simply not a Standard field —
+    // ingest ignores it and the served object carries only `fundingDetails`.
     const ctl = new OpportunityService();
-    const twoBlocks = fixture({
-      id: "itest:two-blocks",
+    const legacy = fixture({
+      id: "itest:legacy-block",
       fundingType: "grant",
-      grant: {},
-      hackathon: { online: true },
+      fundingDetails: { fundingType: "grant" },
+      hackathon: { online: true }, // pre-fundingDetails shape; not a Standard field anymore
     });
-    await expect(ctl.upsertFromStandard(twoBlocks)).rejects.toThrow(/also carries: hackathon/);
-    const res = await app.inject({ method: "GET", url: "/v1/opportunities/itest:two-blocks" });
-    expect(res.statusCode).toBe(404); // nothing was stored
+    await ctl.upsertFromStandard(legacy, { reviewStatus: "approved", isListed: true });
+    const res = await app.inject({ method: "GET", url: "/v1/opportunities/itest:legacy-block" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.hackathon).toBeUndefined();
+    expect(body.fundingDetails).toEqual({ fundingType: "grant" });
   });
 });

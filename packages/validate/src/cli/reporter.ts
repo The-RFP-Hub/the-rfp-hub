@@ -25,7 +25,7 @@ function label(r: EntryResult): string {
 /**
  * How many ENTRIES (not warnings) each check fired on, in the checks' declared order.
  * Counting entries rather than warnings is what makes the summary actionable — "3 of 40
- * entries use an unregistered eligibility key" is a coverage statement; "11 warnings" is not.
+ * entries use an unregistered deadline label" is a coverage statement; "11 warnings" is not.
  */
 function warningCountsByCode(results: EntryResult[]): Map<string, number> {
   const counts = new Map<string, number>();

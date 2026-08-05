@@ -49,7 +49,10 @@ The promotion gate is deliberately **one publisher and one consumer**, not the f
 bar larger projects use. At this size, five implementations is a gate nothing ever passes, and an
 unpassable gate means everything stays experimental forever, which tells a reader nothing.
 
-Fields currently at `provisional`: `serviceAgreement`, `milestones[]`, `grant.programModel`.
+Fields currently at `provisional`: none. The three that carried the marker (`serviceAgreement`,
+`milestones[]`, `programModel`) were promoted to `stable` on 2026-08-05, the maintainers
+accepting the M1 research round — the decision interviews, plus the real third-party RFP that
+motivated `milestones[]` — as the verification the gate asks for (recorded in `CHANGELOG.md`).
 
 ---
 
@@ -112,12 +115,21 @@ version's validator produced a definite answer, the state was not indeterminate.
 
 `v1.0.0` was re-cut in place on 2026-07-27: same version string, different bytes
 ([`adr/0001`](../../adr/0001-recut-v1.0.0-in-place.md)). That was defensible **only** because the
-standard was unpublished and unadopted, and it is **the only one**.
+standard was unpublished and unadopted, and it is **the only re-cut of bytes that had been
+published as final**.
 
 The rule, stated so a future maintainer cannot reason their way around it:
 
 > **A version directory may be edited in place only while its maturity is `draft` and no external
 > consumer has adopted it. It may never be edited in place after it is declared `stable`.**
+
+The draft `v1.0.0` was revised in place a second time under this rule on 2026-08-05
+([`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md), which reconciles
+the revision with the once-only language above — the vow governed the published-re-cut event
+class, the rule governs draft-period edits, and both end at promotion). Note the basis has
+narrowed since ADR-0001: the npm package is published now, so the permission rests on draft
+maturity plus zero external adopters alone. If an adopter appears, the next breaking change is
+a version bump regardless of maturity.
 
 The mechanism, so the rule does not depend on memory: declaring a version stable adds a `FROZEN`
 marker file to its directory, and
@@ -134,6 +146,16 @@ promotion to `stable`.
    already published using it stays valid and stays interpretable. The registry file is an
    append-and-annotate log, not a list of currently-good values — that list is the `active` array
    in the generated [`registries/index.json`](./registries/index.json).
+
+   This rule governs **entries**, not registries. For the registry as a whole, the rule — set
+   as precedent when `eligibility-keys` was retired with the `eligibility` field's move to free
+   text (2026-08-05, [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md)):
+   **a registry may be retired — deleted whole — only while its governing spec version is
+   `draft`.** Entry-level deprecation cannot express a registry losing its subject (there is no
+   successor for `replacedBy` to name, and tooling rejects a registry that governs no field).
+   Once the governing version is `stable`, a registry whose field is removed is deprecated
+   entry-by-entry and kept forever, like any other published vocabulary. A retired registry's
+   definitions stay recoverable through the CHANGELOG record and git history.
 2. **A deprecated field stays valid and stays accepted** for at least one full release after the
    release that deprecated it. A field deprecated in release N may be removed no earlier than
    N+1. Consumers get a release cycle's notice, at minimum.
@@ -160,9 +182,10 @@ promotion to `stable`.
 The registries are how the standard keeps open fields comparable without closing them. Adding to
 one is the cheapest possible contribution and it is designed to be.
 
-There are **three**: `eligibility-keys`, `deadline-labels` and `program-models`. Those are the
-vocabularies where two publishers writing different strings for the same concept produce
-uncomparable data. `ecosystems` and `networks` are open lists too and deliberately have **no**
+There are **two**: `deadline-labels` and `program-models`. Those are the vocabularies where two
+publishers writing different strings for the same concept produce uncomparable data. (A third,
+`eligibility-keys`, was retired on 2026-08-05 when `eligibility` became free text — see the
+registry-retirement rule above.) `ecosystems` is an open list too and deliberately has **no**
 registry — a registry over chain names is read as an allowed-values list however carefully
 [`NORMATIVE.md`](./NORMATIVE.md) words the distinction, and it would put this review process in
 front of a newly launched chain for no interoperability gain.
@@ -176,9 +199,11 @@ A value is registered when it meets all three:
 2. **Clearly described.** One paragraph saying what the value means and when a publisher should
    choose it *over its nearest neighbour*. If the description cannot distinguish it from an
    existing entry, the existing entry is the answer.
-3. **No vendor lock.** A value that only makes sense inside one platform's product belongs in
-   `extensions`, not in a shared vocabulary. Registered values must be meaningful to a publisher
-   who has never heard of whoever proposed them.
+3. **No vendor lock.** A value that only makes sense inside one platform's product does not
+   belong in the standard at all — there is no `extensions` escape hatch to park it in; if the
+   concept is real beyond one vendor, propose a field through a spec release instead.
+   Registered values must be meaningful to a publisher who has never heard of whoever proposed
+   them.
 
 The registration policy is deliberately the **least strict one that works**: an editor reviews,
 and the bar is the three criteria above, not consensus.

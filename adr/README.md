@@ -16,6 +16,9 @@ total, not one per commit.
 | [0001](./0001-recut-v1.0.0-in-place.md) | Re-cut spec v1.0.0 in place rather than bumping the version | accepted | 2026-07-27 |
 | [0002](./0002-v-next-field-recut.md) | The v-next field re-cut — what changed in the data model and why | accepted | 2026-07-27 |
 | [0003](./0003-instance-self-identification-and-version-pattern.md) | Permit instance self-identification, and make `specVersion` a patch-line pattern | partially accepted — self-identification kept; version pattern reverted same day | 2026-07-27 |
+| [0004](./0004-second-draft-revision-org-swap-and-closure.md) | Revise draft v1.0.0 in place a second time — swap the organisation roles, close the top level, retire the eligibility registry | accepted — supersedes parts of 0002 | 2026-08-05 |
+| [0005](./0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md) | Revise draft v1.0.0 in place a third time — mandate UTC `Z` timestamps and collapse the type blocks into a tagged `fundingDetails` union | accepted — supersedes 0002 #3 | 2026-08-05 |
+| [0006](./0006-document-wide-single-currency.md) | Denominate every monetary amount in the single document-wide `fundingInfo.currency` | accepted — supersedes 0002 #17 | 2026-08-05 |
 
 ## When to write one
 

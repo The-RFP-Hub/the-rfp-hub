@@ -8,7 +8,14 @@
   "status": "archived",
   "sponsoringOrganizations": [
     {
-      "name": "ZKsync Foundation"
+      "name": "ZKsync Foundation",
+      "slug": "zksync-foundation"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "ZKsync Foundation",
+      "slug": "zksync-foundation"
     }
   ],
   "source": {
@@ -23,21 +30,22 @@
     "Funding Opportunity"
   ],
   "applicationUrl": "https://forum.zknation.io/t/community-activation-rfp-3-zksync-institutional-narrative-experiment/922",
-  "funding": {
+  "fundingInfo": {
     "budget": 15000,
     "currency": "USD"
   },
   "opensAt": null,
   "deadlines": [
     {
-      "type": "fixed",
+      "deadlineType": "fixed",
       "date": "2026-03-20T00:00:00.000Z",
       "label": "application"
     }
   ],
   "createdAt": "2026-03-11T00:10:20.000Z",
   "updatedAt": "2026-03-20T00:01:36.000Z",
-  "rfp": {
+  "fundingDetails": {
+    "fundingType": "rfp",
     "scope": null
   }
 }

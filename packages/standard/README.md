@@ -18,11 +18,12 @@ const opp: Opportunity = {
   title: "Example Grants",
   description: "…",
   status: "open",
-  sponsoringOrganizations: [{ name: "Example Foundation" }],
+  operatingOrganizations: [{ name: "Example Foundation", slug: "example-foundation" }],
   source: {},
   applicationUrl: "https://example.org/grants",
-  deadlines: [{ type: "fixed", date: "2026-12-31T23:59:59.000Z", label: "application" }],
-  grant: {},
+  fundingInfo: { currency: "USD", budget: 250000 },
+  deadlines: [{ deadlineType: "fixed", date: "2026-12-31T23:59:59.000Z", label: "application" }],
+  fundingDetails: { fundingType: "grant" },
 };
 ```
 
@@ -41,7 +42,7 @@ import schema from "@the-rfp-hub/standard/schemas/v1.0.0/opportunity.schema.json
 | `schemas/v1.0.0/context.jsonld` | JSON-LD context. Term IRIs are versionless; the context *document* is what gets versioned. |
 | `schemas/v1.0.0/examples/` | 28 curated real-world entries. |
 | `conformance/v1.0.0/{pass,fail}/` | One document per rule, named after the rule. Run these against your own implementation — see [`conformance/README.md`](./conformance/README.md). |
-| `registries/` | Three open vocabularies: eligibility keys, deadline labels, program models. The schema keeps these fields free-text; the registry fixes what each value means. `ecosystems` and `networks` are open too and deliberately have no registry — see [`ARTIFACTS.md`](./ARTIFACTS.md). |
+| `registries/` | Two open vocabularies: deadline labels and program models. The schema keeps these fields free-text; the registry fixes what each value means. `ecosystems` is open too and deliberately has no registry — see [`ARTIFACTS.md`](./ARTIFACTS.md). (`eligibility-keys` was retired on 2026-08-05 when `eligibility` became free text.) |
 | `meta/rfphub-schema.meta.json` | Metaschema constraining our schema file's shape and legalising `x-stability` / `x-since` / `x-deprecated`. |
 | `spec.config.json` | The spec's identity. Every generated version string and URL is stamped from here. |
 
@@ -67,14 +68,10 @@ results.
 | [`NORMATIVE.md`](./NORMATIVE.md) | Which artifacts carry authority, and which can be corrected any day without a release. |
 | [`PROCESS.md`](./PROCESS.md) | Feature stages, what "breaking" means operationally, deprecation, how to register a vocabulary value, the release checklist. |
 | [`ARTIFACTS.md`](./ARTIFACTS.md) | Every artifact this standard ships, plans to ship, or has declined — with the reason. |
-| [`schemas/v1.0.0/STATUS.md`](./schemas/v1.0.0/STATUS.md) | Where this version stands: maturity, known issues, and the in-place re-cut. |
-| [`CHANGELOG.md`](./CHANGELOG.md) | What changed and when — including the [field mapping table](./CHANGELOG.md#field-mapping-old--new) for the re-cut. No row is ever removed from it. |
+| [`schemas/v1.0.0/STATUS.md`](./schemas/v1.0.0/STATUS.md) | Where this version stands: maturity, known issues, revision history. |
+| [`CHANGELOG.md`](./CHANGELOG.md) | What changed and when — including the [field mapping tables](./CHANGELOG.md#field-mapping-old--new). No row is ever removed from it. |
 
 Who decides, and the review windows, are in `GOVERNANCE.md` at the repository root.
-
-> ⚠️ **v1.0.0 was re-cut in place on 2026-07-27** — the contents under this version string differ
-> from those published before that date. See `STATUS.md` and the field mapping table in
-> `CHANGELOG.md`.
 
 ## License
 

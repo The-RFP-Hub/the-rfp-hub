@@ -26,7 +26,7 @@ is deleted: this doc stays the canonical reference so deferred work remains disc
 | Table / feature | Status |
 |---|---|
 | `organizations` (minus `verified`) — the org **directory**, written on ingest | ✅ M2 |
-| `opportunities` core columns + provenance + `text[]`/GIN + `jsonb` org arrays / `deadlines` / `type_data` / `extensions` | ✅ M2 |
+| `opportunities` core columns + provenance + `text[]`/GIN + `jsonb` org arrays / `deadlines` / `type_data` | ✅ M2 |
 | `opportunities.next_deadline_at` (derived, denormalized) + `ix_opp_next_deadline` | ✅ M2 |
 | `dataset_snapshots` (nightly export bookkeeping) | ✅ M2 |
 | `opportunities.search_tsv` generated `tsvector` column + `gin_opp_search` | ⏳ deferred (use `ILIKE`/`pg_trgm` in M2; add when data volume warrants) |
@@ -39,7 +39,7 @@ is deleted: this doc stays the canonical reference so deferred work remains disc
 
 **M2 read path (what the `/v1/` API actually touches):** `opportunities` alone, filtered by
 `review_status='approved' AND is_listed` — reads no longer join `organizations` (see
-"Organizations" below). `text[]`+GIN backs the ecosystem/network/category/tag/sponsor filters,
+"Organizations" below). `text[]`+GIN backs the ecosystem/category/organization filters,
 `numeric` award columns back the grant-size ranges, `next_deadline_at` backs the deadline sort and
 window filters, and `ILIKE` over `title`/`summary`/`description` backs the `q` text search (the
 generated `tsvector` column is **deferred** — premature at the M2 dataset size).
@@ -50,18 +50,20 @@ Each ⏳ table/feature below is annotated inline where it appears.
 ## Principles
 
 1. **Hybrid relational + JSONB.** Typed columns for everything the API filters/sorts/searches
-   on (the live filters are funding type, ecosystem, network, status, grant size, sponsor,
+   on (the live filters are funding type, ecosystem, category, status, grant size, organization,
    deadline window, text). `JSONB` for the genuinely variable or order-significant bits: the
-   per-type block, the organization arrays, `deadlines`, `milestones`, `eligibility` and
-   `extensions`.
-2. **Type-as-key via one JSONB column.** The discriminated-union payload lives in
-   `opportunities.type_data`; the API serves it under a key equal to `funding_type` (so
-   `opportunity[opportunity.fundingType]` works) without per-type tables/columns. Since the
-   v1.0.0 re-cut the Standard also *forbids* every non-matching block, so ingest rejects a
-   record that carries one (`assertSingleTypeBlock` in the mapper) rather than silently
-   dropping it.
+   per-type block, the organization arrays, `deadlines` and `milestones`.
+2. **One tagged-union slot via one JSONB column.** The Standard models the type-specific details
+   as a single required `fundingDetails` property — a `oneOf` tagged union whose required inner
+   `fundingType` tag equals the top-level discriminator (a binding `allOf` keeps the two in
+   step). The payload lives in `opportunities.type_data` **without the tag**: the tag is
+   derivable from the `funding_type` column, so storing it twice would only let the copies
+   disagree. The read path reattaches it (`toStandard` emits
+   `fundingDetails = { fundingType: row.fundingType, ...type_data }`), which makes a mismatched
+   served tag structurally impossible. A second type block is likewise unrepresentable — one
+   slot, one shape — so the old `assertSingleTypeBlock` ingest guard is gone.
 3. **Derive-then-denormalize for anything sortable that lives in an array.** The Standard has no
-   sortable deadline scalar — `deadlines[]` is an array of `{type, date?, label?}`. The API
+   sortable deadline scalar — `deadlines[]` is an array of `{deadlineType, date?, label?}`. The API
    derives `next_deadline_at` (earliest **future** `fixed` entry) and stores it in a real,
    indexed column, recomputed on every write. Nothing sorts or ranges over JSONB.
 4. **Provenance-first, but not schema-enforced.** The re-cut removed `source.url` and left
@@ -129,26 +131,26 @@ CREATE TABLE opportunities (
   -- Organizations: ARRAYS with semantic order ([0] = primary/display), each optionally carrying
   -- contacts[]. Stored verbatim as JSONB and served back unchanged — an FK can only carry one
   -- organization and cannot carry order, so reads do not join `organizations` at all.
-  sponsoring_organizations JSONB NOT NULL,            -- min 1 (enforced app-side by the Standard)
-  operating_organizations  JSONB NOT NULL DEFAULT '[]',
-  sponsor_slugs      TEXT[] NOT NULL DEFAULT '{}',    -- denormalized lookup key for ?organization=
+  -- `operating_organizations` is THE primary array (required, min 1 app-side per the Standard);
+  -- sponsors are optional and may be empty.
+  sponsoring_organizations JSONB NOT NULL DEFAULT '[]',
+  operating_organizations  JSONB NOT NULL,            -- min 1 (enforced app-side by the Standard)
+  org_slugs          TEXT[] NOT NULL DEFAULT '{}',    -- denormalized ?organization= key: operating ∪ sponsoring slugs
 
   application_url    TEXT,                            -- the single link-back target
   website            TEXT,
   logo_url           TEXT,
   banner_url         TEXT,
-  social_links       JSONB NOT NULL DEFAULT '{}',     -- small fixed shape; not filtered
+  social_links       JSONB NOT NULL DEFAULT '[]',     -- [{platform, url}] entries; not filtered
 
   -- classification (open lists per the ETH-scoped standard) — filtered via GIN
   ecosystems         TEXT[] NOT NULL DEFAULT '{}',
-  networks           TEXT[] NOT NULL DEFAULT '{}',
   categories         TEXT[] NOT NULL DEFAULT '{}',
-  tags               TEXT[] NOT NULL DEFAULT '{}',
 
-  -- open key→value eligibility map + free-text qualifiers (deliberately NOT filterable)
-  eligibility        JSONB NOT NULL DEFAULT '{}',
+  -- free-flow eligibility text + free-text qualifiers (deliberately NOT filterable)
+  eligibility        TEXT,
   prerequisites      TEXT,
-  resource_links     TEXT,
+  additional_references TEXT,
   service_agreement  TEXT,
 
   -- funding envelope (grant-size filters). `allocated` = COMMITTED to date, not disbursed;
@@ -163,13 +165,12 @@ CREATE TABLE opportunities (
 
   -- dates
   opens_at           TIMESTAMPTZ,
-  deadlines          JSONB NOT NULL DEFAULT '[]',     -- [{type:'fixed'|'rolling', date?, label?}]
+  deadlines          JSONB NOT NULL DEFAULT '[]',     -- [{deadlineType:'fixed'|'rolling', date?, label?}]
   next_deadline_at   TIMESTAMPTZ,                     -- DERIVED: earliest FUTURE fixed deadline
   posted_at          TIMESTAMPTZ,
 
-  -- discriminated-union payload (served under the `funding_type` key) + escape hatch
-  type_data          JSONB NOT NULL DEFAULT '{}',     -- = opportunity[fundingType]
-  extensions         JSONB NOT NULL DEFAULT '{}',
+  -- discriminated-union payload (served as `fundingDetails`, tag reattached on read)
+  type_data          JSONB NOT NULL DEFAULT '{}',     -- = fundingDetails minus its fundingType tag
 
   -- provenance (1:1) — ✅ M2. No column is NOT NULL: the Standard's `source` has no required
   -- member since the re-cut, so completeness is an ingestion-policy concern.
@@ -218,10 +219,8 @@ CREATE INDEX ix_opp_budget        ON opportunities (budget);
 CREATE INDEX ix_opp_award         ON opportunities (min_award, max_award);
 CREATE INDEX ix_opp_updated       ON opportunities (updated_at DESC);
 CREATE INDEX gin_opp_ecosystems   ON opportunities USING gin (ecosystems);
-CREATE INDEX gin_opp_networks     ON opportunities USING gin (networks);
 CREATE INDEX gin_opp_categories   ON opportunities USING gin (categories);
-CREATE INDEX gin_opp_tags         ON opportunities USING gin (tags);
-CREATE INDEX gin_opp_sponsors     ON opportunities USING gin (sponsor_slugs);
+CREATE INDEX gin_opp_org_slugs    ON opportunities USING gin (org_slugs);
 CREATE INDEX gin_opp_search       ON opportunities USING gin (search_tsv);
 CREATE INDEX gin_opp_typedata     ON opportunities USING gin (type_data jsonb_path_ops);
 ```
@@ -264,20 +263,22 @@ auto-closes**, however old its fixed dates are.
 
 ### Organizations
 
-`sponsoringOrganizations` is an array with **semantic order** (`[0]` is the primary/display
-organization), `operatingOrganizations` is a second array, and each entry may carry `contacts[]`.
+`operatingOrganizations` is the **required, primary** array with **semantic order** (`[0]` is the
+primary/display organization); `sponsoringOrganizations` is an optional second array (absent or
+empty when no backer is published), and each entry may carry `contacts[]`.
 An FK can express neither multiplicity nor order, so both arrays are stored verbatim as JSONB on
 the opportunity and are served back byte-for-byte — which is also what keeps the mapper round-trip
 exact against the Standard's committed examples.
 
 `organizations` survives as the **directory / namespace registry**, not as a read-path join: every
-sponsoring *and* operating organization is upserted into it on ingest (keyed by `slug`, or a slug
-derived from `name` when the publisher omits one). That is what M3's `verified` flag, `/publishers`
+operating *and* sponsoring organization is upserted into it on ingest, keyed by `slug` (a
+Standard-required field since the re-cut). That is what M3's `verified` flag, `/publishers`
 and `org_memberships` hang off.
 
-Filtering by organization would otherwise mean a JSONB containment scan, so `sponsor_slugs` carries
-one entry per **sponsoring** organization, GIN-indexed. `?organization=<slug>` therefore matches
-**any** sponsor — not only the primary `[0]` one — and does **not** match operating organizations.
+Filtering by organization would otherwise mean a JSONB containment scan, so `org_slugs` carries the
+**union** of every operating and sponsoring organization slug, GIN-indexed.
+`?organization=<slug>` therefore matches an organization in **either role**, in any array
+position — not only the primary `operatingOrganizations[0]` entry.
 
 ## Identity & access (Privy separate app + API keys)
 
@@ -318,12 +319,12 @@ CREATE TABLE organizations (   -- ✅ M2 (except the two `verified*` columns bel
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   slug          TEXT NOT NULL UNIQUE,    -- the org's NAMESPACE (e.g. 'filecoin')
   name          TEXT NOT NULL,
-  type          org_type,
+  org_type      org_type,
   description   TEXT,
   website       TEXT,
   logo_url      TEXT,
   banner_url    TEXT,
-  social_links  JSONB NOT NULL DEFAULT '{}',
+  social_links  JSONB NOT NULL DEFAULT '[]',       -- [{platform, url}] entries
   ecosystems    TEXT[] NOT NULL DEFAULT '{}',
   contacts      JSONB NOT NULL DEFAULT '[]',       -- ✅ M2; the re-cut's organization.contacts[]
   verified      BOOLEAN NOT NULL DEFAULT FALSE,   -- ⏳ M3; approved-publisher status; powers /publishers
@@ -460,26 +461,25 @@ CREATE TABLE dataset_snapshots (
 |---|---|
 | `id` | `opportunities.public_id` |
 | `specVersion`,`fundingType`,`status`,`title`,`description`,`summary` | same-named columns |
-| `sponsoringOrganizations[]` / `operatingOrganizations[]` | `sponsoring_organizations` / `operating_organizations` JSONB (verbatim, order preserved) + derived `sponsor_slugs` `TEXT[]` (GIN) |
+| `operatingOrganizations[]` / `sponsoringOrganizations[]` | `operating_organizations` / `sponsoring_organizations` JSONB (verbatim, order preserved) + derived `org_slugs` `TEXT[]` (GIN, operating ∪ sponsoring) |
 | `source{}` | `source_publisher`, `source_submitted_by` (= `source.submittedBy`), `source_submitted_at` (= `source.submittedAt`), `ingested_via`, `source_system`, `original_id`, `verified_against_source`, `verified_at`, `snapshot_url`. **`source.url` was removed by the re-cut** and has no column. |
-| `ecosystems`/`networks`/`categories`/`tags` | `TEXT[]` columns (GIN) |
-| `eligibility` | `eligibility` JSONB (open string map) |
-| `prerequisites`/`resourceLinks`/`serviceAgreement` | same-named `TEXT` columns |
+| `ecosystems`/`categories` | `TEXT[]` columns (GIN) |
+| `eligibility` | `eligibility` TEXT (free text, nullable) |
+| `prerequisites`/`additionalReferences`/`serviceAgreement` | same-named `TEXT` columns |
 | `applicationUrl`/`website`/`logoUrl`/`bannerUrl`/`socialLinks` | same-named columns (`social_links` JSONB) |
-| `funding{}` | `currency`,`min_award`,`max_award`,`budget`,`allocated` |
+| `fundingInfo{}` | `currency`,`min_award`,`max_award`,`budget`,`allocated` |
 | `milestones[]` | `milestones` JSONB (array order = sequence) |
 | `deadlines[]` | `deadlines` JSONB, **plus the derived `next_deadline_at`** column |
 | `opensAt`/`postedAt`/`createdAt`/`updatedAt` | `*_at` columns |
-| `opportunity[fundingType]` (grant/hackathon/…) | **`type_data` JSONB** (served under the `fundingType` key) |
-| `extensions` | `extensions` JSONB |
+| `fundingDetails` (tagged union of the six detail shapes) | **`type_data` JSONB**, stored **without** the inner `fundingType` tag (derivable from `funding_type`; reattached on read) |
 | `$schema`/`@context`/`@type` | accepted on ingest and **stripped** — they describe the document, not the opportunity |
 | *(not in standard)* `review_status`,`is_listed`,`submitted_by`,`approved_by`,`last_seen_at` | server-side only |
 
 ## Key flows
 
 - **Read (T0):** `WHERE review_status='approved' AND is_listed` (+ filters), no joins. List =
-  column projection minus `type_data`/`extensions` (thin lists); detail = full row, `type_data`
-  hoisted to the `funding_type` key.
+  column projection minus `type_data` (thin lists); detail = full row, `type_data` served as
+  `fundingDetails` with the `fundingType` tag reattached from the `funding_type` column.
 - **Write (T1/T2):** validate body against the Standard → resolve org/namespace → if the
   account has an `org_memberships` row for that org and the org is `verified` →
   `review_status='approved'` + run verification; else `'pending'` (community submit — no

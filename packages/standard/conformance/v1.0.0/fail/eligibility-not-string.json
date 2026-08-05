@@ -1,0 +1,22 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:eligibility-not-string",
+  "fundingType": "grant",
+  "title": "Structured eligibility object",
+  "description": "eligibility is free text: one string in the publisher's own words, or null. The keyed-map form was dropped because eligibility criteria vary too much across publishers to be comparable as data — the field is for reading, not faceting — so an object here is the structured decomposition the standard deliberately does not provide.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Foundation",
+      "slug": "example-foundation"
+    }
+  ],
+  "source": {},
+  "eligibility": {
+    "geography": "Global",
+    "stage": "Teams with a shipped product"
+  },
+  "fundingDetails": {
+    "fundingType": "grant"
+  }
+}
