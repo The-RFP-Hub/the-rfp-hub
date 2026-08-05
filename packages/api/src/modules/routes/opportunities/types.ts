@@ -2,8 +2,9 @@
  * PURE query-string parsing/normalization for the list endpoint — no Fastify/DB deps, unit-tested.
  *
  * `listQuerySchema` (below) is the authoritative contract: Fastify validates the querystring first,
- * so unknown params (additionalProperties:false), out-of-enum `sort`/`order` and malformed
- * `deadlineAfter`/`deadlineBefore` instants are rejected with 400 before this parser runs. The
+ * so out-of-enum `sort`/`order` and malformed `deadlineAfter`/`deadlineBefore` instants are
+ * rejected with 400 before this parser runs. Unknown params are NOT rejected: Fastify's default
+ * Ajv runs with `removeAdditional`, so `additionalProperties: false` silently STRIPS them. The
  * parser normalizes schema-permitted inputs (splitting comma lists, trimming, de-duping, coercing
  * numbers/dates) and whitelists the free-text list params (fundingType/status) — for those the
  * whitelist IS the filter. Its sort/order fallbacks are a defensive default for non-HTTP callers,

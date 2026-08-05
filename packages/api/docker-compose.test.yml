@@ -1,0 +1,26 @@
+# Throwaway Postgres for the DATABASE_URL-gated integration tests. Safe to `down -v` at will:
+# data lives on tmpfs (RAM), there is no named volume and no restart policy, and the port (5439)
+# and container name (rfphub-test-pg) are distinct from the persistent dev DB in
+# docker-compose.yml (rfphub-postgres, port 5432) — never point tests at that one.
+#
+#   docker compose -f docker-compose.test.yml up -d
+#   DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run migrate
+#   DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub npx vitest run test/integration
+#   docker compose -f docker-compose.test.yml down
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: rfphub-test-pg
+    environment:
+      POSTGRES_USER: rfphub
+      POSTGRES_PASSWORD: rfphub
+      POSTGRES_DB: rfphub
+    ports:
+      - "5439:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rfphub -d rfphub"]
+      interval: 2s
+      timeout: 5s
+      retries: 15

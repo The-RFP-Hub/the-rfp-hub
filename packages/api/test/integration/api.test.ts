@@ -6,11 +6,12 @@
 import { type Opportunity, opportunitySchema } from "@the-rfp-hub/standard";
 import { inArray, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
+import { describeWithDb } from "./db-gate.js";
 
 const TAG = "TESTONLY";
 
@@ -27,7 +28,7 @@ const fixture = (
   ...over,
 });
 
-const run = process.env.DATABASE_URL ? describe : describe.skip;
+const run = describeWithDb;
 
 run("/v1 API", () => {
   let app: FastifyInstance;

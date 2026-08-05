@@ -102,6 +102,20 @@ pnpm --filter @the-rfp-hub/api typecheck
 DATABASE_URL=… pnpm test     # integration tests run when DATABASE_URL is set; otherwise skipped
 ```
 
+### Integration tests
+
+Run the DB-gated suites against the **throwaway** test database in
+[`docker-compose.test.yml`](./docker-compose.test.yml) (tmpfs-backed, port `5439`, container
+`rfphub-test-pg`) — **not** against the persistent dev DB in `docker-compose.yml`, whose data a
+`down -v` would destroy. From `packages/api`:
+
+```bash
+docker compose -f docker-compose.test.yml up -d
+DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run migrate
+DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub npx vitest run test/integration
+docker compose -f docker-compose.test.yml down
+```
+
 ## Deferred (later in M2 / beyond)
 
 Cloud deploy + public export bucket + nightly cron; full OpenAPI live-spec test suite; TS/Python/curl

@@ -15,6 +15,7 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         version: "1.0.0",
         description:
           "Public, unauthenticated read API serving the RFP Hub Standard v1.0.0 — Ethereum-ecosystem funding opportunities.",
+        license: { name: "MIT", identifier: "MIT" },
       },
       servers: [{ url: "/" }],
       tags: [
