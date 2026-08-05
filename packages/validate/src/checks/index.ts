@@ -1,9 +1,5 @@
 import { milestoneAmountWithoutCurrency } from "./currency.js";
-import {
-  unregisteredDeadlineLabel,
-  unregisteredEligibilityKey,
-  unregisteredProgramModel,
-} from "./registry.js";
+import { unregisteredDeadlineLabel, unregisteredProgramModel } from "./registry.js";
 import { type Check, type Warning, isRecord } from "./types.js";
 
 /**
@@ -11,7 +7,6 @@ import { type Check, type Warning, isRecord } from "./types.js";
  * leaves open — see ./types.ts for why the two tiers are separate.
  */
 export const checks: readonly Check[] = [
-  unregisteredEligibilityKey,
   unregisteredDeadlineLabel,
   unregisteredProgramModel,
   milestoneAmountWithoutCurrency,
@@ -29,9 +24,4 @@ export function entryPhrase(code: string): string {
 }
 
 export type { Check, Warning };
-export {
-  milestoneAmountWithoutCurrency,
-  unregisteredDeadlineLabel,
-  unregisteredEligibilityKey,
-  unregisteredProgramModel,
-};
+export { milestoneAmountWithoutCurrency, unregisteredDeadlineLabel, unregisteredProgramModel };

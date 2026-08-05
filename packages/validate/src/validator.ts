@@ -31,8 +31,9 @@ const ANNOTATION_KEYWORDS = ["x-stability", "x-since", "x-deprecated"];
 
 /**
  * Compile an ajv validator. Uses the SAME configuration the standard is authored
- * against: draft 2020-12, strict mode, `strictRequired` off (so the conditional
- * type-block pattern — `opportunity[opportunity.fundingType]` — is permitted).
+ * against: draft 2020-12, strict mode, `strictRequired` off (so applicator subschemas —
+ * the binding `allOf`, the deadline `if`/`then` — may require properties they re-reference
+ * rather than declare).
  */
 export function createValidator(
   schema: Record<string, unknown> = opportunitySchema as Record<string, unknown>,

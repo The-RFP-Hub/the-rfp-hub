@@ -152,6 +152,17 @@ describe("schema file conventions", () => {
     });
   });
 
+  // Decision 1-C(iii): the temporal declarations are a convention, not a shared $ref — this
+  // equality guard is what makes the seven inline sites a single point of truth.
+  it("declares every date-time field identically", () => {
+    const decls = new Set<string>();
+    walk(schema, "", (n) => {
+      if (n.format !== "date-time") return;
+      decls.add(JSON.stringify({ type: n.type, format: n.format, pattern: n.pattern }));
+    });
+    expect([...decls]).toHaveLength(1);
+  });
+
   it("declares additionalProperties on every object $def", () => {
     for (const [name, def] of Object.entries<Record<string, unknown>>(schema.$defs)) {
       if (def.type !== "object") continue;
@@ -251,10 +262,10 @@ describe("registries", () => {
     .filter((f) => f.endsWith(".json") && f !== "entry.schema.json" && f !== "index.json")
     .sort();
 
-  // `ecosystems` and `networks` are open lists too, and deliberately have no registry: a
-  // registry over chain names reads as an allowed-values list whatever NORMATIVE.md says.
-  it("ships the three vocabularies the standard governs by registry", () => {
-    expect(files).toEqual(["deadline-labels.json", "eligibility-keys.json", "program-models.json"]);
+  // `ecosystems` is an open list too, and deliberately has no registry: a registry over
+  // chain names reads as an allowed-values list whatever NORMATIVE.md says.
+  it("ships the two vocabularies the standard governs by registry", () => {
+    expect(files).toEqual(["deadline-labels.json", "program-models.json"]);
   });
 
   for (const file of files) {

@@ -15,23 +15,23 @@ const base = {
   title: "T",
   description: "D",
   status: "open" as const,
-  sponsoringOrganizations: [{ name: "Org" }],
+  operatingOrganizations: [{ name: "Org", slug: "org" }],
   source: {},
-  grant: {},
+  fundingDetails: { fundingType: "grant" as const },
 };
 
 const codes = (data: unknown) => runChecks(data).map((w) => w.code);
 
 describe("advisory tier is separate from schema conformance", () => {
   it("does not make a warning-carrying document invalid", () => {
-    const doc = { ...base, eligibility: { madeUpKey: "whatever" } };
+    const doc = { ...base, deadlines: [{ deadlineType: "rolling", label: "made-up label" }] };
     const { valid, warnings } = validateOpportunity(doc);
     expect(valid).toBe(true);
-    expect(warnings.map((w) => w.code)).toEqual(["unregistered-eligibility-key"]);
+    expect(warnings.map((w) => w.code)).toEqual(["unregistered-deadline-label"]);
   });
 
   it("can be switched off", () => {
-    const doc = { ...base, eligibility: { madeUpKey: "whatever" } };
+    const doc = { ...base, deadlines: [{ deadlineType: "rolling", label: "made-up label" }] };
     expect(validateOpportunity(doc, { checks: false }).warnings).toEqual([]);
   });
 
@@ -43,55 +43,45 @@ describe("advisory tier is separate from schema conformance", () => {
   });
 });
 
-describe("unregistered-eligibility-key", () => {
-  it("stays quiet on registered keys", () => {
-    expect(codes({ ...base, eligibility: { stage: "seed", jurisdiction: "global" } })).toEqual([]);
-  });
-
-  it("fires once per unregistered key, naming it", () => {
-    const warnings = runChecks({ ...base, eligibility: { projectStage: "seed", region: "EU" } });
-    expect(warnings).toHaveLength(2);
-    expect(warnings[0]?.instancePath).toBe("/eligibility/projectStage");
-    expect(warnings[0]?.message).toContain("projectStage");
-  });
-});
-
 describe("unregistered-deadline-label", () => {
   it("stays quiet on registered labels", () => {
     const deadlines = [
-      { type: "fixed", date: "2026-01-01T00:00:00.000Z", label: "application" },
-      { type: "fixed", date: "2026-01-02T00:00:00.000Z", label: "event start" },
+      { deadlineType: "fixed", date: "2026-01-01T00:00:00.000Z", label: "application" },
+      { deadlineType: "fixed", date: "2026-01-02T00:00:00.000Z", label: "event start" },
     ];
     expect(codes({ ...base, deadlines })).toEqual([]);
   });
 
   it("fires on an unregistered label", () => {
-    const deadlines = [{ type: "rolling", label: "reviewed quarterly" }];
+    const deadlines = [{ deadlineType: "rolling", label: "reviewed quarterly" }];
     expect(codes({ ...base, deadlines })).toEqual(["unregistered-deadline-label"]);
   });
 
   it("ignores a missing or null label", () => {
     expect(
-      codes({ ...base, deadlines: [{ type: "rolling" }, { type: "rolling", label: null }] }),
+      codes({
+        ...base,
+        deadlines: [{ deadlineType: "rolling" }, { deadlineType: "rolling", label: null }],
+      }),
     ).toEqual([]);
   });
 });
 
 describe("unregistered-program-model", () => {
   it("stays quiet on registered values", () => {
-    expect(codes({ ...base, grant: { programModel: "incentives" } })).toEqual([]);
+    const doc = { ...base, fundingDetails: { fundingType: "grant", programModel: "incentives" } };
+    expect(codes(doc)).toEqual([]);
   });
 
   it("fires on a publisher's own vocabulary", () => {
-    expect(codes({ ...base, grant: { programModel: "Retro Rounds" } })).toEqual([
-      "unregistered-program-model",
-    ]);
+    const doc = { ...base, fundingDetails: { fundingType: "grant", programModel: "Retro Rounds" } };
+    expect(codes(doc)).toEqual(["unregistered-program-model"]);
   });
 });
 
 describe("milestone-amount-without-currency", () => {
   it("stays quiet when the envelope names a currency", () => {
-    const doc = { ...base, funding: { currency: "USD" }, milestones: [{ amount: 1000 }] };
+    const doc = { ...base, fundingInfo: { currency: "USD" }, milestones: [{ amount: 1000 }] };
     expect(codes(doc)).toEqual([]);
   });
 
@@ -105,8 +95,8 @@ describe("milestone-amount-without-currency", () => {
     expect(warnings[0]?.instancePath).toBe("/milestones/0/amount");
   });
 
-  it("fires when funding exists but carries no currency", () => {
-    const doc = { ...base, funding: { budget: 10 }, milestones: [{ amount: 1000 }] };
+  it("fires when fundingInfo exists but carries no currency", () => {
+    const doc = { ...base, fundingInfo: { budget: 10 }, milestones: [{ amount: 1000 }] };
     expect(codes(doc)).toEqual(["milestone-amount-without-currency"]);
   });
 });
