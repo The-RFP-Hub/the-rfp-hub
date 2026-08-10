@@ -1,8 +1,8 @@
 # User interviews — Milestone 1 discovery research
 
-Interview notes from the RFP Hub's Milestone 1 discovery research (July–early August 2026): 18 records across publishers, builders, services firms, researchers, and aggregators, plus a superseded working index (`_Work-Tracker-interview-notes.md`).
+Interview notes from the RFP Hub's Milestone 1 discovery research (July–early August 2026): 18 records across publishers, builders, services firms, researchers, and aggregators.
 
-**The [M1 Research Report](./M1-Research-Report.md) is the authoritative account of this research.** It carries the counts, the disclosures, and the synthesis, and it is written to be read on its own. This README is a file index for the folder and the work tracker is a historical snapshot; where either differs from the report, the report governs.
+**The [M1 Research Report](./M1-Research-Report.md) is the authoritative account of this research.** It carries the counts, the disclosures, and the synthesis, and it is written to be read on its own. This README is a file index for the folder; where the two differ, the report governs.
 
 These conversations are the evidence base behind the opportunity schema and the API's design priorities: lifecycle status and freshness, stable identifiers, structured eligibility, realistic award ranges, delta synchronization, and correction handling.
 
