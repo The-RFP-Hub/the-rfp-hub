@@ -8,12 +8,116 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 
 ---
 
+## Canonical identity adopted; v1.0.0 declared stable (2026-08-10)
+
+**Every identifier this standard publishes changed.** The project adopted its canonical domain,
+`ethrfps.app`, and the provisional identifiers were replaced with canonical ones on it. Decision
+record: [`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md).
+
+| | Was (provisional) | Is (canonical) |
+|---|---|---|
+| Schema `$id` | `https://raw.githubusercontent.com/…/packages/standard/schemas/v1.0.0/opportunity.schema.json` | `https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json` |
+| Context URL | `…/packages/standard/schemas/v1.0.0/context.jsonld` | `https://ethrfps.app/schemas/v1.0.0/context.jsonld` |
+| Metaschema `$id` | `…/packages/standard/meta/rfphub-schema.meta.json` | `https://ethrfps.app/meta/rfphub-schema.meta.json` |
+| Registry entry `$id` | `…/packages/standard/registries/entry.schema.json` | `https://ethrfps.app/registries/entry.schema.json` |
+| `@vocab` | `https://github.com/The-RFP-Hub/the-rfp-hub/ns/draft/rfp#` | `https://ethrfps.app/ns/rfp#` |
+
+**This is not a change to the data contract.** No property was added, removed, renamed or
+re-typed, and no constraint moved in either direction: under the bidirectional definition in
+`PROCESS.md`, a document valid before is valid after, and one invalid before is invalid after.
+The schema is self-contained (local `#/$defs` pointers only), so nothing ever dereferenced `$id`
+in order to validate. **What breaks is string equality:** a consumer that hard-coded the old
+`$id` in an ajv registry, in a document's own `$schema`, or in an `@context` value gets a
+mismatch. Both strings were published as PROVISIONAL, in the artifacts themselves and in
+`STATUS.md`, with this swap named as the pending event.
+
+The identifiers **do not resolve over HTTP yet** — DNS for `ethrfps.app` is not delegated. The
+serving path exists (see Tooling); what remains is operational, and `STATUS.md` says so rather
+than claiming resolution that does not exist.
+
+### Schema
+
+- Identity only: `$id`, the `$schema` self-identification example and the `@context`
+  self-identification example are re-stamped from `spec.config.json`. **The schema's
+  constraints are byte-for-byte unchanged.**
+
+### Context
+
+- **`@vocab` moves to `https://ethrfps.app/ns/rfp#`**, and drops the `draft` path segment. That
+  segment mirrored the version's maturity, and a namespace that renames itself when the spec
+  matures is not a namespace: term IRIs are versioned by the context DOCUMENT, never by the term.
+- **What moved and what did not,** measured from the document: of 70 term definitions, **25**
+  resolve against `@vocab` (the RFP Hub's own vocabulary) and moved; **40** are prefixed
+  (36 schema.org, 4 DAOIP-5) and are structurally immune, because a prefix is an absolute IRI;
+  **5** are nulled by property-scoped contexts and drop either way. Nothing the standard says
+  about an external vocabulary changed. A further 20 nested properties reach the namespace by
+  `@vocab` keyword expansion rather than an explicit term, and moved with it.
+- **`@protected` is unaffected.** Protection forbids REDEFINITION during one document's
+  processing; it says nothing about which IRI a context version maps a term to. Exactly one
+  protected term (`deadlines`) is `@vocab`-relative and moved with the namespace. The four
+  property-scoped overrides of protected terms (`title` in three scoped contexts, `id` inside
+  `source`) are permitted by JSON-LD 1.1 and are unchanged.
+- A new test (`packages/validate/test/standard-context.test.ts`) pins that whole partition, so
+  the reasoning is checkable rather than remembered.
+
+### Maturity
+
+- **`v1.0.0` is `stable`.** `status` in `spec.config.json` moves `draft` → `stable`,
+  `schemas/index.json` follows, and `schemas/v1.0.0/FROZEN` lands. **The draft window that
+  permitted four in-place revisions is closed permanently** — the last of them the bounty split
+  recorded below, which is therefore part of the bytes this version freezes. A breaking change
+  from here takes a new version directory.
+
+### Tooling
+
+- **`spec.config.json`** gains `identityStatus` (`provisional` | `canonical`) and
+  `identityAdoption {date, adr, note}`: the machine-readable record that the one-time swap has
+  been spent. Both PROVISIONAL notes are rewritten to describe the settled decision.
+- **`check-spec.mjs`** gains a **maturity** rule (`status` is one of `draft`/`stable`, and
+  `stable` holds **iff** the `FROZEN` marker is present — previously the vocabulary lived in
+  `PROCESS.md` prose and nothing enforced it) and an **identity-provenance** rule
+  (`identityStatus` is a known value; `baseUrl` and `vocabIri` are `https` and share one
+  authority; a `canonical` status names an ADR that exists). Its identity sweep no longer
+  hard-codes the retired `draft` namespace path, `@vocab` must end in a delimiter, and a new
+  neutrality rule rejects either retired provisional identifier reappearing anywhere.
+- **`.github/workflows/spec-freeze.yml`** now judges the versionless artifacts and
+  `spec.config.json`'s identity fields from base ∪ head, so the commit that freezes a version is
+  held to the frozen rules for them — and takes an explicit, single-use exemption for the
+  `provisional` → `canonical` transition instead of passing silently on an accident of commit
+  ordering. The exemption is self-extinguishing and `canonical` → `provisional` is rejected.
+- **The API serves every canonical document at its canonical path** (`packages/api`), byte for
+  byte, under `application/schema+json` / `application/ld+json`, and advertises the context by
+  `Link` header on `application/json` opportunity responses — the two `ARTIFACTS.md` rows whose
+  trigger was this decision.
+
+### Docs
+
+- `STATUS.md`'s "no canonical domain" caveat is replaced by its honest successor: identifiers are
+  canonical and final, and HTTP resolution goes live with DNS. `ARTIFACTS.md`, `FIELDS.md` and
+  `CROSSWALK.md` stop describing the identifiers as provisional. `PROCESS.md` records the freeze
+  and the one-time identity adoption.
+
+### Package axis
+
+`@the-rfp-hub/standard` takes a **major** bump (`2.0.0` → `3.0.0`). No exported type and no
+validation behaviour changed *in this entry* — but the package ships identifiers, and the
+published bytes' identifiers changed observably, which is what a major exists to signal. **The
+spec version stays `1.0.0`.** `rfphub-validate`'s own contribution here is a **patch**: it
+declares no identifier of its own and only picks up the new bytes through its `workspace:*`
+dependency, which resolves to the exact version at publish time and needs no range edit.
+
+The release that carries this also carries the bounty split recorded below, whose changeset was
+still unreleased — so `3.0.0` is the first published version containing *both*, and
+`rfphub-validate` ships as `0.3.0` on that entry's minor rather than on this one's patch.
+
+---
+
 ## Spec v1.0.0 fourth draft revision (2026-08-10, amended through 2026-08-11 in review)
 
 Rides the same draft-window permission argued in
 [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md): `v1.0.0` is still
 `draft` and no external consumer has adopted it, re-verified at merge. The structural record is
-[`adr/0007`](../../adr/0008-security-bounty-payout-tiers.md).
+[`adr/0008`](../../adr/0008-security-bounty-payout-tiers.md).
 
 The `bounty` type described "a single scoped task with a stated reward". Measured against a
 public corpus of 247 live crypto bug bounty programs, **3 were representable** under that shape
