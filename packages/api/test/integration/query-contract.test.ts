@@ -137,8 +137,17 @@ run("GET /v1/opportunities input contract", () => {
     const all = await get(`/v1/opportunities?${blank}`);
     expect(all.statusCode, blank).toBe(200);
 
-    const unfiltered = await get("/v1/opportunities");
-    expect(all.json().total).toBe(unfiltered.json().total);
+    // Sending every key blank must return exactly what sending none of them returns. Compared
+    // INSIDE this suite's own ecosystem partition: the sibling integration suites insert and
+    // delete their fixtures in the same database concurrently, so two unpartitioned totals read
+    // one after the other are a race, not an equivalence.
+    const blankInPartition = await get(
+      `/v1/opportunities?ecosystem=${TAG}&fundingType=&status=&ecosystem=&category=&organization=&q=`,
+    );
+    expect(blankInPartition.statusCode).toBe(200);
+    const partition = await get(`/v1/opportunities?ecosystem=${TAG}`);
+    expect(blankInPartition.json().total).toBe(partition.json().total);
+    expect(partition.json().total, "the suite's own two fixtures").toBe(2);
 
     for (const url of [
       "/v1/opportunities?fundingType=",
