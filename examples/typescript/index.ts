@@ -1,14 +1,19 @@
 /**
  * Zero-dependency TypeScript client for the RFP Hub public /v1/ API.
  *
- * Uses only Node 18+'s built-in `fetch` — no HTTP library. The `@the-rfp-hub/standard` import
- * below is type-only (erased at build/run time): it demonstrates that the detail endpoint returns
- * a real `Opportunity` from the standard's generated types, it is not a runtime dependency. That
- * makes this file a type-contract demo as much as a client — if the API and the published standard
- * ever disagreed, `npm run typecheck` would say so.
+ * Uses only Node's built-in `fetch` — no HTTP library. The `@the-rfp-hub/standard` import below is
+ * type-only (erased at run time): it demonstrates that the detail endpoint returns a real
+ * `Opportunity` from the standard's generated types, it is not a runtime dependency. That makes
+ * this file a type-contract demo as much as a client — if the published standard and this
+ * consumer's usage ever disagreed, `npm run typecheck` would say so.
  *
- * Run: `npm install && npm start` (or `npx tsx index.ts`). See ./README.md.
+ * IMPORTING THIS FILE RUNS NOTHING. The demo at the bottom is behind an entrypoint guard, so
+ * `import { listOpportunities } from "./index.js"` performs no I/O; only running the file
+ * directly (`npm start`) makes requests. Every type and function this file defines is exported.
+ *
+ * Run: `npm start` (Node 22.18+ strips the types natively). See ./README.md.
  */
+import { fileURLToPath } from "node:url";
 import type { Opportunity } from "@the-rfp-hub/standard";
 
 const BASE_URL = process.env.RFPHUB_API_BASE ?? "http://localhost:3001";
@@ -25,9 +30,10 @@ type RemoveIndex<T> = {
  * so there is exactly one key to omit here. Fetch the detail endpoint (`getOpportunity` below) to
  * get it, and switch on its own `fundingType` tag to narrow the union.
  */
-type OpportunitySummary = Omit<RemoveIndex<Opportunity>, "fundingDetails">;
+export type OpportunitySummary = Omit<RemoveIndex<Opportunity>, "fundingDetails">;
 
-interface Paginated<T> {
+/** The list envelope. */
+export interface Paginated<T> {
   items: T[];
   page: number;
   limit: number;
@@ -35,7 +41,8 @@ interface Paginated<T> {
   totalPages: number;
 }
 
-interface Stats {
+/** The /v1/stats payload. */
+export interface Stats {
   total: number;
   byFundingType: Record<string, number>;
   byStatus: Record<string, number>;
@@ -46,13 +53,18 @@ interface Stats {
 /**
  * Every filter/sort/pagination param the list endpoint accepts (all optional).
  *
- * This is the COMPLETE set — the closed core removed `network` and `tag`, and the API strips
- * parameters it does not define rather than rejecting them, so a stale filter fails silently
- * instead of erroring. `organization` matches either organization role.
+ * This is the COMPLETE set, and the API's query contract is STRICT: a parameter it does not
+ * define — a typo, or a filter from an older version of the API — is rejected with `400
+ * bad_request`, as is an out-of-enum `fundingType`, `status`, `sort` or `order`. Nothing is
+ * silently ignored, so a mistyped filter fails loudly instead of returning the entire unfiltered
+ * dataset with a 200. An explicitly empty value (`fundingType: []`) is the one thing that is
+ * accepted and ignored, so a client that always emits every key need not strip the blank ones.
+ *
+ * `organization` takes an organization slug and matches either organization role.
  */
 export interface ListOpportunitiesParams {
-  fundingType?: string[];
-  status?: string[];
+  fundingType?: ("grant" | "hackathon" | "bounty" | "accelerator" | "vc_fund" | "rfp")[];
+  status?: ("upcoming" | "open" | "closed" | "archived")[];
   ecosystem?: string[];
   category?: string[];
   organization?: string;
@@ -68,7 +80,7 @@ export interface ListOpportunitiesParams {
 }
 
 /** The API's error envelope: every 400/404/500 carries a stable machine-readable `error` code. */
-interface ApiError {
+export interface ApiError {
   error: string;
   message: string;
 }
@@ -85,8 +97,17 @@ async function getJson<T>(path: string): Promise<T> {
     );
   }
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiError | null;
-    const detail = body?.error ? `${body.error}: ${body.message}` : await res.text();
+    // Read the body ONCE. `res.json()` consumes it even when it then rejects on non-JSON, so a
+    // `res.text()` fallback would throw "Body is unusable" and bury the actual HTTP error —
+    // which is exactly the case that matters, e.g. a proxy returning an HTML 502.
+    const raw = await res.text().catch(() => "");
+    let detail = raw || "(empty body)";
+    try {
+      const body = JSON.parse(raw) as ApiError;
+      if (body?.error) detail = `${body.error}: ${body.message}`;
+    } catch {
+      // Not the API's JSON envelope — keep the raw text.
+    }
     throw new Error(`${res.status} ${res.statusText} from ${path} — ${detail}`);
   }
   return res.json() as Promise<T>;
@@ -120,12 +141,16 @@ export async function getStats(): Promise<Stats> {
  * intake. Array order is semantic, and sponsors are a SEPARATE role: an entry may have a sponsor,
  * several, or none, and a sponsor is never the one to display.
  */
-function displayOrg(o: OpportunitySummary): string {
+export function displayOrg(o: OpportunitySummary): string {
   return o.operatingOrganizations[0].name;
 }
 
-/** One currency per document denominates every amount in it, so it prints once alongside them. */
-function money(o: OpportunitySummary): string {
+/**
+ * One currency per document denominates every amount in it, so it prints once alongside them.
+ * `currency` is `string | null | undefined` in the Standard, so `??` (not `||` on a lookup default)
+ * is what makes an explicit null print the placeholder.
+ */
+export function money(o: OpportunitySummary): string {
   const f = o.fundingInfo;
   if (!f) return "(no funding info)";
   const currency = f.currency ?? "?";
@@ -134,6 +159,31 @@ function money(o: OpportunitySummary): string {
   }
   if (f.budget != null) return `${f.budget} ${currency} budget`;
   return `(${currency})`;
+}
+
+/** Print one `fundingDetails` payload, handling all six shapes the union can take. */
+function describeFundingDetails(details: Opportunity["fundingDetails"]): string {
+  switch (details.fundingType) {
+    case "grant":
+      return `grant, milestone-based: ${details.milestoneBased ?? "unstated"}`;
+    case "hackathon":
+      return `hackathon, location: ${details.location ?? "online-only"}`;
+    case "bounty":
+      return `bounty, reward: ${details.reward}`;
+    case "accelerator":
+      return `accelerator, ${details.programDurationWeeks ?? "?"} weeks, equity: ${details.equity ?? "unstated"}`;
+    case "vc_fund":
+      return `vc_fund, check size: ${details.checkSize?.min ?? "?"}–${details.checkSize?.max ?? "?"}`;
+    case "rfp":
+      return `rfp, ${details.requirements?.length ?? 0} stated requirement(s)`;
+    default: {
+      // Every member of the union is handled above, so `details` is `never` here. This assignment
+      // is what makes the switch EXHAUSTIVE rather than merely narrowing: if the Standard ever
+      // adds a seventh fundingType, this line stops compiling.
+      const unhandled: never = details;
+      throw new Error(`unhandled fundingDetails: ${JSON.stringify(unhandled)}`);
+    }
+  }
 }
 
 async function main() {
@@ -162,22 +212,9 @@ async function main() {
     console.log(`  title:  ${detail.title}`);
     console.log(`  status: ${detail.status}`);
     console.log(`  applicationUrl: ${detail.applicationUrl ?? "(none)"}`);
-    // fundingDetails is the one field the list projection omits. Its own tag equals the top-level
-    // fundingType and narrows the union, so this switch is exhaustive over the six shapes.
-    const details = detail.fundingDetails;
-    switch (details.fundingType) {
-      case "grant":
-        console.log(`  grant, milestone-based: ${details.milestoneBased ?? "unstated"}`);
-        break;
-      case "hackathon":
-        console.log(`  hackathon, location: ${details.location ?? "unstated"}`);
-        break;
-      case "bounty":
-        console.log(`  bounty, reward: ${details.reward ?? "unstated"}`);
-        break;
-      default:
-        console.log(`  ${details.fundingType} details: ${JSON.stringify(details)}`);
-    }
+    // fundingDetails is the one field the list projection omits, and its own tag equals the
+    // top-level fundingType.
+    console.log(`  ${describeFundingDetails(detail.fundingDetails)}`);
   }
 
   console.log("\n-- stats --");
@@ -186,7 +223,10 @@ async function main() {
   console.log("  byFundingType:", stats.byFundingType);
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exitCode = 1;
-});
+// Entrypoint guard: the demo runs only when this file is executed directly, never on import.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exitCode = 1;
+  });
+}

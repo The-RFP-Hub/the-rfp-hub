@@ -1,9 +1,10 @@
 # curl examples
 
-Copy-pastable `curl` commands for every `/v1/` endpoint. Set the base URL once:
+Copy-pastable `curl` commands for every `/v1/` endpoint. Every command below defaults to a local
+API, so it works pasted as-is; export the variable to point them all somewhere else:
 
 ```bash
-export RFPHUB_API_BASE=http://localhost:3001   # default; override for a hosted instance
+export RFPHUB_API_BASE=https://api.ethrfps.app   # optional; default is http://localhost:3001
 ```
 
 You need a running API to try these against — see
@@ -12,26 +13,11 @@ migrations, and seeding data locally.
 
 ## Service info
 
-The root document names the API, the Standard version it serves, and the endpoints below:
+The root document names the API, the Standard version it serves (`standard`), the docs path, and
+the endpoints below — ask the deployment rather than trusting a version pasted here:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/" | jq
-```
-
-```json
-{
-  "name": "RFP Hub API",
-  "version": "v1",
-  "standard": "1.0.0",
-  "docs": "/v1/docs",
-  "endpoints": [
-    "/v1/opportunities",
-    "/v1/opportunities/:id",
-    "/v1/opportunities/schema",
-    "/v1/stats",
-    "/v1/health"
-  ]
-}
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/" | jq
 ```
 
 ## List opportunities
@@ -39,19 +25,19 @@ curl -s "$RFPHUB_API_BASE/" | jq
 Plain list (defaults: `sort=nextDeadlineAt`, `order=asc`, `page=1`, `limit=20`):
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities" | jq
 ```
 
 Filter by funding type, status and ecosystem (all comma-separated, ANY-of match):
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities?fundingType=grant,hackathon&status=open&ecosystem=Optimism" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities?fundingType=grant,hackathon&status=open&ecosystem=Optimism" | jq
 ```
 
 Full-text-ish search over title/summary/description with `q`:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities?q=public%20goods" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities?q=public%20goods" | jq
 ```
 
 Only opportunities with an upcoming fixed deadline after a given instant, sorted by that
@@ -59,19 +45,19 @@ deadline (records with no upcoming fixed deadline — rolling-only, all past, or
 are excluded by `deadlineAfter`/`deadlineBefore` and always sort last):
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities?deadlineAfter=2026-08-01T00:00:00Z&sort=nextDeadlineAt&order=asc" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities?deadlineAfter=2026-08-01T00:00:00Z&sort=nextDeadlineAt&order=asc" | jq
 ```
 
 Pagination:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities?page=2&limit=10" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities?page=2&limit=10" | jq
 ```
 
 Every list filter the API accepts, combined — this is the complete set:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities" \
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities" \
   --get \
   --data-urlencode "fundingType=grant" \
   --data-urlencode "status=open" \
@@ -96,13 +82,34 @@ only the primary `operatingOrganizations[0]`. Slugs are derived from the organis
 (`Ecosystem Grants Collective` → `ecosystem-grants-collective`), not from the ecosystem that lists
 the program. List a page and read the `slug` values a given deployment serves.
 
-Every list filter also accepts an empty value (`?fundingType=&status=`), which is simply ignored —
-so a client that always emits every key does not have to strip the blank ones. Parameters the API
-does not define are **stripped**, not rejected: a stale `?network=`/`?tag=` from before the closed
-core silently does nothing rather than 400-ing, so check your filter actually narrowed the result.
+### A mistyped filter is a 400, never a silent full result set
 
-Abbreviated real response envelope (`{items, page, limit, total, totalPages}` — list items are
-the thin projection, which omits `fundingDetails`):
+The query contract is **strict**. A parameter the API does not define — a typo, or a filter from
+an older version of the API — is **rejected**, and so is an out-of-enum `fundingType`, `status`,
+`sort` or `order` value:
+
+```bash
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities?fundingtype=grant" | jq
+```
+
+```json
+{ "error": "bad_request", "message": "querystring must NOT have additional properties" }
+```
+
+That is the property worth relying on: the worst failure mode for a discovery API is a filter
+that quietly does nothing, because the response still looks like a valid 200 — it is just the
+*entire* dataset. Here a wrong parameter name, a wrong case, or a stale value fails loudly at the
+first request instead of silently widening every result set that follows.
+
+The one input that is accepted and ignored is an **explicitly empty value**
+(`?fundingType=&status=`), so a client that always emits every key does not have to strip the
+blank ones. List filters also accept both wire forms interchangeably: repeat the parameter
+(`?ecosystem=Optimism&ecosystem=Base`) or comma-separate it (`?ecosystem=Optimism,Base`).
+
+### The list envelope
+
+`{items, page, limit, total, totalPages}` — list items are the thin projection, which omits
+`fundingDetails`. Abbreviated (one item, most fields elided):
 
 ```json
 {
@@ -112,22 +119,15 @@ the thin projection, which omits `fundingDetails`):
       "id": "fundingmap:1502",
       "fundingType": "hackathon",
       "title": "Onchain Summer Hackathon",
-      "description": "A four-week hackathon for consumer onchain applications.",
       "status": "open",
       "operatingOrganizations": [
         { "name": "Base Builders", "slug": "base-builders", "orgType": "program" }
       ],
-      "source": { "ingestedVia": "import", "verifiedAgainstSource": null },
       "ecosystems": ["Base"],
-      "categories": ["Consumer"],
-      "applicationUrl": "https://hack.example.org/register",
       "fundingInfo": { "currency": "USDC", "budget": 250000 },
       "deadlines": [
-        { "date": "2026-08-20T23:59:00.000Z", "label": "registration", "deadlineType": "fixed" },
-        { "date": "2026-09-05T00:00:00.000Z", "label": "event start", "deadlineType": "fixed" }
-      ],
-      "createdAt": "2026-08-10T16:23:08.126Z",
-      "updatedAt": "2026-08-10T16:23:08.126Z"
+        { "date": "2026-08-20T23:59:00.000Z", "label": "registration", "deadlineType": "fixed" }
+      ]
     }
   ],
   "page": 1,
@@ -139,7 +139,8 @@ the thin projection, which omits `fundingDetails`):
 
 Note `fundingInfo.currency`: the Standard permits **one currency per document**, and it
 denominates every amount in that entry (`budget`, `allocated`, `minAward`, `maxAward`, and any
-amounts inside `fundingDetails` or `milestones`).
+amounts inside `fundingDetails` or `milestones`). It is nullable — an entry may state amounts
+without naming a currency — so read it defensively.
 
 ## Get one opportunity
 
@@ -147,7 +148,7 @@ The full Standard object — the list fields **plus `fundingDetails`**, the tagg
 `fundingType` names its shape — by public id, the colon-form `<sourceSystem>:<originalId>`:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities/fundingmap:1459" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities/fundingmap:1459" | jq
 ```
 
 ```json
@@ -192,25 +193,15 @@ The two organization roles are distinct and both optional to read: `operatingOrg
 required on every entry and its **entry 0 is the one to display**; `sponsoringOrganizations` names
 the backer and may be absent.
 
-A missing id returns `404` with the standard error envelope:
+A missing id returns `404` with the standard error envelope, and every error (400/404/500) has
+that same `{error, message}` shape with a stable machine-readable `error` code:
 
 ```bash
-curl -si "$RFPHUB_API_BASE/v1/opportunities/fundingmap:does-not-exist"
+curl -si "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities/fundingmap:does-not-exist"
 ```
 
 ```json
 { "error": "not_found", "message": "opportunity 'fundingmap:does-not-exist' not found" }
-```
-
-Every error (400/404/500) has that `{error, message}` shape, with a stable machine-readable
-`error` code. An out-of-enum `sort` is a `400`:
-
-```bash
-curl -si "$RFPHUB_API_BASE/v1/opportunities?sort=bogus"
-```
-
-```json
-{ "error": "bad_request", "message": "querystring/sort must be equal to one of the allowed values" }
 ```
 
 ## The Standard's JSON Schema
@@ -219,41 +210,26 @@ Served as `application/schema+json` and self-identifying through its own `$id`/`
 generic validator can point at the URL directly:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/opportunities/schema" | jq '{title, $id: .["$id"]}'
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities/schema" \
+  | jq '{title, "$id": .["$id"], "$schema": .["$schema"]}'
 ```
 
 ## Dataset stats
 
-Totals and breakdowns by funding type, status and top ecosystems:
+Totals and breakdowns by funding type, status and top ecosystems
+(`{total, byFundingType, byStatus, topEcosystems, lastUpdatedAt}`):
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/stats" | jq
-```
-
-```json
-{
-  "total": 3,
-  "byFundingType": { "grant": 1, "hackathon": 1, "bounty": 1 },
-  "byStatus": { "open": 3 },
-  "topEcosystems": [
-    { "ecosystem": "Base", "count": 2 },
-    { "ecosystem": "Ethereum", "count": 1 },
-    { "ecosystem": "Optimism", "count": 1 }
-  ],
-  "lastUpdatedAt": "2026-08-10T16:23:08.128Z"
-}
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/stats" | jq
 ```
 
 ## Health check
 
-Liveness + DB readiness (`200` when up, `503` when the DB is unreachable):
+Liveness + DB readiness — `{"status":"ok","db":"up"}` with `200` when up, `503` when the DB is
+unreachable:
 
 ```bash
-curl -si "$RFPHUB_API_BASE/v1/health"
-```
-
-```json
-{ "status": "ok", "db": "up" }
+curl -si "${RFPHUB_API_BASE:-http://localhost:3001}/v1/health"
 ```
 
 ## OpenAPI document
@@ -261,14 +237,15 @@ curl -si "$RFPHUB_API_BASE/v1/health"
 The full OpenAPI 3.1 document (also browsable as Swagger UI at `/v1/docs`):
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/docs/json" | jq
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/docs/json" | jq
 ```
 
 It is derived from the Standard's JSON Schema at startup, so it is the authoritative list of
-parameters and response fields — including which ones exist at all:
+parameters and response fields — including which ones exist at all. Since an undefined parameter
+is a 400, this list is exactly what the API will accept:
 
 ```bash
-curl -s "$RFPHUB_API_BASE/v1/docs/json" \
+curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/docs/json" \
   | jq '.paths["/v1/opportunities"].get.parameters | map(.name)'
 ```
 

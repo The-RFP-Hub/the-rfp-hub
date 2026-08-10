@@ -4,8 +4,11 @@
   "private": true,
   "description": "Zero-dependency TypeScript fetch client demonstrating the RFP Hub /v1/ API.",
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
-    "start": "tsx index.ts",
+    "start": "node index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -13,7 +16,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   }
 }

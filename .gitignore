@@ -10,7 +10,3 @@ coverage/
 .env
 .env.local
 packages/api/exports/
-
-# The TypeScript example installs from the npm registry as a consumer would (npm, not pnpm);
-# its lockfile is a local artifact of running it, not part of the repo's dependency graph.
-examples/typescript/package-lock.json

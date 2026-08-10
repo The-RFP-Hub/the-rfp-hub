@@ -75,10 +75,12 @@ def list_opportunities(
     the thin projection: a full Standard object minus "fundingDetails" (fetch the detail endpoint
     for that).
 
-    The keyword arguments above are the COMPLETE filter set the API defines. Parameters it does
-    not define are silently stripped rather than rejected, so a stale filter (the closed core
-    removed `network` and `tag`) fails quietly instead of erroring -- check that your filter
-    actually narrowed the result.
+    The keyword arguments above are the COMPLETE filter set the API defines, and the query
+    contract is STRICT: a parameter the API does not define -- a typo, or a filter from an older
+    version of the API -- is rejected with 400 "bad_request", as is an out-of-enum funding_type,
+    status, sort or order. Nothing is silently ignored, so a mistyped filter raises here instead
+    of returning the whole unfiltered dataset with a 200. Passing None omits the parameter
+    entirely; an explicitly empty value is the one thing accepted and ignored.
 
     `organization` takes an org slug and matches ANY entry in either role: operatingOrganizations
     (who runs the intake) or sponsoringOrganizations (who backs it).
@@ -143,7 +145,9 @@ def money(opportunity: dict) -> str:
     funding = opportunity.get("fundingInfo") or {}
     if not funding:
         return "(no funding info)"
-    currency = funding.get("currency", "?")
+    # `or`, not dict.get's default: the Standard types currency as string | null | undefined, and a
+    # default only fires on a MISSING key -- a present-but-null one would print "None".
+    currency = funding.get("currency") or "?"
     low, high = funding.get("minAward"), funding.get("maxAward")
     if low is not None and high is not None:
         return f"{low}-{high} {currency}"

@@ -42,6 +42,19 @@ If the API isn't reachable, the client prints a clear "could not reach the API" 
 `1`, instead of an unhandled `urllib.error.URLError` traceback. HTTP errors are unwrapped from the
 API's `{"error", "message"}` envelope, so a failure names the stable error code.
 
+## A mistyped filter is a 400, never a silent full result set
+
+The API's query contract is **strict**: a parameter it does not define — a typo, or a filter from
+an older version of the API — is rejected with `400 bad_request`, and so is an out-of-enum
+`funding_type`, `status`, `sort` or `order` value. That is the property to lean on. The worst
+failure mode for a discovery API is a filter that quietly does nothing, because the response still
+looks like a valid 200 — it is just the *entire* dataset. Here it raises a `RuntimeError` naming
+the error code on the very first request instead.
+
+`list_opportunities()` only sends the keyword arguments you pass (a `None` is omitted entirely),
+so the client cannot trip that on its own — but it will surface it faithfully if you build a query
+string by hand.
+
 ## Use as a library
 
 ```python
@@ -65,7 +78,9 @@ Three things worth knowing before you index into a response:
   either role.
 - **One currency per document.** `fundingInfo.currency` denominates every amount in that entry —
   `budget`, `allocated`, `minAward`, `maxAward`, and any amounts inside `fundingDetails` or
-  `milestones`. There is no per-amount currency to reconcile.
+  `milestones`. There is no per-amount currency to reconcile. It is *nullable*, so read it with
+  `funding.get("currency") or "?"`: a `dict.get` default only fires on a missing key and would let
+  an explicit `null` through as `None`.
 - **`fundingDetails` is a tagged union.** Its own `fundingType` names its shape and equals the
   top-level `fundingType`, so dispatch on either. It is the single slot that replaced the six
   per-type blocks, and the only field the list projection leaves out.
