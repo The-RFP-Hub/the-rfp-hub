@@ -59,12 +59,14 @@ jobs:
       - name: Migrate API database (for integration tests)
         run: pnpm --filter @the-rfp-hub/api migrate
 
-      # The seed's reproducibility gate. `--from-file` reads the frozen corpus of raw upstream
-      # programs committed under test/fixtures — no network, no credentials, same result every run.
-      # `--strict` fails the build on a single schema-invalid record (the per-record gate already
-      # validates every one), and the >=100 floor is asserted before the first write.
-      - name: Seed from the frozen corpus (offline, strict)
-        run: pnpm --filter @the-rfp-hub/api seed --from-file test/fixtures/seed-corpus.json --strict
+      # The seed's reproducibility gate, on a clean checkout. The loader reads ONE input — the
+      # corpus file named here, committed under test/fixtures — and has no other source: no
+      # network, no credentials, same rows every run. (Refreshing that corpus from an upstream is
+      # scripts/fetch-corpus.ts, a separate program that CI never runs.) `--strict` fails the build
+      # on a single schema-invalid record (the per-record gate already validates every one), and
+      # the >=100 floor is asserted before the first write.
+      - name: Seed from the committed corpus (offline, strict)
+        run: pnpm --filter @the-rfp-hub/api seed test/fixtures/seed-corpus.json --strict
 
       - name: Export the open-data slice (JSON + CSV)
         run: pnpm --filter @the-rfp-hub/api export

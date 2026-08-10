@@ -1,13 +1,16 @@
-/** Runtime configuration, read from the environment with local-friendly defaults. */
+/**
+ * Runtime configuration of the SERVER, read from the environment with local-friendly defaults.
+ *
+ * Only what the running service actually needs is here. Ingest-side settings are deliberately
+ * absent: the seed loader takes a corpus file as an argument, and the one variable that points at
+ * an upstream (SOURCE_API_URL) is read directly by `scripts/fetch-corpus.ts`, the only program
+ * that fetches. A variable declared here is a variable every deployment has to reason about — so
+ * a variable no request path reads does not belong here.
+ */
 export interface AppConfig {
   databaseUrl: string;
   port: number;
   host: string;
-  /**
-   * Base URL of the upstream funding-map registry API the seed loader ingests from.
-   * Deployment-specific — set via SOURCE_API_URL (see .env-example). Empty unless configured.
-   */
-  sourceApiUrl: string;
   /**
    * Base URL the OpenAPI document advertises as its `servers[0].url` (see plugins/swagger.ts).
    * Defaults to `/` — relative, and therefore correct wherever the server happens to be reachable,
@@ -136,7 +139,6 @@ export const config: AppConfig = {
     (isProduction ? "" : "postgres://rfphub:rfphub@localhost:5432/rfphub"),
   port: readPort(process.env.PORT),
   host: process.env.HOST ?? "0.0.0.0",
-  sourceApiUrl: process.env.SOURCE_API_URL ?? "",
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
 };

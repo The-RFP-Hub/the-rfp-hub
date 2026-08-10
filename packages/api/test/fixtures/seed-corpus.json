@@ -1,5 +1,5 @@
 {
-  "note": "Frozen, neutralized snapshot of raw upstream funding-map registry programs — the SOURCE side of the seed contract. Rebuild with test/fixtures/build-seed-corpus.ts; consume with `pnpm seed --from-file`. Program data is public; vendor identity is removed.",
+  "note": "Frozen, neutralized snapshot of raw upstream funding-map registry programs — the SOURCE side of the seed contract. Rebuild with scripts/fetch-corpus.ts; consume with `pnpm seed <path>`. Program data is public; vendor identity is removed.",
   "programs": [
     {
       "id": "696e57d7ec296b896ceacf28",

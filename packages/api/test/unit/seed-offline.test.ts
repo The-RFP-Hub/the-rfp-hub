@@ -1,7 +1,7 @@
 /**
- * The seed's reproducibility contract: the frozen corpus, the offline `--from-file` path that
- * reads it, and the ordering guarantee that no row is written until the batch clears the floor.
- * No DB and no network — the corpus is read off disk and the writer is a spy.
+ * The seed's reproducibility contract: the committed corpus, the one argument that names it, and
+ * the ordering guarantee that no row is written until the batch clears the floor. No DB and no
+ * network — the corpus is read off disk and the writer is a spy.
  *
  * seed.test.ts covers the ingestion gate itself; this file covers HOW a run is fed and guarded.
  */
@@ -23,46 +23,64 @@ const CORPUS_PATH = fileURLToPath(new URL("../fixtures/seed-corpus.json", import
 const MIN_VALID = 100;
 
 describe("parseSeedOptions", () => {
-  it("reads --from-file <path> and --from-file=<path>", () => {
-    expect(parseSeedOptions(["node", "seed.ts", "--from-file", "corpus.json"], {})).toEqual({
+  it("takes the corpus path as the positional argument", () => {
+    expect(parseSeedOptions(["node", "seed.ts", "corpus.json"], {})).toEqual({
+      corpusPath: "corpus.json",
       strict: false,
-      fixturePath: "corpus.json",
-    });
-    expect(parseSeedOptions(["node", "seed.ts", "--from-file=corpus.json"], {})).toEqual({
-      strict: false,
-      fixturePath: "corpus.json",
     });
   });
 
-  it("reads SEED_FIXTURE / SEED_STRICT from the environment", () => {
-    expect(
-      parseSeedOptions(["node", "seed.ts"], { SEED_FIXTURE: "corpus.json", SEED_STRICT: "1" }),
-    ).toEqual({ strict: true, fixturePath: "corpus.json" });
-  });
-
-  it("lets the flag win over the env, and combines with --strict", () => {
-    expect(
-      parseSeedOptions(["node", "seed.ts", "--from-file", "flag.json", "--strict"], {
-        SEED_FIXTURE: "env.json",
-      }),
-    ).toEqual({ strict: true, fixturePath: "flag.json" });
-  });
-
-  it("is live mode when nothing asks for a corpus", () => {
-    expect(parseSeedOptions(["node", "seed.ts"], {})).toEqual({
-      strict: false,
-      fixturePath: undefined,
+  it("reads --strict from the flag or SEED_STRICT, in any argument order", () => {
+    expect(parseSeedOptions(["node", "seed.ts", "corpus.json", "--strict"], {})).toEqual({
+      corpusPath: "corpus.json",
+      strict: true,
+    });
+    expect(parseSeedOptions(["node", "seed.ts", "--strict", "corpus.json"], {})).toEqual({
+      corpusPath: "corpus.json",
+      strict: true,
+    });
+    expect(parseSeedOptions(["node", "seed.ts", "corpus.json"], { SEED_STRICT: "1" })).toEqual({
+      corpusPath: "corpus.json",
+      strict: true,
     });
   });
 
-  // A run that meant to be offline must fail, never quietly fall through to the network.
-  it("rejects --from-file with no path instead of falling back to the live source", () => {
-    expect(() => parseSeedOptions(["node", "seed.ts", "--from-file"], {})).toThrow(/needs a path/);
-    expect(() => parseSeedOptions(["node", "seed.ts", "--from-file="], {})).toThrow(/needs a path/);
-    // the next flag is a flag, not a file named "--strict"
-    expect(() => parseSeedOptions(["node", "seed.ts", "--from-file", "--strict"], {})).toThrow(
-      /needs a path/,
+  // The corpus file is the loader's ONLY input, so a run without one is a usage error — there is
+  // no upstream left to fall through to, and nothing to guess.
+  it("refuses a run with no corpus file", () => {
+    expect(() => parseSeedOptions(["node", "seed.ts"], {})).toThrow(/no corpus file/);
+    expect(() => parseSeedOptions(["node", "seed.ts", "--strict"], {})).toThrow(/no corpus file/);
+  });
+
+  it("refuses more than one corpus file rather than silently seeding the first", () => {
+    expect(() => parseSeedOptions(["node", "seed.ts", "a.json", "b.json"], {})).toThrow(
+      /expected one corpus file/,
     );
+  });
+});
+
+/**
+ * The offline guarantee, asserted on the source itself rather than trusted to review. A seed that
+ * can reach an upstream is a seed whose output depends on someone else's uptime and on a
+ * credential CI does not have — so the loader and the pure mapper it calls must contain no request
+ * at all, and no pointer at an upstream to make one with. Acquisition lives in
+ * scripts/fetch-corpus.ts, which is not on this path.
+ */
+describe("the seed path cannot reach the network", () => {
+  const SEED_PATH = fileURLToPath(new URL("../../scripts/seed.ts", import.meta.url));
+  const MAPPER_PATH = fileURLToPath(new URL("../../scripts/map-program.ts", import.meta.url));
+
+  it("has no request and no upstream pointer in the loader or the mapper", async () => {
+    for (const path of [SEED_PATH, MAPPER_PATH]) {
+      // strip comments so the prose explaining the decision cannot fail the check that enforces it
+      const code = (await readFile(path, "utf8"))
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      expect(code, `${path}: fetch(`).not.toMatch(/\bfetch\s*\(/);
+      expect(code, `${path}: an HTTP client`).not.toMatch(/node:https?|undici|axios|node-fetch/);
+      expect(code, `${path}: SOURCE_API_URL`).not.toContain("SOURCE_API_URL");
+      expect(code, `${path}: config.source*`).not.toMatch(/config\.source/);
+    }
   });
 });
 
