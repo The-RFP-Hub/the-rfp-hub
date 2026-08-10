@@ -11,13 +11,6 @@ export interface AppConfig {
   /** Provenance namespace recorded on seeded entries (source_system column + public id prefix). */
   sourceSystem: string;
   /**
-   * Base URL for a program's page on the upstream source. Used as the last-resort
-   * `applicationUrl` when a program publishes no submission or website URL — the re-cut removed
-   * `source.url`, making `applicationUrl` the only link-back target. Deployment-specific — set
-   * via SOURCE_PROGRAM_URL_BASE.
-   */
-  sourceProgramUrlBase: string;
-  /**
    * Base URL the OpenAPI document advertises as its `servers[0].url` (see plugins/swagger.ts).
    * Defaults to `/` — relative, and therefore correct wherever the server happens to be reachable,
    * which is what local development runs with.
@@ -147,7 +140,6 @@ export const config: AppConfig = {
   host: process.env.HOST ?? "0.0.0.0",
   sourceApiUrl: process.env.SOURCE_API_URL ?? "",
   sourceSystem: process.env.SOURCE_SYSTEM ?? "fundingmap",
-  sourceProgramUrlBase: process.env.SOURCE_PROGRAM_URL_BASE ?? "",
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
 };

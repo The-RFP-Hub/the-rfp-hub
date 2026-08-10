@@ -16,7 +16,7 @@
  *
  * Two modes, one pipeline:
  *   live     — page through the upstream registry. Deployment-specific: set SOURCE_API_URL (and
- *              optionally SOURCE_SYSTEM / SOURCE_PROGRAM_URL_BASE); see .env-example.
+ *              optionally SOURCE_SYSTEM); see .env-example.
  *   offline  — `--from-file <path>` (or SEED_FIXTURE=<path>) reads a frozen corpus of raw upstream
  *              programs instead, with no network at all. That is what CI runs, against
  *              test/fixtures/seed-corpus.json, so the seed is reproducible and the gate has a
@@ -220,10 +220,7 @@ async function main(): Promise<void> {
       `SOURCE_API_URL is not set — point it at an upstream funding-map registry API (see .env-example), or seed offline with ${FIXTURE_FLAG} <path>`,
     );
   }
-  const mapOpts = {
-    sourceSystem: config.sourceSystem,
-    programUrlBase: config.sourceProgramUrlBase || undefined,
-  };
+  const mapOpts = { sourceSystem: config.sourceSystem };
   // Offline: one batch, read once, no network. Live: paged until TARGET or the source runs out.
   const corpus = fixturePath ? await readCorpus(fixturePath) : undefined;
   console.log(

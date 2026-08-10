@@ -5,7 +5,7 @@
  *
  * Field rules were derived from the committed examples in
  * packages/standard/schemas/v1.0.0/examples. The provenance namespace (id prefix + source_system)
- * and the fallback program URL are supplied by the caller — this mapper is source-agnostic.
+ * is supplied by the caller — this mapper is source-agnostic.
  *
  * ── Old-upstream → re-cut Standard ─────────────────────────────────────────────────
  * The upstream registry still speaks the pre-re-cut vocabulary, so THIS FILE is where the
@@ -27,7 +27,8 @@
  *                              → plain numbers; an upstream per-item currency hoists into the
  *                                document-wide fundingInfo.currency (see THE CURRENCY RULE below)
  *   <type>Metadata blob        → fundingDetails { fundingType: <type>, …whitelisted keys }
- *   source.url                 → removed; the program URL now feeds `applicationUrl`
+ *   source.url                 → removed; a program's OWN submission/website URL feeds
+ *                                `applicationUrl`, and nothing is substituted when it publishes none
  *   every timestamp            → RFC 3339 **UTC** (trailing 'Z') — see `isoDate`
  *
  * ── Fields the upstream carries that the Standard has a home for ───────────────────
@@ -680,10 +681,7 @@ function typeBlockOf(
   };
 }
 
-export function mapProgram(
-  p: RegistryProgram,
-  opts: { sourceSystem?: string; programUrlBase?: string } = {},
-): Opportunity {
+export function mapProgram(p: RegistryProgram, opts: { sourceSystem?: string } = {}): Opportunity {
   const sourceSystem = opts.sourceSystem || "fundingmap";
   const md = p.metadata ?? {};
   const fundingType: FundingType = (FUNDING_TYPES as string[]).includes(p.type ?? "")
@@ -748,18 +746,15 @@ export function mapProgram(
 
   const sl = md.socialLinks;
   const social = socialLinksOf(sl);
-  // `source.url` is gone; `applicationUrl` is now the single link-back target, so the program's
-  // page on the source becomes its last-resort value. Source-agnostic — nothing is fabricated when
-  // the caller supplies no base.
-  const fallbackUrl = opts.programUrlBase
-    ? `${opts.programUrlBase.replace(/\/+$/, "")}/${programId}`
-    : undefined;
-
+  // `source.url` is gone, which makes `applicationUrl` the single link-back target — but only for
+  // links the PROGRAM published. There is deliberately no last-resort fallback: pointing at the
+  // program's listing page on the aggregator we ingested it from would state, in the field
+  // consumers read as "apply here", a URL the program never gave. That is the same fabrication
+  // this branch removed when it stopped inventing sponsoring organisations out of program titles.
+  // A program that publishes no URL gets no `applicationUrl` — the field is optional, and an
+  // absent value is a fact where a substituted one is a guess.
   const applicationUrl =
-    validUri(p.submissionUrl) ??
-    validUri(sl?.grantsSite) ??
-    validUri(md.website) ??
-    validUri(fallbackUrl);
+    validUri(p.submissionUrl) ?? validUri(sl?.grantsSite) ?? validUri(md.website);
 
   // Array order is semantic: entry 0 is the primary organisation and the one to display. Only it
   // carries the program's branding; a co-operator the upstream names in passing gets the identity

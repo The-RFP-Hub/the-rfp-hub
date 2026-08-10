@@ -22,8 +22,6 @@ import {
   unnamedOrgProgram,
 } from "../fixtures/upstream-programs.js";
 
-const BASE = "https://example.org/programs";
-
 /**
  * The re-cut split organisations into two roles. The upstream publishes one flat list of the
  * organisations behind a program, and those organisations RUN it — so they fill the required
@@ -32,7 +30,7 @@ const BASE = "https://example.org/programs";
  */
 describe("operating organizations", () => {
   it("publishes the organisations the upstream names, in upstream order", () => {
-    const o = mapProgram(multiOrgProgram, { programUrlBase: BASE });
+    const o = mapProgram(multiOrgProgram);
     expect(validateOpportunity(o).valid).toBe(true);
     expect(o.operatingOrganizations.map((s) => s.name)).toEqual(["Solana Foundation", "Colosseum"]);
     // and never the program title, which is what the fallback used to fabricate
@@ -44,27 +42,25 @@ describe("operating organizations", () => {
   // the program without necessarily funding it.
   it("never invents a sponsoring organization the upstream did not publish", () => {
     for (const p of [multiOrgProgram, unnamedOrgProgram, grantProgram, rfpProgram]) {
-      expect(mapProgram(p, { programUrlBase: BASE })).not.toHaveProperty("sponsoringOrganizations");
+      expect(mapProgram(p)).not.toHaveProperty("sponsoringOrganizations");
     }
   });
 
   it("identifies a named organisation by its own slug, not by the community's", () => {
-    const o = mapProgram(multiOrgProgram, { programUrlBase: BASE });
+    const o = mapProgram(multiOrgProgram);
     expect(o.operatingOrganizations.map((s) => s.slug)).toEqual(["solana-foundation", "colosseum"]);
     // the community is the ecosystem, and stays the provenance publisher
     expect(o.source.publisher).toBe("solana");
   });
 
   it("gives only the primary organisation the program's branding", () => {
-    const [primary, coOperator] = mapProgram(multiOrgProgram, {
-      programUrlBase: BASE,
-    }).operatingOrganizations;
+    const [primary, coOperator] = mapProgram(multiOrgProgram).operatingOrganizations;
     expect(primary?.website).toBe("https://foundation.example.org");
     expect(coOperator).toEqual({ name: "Colosseum", slug: "colosseum" });
   });
 
   it("falls back to the listing community when no organisation is genuinely named", () => {
-    const o = mapProgram(unnamedOrgProgram, { programUrlBase: BASE });
+    const o = mapProgram(unnamedOrgProgram);
     expect(validateOpportunity(o).valid).toBe(true);
     expect(o.operatingOrganizations).toHaveLength(1);
     // a real, lookup-able organisation — not the program title, which is not an organisation
@@ -77,29 +73,26 @@ describe("operating organizations", () => {
   // fabricated organisation was written last, and `?organization=<slug>` conflates them.
   it("gives a title fallback its own slug, never the community's", () => {
     const noCommunity = { ...unnamedOrgProgram, communities: [] };
-    const o = mapProgram(noCommunity, { programUrlBase: BASE });
+    const o = mapProgram(noCommunity);
     expect(validateOpportunity(o).valid).toBe(true);
     expect(o.operatingOrganizations[0]).toMatchObject({
       name: "Anonymous Builders Round",
       slug: "anonymous-builders-round",
     });
 
-    const sibling = mapProgram(
-      {
-        ...noCommunity,
-        programId: "2052",
-        metadata: { ...noCommunity.metadata, title: "Anonymous Builders Round 2" },
-      },
-      { programUrlBase: BASE },
-    );
+    const sibling = mapProgram({
+      ...noCommunity,
+      programId: "2052",
+      metadata: { ...noCommunity.metadata, title: "Anonymous Builders Round 2" },
+    });
     expect(sibling.operatingOrganizations[0]?.slug).not.toBe(o.operatingOrganizations[0]?.slug);
   });
 
   it("lets rfp.issuingOrganization take the primary slot", () => {
-    const o = mapProgram(
-      { ...rfpProgram, metadata: { ...rfpProgram.metadata, organizations: ["Matter Labs"] } },
-      { programUrlBase: BASE },
-    );
+    const o = mapProgram({
+      ...rfpProgram,
+      metadata: { ...rfpProgram.metadata, organizations: ["Matter Labs"] },
+    });
     expect(o.operatingOrganizations.map((s) => s.name)).toEqual([
       "ZKsync Foundation",
       "Matter Labs",
@@ -174,7 +167,7 @@ describe("operating organizations across the frozen corpus", () => {
 });
 
 describe("fields the upstream provides that used to be dropped", () => {
-  const o = mapProgram(multiOrgProgram, { programUrlBase: BASE });
+  const o = mapProgram(multiOrgProgram);
 
   it("maps committed-to-date into the funding envelope, ignoring the upstream's 0 default", () => {
     expect(o.fundingInfo?.allocated).toBe(125000);
@@ -202,7 +195,7 @@ describe("fields the upstream provides that used to be dropped", () => {
   });
 
   it("reads 'online' out of a location that says so in words", () => {
-    const hackathon = mapProgram(hackathonProgram, { programUrlBase: BASE }).fundingDetails;
+    const hackathon = mapProgram(hackathonProgram).fundingDetails;
     expect(hackathon).toMatchObject({ fundingType: "hackathon", online: true });
     expect(mapProgram(grantProgram).fundingDetails).not.toHaveProperty("online");
   });
@@ -218,7 +211,7 @@ describe("fields the upstream provides that used to be dropped", () => {
  * decision rather than becoming a surprise.
  */
 describe("what the closed core cannot carry", () => {
-  const o = mapProgram(multiOrgProgram, { programUrlBase: BASE });
+  const o = mapProgram(multiOrgProgram);
 
   it("emits no extensions block, and no key outside the Standard's own vocabulary", () => {
     expect(o).not.toHaveProperty("extensions");
@@ -228,19 +221,16 @@ describe("what the closed core cannot carry", () => {
   });
 
   it("drops the removed networks/tags axes rather than smuggling them elsewhere", () => {
-    const withRemovedAxes = mapProgram(
-      {
-        ...multiOrgProgram,
-        metadata: {
-          ...multiOrgProgram.metadata,
-          title: "Frontier Builders Round",
-          categories: ["Public Goods"],
-          networks: ["arbitrum"],
-          grantTypes: ["retroactive"],
-        },
+    const withRemovedAxes = mapProgram({
+      ...multiOrgProgram,
+      metadata: {
+        ...multiOrgProgram.metadata,
+        title: "Frontier Builders Round",
+        categories: ["Public Goods"],
+        networks: ["arbitrum"],
+        grantTypes: ["retroactive"],
       },
-      { programUrlBase: BASE },
-    );
+    });
     expect(validateOpportunity(withRemovedAxes).valid).toBe(true);
     expect(withRemovedAxes).not.toHaveProperty("networks");
     expect(withRemovedAxes).not.toHaveProperty("tags");
@@ -254,7 +244,7 @@ describe("timestamps are UTC", () => {
 
   it("converts a local-offset upstream timestamp to the same instant in UTC", () => {
     // the fixture's createdAt is 07:00-03:00 — converted, not relabelled as 07:00Z
-    const o = mapProgram(multiOrgProgram, { programUrlBase: BASE });
+    const o = mapProgram(multiOrgProgram);
     expect(o.createdAt).toBe("2026-01-05T10:00:00.000Z");
     expect(o.postedAt).toBe("2026-01-05T10:00:00.000Z");
     expect(validateOpportunity(o).valid).toBe(true);
@@ -275,7 +265,7 @@ describe("timestamps are UTC", () => {
         startDate: offset("2026-06-01T18:29:00.000Z"),
       },
     };
-    const o = mapProgram(shifted, { programUrlBase: BASE });
+    const o = mapProgram(shifted);
     expect(validateOpportunity(o).valid).toBe(true);
     for (const field of TIMESTAMP_FIELDS) {
       if (o[field] != null) expect(o[field], field).toMatch(/Z$/);

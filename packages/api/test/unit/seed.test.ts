@@ -13,8 +13,7 @@ import {
 } from "../../scripts/seed.js";
 import { UPSTREAM_PROGRAMS, grantProgram } from "../fixtures/upstream-programs.js";
 
-const BASE = "https://example.org/programs";
-const mapped = Object.values(UPSTREAM_PROGRAMS).map((p) => mapProgram(p, { programUrlBase: BASE }));
+const mapped = Object.values(UPSTREAM_PROGRAMS).map((p) => mapProgram(p));
 
 describe("gateForSeed", () => {
   it("accepts every record the mapper produces from the recorded upstream shapes", () => {
@@ -25,7 +24,7 @@ describe("gateForSeed", () => {
 
   // The whole point of the gate: a bad record is named, not silently subtracted from a count.
   it("rejects a non-conforming record and reports its id and the rules it broke", () => {
-    const good = mapProgram(grantProgram, { programUrlBase: BASE });
+    const good = mapProgram(grantProgram);
     const bad = { ...good, id: "fundingmap:broken", status: "Active" } as unknown as Opportunity;
     const { accepted, rejected } = gateForSeed([good, bad]);
 
@@ -38,7 +37,7 @@ describe("gateForSeed", () => {
   it("rejects a fundingDetails tag that disagrees with the top-level fundingType", () => {
     // Two type blocks are UNREPRESENTABLE since the single fundingDetails slot; the residual
     // failure mode is a details payload tagged as another type — the binding allOf rejects it.
-    const good = mapProgram(grantProgram, { programUrlBase: BASE });
+    const good = mapProgram(grantProgram);
     const mismatched = {
       ...good,
       id: "fundingmap:mismatch",
@@ -50,7 +49,7 @@ describe("gateForSeed", () => {
   });
 
   it("does not let advisory warnings reject a record", () => {
-    const good = mapProgram(grantProgram, { programUrlBase: BASE });
+    const good = mapProgram(grantProgram);
     const warns = {
       ...good,
       eligibility: "Seed-stage teams only.",
@@ -60,7 +59,7 @@ describe("gateForSeed", () => {
   });
 
   it("hard-rejects the pre-re-cut eligibility OBJECT — eligibility is free text now", () => {
-    const good = mapProgram(grantProgram, { programUrlBase: BASE });
+    const good = mapProgram(grantProgram);
     const objectEligibility = {
       ...good,
       id: "fundingmap:object-eligibility",
