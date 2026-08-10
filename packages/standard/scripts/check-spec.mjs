@@ -12,15 +12,22 @@
 //                        status note) that codegen does not own and would survive a domain
 //                        swap unchanged. Every identity-shaped URL anywhere in the package
 //                        must agree with spec.config.json, however it got there.
+//   2c. MATURITY       — `status` and the FROZEN marker are two halves of one fact, written
+//                        in two places. If they disagree, either a stable version is quietly
+//                        editable or a frozen one still advertises itself as a draft. This
+//                        rule existed only in PROCESS.md prose until 2026-08-10; it is
+//                        mechanised here because that is the release checklist item most
+//                        likely to be forgotten in the one release that performs it.
 //   3. NEUTRALITY      — an internal issue-tracker ID inside a CC0 artifact that is
 //                        designed to be embedded, forked and code-generated from. One leak
 //                        in a normative field description travels into every downstream copy.
-//                        Also: an identifier on a domain the project does not own. Every
-//                        published identifier must dereference or be visibly provisional;
-//                        a URL pointing at an unowned domain is neither.
+//                        Also: an identifier on a domain the project does not own, and any
+//                        reappearance of a RETIRED identifier — the placeholder domain, the
+//                        old npm scope, or the provisional base/vocab URLs this package
+//                        published before it adopted its canonical domain.
 //
 // Run with `pnpm --filter @the-rfp-hub/standard check`. Exits non-zero on any failure.
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -132,6 +139,14 @@ if (/\d+\.\d+\.\d+/.test(spec.vocabIri)) {
     `@vocab '${spec.vocabIri}' carries a version. Term IRIs must be versionless — version the context DOCUMENT, never the terms`,
   );
 }
+// A term IRI is @vocab CONCATENATED with the term, not resolved against it. Without a trailing
+// '#' or '/', `@vocab` + `tracks` yields one fused string and every vocabulary term is wrong.
+if (!/[#/]$/.test(spec.vocabIri)) {
+  fail(
+    "version-drift",
+    `@vocab '${spec.vocabIri}' does not end in '#' or '/'. Terms are concatenated onto it, so without a delimiter every vocabulary term IRI is malformed`,
+  );
+}
 
 const schemaTs = readText(p("src", "schema.ts"));
 const specVersionConst = schemaTs.match(/export const SPEC_VERSION = "([^"]*)"/)?.[1];
@@ -155,6 +170,12 @@ if (registryIndex.specVersion !== want) {
 const URL_TOKEN = /https?:\/\/[^\s"'`<>\\)\]]+/g;
 const trimUrl = (u) => u.replace(/[.,;:!?'"`]+$/, "");
 
+// A vocabulary-namespace-shaped URL: an `/ns/…rfp` path on ANY authority. Deliberately not
+// derived from the current vocabIri's own path — the point is to catch a RETIRED namespace
+// (which by definition has a different path) as well as a typo in the current one. Foreign
+// `/ns/` IRIs the docs legitimately cite, such as w3.org's JSON-LD link relation, do not match.
+const VOCAB_SHAPED = /\/ns\/[a-z0-9/-]*rfp(?![a-z0-9-])/i;
+
 function sweepIdentityUrls(file, text) {
   for (const raw of text.match(URL_TOKEN) ?? []) {
     const url = trimUrl(raw);
@@ -164,16 +185,93 @@ function sweepIdentityUrls(file, text) {
         `${relative(pkgRoot, file)} carries schema URL '${url}', which is not under '${spec.baseUrl}/schemas/'`,
       );
     }
-    if (
-      url.includes("/ns/draft/rfp") &&
-      !url.startsWith(spec.vocabIri) &&
-      `${url}#` !== spec.vocabIri
-    ) {
+    if (VOCAB_SHAPED.test(url) && !url.startsWith(spec.vocabIri) && `${url}#` !== spec.vocabIri) {
       fail(
         "identity-sweep",
         `${relative(pkgRoot, file)} carries vocab IRI '${url}', expected '${spec.vocabIri}'`,
       );
     }
+  }
+}
+
+// ---------------------------------------------------------- 2c. maturity ----
+// `status` is the version's maturity on the spec axis and the vocabulary is closed: a version
+// is being drafted or it is published and immutable. There is no third state, and `stable`
+// without the FROZEN marker is the dangerous half — it reads as published while CI still lets
+// the directory be edited.
+const MATURITIES = ["draft", "stable"];
+const frozenMarker = p(spec.schemaDir, "FROZEN");
+const isFrozen = existsSync(frozenMarker);
+
+if (!MATURITIES.includes(spec.status)) {
+  fail(
+    "maturity",
+    `spec.config.json status is '${spec.status}', expected one of ${MATURITIES.map((s) => `'${s}'`).join(", ")} (PROCESS.md, "In-place re-cuts")`,
+  );
+} else if (spec.status === "stable" && !isFrozen) {
+  fail(
+    "maturity",
+    `status is 'stable' but ${spec.schemaDir}/FROZEN is missing. Declaring a version stable is what freezes it — without the marker the freeze workflow lets the directory be edited`,
+  );
+} else if (spec.status === "draft" && isFrozen) {
+  fail(
+    "maturity",
+    `${spec.schemaDir}/FROZEN exists but status is 'draft'. A frozen version is published; drop the marker or declare the version stable`,
+  );
+}
+
+// ---------------------------------------------- 2d. identity provenance -----
+// Identifiers are provisional exactly once. `identityStatus` is the machine-readable record of
+// which side of that line this package is on, and .github/workflows/spec-freeze.yml reads the
+// same field: it permits an identity-field change ONLY on a provisional -> canonical transition
+// naming an existing ADR. The checks below are what keep that field honest.
+const IDENTITY_STATES = ["provisional", "canonical"];
+if (!IDENTITY_STATES.includes(spec.identityStatus)) {
+  fail(
+    "identity-provenance",
+    `spec.config.json identityStatus is '${spec.identityStatus}', expected one of ${IDENTITY_STATES.map((s) => `'${s}'`).join(", ")}`,
+  );
+}
+
+for (const [field, value] of [
+  ["baseUrl", spec.baseUrl],
+  ["vocabIri", spec.vocabIri],
+]) {
+  // The canonical domain is an HSTS-preloaded TLD: browsers force HTTPS, so a plaintext
+  // identifier is unreachable as well as wrong. There is deliberately no http:// variant of
+  // this namespace — see ARTIFACTS.md's decline of dual http/https namespace IRIs.
+  if (!value.startsWith("https://")) {
+    fail("identity-provenance", `${field} '${value}' is not https://. Identifiers are https-only`);
+  }
+}
+
+if (spec.identityStatus === "canonical") {
+  const host = (u) => {
+    try {
+      return new URL(u).host;
+    } catch {
+      return null;
+    }
+  };
+  // One authority, or the vocabulary and the schemas are two different projects' identifiers.
+  if (host(spec.baseUrl) !== host(spec.vocabIri)) {
+    fail(
+      "identity-provenance",
+      `baseUrl host '${host(spec.baseUrl)}' and vocabIri host '${host(spec.vocabIri)}' differ — canonical identifiers share one authority`,
+    );
+  }
+  // "Sanctioned" means there is a decision record, not that someone remembered a conversation.
+  const repoRoot = resolve(pkgRoot, "..", "..");
+  const adr = spec.identityAdoption?.adr;
+  if (!adr) {
+    fail(
+      "identity-provenance",
+      "identityStatus is 'canonical' but identityAdoption.adr names no decision record",
+    );
+  } else if (existsSync(join(repoRoot, "adr")) && !existsSync(join(repoRoot, adr))) {
+    // Guarded on the decision log being present at all: this script also runs from an
+    // extracted package tarball, which ships the spec but not the repository around it.
+    fail("identity-provenance", `identityAdoption.adr points at '${adr}', which does not exist`);
   }
 }
 
@@ -188,6 +286,16 @@ const UNOWNED_DOMAIN = new RegExp(`\\b${["rfphub", "org"].join("\\.")}\\b`, "g")
 // reappear — a stale build once shipped it inside a published tarball. Assembled from parts
 // so this rule does not trip itself; "@the-rfp-hub/" does not match it.
 const RETIRED_SCOPE = new RegExp(`@${["rfp", "hub"].join("-")}/`, "g");
+// The identifiers this package published while its domain was undecided (2026-07 → 2026-08-10):
+// a raw-repository base URL, and a vocabulary IRI with a `draft` maturity segment. The identity
+// sweep above only catches copies that still LOOK like identifiers; a retired base URL can also
+// survive in prose, a link, or a fixture path the sweep's shapes do not match. Both are dead —
+// see adr/0007. Assembled from parts so this rule does not trip itself, and matching the full
+// base only, so the CHANGELOG's historical prose about the host survives.
+const RETIRED_IDENTIFIERS = [
+  ["https://raw.", "githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard"].join(""),
+  ["https://github.com/The-RFP-Hub/the-rfp-hub/ns/", "draft", "/rfp"].join(""),
+];
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git", ".turbo"]);
 const TEXT_EXT = /\.(json|jsonld|ts|mjs|js|md|yml|yaml)$/;
 
@@ -215,8 +323,16 @@ for (const file of walk(pkgRoot)) {
   if (hits2) {
     fail(
       "neutrality",
-      `${relative(pkgRoot, file)} references the retired placeholder domain (${hits2[0]}) — the project does not own it. Identifiers come from spec.config.json; there is no canonical domain yet`,
+      `${relative(pkgRoot, file)} references the retired placeholder domain (${hits2[0]}) — the project does not own it. The canonical domain is ${new URL(spec.baseUrl).host}, and every identifier comes from spec.config.json`,
     );
+  }
+  for (const retired of RETIRED_IDENTIFIERS) {
+    if (text.includes(retired)) {
+      fail(
+        "neutrality",
+        `${relative(pkgRoot, file)} carries a retired provisional identifier ('${retired}'). Those were superseded by the canonical identity on ${new URL(spec.baseUrl).host} — see adr/0007`,
+      );
+    }
   }
   const hits3 = text.match(RETIRED_SCOPE);
   if (hits3) {
@@ -234,5 +350,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `✓ check-spec: context covers ${topLevelProperties.length} top-level terms, identifiers all stamped from spec.config.json (${spec.baseUrl}), identity sweep found no stray schema/vocab URLs, version strings agree on ${want}, no tracker IDs or unowned-domain URLs`,
+  `✓ check-spec: context covers ${topLevelProperties.length} top-level terms, identifiers all ${spec.identityStatus} and stamped from spec.config.json (${spec.baseUrl}), identity sweep found no stray schema/vocab URLs, maturity '${spec.status}' agrees with ${isFrozen ? "a present" : "no"} FROZEN marker, version strings agree on ${want}, no tracker IDs, unowned-domain URLs or retired identifiers`,
 );
