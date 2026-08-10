@@ -17,6 +17,7 @@
     "db:generate": "drizzle-kit generate",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
+    "corpus": "tsx scripts/fetch-corpus.ts",
     "export": "tsx scripts/export.ts"
   },
   "dependencies": {
