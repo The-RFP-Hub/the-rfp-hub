@@ -24,6 +24,8 @@ re-proposed every few months, and each time costs the same conversation.
 | [`schemas/index.json`](./schemas/index.json) | Machine-readable index of published versions, with `latest`. | `scripts/codegen.mjs` from `spec.config.json`. |
 | [`meta/rfphub-schema.meta.json`](./meta/rfphub-schema.meta.json) | Metaschema constraining our own schema file and legalising the three `x-` annotations (`x-stability`, `x-since`, `x-deprecated`) on top of the native 2020-12 vocabulary — including the rule that `x-deprecated` may only accompany a native `deprecated: true`, never replace it. | Hand-authored, validated in CI. |
 | [`spec.config.json`](./spec.config.json) | The spec's identity. The only place a version string or namespace IRI is hand-written. | Hand-authored. |
+| **HTTP `Link` header context advertisement** | `Link: <…/context.jsonld>; rel="http://www.w3.org/ns/json-ld#context"` on `application/json` opportunity responses from the API. Every response becomes linked data for zero payload bytes and no `@context` pollution. Deliberately absent from `application/schema+json` and `application/ld+json` responses — a processor MUST follow an advertised context on any other `+json` type, so advertising there would misread a schema document as an opportunity. | `packages/api` (`modules/shared/jsonld-link.ts`). **Shipped 2026-08-10**, on its stated trigger. |
+| **Publication tree mirroring `$id`** | Every canonical document served at exactly the path its own identifier names — the schema, the context, the versions index, the meta-schema and the registry entry schema — byte-for-byte as shipped here, under `application/schema+json` / `application/ld+json`. Mounted at the root, never under an API version. | `packages/api` (`modules/shared/canonical-documents.ts`), paths computed from the identifiers. **Shipped 2026-08-10**, on the same trigger. Resolution goes live with DNS; see the identifiers section below. |
 | [`schemas/v1.0.0/examples/`](./schemas/v1.0.0/examples) | 30 curated real-world documents. Illustrative, not normative. | 28 mapped from a public aggregator API; 2 security bug bounties transcribed from their publishers' own pages. See `BENCHMARK.md`. |
 | Policy docs — [`PROCESS.md`](./PROCESS.md), [`NORMATIVE.md`](./NORMATIVE.md), [`CHANGELOG.md`](./CHANGELOG.md), [`STATUS.md`](./schemas/v1.0.0/STATUS.md), [`adr/`](../../adr) | Four Markdown files and a decision log. No tooling, highest credibility per hour of anything in this table. | Hand-written. |
 
@@ -41,12 +43,20 @@ building any of them before its trigger is carrying cost for no reader.
 | **`vocabulary.ttl`** | RDFS/OWL in Turtle — the only format that can state "this field **is** that schema.org property" via `owl:equivalentProperty`, rather than the informal assertion `context.jsonld` makes today. ~200 lines, and the source any other RDF serialization would be generated from. | A consumer asks for it. Not before — see the RDF decline below. |
 | **DAOIP-5 `grantPools` export adapter** | A one-way output adapter emitting grant-type opportunities as DAOIP-5 `grantPools` JSON, applying the three cardinality reductions documented in [`CROSSWALK.md`](./schemas/v1.0.0/CROSSWALK.md). Emits the object shape directly — DAOIP-5's own `@context` does not resolve. | A named consumer wants DAOIP-5 output. It is the only serialization in this niche with a real audience. |
 | **`opportunity-package.schema.json`** (envelope) | `{specVersion, publisher, license, generatedAt, opportunities: [...]}` — because "this object is valid" and "this file is valid RFP Hub data" are different claims, and the envelope is the natural home for publisher, licence and generation time. Both closest domain analogues ship exactly two schemas. | The first bulk export or bulk publication path. Cheaper now than later, but it is an addition to a settled field plan, so it lands as its own decision. |
-| **HTTP `Link` header context advertisement** | On `application/json` opportunity responses from the API: `Link: <…/context.jsonld>; rel="http://www.w3.org/ns/json-ld#context"`. Upgrades every response to linked data for zero payload bytes and no `@context` pollution. | **The canonical domain decision.** A conformant processor MUST fetch an advertised context, so advertising one is only worth doing once the URL is stable — the raw-repository URL used today would pin every consumer to a branch path. |
+*(The **HTTP `Link` header context advertisement** and the **publication tree mirroring `$id`**
+were the two rows here whose trigger was the canonical domain decision. That decision landed on
+2026-08-10 — [`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md) — and both moved
+to* Shipped *above.)*
 
-Two more, noted rather than tabled: **CSV codelists** of the registries (worth it when
+One more, noted rather than tabled: **CSV codelists** of the registries (worth it when
 non-developer curators or translators appear — today it adds a parser and a second
-source-of-truth question), and a **separate publication tree** mirroring `$id` byte-for-byte
-(the right end state, blocked on the same domain decision).
+source-of-truth question).
+
+The publication tree ships **inside the API** rather than as static hosting, which is the
+compromise `adr/0007` records: spec resolution rides the API's uptime until the package directory
+is published to object storage behind a CDN. That migration retires the API routes with no
+identifier changing and no consumer-visible event, and the freeze makes an unbounded cache TTL
+correct — the bytes can never change again.
 
 ### On identifiers — settled 2026-08-10
 

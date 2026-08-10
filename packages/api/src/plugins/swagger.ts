@@ -26,6 +26,11 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         { name: "feeds", description: "Syndication feeds (Atom 1.0, RSS 2.0)" },
         { name: "stats", description: "Dataset statistics" },
         { name: "meta", description: "Service metadata" },
+        {
+          name: "spec",
+          description:
+            "The RFP Hub Standard's own documents, served at the canonical URLs their identifiers name. Unversioned by the API on purpose — an identifier must not carry an API version.",
+        },
       ],
     },
     // Name components by their $id (Opportunity, Stats, …) instead of the default def-0/def-1/…

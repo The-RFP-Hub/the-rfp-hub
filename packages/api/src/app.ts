@@ -1,6 +1,8 @@
 import cors from "@fastify/cors";
+import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { registerRoutes } from "./modules/routes/index.js";
+import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { responseSchemas } from "./openapi/schemas.js";
 import { registerSwagger } from "./plugins/swagger.js";
 
@@ -68,7 +70,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     async () => ({
       name: "RFP Hub API",
       version: "v1",
-      standard: "1.0.0",
+      standard: SPEC_VERSION,
       docs: "/v1/docs",
       endpoints: [
         "/v1/opportunities",
@@ -79,6 +81,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         "/v1/stats",
         "/v1/health",
       ],
+      // The spec's own documents, at the paths their identifiers name (adr/0007).
+      spec: canonicalDocuments.map((doc) => doc.path),
       // Feed autodiscovery. There is no HTML page here to carry the usual
       // `<link rel="alternate" type="application/atom+xml">`, so the service-info document is what
       // an agent (or a human pointing a reader at the API root) reads instead — same three facts a

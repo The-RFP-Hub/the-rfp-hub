@@ -35,6 +35,7 @@ import {
 import { listQuerySchema } from "../../src/modules/routes/opportunities/types.js";
 import type { Page } from "../../src/modules/services/opportunities/opportunity.service.js";
 import type { StatsSummary } from "../../src/modules/services/stats/stats.service.js";
+import { canonicalDocuments } from "../../src/modules/shared/canonical-documents.js";
 import { responseSchemas } from "../../src/openapi/schemas.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -236,6 +237,39 @@ describe("closed response components vs their producers", () => {
       "PaginatedOpportunities",
       "Stats",
     ]);
+  });
+
+  /**
+   * The canonical spec documents are the Standard's own bytes, so their components are
+   * deliberately OPEN — a closed component would let fast-json-stringify drop a member of a
+   * document the API does not own. What can drift is the pairing: a document added without a
+   * component, or a component whose `required` members are not actually in the served bytes.
+   */
+  it("declares an open component for every canonical spec document", () => {
+    for (const doc of canonicalDocuments) {
+      const schema = component(doc.component);
+      expect(schema.additionalProperties, doc.component).toBe(true);
+      const body = JSON.parse(doc.body.toString("utf8")) as Record<string, unknown>;
+      for (const name of (schema.required as string[]) ?? []) {
+        expect(body[name], `${doc.source} is missing the declared '${name}'`).toBeDefined();
+      }
+    }
+  });
+
+  // The media types ARE the interoperability contract: a JSON Schema document served as
+  // application/json is not `$ref`-able by a generic validator, and a context served as
+  // anything but ld+json is not a context.
+  it("serves each canonical document under the media type its kind requires", () => {
+    const expected: Record<string, string> = {
+      "/schemas/v1.0.0/opportunity.schema.json": "application/schema+json",
+      "/schemas/v1.0.0/context.jsonld": "application/ld+json",
+      "/schemas/index.json": "application/json",
+      "/meta/rfphub-schema.meta.json": "application/schema+json",
+      "/registries/entry.schema.json": "application/schema+json",
+    };
+    expect(Object.fromEntries(canonicalDocuments.map((d) => [d.path, d.mediaType]))).toEqual(
+      expected,
+    );
   });
 
   it("Stats declares exactly what StatsService.summary() returns", () => {
