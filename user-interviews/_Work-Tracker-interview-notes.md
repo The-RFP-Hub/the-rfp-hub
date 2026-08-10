@@ -1,6 +1,8 @@
 # RFP Hub — Interview Notes (from Work Tracker)
 
-_Source: Notion Work Tracker database (Status = Done), snapshot 2026-07-21, extended locally on 2026-08-05 with the second research wave and the two written builder responses. Every interview now has its own file in this archive._
+_Source: Notion Work Tracker database (Status = Done), snapshot 2026-07-21, extended locally on 2026-08-05 with the second research wave and the two written builder responses._
+
+> **This file is a historical working index, not a source of truth.** It is a snapshot of an operational tracker taken while the research was still in progress, and its categories and counts predate the final set of contributions. The [M1 Research Report](./M1-Research-Report.md) is the authoritative account: 18 contributions, of which nine are builder and services-firm records. Where this file disagrees with the report, the report governs. It is published for provenance — to show how the research was run — and is not maintained.
 
 ## Adedalapo (BitGifty)
 **Category:** Builder (0-to-1)
@@ -33,9 +35,11 @@ Live call 2026-07-28 (Jon Ruth; Sov solo). Most agent-native respondent: discove
 Sov first-pass candidate (doc comments). Intro: Sov. 2026-07-14: interview complete (services-firm + builder perspective). Signal: finding opportunities is not their pain (strong founder network + a full-time researcher); the pain is opportunity cost of pursuing proposals that lose on politics, incumbents, or misread criteria (lost a heavily worked marketplace RFP). Wants org-level matchmaking over per-RFP, anonymized intelligence on who else applied (incumbents / previously funded / strong fits) to prioritize, a shift toward long-term service agreements with labs over transactional RFPs, and tooling that helps publishers draft better requirements. Offered a follow-up with a teammate (an ex-domain allocator, publisher view).
 
 ## CoW Grants  
-**Category:** Protocol team
+**Category:** Publisher
 
-Builder-side interview, separate call from the CoW DAO publisher interview, same relationship. Counts as a Protocol team builder interview (Sov 2026-07-10). Publisher side completed 2026-07-08 as Sov's self-authored publisher-seat response (see file).
+Publisher side completed 2026-07-08 as Sov's self-authored publisher-seat response (see file). That response is the only filed CoW record, and the report counts it as one of the five publisher records.
+
+_Stale tracker line, corrected._ This entry previously categorized CoW as "Protocol team" and recorded a builder-side call on 2026-07-10 as counting toward the builder interviews. That line predates the final set of contributions and was never reconciled. It produced no filed record, and the report does not count it: the builder total is nine, and the CoW publisher-seat response is the only CoW record in this archive.
 
 ## Cornaro Labs  
 **Category:** Aggregator
