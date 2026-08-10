@@ -1,0 +1,19 @@
+{
+  "name": "rfphub-example-typescript",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Zero-dependency TypeScript fetch client demonstrating the RFP Hub /v1/ API.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@the-rfp-hub/standard": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

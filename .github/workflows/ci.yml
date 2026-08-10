@@ -67,3 +67,14 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # The TypeScript example is a CONSUMER, not a workspace member: it resolves
+      # @the-rfp-hub/standard from the npm REGISTRY, not from packages/standard. Installing it with
+      # npm (no pnpm workspace linking, no lockfile from this repo) is the point — it typechecks
+      # the example against the PUBLISHED package, so a release that breaks downstream consumers
+      # fails here instead of in their repos.
+      - name: Typecheck the TypeScript client example (as a consumer)
+        working-directory: examples/typescript
+        run: |
+          npm install
+          npm run typecheck

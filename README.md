@@ -88,6 +88,17 @@ pnpm typecheck
 pnpm lint           # biome
 ```
 
+## Using the API
+
+Runnable client examples — curl, TypeScript (zero-dependency `fetch`), and Python
+(stdlib-only) — live in [`examples/`](./examples), one endpoint-by-endpoint tour each. All
+three read the API's base URL from `RFPHUB_API_BASE` (default `http://localhost:3001`); see
+[`packages/api/README.md`](./packages/api/README.md) to run one locally.
+
+The [TypeScript example](./examples/typescript) installs
+[`@the-rfp-hub/standard`](./packages/standard) from npm and types its responses with it, so it
+doubles as a type-contract demo — CI installs and typechecks it the way a consumer would.
+
 ## Licensing
 
 Code is **MIT**; the standard and datasets are **CC0-1.0**. See [LICENSING.md](./LICENSING.md)
