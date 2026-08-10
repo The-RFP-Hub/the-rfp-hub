@@ -5,58 +5,22 @@
 # the reasoning that justified re-cutting v1.0.0 in place ("nobody has adopted it yet")
 # will feel true again next time, and the second time it will not be defensible.
 #
-# What freezing covers — everything that operationally defines a version's conformance:
-#   - packages/standard/schemas/v<version>/           (the schema, context, docs of record)
-#   - packages/standard/conformance/v<version>/       (the pass/fail cases ARE the observable
-#                                                      meaning of conformance; NORMATIVE.md)
-#   and, while ANY version is frozen, the versionless normative artifacts a frozen version
-#   rests on:
-#   - packages/standard/meta/                          (the meta-schema the schema validates
-#                                                      against — changing it changes what the
-#                                                      frozen schema is allowed to mean)
-#   - packages/standard/registries/entry.schema.json   (the contract registry entries obey)
-#   - spec.config.json identity fields (baseUrl, vocabIri) — codegen re-stamps every $id from
-#     them, so editing them rewrites frozen bytes. Non-identity fields (specVersion,
-#     schemaDir, status, recutDate) stay editable: cutting a NEW version must not trip the
-#     gate for an old one.
-#
-# A version is frozen when packages/standard/schemas/v<version>/ contains a FROZEN marker
-# file — the single marker for that version's schema AND conformance directories. The marker
-# lands in the commit that declares the version stable. v1.0.0 was declared stable and frozen
-# on 2026-08-10 (adr/0007), so this gate is live.
-#
-# TWO DIFFERENT READINGS OF "FROZEN", ON PURPOSE:
-#   - VERSIONED directories are judged from the BASE ref only. A version's marker necessarily
-#     lands in the same commit that finishes its directory, so judging schemas/v*/ from
-#     base ∪ head would make declaring ANY version stable impossible.
-#   - The VERSIONLESS artifacts and spec.config.json's identity fields are judged from
-#     base ∪ head. Those are not part of the directory being declared, so the commit that
-#     freezes a version is held to the frozen rules for them. Without this, a change could
-#     rewrite every $id in a spec version and be permitted by nothing more than the ORDER of
-#     two edits in one commit — which is exactly how the canonical-domain adoption would
-#     otherwise have landed, silently.
-# Either way markers are read from a ref that includes the base, so deleting a FROZEN file in
-# the same PR is not a way through the gate.
-#
-# THE ONE SANCTIONED IDENTITY CHANGE. The identifiers this standard published before it owned
-# a domain were marked PROVISIONAL in the artifact itself, and swapping them for canonical ones
-# was a planned event with a declared trigger. That is a real exception and it is expressed
-# here rather than assumed: an identity-field change is permitted ONLY on the
-# `identityStatus` transition provisional -> canonical, only when the head names an
-# `identityAdoption.adr` that exists, and — because codegen re-stamps them from baseUrl — only
-# with $id-line-only changes to meta/ and registries/entry.schema.json. It is
-# self-extinguishing: afterwards the base always reads `canonical`, so the transition cannot
-# recur, and canonical -> provisional is rejected outright so it cannot be re-armed. This is
-# NOT a general escape hatch; every other identity edit to a frozen version fails as before.
+# THE RULE ITSELF LIVES IN scripts/spec-freeze.mjs, not in this file. It compares the two
+# revisions of every touched artifact by PARSING them and diffing their JSON structure — an
+# earlier version of this gate did the comparison with `grep` over diff lines, and both of the
+# ways it could be walked past were consequences of matching text instead of parsing JSON. The
+# script's header documents what freezing covers, the three readings of "frozen", and the
+# one-time provisional -> canonical identity adoption and how narrow it is; scripts/spec-freeze.test.mjs
+# runs the bypass attempts as tests, so the gate's own claims are checked on every `pnpm test`.
 #
 # What this job cannot defend against is repo configuration: it must be a required status
 # check (a deleted required workflow blocks merge as "expected"), main must require PRs, and
-# .github/workflows/ should be CODEOWNERS-protected — none of which is expressible from inside
-# the tree. The push trigger below is the tripwire for direct pushes: it cannot block them, but
-# it turns main red so the bypass is at least loud.
+# .github/workflows/ AND scripts/spec-freeze.mjs should be CODEOWNERS-protected — none of which
+# is expressible from inside the tree. The push trigger below is the tripwire for direct pushes:
+# it cannot block them, but it turns main red so the bypass is at least loud.
 #
-# See packages/standard/PROCESS.md, adr/0001-recut-v1.0.0-in-place.md and
-# adr/0007-canonical-domain-and-spec-identity.md.
+# See packages/standard/PROCESS.md, packages/standard/NORMATIVE.md,
+# adr/0001-recut-v1.0.0-in-place.md and adr/0007-canonical-domain-and-spec-identity.md.
 name: Spec freeze
 
 on:
@@ -67,6 +31,7 @@ on:
       - "packages/standard/meta/**"
       - "packages/standard/registries/entry.schema.json"
       - "packages/standard/spec.config.json"
+      - "scripts/spec-freeze.mjs"
   push:
     branches: [main]
     paths:
@@ -75,6 +40,7 @@ on:
       - "packages/standard/meta/**"
       - "packages/standard/registries/entry.schema.json"
       - "packages/standard/spec.config.json"
+      - "scripts/spec-freeze.mjs"
 
 jobs:
   frozen:
@@ -86,142 +52,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The gate runs from the BASE ref's copy of the script, not the head's. A PR that weakens
+      # the gate must not be judged by the weakened gate — the same reason frozen-ness for a
+      # version directory is read from the base. Reviewing the script change is a human job
+      # (CODEOWNERS); this only stops the change from grading itself.
       - name: Check changed normative artifacts against FROZEN markers
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-
-          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
-            echo "✓ no base to compare against (branch creation) — nothing to check"
-            exit 0
+          gate=scripts/spec-freeze.mjs
+          if [[ ! "$BASE_SHA" =~ ^0+$ ]] && git cat-file -e "$BASE_SHA:$gate" 2>/dev/null; then
+            mkdir -p "$RUNNER_TEMP/base-gate"
+            git show "$BASE_SHA:$gate" > "$RUNNER_TEMP/base-gate/spec-freeze.mjs"
+            gate="$RUNNER_TEMP/base-gate/spec-freeze.mjs"
+            echo "· judging this change with the gate as it exists at the base ref"
           fi
-
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- \
-            'packages/standard/schemas/v*' \
-            'packages/standard/conformance/v*' \
-            'packages/standard/meta' \
-            'packages/standard/registries/entry.schema.json' \
-            'packages/standard/spec.config.json' || true)
-          if [ -z "$changed" ]; then
-            echo "✓ no normative spec artifact touched"
-            exit 0
-          fi
-
-          violations=0
-
-          # --- versioned directories: schemas/vX and conformance/vX share schemas/vX/FROZEN ---
-          versions=$(printf '%s\n' "$changed" \
-            | sed -nE 's#^packages/standard/(schemas|conformance)/(v[^/]*)/.*$#\2#p' \
-            | sort -u)
-          for ver in $versions; do
-            # Read the marker from the BASE ref, not the head: deleting FROZEN in the same PR
-            # must not be a way through the gate.
-            if git cat-file -e "$BASE_SHA:packages/standard/schemas/$ver/FROZEN" 2>/dev/null; then
-              echo "✗ $ver is FROZEN and this change edits its normative artifacts:"
-              printf '%s\n' "$changed" \
-                | grep -E "^packages/standard/(schemas|conformance)/$ver/" | sed 's/^/    /'
-              violations=$((violations + 1))
-            else
-              echo "✓ $ver is not frozen"
-            fi
-          done
-
-          # Frozen-ness for the VERSIONLESS rules below is judged from base ∪ head — see the
-          # header. The versioned-directory rule above stays base-only on purpose.
-          count_frozen() {
-            git ls-tree -r --name-only "$1" -- packages/standard/schemas | grep -c '/FROZEN$' || true
-          }
-          any_frozen=$(( $(count_frozen "$BASE_SHA") + $(count_frozen "$HEAD_SHA") ))
-
-          # --- the one sanctioned identity change: provisional -> canonical, once ---
-          spec_field() { git show "$1:packages/standard/spec.config.json" | jq -r "$2"; }
-          adoption=no
-          if printf '%s\n' "$changed" | grep -q '^packages/standard/spec.config.json$'; then
-            base_is=$(spec_field "$BASE_SHA" '.identityStatus // "provisional"')
-            head_is=$(spec_field "$HEAD_SHA" '.identityStatus // "provisional"')
-            head_adr=$(spec_field "$HEAD_SHA" '.identityAdoption.adr // ""')
-            if [ "$base_is" = "canonical" ] && [ "$head_is" != "canonical" ]; then
-              echo "✗ identityStatus moves canonical -> $head_is. Adoption is irreversible:"
-              echo "    reverting it would re-arm the one-time exemption for a later change."
-              violations=$((violations + 1))
-            elif [ "$base_is" = "provisional" ] && [ "$head_is" = "canonical" ]; then
-              if [ -n "$head_adr" ] && git cat-file -e "$HEAD_SHA:$head_adr" 2>/dev/null; then
-                adoption=yes
-                echo "✓ one-time identity adoption (provisional -> canonical), recorded in $head_adr"
-              else
-                echo "✗ identityStatus moves provisional -> canonical, but identityAdoption.adr"
-                echo "    ('${head_adr:-<unset>}') names no decision record present at HEAD."
-                violations=$((violations + 1))
-              fi
-            fi
-          fi
-
-          # --- versionless normative artifacts: locked while ANY version is frozen ---
-          versionless=$(printf '%s\n' "$changed" \
-            | grep -E '^packages/standard/(meta/|registries/entry\.schema\.json)' || true)
-          if [ "$any_frozen" -gt 0 ] && [ -n "$versionless" ]; then
-            if [ "$adoption" = "yes" ]; then
-              # codegen re-stamps these two $ids from baseUrl. That, and nothing else.
-              offending=""
-              for f in $versionless; do
-                body=$(git diff -U0 "$BASE_SHA" "$HEAD_SHA" -- "$f" \
-                  | grep -E '^[+-]' \
-                  | grep -vE '^(\+\+\+|---)' \
-                  | grep -vE '^[+-][[:space:]]*"\$id":' || true)
-                if [ -n "$body" ]; then offending="${offending}${f} "; fi
-              done
-              if [ -n "$offending" ]; then
-                echo "✗ identity adoption may only re-stamp \$id in versionless normative artifacts:"
-                for f in $offending; do echo "    $f"; done
-                violations=$((violations + 1))
-              else
-                echo "✓ versionless normative artifacts changed on their \$id line only (adoption)"
-              fi
-            else
-              echo "✗ a frozen version exists and this change edits versionless normative artifacts:"
-              printf '%s\n' "$versionless" | sed 's/^/    /'
-              violations=$((violations + 1))
-            fi
-          fi
-
-          # --- spec.config.json identity fields: locked while ANY version is frozen ---
-          if [ "$any_frozen" -gt 0 ] && printf '%s\n' "$changed" | grep -q '^packages/standard/spec.config.json$'; then
-            base_id=$(spec_field "$BASE_SHA" '[.baseUrl, .vocabIri] | join(" ")')
-            head_id=$(spec_field "$HEAD_SHA" '[.baseUrl, .vocabIri] | join(" ")')
-            if [ "$base_id" = "$head_id" ]; then
-              echo "✓ spec.config.json touched, but identity fields (baseUrl, vocabIri) are unchanged"
-            elif [ "$adoption" = "yes" ]; then
-              echo "✓ spec.config.json identity fields adopted under the one-time exemption:"
-              echo "    base: $base_id"
-              echo "    head: $head_id"
-            else
-              echo "✗ a frozen version exists and this change edits spec.config.json identity fields:"
-              echo "    base: $base_id"
-              echo "    head: $head_id"
-              violations=$((violations + 1))
-            fi
-          fi
-
-          if [ "$violations" -gt 0 ]; then
-            cat <<'MSG'
-
-          A published spec version is immutable once frozen — the schema directory, its
-          conformance suite, and the versionless artifacts it rests on. Breaking changes take
-          a NEW version directory; the previous one stays published and unedited, forever.
-
-          If this is an editorial correction to an informative document, it belongs outside the
-          version directory or in a new version — see packages/standard/NORMATIVE.md.
-          If you believe the freeze itself is wrong, that is a governance question: open an issue
-          (GOVERNANCE.md). Do not remove the marker to land a change.
-
-          On identifiers specifically: the provisional -> canonical adoption was a one-time,
-          pre-declared event and it has been spent (adr/0007). identityStatus reads `canonical`
-          and there is no second transition. An identifier on a frozen version is frozen bytes;
-          changing one takes a NEW spec version like any other breaking change.
-          MSG
-            exit 1
-          fi
-
-          echo "✓ no frozen spec artifact was modified"
+          node "$gate" "$BASE_SHA" "$HEAD_SHA"

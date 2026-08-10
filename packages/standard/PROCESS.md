@@ -139,10 +139,25 @@ a version bump regardless of maturity.
 
 The mechanism, so the rule does not depend on memory: declaring a version stable adds a `FROZEN`
 marker file to its directory, and
-[`.github/workflows/spec-freeze.yml`](../../.github/workflows/spec-freeze.yml) fails any PR that
-touches a version directory containing one. **`v1.0.0` was declared `stable` on 2026-08-10 and
-its marker is [`schemas/v1.0.0/FROZEN`](./schemas/v1.0.0/FROZEN)** — the draft window that
+[`.github/workflows/spec-freeze.yml`](../../.github/workflows/spec-freeze.yml) — whose rule is
+[`scripts/spec-freeze.mjs`](../../scripts/spec-freeze.mjs) — fails any PR that edits a normative
+artifact of a version directory containing one. **`v1.0.0` was declared `stable` on 2026-08-10
+and its marker is [`schemas/v1.0.0/FROZEN`](./schemas/v1.0.0/FROZEN)** — the draft window that
 permitted the three in-place revisions is closed, and the gate is live.
+
+**What "the version directory is frozen" means exactly**, because two rules in this document
+would otherwise contradict each other. The consequences above say informative documents may be
+corrected at any time; the freeze says a published directory never changes. The line is
+[`NORMATIVE.md`](./NORMATIVE.md)'s, and the gate draws it there:
+
+| In a frozen version directory | Frozen? |
+|---|---|
+| `opportunity.schema.json`, `context.jsonld`, `examples/`, and the whole `conformance/v<version>/` suite | **Yes** — immutable bytes. A consumer may have hashed them. |
+| `FIELDS.md`, `CROSSWALK.md`, `BENCHMARK.md`, `STATUS.md` | **No** — informative, and correctable by an ordinary PR, by name. |
+| Adding a file, deleting a file, renaming a file | **Yes**, either way. A correction is a modification. |
+
+Correcting an informative document of a frozen version is still an erratum, not a spec change:
+it takes no version bump, no comment window, and no CHANGELOG entry beyond the commit.
 
 ### The one-time identity adoption
 
@@ -155,10 +170,29 @@ declared trigger**, not a mutation of a published version — the bytes it rewro
 
 That is a sanctioned exception, and it is expressed rather than assumed. `spec.config.json`
 carries `identityStatus`, and the freeze gate permits an identity-field change **only** on a
-`provisional` → `canonical` transition that names an existing ADR. The exemption is
-self-extinguishing: after the adoption the base ref always reads `canonical`, so it can never be
-taken a second time, and reverting `identityStatus` to `provisional` is itself rejected. Any
-other identity edit to a frozen version is a normal freeze violation.
+`provisional` → `canonical` transition whose `identityAdoption.adr` is an **accepted decision
+record at `adr/NNNN-slug.md` that names the `baseUrl` and `vocabIri` it sanctions** — proving the
+path resolves to *something* is not a governance gate. The exemption is self-extinguishing: after
+the adoption the base ref always reads `canonical`, so it can never be taken a second time, and
+reverting `identityStatus` to `provisional` is itself rejected. Any other identity edit to a
+frozen version is a normal freeze violation.
+
+**The exemption is narrow in the files it reaches, too.** It is not "the first freeze may finish
+the directory". While it is open, the gate parses both revisions of every touched artifact and
+permits a change only where the differing JSON pointer is one of these and the new value is the
+identifier `spec.config.json` derives:
+
+| Artifact | Pointers the adoption may move |
+|---|---|
+| `schemas/v<version>/opportunity.schema.json` | `/$id`, and the two self-identification examples |
+| `schemas/v<version>/context.jsonld` | `/@context/@vocab` |
+| `conformance/v<version>/pass/self-identification.json` | `/$schema`, `/@context` |
+| `conformance/v<version>/pass/full-featured.json` | `/$schema` |
+| `meta/*.json`, `registries/entry.schema.json` | `/$id` |
+
+Any other pointer, any other file, and any addition or deletion fails the job — including a
+second JSON member sharing a line with `$id`, which an earlier line-matching version of this gate
+could not see.
 
 ---
 

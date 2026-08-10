@@ -246,19 +246,39 @@ now:
   from base **∪** head, so the commit that freezes a version is held to the frozen rules for those
   files — which makes this change trip the gate, on purpose;
 - permits an identity-field change on exactly one transition: `identityStatus` `provisional` →
-  `canonical`, where the head names an `identityAdoption.adr` that exists at head. Anything else
-  is a violation;
+  `canonical`, where `identityAdoption.adr` is an **accepted** record at `adr/NNNN-slug.md` that
+  **names the `baseUrl` and `vocabIri` it sanctions**. Anything else is a violation;
 - rejects `canonical` → `provisional` outright, which is what stops the exemption from being
   re-armed by a preparatory commit;
-- under the exemption, permits `meta/` and `registries/entry.schema.json` to change **only on
-  their `$id` line** — codegen re-stamps those two `$id`s from `baseUrl`, and nothing else about
-  them may move while the door is open.
+- under the exemption, holds every touched artifact — versioned and versionless alike — to an
+  explicit allowlist of JSON pointers, each of whose new values must equal the identifier
+  `spec.config.json` derives. The permitted set is exactly `$id`, the two self-identification
+  examples, `@vocab`, and the identifiers inside the two self-identification conformance fixtures.
+
+**The rule is a semantic comparison, and it lives in
+[`scripts/spec-freeze.mjs`](../scripts/spec-freeze.mjs) rather than in workflow YAML.** The first
+version of this gate did its comparison with `grep` over diff lines, and an independent review
+demonstrated both of the ways that can be walked past: a second JSON member on the same line as
+`$id` (`"$id": "…", "minProperties": 1,`) was discarded whole by the `$id`-line filter, and
+"the first freeze may finish the directory" let the adoption PR widen `status`'s enum in the same
+commit as the `FROZEN` marker. Both attempts are now tests
+([`scripts/spec-freeze.test.mjs`](../scripts/spec-freeze.test.mjs)); a gate whose own claims are
+not attacked is a comment.
 
 The exemption is self-extinguishing: after this change the base ref always reads `canonical`, so
 the `provisional` → `canonical` transition can never occur again. The versioned-directory rule is
 deliberately left reading base-only — a version's `FROZEN` marker necessarily lands in the same
 commit that finishes its directory, and making that rule base ∪ head would make declaring any
-version stable impossible.
+version stable impossible. What that rule no longer does is treat "not frozen at base" as "no
+rules apply": during the adoption, a version directory is judged by the allowlist above.
+
+**And the freeze stops contradicting `PROCESS.md`.** That document says informative content may be
+corrected at any time; the first gate rejected every path below `schemas/v1.0.0/`, which would
+have made the stale `draft` banner in `FIELDS.md` uncorrectable the moment this ADR merged. The
+gate now permits modifying the four informative documents `NORMATIVE.md` names — `FIELDS.md`,
+`CROSSWALK.md`, `BENCHMARK.md`, `STATUS.md` — and freezes everything else in the directory,
+including `examples/` and the whole conformance suite. Additions and deletions are frozen either
+way: a correction is a modification.
 
 ### Serving
 

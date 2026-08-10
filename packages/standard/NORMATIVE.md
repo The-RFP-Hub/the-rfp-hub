@@ -69,6 +69,14 @@ These explain the standard. They are corrigible, and correcting them is not a sp
    keeps documentation improvable at the speed documentation needs to be improvable, while the
    schema stays under change control.
 
+   **This survives the freeze, and the gate knows it.** A frozen version directory
+   ([`PROCESS.md`](./PROCESS.md), "In-place re-cuts") keeps its four informative documents —
+   `FIELDS.md`, `CROSSWALK.md`, `BENCHMARK.md`, `STATUS.md` — correctable by name, while the
+   schema, the context, the examples and the conformance suite become immutable bytes.
+   `examples/` is informative in the sense of this table (an illustration is not a conformance
+   case) but it is still shipped *data*: a consumer may have hashed it, so correcting one takes
+   a new version like any other byte in the publication.
+
    The inverse also holds. A change to any artifact in the normative table — **including adding,
    deprecating or re-describing a registry value** — is a spec change and follows
    [`PROCESS.md`](./PROCESS.md).
