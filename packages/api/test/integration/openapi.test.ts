@@ -11,6 +11,7 @@ import { eq, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
+import { config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
@@ -173,6 +174,14 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(opportunity.required).not.toContain("sponsoringOrganizations"); // optional now
     expect(opportunity.properties.deadlines).toBeTruthy();
     expect(opportunity.properties.closesAt).toBeUndefined();
+  });
+
+  // `servers[0].url` is driven by PUBLIC_BASE_URL and defaults to the relative "/" — correct
+  // wherever the server is reachable, and never carrying a trailing slash that would make every
+  // operation resolve to "//v1/…". config.ts is what enforces the shape; this is the wiring.
+  it("advertises the configured base URL as its single server entry", () => {
+    expect(doc.servers).toEqual([{ url: config.publicBaseUrl }]);
+    expect(doc.servers[0].url === "/" || !doc.servers[0].url.endsWith("/")).toBe(true);
   });
 
   it("publishes detail (Opportunity) and list (OpportunitySummary) as distinct components", () => {

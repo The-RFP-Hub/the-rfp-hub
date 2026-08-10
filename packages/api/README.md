@@ -62,8 +62,23 @@ pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhos
 pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 ```
 
-Config is read from the environment (see `.env-example`): `DATABASE_URL`, `PORT`, `HOST`, and the
-seed source (`SOURCE_API_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`).
+### Configuration
+
+Config is read from the environment (see `.env-example`) — everything is optional in development
+(localhost defaults), and this table is the whole surface: every key `src/config.ts` and
+`scripts/*.ts` read, and no others.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | `postgres://rfphub:rfphub@localhost:5432/rfphub` | Postgres connection string. **Required in production** — with `NODE_ENV=production` the process exits non-zero at startup if unset, rather than silently using the localhost default. |
+| `PORT` | `3001` | HTTP port. A set-but-unusable value — empty, whitespace-only, non-numeric, or outside `1..65535` — falls back to the default rather than binding an ephemeral port (`Number("")` is `0`, not `NaN`). |
+| `HOST` | `0.0.0.0` | HTTP bind address. |
+| `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
+| `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
+| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped, and an `http://` origin under `ethrfps.app` is rejected because the domain is HSTS-preloaded. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. |
+| `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
+| `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
+| `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
 
 ### Process behaviour
 
