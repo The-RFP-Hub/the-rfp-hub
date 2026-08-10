@@ -1,7 +1,7 @@
 import type { DetailsByFundingType, FundingType, Opportunity } from "@the-rfp-hub/standard";
 import { humanizeErrors, validateOpportunity } from "rfphub-validate";
 import { describe, expect, it } from "vitest";
-import { mapProgram } from "../../scripts/map-program.js";
+import { SOURCE_SYSTEM, mapProgram } from "../../scripts/map-program.js";
 import {
   UPSTREAM_PROGRAMS,
   acceleratorProgram,
@@ -51,9 +51,12 @@ describe("mapProgram", () => {
     ]);
   });
 
-  it("honors a custom source system in the id/provenance namespace", () => {
-    const o = mapProgram(grantProgram, { sourceSystem: "acme" });
-    expect(o.id).toBe("acme:1479");
+  // The namespace is a data contract, not a knob: it prefixes every public id and pairs with
+  // original_id in the uniqueness constraint that makes re-seeding idempotent. It therefore has
+  // exactly one definition, in code, and no caller — and no environment — can vary it.
+  it("takes the provenance namespace from the SOURCE_SYSTEM constant", () => {
+    expect(mapProgram(grantProgram).id).toBe(`${SOURCE_SYSTEM}:1479`);
+    expect(mapProgram(hackathonProgram).id.startsWith(`${SOURCE_SYSTEM}:`)).toBe(true);
   });
 
   it("coerces hackathon prizes/teamSize and parses '2026 USD'", () => {

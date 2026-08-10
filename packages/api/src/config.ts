@@ -8,8 +8,6 @@ export interface AppConfig {
    * Deployment-specific — set via SOURCE_API_URL (see .env-example). Empty unless configured.
    */
   sourceApiUrl: string;
-  /** Provenance namespace recorded on seeded entries (source_system column + public id prefix). */
-  sourceSystem: string;
   /**
    * Base URL the OpenAPI document advertises as its `servers[0].url` (see plugins/swagger.ts).
    * Defaults to `/` — relative, and therefore correct wherever the server happens to be reachable,
@@ -139,7 +137,6 @@ export const config: AppConfig = {
   port: readPort(process.env.PORT),
   host: process.env.HOST ?? "0.0.0.0",
   sourceApiUrl: process.env.SOURCE_API_URL ?? "",
-  sourceSystem: process.env.SOURCE_SYSTEM ?? "fundingmap",
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
 };

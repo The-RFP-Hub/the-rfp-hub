@@ -5,7 +5,7 @@
  *
  * Field rules were derived from the committed examples in
  * packages/standard/schemas/v1.0.0/examples. The provenance namespace (id prefix + source_system)
- * is supplied by the caller — this mapper is source-agnostic.
+ * is the `SOURCE_SYSTEM` constant below — a data contract, not a caller's knob.
  *
  * ── Old-upstream → re-cut Standard ─────────────────────────────────────────────────
  * The upstream registry still speaks the pre-re-cut vocabulary, so THIS FILE is where the
@@ -78,6 +78,25 @@ import {
   SPEC_VERSION,
   type SocialLink,
 } from "@the-rfp-hub/standard";
+
+/**
+ * The provenance namespace for everything this mapper produces. ONE definition, in code, on
+ * purpose — it is a data contract, not a deployment knob, and it was an environment variable
+ * until this commit:
+ *
+ *   - it forms every public id (`<system>:<id>`), so a missing or mistyped value silently
+ *     rewrites every id in the dataset and breaks every link a consumer has stored;
+ *   - it fills the `source_system` column, which carries a uniqueness constraint together with
+ *     `original_id`. Change it and idempotency goes with it: the next run no longer matches the
+ *     rows it wrote last time and inserts duplicates instead of updating them.
+ *
+ * Neither failure is loud. An env var that can be forgotten or fat-fingered in one deployment is
+ * the wrong shape for a value with those consequences, so it is a constant that ships with the
+ * code that depends on it. In M3 a publisher's namespace becomes a property of the publisher
+ * record — per-source data, keyed by the row it describes — rather than one global for the
+ * process; this constant is the single-source stand-in until then.
+ */
+export const SOURCE_SYSTEM = "fundingmap";
 
 export interface RegistryCommunity {
   uid?: string;
@@ -681,8 +700,7 @@ function typeBlockOf(
   };
 }
 
-export function mapProgram(p: RegistryProgram, opts: { sourceSystem?: string } = {}): Opportunity {
-  const sourceSystem = opts.sourceSystem || "fundingmap";
+export function mapProgram(p: RegistryProgram): Opportunity {
   const md = p.metadata ?? {};
   const fundingType: FundingType = (FUNDING_TYPES as string[]).includes(p.type ?? "")
     ? (p.type as FundingType)
@@ -776,7 +794,7 @@ export function mapProgram(p: RegistryProgram, opts: { sourceSystem?: string } =
 
   const out: Record<string, unknown> = compact({
     specVersion: SPEC_VERSION,
-    id: `${sourceSystem}:${programId}`,
+    id: `${SOURCE_SYSTEM}:${programId}`,
     fundingType,
     title,
     description,

@@ -15,8 +15,8 @@
  * publishing a half-updated mix of this run's and the previous run's rows.
  *
  * Two modes, one pipeline:
- *   live     — page through the upstream registry. Deployment-specific: set SOURCE_API_URL (and
- *              optionally SOURCE_SYSTEM); see .env-example.
+ *   live     — page through the upstream registry. Deployment-specific: set SOURCE_API_URL;
+ *              see .env-example.
  *   offline  — `--from-file <path>` (or SEED_FIXTURE=<path>) reads a frozen corpus of raw upstream
  *              programs instead, with no network at all. That is what CI runs, against
  *              test/fixtures/seed-corpus.json, so the seed is reproducible and the gate has a
@@ -37,7 +37,7 @@ import { humanizeErrors, validateOpportunity } from "rfphub-validate";
 import { config } from "../src/config.js";
 import { type DB, db, pool } from "../src/db/client.js";
 import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
-import { type RegistryProgram, mapProgram } from "./map-program.js";
+import { type RegistryProgram, SOURCE_SYSTEM, mapProgram } from "./map-program.js";
 
 const TARGET = Number(process.env.SEED_TARGET ?? 120);
 const PAGE_LIMIT = 100;
@@ -220,7 +220,6 @@ async function main(): Promise<void> {
       `SOURCE_API_URL is not set — point it at an upstream funding-map registry API (see .env-example), or seed offline with ${FIXTURE_FLAG} <path>`,
     );
   }
-  const mapOpts = { sourceSystem: config.sourceSystem };
   // Offline: one batch, read once, no network. Live: paged until TARGET or the source runs out.
   const corpus = fixturePath ? await readCorpus(fixturePath) : undefined;
   console.log(
@@ -238,7 +237,7 @@ async function main(): Promise<void> {
 
     const mapped: Opportunity[] = [];
     for (const program of programs) {
-      const std = mapProgram(program, mapOpts);
+      const std = mapProgram(program);
       if (seen.has(std.id)) continue;
       seen.add(std.id);
       mapped.push(std);
@@ -269,7 +268,7 @@ async function main(): Promise<void> {
         ctl.upsertFromStandard(std, {
           reviewStatus: "approved",
           isListed: true,
-          sourceSystem: config.sourceSystem,
+          sourceSystem: SOURCE_SYSTEM,
         }),
       { strict },
     );

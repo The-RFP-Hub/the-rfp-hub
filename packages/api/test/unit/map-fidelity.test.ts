@@ -11,6 +11,7 @@ import { validateOpportunity } from "rfphub-validate";
 import { describe, expect, it } from "vitest";
 import {
   type RegistryProgram,
+  SOURCE_SYSTEM,
   mapProgram,
   organizationNamesOf,
 } from "../../scripts/map-program.js";
@@ -136,7 +137,7 @@ describe("operating organizations across the frozen corpus", () => {
   const corpus = JSON.parse(
     readFileSync(fileURLToPath(new URL("../fixtures/seed-corpus.json", import.meta.url)), "utf8"),
   ) as { programs: RegistryProgram[] };
-  const mapped = corpus.programs.map((p) => mapProgram(p, { sourceSystem: "fundingmap" }));
+  const mapped = corpus.programs.map((p) => mapProgram(p));
 
   it("never lets two different organisation names share one directory slug", () => {
     const namesBySlug = new Map<string, Set<string>>();
@@ -158,7 +159,9 @@ describe("operating organizations across the frozen corpus", () => {
     // listing community — never where either is available.
     const fabricated = mapped.filter((o) => o.operatingOrganizations[0]?.name === o.title);
     for (const o of fabricated) {
-      const p = corpus.programs.find((raw) => `fundingmap:${raw.programId ?? raw.id}` === o.id);
+      const p = corpus.programs.find(
+        (raw) => `${SOURCE_SYSTEM}:${raw.programId ?? raw.id}` === o.id,
+      );
       expect(p?.metadata?.organizations ?? [], o.id).toEqual([]);
       expect(p?.communities?.[0]?.name, o.id).toBeUndefined();
     }

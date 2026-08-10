@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { describe, expect, it, vi } from "vitest";
-import { mapProgram } from "../../scripts/map-program.js";
+import { SOURCE_SYSTEM, mapProgram } from "../../scripts/map-program.js";
 import {
   gateForSeed,
   loadValidated,
@@ -98,7 +98,7 @@ describe("the frozen corpus", () => {
     const seen = new Set<string>();
     const mapped: Opportunity[] = [];
     for (const program of programs) {
-      const std = mapProgram(program, { sourceSystem: "fundingmap" });
+      const std = mapProgram(program);
       if (seen.has(std.id)) continue;
       seen.add(std.id);
       mapped.push(std);
@@ -125,9 +125,7 @@ describe("the frozen corpus", () => {
 
 describe("loadValidated: the floor is asserted before anything is written", () => {
   const ok = (n: number): Opportunity[] =>
-    Array.from({ length: n }, (_, i) =>
-      mapProgram({ ...grantProgram, programId: String(i) }, { sourceSystem: "fundingmap" }),
-    );
+    Array.from({ length: n }, (_, i) => mapProgram({ ...grantProgram, programId: String(i) }));
 
   it("writes every accepted record once the floor is cleared", async () => {
     const write = vi.fn().mockResolvedValue(undefined);
@@ -149,9 +147,9 @@ describe("loadValidated: the floor is asserted before anything is written", () =
 
   it("writes nothing when --strict trips on a rejection either", async () => {
     const write = vi.fn().mockResolvedValue(undefined);
-    const rejected = [{ id: "fundingmap:bad", errors: ["/status must be one of …"] }];
+    const rejected = [{ id: `${SOURCE_SYSTEM}:bad`, errors: ["/status must be one of …"] }];
     await expect(loadValidated(ok(MIN_VALID), rejected, write, { strict: true })).rejects.toThrow(
-      /fundingmap:bad/,
+      new RegExp(`${SOURCE_SYSTEM}:bad`),
     );
     expect(write).not.toHaveBeenCalled();
   });
