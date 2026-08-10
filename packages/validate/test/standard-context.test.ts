@@ -166,13 +166,75 @@ describe("the @vocab surface — which terms move when the namespace moves", () 
     expect(pathsOf("vocab")).toEqual([...RFPHUB_TERMS].sort());
   });
 
-  it("borrows every other mapped term from schema.org or DAOIP-5", () => {
-    const borrowed = terms.filter((t) => t.cls === "prefixed");
-    expect(borrowed.length).toBe(40);
-    for (const term of borrowed) {
-      expect(String(term.id), term.path).toMatch(/^(schema|daoip5):/);
-    }
+  /**
+   * The borrowed half of the partition, pinned as a TABLE rather than a count.
+   *
+   * A count plus a prefix regex is not a check on semantics: re-pointing `contacts` from
+   * `schema:contactPoint` to some `daoip5:` IRI keeps the total at 40, keeps every entry matching
+   * `^(schema|daoip5):`, and leaves the moved-set counterfactual reporting the same 25 paths —
+   * while the standard now says something different about an external vocabulary. What a reader
+   * of `CROSSWALK.md` is entitled to rely on is which external term each field means, so that is
+   * what is written down here. Every row is a claim about someone else's vocabulary; changing one
+   * is a crosswalk decision, and it should cost a deliberate edit to this table.
+   */
+  const BORROWED: Record<string, string> = {
+    additionalReferences: "schema:citation",
+    amount: "schema:value",
+    applicationUrl: "schema:url",
+    bannerUrl: "schema:image",
+    budget: "daoip5:totalGrantPoolSize",
+    categories: "schema:about",
+    contacts: "schema:contactPoint",
+    createdAt: "schema:dateCreated",
+    currency: "schema:currency",
+    date: "daoip5:closeDate",
+    "deadlines.label": "schema:name",
+    description: "schema:description",
+    eligibility: "schema:eligibleCustomerType",
+    email: "schema:email",
+    "fundingDetails.funding": "schema:amount",
+    fundingInfo: "schema:amount",
+    fundingMechanisms: "daoip5:grantFundingMechanism",
+    fundingType: "schema:additionalType",
+    id: "schema:identifier",
+    logoUrl: "schema:logo",
+    opensAt: "schema:startDate",
+    operatingOrganizations: "schema:sponsor",
+    "operatingOrganizations.name": "schema:name",
+    postedAt: "schema:datePublished",
+    prerequisites: "schema:competencyRequired",
+    publisher: "schema:publisher",
+    role: "schema:roleName",
+    snapshotUrl: "schema:archivedAt",
+    "socialLinks.url": "schema:url",
+    "source.originalId": "schema:identifier",
+    "source.submittedAt": "schema:dateCreated",
+    specVersion: "schema:schemaVersion",
+    sponsoringOrganizations: "schema:funder",
+    "sponsoringOrganizations.name": "schema:name",
+    status: "daoip5:isOpen",
+    submittedBy: "schema:contributor",
+    summary: "schema:disambiguatingDescription",
+    title: "schema:name",
+    updatedAt: "schema:dateModified",
+    website: "schema:sameAs",
+  };
+
+  it("borrows every other mapped term from schema.org or DAOIP-5, exactly as written", () => {
+    const borrowed = Object.fromEntries(
+      terms.filter((t) => t.cls === "prefixed").map((t) => [t.path, t.id as string]),
+    );
+    expect(borrowed).toEqual(BORROWED);
     expect(pathsOf("absolute")).toEqual([]); // nothing bypasses the prefixes
+  });
+
+  // The split the CHANGELOG states as "36 schema.org, 4 DAOIP-5" — derived from the table above,
+  // so the two can never disagree, and asserted so the prose number stays checkable.
+  it("splits 36 schema.org / 4 DAOIP-5", () => {
+    const byPrefix = (prefix: string) =>
+      Object.values(BORROWED).filter((id) => id.startsWith(`${prefix}:`)).length;
+    expect([byPrefix("schema"), byPrefix("daoip5")]).toEqual([36, 4]);
+    expect(Object.keys(BORROWED)).toHaveLength(40);
   });
 
   /**
@@ -238,11 +300,20 @@ describe("@protected terms", () => {
    * `@protected` forbids REDEFINITION during one document's processing, it says nothing about
    * the IRI a given context version maps a term to — but it is precisely the pairing a careless
    * edit gets wrong, so it is pinned rather than left to be re-derived.
+   *
+   * It is also the exact set that makes "`@protected` is unaffected" true only ONE CONTEXT
+   * VERSION AT A TIME. A consumer who composes a pinned copy of a pre-2026-08-10 context with
+   * this one in a single `@context` array gets a protected-term-redefinition error on precisely
+   * these terms — the thirteen protected terms with absolute IRIs are identical across the two
+   * and identical redefinition is permitted, so this list IS the collision set. Keeping it at
+   * one is what keeps that caveat to one sentence in the CHANGELOG.
    */
   it("has exactly one protected term in the RFP Hub namespace", () => {
     expect(protectedTerms.filter((t) => t.cls === "vocab").map((t) => t.path)).toEqual([
       "deadlines",
     ]);
+    // The other thirteen borrow an absolute IRI, so they are byte-identical across any @vocab.
+    expect(protectedTerms.filter((t) => t.cls === "prefixed")).toHaveLength(13);
   });
 
   it("declares every protected term in the root context, never a scoped one", () => {

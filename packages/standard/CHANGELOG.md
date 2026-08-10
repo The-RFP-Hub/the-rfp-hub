@@ -57,11 +57,21 @@ than claiming resolution that does not exist.
   **5** are nulled by property-scoped contexts and drop either way. Nothing the standard says
   about an external vocabulary changed. A further 20 nested properties reach the namespace by
   `@vocab` keyword expansion rather than an explicit term, and moved with it.
-- **`@protected` is unaffected.** Protection forbids REDEFINITION during one document's
-  processing; it says nothing about which IRI a context version maps a term to. Exactly one
-  protected term (`deadlines`) is `@vocab`-relative and moved with the namespace. The four
-  property-scoped overrides of protected terms (`title` in three scoped contexts, `id` inside
-  `source`) are permitted by JSON-LD 1.1 and are unchanged.
+- **`@protected` is unaffected — for a document using one context version at a time.** Protection
+  forbids REDEFINITION during one document's processing; it says nothing about which IRI a context
+  version maps a term to. Exactly one protected term (`deadlines`) is `@vocab`-relative and moved
+  with the namespace. The four property-scoped overrides of protected terms (`title` in three
+  scoped contexts, `id` inside `source`) are permitted by JSON-LD 1.1
+  ([Protected Term Definitions](https://www.w3.org/TR/json-ld11/#protected-term-definitions)) and
+  are unchanged.
+  - **The one case where it is not "unaffected":** a consumer who COMPOSES a pinned copy of the
+    old context and this one in a single `@context` array. Thirteen of the fourteen protected
+    definitions are identical between the two — and identical redefinition is expressly permitted
+    — but protected `deadlines` maps to the provisional namespace in the old context and to the
+    canonical one here, so processing the second context raises a protected-term-redefinition
+    error. Do not compose two versions of this context; use one. That is the ordinary way to
+    consume a versioned context document, and the reason the term IRIs are versioned by the
+    document rather than by the term.
 - A new test (`packages/validate/test/standard-context.test.ts`) pins that whole partition, so
   the reasoning is checkable rather than remembered.
 
