@@ -8,11 +8,12 @@ These conversations are the evidence base behind the opportunity schema and the 
 
 Notes were prepared for publication: internal links and workspace references were removed, and some responses were lightly edited. Files that were edited say so in their headers.
 
-| Segment | Records |
-|---|---|
-| Publishers | EF Grants Management, CoW Grants, ENS DAO Grants, Uniswap Foundation, DAO Security Fund |
-| Builders & services firms | Remix, Argot Collective, Cactus, CoBuilders, Namespace, Revoke.cash, Climate Collective, Marco Barbosa, Adedalapo (BitGifty) |
-| Researchers | BlockchainGov, Weizenbaum Institute |
-| Aggregators | Crypto Grant Wire, Cornaro Labs |
+| Segment | Count | Records |
+|---|:--:|---|
+| Publishers | 5 | EF Grants Management, CoW Grants, ENS DAO Grants, Uniswap Foundation, DAO Security Fund |
+| Builders & services firms | 9 | Remix, Argot Collective, Cactus, CoBuilders, Namespace, Revoke.cash, Climate Collective, Marco Barbosa, Adedalapo (BitGifty) |
+| Researchers | 2 | BlockchainGov, Weizenbaum Institute |
+| Aggregators | 2 | Crypto Grant Wire, Cornaro Labs |
+| **Total** | **18** | one file per record, all in this folder |
 
 Four records — CoW Grants, ENS DAO Grants, Uniswap Foundation, and Crypto Grant Wire — were self-authored by the research lead from operating roles they hold at those organizations. The report discloses this and sets out how those records are treated; see its Research scope section and the source lines in Appendix A.
