@@ -75,13 +75,28 @@ export function readDbPoolMax(raw: string | undefined, fallback = DEFAULT_DB_POO
 }
 
 /**
- * The project's own domain. It is the ONLY host whose scheme this file constrains: the domain is on
- * the HSTS preload list, so a plaintext origin under it is one no browser will ever actually use —
- * publishing it in `servers[0].url` would send every "Try it out" request in the docs to a URL that
- * is rewritten out from under it. Any other host (localhost, a preview environment, a proxy) is
- * left alone, because nothing here knows their transport.
+ * Hosts whose traffic never leaves the machine — the only ones allowed to advertise a plaintext
+ * base URL, because there is no network segment on which that plaintext could be observed or
+ * tampered with. The set is deliberately narrow, and deliberately says nothing about any
+ * particular domain:
+ *
+ * - `localhost` and any `*.localhost` name: RFC 6761 §6.3 reserves the whole subtree to resolve to
+ *   loopback, so `http://api.localhost:3001` is a legitimate development origin;
+ * - the entire IPv4 loopback block `127.0.0.0/8` (RFC 1122 §3.2.1.3), not merely `127.0.0.1` —
+ *   every address in it is loopback, and per-service aliases like `127.0.0.2` are a common habit;
+ * - `::1`, the IPv6 loopback (RFC 4291 §2.5.3). `new URL()` reports IPv6 hosts bracketed, so the
+ *   brackets are stripped before comparing.
+ *
+ * Deliberately NOT loopback: private LAN ranges (10/8, 172.16/12, 192.168/16) and mDNS `*.local`
+ * names — traffic to those crosses a real network, where plaintext is really exposed. `0.0.0.0` is
+ * a wildcard bind address rather than a host any client can reach, so it is excluded too.
  */
-const OWN_DOMAIN = "ethrfps.app";
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host === "::1") return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+}
 
 /**
  * PUBLIC_BASE_URL → the OpenAPI document's `servers[0].url`. Unlike PORT and DB_POOL_MAX, a wrong
@@ -95,6 +110,11 @@ const OWN_DOMAIN = "ethrfps.app";
  *   an error, not a base URL);
  * - a trailing slash is stripped: `servers[0].url` is joined with paths that already start with
  *   `/`, so leaving it produces `//v1/opportunities`.
+ * - the scheme must be `https:` for every host that is not loopback (see `isLoopbackHost`). This
+ *   value is not merely how this process is reached — it is what the published document tells
+ *   every client to use, so a plaintext remote origin downgrades all of them at once. The rule is
+ *   about the transport, not about any particular domain, so it holds for a proxy, a preview
+ *   environment and a vendor host alike.
  */
 export function readPublicBaseUrl(raw: string | undefined, fallback = "/"): string {
   const value = (raw ?? "").trim();
@@ -106,14 +126,13 @@ export function readPublicBaseUrl(raw: string | undefined, fallback = "/"): stri
     url = new URL(value);
   } catch {
     throw new Error(
-      `PUBLIC_BASE_URL must be an absolute URL (e.g. https://api.${OWN_DOMAIN}) or "/", got ${JSON.stringify(value)}.`,
+      `PUBLIC_BASE_URL must be an absolute URL (e.g. https://api.example.org) or "/", got ${JSON.stringify(value)}.`,
     );
   }
 
-  const host = url.hostname.toLowerCase();
-  if ((host === OWN_DOMAIN || host.endsWith(`.${OWN_DOMAIN}`)) && url.protocol !== "https:") {
+  if (url.protocol !== "https:" && !isLoopbackHost(url.hostname)) {
     throw new Error(
-      `PUBLIC_BASE_URL must use https:// for ${OWN_DOMAIN} (the domain is HSTS-preloaded, so there is no plaintext variant to advertise), got ${JSON.stringify(value)}.`,
+      `PUBLIC_BASE_URL must use https:// for any host that is not loopback — it is published as the OpenAPI document's servers[0].url, so it tells every client which scheme to use. Got ${JSON.stringify(value)}.`,
     );
   }
 

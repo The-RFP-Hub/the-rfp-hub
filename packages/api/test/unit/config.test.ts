@@ -61,48 +61,71 @@ describe("readPublicBaseUrl", () => {
       expect(readPublicBaseUrl(raw), JSON.stringify(raw)).toBe("/");
     }
     expect(readPublicBaseUrl("/")).toBe("/");
-    expect(readPublicBaseUrl(undefined, "https://api.ethrfps.app")).toBe("https://api.ethrfps.app");
+    expect(readPublicBaseUrl(undefined, "https://api.example.org")).toBe("https://api.example.org");
   });
 
   it("accepts an absolute origin and normalizes it", () => {
-    expect(readPublicBaseUrl("https://api.ethrfps.app")).toBe("https://api.ethrfps.app");
-    expect(readPublicBaseUrl(" https://api.ethrfps.app ")).toBe("https://api.ethrfps.app");
+    expect(readPublicBaseUrl("https://api.example.org")).toBe("https://api.example.org");
+    expect(readPublicBaseUrl(" https://api.example.org ")).toBe("https://api.example.org");
   });
 
   // servers[0].url is joined with paths that already begin with "/", so a trailing slash would
   // publish "//v1/opportunities".
   it("strips a trailing slash, including under a base path", () => {
-    expect(readPublicBaseUrl("https://api.ethrfps.app/")).toBe("https://api.ethrfps.app");
+    expect(readPublicBaseUrl("https://api.example.org/")).toBe("https://api.example.org");
     expect(readPublicBaseUrl("https://proxy.example.org/api/")).toBe(
       "https://proxy.example.org/api",
     );
+    expect(readPublicBaseUrl("http://localhost:3001/")).toBe("http://localhost:3001");
   });
 
-  // The domain is on the HSTS preload list: a plaintext origin under it is one no browser will
-  // ever use, so publishing it in the OpenAPI document would break every "Try it out" in the docs.
-  it("rejects a non-https scheme on this project's own domain and its subdomains", () => {
+  // The rule is about the transport, not about any particular domain: this value is published as
+  // servers[0].url, so a plaintext remote origin tells EVERY client to speak plaintext. Any host
+  // that is not loopback must therefore be https, whoever owns it.
+  it("rejects a non-https scheme on any host that is not loopback", () => {
     for (const raw of [
-      "http://ethrfps.app",
-      "http://api.ethrfps.app",
-      "http://api-staging.ethrfps.app",
-      "http://API.ETHRFPS.APP",
-      "ftp://api.ethrfps.app",
+      "http://example.org",
+      "http://api.example.org",
+      "http://api-staging.example.org",
+      "http://API.EXAMPLE.ORG",
+      "ftp://api.example.org",
+      "http://anything-else.example.com",
+      "http://192.168.1.10:3001",
+      "http://10.0.0.5",
+      "http://api.local",
+      "http://0.0.0.0:3001",
     ]) {
       expect(() => readPublicBaseUrl(raw), raw).toThrow(/https/i);
     }
   });
 
-  // Only this project's own domain is constrained — nothing here knows the transport in front of
-  // an arbitrary host, and local development legitimately runs over plain http.
-  it("leaves other hosts alone", () => {
+  // Loopback traffic never leaves the machine, so there is no segment on which the plaintext could
+  // be observed — and local development legitimately runs over plain http.
+  it("accepts a plaintext scheme on a loopback host", () => {
     expect(readPublicBaseUrl("http://localhost:3001")).toBe("http://localhost:3001");
-    expect(readPublicBaseUrl("http://not-ethrfps.app")).toBe("http://not-ethrfps.app");
+    expect(readPublicBaseUrl("http://LOCALHOST:3001")).toBe("http://localhost:3001");
+    // RFC 6761 §6.3 reserves the whole *.localhost subtree to loopback.
+    expect(readPublicBaseUrl("http://api.localhost:3001")).toBe("http://api.localhost:3001");
+    // The whole 127.0.0.0/8 block is loopback (RFC 1122 §3.2.1.3), not just 127.0.0.1.
+    expect(readPublicBaseUrl("http://127.0.0.1:3001")).toBe("http://127.0.0.1:3001");
+    expect(readPublicBaseUrl("http://127.0.0.2:3001")).toBe("http://127.0.0.2:3001");
+    // IPv6 loopback — new URL() reports the hostname bracketed.
+    expect(readPublicBaseUrl("http://[::1]:3001")).toBe("http://[::1]:3001");
+  });
+
+  it("accepts https on any host, loopback or not", () => {
+    expect(readPublicBaseUrl("https://api.example.org")).toBe("https://api.example.org");
+    expect(readPublicBaseUrl("https://anything-else.example.com")).toBe(
+      "https://anything-else.example.com",
+    );
+    expect(readPublicBaseUrl("https://localhost:3001")).toBe("https://localhost:3001");
+    expect(readPublicBaseUrl("https://127.0.0.1:3001")).toBe("https://127.0.0.1:3001");
   });
 
   // A bare hostname is the common mistake, and there is no safe value to fall back to: serving `/`
   // in its place hands every consumer a document that resolves against whichever host loaded it.
   it("rejects a value that is not an absolute URL", () => {
-    for (const raw of ["api.ethrfps.app", "https://", "//api.ethrfps.app", "not a url"]) {
+    for (const raw of ["api.example.org", "https://", "//api.example.org", "not a url"]) {
       expect(() => readPublicBaseUrl(raw), raw).toThrow(/PUBLIC_BASE_URL/);
     }
   });
