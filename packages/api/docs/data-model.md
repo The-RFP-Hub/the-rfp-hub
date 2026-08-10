@@ -21,7 +21,7 @@ is deleted: this doc stays the canonical reference so deferred work remains disc
 > from scratch** into a single `0000_recut_v1_0_0` migration rather than carrying a rename chain
 > — the migration directory stays 100% drizzle-kit output and is never hand-edited. Applying it
 > to a database that already holds the pre-re-cut schema will fail: drop and re-migrate, then
-> re-run the seed (every row is re-derivable from the upstream source).
+> re-run the seed (every row is re-derivable from the corpus file).
 
 | Table / feature | Status |
 |---|---|

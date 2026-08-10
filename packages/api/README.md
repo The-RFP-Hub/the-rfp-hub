@@ -1,9 +1,8 @@
 # @the-rfp-hub/api
 
 The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
-serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a 100+ entry seed dataset ingested
-from a configurable upstream funding-map source and nightly open-data exports (CC0). This is
-milestone **M2**.
+serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a 100+ entry seed dataset loaded
+from a committed corpus file, and nightly open-data exports (CC0). This is milestone **M2**.
 
 ## Endpoints (`/v1`)
 
@@ -55,9 +54,7 @@ The API is pre-adoption, so the re-cut renames are applied without a back-compat
 docker compose up -d                     # Postgres 15 (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
-export SOURCE_API_URL=https://…          # upstream funding-map registry API (see .env-example)
-pnpm --filter @the-rfp-hub/api seed          # ingest 100+ entries from SOURCE_API_URL
-pnpm --filter @the-rfp-hub/api seed -- --strict   # ...and fail the run on ANY non-conforming record
+pnpm --filter @the-rfp-hub/api seed test/fixtures/seed-corpus.json --strict   # 143 entries, offline
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 ```
@@ -65,8 +62,8 @@ pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 ### Configuration
 
 Config is read from the environment (see `.env-example`) — everything is optional in development
-(localhost defaults), and this table is the whole surface: every key `src/config.ts` and
-`scripts/*.ts` read, and no others.
+(localhost defaults), and this table is the whole surface of the **running server**: every key
+`src/config.ts` reads, and no others.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -76,9 +73,11 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. |
-| `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
-| `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
-| `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
+
+The seed is deliberately absent from that table: it is not configured through the environment at
+all — it takes a corpus file as its argument. The one variable that points at an upstream is read
+by the separate corpus-refresh program, and is documented with it under
+[Seeding](#seeding-fetch--file--seed-file) rather than as a deployment variable.
 
 ### Process behaviour
 
@@ -95,8 +94,49 @@ Config is read from the environment (see `.env-example`) — everything is optio
 > schema v-next changes (org-array flip, `networks`/`tags`/`extensions` removal, eligibility →
 > text, the renames) forward-only on top of it. `0001` rewrites DDL but NOT pre-existing jsonb
 > payloads — **after migrating a database that already has data, re-run the seed**; every row is
-> re-derivable from the upstream source. Regenerate after a schema change with
+> re-derivable from the corpus file. Regenerate after a schema change with
 > `pnpm --filter @the-rfp-hub/api db:generate`.
+
+## Seeding: fetch → file → seed file
+
+Acquiring data and loading data are **two programs**, because they have two different failure
+modes:
+
+| | `scripts/fetch-corpus.ts` (`pnpm corpus`) | `scripts/seed.ts` (`pnpm seed <path>`) |
+|---|---|---|
+| Job | page an upstream registry, neutralize, write a corpus file | read a corpus file, map, validate, upsert |
+| Network | yes — the only file that fetches | **none**, by construction |
+| Config | `SOURCE_API_URL` (+ optional `SOURCE_BRAND`, `CORPUS_SIZE`), env-only | one argument: the corpus path |
+| Runs | by hand, when the corpus needs refreshing | CI, deploys, local dev — anywhere |
+| Output | `test/fixtures/seed-corpus.json` | rows in Postgres |
+
+```bash
+# step 1 — refresh the corpus (rare, by hand; needs an upstream you can reach)
+SOURCE_API_URL=https://… SOURCE_BRAND="acme,acme-labs" pnpm --filter @the-rfp-hub/api corpus
+
+# step 2 — load a corpus file (deterministic, offline, no secrets; this is what CI runs)
+pnpm --filter @the-rfp-hub/api seed test/fixtures/seed-corpus.json --strict
+```
+
+The loader is deliberately the boring half: same file in, same rows out, on any machine with a
+database and no credentials. That is what lets CI prove on every PR that a clean checkout seeds
+143 valid entries with nothing rejected. `SOURCE_API_URL` is read by step 1 only, straight from
+the environment, and no value for it is ever committed.
+
+The provenance namespace (`fundingmap` in `fundingmap:1459`, and the `source_system` column) is
+**not** a variable: it is the `SOURCE_SYSTEM` constant in `scripts/map-program.ts`. It forms every
+public id and pairs with `original_id` in a uniqueness constraint, so a missing or mistyped value
+would silently rewrite every id AND break idempotency — re-seeding would insert duplicates instead
+of updating. In M3 a publisher's namespace becomes a property of the publisher record rather than
+one global.
+
+A program that publishes no URL of its own gets **no `applicationUrl`**. The mapper reads
+`submissionUrl`, then the program's own grants site, then its website — and then stops. It does not
+fall back to the program's listing page on the platform the record was ingested from: that page is
+not the program's application URL, and putting it in the field consumers read as "apply here" is a
+fabrication of the same kind as inventing an organisation from a program title. In the committed
+corpus, 13 of 143 records (9%) have no `applicationUrl` as a result; `applicationUrl` is optional
+in the Standard, so all 143 still validate.
 
 ## Architecture
 
@@ -114,8 +154,8 @@ registration lives in `routes/<module>/index.ts`.
   schema before anything reaches the database** (`gateForSeed` in `scripts/seed.ts`), printing each
   rejection with its id and the rules it broke — a rejected record is never silently subtracted
   from a count. `--strict` (or `SEED_STRICT=1`) turns any rejection into a failed run; it is off by
-  default because the upstream is a third-party feed, so one malformed program should not block a
-  120-record seed.
+  default because a corpus is a recording of a third-party feed, so one malformed program should
+  not block a 143-record seed. CI runs it on, against the committed corpus.
 
 ## Tests
 
