@@ -3,8 +3,10 @@
 #
 # Nothing environment-specific is written down here. The registry repository, the cluster and the
 # credentials all arrive from the `staging` GitHub Environment (secrets), and the two task-family
-# names from that environment's variables. This file therefore reveals nothing about where the
-# service runs — which is deliberate: this repository is public and source-neutral.
+# names from that environment's variables. This file therefore names no account, cluster or
+# registry — which is deliberate: this repository is public and source-neutral. (The hostname this
+# environment serves, `https://apistag.ethrfps.app`, is public by nature and is documented in
+# packages/api/README.md; it is not a pipeline input — see the runtime-configuration note below.)
 #
 # Required in the `staging` GitHub Environment:
 #   secrets    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ECR_REPOSITORY, ECS_CLUSTER,
@@ -31,7 +33,9 @@
 #                         one value here that names shared, non-component infrastructure.
 #
 # Runtime configuration (DATABASE_URL and friends) is NOT set here and never passes through GitHub:
-# the task definition pulls it from the secrets store at task start. See packages/api/README.md.
+# the task definition pulls it from the secrets store at task start. That includes PUBLIC_BASE_URL
+# (`https://apistag.ethrfps.app` here) — so changing the advertised origin is a task-definition
+# change plus a new deployment, never an edit to this file. See packages/api/README.md.
 name: Deploy API (staging)
 
 on:

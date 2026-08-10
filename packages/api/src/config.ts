@@ -19,8 +19,17 @@ export interface AppConfig {
   sourceProgramUrlBase: string;
   /**
    * Base URL the OpenAPI document advertises as its `servers[0].url` (see plugins/swagger.ts).
-   * Defaults to `/` (relative — correct for Swagger UI regardless of where it's hosted). Set to
-   * the API's public URL, e.g. `https://api.example.org`, once one exists — no domain yet.
+   * Defaults to `/` (relative — correct for Swagger UI regardless of where it's hosted).
+   *
+   * In a deployed environment this is the API's OWN origin, always `https://` (the domain is on
+   * the HSTS preload list, so there is no plaintext variant to fall back to):
+   *
+   *   production  https://api.ethrfps.app
+   *   staging     https://apistag.ethrfps.app
+   *
+   * It is NOT the apex. The apex is the specification's origin — it serves the Standard's
+   * canonical documents, whose identifiers are owned by `packages/standard` — and pointing
+   * `servers[0].url` there would advertise the wrong host for every API operation.
    */
   publicBaseUrl: string;
   /**

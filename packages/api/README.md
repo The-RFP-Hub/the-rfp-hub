@@ -88,7 +88,8 @@ pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 ### Configuration
 
 Config is read from the environment (see `.env-example`) — everything is optional in development
-(sane localhost defaults), and there is no domain yet, so nothing below defaults to one:
+(sane localhost defaults). Nothing below defaults to a deployed hostname: the domain is set per
+environment, never baked in (see **Hostnames** under *Deployment*):
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -97,7 +98,7 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `HOST` | `0.0.0.0` | HTTP bind address. |
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this for shared database instances where connection budget is split across multiple services. Defaults to pg's own default (10). A set-but-unusable value — empty, whitespace-only, non-numeric, zero, or negative — falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
-| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url` (see `src/plugins/swagger.ts`). Relative by default — correct wherever the server happens to be hosted. Set to the API's public URL (e.g. `https://api.example.org`) once one exists. |
+| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url` (see `src/plugins/swagger.ts`). Relative by default — correct wherever the server happens to be hosted. Deployed environments set it to the API's own origin: `https://api.ethrfps.app` (production), `https://apistag.ethrfps.app` (staging). Always `https://`, never the apex — see **Hostnames**. |
 | `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
 | `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
 | `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
@@ -266,6 +267,39 @@ needs a forced new deployment.
   block lists the secrets and variables its Environment must define, and the expected **shape** of
   each value, because nothing in the run validates them and a wrong one fails late.
 
+### Hostnames
+
+The project's domain is **`ethrfps.app`**. Every environment is reached over `https://` and only
+`https://` — `.app` is on the HSTS preload list, so browsers refuse plaintext to this domain before
+a request is ever made. There is no `http://` variant to document, redirect from, or fall back to;
+a plaintext example in a doc or a config is a bug, not a convenience.
+
+| Environment | API host | `PUBLIC_BASE_URL` |
+|---|---|---|
+| production | `api.ethrfps.app` | `https://api.ethrfps.app` |
+| staging | `apistag.ethrfps.app` | `https://apistag.ethrfps.app` |
+
+Two properties of these names are load-bearing rather than stylistic:
+
+- **One label deep, always.** `apistag.` and not `api.staging.`: an RFC 6125 wildcard matches
+  exactly one label, so `*.ethrfps.app` covers `apistag.` and `api.` but would not cover
+  `api.staging.`. Production's certificate is the apex plus that wildcard; staging issues its own
+  certificate for its exact name, so that two environments never contend over the same ACM
+  validation record. Either way, a name deeper than one label is a name that needs a certificate
+  nothing already covers.
+- **`PUBLIC_BASE_URL` is the API's own origin, not the apex.** It becomes the OpenAPI document's
+  `servers[0].url`, so it must be the host the operations below it actually answer on. In production
+  the apex `ethrfps.app` is routed to this same service, but it is the **specification's** origin:
+  the canonical documents it serves — and their identifiers — are owned by
+  [`packages/standard`](../standard), which is the only place they are written down. Nothing in this
+  package's routing tree answers those paths yet; they arrive with the canonical-document work.
+  Staging has no apex at all, deliberately: there is one canonical origin for an identifier, and a
+  second one that resolves to a different copy is worse than none.
+
+`PUBLIC_BASE_URL` is a plain environment entry on the task definition (see the env-contract table
+above), not a GitHub Environment value — the pipelines never read it, and changing it takes a new
+deployment like any other task-definition change.
+
 ### Names the deploy depends on
 
 These are the names the infrastructure creates, and the values the GitHub Environments must carry.
@@ -293,15 +327,22 @@ Derived from those, and not configured anywhere:
   prefix (see **Deferred** — nothing writes to it yet).
 - **Container port** `3001`, health path `/v1/health` — the same path the container health check,
   the load balancer and the external uptime check all use.
+- **Public hostnames**: `api.ethrfps.app` / `apistag.ethrfps.app`, plus the apex `ethrfps.app` in
+  production only (see **Hostnames** above). These are load-balancer host-header rules and DNS
+  records — nothing in this package or in the pipelines configures them, and the only place the
+  hostname reaches this code is `PUBLIC_BASE_URL` on the task definition.
 
 ## Deferred (later in M2 / beyond)
 
-The public URL itself (the pipelines above deploy the image, but the hostname is still being
-decided, so `PUBLIC_BASE_URL` has no live value yet); **the export's cloud sink** — `scripts/export.ts`
-writes JSON + CSV + `LICENSE` to a local `./exports` directory and nothing uploads them anywhere, so
-there are no stable public URLs and no minimum-record floor guarding what gets published; DAOIP-5
-`grantPools` export adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
-`docs/data-model.md`).
+**The export's cloud sink** — `scripts/export.ts` writes JSON + CSV + `LICENSE` to a local
+`./exports` directory and nothing uploads them anywhere, so there are no stable public URLs and no
+minimum-record floor guarding what gets published; DAOIP-5 `grantPools` export adapter. The write
+API, auth, verification, dedup, and analytics are M3+ (see `docs/data-model.md`).
+
+The hostnames themselves are no longer deferred — see **Hostnames** above — but nothing in this
+repository asserts that they resolve or that the certificate covers them. The pipelines finish at
+"the ECS service reached the new revision"; whether the load balancer routes the name to it is
+outside what a deploy here can prove.
 
 ### Names reserved for the export sink
 
@@ -315,7 +356,7 @@ implementation adopts these exact names rather than inventing parallel ones:
 | `AWS_REGION` | Region of the export bucket. |
 | `S3_BUCKET` | Destination bucket, `<env>-rfp-hub-exports`. |
 | `S3_PREFIX` | Key prefix to write under, `exports`. This is the only prefix the bucket policy makes publicly readable, so writing outside it publishes nothing. |
-| `S3_PUBLIC_BASE_URL` | Base URL to record in `dataset_snapshots.url` for each published object, in place of today's local path. |
+| `S3_PUBLIC_BASE_URL` | Base URL to record in `dataset_snapshots.url` for each published object, in place of today's local path. **Not derivable from `PUBLIC_BASE_URL`** — the exports are served by the bucket, not by this service. No name has been created for it: the infrastructure routes `ethrfps.app` and the two API hosts and nothing else, so whether this becomes a subdomain of `ethrfps.app` or the bucket's own endpoint is still open. `https://` either way. |
 | `EXPORT_MIN_COUNT` | Floor for `seed --strict` / export: a run producing fewer records than this must exit non-zero instead of publishing a truncated dataset. |
 
 Until that lands, running the scheduled refresh writes the export into a container filesystem that

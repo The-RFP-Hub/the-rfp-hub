@@ -19,7 +19,8 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         license: { name: "MIT", identifier: "MIT" },
       },
       // Driven by PUBLIC_BASE_URL (default "/" — relative, correct wherever the server is hosted).
-      // No domain exists yet; once one does, setting the env var is the only change needed.
+      // Deployed environments set it to the API's own https:// origin — see config.ts, which
+      // documents the per-environment values. Setting the env var is the only change needed.
       servers: [{ url: config.publicBaseUrl }],
       tags: [
         { name: "opportunities", description: "Funding opportunities" },

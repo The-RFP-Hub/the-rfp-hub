@@ -5,7 +5,10 @@
 # than a push to main, there is no `build_only` escape (production is never the place to rehearse a
 # build), and the concurrency group and the `production` GitHub Environment are separate from
 # staging's. Everything environment-specific arrives from that Environment; this file names no
-# cluster, registry or host, because this repository is public and source-neutral.
+# account, cluster or registry, because this repository is public and source-neutral. (The hosts
+# this environment serves — `https://api.ethrfps.app`, plus the apex `https://ethrfps.app` routed
+# to the same service — are public by nature and documented in packages/api/README.md. Neither is
+# a pipeline input; see the runtime-configuration note below.)
 #
 # Required in the `production` GitHub Environment:
 #   secrets    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ECR_REPOSITORY, ECS_CLUSTER,
@@ -35,6 +38,11 @@
 # the registry repository is environment-PREFIXED (`production-rfp-hub`) while the task families
 # are environment-SUFFIXED (`rfp-hub-production`). Copying one Environment's values into the
 # other is the mistake this block exists to prevent.
+#
+# Runtime configuration (DATABASE_URL and friends) is NOT set here and never passes through GitHub:
+# the task definition pulls it from the secrets store at task start. That includes PUBLIC_BASE_URL
+# (`https://api.ethrfps.app` here) — so changing the advertised origin is a task-definition change
+# plus a new deployment, never an edit to this file. See packages/api/README.md.
 #
 # To deploy: push a `production-<version>` tag. To re-deploy an unchanged tree (after a secret
 # rotation, say — task-definition secrets resolve at task start, so a value change needs a new
