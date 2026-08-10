@@ -62,5 +62,4 @@ The ideal outcome is set it and forget it: EF continues operating in Salesforce,
 - What is the cleanest privacy-aligned way to show publishers whether an opportunity reached the right audiences?
 
 ## Sources
-- Local note: call-notes/2026-07-09-ef-grants-management-boris.md
-- Work Tracker row: EF Grants Management
+- Live call, 2026-07-09.

@@ -88,5 +88,4 @@ Andrew said Remix is now trying to make itself more discoverable and verifiable 
 - Can consortium formation be supported in v1, or should v1 only expose consortium requirements?
 
 ## Sources
-- Local note: call-notes/2026-07-09-remix-andrew.md
-- Work Tracker row: Remix
+- Live call, 2026-07-09.
