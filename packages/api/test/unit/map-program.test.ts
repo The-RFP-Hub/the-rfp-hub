@@ -29,12 +29,13 @@ describe("mapProgram", () => {
     expect(o.fundingType).toBe("grant");
     expect(o).not.toHaveProperty("type");
     expect(o).not.toHaveProperty("organization");
+    expect(o).not.toHaveProperty("sponsoringOrganizations"); // operating is the array ingests fill
     expect(o).not.toHaveProperty("closesAt");
-    expect(o.sponsoringOrganizations).toHaveLength(1);
+    expect(o.operatingOrganizations).toHaveLength(1);
     // the upstream names no organisation, so the listing community stands in — NOT the program
-    // title, which is not an organisation anyone can look up (see sponsorNamesOf)
-    expect(o.sponsoringOrganizations[0]?.name).toBe("Filecoin");
-    expect(o.sponsoringOrganizations[0]?.slug).toBe("filecoin");
+    // title, which is not an organisation anyone can look up (see organizationNamesOf)
+    expect(o.operatingOrganizations[0]?.name).toBe("Filecoin");
+    expect(o.operatingOrganizations[0]?.slug).toBe("filecoin");
     expect(o.source.originalId).toBe("1479");
     expect(o.source).not.toHaveProperty("url");
     expect(o.source.verifiedAgainstSource).toBeNull();
