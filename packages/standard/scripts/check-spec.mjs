@@ -220,6 +220,26 @@ if (!MATURITIES.includes(spec.status)) {
   );
 }
 
+// The field reference opens with a maturity banner, and prose is where the two halves of this
+// fact drift apart: FIELDS.md announced `draft` for the whole window in which spec.config.json
+// already said `stable`. A reader reaches the banner before any machine-readable source, so the
+// banner is checked against `status` rather than trusted to be updated by hand.
+{
+  const banner = readText(p(spec.schemaDir, "FIELDS.md")).split(/\r?\n/, 12).join("\n");
+  const declared = banner.match(/\*\*Maturity:\s*`([a-z]+)`/)?.[1];
+  if (!declared) {
+    fail(
+      "maturity",
+      `${spec.schemaDir}/FIELDS.md has no '**Maturity: \`<status>\`' banner in its first 12 lines`,
+    );
+  } else if (declared !== spec.status) {
+    fail(
+      "maturity",
+      `${spec.schemaDir}/FIELDS.md announces maturity '${declared}' but spec.config.json status is '${spec.status}'`,
+    );
+  }
+}
+
 // ---------------------------------------------- 2d. identity provenance -----
 // Identifiers are provisional exactly once. `identityStatus` is the machine-readable record of
 // which side of that line this package is on, and .github/workflows/spec-freeze.yml reads the

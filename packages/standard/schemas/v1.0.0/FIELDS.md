@@ -1,7 +1,9 @@
 # RFP Hub Standard v1.0.0 — Field Reference
 
-> **Maturity: `draft`.** While a version is draft its contents may still change; the revision
-> history lives in [`STATUS.md`](./STATUS.md), the field-mapping tables in
+> **Maturity: `stable`** — declared 2026-08-10, and this directory is frozen (`FROZEN`). The
+> normative bytes of this version will never change again; a breaking change takes a new version
+> directory. This file is informative and stays corrigible (see below). The revision history
+> lives in [`STATUS.md`](./STATUS.md), the field-mapping tables in
 > [`CHANGELOG.md`](../../CHANGELOG.md), and the reasoning in the [ADRs](../../../../adr).
 
 The **RFP Hub Standard** is a canonical, ecosystem-neutral representation of a funding
