@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { scanText } from "./check-neutral.mjs";
+import { classifyTracked, scanText } from "./check-neutral.mjs";
 
 const BRAND = ["kar", "ma"].join("");
 const OTHER = ["g", "ap"].join("");
@@ -223,5 +223,45 @@ describe("archived source material", () => {
     // "an existing grants platform", the record has been rewritten to satisfy a lint — which is
     // exactly what this exemption exists to prevent.
     expect(read(ARCHIVED).toLowerCase()).toContain(BRAND);
+  });
+});
+
+/**
+ * THE DENOMINATOR.
+ *
+ * The failure this guards against already happened: a tracked 522-line script contained a literal
+ * NUL byte as a delimiter, so Git classified it as binary and this checker dropped it — and the
+ * summary still read "N tracked files, zero violations". N was one smaller than the number of
+ * tracked files, and nothing said so. The rule now is that a file this checker cannot read is
+ * reported, never subtracted in silence.
+ */
+describe("files this checker cannot read", () => {
+  const text = (s) => Buffer.from(s, "utf8");
+
+  it("scans an ordinary text file", () => {
+    expect(classifyTracked("scripts/x.mjs", text("const a = 1;\n")).skip).toBeNull();
+  });
+
+  it("refuses to scan a file with a NUL byte, and says why", () => {
+    const { rel, skip } = classifyTracked("scripts/x.mjs", text('join("\0")\n'));
+    expect(rel).toBe("scripts/x.mjs");
+    expect(skip).toMatch(/NUL/);
+    expect(skip).toMatch(/binary/);
+  });
+
+  // Deleted-but-tracked, mid-`git rm`. Still not scanned, so still named.
+  it("reports a tracked path that is not on disk", () => {
+    expect(classifyTracked("gone.md", null).skip).toMatch(/not present/);
+  });
+
+  // The 8 KiB window is Git's own heuristic; a NUL past it is still a file nobody should trust,
+  // but this checker's contract is exactly "what it read", so the boundary is pinned on purpose.
+  it("looks for the NUL in the first 8 KiB, as Git does", () => {
+    expect(
+      classifyTracked("a.md", Buffer.concat([text("x".repeat(8191)), text("\0")])).skip,
+    ).toMatch(/NUL/);
+    expect(
+      classifyTracked("a.md", Buffer.concat([text("x".repeat(8192)), text("\0")])).skip,
+    ).toBeNull();
   });
 });

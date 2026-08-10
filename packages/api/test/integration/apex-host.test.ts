@@ -18,8 +18,9 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
+import { config } from "../../src/config.js";
 import { canonicalDocuments, specConfig } from "../../src/modules/shared/canonical-documents.js";
-import { APEX_HOST, isApexRequest } from "../../src/plugins/apex-host.js";
+import { APEX_HOST, apexDenialMessage, isApexRequest } from "../../src/plugins/apex-host.js";
 
 const API_HOST = `api.${APEX_HOST}`;
 
@@ -84,6 +85,36 @@ describe("the apex serves the spec and nothing else", () => {
       expect(res.statusCode, url).toBe(404);
       expect(res.json().error, url).toBe("not_found");
       expect(res.json().message, url).toContain("reserved");
+    }
+  });
+
+  /**
+   * The denial has to be actionable, and the one URL it must never offer is the apex — which is
+   * exactly what `specConfig.baseUrl` is. "The API lives on its own host; see <the host that just
+   * refused you>" sends the caller back where they started and reads as a broken service.
+   */
+  it("does not send the caller back to the hostname that just refused them", async () => {
+    const { message } = (await get("/v1/opportunities", APEX_HOST)).json();
+    expect(message).not.toContain(specConfig.baseUrl);
+    expect(message).not.toContain(APEX_HOST);
+    expect(message).toContain("different host");
+  });
+
+  // Only the deployment knows the API's public origin, so it is configuration, not a literal — and
+  // it is the SAME configuration the OpenAPI document advertises, not a second variable saying the
+  // same thing. Its `/` default names no host, so it has to read as "not configured" here.
+  it("names the configured public origin when the deployment provides one", () => {
+    const original = config.publicBaseUrl;
+    try {
+      config.publicBaseUrl = `https://${API_HOST}`;
+      expect(apexDenialMessage()).toContain(`https://${API_HOST}`);
+      for (const unset of ["/", ""]) {
+        config.publicBaseUrl = unset;
+        expect(apexDenialMessage(), unset).not.toContain(APEX_HOST);
+        expect(apexDenialMessage(), unset).toContain("The API is served on a different host.");
+      }
+    } finally {
+      config.publicBaseUrl = original;
     }
   });
 

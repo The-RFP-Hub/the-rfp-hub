@@ -66,6 +66,13 @@ independently**: the apex listener rule belongs path-scoped to `/schemas/*`, `/m
 application rule survives an infrastructure edit and the infrastructure rule survives a routing
 change here.
 
+The apex `404` says where the API actually is, and takes that from `PUBLIC_BASE_URL` — the same
+value the OpenAPI document publishes, because it is the same fact and a second variable for it
+would only be a way for a deployment to contradict itself. At its `/` default nothing has been
+configured, so the message says the API is on a different host without naming one. What it never
+does is name the apex: sending a caller back to the hostname that just refused them is a redirect
+loop written in prose.
+
 ### JSON-LD
 
 `application/json` opportunity responses (list and detail, `200` only) carry
@@ -185,7 +192,7 @@ under [the converter's README](./tools/converter/README.md).
 | `HOST` | `0.0.0.0` | HTTP bind address. |
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
-| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). |
+| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). It is read by the apex reservation too, which uses it to tell a caller it refused where the API is; the `/` default names no host, so the message says so plainly instead. |
 | `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 
 The seed is deliberately absent from that table: its corpus is an argument, not an environment

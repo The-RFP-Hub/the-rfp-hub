@@ -19,7 +19,9 @@
 //     every check the project runs. The package-local copy stays; this one covers everything else.
 //
 // TRACKED files, via `git ls-files`: an untracked local report or a scratch file must not be able
-// to fail CI, and — more importantly — must not be able to hide a real violation behind noise.
+// to fail CI, and — more importantly — must not be able to hide a real violation behind noise. A
+// tracked file this scanner cannot read as text is NAMED and COUNTED rather than dropped from the
+// denominator — see `classifyTracked`, and the incident that rule exists for.
 //
 // The forbidden strings are assembled from parts throughout, so this file does not trip its own
 // rules. There is no skip comment and no way for a file to silence a rule from the inside; the one
@@ -256,25 +258,68 @@ export function scanText(file, text) {
   return failures;
 }
 
-/** Tracked, non-binary files. `git ls-files` is the point: ignored scratch files cannot vote. */
-function trackedTextFiles() {
+/**
+ * WHY A SKIP IS REPORTED RATHER THAN SUBTRACTED.
+ *
+ * This checker cannot scan a file it cannot read as text, and that is fine — what is not fine is
+ * doing it quietly. A single NUL byte anywhere in the first 8 KiB makes Git treat a file as binary
+ * and makes this scanner drop it, and that has already happened here: a 522-line script carried a
+ * literal NUL as a delimiter, so it was excluded from `git diff` AND excluded from this scan, and
+ * the summary line still said "N tracked files, zero violations". The denominator moved and nobody
+ * could tell. One byte in one file is enough to make the most security-sensitive file in a change
+ * invisible to review and to this rule at the same time.
+ *
+ * So a skipped file is a reported file: counted, named, printed on stderr with its reason, and
+ * carried into the summary line as "X of Y" whether the run passes or fails. "Zero violations" is
+ * only ever a statement about the files that were actually read, and now it says so out loud.
+ *
+ * A skip is loud rather than fatal, deliberately: a repository is allowed to track an image, and a
+ * rule that fails on the first one added gets deleted rather than fixed. What it is not allowed to
+ * do is track SOURCE this checker cannot read — and the "X of Y" on the green line is what makes
+ * that visible without anyone having to go looking.
+ *
+ * @returns {{rel: string, skip: string|null}} the reason this file cannot be scanned, or null.
+ */
+export function classifyTracked(rel, buf) {
+  if (buf === null) {
+    return { rel, skip: "tracked but not present in the working tree" };
+  }
+  if (buf.subarray(0, 8192).includes(0)) {
+    return { rel, skip: "not text — a NUL byte in the first 8 KiB, so Git treats it as binary" };
+  }
+  return { rel, skip: null };
+}
+
+/** Every tracked path, classified. `git ls-files` is the point: ignored scratch files cannot vote. */
+function trackedFiles() {
   const listed = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" })
     .split("\0")
     .filter((f) => f !== "");
   if (listed.length === 0) throw new Error("check-neutral: `git ls-files` returned nothing");
-  return listed.filter((rel) => {
-    let buf;
+  return listed.map((rel) => {
+    let buf = null;
     try {
       buf = readFileSync(join(repoRoot, rel));
     } catch {
-      return false; // deleted-but-tracked; the commit that removes it will settle this
+      buf = null; // deleted-but-tracked; the commit that removes it will settle this
     }
-    return !buf.subarray(0, 8192).includes(0); // a NUL byte means binary
+    return classifyTracked(rel, buf);
   });
 }
 
 function main() {
-  const files = trackedTextFiles();
+  const classified = trackedFiles();
+  const skipped = classified.filter((c) => c.skip !== null);
+  const files = classified.filter((c) => c.skip === null).map((c) => c.rel);
+
+  if (skipped.length > 0) {
+    console.error(
+      `⚠ check-neutral: ${skipped.length} of ${classified.length} tracked file(s) could NOT be scanned.
+  They are not covered by the result below — check each one by hand, and if it is source rather
+  than an asset, make it text:`,
+    );
+    for (const { rel, skip } of skipped) console.error(`  ${rel}  — ${skip}`);
+  }
 
   // A waiver for a path that no longer exists is a waiver nobody is reading. Renaming or deleting
   // an archived record must force the list to be revisited, so the exemption cannot quietly
@@ -292,9 +337,12 @@ function main() {
 
   const failures = files.flatMap((rel) => scanText(rel, readFileSync(join(repoRoot, rel), "utf8")));
 
+  const skippedNote = skipped.length > 0 ? `, ${skipped.length} NOT scanned (listed above)` : "";
+  const scanned = `${files.length} of ${classified.length} tracked files scanned${skippedNote}`;
+
   if (failures.length > 0) {
     console.error(
-      `✗ check-neutral: ${failures.length} violation(s) in a public, source-neutral repo`,
+      `✗ check-neutral: ${failures.length} violation(s) in a public, source-neutral repo (${scanned})`,
     );
     for (const f of failures) console.error(`  [${f.rule}] ${f.file}:${f.line}  ${f.message}`);
     console.error(
@@ -311,7 +359,7 @@ function main() {
   }
 
   console.log(
-    `✓ check-neutral: ${files.length} tracked files scanned — no tracker IDs, no source branding, ` +
+    `✓ check-neutral: ${scanned} — no tracker IDs, no source branding, ` +
       `no retired or off-domain identifiers, no plaintext ${CANONICAL_HOST} URLs ` +
       `(${ARCHIVED_SOURCE.size} archived primary sources exempt from the neutrality rule only)`,
   );

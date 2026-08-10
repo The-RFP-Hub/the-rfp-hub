@@ -31,6 +31,7 @@
  * is the second half of that, and the half that survives an infrastructure edit.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { config } from "../config.js";
 import { canonicalDocuments, specConfig } from "../modules/shared/canonical-documents.js";
 
 /** `https://ethrfps.app` → `ethrfps.app`. The one hostname reserved for the spec. */
@@ -57,6 +58,34 @@ export function servedOnApex(url: string): boolean {
   return APEX_PATHS.has(url.split("?")[0] as string);
 }
 
+const RESERVED =
+  "This hostname is reserved for the RFP Hub Standard's canonical documents and serves nothing else (adr/0007).";
+
+/**
+ * What the apex tells a caller it just refused.
+ *
+ * This message must not name the apex. Sending someone to `specConfig.baseUrl` — which IS the
+ * hostname that just 404'd — is a redirect loop written in prose: the caller asked this host for
+ * the API, and the answer "the API is on its own host, see <this host>" tells them nothing and
+ * reads as a bug in the service. Only the deployment knows the API's public origin, so it comes
+ * from `PUBLIC_BASE_URL` — the same value the OpenAPI document advertises as `servers[0].url`,
+ * because it is the same fact and there is no version of this service where the two differ.
+ *
+ * Its default is the relative `/`, which names no host at all; that and an empty value both mean
+ * "the deployment has not told us", and the message then says plainly that the API is elsewhere
+ * rather than inventing a hostname or echoing the one that was refused.
+ */
+const publicOrigin = (): string => (config.publicBaseUrl === "/" ? "" : config.publicBaseUrl);
+
+export const apexDenialMessage = (): string => {
+  const origin = publicOrigin();
+  return `${RESERVED} ${
+    origin
+      ? `The API is served on a different host: ${origin}`
+      : "The API is served on a different host."
+  }`;
+};
+
 /**
  * Registered on the ROOT instance, before the routes, so it covers every route this service has
  * or gains — including ones added later by someone who has never read `adr/0007`. An allowlist
@@ -65,11 +94,6 @@ export function servedOnApex(url: string): boolean {
 export function registerApexHostRule(app: FastifyInstance): void {
   app.addHook("onRequest", async (request: FastifyRequest, reply) => {
     if (!isApexRequest(request.hostname) || servedOnApex(request.url)) return;
-    await reply.code(404).send({
-      error: "not_found",
-      message:
-        `${APEX_HOST} serves the RFP Hub Standard's canonical documents only — it is reserved ` +
-        `for the spec (adr/0007). The API lives on its own host; see ${specConfig.baseUrl}.`,
-    });
+    await reply.code(404).send({ error: "not_found", message: apexDenialMessage() });
   });
 }

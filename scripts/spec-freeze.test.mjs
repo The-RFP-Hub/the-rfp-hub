@@ -11,7 +11,14 @@
  * microseconds and need no clone, no fixtures on disk and no network.
  */
 import { describe, expect, it } from "vitest";
-import { STANDARD, adoptionRule, canonicalUrl, diffPointers, evaluate } from "./spec-freeze.mjs";
+import {
+  STANDARD,
+  adoptionRule,
+  bytesBeyondIdentifiers,
+  canonicalUrl,
+  diffPointers,
+  evaluate,
+} from "./spec-freeze.mjs";
 
 // The identifiers this standard published before it owned a domain, and the ones it owns now.
 const OLD_BASE = "https://example.invalid/provisional/packages/standard";
@@ -305,6 +312,102 @@ describe("the one-time identity adoption", () => {
     const result = run(baseTree(), head);
     expect(result.ok).toBe(false);
     expect(messages(result)).toContain("may not touch this file");
+  });
+
+  /**
+   * BYPASS 3. Structure is not bytes, and "immutable bytes" is the promise PROCESS.md and
+   * NORMATIVE.md make. A reflowed document and a re-escaped identifier both PARSE identical to the
+   * permitted result, so a pointer diff alone reports nothing at all — while a consumer who hashed
+   * the published file receives something else. The exemption is meant to be maximally narrow, so
+   * the adoption path ends on the bytes.
+   */
+  it("rejects re-formatting a published file while the adoption door is open", () => {
+    const head = adoptionHead({
+      // Same document, same key order, same values — compact instead of indented.
+      [s("meta/rfphub-schema.meta.json")]: JSON.stringify(JSON.parse(metaDoc(NEW_BASE))),
+    });
+    const result = run(baseTree(), head);
+    expect(result.ok).toBe(false);
+    expect(messages(result)).toContain("changes published bytes");
+    expect(messages(result)).toContain("bytes diverge at line");
+  });
+
+  it("rejects an identifier that parses correctly but is escaped differently", () => {
+    const escaped = schemaDoc(NEW_BASE).replace(
+      `"${NEW_BASE}/schemas/v1.0.0/opportunity.schema.json"`,
+      `"${NEW_BASE.replace(/\//g, "\\/")}\\/schemas\\/v1.0.0\\/opportunity.schema.json"`,
+    );
+    // It really does parse to the right identifier — that is the whole point of the attempt.
+    expect(JSON.parse(escaped).$id).toBe(`${NEW_BASE}/schemas/v1.0.0/opportunity.schema.json`);
+
+    const result = run(
+      baseTree(),
+      adoptionHead({ [s("schemas/v1.0.0/opportunity.schema.json")]: escaped }),
+    );
+    expect(result.ok).toBe(false);
+    expect(messages(result)).toContain("changes published bytes");
+  });
+
+  // A file listed as modified whose parse is identical on both sides: there is no differing
+  // pointer, so the allowlist and the value check both pass vacuously and report nothing. Only the
+  // byte check has anything to say about it at all.
+  it("rejects a whitespace-only rewrite that produces no differing pointer", () => {
+    const head = adoptionHead({ [s("meta/rfphub-schema.meta.json")]: `${metaDoc(OLD_BASE)}\n` });
+    const result = run(baseTree(), head);
+    expect(result.ok).toBe(false);
+    expect(messages(result)).toContain("changes published bytes");
+  });
+});
+
+// ------------------------------------------------------------------------- the byte check ---
+
+describe("bytes beyond the identifier substitution", () => {
+  const sub = (from, to) => [JSON.stringify(from), JSON.stringify(to)];
+
+  it("accepts the base bytes with every occurrence of the identifier substituted", () => {
+    expect(
+      bytesBeyondIdentifiers(schemaDoc(OLD_BASE), schemaDoc(NEW_BASE), [
+        sub(
+          `${OLD_BASE}/schemas/v1.0.0/opportunity.schema.json`,
+          `${NEW_BASE}/schemas/v1.0.0/opportunity.schema.json`,
+        ),
+        sub(
+          `${OLD_BASE}/schemas/v1.0.0/context.jsonld`,
+          `${NEW_BASE}/schemas/v1.0.0/context.jsonld`,
+        ),
+      ]),
+    ).toBeNull();
+  });
+
+  it("accepts an untouched file and rejects one whitespace character", () => {
+    expect(bytesBeyondIdentifiers("{}\n", "{}\n", [])).toBeNull();
+    expect(bytesBeyondIdentifiers("{}\n", "{} \n", [])).toMatch(/bytes diverge/);
+  });
+
+  /**
+   * The substitution must be REAL. A published value the base file does not contain verbatim means
+   * the parse and the bytes disagree, which is the condition this check exists to detect — so an
+   * unused substitution fails rather than degrading to a plain equality test.
+   */
+  it("rejects a substitution the base file's bytes never contained", () => {
+    expect(bytesBeyondIdentifiers('{"a":"x"}', '{"a":"y"}', [sub("q", "y")])).toMatch(
+      /does not appear verbatim/,
+    );
+  });
+
+  it("refuses to map one published value onto two different identifiers", () => {
+    expect(
+      bytesBeyondIdentifiers('{"a":"x","b":"x"}', '{"a":"y","b":"z"}', [
+        sub("x", "y"),
+        sub("x", "z"),
+      ]),
+    ).toMatch(/would have to become both/);
+  });
+
+  // Substituted text is never re-scanned, so a new value containing an old one is not rewritten
+  // a second time. Quoting is what keeps the pairs from interfering at all.
+  it("substitutes in a single left-to-right pass", () => {
+    expect(bytesBeyondIdentifiers('["a","b"]', '["ab","b"]', [sub("a", "ab")])).toBeNull();
   });
 });
 

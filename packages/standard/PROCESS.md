@@ -194,6 +194,14 @@ Any other pointer, any other file, and any addition or deletion fails the job â€
 second JSON member sharing a line with `$id`, which an earlier line-matching version of this gate
 could not see.
 
+**And then the bytes.** Parsing is how the gate decides *what* changed; it is not the promise this
+table is protecting. A whitespace-only reflow and a re-escaped identifier both parse identical to
+the permitted result and produce no differing pointer at all â€” while a consumer who hashed the
+published file receives something else. So a file that clears the table above is finally required
+to be its own base bytes with those identifier strings substituted, and nothing else moved. Under
+this exemption "only the identifier changed" is a statement about the file, not about its parse
+tree.
+
 ---
 
 ## Deprecation

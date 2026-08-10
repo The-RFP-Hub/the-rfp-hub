@@ -28,6 +28,11 @@ export interface AppConfig {
    * specification's origin, and the Standard's canonical documents and their identifiers are owned
    * by `packages/standard` — no route in this package answers those paths. Pointing
    * `servers[0].url` at the apex would advertise the wrong host for every API operation.
+   *
+   * The apex reservation (`plugins/apex-host.ts`) reads the same value for the same reason: when it
+   * refuses a request on the apex it has to say where the API actually is, and the one URL it must
+   * never name is the Standard's `baseUrl`, which IS the host that just refused. At the `/` default
+   * the deployment has told us nothing, so the denial says "a different host" rather than guessing.
    */
   publicBaseUrl: string;
   /**
