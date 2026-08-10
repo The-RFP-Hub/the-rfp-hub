@@ -387,7 +387,7 @@ export interface TeamSizeRange {
   max?: number | null;
 }
 /**
- * The fundingDetails payload when fundingType is 'bounty': bounty-specific attributes. A bounty is a single scoped task with a stated reward, so the reward is the one required field beyond the fundingType tag.
+ * The fundingDetails payload when fundingType is 'bounty': bounty-specific attributes. Two kinds share this block, named by bountyKind. A 'task' bounty is a single scoped piece of work with one stated reward. A 'security' bounty is a standing vulnerability-disclosure program whose payout is a table of tiers, normally graded by severity and by the class of asset in scope. The two kinds carry different required fields, bound by the allOf below.
  */
 export interface BountyDetails {
   /**
@@ -395,11 +395,29 @@ export interface BountyDetails {
    */
   fundingType: "bounty";
   /**
-   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
+   * Which kind of bounty this is, and the discriminator for what the payout looks like. 'task' = one scoped piece of work paying a single reward; 'security' = a standing vulnerability-disclosure program paying against a tier table. This is about payout shape, not about how long the bounty stays open: intake duration lives in the top-level deadlines array, and either kind may be rolling.
    */
-  reward: number;
+  bountyKind: "task" | "security";
   /**
-   * Self-assessed difficulty, as a hint to applicants.
+   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty leaves this absent and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
+   */
+  reward?: number;
+  /**
+   * The payout table, one entry per tier. Required when bountyKind is 'security', enforced by the if/then/else below, and permitted on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Array order carries no meaning; select by the tier's own severity, assetType or label.
+   *
+   * @minItems 1
+   */
+  rewardTiers?: [RewardTier, ...RewardTier[]];
+  /**
+   * The published classification the tier severities are drawn from, named so a consumer can tell whose definition of 'critical' is in play. Free text, because these schemes are documents rather than a vocabulary worth governing.
+   */
+  severityScheme?: string | null;
+  /**
+   * Whether the money behind the advertised amounts is actually held. 'funded' = escrowed or otherwise verifiably reserved; 'unfunded' = advertised as an intent to pay, with nothing set aside; 'unknown' = not published, which is the honest value where the program says nothing and the reason absent does not read as 'unfunded'. Separate from fundingInfo.budget, which carries the amount: a program can name a large maximum and hold nothing against it.
+   */
+  rewardPoolStatus?: "funded" | "unfunded" | "unknown" | null;
+  /**
+   * Self-assessed difficulty, as a hint to applicants. Meaningful on a task bounty; a security program grades by severity in rewardTiers instead.
    */
   difficulty?: "beginner" | "intermediate" | "advanced" | null;
   /**
@@ -410,6 +428,57 @@ export interface BountyDetails {
    * Platform hosting the bounty.
    */
   platform?: string | null;
+}
+/**
+ * One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is expressed by severity and assetType on a security bounty and by label on a task bounty; all three are optional so a program that grades on only one axis carries only that one. The payout itself is the one required part, because a tier that names no amount and no payout model is not a tier.
+ */
+export interface RewardTier {
+  /**
+   * Severity band this row pays for. An open list rather than a closed enum — conventional values are published in registries/bounty-severities.json, and a program's own vocabulary is valid without a schema change. Name the scheme these are drawn from in severityScheme.
+   */
+  severity?: string | null;
+  /**
+   * Class of in-scope asset this row pays for, where a program grades the same severity differently by what was found. An open list rather than a closed enum — conventional values are published in registries/bounty-asset-types.json. Absent where a program grades on severity alone.
+   */
+  assetType?: string | null;
+  /**
+   * What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a task bounty's prize ladder, or a named category. Free text.
+   */
+  label?: string | null;
+  payout: Payout;
+}
+/**
+ * What this tier pays, and on which model.
+ */
+export interface Payout {
+  /**
+   * How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.
+   */
+  model: "fixed" | "range" | "up_to" | "percentage_of_value_at_risk" | "discretionary";
+  /**
+   * The amount paid, where the model is 'fixed'. Required and non-null for that model, enforced by the if/then/else below.
+   */
+  amount?: number | null;
+  /**
+   * Lower bound, where the model is 'range'. Required and non-null for that model, enforced by the if/then/else below.
+   */
+  min?: number | null;
+  /**
+   * Upper bound, where the model is 'range' or 'up_to'. Required and non-null for both, enforced by the if/then/else below.
+   */
+  max?: number | null;
+  /**
+   * Share of the value at risk that this tier pays, as a percentage between 0 and 100 — a program paying 'up to 10% of funds affected' carries 10 here. Required and non-null where the model is 'percentage_of_value_at_risk', enforced by the if/then/else below.
+   */
+  percent?: number | null;
+  /**
+   * Least the tier pays regardless of the computed figure, where a percentage model states a minimum. Optional; absent means the computation is unbounded below.
+   */
+  floor?: number | null;
+  /**
+   * Most the tier pays regardless of the computed figure, where a percentage model states a maximum. Optional; absent means the computation is unbounded above.
+   */
+  cap?: number | null;
 }
 /**
  * The fundingDetails payload when fundingType is 'accelerator': accelerator-specific attributes. The application deadline lives in the shared top-level deadlines array with label 'application'.

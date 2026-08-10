@@ -49,10 +49,16 @@ The promotion gate is deliberately **one publisher and one consumer**, not the f
 bar larger projects use. At this size, five implementations is a gate nothing ever passes, and an
 unpassable gate means everything stays experimental forever, which tells a reader nothing.
 
-Fields currently at `provisional`: none. The three that carried the marker (`serviceAgreement`,
-`milestones[]`, `programModel`) were promoted to `stable` on 2026-08-05, the maintainers
-accepting the M1 research round — the decision interviews, plus the real third-party RFP that
-motivated `milestones[]` — as the verification the gate asks for (recorded in `CHANGELOG.md`).
+Fields currently at `provisional`: the security-bounty payout surface added 2026-08-10 —
+`bounty.bountyKind`, `bounty.rewardTiers[]`, `bounty.severityScheme`,
+`bounty.rewardPoolStatus`, and every property of `$defs/rewardTier` and `$defs/payout`. It has
+publisher evidence and no consumer implementation, so it sits at `experimental` until one ships
+(see [`adr/0007`](../../adr/0007-security-bounty-payout-tiers.md)).
+
+An earlier three (`serviceAgreement`, `milestones[]`, `programModel`) were promoted to `stable`
+on 2026-08-05, the maintainers accepting the M1 research round — the decision interviews, plus
+the real third-party RFP that motivated `milestones[]` — as the verification the gate asks for
+(recorded in `CHANGELOG.md`).
 
 ---
 

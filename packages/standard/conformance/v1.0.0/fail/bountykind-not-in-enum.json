@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bountykind-not-in-enum",
+  "fundingType": "bounty",
+  "title": "Bounty with an unregistered bountyKind",
+  "description": "bountyKind is a closed enum of 'task' and 'security'. 'open_ended' is not a kind — intake duration lives in the deadlines array.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "open_ended",
+    "reward": 5000
+  }
+}

@@ -31,6 +31,7 @@
   ],
   "fundingDetails": {
     "fundingType": "bounty",
+    "bountyKind": "task",
     "reward": 5000,
     "difficulty": "intermediate",
     "skills": [

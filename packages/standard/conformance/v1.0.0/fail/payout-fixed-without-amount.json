@@ -1,0 +1,37 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-fixed-without-amount",
+  "fundingType": "bounty",
+  "title": "Fixed payout with no amount",
+  "description": "The payout model binds which amounts are required: 'fixed' requires a non-null amount.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "fixed"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-task-reward-tiers",
+  "fundingType": "bounty",
+  "title": "Task bounty with a graded placement ladder",
+  "description": "Exercises rewardTiers on bountyKind 'task': tiers are required for a security bounty but permitted on any bounty that grades its payout, and a placement ladder grades on the tier label rather than on severity. The required task reward is still present and carries the total.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "task",
+    "reward": 5000,
+    "rewardTiers": [
+      {
+        "label": "1st place",
+        "payout": {
+          "model": "fixed",
+          "amount": 3000
+        }
+      },
+      {
+        "label": "2nd place",
+        "payout": {
+          "model": "fixed",
+          "amount": 1500
+        }
+      },
+      {
+        "label": "3rd place",
+        "payout": {
+          "model": "fixed",
+          "amount": 500
+        }
+      }
+    ],
+    "skills": [
+      "Design"
+    ],
+    "platform": "Example Bounty Board"
+  }
+}

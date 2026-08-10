@@ -1,0 +1,38 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-model-not-in-enum",
+  "fundingType": "bounty",
+  "title": "Payout with an unregistered model",
+  "description": "The payout model is a closed enum. A program paying on a bespoke formula uses the nearest model and puts the arithmetic in description.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "step_function",
+          "max": 1000
+        }
+      }
+    ]
+  }
+}

@@ -135,6 +135,32 @@ describe("amount-without-currency", () => {
     expect(warnings[0]?.message).toContain("bounty reward 500");
   });
 
+  it("fires on every reward-tier payout bound, but not on percent", () => {
+    const doc = {
+      ...base,
+      fundingType: "bounty" as const,
+      fundingDetails: {
+        fundingType: "bounty" as const,
+        bountyKind: "security" as const,
+        rewardTiers: [
+          { severity: "critical", payout: { model: "range" as const, min: 1000, max: 5000 } },
+          {
+            severity: "high",
+            payout: { model: "percentage_of_value_at_risk" as const, percent: 10, cap: 20000 },
+          },
+          { severity: "low", payout: { model: "discretionary" as const } },
+        ],
+      },
+    };
+    const warnings = runChecks(doc);
+    expect(warnings.map((w) => w.instancePath)).toEqual([
+      "/fundingDetails/rewardTiers/0/payout/min",
+      "/fundingDetails/rewardTiers/0/payout/max",
+      "/fundingDetails/rewardTiers/1/payout/cap",
+    ]);
+    expect(warnings[0]?.message).toContain("reward tier payout.min 1000");
+  });
+
   it("fires on accelerator funding, ignoring an explicit null", () => {
     const details = { fundingType: "accelerator" as const, funding: 120000 };
     const doc = { ...base, fundingType: "accelerator" as const, fundingDetails: details };

@@ -49,6 +49,7 @@
   "updatedAt": "2026-05-16T00:02:40.000Z",
   "fundingDetails": {
     "fundingType": "bounty",
+    "bountyKind": "task",
     "difficulty": null,
     "skills": [
       "Growth",

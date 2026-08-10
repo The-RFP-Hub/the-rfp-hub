@@ -1,0 +1,38 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-percent-above-100",
+  "fundingType": "bounty",
+  "title": "Percentage payout above 100",
+  "description": "percent is a share of the value at risk expressed on a 0-to-100 scale, so a value above 100 is out of range.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "percentage_of_value_at_risk",
+          "percent": 150
+        }
+      }
+    ]
+  }
+}

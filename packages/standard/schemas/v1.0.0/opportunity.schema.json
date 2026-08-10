@@ -554,19 +554,44 @@
       "type": "object",
       "title": "Bounty details",
       "additionalProperties": false,
-      "required": ["fundingType", "reward"],
-      "description": "The fundingDetails payload when fundingType is 'bounty': bounty-specific attributes. A bounty is a single scoped task with a stated reward, so the reward is the one required field beyond the fundingType tag.",
+      "required": ["fundingType", "bountyKind"],
+      "description": "The fundingDetails payload when fundingType is 'bounty': bounty-specific attributes. Two kinds share this block, named by bountyKind. A 'task' bounty is a single scoped piece of work with one stated reward. A 'security' bounty is a standing vulnerability-disclosure program whose payout is a table of tiers, normally graded by severity and by the class of asset in scope. The two kinds carry different required fields, bound by the allOf below.",
       "properties": {
         "fundingType": { "const": "bounty", "description": "Names this block's shape; equals the top-level fundingType." },
+        "bountyKind": {
+          "type": "string",
+          "enum": ["task", "security"],
+          "description": "Which kind of bounty this is, and the discriminator for what the payout looks like. 'task' = one scoped piece of work paying a single reward; 'security' = a standing vulnerability-disclosure program paying against a tier table. This is about payout shape, not about how long the bounty stays open: intake duration lives in the top-level deadlines array, and either kind may be rolling.",
+          "x-stability": "provisional"
+        },
         "reward": {
           "type": "number",
           "minimum": 0,
-          "description": "The reward paid on completion, in major units of the document-wide fundingInfo.currency. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
+          "description": "The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty leaves this absent and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
+        },
+        "rewardTiers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rewardTier" },
+          "minItems": 1,
+          "description": "The payout table, one entry per tier. Required when bountyKind is 'security', enforced by the if/then/else below, and permitted on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Array order carries no meaning; select by the tier's own severity, assetType or label.",
+          "x-stability": "provisional"
+        },
+        "severityScheme": {
+          "type": ["string", "null"],
+          "description": "The published classification the tier severities are drawn from, named so a consumer can tell whose definition of 'critical' is in play. Free text, because these schemes are documents rather than a vocabulary worth governing.",
+          "examples": ["Immunefi Vulnerability Severity Classification System v2.3", "CVSS v4.0"],
+          "x-stability": "provisional"
+        },
+        "rewardPoolStatus": {
+          "type": ["string", "null"],
+          "enum": ["funded", "unfunded", "unknown", null],
+          "description": "Whether the money behind the advertised amounts is actually held. 'funded' = escrowed or otherwise verifiably reserved; 'unfunded' = advertised as an intent to pay, with nothing set aside; 'unknown' = not published, which is the honest value where the program says nothing and the reason absent does not read as 'unfunded'. Separate from fundingInfo.budget, which carries the amount: a program can name a large maximum and hold nothing against it.",
+          "x-stability": "provisional"
         },
         "difficulty": {
           "type": ["string", "null"],
           "enum": ["beginner", "intermediate", "advanced", null],
-          "description": "Self-assessed difficulty, as a hint to applicants."
+          "description": "Self-assessed difficulty, as a hint to applicants. Meaningful on a task bounty; a security program grades by severity in rewardTiers instead."
         },
         "skills": {
           "type": "array",
@@ -578,9 +603,114 @@
         "platform": {
           "type": ["string", "null"],
           "description": "Platform hosting the bounty.",
-          "examples": ["Gitcoin", "Layer3", "Superteam Earn"]
+          "examples": ["Gitcoin", "Layer3", "Superteam Earn", "Immunefi"]
         }
+      },
+      "$comment": "Binds the required payout field to the kind. bountyKind is required and has exactly two values, so if/else is total. Each branch names only properties already declared above, so no branch introduces an undeclared property name — see the root $comment. Written as a bare if/then/else rather than an allOf of branches because an allOf at this level defeats the type generator, which emits an index signature instead of the interface.",
+      "if": { "properties": { "bountyKind": { "const": "task" } }, "required": ["bountyKind"] },
+      "then": { "required": ["reward"] },
+      "else": { "required": ["rewardTiers"] }
+    },
+    "rewardTier": {
+      "type": "object",
+      "title": "Reward tier",
+      "additionalProperties": false,
+      "required": ["payout"],
+      "description": "One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is expressed by severity and assetType on a security bounty and by label on a task bounty; all three are optional so a program that grades on only one axis carries only that one. The payout itself is the one required part, because a tier that names no amount and no payout model is not a tier.",
+      "properties": {
+        "severity": {
+          "type": ["string", "null"],
+          "description": "Severity band this row pays for. An open list rather than a closed enum — conventional values are published in registries/bounty-severities.json, and a program's own vocabulary is valid without a schema change. Name the scheme these are drawn from in severityScheme.",
+          "examples": ["critical", "high"],
+          "x-stability": "provisional"
+        },
+        "assetType": {
+          "type": ["string", "null"],
+          "description": "Class of in-scope asset this row pays for, where a program grades the same severity differently by what was found. An open list rather than a closed enum — conventional values are published in registries/bounty-asset-types.json. Absent where a program grades on severity alone.",
+          "examples": ["smart_contract", "websites_and_applications"],
+          "x-stability": "provisional"
+        },
+        "label": {
+          "type": ["string", "null"],
+          "maxLength": 120,
+          "description": "What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a task bounty's prize ladder, or a named category. Free text.",
+          "examples": ["1st place", "Best use of the SDK"],
+          "x-stability": "provisional"
+        },
+        "payout": { "$ref": "#/$defs/payout", "description": "What this tier pays, and on which model." }
       }
+    },
+    "payout": {
+      "type": "object",
+      "title": "Payout",
+      "additionalProperties": false,
+      "required": ["model"],
+      "description": "What a tier pays, tagged by the model that determines which of the amounts below apply. Every amount is in major units of the document-wide fundingInfo.currency, the same rule that governs every other monetary value in the document. Amounts that do not apply to the stated model are meaningless and normally omitted, the same convention deadline.date follows.",
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": ["fixed", "range", "up_to", "percentage_of_value_at_risk", "discretionary"],
+          "description": "How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.",
+          "x-stability": "provisional"
+        },
+        "amount": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "The amount paid, where the model is 'fixed'. Required and non-null for that model, enforced by the if/then/else below.",
+          "x-stability": "provisional"
+        },
+        "min": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Lower bound, where the model is 'range'. Required and non-null for that model, enforced by the if/then/else below.",
+          "x-stability": "provisional"
+        },
+        "max": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Upper bound, where the model is 'range' or 'up_to'. Required and non-null for both, enforced by the if/then/else below.",
+          "x-stability": "provisional"
+        },
+        "percent": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Share of the value at risk that this tier pays, as a percentage between 0 and 100 — a program paying 'up to 10% of funds affected' carries 10 here. Required and non-null where the model is 'percentage_of_value_at_risk', enforced by the if/then/else below.",
+          "x-stability": "provisional"
+        },
+        "floor": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Least the tier pays regardless of the computed figure, where a percentage model states a minimum. Optional; absent means the computation is unbounded below.",
+          "x-stability": "provisional"
+        },
+        "cap": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Most the tier pays regardless of the computed figure, where a percentage model states a maximum. Optional; absent means the computation is unbounded above.",
+          "x-stability": "provisional"
+        }
+      },
+      "$comment": "Binds the required amounts to the model, as a nested if/then/else chain rather than an allOf of branches: an allOf at this level defeats the type generator, which emits an index signature instead of the interface. Every branch names only properties already declared above, so none introduces an undeclared property name — see the root $comment. The final else is 'discretionary', which requires no amount.",
+      "if": { "properties": { "model": { "const": "fixed" } }, "required": ["model"] },
+      "then": { "required": ["amount"], "properties": { "amount": { "type": "number" } } },
+      "else": {
+        "if": { "properties": { "model": { "const": "range" } }, "required": ["model"] },
+        "then": { "required": ["min", "max"], "properties": { "min": { "type": "number" }, "max": { "type": "number" } } },
+        "else": {
+          "if": { "properties": { "model": { "const": "up_to" } }, "required": ["model"] },
+          "then": { "required": ["max"], "properties": { "max": { "type": "number" } } },
+          "else": {
+            "if": { "properties": { "model": { "const": "percentage_of_value_at_risk" } }, "required": ["model"] },
+            "then": { "required": ["percent"], "properties": { "percent": { "type": "number" } } }
+          }
+        }
+      },
+      "examples": [
+        { "model": "range", "min": 15000, "max": 250000 },
+        { "model": "percentage_of_value_at_risk", "percent": 10, "floor": 100000, "cap": 1000000 },
+        { "model": "discretionary" }
+      ]
     },
     "accelerator": {
       "type": "object",

@@ -191,6 +191,8 @@ const FIELDS_END = "<!-- END generated:fields -->";
 const REGISTRY_FOR_FIELD = {
   "deadline.label": "deadline-labels",
   "grant.programModel": "program-models",
+  "rewardTier.severity": "bounty-severities",
+  "rewardTier.assetType": "bounty-asset-types",
 };
 
 // Fail loudly if a registry exists that no field points at, or vice versa — a registry nothing
@@ -227,6 +229,8 @@ const DEF_ORDER = [
   "prize",
   "teamSize",
   "bounty",
+  "rewardTier",
+  "payout",
   "accelerator",
   "vcFund",
   "rfp",

@@ -99,7 +99,16 @@ const STATUSES: OpportunityStatus[] = ["upcoming", "open", "closed", "archived"]
 const TYPE_BLOCK_KEYS: Record<FundingType, string[]> = {
   grant: ["fundingMechanisms", "programModel", "milestoneBased", "recurring"],
   hackathon: ["location", "online", "tracks", "prizes", "teamSize"],
-  bounty: ["reward", "difficulty", "skills", "platform"],
+  bounty: [
+    "bountyKind",
+    "reward",
+    "rewardTiers",
+    "severityScheme",
+    "rewardPoolStatus",
+    "difficulty",
+    "skills",
+    "platform",
+  ],
   accelerator: [
     "programDurationWeeks",
     "batchSize",
@@ -435,11 +444,22 @@ function typeBlockOf(
     if (legacy !== undefined && legacy !== null && legacy !== "") picked.fundingMechanisms = legacy;
   }
   const out = normalizeBlock(picked, hoist);
-  // bounty.reward is required by the Standard — synthesize from the budget if absent (a plain
-  // number now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram).
-  if (type === "bounty" && out.reward === undefined) {
-    const { amount } = parseAmount(p.metadata?.programBudget);
-    if (amount !== undefined) out.reward = amount;
+  if (type === "bounty") {
+    // bountyKind is required by the Standard and upstream does not send it. Infer from the
+    // payout shape: a tier table is a security program, anything else is a task bounty — which
+    // is what this upstream carries, gig-style listings off bounty boards.
+    if (out.bountyKind === undefined) {
+      out.bountyKind =
+        Array.isArray(out.rewardTiers) && out.rewardTiers.length > 0 ? "security" : "task";
+    }
+    // reward is required for a task bounty — synthesize from the budget if absent (a plain
+    // number now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram).
+    // Never synthesized for a security bounty: collapsing a graded table to one number is the
+    // misrepresentation the tier table exists to prevent.
+    if (out.bountyKind === "task" && out.reward === undefined) {
+      const { amount } = parseAmount(p.metadata?.programBudget);
+      if (amount !== undefined) out.reward = amount;
+    }
   }
   return out;
 }

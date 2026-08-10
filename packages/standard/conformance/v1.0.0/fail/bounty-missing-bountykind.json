@@ -1,0 +1,29 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-missing-bountykind",
+  "fundingType": "bounty",
+  "title": "Bounty without bountyKind",
+  "description": "bountyKind is required on every bounty: it is the discriminator that decides whether reward or rewardTiers is the required payout field.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "reward": 5000
+  }
+}

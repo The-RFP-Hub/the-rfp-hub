@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-security-without-reward-tiers",
+  "fundingType": "bounty",
+  "title": "Security bounty without a tier table",
+  "description": "A security bounty states its amounts as a graded table, so rewardTiers is required when bountyKind is 'security'. Carrying a single reward instead is exactly the collapse the tier table exists to prevent.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "reward": 50000
+  }
+}

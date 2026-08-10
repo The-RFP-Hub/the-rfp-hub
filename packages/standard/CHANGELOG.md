@@ -8,6 +8,91 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 
 ---
 
+## Spec v1.0.0 fourth draft revision (2026-08-10)
+
+Rides the same draft-window permission argued in
+[`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md): `v1.0.0` is still
+`draft` and no external consumer has adopted it, re-verified at merge. The structural record is
+[`adr/0007`](../../adr/0007-security-bounty-payout-tiers.md).
+
+The `bounty` type described "a single scoped task with a stated reward". Measured against a
+public corpus of 247 live crypto bug bounty programs, **3 were representable** under that
+shape. The rest publish a graded table — a median of four rows, keyed on severity and on the
+class of in-scope asset — so a publisher forced into one `reward` number enters the maximum,
+which is the budget-honesty failure the standard separates `budget` from `maxAward` to avoid.
+
+### Schema
+
+- **Breaking — tightening.** `bounty.bountyKind` is a **new required** property, enum
+  `task | security`. Every bounty document valid under the previous shape is now invalid until
+  it carries the tag. Migration: add `"bountyKind": "task"` — the previous shape *was* a task
+  bounty in everything but name.
+- **Breaking — loosening** (previously invalid documents now validate). `bounty.reward` is no
+  longer unconditionally required. It is required when `bountyKind` is `task`, and a security
+  bounty carries `rewardTiers` instead. Enforced by a bare `if`/`then`/`else` on `$defs/bounty`.
+- **Breaking — loosenings.** New optional properties on `$defs/bounty`: `rewardTiers[]`,
+  `severityScheme`, `rewardPoolStatus`. Every object in this schema is
+  `additionalProperties: false`, so each addition turns previously-rejected documents into
+  valid ones — breaking under the bidirectional rule in [`PROCESS.md`](./PROCESS.md), which
+  governs over the "new optional fields" bullet in that file's Consequences list.
+- **New `$defs`.** `rewardTier` (`severity`, `assetType`, `label`, and a required `payout`) and
+  `payout` (a `model` tag over `fixed | range | up_to | percentage_of_value_at_risk |
+  discretionary`, with the amounts each model requires bound by a nested `if`/`then`/`else`).
+- `rewardTiers[]` is **required for `security` and permitted on either kind**. Requiring it on
+  one kind is not a reason to forbid it on the other: a task bounty with a placement ladder is
+  the same graded structure keyed on `label` instead of `severity`.
+- `discretionary` is a **payout model, not absent data** — programs publish numeric and
+  case-by-case tiers in one table.
+- **Stability.** The whole surface lands `x-stability: provisional`. It has a measured
+  publisher corpus and no shipped consumer, and the gate in `PROCESS.md` asks for both.
+- **Not modelled, deliberately**: step functions over funds at risk, TVL-conditional tiers,
+  conditional pool release, per-tier vesting and multipliers. See the design rule recorded in
+  [`FIELDS.md`](./schemas/v1.0.0/FIELDS.md) and ADR-0007.
+- **Authoring note.** Both new conditionals are written as bare `if`/`then`/`else` rather than
+  an `allOf` of branches. An `allOf` at `$def` level defeats the type generator, which emits an
+  index signature in place of the interface — caught in review, recorded here so it is not
+  reintroduced.
+
+### Context
+
+- New terms: `rewardTiers` (`@set`), `bountyKind`, `severityScheme`, `rewardPoolStatus`. No
+  existing term assignment moved. Neither schema.org nor DAOIP-5 offers a target for a tiered
+  award, so these take IRIs in the standard's own vocabulary — see
+  [`CROSSWALK.md`](./schemas/v1.0.0/CROSSWALK.md).
+
+### Tooling
+
+- Two new registries: `bounty-severities.json` (`critical | high | medium | low |
+  informational`) and `bounty-asset-types.json` (`smart_contract | blockchain_dlt |
+  websites_and_applications`). Both govern **open** string fields — an unregistered value is
+  valid data and warns, as with every registry here. Closed enums were rejected: the observed
+  vocabularies are one platform's, and a closed list would put that platform's labels in a
+  source-agnostic standard.
+- `codegen.mjs`: `DEF_ORDER` gains `rewardTier` and `payout`; `REGISTRY_FOR_FIELD` gains the
+  two new registry bindings.
+- `rfphub-validate`: the `amount-without-currency` advisory now traverses every
+  `rewardTiers[].payout` bound (`amount`, `min`, `max`, `floor`, `cap`). A tier's `percent` is
+  **not** a denominated site — it is a share, not an amount.
+- Conformance: 3 new `pass/` and 9 new `fail/` cases, one per rule changed.
+
+### Docs
+
+- `FIELDS.md` gains a hand section on the two kinds and on what the tier table deliberately
+  cannot say; the single-currency narrative now enumerates **seven** denominated sites.
+- `STATUS.md`, `PROCESS.md`: the `provisional` stage, emptied on 2026-08-05, is refilled.
+- `NORMATIVE.md`, `ARTIFACTS.md`, `README.md`: two registries become four.
+
+### Field mapping (old → new)
+
+| Old | New | Kind | Notes |
+|---|---|---|---|
+| `bounty.reward` (always required) | `bounty.reward` (required when `bountyKind` is `task`) | reshaped | Migrate a task bounty by adding `"bountyKind": "task"`; the value is untouched. |
+| — | `bounty.bountyKind` | added, **required** | No default. A document without it does not validate. |
+| — | `bounty.rewardTiers[]` | added | Required when `bountyKind` is `security`. |
+| — | `bounty.severityScheme`, `bounty.rewardPoolStatus` | added | Optional on either kind. |
+
+---
+
 ## Spec v1.0.0 third draft revision (2026-08-05)
 
 **Same day as the second draft revision, applied after it** — two revision batches landed on
