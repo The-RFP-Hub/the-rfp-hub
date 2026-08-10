@@ -55,8 +55,12 @@ source-of-truth question).
 The publication tree ships **inside the API** rather than as static hosting, which is the
 compromise `adr/0007` records: spec resolution rides the API's uptime until the package directory
 is published to object storage behind a CDN. That migration retires the API routes with no
-identifier changing and no consumer-visible event, and the freeze makes an unbounded cache TTL
-correct — the bytes can never change again.
+identifier changing and no consumer-visible event. The freeze makes an unbounded cache lifetime
+correct for the *versioned* documents — the bytes under `schemas/v<version>/` can never change
+again — and the API already serves them as `public, max-age=31536000, immutable` with a strong
+`ETag`, so a client that has fetched the context once keeps a usable copy through an outage. The
+documents whose URLs carry no version (the versions index, the meta-schema, the registry entry
+schema) revalidate hourly instead: a URL that does not name a version must not promise one.
 
 ### On identifiers — settled 2026-08-10
 

@@ -88,22 +88,38 @@ than claiming resolution that does not exist.
 - **`spec.config.json`** gains `identityStatus` (`provisional` | `canonical`) and
   `identityAdoption {date, adr, note}`: the machine-readable record that the one-time swap has
   been spent. Both PROVISIONAL notes are rewritten to describe the settled decision.
-- **`check-spec.mjs`** gains a **maturity** rule (`status` is one of `draft`/`stable`, and
-  `stable` holds **iff** the `FROZEN` marker is present — previously the vocabulary lived in
-  `PROCESS.md` prose and nothing enforced it) and an **identity-provenance** rule
-  (`identityStatus` is a known value; `baseUrl` and `vocabIri` are `https` and share one
-  authority; a `canonical` status names an ADR that exists). Its identity sweep no longer
-  hard-codes the retired `draft` namespace path, `@vocab` must end in a delimiter, and a new
-  neutrality rule rejects either retired provisional identifier reappearing anywhere.
-- **`.github/workflows/spec-freeze.yml`** now judges the versionless artifacts and
+- **`check-spec.mjs`** gains a **maturity** rule (`status` is one of `draft`/`stable`, `stable`
+  holds **iff** the `FROZEN` marker is present — previously the vocabulary lived in `PROCESS.md`
+  prose and nothing enforced it — and `FIELDS.md`'s own maturity banner has to agree, because
+  prose is the spelling that drifts) and an **identity-provenance** rule (`identityStatus` is a
+  known value; `baseUrl` and `vocabIri` are `https` and share one authority; a `canonical` status
+  names an ADR that exists). Its identity sweep no longer hard-codes the retired `draft` namespace
+  path, `@vocab` must end in a delimiter, and a new neutrality rule rejects either retired
+  provisional identifier reappearing anywhere.
+- **`scripts/check-neutral.mjs`** (repository, not package) becomes the repo-wide half of the same
+  sweep, over `git ls-files`: the package-local checker walks `packages/standard` only, so a
+  retired identifier in an API test, a workflow or a root document was invisible to every check.
+  It also gains the source-neutrality rule the repository's policy always claimed and nothing
+  enforced, and a plaintext-URL rule — `.app` is HSTS-preloaded, so `http://` on this domain is
+  broken rather than lenient.
+- **The freeze gate is a semantic comparison now**, and its rule lives in
+  `scripts/spec-freeze.mjs` rather than in workflow YAML. It judges the versionless artifacts and
   `spec.config.json`'s identity fields from base ∪ head, so the commit that freezes a version is
-  held to the frozen rules for them — and takes an explicit, single-use exemption for the
+  held to the frozen rules for them; it takes an explicit, single-use exemption for the
   `provisional` → `canonical` transition instead of passing silently on an accident of commit
-  ordering. The exemption is self-extinguishing and `canonical` → `provisional` is rejected.
+  ordering; and under that exemption it **parses** both revisions of every touched artifact and
+  permits a change only where the differing JSON pointer is on an allowlist and the new value is
+  the identifier `spec.config.json` derives. The earlier `grep`-based version could be walked past
+  two ways — a second JSON member sharing a line with `$id`, and arbitrary v1.0.0 edits riding the
+  first freeze — and both are now tests. The exemption is self-extinguishing, `canonical` →
+  `provisional` is rejected, and the four informative documents of a frozen version stay
+  correctable, which is what `PROCESS.md` always said.
 - **The API serves every canonical document at its canonical path** (`packages/api`), byte for
-  byte, under `application/schema+json` / `application/ld+json`, and advertises the context by
-  `Link` header on `application/json` opportunity responses — the two `ARTIFACTS.md` rows whose
-  trigger was this decision.
+  byte, under `application/schema+json` / `application/ld+json`, with an explicit cache policy and
+  a strong `ETag` (`immutable` only where the URL carries the spec version), and advertises the
+  context by `Link` header on `application/json` opportunity responses — the two `ARTIFACTS.md`
+  rows whose trigger was this decision. The apex reservation is enforced rather than asserted: on
+  `ethrfps.app` the service answers those documents and nothing else.
 
 ### Docs
 
