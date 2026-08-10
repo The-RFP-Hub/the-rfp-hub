@@ -14,13 +14,28 @@ describe("parseOpportunityQuery", () => {
     });
   });
 
-  it("splits comma lists and whitelists enum values", () => {
+  it("splits comma lists and repeated params into de-duped value lists", () => {
+    expect(parseOpportunityQuery({ fundingType: "grant,hackathon" }).fundingType).toEqual([
+      "grant",
+      "hackathon",
+    ]);
+    expect(parseOpportunityQuery({ fundingType: ["grant", "rfp"] }).fundingType).toEqual([
+      "grant",
+      "rfp",
+    ]);
+    // mixed forms OR together, duplicates collapse
+    expect(parseOpportunityQuery({ status: ["open,closed", "open"] }).status).toEqual([
+      "open",
+      "closed",
+    ]);
+  });
+
+  it("whitelists enum values defensively (HTTP returns 400 for them first)", () => {
+    // Over HTTP `bogus` fails listQuerySchema's comma-list pattern and yields 400 before the
+    // parser runs; the whitelist below only guards direct (non-HTTP) callers.
     const q = parseOpportunityQuery({ fundingType: "grant,bogus,hackathon", status: "open,nope" });
     expect(q.fundingType).toEqual(["grant", "hackathon"]);
     expect(q.status).toEqual(["open"]);
-  });
-
-  it("drops a filter entirely when no value survives whitelisting", () => {
     expect(parseOpportunityQuery({ fundingType: "bogus" }).fundingType).toBeUndefined();
   });
 
@@ -86,5 +101,37 @@ describe("listQuerySchema", () => {
   it("offers nextDeadlineAt instead of closesAt as the sort default", () => {
     expect(listQuerySchema.properties.sort.default).toBe("nextDeadlineAt");
     expect(listQuerySchema.properties.sort.enum).not.toContain("closesAt");
+  });
+
+  it("constrains fundingType/status to their value sets (so a bad value 400s, not silently drops)", () => {
+    const cases = [
+      [listQuerySchema.properties.fundingType, ["grant", "hackathon", "rfp"], ["grants", "bogus"]],
+      [listQuerySchema.properties.status, ["open", "archived"], ["opened", "nope"]],
+    ] as const;
+    for (const [param, valid, invalid] of cases) {
+      const re = new RegExp(param.items.pattern);
+      for (const value of valid) expect(re.test(value), value).toBe(true);
+      for (const value of invalid) expect(re.test(value), value).toBe(false);
+      // the pattern spans the whole comma list, so one bad entry rejects the request
+      expect(re.test(valid.join(","))).toBe(true);
+      expect(re.test(valid.join(", "))).toBe(true); // whitespace the parser would trim
+      expect(re.test(`${valid[0]},${invalid[0]}`)).toBe(false);
+      // …but an EMPTY value is accepted and then ignored, exactly like ecosystem/category/q: a client
+      // that emits every filter key with the unselected ones blank must not get a 400 from these
+      // two alone. `list()` above drops it, so the filter simply does not apply.
+      expect(re.test("")).toBe(true);
+      expect(re.test("  ")).toBe(true);
+    }
+  });
+
+  it("types every list param as a repeatable array and says so in its description", () => {
+    for (const key of ["fundingType", "status", "ecosystem", "category"] as const) {
+      expect(listQuerySchema.properties[key].type, key).toBe("array");
+      expect(listQuerySchema.properties[key].description, key).toMatch(/Repeat the parameter/);
+    }
+  });
+
+  it("keeps additionalProperties:false so unknown params are rejected", () => {
+    expect(listQuerySchema.additionalProperties).toBe(false);
   });
 });

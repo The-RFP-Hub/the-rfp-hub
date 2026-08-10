@@ -140,6 +140,11 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(doc.info.license).toEqual({ name: "MIT", identifier: "MIT" });
   });
 
+  it("publishes collection paths in the documented no-slash form", () => {
+    const collections = Object.keys(doc.paths).filter((p: string) => p !== "/" && p.endsWith("/"));
+    expect(collections, "no published path carries a trailing slash").toEqual([]);
+  });
+
   it("publishes the re-cut filter surface, with the rolling-only exclusion documented", () => {
     const params: { name: string; description?: string; schema?: Record<string, unknown> }[] =
       doc.paths["/v1/opportunities"].get.parameters;
@@ -161,6 +166,32 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(sortEnum).toContain("nextDeadlineAt");
     expect(sortEnum).not.toContain("closesAt");
     expect(byName.get("sort")?.schema?.default).toBe("nextDeadlineAt");
+  });
+
+  it("publishes the accepted values of the enum filters and the repeatable list form", () => {
+    const params: { name: string; description?: string; schema?: Record<string, unknown> }[] =
+      doc.paths["/v1/opportunities"].get.parameters;
+    const byName = new Map(params.map((p) => [p.name, p]));
+
+    for (const [name, values] of [
+      ["fundingType", ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"]],
+      ["status", ["upcoming", "open", "closed", "archived"]],
+    ] as const) {
+      const param = byName.get(name);
+      // list params are arrays (repeatable); the comma-list pattern is what documents the values
+      expect(param?.schema?.type, `${name} is a repeatable list`).toBe("array");
+      const pattern = (param?.schema?.items as { pattern?: string } | undefined)?.pattern;
+      for (const value of values) {
+        expect(pattern, `${name} pattern accepts ${value}`).toContain(value);
+        expect(param?.description, `${name} description lists ${value}`).toContain(value);
+      }
+      expect(param?.description).toMatch(/comma-separate/i);
+    }
+
+    for (const name of ["ecosystem", "category"]) {
+      expect(byName.get(name)?.schema?.type, `${name} is a repeatable list`).toBe("array");
+      expect(byName.get(name)?.description).toMatch(/Repeat the parameter/i);
+    }
   });
 
   it("declares the Opportunity component in the re-cut shape", () => {
