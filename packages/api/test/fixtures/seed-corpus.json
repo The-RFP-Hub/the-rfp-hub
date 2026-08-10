@@ -8,8 +8,8 @@
       "chainID": null,
       "name": "ProPGF Batch 2 - Pods Track",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2026-02-12T23:59:00.000Z",
+      "submissionUrl": "https://app.filpgf.io/programs/1039/apply",
       "communities": [
         {
           "uid": "0x347ed1f64741624223f41b542c38a029fdd5ffa6c13e10082ad37d2772208b7f",
@@ -66,8 +66,8 @@
       "chainID": null,
       "name": "Filecoin ProPGF Batch 3",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2026-06-16T23:59:00.000Z",
+      "submissionUrl": "https://app.filpgf.io/programs/1479/apply",
       "communities": [
         {
           "uid": "0x347ed1f64741624223f41b542c38a029fdd5ffa6c13e10082ad37d2772208b7f",
@@ -121,11 +121,11 @@
       "id": "6914c8e8ffd357aebd1ccb1c",
       "programId": "992",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Filecoin ProPGF Batch 2",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2026-02-19T23:59:00.000Z",
+      "submissionUrl": "https://app.filpgf.io/programs/992/apply",
       "communities": [
         {
           "uid": "0x347ed1f64741624223f41b542c38a029fdd5ffa6c13e10082ad37d2772208b7f",
@@ -180,69 +180,13 @@
       "rfpMetadata": null
     },
     {
-      "id": "69f119e4979459530c018111",
-      "programId": "1400",
-      "type": "grant",
-      "chainID": null,
-      "name": "ProPGF Pod Reporting & Planning Form",
-      "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
-      "communities": [
-        {
-          "uid": "0x347ed1f64741624223f41b542c38a029fdd5ffa6c13e10082ad37d2772208b7f",
-          "name": "Filecoin",
-          "slug": "filecoin"
-        }
-      ],
-      "createdAt": "2026-04-28T20:34:44.000Z",
-      "updatedAt": "2026-05-22T22:21:55.000Z",
-      "metadata": {
-        "title": "ProPGF Pod Reporting & Planning Form",
-        "description": "ProPGF Pod Reporting & Planning Form",
-        "shortDescription": "ProPGF Pod Reporting & Planning Form",
-        "logoImg": "",
-        "bannerImg": "",
-        "status": "Active",
-        "endsAt": "2026-06-05T23:59:00.000Z",
-        "categories": [],
-        "ecosystems": [],
-        "networks": [],
-        "grantTypes": [],
-        "organizations": [],
-        "communityRef": [
-          "0x347ed1f64741624223f41b542c38a029fdd5ffa6c13e10082ad37d2772208b7f"
-        ],
-        "website": "",
-        "projectTwitter": "",
-        "type": "program",
-        "bugBounty": "",
-        "anyoneCanJoin": false,
-        "socialLinks": {
-          "twitter": "",
-          "discord": "",
-          "website": "",
-          "orgWebsite": "",
-          "blog": "",
-          "forum": "",
-          "grantsSite": "",
-          "telegram": ""
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "6982345ad9e4269687a7a93f",
       "programId": "1042",
       "type": "grant",
       "chainID": null,
       "name": "Optimism Season 9 - Audit Grants",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-05-20T23:59:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -303,7 +247,7 @@
       "chainID": null,
       "name": "Optimism Season 9 - Growth Grants",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-05-20T23:59:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -357,7 +301,7 @@
       "id": "68a639c6e46c0bf26077fc72",
       "programId": "961",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Optimism ASP",
       "isActive": true,
       "deadline": null,
@@ -417,11 +361,11 @@
       "id": "6930b402d984d9be0cea8a0e",
       "programId": "1013",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Filecoin ProPGF Batch 1",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2025-10-01T23:59:00.000Z",
+      "submissionUrl": "https://app.filpgf.io/programs/1013/apply",
       "communities": [
         {
           "uid": "0x347ed1f64741624223f41b542c38a029fdd5ffa6c13e10082ad37d2772208b7f",
@@ -477,7 +421,7 @@
       "chainID": null,
       "name": "Build Agents for the Real World Hackathon V2",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-03-23T23:59:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -548,10 +492,10 @@
       "id": "690e1ddc56bd3bed0f860bdf",
       "programId": "991",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Polygon Prediction Markets Program",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-02-16T23:59:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -610,11 +554,11 @@
       "id": "6914e3ea8c1ab11d7eb432ca",
       "programId": "996",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Polygon Audit Support Program",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2026-02-16T23:59:00.000Z",
+      "submissionUrl": "https://polygon.areta.market/intro",
       "communities": [
         {
           "uid": "0x955a36b1484633f35b5ade4432f07d9ffd993588e9e34cadefe7bf1588f086ac",
@@ -670,10 +614,10 @@
       "id": "690121c160f1eeec4df73442",
       "programId": "981",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Polygon Growth Partnership Program",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-02-16T23:59:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -740,7 +684,7 @@
       "chainID": null,
       "name": "GEN Ukraine MicroGrant Program",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-02-28T22:00:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -798,7 +742,7 @@
       "chainID": null,
       "name": "Localism Mini Grant Round 01 | Colombia",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-02-07T23:59:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -864,11 +808,11 @@
       "id": "695bbdbb0ff9704c0d6c4547",
       "programId": "1023",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "2025 - Data and Trust Cohort",
       "isActive": true,
       "deadline": null,
-      "submissionUrl": null,
+      "submissionUrl": "https://www.unicefventurefund.org/call/ai-and-blockchain-data-and-trust",
       "communities": [
         {
           "uid": "0x566e414faef4f39ea08ce537ac39cd6eaf39fc04bc1a9ab2cc9e8b1c14733dc7",
@@ -919,10 +863,10 @@
       "id": "68a4a3687a11597f477d71a4",
       "programId": "958",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Optimism Season 8 - Audit Grants",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2025-12-21T08:00:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -980,10 +924,10 @@
       "id": "68a4a3387a11597f477d71a3",
       "programId": "959",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Optimism Season 8 - Growth Grants",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2025-12-21T08:00:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -1038,71 +982,14 @@
       "rfpMetadata": null
     },
     {
-      "id": "6943bcb88cf30b2700dc5b1b",
-      "programId": "1019",
-      "type": "grant",
-      "chainID": 42220,
-      "name": "Builders-Round-3-Test",
-      "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
-      "communities": [
-        {
-          "uid": "0x801528cc69368f07500d669c4636e88a086b8bc6a2fb3c9d71f219f7853e3dba",
-          "name": "GoodDollar",
-          "slug": "good-dollar"
-        }
-      ],
-      "createdAt": "2025-12-18T08:35:04.000Z",
-      "updatedAt": "2025-12-22T18:08:54.000Z",
-      "metadata": {
-        "title": "Good Dollar Builders Round 3",
-        "description": "Good Dollar Builders Round 3 will be launching in 2026.",
-        "shortDescription": "Good Dollar Builders Round 3 will be launching in 2026.",
-        "logoImg": "",
-        "bannerImg": "",
-        "status": "Active",
-        "startsAt": "2025-12-13T17:00:00.000Z",
-        "endsAt": "2026-02-25T17:00:00.000Z",
-        "categories": [],
-        "ecosystems": [],
-        "networks": [],
-        "grantTypes": [],
-        "organizations": [],
-        "programBudget": 0,
-        "communityRef": [
-          "0x801528cc69368f07500d669c4636e88a086b8bc6a2fb3c9d71f219f7853e3dba"
-        ],
-        "website": "",
-        "projectTwitter": "",
-        "type": "program",
-        "bugBounty": "",
-        "socialLinks": {
-          "twitter": "",
-          "discord": "",
-          "website": "",
-          "orgWebsite": "",
-          "blog": "",
-          "forum": "",
-          "grantsSite": "",
-          "telegram": ""
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "68d68abef903faa1a0475ad4",
       "programId": "969",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Scroll Community Grants",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2025-12-19T23:59:00.000Z",
+      "submissionUrl": "https://grantsapp.scroll.io/programs/969/apply",
       "communities": [
         {
           "uid": "0x92c22819704c38087f22ad1d7b900bc9bedb4f4946fafaf90e047e6eb43fc0da",
@@ -1165,73 +1052,13 @@
       "rfpMetadata": null
     },
     {
-      "id": "6914e4d4ffd357aebd1ccb3b",
-      "programId": "995",
-      "type": "grant",
-      "chainID": 42161,
-      "name": "Polygon Builders at Devconnect 2025",
-      "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
-      "communities": [
-        {
-          "uid": "0x955a36b1484633f35b5ade4432f07d9ffd993588e9e34cadefe7bf1588f086ac",
-          "name": "Polygon",
-          "slug": "polygon"
-        }
-      ],
-      "createdAt": "2025-11-12T19:49:40.000Z",
-      "updatedAt": "2025-11-12T23:05:31.000Z",
-      "metadata": {
-        "title": "Polygon Builders at Devconnect 2025",
-        "description": "Polygon Builders at Devconnect 2025\n\nIf you built, spoke, or shipped anything on Polygon during devconnect week in buenos aires — we want to stay in touch.\n\nThis form helps us connect after the event, learn what you’re building, and plug you into ongoing support programs through the Founder Support Fund and Polygon ecosystem teams.\n\nWhy fill this out:\n- Get follow-up access to office hours, founder resources, and growth program\n- Share what you launched or demoed at devconnect\n- Join the next wave of polygon founders building in payments, rwas, defi, gaming, and infra",
-        "logoImg": "",
-        "bannerImg": "",
-        "status": "Active",
-        "startsAt": "2025-11-12T03:00:00.000Z",
-        "endsAt": "2025-11-30T03:00:00.000Z",
-        "categories": [],
-        "ecosystems": [],
-        "networks": [],
-        "grantTypes": [],
-        "organizations": [],
-        "minGrantSize": 0,
-        "maxGrantSize": 0,
-        "programBudget": 0,
-        "amountDistributedToDate": "0",
-        "grantsToDate": 0,
-        "communityRef": [
-          "0x955a36b1484633f35b5ade4432f07d9ffd993588e9e34cadefe7bf1588f086ac"
-        ],
-        "website": "",
-        "projectTwitter": "",
-        "type": "program",
-        "bugBounty": "",
-        "socialLinks": {
-          "twitter": "",
-          "discord": "",
-          "website": "",
-          "orgWebsite": "",
-          "blog": "",
-          "forum": "",
-          "grantsSite": "founders.polygon.technology",
-          "telegram": ""
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "690baaf8521b575c547c3e91",
       "programId": "990",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Local Meetups LATAM | Round 02",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2026-12-31T12:00:00.000Z",
       "submissionUrl": null,
       "communities": [
         {
@@ -1371,7 +1198,7 @@
           "AI"
         ],
         "networks": [],
-        "programBudget": "2026 USD",
+        "programBudget": null,
         "website": "https://code-storm-hackathon.pages.dev/",
         "projectTwitter": "",
         "socialLinks": {
@@ -1414,7 +1241,7 @@
       "updatedAt": "2026-06-21T00:02:37.000Z",
       "metadata": {
         "title": "CodeStorm 2026 #2",
-        "description": "**Build the Future of the Web**\n\nCodeStorm 2026 Month 2 centers on the development of modern, efficient, and innovative web experiences utilizing the latest web technologies.\n\nThis month emphasizes the creation of aesthetically pleasing landing pages, along with robust productivity tools. The objective is to expand the boundaries of web design and functionality. Participants are encouraged to engage in the development of interactive user interfaces, real-time applications, browser-based games, and experimental websites — this is your domain for exploration.\n\nThis hackathon is a segment of the CodeStorm 2026 multi-month series, with each month dedicated to a different technological vertical and creative challenge.\n\nThe event will be conducted virtually via our Discord server. Participation is complimentary, and team sizes may consist of one to six members.\n\nParticipants are urged to prototype swiftly, experiment boldly, and create projects that are both functional and polished while showcasing innovation.\n\n## Month 2 Focus:\n\nNext-Generation Web Experiences\n\nParticipants are invited to develop:\n\n- Interactive websites\n- Productivity applications\n- Creative frontend experiments\n- Browser-based games\n- Real-time web applications\n- AI-powered web utilities\n\n## Guidelines\n- Adhere to the Code of Conduct.\n- Team size: 1–6 members.\n- Projects must be developed exclusively during the hackathon.\n- Utilization of open-source libraries and APIs is permitted.\n- Submissions must include a functioning demonstration or project showcase.\n\nFind us on **Discord**: [Join our server](https://discord.com/invite/a3mE9SMCqb).\n\nFollow us on Instagram: [@code_storm_hackathon](https://www.instagram.com/code_storm_hackathon/).\n\nFor additional information, please visit our official website: [CodeStorm Official Website](https://code-storm-hackathon.pages.de).",
+        "description": "**Build the Future of the Web**\n\nCodeStorm 2026 Month 2 centers on the development of modern, efficient, and innovative web experiences utilizing the latest web technologies.\n\nThis month emphasizes the creation of aesthetically pleasing landing pages, along with robust productivity tools. The objective is to expand the boundaries of web design and functionality. Participants are encouraged to engage in the development of interactive user interfaces, real-time applications, browser-based games, and experimental websites — this is your domain for exploration.\n\nThis hackathon is a segment of the CodeStorm 2026 multi-month series, with each month dedicated to a different technological vertical and creative challenge.\n\nThe event will be conducted virtually via our Discord server. Participation is complimentary, and team sizes may consist of one to six members.\n\nParticipants are urged to prototype swiftly, experiment boldly, and create projects that are both functional and polished while showcasing innovation.\n\n## Month 2 Focus:\n\nNext-Generation Web Experiences\n\nParticipants are invited to develop:\n\n- Interactive websites\n- Productivity applications\n- Creative frontend experiments\n- Browser-based games\n- Real-time web applications\n- AI-powered web utilities\n\n## Guidelines\n- Adhere to the Code of Conduct.\n- Team size: 1–6 members.\n- Projects must be developed exclusively during the hackathon.\n- Utilization of open-source libraries and APIs is permitted.\n- Submissions must include a functioning demonstration or project showcase.\n\nFind us on **Discord**: [Join our server](https://discord.com/invite/a3mE9SMCqb).\n\nFollow us on Instagram: [@code_storm_hackathon](https://www.instagram.com/code_storm_hackathon/).\n\nFor additional information, please visit our official website: [CodeStorm Official Website](https://code-storm-hackathon.pages.dev/).",
         "shortDescription": "**Build the Future of the Web**\n\nCodeStorm 2026 Month 2 centers on the development of modern,...",
         "status": "active",
         "startsAt": "2026-06-01T18:29:00.000Z",
@@ -1426,7 +1253,7 @@
           "AI"
         ],
         "networks": [],
-        "programBudget": "2026 USD",
+        "programBudget": null,
         "website": "https://code-storm-hackathon.pages.dev/",
         "projectTwitter": "",
         "socialLinks": {
@@ -1550,56 +1377,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "6a33357e883eef59e66797b9",
-      "programId": "1495",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "Ignisys 1.O",
-      "isActive": true,
-      "deadline": "2026-07-28T18:29:00.000Z",
-      "submissionUrl": "https://ignisys-ignitia.devfolio.co",
-      "createdAt": "2026-06-18T00:02:06.000Z",
-      "updatedAt": "2026-06-18T00:10:15.000Z",
-      "metadata": {
-        "title": "Ignisys 1.O",
-        "description": "Accelerate your impact. This intensive innovation sprint brings together multidisciplinary teams to solve complex, real-world problems under structured time constraints. Designed for visionaries and tech enthusiasts, this experience is engineered to cultivate rapid prototyping, rigorous collaboration, and high-impact innovation.",
-        "shortDescription": "Accelerate your impact.",
-        "status": "active",
-        "startsAt": "2026-08-01T04:30:00.000Z",
-        "endsAt": "2026-08-02T04:30:00.000Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "Ethereum"
-        ],
-        "networks": [],
-        "programBudget": "",
-        "website": "https://www.ignitia.live/",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://www.ignitia.live/",
-          "grantsSite": "https://ignisys-ignitia.devfolio.co"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-08-01T04:30:00.000Z",
-        "endDate": "2026-08-02T04:30:00.000Z",
-        "location": "University of Engineering & Management, Kolkata (UEM), New Town Road, Action Area III, Newtown, New Town, West Bengal, India",
-        "tracks": [],
-        "prizes": [],
-        "registrationDeadline": "2026-07-28T18:29:00.000Z",
-        "teamSize": {
-          "min": 1,
-          "max": 2
-        }
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "6a33357e883eef59e66797b8",
       "programId": "1494",
       "type": "hackathon",
@@ -1665,7 +1442,7 @@
       "metadata": {
         "title": "MicroCraft - ArcNight",
         "description": "ARC Night is the flagship hackathon of [MicroCraft](https://micro-craft.microsoftinnovations.club/), a summer innovation series that has already engaged 2,000+ participants. Inspired by the excitement of arcade gaming, ARC Night brings together developers, designers, and innovators to solve real-world challenges, build impactful solutions, and compete for a ₹2,00,000 prize pool.\n\nWhether you're taking your first step into hackathons or looking to push your limits, ARC Night is where ideas come to life.\n\nPress Start to Innovation.",
-        "shortDescription": "ARC Night is the flagship hackathon of [MicroCraft](https://micro-craft.microsoftinnovations.",
+        "shortDescription": "",
         "status": "active",
         "startsAt": "2026-06-13T06:30:00.000Z",
         "endsAt": "2026-06-14T10:30:00.000Z",
@@ -1800,48 +1577,6 @@
       "hackathonMetadata": {
         "startDate": "2026-04-30T00:00:00.000Z",
         "endDate": "2026-06-15T23:59:00.000Z",
-        "location": "TBD"
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69fbd75e93e5c960b9124b0d",
-      "programId": "1466",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "Mantle Turing Test Hackathon",
-      "isActive": false,
-      "deadline": "2026-06-15T00:00:00.000Z",
-      "submissionUrl": "https://dorahacks.io/hackathon/mantleturingtesthackathon2026/detail",
-      "createdAt": "2026-05-07T00:05:50.000Z",
-      "updatedAt": "2026-06-15T00:02:11.000Z",
-      "metadata": {
-        "title": "Mantle Turing Test Hackathon",
-        "description": "Phase 2 (AI Awakening) challenges builders to create AI agents operating on-chain with verifiable performance across 6 tracks. Open to developers, AI builders, and Web3 innovators globally. Register and submit projects online for a share of the prize pool.",
-        "shortDescription": "Phase 2 (AI Awakening) challenges builders to create AI agents operating on-chain with...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-06-15",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "Mantle"
-        ],
-        "networks": [],
-        "programBudget": "100000 USD",
-        "website": "",
-        "projectTwitter": "",
-        "socialLinks": {
-          "grantsSite": "https://dorahacks.io/hackathon/mantleturingtesthackathon2026/detail"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "",
-        "endDate": "2026-06-15",
         "location": "TBD"
       },
       "bountyMetadata": null,
@@ -2039,7 +1774,7 @@
       "name": "Open House London Buildathon",
       "isActive": false,
       "deadline": "2026-06-14T00:00:00.000Z",
-      "submissionUrl": null,
+      "submissionUrl": "https://arbitrum-london.hackquest.io/buildathons/Arbitrum-Open-House-London-Online-Buildathon",
       "createdAt": "2026-05-01T14:31:02.000Z",
       "updatedAt": "2026-06-14T00:02:08.000Z",
       "metadata": {
@@ -2170,57 +1905,6 @@
           "max": 4
         }
       },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69ffcb7738cd33e7348c0e56",
-      "programId": "1477",
-      "type": "grant",
-      "chainID": null,
-      "name": "Base Ambassador Program",
-      "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
-      "createdAt": "2026-05-10T00:04:07.000Z",
-      "updatedAt": "2026-06-08T05:14:12.000Z",
-      "metadata": {
-        "title": "Base Ambassador Program",
-        "description": "Reopened applications for community builders, developers, and advocates to join Base ecosystem; active participants eligible for builder grants. Involves growing awareness, mentoring, feedback; Builder Network form connects founders/devs for support. Apply via Discord forms for roles and potential funding.",
-        "shortDescription": "Reopened applications for community builders, developers, and advocates to join Base ecosystem;...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "Base"
-        ],
-        "networks": [],
-        "grantTypes": [],
-        "organizations": [],
-        "programBudget": "",
-        "communityRef": [],
-        "website": "https://docs.base.org/get-started/country-leads-and-ambassadors",
-        "projectTwitter": "",
-        "type": "program",
-        "bugBounty": "",
-        "anyoneCanJoin": true,
-        "socialLinks": {
-          "twitter": "",
-          "discord": "",
-          "website": "https://docs.base.org/get-started/country-leads-and-ambassadors",
-          "orgWebsite": "",
-          "blog": "",
-          "forum": "",
-          "grantsSite": "https://docs.base.org/get-started/country-leads-and-ambassadors",
-          "telegram": ""
-        }
-      },
-      "hackathonMetadata": null,
       "bountyMetadata": null,
       "acceleratorMetadata": null,
       "vcFundMetadata": null,
@@ -2406,7 +2090,7 @@
           "AI"
         ],
         "networks": [],
-        "programBudget": "2026 USD",
+        "programBudget": null,
         "website": "https://code-storm-hackathon.pages.dev/",
         "projectTwitter": "",
         "socialLinks": {
@@ -2794,57 +2478,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "69f4be74094334d0516f75f3",
-      "programId": "1457",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Write a Twitter Thread on Kimia Protocol",
-      "isActive": false,
-      "deadline": "2026-05-26T18:29:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/write-a-twitter-thread-on-kimia-protocol",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-27T00:02:10.000Z",
-      "metadata": {
-        "title": "Write a Twitter Thread on Kimia Protocol",
-        "description": "## About Kimia Protocol\n\nKimia is a Solana-native fixed-income protocol. It combines an on-chain perpetual futures exchange, a delta-neutral yield vault, and a tokenization layer that splits yield-bearing positions into **Principal (PT)** and **Yield (YT)** tokens, so traders can lock fixed rates, speculate on funding, or earn passively.Everything on Kimia is composable: the perp, the vault, the split, and the AMM are separate Anchor programs you can use in isolation.  \n  \n**What we’re building**\n\nA single, composable stack on Solana that turns perpetual funding into transferable, tradable, lendable fixed income:\n\n-   **On-chain perpetuals** with permissionless liquidation, Pyth Hermes pull oracles, and no privileged keepers, the yield source.\n    \n-   **A delta-neutral vault** that owns the hedge for you, the yield generator.\n    \n-   **PT + YT tokenization** so yield becomes two ERC20-style tokens you can sell, lend, or bundle, the yield distribution layer.\n    \n-   **A yield-space AMM** where PT and underlying trade at a price that decays into par at maturity, the fixed-rate discovery layer.\n    \n-   **An intent router** that guarantees the end-to-end APY you asked for, across three transactions, the UX layer.\n    \n-   **KUSD Stablecoin** introduces delayed settlement.\n    \n\n## **Your Mission**\n\nDive deep into Kimia Protocol and create an **engaging Twitter thread** with **6+ tweets** that showcases your understanding. The ideal submission will:\n\n1.  **Introduce Kimia** and its background.\n    \n2.  Explain how **the problems we are solving and if it is noble.**\n    \n3.  Present an overview of **Kimia Protocol’s core features** and how it differs from it’s competitors.\n    \n4.  Discuss the **role of Solana** and how it can be the home of ‘The yield layer for perps’.\n    \n5.  Explain the **potential impact of Kimia** on the broader DeFi landscape.\n    \n6.  Roast us, give us your genuine feedbacks.\n    \n\n### **Bonus Points for:**\n\n-   Including **memes, screenshots, infographics** or other engaging visuals.\n    \n-   Writing in a way that is accessible to **crypto newcomers** and seasoned DeFi enthusiasts alike.\n    \n-   Ending your thread with a **call-to-action** about how to follow the project and stay updated. (Mainly by following Twitter and joining the telegram group)\n    \n-   **Highlight what you want as a user.** Also tell us what can be the possible experimentation that you can do with it.\n    \n\n## Submission Requirements\n\n-   Does your thread cover all of the points mentioned above?\n    \n-   Does your thread have **at least 6 tweets**?\n    \n-   Does your thread include **visuals** or a **CTA**?\n    \n-   Did you tag **@KimiaProtocol** in the post?\n    \n\n### Judging Criteria\n\n-   Is your thread **engaging and fun** to read?\n    \n-   Did you avoid **overly complex jargon**?\n    \n-   Did you explain concepts in a way that’s **easy to understand** for a new audience?\n    \n-   You have some crazy amount of **traction**!\n    \n-   **If you are making a video on it, it’s a bonus!**\n    \n-   You should have joined the Kimia telegram community [https://t.me/communitykimia](https://t.me/communitykimia)\n    \n\n### Resources\n\n-   **Website:** [Kimia Protocol](https://kimia.live/)\n    \n-   **Twitter:** [@KimiaProtocol](https://x.com/KimiaProtocol)\n    \n-   **Documentation:** [Kimia Doc](https://docs.kimia.live/introduction)s\n    \n-   **Community:** [Telegram](https://t.me/communitykimia)",
-        "shortDescription": "## About Kimia Protocol\n\nKimia is a Solana-native fixed-income protocol.",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-26T18:29:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Kimia"
-        ],
-        "programBudget": "110 USDC",
-        "website": "https://superteam.fun/earn/listing/write-a-twitter-thread-on-kimia-protocol",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/write-a-twitter-thread-on-kimia-protocol",
-          "grantsSite": "https://superteam.fun/earn/listing/write-a-twitter-thread-on-kimia-protocol"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 110,
-          "currency": "USDC"
-        },
-        "skills": [
-          "Content"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "69f4be74094334d0516f75f2",
       "programId": "1456",
       "type": "bounty",
@@ -2858,7 +2491,7 @@
       "metadata": {
         "title": "Create Your Own Currency on Flipcash",
         "description": "![](https://res.cloudinary.com/dgvnuwspr/image/upload/v1777460305/listing-description/oyrbgb7yrhsuemf0mui3.webp)\n\n# The Flipcash Currency Creator\n\n### The best of Bitcoin, Stablecoins, and Memecoins, combined into a magical payments experience\n\nFlipcash is a new platform that lets anyone create a currency and immediately use it as money. You can send it, spend it, or tip it.\n\nEvery currency is created with 21 million coins. Those coins are deposited into a trustless on-chain Reserve that manages supply and liquidity. This fixed supply can never increase, just like Bitcoin, so as adoption of your currency grows, so does its value.\n\nThe Reserve sells coins on a fixed pricing curve, taking payment in USDF, and buys coins from users on the same curve, guaranteeing liquidity and a price per coin at all times.\n\nThis system allows a community to create and use a currency while sharing in the upside as the community grows. The ultimate win win.\n\nYou can learn more at [flipcash.com](http://flipcash.com)\n\n# The Bounty\n\n### The bounty is simple: create a currency for your community and drive adoption\n\nBounty rewards will be allocated to the submissions with the highest position on the Flipcash leaderboard, which is ranked by the number of people using a currency.\n\nWe’d recommend checking out these currencies as examples of how others are building their community: \n\n-   [Moony](https://x.com/moonycoin)\n    \n-   [Jeffy](https://x.com/jeffycurrency)\n    \n\n# The Reward Structure\n\n-   **First Place: $1,000**\n    \n-   **Second Place: $500**\n    \n-   **Third Place: $250**\n    \n-   **Discretionary Bonus Rewards: $100 each**\n    \n    -   There are additional bonuses available for the most creative content highlighting a currency on Flipcash\n        \n    -   This could be a thread, a video, or anything you think will resonate with your community\n        \n\n# Creating a Currency\n\nCreating a currency is simple:\n\n1.  [Download the Flipcash app](https://flipcash.com)\n    \n2.  Tap Wallet → Discover Currencies → Create Your Own Currency\n    \n3.  Pick a name, icon, description, and customize your bill\n    \n4.  Pay $20 to create your currency. You will get the first $5 of your currency for free\n    \n\nYou can then buy more of your currency, or convert to dollars at any time in Flipcash.\n\n_Note: Once you’ve created your currency, you can send a message to @tphilp on Telegram to apply for a “demo budget” to help you get started sharing your currency with your community._\n\n# Submission Criteria\n\nEligible submissions must include: \n\n1.  Your currency info link \n    \n2.  Proof that you created the currency (a screenshot from the currency creation process)\n    \n3.  A tweet about your currency, tagging the [@flipcash](https://x.com/flipcash) account\n    \n\nTo be eligible, your currency must have:\n\n-   At least 20 people using it\n    \n-   More than $200 of circulating value\n    \n\n# Relevant Links\n\n-   **Website:** [flipcash.com](https://flipcash.com)\n    \n-   **Twitter:** [@flipcash](https://x.com/flipcash)\n    \n\n## The future has many currencies. It's time to create your own.",
-        "shortDescription": "![](https://res.cloudinary.",
+        "shortDescription": "",
         "status": "active",
         "startsAt": "",
         "endsAt": "2026-05-23T03:59:59.999Z",
@@ -2998,8 +2631,8 @@
       "chainID": null,
       "name": "Prezenti Anchor Pool",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2026-06-30T23:59:00.000Z",
+      "submissionUrl": "https://anchor.prezenti.xyz/",
       "communities": [
         {
           "uid": "0x67cce5e1bd0851f8c51b2baca9d556ed447efdfe5309e2b1668d92a48fbe1f2d",
@@ -3071,8 +2704,8 @@
       "chainID": null,
       "name": "Prezenti Boost Pool S2",
       "isActive": true,
-      "deadline": null,
-      "submissionUrl": null,
+      "deadline": "2026-06-30T23:59:00.000Z",
+      "submissionUrl": "https://www.prezenti.xyz/grants",
       "communities": [
         {
           "uid": "0x67cce5e1bd0851f8c51b2baca9d556ed447efdfe5309e2b1668d92a48fbe1f2d",
@@ -3151,10 +2784,10 @@
       "id": "66ec672f77894b9f213ebbcf",
       "programId": "600",
       "type": "grant",
-      "chainID": 42161,
+      "chainID": null,
       "name": "Prezenti Mint Round",
       "isActive": true,
-      "deadline": null,
+      "deadline": "2024-11-30T08:00:00.000Z",
       "submissionUrl": null,
       "createdAt": "2024-09-19T18:02:23.000Z",
       "updatedAt": "2026-05-18T13:37:50.000Z",
@@ -3327,100 +2960,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "69fde65f97603b6e5dc68040",
-      "programId": "1473",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "QIE Blockchain Hackathon",
-      "isActive": false,
-      "deadline": "2026-05-15T00:00:00.000Z",
-      "submissionUrl": "https://qie.io/hackathon",
-      "createdAt": "2026-05-08T13:34:23.000Z",
-      "updatedAt": "2026-05-15T00:02:35.000Z",
-      "metadata": {
-        "title": "QIE Blockchain Hackathon",
-        "description": "Hackathon for global builders to develop dApps on QIE Layer 1 blockchain across DeFi & Payments, AI + Web3, Gaming, Infrastructure, Social & Community tracks. $20K+ prize pool with potential $1M special prize, investment, or grants for high-traction projects. EVM & Cosmos compatible with low fees.",
-        "shortDescription": "Hackathon for global builders to develop dApps on QIE Layer 1 blockchain across DeFi & Payments,...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-15",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "QIE"
-        ],
-        "networks": [],
-        "programBudget": "20000 USD",
-        "website": "https://qie.io",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://qie.io",
-          "grantsSite": "https://qie.io/hackathon"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "",
-        "endDate": "2026-05-15",
-        "location": "TBD"
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be74094334d0516f75ed",
-      "programId": "1451",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Capture Instagram Content at Superteam Ukraine's BuildStation Events",
-      "isActive": false,
-      "deadline": "2026-05-13T20:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/capture-instagram-content-at-superteam-ukraines-buildstation-events",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-14T00:02:36.000Z",
-      "metadata": {
-        "title": "Capture Instagram Content at Superteam Ukraine's BuildStation Events",
-        "description": "## About Superteam Ukraine\n\nSuperteam Ukraine is a group of people passionate about Web3. We're all about building cool stuff and helping each other out. Our goal is to grow the Web3 ecosystem in Ukraine and connect talented individuals with exciting opportunities.\n\n## Mission\n\nCreate engaging, user-generated content for Instagram by capturing moments at our BuildStation events.\n\n## Scope Detail\n\n-   Attend Superteam Ukraine's BuildStation events happening until May 11th.\n    \n-   Develop various content types:\n    \n    -   Instagram Stories\n        \n    -   Reels\n        \n    -   Photos\n        \n-   Ensure all content organically showcases Superteam Ukraine and its activities.\n    \n-   Tag Superteam Ukraine in all published content.\n    \n-   Focus on native storytelling about our community and events.\n    \n\n## Submission Requirements\n\n-   Content must be published as live Instagram Posts, Stories, or Reels.\n    \n-   All content must be publicly visible on Instagram.\n    \n-   Include relevant tags for Superteam Ukraine.\n    \n-   You must be subscribed to our Instagram.\n    \n-   Submit here a Doc with screenshots or links to the content you created, tagging Superteam Ukraine.\n    \n\n## Judging Criteria\n\n-   **Creativity and Originality:** How unique and engaging is the content?\n    \n-   **Relevance to Superteam Ukraine:** Does the content effectively highlight our events and community?\n    \n-   **Engagement:** Content that generates likes, comments, shares, and saves will be highly valued.\n    \n-   **Quality of Content:** Clarity of photos, video quality, and storytelling in captions/reels.\n    \n-   **Consistency with Brand Voice:** Content should align with a positive and community-focused image.\n    \n-   **Quantity:** The more you do, the higher the chances of winning.\n    \n\n## Resourses\n\n-   Events schedule: [Luma](https://luma.com/superteamua)\n    \n\n⚠️ Some events require you to participate in the hackathon.\n\n-   Instagram [Superteam Ukraine](https://www.instagram.com/superteamua/)\n    \n\n## Reward Structure\n\n-   1st Place: 200 USDG\n    \n-   2nd Place: 100 USDG\n    \n-   3rd Place: 50 USDG",
-        "shortDescription": "## About Superteam Ukraine\n\nSuperteam Ukraine is a group of people passionate about Web3.",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-13T20:59:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Superteam Ukraine"
-        ],
-        "programBudget": "350 USDG",
-        "website": "https://superteam.fun/earn/listing/capture-instagram-content-at-superteam-ukraines-buildstation-events",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/capture-instagram-content-at-superteam-ukraines-buildstation-events",
-          "grantsSite": "https://superteam.fun/earn/listing/capture-instagram-content-at-superteam-ukraines-buildstation-events"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 350,
-          "currency": "USDG"
-        },
-        "skills": [
-          "Content"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "69f4be74094334d0516f75ee",
       "programId": "1452",
       "type": "bounty",
@@ -3512,57 +3051,6 @@
         "reward": {
           "amount": 300,
           "currency": "USDC"
-        },
-        "skills": [
-          "Content"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be74094334d0516f75e9",
-      "programId": "1447",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Create Content from Inside The Garage",
-      "isActive": false,
-      "deadline": "2026-05-11T02:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/create-content-from-inside-the-garage",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-12T00:02:23.000Z",
-      "metadata": {
-        "title": "Create Content from Inside The Garage",
-        "description": "# Crie Conteúdo no the/Garage\n\n## Sobre\n\nVocê chegou no the/Garage. Agora mostre pro mundo o que está acontecendo aqui.\n\nEsta bounty é exclusiva para builders presentes no the/Garage na Solana House em São Paulo. Se você está na sala — buildando, aprendendo, almoçando com a galera, assistindo a um workshop — queremos que você documente e compartilhe com o mundo.\n\nO melhor conteúdo vai vir de quem está vivendo a experiência. Sem roteiro, só a sua perspectiva de dentro da primeira Build Station Solana do Brasil.\n\n* * *\n\n## Recompensas\n\n🏅 5 vencedores — $100 USDC cada\n\n**Total: $500 USDC**\n\n* * *\n\n## O Que Estamos Procurando\n\nUma thread no X que capture the/Garage por dentro — a energia, as pessoas, a infraestrutura, os momentos.\n\nSeu conteúdo deve dar a quem não está aqui uma noção real de como é estar na sala: 40 builders na reta final do Colosseum Frontier, almoço grátis todo dia, workshops internacionais no palco, happy hours nas sextas, sessões de bem-estar aos sábados.\n\nMostre a experiência. Faça alguém querer estar aqui.\n\nConteúdo sem esforço, spam ou gerado por IA não será considerado.\n\n* * *\n\n## Entregáveis\n\nSubmeta **uma thread no X** com no mínimo 3 tweets.\n\n### Requisitos obrigatórios:\n\n-   **Pelo menos um vídeo de 30 segundos ou mais** filmado no the/Garage — footage bruto está ótimo, editado é melhor, criativo é o ideal. Fotos também são bem-vindas para complementar a thread.\n    \n-   Deve utilizar elementos visuais do [The Garage Brand Kit](https://drive.google.com/drive/folders/1pW2hTfncWCERzKQ4sAezSh4rRAVjO3Pw?usp=sharing) — **submissões sem elementos de branding não serão consideradas**\n    \n-   Deve mencionar a infraestrutura que a Superteam Brasil está oferecendo à comunidade — fique à vontade para destacar:\n    \n    -   Café da manhã, almoço e coffee break gratuitos todos os dias durante as 3 semanas\n        \n    -   Workshops internacionais imersivos no palco e com membros locais do Superteam brasil\n        \n    -   Happy hours nas sextas\n        \n    -   Sessões de bem-estar aos sábados\n        \n-   Deve incluir o link de cadastro no Luma: [luma.com/user/superteambr](https://luma.com/user/superteambr)\n    \n-   Deve marcar **@SuperteamBR**\n    \n-   O conteúdo deve ser publicado publicamente\n    \n-   Contas com menos de 50 seguidores ou que aparentem ser bots não serão consideradas\n    \n\n* * *\n\n## Critérios de Avaliação\n\n-   **Autenticidade & Imersão (35%)** — Dá a sensação de estar dentro de the/Garage?\n    \n-   **Criatividade (30%)** — Ângulo original, gancho forte, execução marcante\n    \n-   **Completude (20%)** — Todos os elementos obrigatórios presentes e bem integrados\n    \n-   **Call-to-Action (15%)** — Inspira alguém a aparecer ou acompanhar a jornada?\n    \n\n* * *\n\n## Como Submeter\n\nSubmeta pelo Superteam Earn com:\n\n-   Um link para sua thread no X\n    \n-   Uma descrição de 2 a 3 linhas sobre seu ângulo e abordagem\n    \n\n* * *\n\n## Prazo\n\n-   **Deadline para submissões:** 9 de maio (Demo Day)\n    \n-   **Anúncio dos vencedores:** Até 5 dias após o deadline\n    \n-   **Pagamento:** Até 15 dias após o anúncio dos vencedores\n    \n\n* * *\n\n## Termos\n\n-   Apenas submissões de builders presencialmente em the/Garage durante o evento serão consideradas\n    \n-   Todas as submissões devem ser trabalho original\n    \n-   O conteúdo deve permanecer publicado até o anúncio dos vencedores\n    \n-   Uma submissão por pessoa\n    \n-   Recompensas pagas em USDG\n    \n\n* * *\n\n## Contato\n\nDúvidas? Fale com a gente:\n\n-   **Telegram:** [t.me/+LXD2N5HhchFhNmMx](https://t.me/+LXD2N5HhchFhNmMx)\n    \n-   **Twitter:** [@SuperteamBR](https://x.com/SuperteamBR)\n    \n\n* * *\n\n**Skills Necessárias:** Criação de Conteúdo, Produção de Vídeo, Redes Sociais\n\n**Elegibilidade:** Participantes presenciais do the/Garage — Solana House, São Paulo 🇧🇷\n\n* * *\n\n* * *\n\n# Create Content from Inside The Garage\n\n## About\n\nYou're at the/Garage. Now show the world what's happening here.\n\nThis bounty is exclusively for builders attending the/Garage at Solana House in São Paulo. If you're in the room — building, learning, eating lunch with the crew, catching a workshop — we want you to document it and share it with the world.\n\nThe best content will come from people who are living the experience. No scripts needed, just your perspective from inside Brazil's first Solana Build Station.\n\n* * *\n\n## Rewards\n\n🏅 5 winners — $100 USDC each\n\n**Total Prize Pool: $500 USDC**\n\n* * *\n\n## What We're Looking For\n\nA thread on X that captures the/Garage from the inside — the energy, the people, the infrastructure, the moments.\n\nYour content should give someone who isn't there a real sense of what it's like to be in the room: 40 builders grinding through the final stretch of Colosseum Frontier, free lunch every day, international workshops on the stage, Friday happy hours, wellness sessions on Saturdays.\n\nShow the experience. Make someone wish they were here.\n\nLow-effort, spammy, or clearly AI-generated content will not be considered.\n\n* * *\n\n## Deliverables\n\nSubmit **one X thread** with a minimum of 3 tweets.\n\n### Mandatory requirements:\n\n-   **At least one video of 30 seconds or more** filmed inside the/Garage — raw footage is fine, edited is better, creative is best. Photos are also welcome to complement the thread.\n    \n-   Must use branding elements from the [The Garage Brand Kit](https://drive.google.com/drive/folders/1pW2hTfncWCERzKQ4sAezSh4rRAVjO3Pw?usp=sharing) — **submissions without branding elements will not be considered**\n    \n-   Must mention the infrastructure Superteam Brasil is providing to the community — feel free to highlight:\n    \n    -   Free breakfast, lunch, and coffee break every day during the 3 weeks\n        \n    -   Immersive international workshops on the stage and local Superteam Brasil members\n        \n    -   Friday happy hours\n        \n    -   Saturday wellness sessions\n        \n-   Must include the Luma registration link: [luma.com/user/superteambr](https://luma.com/user/superteambr)\n    \n-   Must tag **@SuperteamBR**\n    \n-   Content must be posted publicly\n    \n-   Accounts with fewer than 50 followers or that appear to be bots will not be considered\n    \n\n* * *\n\n## Evaluation Criteria\n\n-   **Authenticity & Immersion (35%)** — Does it make you feel like you're inside the/Garage?\n    \n-   **Creativity (30%)** — Original angle, strong hook, memorable execution\n    \n-   **Completeness (20%)** — All mandatory elements present and well integrated\n    \n-   **Call-to-Action (15%)** — Does it inspire someone to show up or follow the journey?\n    \n\n* * *\n\n## How to Submit\n\nSubmit through Superteam Earn with:\n\n-   A link to your X thread\n    \n-   A 2–3 line description of your angle and approach\n    \n\n* * *\n\n## Timeline\n\n-   **Submission Deadline:** May 9 (Demo Day)\n    \n-   **Winner Announcement:** Within 5 days after deadline\n    \n-   **Payment:** Within 15 days after winner announcement\n    \n\n* * *\n\n## Terms\n\n-   Only submissions from builders physically present at the/Garage during the event will be considered\n    \n-   All submissions must be original work\n    \n-   Content must remain published until winners are announced\n    \n-   One submission per person\n    \n-   Rewards paid in USDC\n    \n\n* * *\n\n## Contact\n\nQuestions? Reach out:\n\n-   **Telegram:** [t.me/+LXD2N5HhchFhNmMx](https://t.me/+LXD2N5HhchFhNmMx)\n    \n-   **Twitter:** [@SuperteamBR](https://x.com/SuperteamBR)\n    \n\n* * *\n\n**Skills Needed:** Content Creation, Video Production, Social Media\n\n**Eligibility:** In-person attendees of the/Garage — Solana House, São Paulo 🇧🇷",
-        "shortDescription": "# Crie Conteúdo no the/Garage\n\n## Sobre\n\nVocê chegou no the/Garage.",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-11T02:59:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Superteam Brasil"
-        ],
-        "programBudget": "500 USDG",
-        "website": "https://superteam.fun/earn/listing/create-content-from-inside-the-garage",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/create-content-from-inside-the-garage",
-          "grantsSite": "https://superteam.fun/earn/listing/create-content-from-inside-the-garage"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 500,
-          "currency": "USDG"
         },
         "skills": [
           "Content"
@@ -3786,7 +3274,7 @@
       "name": "Confidential Onchain Finance Bounty",
       "isActive": false,
       "deadline": "2026-05-10T00:00:00.000Z",
-      "submissionUrl": null,
+      "submissionUrl": "https://forms.gle/h2vdBaZ9zwmLVzeu5",
       "createdAt": "2026-04-14T02:08:46.000Z",
       "updatedAt": "2026-05-10T00:04:11.000Z",
       "metadata": {
@@ -3866,110 +3354,6 @@
         },
         "skills": [
           "Design"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be74094334d0516f75e7",
-      "programId": "1445",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Tramplin Affiliate Program — Meme Challenge",
-      "isActive": false,
-      "deadline": "2026-05-08T22:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/tramplin-affiliate-program-meme-challenge",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-09T00:04:47.000Z",
-      "metadata": {
-        "title": "Tramplin Affiliate Program — Meme Challenge",
-        "description": "## **The Challenge**\n\nTramplin just launched a **$10,000 + 21 SOL affiliate program** exclusively for Nigerians - but here's the thing: it's got sprint leaderboards, 7 tiers, random SOL redistributions and a 2× referral boost. A lot of people won't read the full page.\n\n**Your job is to make it impossible NOT to understand.**\n\nWe're looking for the clearest, most creative visual breakdowns that explain how Tramplin's affiliate program works. The kind of content you'd send to a friend who asks \"wait, how does this actually work?\"\n\n## **What is Tramplin?**\n\nTramplin is a native staking protocol on Solana that pools staking rewards and redistributes them - so smaller stakers can win outsized payouts. Your SOL never leaves your wallet. Average APR across stakers: 54.10%. Audited by MixBytes, backed by iTreasury Ventures.\n\n**Full affiliate program page:** [**https://ng.tramplin.io/**](https://ng.tramplin.io/)\n\n### **Your Task**\n\nCreate a **meme** that explains or promotes any aspect of the affiliate program.\n\n**Ideas to riff on:**\n\n-   The leaderboard reset (everyone starts from zero each tier)\n    \n-   The random SOL redistribution (3 lucky affiliates get 1 SOL each)\n    \n-   The 2× boost for your referrals\n    \n-   The $10,000 total reward pool\n    \n-   \"Explaining this program to my friends\" energy\n    \n-   The sprint mechanic (race to the tier, then reset)\n    \n\n### Format\n\n-   Image or short video, max 30 sec.\n    \n-   Must be shareable on X/Twitter.\n    \n\n### Judging Criteria\n\n1.  **Humor / shareability** - Would people actually repost this? (50%)\n    \n2.  **Program accuracy** - Does it reflect real mechanics? (30%)\n    \n3.  **Originality** (20%)\n    \n\n### **Submission Requirements**\n\n-   Post your submission on X/Twitter and tag **@Tramplin\\_io** + **@SuperteamNG**\n    \n-   Include the hashtag **#TramplinAffiliate**\n    \n-   Submit the X/Twitter post link on Superteam Earn\n    \n\n  \n**Bonus (not required, but encouraged):** If you want to actually earn affiliate commissions on top of the bounty prize. DM [@Tramplin\\_io](https://x.com/Tramplin_io) on X or reach out on [Telegram](https://t.me/tramplin_io) to get your personal affiliate link. Include it in your post and start earning from day one.\n\n### **Rules**\n\n-   One submission per track per person (you can enter both tracks)\n    \n-   No AI-generated images - you can use AI as a tool, but the final output must show clear human creative direction\n    \n-   Submissions with factual errors about the program mechanics will be disqualified\n    \n-   Plagiarism = instant disqualification\n    \n-   Must be original work created for this bounty\n    \n\n## Resources\n\n[**Stake on Tramplin**](https://tramplin.io)\n\n[**Apply as Affiliate**](https://ng.tramplin.io/)\n\n[**Telegram Community**](https://t.me/tramplin_io)\n\n[**Discord**](https://discord.gg/GUcARPNyY8)\n\n[**Twitter / X**](https://x.com/Tramplin_io)\n\n[**Official Blog**](https://blog.tramplin.io/)\n\n## _Terms_\n\n_Participation in this bounty is entirely voluntary. Bounties are a way to learn and dabble in opportunities to build in web3. These are neither full time jobs nor project based engagement. Please be advised that the sponsors will not have time for individualized feedback due to the number of entries we receive._",
-        "shortDescription": "## **The Challenge**\n\nTramplin just launched a **$10,000 + 21 SOL affiliate program**...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-08T22:59:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Tramplin"
-        ],
-        "programBudget": "200 USDC",
-        "website": "https://superteam.fun/earn/listing/tramplin-affiliate-program-meme-challenge",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/tramplin-affiliate-program-meme-challenge",
-          "grantsSite": "https://superteam.fun/earn/listing/tramplin-affiliate-program-meme-challenge"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 200,
-          "currency": "USDC"
-        },
-        "skills": [
-          "Design",
-          "Content"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be74094334d0516f75e8",
-      "programId": "1446",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Tramplin Affiliate Program — Visual Explainer Bounty",
-      "isActive": false,
-      "deadline": "2026-05-08T22:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/tramplin-affiliate-program-visual-explainer-bounty",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-09T00:04:47.000Z",
-      "metadata": {
-        "title": "Tramplin Affiliate Program — Visual Explainer Bounty",
-        "description": "## **The Challenge**\n\nTramplin just launched a **$10,000 + 21 SOL affiliate program** exclusively for Nigerians - but here's the thing: it's got sprint leaderboards, 7 tiers, random SOL redistributions and a 2× referral boost. A lot of people won't read the full page.\n\n**Your job is to make it impossible NOT to understand.**\n\nWe're looking for the clearest, most creative visual breakdowns that explain how Tramplin's affiliate program works. The kind of content you'd send to a friend who asks \"wait, how does this actually work?\"\n\n## **What is Tramplin?**\n\nTramplin is a native staking protocol on Solana that pools staking rewards and redistributes them - so smaller stakers can win outsized payouts. Your SOL never leaves your wallet. Average APR across stakers: 54.10%. Audited by MixBytes, backed by iTreasury Ventures.\n\n**Full affiliate program page:** [**https://ng.tramplin.io/**](https://ng.tramplin.io/)\n\n### **Your Task**\n\nCreate an **infographic, flowchart, diagram, or illustrated guide** that explains Tramplin's affiliate program clearly.\n\n**Your explainer must cover:**\n\n-   How to join (stake 1 SOL → apply → get link → share)\n    \n-   The two earning mechanics: Sprint Leaderboard (top 3 split) + Random Redistribution (3 × 1 SOL)\n    \n-   The 7-tier milestone system (100 → 500 → 1K → 2K → 5K → 8K → 10K SOL)\n    \n-   What the leaderboard reset means (fresh race at each tier)\n    \n-   The 2× stake weight boost for referrals (your strongest conversion hook)\n    \n\n### Format\n\n-   Single image, carousel (up to 5 slides), or a short animated visual.\n    \n-   Must be shareable on X/Twitter.\n    \n\n### Judging Criteria\n\n1.  **Accuracy** - Does it correctly represent the mechanics? (40%)\n    \n2.  **Clarity** - Would someone with zero context understand it? (30%)\n    \n3.  **Design quality** - Is it visually polished and shareable? (20%)\n    \n4.  **Creativity** - Does it use a fresh angle, metaphor, or storytelling device? (10%)\n    \n\n### **Submission Requirements**\n\n-   Post your submission on X/Twitter and tag **@Tramplin\\_io** + **@SuperteamNG**\n    \n-   Include the hashtag **#TramplinAffiliate**\n    \n-   Submit the X/Twitter post link on Superteam Earn\n    \n\n  \n**Bonus (not required, but encouraged):** If you want to actually earn affiliate commissions on top of the bounty prize. DM [@Tramplin\\_io](https://x.com/Tramplin_io) on X or reach out on [Telegram](https://t.me/tramplin_io) to get your personal affiliate link. Include it in your post and start earning from day one.\n\n### **Rules**\n\n-   One submission per track per person (you can enter both tracks)\n    \n-   No AI-generated images - you can use AI as a tool, but the final output must show clear human creative direction\n    \n-   Submissions with factual errors about the program mechanics will be disqualified\n    \n-   Plagiarism = instant disqualification\n    \n-   Must be original work created for this bounty\n    \n\n## Resources\n\n[**Stake on Tramplin**](https://tramplin.io)\n\n[**Apply as Affiliate**](https://ng.tramplin.io/)\n\n[**Telegram Community**](https://t.me/tramplin_io)\n\n[**Discord**](https://discord.gg/GUcARPNyY8)\n\n[**Twitter / X**](https://x.com/Tramplin_io)\n\n[**Official Blog**](https://blog.tramplin.io/)\n\n## _Terms_\n\n_Participation in this bounty is entirely voluntary. Bounties are a way to learn and dabble in opportunities to build in web3. These are neither full time jobs nor project based engagement. Please be advised that the sponsors will not have time for individualized feedback due to the number of entries we receive._",
-        "shortDescription": "## **The Challenge**\n\nTramplin just launched a **$10,000 + 21 SOL affiliate program**...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-08T22:59:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Tramplin"
-        ],
-        "programBudget": "300 USDC",
-        "website": "https://superteam.fun/earn/listing/tramplin-affiliate-program-visual-explainer-bounty",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/tramplin-affiliate-program-visual-explainer-bounty",
-          "grantsSite": "https://superteam.fun/earn/listing/tramplin-affiliate-program-visual-explainer-bounty"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 300,
-          "currency": "USDC"
-        },
-        "skills": [
-          "Design",
-          "Content"
         ],
         "platform": "Superteam Earn"
       },
@@ -4333,7 +3717,7 @@
       "metadata": {
         "title": "Manic Agent Benchmark UGC Contest",
         "description": "![](https://res.cloudinary.com/dgvnuwspr/image/upload/v1776931739/listing-description/mpjagixnfb5pwckdwp94.webp)\n\n  \n  \n**About Manic Agent Benchmark UGC Contest**\n\n**Manic Trade** hosting a UGC Contest in tandem with our new [**Agent Benchmark Contest**](https://x.com/ManicTrade/status/2046529388502753342?s=20) that just launch launched. Manic is a Momentum Trading platform that is still in alpha and we’ve recently expanded our alpha to more users to test out Manic for the first time and share their honest thoughts about it.  \nThis is an opportunity for you to win a piece of a $1000 USDC Prize pool!  \n  \n**Manic Trade is in Dev Net so you will NOT need to to spend any money to participate!**  \n  \n**Get started here to participate in this contest!**  \n[https://benchmark.manic.trade/](https://benchmark.manic.trade/)  \n\n* * *\n\n## **About Manic Trade:**\n\n**Manic Trade** is the First Momentum-based Trading Platform of it’s kind  \nTrade the Moment. Master the Momentum. This is Manic.  \n  \nLearn about Momentum Trading here: [**LINK**](https://x.com/ManicTrade/status/2024398850895860128)  \n  \n\n* * *\n\n## **What you need to do:**\n\nThis contest is open to **everyone**, all we want is for you to post a fun video or or screenshot showing off your agent’s benchmark  \n  \nLink this one posted by one of our partners at [**Donut AI**](https://x.com/DonutAI/status/2046569057533800641)\n\n![](https://res.cloudinary.com/dgvnuwspr/image/upload/v1776908850/listing-description/pbmuka7go4lqcrgkk7sr.webp)\n\n  \n  \n  \nOr this one posted by our partners at [**Sonic SVM**](https://x.com/SonicSVM/status/2046911805025583197?s=20)\n\n![](https://res.cloudinary.com/dgvnuwspr/image/upload/v1776908988/listing-description/vzzcnb58hdzjbow0xhd5.webp)\n\n  \n  \n  \nAll you need to do this is:\n\n-   Download or access an agent like [Claudecode](https://code.claude.com/docs/en/overview), [OpenClaw](https://openclaw.ai/), [Hermes](https://hermes-agent.nousresearch.com/), [D0](https://d0.donutbrowser.ai/) or any of the other readily accessible agents.\n    \n-   Then go to [https://benchmark.manic.trade/](https://benchmark.manic.trade/)\n    \n-   Press on start benchmark button\n    \n-   Log in with your X/Twitter (Very important it’s the same one tied to Earn Superteam so we can verify)\n    \n-   add the skill to your agent and then bind it\n    \n-   Run the benchmark\n    \n-   once the benchmark is finished take a screenshot or video of your results and/or leaderboard placement\n    \n-   Experiment with the agent toolbox to get a higher score\n    \n-   Post your benchmark results on X and tag @ManicTrade and talk a bit about your experience agentic trading or what features you would like to see in the future.\n    \n\n[**_Here is a video demo showing you how to do it from start to finish._**](https://canva.link/amvknjkzs708p4l)\n\n  \n———————————————————————  \n  \n**_If you need help getting started with an agent please reason out via our DM’s and we’ll help troubleshoot any issue you may have_**\n\n* * *\n\n## **Rewards**\n\n### **Total Prize Pool: $1,000 USDT**\n\n-   1st place: $100 USDC\n    \n-   2nd place: $100 USDC\n    \n-   3rd place: $100 USDC\n    \n-   4th place: $100 USDC\n    \n-   5th place: $100 USDC\n    \n-   6th place: $100 USDC\n    \n-   7th place: $100 USDC\n    \n-   8th place: $100 USDC\n    \n-   9th place: $100 USDC\n    \n-   10th place: $100 USDC\n    \n\n**10 winners will be chosen!**  \n  \n**_Explore more rewards at:_** [**_https://alpha-app.manic.trade/_**](https://alpha-app.manic.trade/)\n\n* * *\n\n  \n**Duration:** April 22nd - May 6th, 2026  \n\n* * *\n\n## **What to Cover in Your Submission**\n\n### **Your Twitter post/thread should:**\n\n-   Visual screenshot or video\n    \n-   A thread talking about your experiences with AI agent traders or ambitions to use one.\n    \n-   Tag @ManicTrade\n    \n-   DO NOT mention this contest in your twitter copy\n    \n\n### **Visual Media Tips:**\n\n-   Keep videos short for maximum view times\n    \n-   Keep screenshots simple\n    \n-   No use of creative AI tools to make sure product UI is intact\n    \n\n## **Evaluation Criteria**\n\n-   The Manic team will pick the winners\n    \n-   The winners will be picked based verifiable benchmarks and from the screenshot.\n    \n\n* * *\n\n## **Rules**\n\n-   **No plagiarism**—must be original content.\n    \n    -   your X/Twitter handle shows up in the graphic and it will be verified\n        \n-   AI slop, low-effort submissions will be **disqualified**. (Good quality AI is safe as long as the product UI is not changed)\n    \n-   **We’re aiming for submissions to be of higher quality**\n    \n\n* * *\n\n## **Join the Community**\n\n-   **Follow us on X:** [**https://x.com/ManicTrade**](https://x.com/ManicTrade)\n    \n-   **Join our** **Discord:** [**https://discord.com/invite/manic-trade**](https://discord.com/invite/manic-trade)\n    \n\n![](https://res.cloudinary.com/dgvnuwspr/image/upload/v1774202299/listing-description/ulkw6u79rfvgeajdnyil.webp)",
-        "shortDescription": "![](https://res.cloudinary.",
+        "shortDescription": "",
         "status": "active",
         "startsAt": "",
         "endsAt": "2026-05-07T06:59:59.000Z",
@@ -4366,57 +3750,6 @@
           "Content",
           "Growth",
           "Community"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be74094334d0516f75e4",
-      "programId": "1442",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Echoes pay for the best funny, f*ck up and embarassing stories",
-      "isActive": false,
-      "deadline": "2026-05-06T20:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/echoes-pay-for-the-best-funny-fck-up-and-embarassing-stories",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-07T00:05:55.000Z",
-      "metadata": {
-        "title": "Echoes pay for the best funny, f*ck up and embarassing stories",
-        "description": "**About Echoes  \n**  \nA Web3 audio storytelling platform where human experiences become permanent, tradeable on-chain assets — preserved on Arweave, launched on Bags App, curated by the Seeker (SKR) community.  \n  \n**About the Bounty**\n\nWe’re experimenting with something simple — bringing real human stories back into Crypto Twitter. The goal is to help people relax a bit, and create a space where it’s easier to connect through shared experiences, humor, and vulnerability. Think of it as a way to “break the ice” across CT and remind everyone there are real people behind the profiles.\n\n**Your mission:**\n\n1.  Quote each of the three tweets ([funny](https://x.com/echoes_fans/status/2044841130437603796?s=20), [f\\*ck up](https://x.com/echoes_fans/status/2044841669732782249?s=20), [embarrassing](https://x.com/echoes_fans/status/2044841977888362886?s=20))\n    \n    -   One quote per tweet, three in total\n        \n    -   Every quote must start with: **“Echoes reminded me of”** and include your story\n        \n    -   We recommend splitting quotes across three different days during the bounty time window to keep your timeline cleaner and maintain native engagement.\n        \n2.  Follow us on X ([Link](https://x.com/echoes_fans))\n    \n3.  (Optional) Join the [waitlist](https://echoes.fans)\n    \n\n* * *\n\n**Evaluation Criteria**\n\nSubmissions will be evaluated based on:\n\n**Engagement & Attention**\n\n-   Did your story capture attention?\n    \n-   Did it get likes, replies, or quotes from others?\n    \n\n**Storytelling Quality**\n\n-   Is the story clear, structured, and easy to follow?\n    \n-   Does it feel authentic and personal?\n    \n\n**Emotional Impact**\n\n-   Did it make people laugh, relate, or feel something?\n    \n-   Does it spark reactions or conversations?\n    \n\n* * *\n\n**Submission Requirements**\n\n-   Submit 3 quote tweets (one per original tweet)\n    \n-   Each quote must start with: **“Echoes reminded me of”**\n    \n-   Provide all 3 links in your submission\n    \n-   Follow the [sponsor page](https://x.com/echoes_fans)\n    \n-   (Optional) Join the [waitlist](https://echoes.fans)\n    \n\n* * *\n\n**Resources**  \n  \n1. Funny tweet: [Link](https://x.com/echoes_fans/status/2044841130437603796?s=20)  \n2\\. F\\*uck up tweet:[Link](https://x.com/echoes_fans/status/2044841669732782249?s=20)3\\. Embarassing: [Link](https://x.com/echoes_fans/status/2044841977888362886?s=20)\n\n-   Twitter: [https://x.com/echoes\\_fans](https://x.com/echoes_fans)\n    \n-   Website / Waitlist: [https://echoes.fans](https://echoes.fans)\n    \n\n* * *\n\n**Terms**\n\nParticipation in this bounty is voluntary. Due to the number of submissions, we may not be able to provide individual feedback. We’ll be reviewing entries in real time and amplifying stories that stand out.",
-        "shortDescription": "**About Echoes  \n**  \nA Web3 audio storytelling platform where human experiences become...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-06T20:59:59.999Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Echoes Fans"
-        ],
-        "programBudget": "520 USDC",
-        "website": "https://superteam.fun/earn/listing/echoes-pay-for-the-best-funny-fck-up-and-embarassing-stories",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/echoes-pay-for-the-best-funny-fck-up-and-embarassing-stories",
-          "grantsSite": "https://superteam.fun/earn/listing/echoes-pay-for-the-best-funny-fck-up-and-embarassing-stories"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 520,
-          "currency": "USDC"
-        },
-        "skills": [
-          "Content"
         ],
         "platform": "Superteam Earn"
       },
@@ -4656,7 +3989,7 @@
       "metadata": {
         "title": "Birdeye Data 4-Week BIP Competition — Sprint 2",
         "description": "![](https://res.cloudinary.com/dgvnuwspr/image/upload/v1777028257/listing-description/j0v93jxmambzqn7ia1gk.webp)\n\n# 🚨 **Birdeye Data 4-Week BIP Competition | Sprint 2**\n\nDuring April–May 2026, Birdeye Data is dedicating **$2,000 in cash rewards** and **5000$ worth of enterprise-grade API access** to developers building the next wave of onchain tools, trading bots, and AI agents. We want to see what the sharpest builders can create with the most comprehensive real-time onchain data available.\n\nParticipants compete for weekly prizes across four sprints (April 18 – May 16, 2026), but every builder gets a chance to stress-test their ideas using the same data infrastructure trusted by Phantom, Raydium, Coinbase, and Bybit.\n\n## **⚡️ This is Sprint 1 of 4.**\n\n**⏱️ Sprint period:** April 25 – May 2.\n\n**🏆 Winners announced:** May 4.\n\nThe **weekly prize** pool includes:\n\n-   **Top 1:** **$500 in USDC** plus a **2-Month Birdeye Data Premium Plus Plan** ($1,000 total value).\n    \n-   **Top 2:** **2-Month Birdeye Data Premium Plus Plan** ($500 value).\n    \n-   **Top 3:** **1-Month Birdeye Data Premium Plus Plan** ($250 value).\n    \n\n**Note:** _Birdeye Data rewards are granted as API credits equivalent to the plan value. Winners can use the credits at their own pace until the balance is depleted. All credits are valid until April 1, 2027_.\n\nProjects are evaluated equally across four key metrics:\n\n-   **Community Support**: measured by X views and engagement\n    \n-   **Product Utility**\n    \n-   **Technical Depth**\n    \n-   **Presentation:** Intro Content + GitHub repo (optional) quality.\n    \n\n## **Sprint Schedule**\n\n-   **Sprint 1:** April 18 – April 25 | Winners announced: April 27\n    \n-   **Sprint 2:** April 25 – May 2 | Winners announced: May 4\n    \n-   **Sprint 3:** May 2 – May 9 | Winners announced: May 11\n    \n-   **Sprint 4:** May 9 – May 16 | Winners announced: May 18\n    \n\nNew winners every sprint. Builders can enter any week.\n\n## **Need inspiration? Here are starter ideas for Sprint 1:**\n\nNot sure what to build? These are shippable in a weekend using Birdeye's API:\n\n\\- New token radar with safety scoring — pull fresh listings via /v2/tokens/new\\_listing, filter through /defi/token\\_security, surface only the ones worth watching.\n\n\\- Trending token alert bot — monitor /defi/token\\_trending, post to Telegram or Discord when a token breaks out. Simple stack, immediate value.\n\n\\- Early meme discovery dashboard — combine new listings, holder concentration, and price momentum into a live feed.\n\n**Example build:** [https://solana-monitor-teal.vercel.app/](https://solana-monitor-teal.vercel.app/) — a live prototype pulling Birdeye data into a real-time interface.\n\n**Tutorial:** [https://www.youtube.com/@siddankcode](https://www.youtube.com/@siddankcode) — end-to-end walkthroughs on building crypto data tools with live APIs.\n\n## **How to get started**\n\nYou don’t need permission to start. The sprint is open now:\n\n1.  **Get your API Key:** Head to [bds.birdeye.so](http://bds.birdeye.so) and create your free account to grab an API key.\n    \n2.  **Ship your build:** Develop your idea and hit a minimum of 50 API calls to qualify.\n    \n3.  **Share your progress:** Build in public. Post updates on X by tagging @birdeye\\_data and using the #BirdeyeAPI hashtag. Open-sourcing your code on GitHub and referencing Birdeye Data is highly encouraged and boosts your Presentation score.\n    \n4.  **Submit your entry:** Submit via this Earn listing before April 25. Include your project name, GitHub link, X post link, and a brief description of the Birdeye endpoints you used.\n    \n    Join the Birdeye Discord for updates, workshops, technical help, and questions: [https://discord.gg/tbKbCmU5fM](https://discord.gg/tbKbCmU5fM)",
-        "shortDescription": "![](https://res.cloudinary.",
+        "shortDescription": "",
         "status": "active",
         "startsAt": "",
         "endsAt": "2026-05-02T16:59:59.000Z",
@@ -5142,69 +4475,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "69f4be46b598be17342a1f54",
-      "programId": "1430",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "Locus' Paygentic Hackathon - #4",
-      "isActive": false,
-      "deadline": "2026-05-05T06:59:00.000Z",
-      "submissionUrl": "https://paygentic-week4.devfolio.co",
-      "createdAt": "2026-05-01T14:52:54.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Locus' Paygentic Hackathon - #4",
-        "description": "**The Locus Paygentic Hackathon #4** is the **FOURTH** and **LAST** week of a hackathon series spanning 4 weeks. \n&#013;\n1 track per week, 4 weeks, **$4000** in prizes over the series. Each week, the hackathon will kick off on Friday and will close on Thursday, starting the cycle again the day after. This hackathon series is centered around the different verticals of Locus, each week focusing on a different one.\n&#013;\n**Week 4 Track**: Using **LocusFounder** to build a business!\n&#013;\nHackathon series will be hosted virtually in our Locus Discord server, with team sizes of **1-4**, with free admission. \n&#013;\nEach team will receive $10 in credits to build and experiment with Locus.\n&#013;\nLink to Locus' Discord server: [discord.gg/locus](https://discord.gg/locus)",
-        "shortDescription": "**The Locus Paygentic Hackathon #4** is the **FOURTH** and **LAST** week of a hackathon series...",
-        "status": "active",
-        "startsAt": "2026-05-02T00:30:00.000Z",
-        "endsAt": "2026-05-07T06:59:00.000Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "FinTech"
-        ],
-        "networks": [],
-        "programBudget": "1000 USD",
-        "website": "https://discord.gg/locus",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://discord.gg/locus",
-          "grantsSite": "https://paygentic-week4.devfolio.co"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-05-02T00:30:00.000Z",
-        "endDate": "2026-05-07T06:59:00.000Z",
-        "location": "Online",
-        "tracks": [],
-        "prizes": [
-          {
-            "amount": 600,
-            "currency": "USD"
-          },
-          {
-            "amount": 300,
-            "currency": "USD"
-          },
-          {
-            "amount": 100,
-            "currency": "USD"
-          }
-        ],
-        "registrationDeadline": "2026-05-05T06:59:00.000Z",
-        "teamSize": {
-          "min": 1,
-          "max": 4
-        }
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "69e800983e472e420b51adcf",
       "programId": "1398",
       "type": "accelerator",
@@ -5212,7 +4482,7 @@
       "name": "Open House London",
       "isActive": false,
       "deadline": null,
-      "submissionUrl": null,
+      "submissionUrl": "https://arbitrum-london.hackquest.io/",
       "createdAt": "2026-04-21T22:56:24.000Z",
       "updatedAt": "2026-05-06T00:05:42.000Z",
       "metadata": {
@@ -5240,58 +4510,6 @@
       "hackathonMetadata": null,
       "bountyMetadata": null,
       "acceleratorMetadata": {},
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69d83e0f43124c715bbd0efc",
-      "programId": "1375",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "Altaria",
-      "isActive": false,
-      "deadline": "2026-04-20T18:29:00.000Z",
-      "submissionUrl": "https://altaria.devfolio.co",
-      "createdAt": "2026-04-10T00:02:23.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Altaria",
-        "description": "Altaria is a next-generation hackathon focused on building intelligent, secure, and scalable solutions by combining Artificial Intelligence with emerging technologies.\n\nThis event brings together developers, innovators, and problem-solvers to create impactful projects across three core tracks:\n\n🔹 AI + IoT – Build smart systems that interact with the real world through sensors, automation, and intelligent decision-making.\n\n🔹 AI + Cybersecurity – Develop advanced solutions for threat detection, anomaly analysis, and secure digital ecosystems.\n\n🔹 AI + Blockchain – Create decentralized and intelligent applications that ensure transparency, trust, and automation.\n\nParticipants will work in teams to solve real-world challenges, turning ideas into working prototypes within a limited time.",
-        "shortDescription": "Altaria is a next-generation hackathon focused on building intelligent, secure, and scalable...",
-        "status": "active",
-        "startsAt": "2026-04-30T08:30:00.000Z",
-        "endsAt": "2026-05-01T08:30:00.000Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "IoT",
-          "Ethereum",
-          "AI"
-        ],
-        "networks": [],
-        "programBudget": "",
-        "website": "https://www.altaria.org.in/",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://www.altaria.org.in/",
-          "grantsSite": "https://altaria.devfolio.co"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-04-30T08:30:00.000Z",
-        "endDate": "2026-05-01T08:30:00.000Z",
-        "location": "Dayananda Sagar College of Engineering, 91st Main Road, 1st Stage, Kumaraswamy Layout, Bengaluru, Karnataka, India",
-        "tracks": [],
-        "prizes": [],
-        "registrationDeadline": "2026-04-20T18:29:00.000Z",
-        "teamSize": {
-          "min": 2,
-          "max": 3
-        }
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
       "vcFundMetadata": null,
       "rfpMetadata": null
     },
@@ -5331,56 +4549,6 @@
         "startDate": "",
         "endDate": "2026-04-25",
         "location": "TBD"
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be46b598be17342a1f53",
-      "programId": "1429",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "HACKWAVE 2.0",
-      "isActive": false,
-      "deadline": "2026-05-03T18:00:00.000Z",
-      "submissionUrl": "https://hackwave2.devfolio.co",
-      "createdAt": "2026-05-01T14:52:54.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "HACKWAVE 2.0",
-        "description": "We are back, stronger and bigger🔥🔥🔥🔥🔥\n\nGDG GTBIT presents HackWave 2.0 ⚡️\n\nA 36-hour hackathon where ideas turn into real, impactful projects. Collaborate, innovate, and push your limits with passionate builders.\n\n📍 Venue: Guru Tegh Bahadur Institute of Technology\n\n📅 Date: 5–6 May\n\n⏱️ Duration: 36 Hours (Offline)\n\n.🏆Exclusive goodies and a 1L+ prize pool\nWinner - Rs. 15,000 + Exciting Goodies + Surprise Prize\n2nd Place - Rs. 10,000 + Exciting Goodies\n3rd Place - Rs. 5,000 + Exciting Goodies\n\n🚀 Are you ready to build? \n\nJoin the Hackwave 2.0 Whatsapp group for further updates - https://chat.whatsapp.com/LB4hJ4g4x3RGCRuzEE6ynu",
-        "shortDescription": "We are back, stronger and bigger🔥🔥🔥🔥🔥\n\nGDG GTBIT presents HackWave 2.0 ⚡️\n\nA 36-hour...",
-        "status": "active",
-        "startsAt": "2026-05-05T03:30:00.000Z",
-        "endsAt": "2026-05-06T12:30:00.000Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "Ethereum"
-        ],
-        "networks": [],
-        "programBudget": "",
-        "website": "https://gdg-hackwave2-0.vercel.app/",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://gdg-hackwave2-0.vercel.app/",
-          "grantsSite": "https://hackwave2.devfolio.co"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-05-05T03:30:00.000Z",
-        "endDate": "2026-05-06T12:30:00.000Z",
-        "location": "Guru Tegh Bahadur Institute of Technology, G-8 Area, Press Colony, Rajouri Garden, New Delhi:, Delhi, India",
-        "tracks": [],
-        "prizes": [],
-        "registrationDeadline": "2026-05-03T18:00:00.000Z",
-        "teamSize": {
-          "min": 1,
-          "max": 4
-        }
       },
       "bountyMetadata": null,
       "acceleratorMetadata": null,
@@ -5439,218 +4607,6 @@
       },
       "bountyMetadata": null,
       "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4b9309cbdf6809e2eb1c9",
-      "programId": "1424",
-      "type": "accelerator",
-      "chainID": null,
-      "name": "Superteam Black",
-      "isActive": false,
-      "deadline": null,
-      "submissionUrl": "https://www.superteamblack.com/",
-      "createdAt": "2026-05-01T14:31:12.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Superteam Black",
-        "description": "Invite-only accelerator providing bespoke support, up to $100K+ in perks (cloud credits, audits, legal), mentorship, media, and distribution for high-traction Solana startups that have raised $250K+ or shown revenue. Rolling admissions, remote-first, no equity taken; apply via site for consideration.",
-        "shortDescription": "Invite-only accelerator providing bespoke support, up to $100K+ in perks (cloud credits, audits,...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "programBudget": "$100K",
-        "website": "",
-        "projectTwitter": "",
-        "socialLinks": {
-          "grantsSite": "https://www.superteamblack.com/"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": {
-        "funding": {
-          "amount": 100000,
-          "currency": "USD"
-        }
-      },
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4be74094334d0516f75dd",
-      "programId": "1435",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Airbills Video Bounty - Ad Content",
-      "isActive": false,
-      "deadline": "2026-05-01T22:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/airbills-video-bounty-ad-content",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Airbills Video Bounty - Ad Content",
-        "description": "## Overview\n\nAirbills just launched Orbit,  an off-ramping feature within Airbills that lets you instantly convert and send your stablecoins (USDC & USDT) to your Naira bank account.  \nThis bounty invites video creators to produce clear, engaging Ad content that showcases how orbit works and why the feature is valuable for users.\n\n## Objective:\n\nA short Ad content on X, Instagram & Tiktok\n\n-   Introduces Airbills and the Orbit feature.\n    \n-   Explains and demonstrates the problem with existing P2P platforms\n    \n-   Demonstrates the process flow of Orbit.\n    \n-   Utilizes clear storytelling to show practical use cases relevant to Airbills users\n    \n-   Explain why AirbillsOrbit is better than the rest Off-ramping platform using No gas fee, No Kyc as your point  \n    \n\n## Requirements:\n\n-   Ad can be a **video** or an animated content (no AI-generated content; edited or scripted videos must use human-generated footage and audio),\n    \n-   Ad must be original, unpublished, clear, and captivating, \n    \n-   Videos must be in **English** and should be suitable for a Nigerian and African audience,\n    \n-   Creators should keep content practical, engaging, and easy to understand,\n    \n-   Must not be less than 2 mins,\n    \n-   Must include a clear CTA,\n    \n-   Tag Airbills & SuperteamNG in your post on X, Instagram & Tiktok,\n    \n-   Invite Airbills’ handle as a collaborator on your post on Instagram.  \n    \n\n## Judging Criteria:\n\n-   Clarity of Explanation: Is the content engaging and easy to follow?\n    \n-   Creativity and storytelling: Does your content tie in relatable narratives?\n    \n-   Shareability: Is your content compact and serves its Ad purpose?\n    \n-   Accuracy of information: Did you actually test the platform and provide accurate reviews?\n    \n-   Engagement potential: Does your audience find your content engaging?\n    \n\n## Prizes\n\nTotal prize pool: $2,000 USDG\n\n1st - $800 USDG  \n2nd - $600 USDG  \n3rd - $400 USDG  \n4th - $200 USDG  \n\n## Terms\n\n-   Submissions must be original, Public and clearly tagged\n    \n-   Only content sharing first-hand user experience will be considered\n    \n-   Plagiarised or off-topic content will be disqualified\n    \n\nParticipation in this bounty is entirely voluntary. By submitting, participants agree that their Ads may be reviewed or amplified  by Airbills and its ecosystem partner  \n\n## Official handles\n\nX: [https://x.com/airbillspa](https://x.com/airbillspay)y  \n[https://www.tiktok.com/@officialairbills](https://www.tiktok.com/@officialairbills)  \nwww.instagram.com/airbillspay",
-        "shortDescription": "## Overview\n\nAirbills just launched Orbit,  an off-ramping feature within Airbills that lets you...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-01T22:59:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Superteam Nigeria"
-        ],
-        "programBudget": "2000 USDG",
-        "website": "https://superteam.fun/earn/listing/airbills-video-bounty-ad-content",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/airbills-video-bounty-ad-content",
-          "grantsSite": "https://superteam.fun/earn/listing/airbills-video-bounty-ad-content"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 2000,
-          "currency": "USDG"
-        },
-        "skills": [
-          "Content"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69e0272ff057f21a8778a88e",
-      "programId": "1389",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "Locus' Paygentic Hackathon - #2",
-      "isActive": false,
-      "deadline": "2026-04-23T06:59:00.000Z",
-      "submissionUrl": "https://paygentic-week2.devfolio.co",
-      "createdAt": "2026-04-16T00:02:55.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Locus' Paygentic Hackathon - #2",
-        "description": "**The Locus Paygentic Hackathon #2** is the second week of a hackathon series spanning 4 weeks. \n&#013;\n1 track per week, 4 weeks, **$4000** in prizes over the series. \n&#013;\nEach week the hackathon will kickoff on Friday and will close on Thursday, starting the cycle again the day after. This hackathon series is centered around the different verticals of Locus, each week focusing on a different one.\n&#013;\n**Week 2 Track** : Using **BuildWithLocus** to leverage our suite. \n&#013;\nHackathon series will be hosted virtually in our Locus discord server, with team sizes of **1-4** with free admission. \n&#013;\nEach team will receive $10 in credits to build and experiment with Locus.\n&#013;\nLink to Locus' Discord server: [discord.gg/locus](https://discord.gg/locus)",
-        "shortDescription": "**The Locus Paygentic Hackathon #2** is the second week of a hackathon series spanning 4 weeks.",
-        "status": "active",
-        "startsAt": "2026-04-18T00:30:00.000Z",
-        "endsAt": "2026-04-23T06:59:00.000Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "FinTech",
-          "AI"
-        ],
-        "networks": [],
-        "programBudget": "1000 USD",
-        "website": "https://discord.gg/locus",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://discord.gg/locus",
-          "grantsSite": "https://paygentic-week2.devfolio.co"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-04-18T00:30:00.000Z",
-        "endDate": "2026-04-23T06:59:00.000Z",
-        "location": "Online",
-        "tracks": [],
-        "prizes": [
-          {
-            "amount": 600,
-            "currency": "USD"
-          },
-          {
-            "amount": 300,
-            "currency": "USD"
-          },
-          {
-            "amount": 100,
-            "currency": "USD"
-          }
-        ],
-        "registrationDeadline": "2026-04-23T06:59:00.000Z",
-        "teamSize": {
-          "min": 1,
-          "max": 4
-        }
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69f4b9274c2e42112d0862b0",
-      "programId": "1414",
-      "type": "accelerator",
-      "chainID": null,
-      "name": "Yellow Acceleration Round 2",
-      "isActive": false,
-      "deadline": null,
-      "submissionUrl": "https://tally.so/r/jaW6E9",
-      "createdAt": "2026-05-01T14:31:03.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Yellow Acceleration Round 2",
-        "description": "Growth acceleration program offering cash grants and networking for startups building with blockchain technologies. Open to builders via a simple entry form, providing opportunities to expand ideas and networks. Applications currently open.",
-        "shortDescription": "Growth acceleration program offering cash grants and networking for startups building with...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "Multi-chain"
-        ],
-        "networks": [],
-        "grantTypes": [],
-        "organizations": [],
-        "programBudget": "",
-        "communityRef": [],
-        "website": "",
-        "projectTwitter": "https://x.com/Yellow",
-        "type": "program",
-        "bugBounty": "",
-        "anyoneCanJoin": true,
-        "socialLinks": {
-          "twitter": "https://x.com/Yellow",
-          "discord": "",
-          "website": "",
-          "orgWebsite": "",
-          "blog": "",
-          "forum": "",
-          "grantsSite": "https://tally.so/r/jaW6E9",
-          "telegram": ""
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": {
-        "equity": "",
-        "location": ""
-      },
       "vcFundMetadata": null,
       "rfpMetadata": null
     },
@@ -5853,57 +4809,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "69f4be74094334d0516f75e2",
-      "programId": "1440",
-      "type": "bounty",
-      "chainID": null,
-      "name": "Capture Tennis & Networking Builders Day for Social Media",
-      "isActive": false,
-      "deadline": "2026-05-04T20:59:59.000Z",
-      "submissionUrl": "https://superteam.fun/earn/listing/capture-tennis-and-networking-builders-day-for-social-media",
-      "createdAt": "2026-05-01T14:53:40.000Z",
-      "updatedAt": "2026-05-06T00:05:42.000Z",
-      "metadata": {
-        "title": "Capture Tennis & Networking Builders Day for Social Media",
-        "description": "## About Superteam Ukraine\n\nSuperteam Ukraine is a growing community of Web3 talent. We're part of the larger Superteam global ecosystem, focused on helping our members find work, learn, and connect with other talented individuals in the Solana space and beyond.\n\n## Mission\n\nCapture the excitement and atmosphere of the Tennis Day event through creative photos or short videos.\n\n## Scope Detail\n\n-   Take creative photos or short videos at the Tennis Day event. This can include shots on the tennis court, during matches, group photos with the community, or showcasing the overall vibe of the event.\n    \n-   Publish your content on X (Twitter), Instagram, or LinkedIn.\n    \n-   Include a short caption about the event.\n    \n-   Tag Superteam Ukraine's official page in your post.\n    \n\n## Submission Requirements\n\n-   Submissions must be a photo or short video.\n    \n-   Posts must be published on X (Twitter)/ Instagram / LinkedIn.\n    \n-   Each post needs a short caption describing the event.\n    \n-   Superteam Ukraine's official page must be tagged in the post.\n    \n-   The content should be related to the Tennis Day event and the Superteam Ukraine opportunities.\n    \n\n## Resourses\n\n-   [X](https://x.com/SuperteamUKR)\n    \n-   [Instagram](https://www.instagram.com/superteamua/)\n    \n-   [Linkedin](https://www.linkedin.com/company/superteamua/?viewAsMember=true)\n    \n-   [Event](https://luma.com/vmrlaqnd)\n    \n\n## Judging Criteria\n\n-   **Creativity and Originality:** How unique and imaginative is your photo/video?\n    \n-   **Event Atmosphere:** Does your submission effectively capture the spirit and energy of the event?\n    \n-   **Tennis + Web3 + Community Vibe:** How well does your content blend these three elements?\n    \n\n## Reward Structure\n\n-   1st Place: 100 USDG\n    \n-   2nd Place: 50 USDG\n    \n-   3rd Place: 20 USDG",
-        "shortDescription": "## About Superteam Ukraine\n\nSuperteam Ukraine is a growing community of Web3 talent.",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-04T20:59:59.000Z",
-        "categories": [
-          "Bounty"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "organizations": [
-          "Superteam Ukraine"
-        ],
-        "programBudget": "170 USDG",
-        "website": "https://superteam.fun/earn/listing/capture-tennis-and-networking-builders-day-for-social-media",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://superteam.fun/earn/listing/capture-tennis-and-networking-builders-day-for-social-media",
-          "grantsSite": "https://superteam.fun/earn/listing/capture-tennis-and-networking-builders-day-for-social-media"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": {
-        "reward": {
-          "amount": 170,
-          "currency": "USDG"
-        },
-        "skills": [
-          "Content"
-        ],
-        "platform": "Superteam Earn"
-      },
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "69f4b9274c2e42112d0862b3",
       "programId": "1417",
       "type": "grant",
@@ -6033,44 +4938,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "69f4b9264c2e42112d0862ad",
-      "programId": "1411",
-      "type": "grant",
-      "chainID": null,
-      "name": "Call for Research Proposals",
-      "isActive": true,
-      "deadline": "2026-06-01T00:00:00.000Z",
-      "submissionUrl": "https://build.avax.network/grants/avalanche-research-proposals",
-      "createdAt": "2026-05-01T14:31:02.000Z",
-      "updatedAt": "2026-05-01T15:02:20.000Z",
-      "metadata": {
-        "title": "Call for Research Proposals",
-        "description": "Grants funding original academic research on cryptoasset pricing/valuation and validator economics/network security for decentralized networks like Avalanche. Open to researchers who retain full IP rights and can publish freely; structured across three milestones over 12 months. Submit proposals through the dedicated grants portal.",
-        "shortDescription": "Grants funding original academic research on cryptoasset pricing/valuation and validator...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-06-01",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "Avalanche"
-        ],
-        "networks": [],
-        "programBudget": "",
-        "website": "",
-        "projectTwitter": "",
-        "socialLinks": {
-          "grantsSite": "https://build.avax.network/grants/avalanche-research-proposals"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "69f4b9274c2e42112d0862b2",
       "programId": "1416",
       "type": "grant",
@@ -6078,7 +4945,7 @@
       "name": "AUDD Grants on Solana",
       "isActive": true,
       "deadline": null,
-      "submissionUrl": null,
+      "submissionUrl": "https://superteam.fun/earn/grants/audd-grants",
       "createdAt": "2026-05-01T14:31:03.000Z",
       "updatedAt": "2026-05-01T15:01:38.000Z",
       "metadata": {
@@ -6566,7 +5433,7 @@
       "name": "Starkzap Developer Bounty",
       "isActive": false,
       "deadline": "2026-04-17T00:00:00.000Z",
-      "submissionUrl": null,
+      "submissionUrl": "https://www.thewp1.xyz/DeveloperBounty",
       "createdAt": "2026-03-27T20:58:39.000Z",
       "updatedAt": "2026-04-17T00:02:10.000Z",
       "metadata": {
@@ -6833,56 +5700,6 @@
         "registrationDeadline": "2026-04-14T22:00:00.000Z",
         "teamSize": {
           "min": 3,
-          "max": 4
-        }
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69d83e0f43124c715bbd0efb",
-      "programId": "1374",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "Hack in GitHub DevDays",
-      "isActive": false,
-      "deadline": "2026-04-14T18:29:00.000Z",
-      "submissionUrl": "https://hack-in-github-devdays.devfolio.co",
-      "createdAt": "2026-04-10T00:02:23.000Z",
-      "updatedAt": "2026-04-15T00:02:13.000Z",
-      "metadata": {
-        "title": "Hack in GitHub DevDays",
-        "description": "**Hack in GitHub Dev Days** is a 12-hour high-energy mini hackathon, hosted as part of **GitHub Copilot Dev Days**, in partnership with **MLH**, and powered by **Google Gemini.** \n\nIt brings together developers, designers, and builders to collaborate, experiment, and turn ideas into impactful solutions within a single day.\n\nParticipants will engage in focused hacking sessions, along with a dedicated mentoring round designed to help teams refine their ideas, strengthen implementation, and navigate technical challenges. The event also includes structured breaks for meals and networking, allowing participants to connect, exchange ideas, and collaborate beyond their teams.\n\nThe hackathon will conclude with an exciting judging round where teams present their projects, followed by a closing ceremony recognizing standout innovations and contributions.",
-        "shortDescription": "**Hack in GitHub Dev Days** is a 12-hour high-energy mini hackathon, hosted as part of **GitHub...",
-        "status": "active",
-        "startsAt": "2026-04-18T03:30:00.000Z",
-        "endsAt": "2026-04-18T03:30:00.000Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "Ethereum"
-        ],
-        "networks": [],
-        "programBudget": "",
-        "website": "https://devdays.devsync.club",
-        "projectTwitter": "",
-        "socialLinks": {
-          "website": "https://devdays.devsync.club",
-          "grantsSite": "https://hack-in-github-devdays.devfolio.co"
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-04-18T03:30:00.000Z",
-        "endDate": "2026-04-18T03:30:00.000Z",
-        "location": "Rungta College Of Engineering & Technology, Rungta Educational Campus, Kurud Road, Kohka, Bhilai, Chhattisgarh 490024, India",
-        "tracks": [],
-        "prizes": [],
-        "registrationDeadline": "2026-04-14T18:29:00.000Z",
-        "teamSize": {
-          "min": 2,
           "max": 4
         }
       },
@@ -7200,44 +6017,6 @@
       "rfpMetadata": null
     },
     {
-      "id": "69dda1ae9c129cc1a9168cb8",
-      "programId": "1384",
-      "type": "grant",
-      "chainID": null,
-      "name": "Agentic Engineering Grant",
-      "isActive": true,
-      "deadline": "2026-05-04T00:00:00.000Z",
-      "submissionUrl": "https://superteam.fun/earn/grants/agentic-engineering",
-      "createdAt": "2026-04-14T02:08:46.000Z",
-      "updatedAt": "2026-04-14T02:26:26.000Z",
-      "metadata": {
-        "title": "Agentic Engineering Grant",
-        "description": "Offers $200 USDG ($100 upfront, $100 upon shipping) to cover pro-tier AI coding tools for builders developing Solana-integrated projects submitted to the Colosseum Frontier hackathon by May 11. Eligible for Solana developers with working products. Apply via the Superteam Earn platform before May 4.",
-        "shortDescription": "Offers $200 USDG ($100 upfront, $100 upon shipping) to cover pro-tier AI coding tools for...",
-        "status": "active",
-        "startsAt": "",
-        "endsAt": "2026-05-04",
-        "categories": [
-          "Funding Opportunity"
-        ],
-        "ecosystems": [
-          "Solana"
-        ],
-        "networks": [],
-        "programBudget": "$200 USD",
-        "website": "",
-        "projectTwitter": "",
-        "socialLinks": {
-          "grantsSite": "https://superteam.fun/earn/grants/agentic-engineering"
-        }
-      },
-      "hackathonMetadata": null,
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
       "id": "69d59b024f6f7cab51a7b3fa",
       "programId": "1361",
       "type": "hackathon",
@@ -7281,70 +6060,6 @@
           "min": 2,
           "max": 4
         }
-      },
-      "bountyMetadata": null,
-      "acceleratorMetadata": null,
-      "vcFundMetadata": null,
-      "rfpMetadata": null
-    },
-    {
-      "id": "69d2f7dc51c05a1b422da80d",
-      "programId": "1358",
-      "type": "hackathon",
-      "chainID": null,
-      "name": "ETHOnline 2026",
-      "isActive": false,
-      "deadline": "2026-04-13T23:59:00.000Z",
-      "submissionUrl": "https://ethglobal.com/events/ethonline2026",
-      "createdAt": "2026-04-06T00:01:32.000Z",
-      "updatedAt": "2026-04-14T00:02:09.000Z",
-      "metadata": {
-        "title": "ETHOnline 2026",
-        "description": "Async hackathon by ETH Global",
-        "shortDescription": "Async hackathon by ETH Global",
-        "status": "active",
-        "startsAt": "2026-09-04T12:00:00.000Z",
-        "endsAt": "2026-09-16T23:59:59.999Z",
-        "categories": [
-          "Hackathon"
-        ],
-        "ecosystems": [
-          "Ethereum"
-        ],
-        "networks": [],
-        "grantTypes": [
-          "Hackathons"
-        ],
-        "organizations": [],
-        "programBudget": "50000",
-        "communityRef": [],
-        "website": "https://ethglobal.com/events/ethonline2026",
-        "projectTwitter": "https://x.com/ETHGlobal",
-        "type": "program",
-        "bugBounty": "",
-        "anyoneCanJoin": true,
-        "socialLinks": {
-          "twitter": "https://x.com/ETHGlobal",
-          "discord": "",
-          "website": "https://ethglobal.com/events/ethonline2026",
-          "orgWebsite": "",
-          "blog": "",
-          "forum": "",
-          "grantsSite": "https://ethglobal.com/events/ethonline2026",
-          "telegram": ""
-        }
-      },
-      "hackathonMetadata": {
-        "startDate": "2026-09-04T12:00:00.000Z",
-        "endDate": "2026-09-16T23:59:59.999Z",
-        "location": "Remote",
-        "prizes": [
-          {
-            "amount": "50000",
-            "currency": "USD"
-          }
-        ],
-        "registrationDeadline": "2026-09-06T17:00:00.000Z"
       },
       "bountyMetadata": null,
       "acceleratorMetadata": null,
