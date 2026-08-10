@@ -25,11 +25,12 @@ export interface AppConfig {
    * the HSTS preload list, so there is no plaintext variant to fall back to):
    *
    *   production  https://api.ethrfps.app
-   *   staging     https://apistag.ethrfps.app
+   *   staging     https://api-staging.ethrfps.app
    *
-   * It is NOT the apex. The apex is the specification's origin — it serves the Standard's
-   * canonical documents, whose identifiers are owned by `packages/standard` — and pointing
-   * `servers[0].url` there would advertise the wrong host for every API operation.
+   * It is NOT the apex. The apex is the specification's origin: the Standard's canonical
+   * documents and their identifiers are owned by `packages/standard`, and no route in this
+   * package answers those paths. Pointing `servers[0].url` at the apex would advertise the
+   * wrong host for every API operation.
    */
   publicBaseUrl: string;
   /**

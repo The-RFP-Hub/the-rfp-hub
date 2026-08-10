@@ -98,7 +98,7 @@ environment, never baked in (see **Hostnames** under *Deployment*):
 | `HOST` | `0.0.0.0` | HTTP bind address. |
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this for shared database instances where connection budget is split across multiple services. Defaults to pg's own default (10). A set-but-unusable value — empty, whitespace-only, non-numeric, zero, or negative — falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
-| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url` (see `src/plugins/swagger.ts`). Relative by default — correct wherever the server happens to be hosted. Deployed environments set it to the API's own origin: `https://api.ethrfps.app` (production), `https://apistag.ethrfps.app` (staging). Always `https://`, never the apex — see **Hostnames**. |
+| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url` (see `src/plugins/swagger.ts`). Relative by default — correct wherever the server happens to be hosted. Deployed environments set it to the API's own origin: `https://api.ethrfps.app` (production), `https://api-staging.ethrfps.app` (staging). Always `https://`, never the apex — see **Hostnames**. |
 | `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
 | `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
 | `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
@@ -277,12 +277,12 @@ a plaintext example in a doc or a config is a bug, not a convenience.
 | Environment | API host | `PUBLIC_BASE_URL` |
 |---|---|---|
 | production | `api.ethrfps.app` | `https://api.ethrfps.app` |
-| staging | `apistag.ethrfps.app` | `https://apistag.ethrfps.app` |
+| staging | `api-staging.ethrfps.app` | `https://api-staging.ethrfps.app` |
 
 Two properties of these names are load-bearing rather than stylistic:
 
-- **One label deep, always.** `apistag.` and not `api.staging.`: an RFC 6125 wildcard matches
-  exactly one label, so `*.ethrfps.app` covers `apistag.` and `api.` but would not cover
+- **One label deep, always.** `api-staging.` and not `api.staging.`: an RFC 6125 wildcard matches
+  exactly one label, so `*.ethrfps.app` covers `api-staging.` and `api.` but would not cover
   `api.staging.`. Production's certificate is the apex plus that wildcard; staging issues its own
   certificate for its exact name, so that two environments never contend over the same ACM
   validation record. Either way, a name deeper than one label is a name that needs a certificate
@@ -327,7 +327,7 @@ Derived from those, and not configured anywhere:
   prefix (see **Deferred** — nothing writes to it yet).
 - **Container port** `3001`, health path `/v1/health` — the same path the container health check,
   the load balancer and the external uptime check all use.
-- **Public hostnames**: `api.ethrfps.app` / `apistag.ethrfps.app`, plus the apex `ethrfps.app` in
+- **Public hostnames**: `api.ethrfps.app` / `api-staging.ethrfps.app`, plus the apex `ethrfps.app` in
   production only (see **Hostnames** above). These are load-balancer host-header rules and DNS
   records — nothing in this package or in the pipelines configures them, and the only place the
   hostname reaches this code is `PUBLIC_BASE_URL` on the task definition.

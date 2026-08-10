@@ -5,7 +5,7 @@
 # credentials all arrive from the `staging` GitHub Environment (secrets), and the two task-family
 # names from that environment's variables. This file therefore names no account, cluster or
 # registry — which is deliberate: this repository is public and source-neutral. (The hostname this
-# environment serves, `https://apistag.ethrfps.app`, is public by nature and is documented in
+# environment serves, `https://api-staging.ethrfps.app`, is public by nature and is documented in
 # packages/api/README.md; it is not a pipeline input — see the runtime-configuration note below.)
 #
 # Required in the `staging` GitHub Environment:
@@ -34,7 +34,7 @@
 #
 # Runtime configuration (DATABASE_URL and friends) is NOT set here and never passes through GitHub:
 # the task definition pulls it from the secrets store at task start. That includes PUBLIC_BASE_URL
-# (`https://apistag.ethrfps.app` here) — so changing the advertised origin is a task-definition
+# (`https://api-staging.ethrfps.app` here) — so changing the advertised origin is a task-definition
 # change plus a new deployment, never an edit to this file. See packages/api/README.md.
 name: Deploy API (staging)
 
