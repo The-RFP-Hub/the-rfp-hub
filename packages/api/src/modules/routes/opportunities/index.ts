@@ -45,6 +45,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
               "application/schema+json": { schema: { $ref: "SchemaResponse#" } },
             },
           },
+          304: { description: "Not modified — the entity-tag you hold is current." },
         },
       },
     },

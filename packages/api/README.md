@@ -33,6 +33,13 @@ as one that hashes the file). See [`adr/0007`](../../adr/0007-canonical-domain-a
 | `GET` | `/meta/rfphub-schema.meta.json` | `application/schema+json` |
 | `GET` | `/registries/entry.schema.json` | `application/schema+json` |
 
+Each carries an explicit cache policy and a strong `ETag` (send `If-None-Match` for a `304`).
+`/schemas/v<version>/**` is `public, max-age=31536000, immutable` — the version is in the path and
+the directory is frozen, so those bytes can never change at that URL. Everything whose URL carries
+no version, including the `/v1/opportunities/schema` alias, is `public, max-age=3600,
+must-revalidate`. No `Last-Modified`: the only timestamp available is the build's, and it changes
+for bytes that did not.
+
 These resolve once DNS for `ethrfps.app` is delegated and the apex is routed to this service **for
 these five paths**. Spec resolution therefore rides this service's uptime for now; the recorded end
 state is the package directory on object storage behind a CDN, which retires these five routes

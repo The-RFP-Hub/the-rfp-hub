@@ -309,7 +309,28 @@ reserved, only harder to serve.
 permanent, widely-cached identifier and an API is a deployable with a database behind it; those
 have very different availability profiles, and coupling them is a compromise, not a design.
 It is accepted for one reason — it is what makes the identifiers resolve *at all* on the day DNS
-lands, using infrastructure that already exists — and it is bounded by an explicit migration path:
+lands, using infrastructure that already exists — and it is mitigated by a cache policy, then
+bounded by an explicit migration path.
+
+### The cache policy
+
+The mitigation only exists if the responses carry it, so each document states its own lifetime and
+a strong validator. The split is whether the URL names a spec version:
+
+| Documents | `Cache-Control` | Why |
+|---|---|---|
+| `/schemas/v<version>/**` | `public, max-age=31536000, immutable` | The version is in the path and the directory is FROZEN. These bytes can never change *at this URL*, so the strongest promise HTTP has is simply true — and it is what makes the CDN migration below a no-op rather than an invalidation exercise. |
+| `/schemas/index.json`, `/meta/**`, `/registries/entry.schema.json`, `/v1/opportunities/schema` | `public, max-age=3600, must-revalidate` | These URLs carry no version. The freeze happens to hold them still, but a URL that does not name a version must not promise one. Revalidation costs a `304`, not a re-download. |
+
+Every document carries a strong `ETag` derived from the bytes — content-derived, so it is identical
+across replicas and across rebuilds of the same package — and `If-None-Match` is honoured. There is
+deliberately **no `Last-Modified`**: the only timestamp available is when the image checked the
+package out, it changes on every rebuild for bytes that did not, and a validator that lies is worse
+than one that is absent. Asserted in `packages/api/test/integration/canonical-cache.test.ts`.
+
+With this, a processor that has fetched the context once keeps a usable copy through an API outage,
+which is what "the identifiers resolve" has to mean for something machines fetch on their own
+schedule.
 
 > **Migration to static hosting.** The served documents are byte-identical to the files in
 > `packages/standard`. Publishing that directory to object storage behind a CDN and pointing the

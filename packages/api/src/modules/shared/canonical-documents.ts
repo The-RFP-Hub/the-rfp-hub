@@ -23,6 +23,7 @@
  * which retires this module entirely without any identifier changing. Until then spec
  * resolution rides the API's uptime, which is a compromise and is written down as one.
  */
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -57,6 +58,40 @@ function canonicalPath(identifier: string): string {
   return url.pathname;
 }
 
+/**
+ * CACHING, DECIDED RATHER THAN DEFAULTED.
+ *
+ * These documents are fetched by JSON-LD processors and schema validators, on the machine's
+ * schedule rather than a human's, and every uncached fetch reaches a database-backed API service
+ * for bytes that came off disk. Worse, without a cache policy an API outage makes a permanent,
+ * widely-cacheable context unavailable even to clients that already have a copy.
+ *
+ * Two policies, and the difference is whether the URL itself carries the version:
+ *
+ *   - IMMUTABLE — anything under `/schemas/v<version>/`. The version is in the path and the
+ *     directory is FROZEN, so these bytes can never change at this URL. A year plus `immutable`
+ *     is the strongest promise HTTP has and it is simply true here. This is what makes the
+ *     recorded migration to a CDN a no-op rather than a cache-invalidation exercise.
+ *   - REVALIDATE — the versions index, the meta-schema, the registry entry schema, and the
+ *     `/v1/opportunities/schema` alias. Their URLs carry no spec version. The freeze happens to
+ *     hold them still today, but a URL that does not name a version must not promise one, and an
+ *     hour with a validator costs a 304, not a re-download.
+ */
+export const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+export const REVALIDATE_CACHE = "public, max-age=3600, must-revalidate";
+
+/**
+ * A strong entity-tag over the exact bytes served.
+ *
+ * Content-derived, so it is identical across every replica and every deploy of the same package —
+ * which a `Last-Modified` from the file's mtime would not be. Deliberately no `Last-Modified`:
+ * the only timestamp available is when the image checked the package out, that value changes on
+ * every rebuild for bytes that did not, and a validator that lies is worse than one that is
+ * absent (RFC 9110 § 8.8 prefers a strong validator anyway).
+ */
+export const entityTag = (body: Buffer): string =>
+  `"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`;
+
 export interface CanonicalDocument {
   /** The identifier this document is published under. */
   url: string;
@@ -72,15 +107,30 @@ export interface CanonicalDocument {
   /** True when the document carries an `$id` that must equal `url`. */
   selfIdentifying: boolean;
   body: Buffer;
+  /** `Cache-Control` for this document — see IMMUTABLE_CACHE / REVALIDATE_CACHE above. */
+  cacheControl: string;
+  /** Strong `ETag` over `body`. */
+  etag: string;
 }
 
 function document(
   identifier: string,
-  init: Omit<CanonicalDocument, "url" | "path" | "source" | "body">,
+  init: Omit<CanonicalDocument, "url" | "path" | "source" | "body" | "cacheControl" | "etag">,
 ): CanonicalDocument {
   const path = canonicalPath(identifier);
   const source = path.slice(1);
-  return { ...init, url: identifier, path, source, body: readStandardFile(source) };
+  const body = readStandardFile(source);
+  return {
+    ...init,
+    url: identifier,
+    path,
+    source,
+    body,
+    // The version in the path is what licenses the unbounded lifetime — derived, not declared
+    // per document, so a new version directory inherits the right policy with no edit here.
+    cacheControl: /^\/schemas\/v[^/]+\//.test(path) ? IMMUTABLE_CACHE : REVALIDATE_CACHE,
+    etag: entityTag(body),
+  };
 }
 
 const schemaBase = `${specConfig.baseUrl}/${specConfig.schemaDir}`;
@@ -151,3 +201,17 @@ export function assertSelfIdentifies(): void {
 
 /** The Standard's schema as an object — the payload `/v1/opportunities/schema` has always served. */
 export const opportunitySchemaDocument = canonicalDocuments[0] as CanonicalDocument;
+
+/**
+ * Does an `If-None-Match` header match this document's entity-tag? (RFC 9110 § 13.1.2.)
+ *
+ * `*` matches any existing representation; otherwise the header is a comma-separated list of
+ * entity-tags compared with the WEAK comparison function, so a `W/` prefix on either side is
+ * ignored — which is what makes an intermediary that weakened the tag still get its 304.
+ */
+export function ifNoneMatchSatisfied(header: string | undefined, etag: string): boolean {
+  if (!header) return false;
+  const opaque = (tag: string) => tag.trim().replace(/^W\//, "");
+  if (header.trim() === "*") return true;
+  return header.split(",").some((candidate) => opaque(candidate) === opaque(etag));
+}

@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { OpportunityService } from "../../services/opportunities/opportunity.service.js";
-import { opportunitySchemaDocument } from "../../shared/canonical-documents.js";
+import { REVALIDATE_CACHE, opportunitySchemaDocument } from "../../shared/canonical-documents.js";
+import { sendCanonical } from "../canonical/index.js";
 import { type RawQuery, parseOpportunityQuery } from "./types.js";
 
 /** GET /v1/opportunities — filtered, sorted, paginated thin list. */
@@ -29,9 +30,12 @@ const find = async (req: FastifyRequest, res: FastifyReply) => {
  * Same bytes, same module as the root-mounted canonical route: this one is the convenience for
  * a client already talking to `/v1/`, and the `$id` it carries points at the canonical URL, not
  * here. When spec serving moves to a CDN the canonical routes go and this one stays.
+ *
+ * It is cached with revalidation rather than as immutable, unlike the canonical schema URL it
+ * mirrors: this path names no spec version, so its bytes change the day a new version becomes
+ * current. Same document, same entity-tag, different promise about the URL.
  */
-const schema = async (_req: FastifyRequest, res: FastifyReply) => {
-  return res.type(opportunitySchemaDocument.mediaType).send(opportunitySchemaDocument.body);
-};
+const schema = async (req: FastifyRequest, res: FastifyReply) =>
+  sendCanonical({ ...opportunitySchemaDocument, cacheControl: REVALIDATE_CACHE }, req, res);
 
 export const opportunityController = { getAll, find, schema };
