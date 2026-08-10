@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { registerRoutes } from "./modules/routes/index.js";
 import { responseSchemas } from "./openapi/schemas.js";
@@ -11,6 +12,12 @@ export interface BuildOptions {
 /** Build the Fastify app (no network bind) — used by both the server and the integration tests. */
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: opts.logger ?? false });
+
+  // Fully public, unauthenticated read API — no browser client can call it today because no
+  // response carries CORS headers. Any origin is allowed, and only the read-safe verbs are
+  // permitted (this API never mutates), so there are no credentials to protect and no origin
+  // allowlist to maintain.
+  await app.register(cors, { origin: "*", methods: ["GET", "HEAD", "OPTIONS"] });
 
   // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
   for (const schema of responseSchemas) app.addSchema(schema);

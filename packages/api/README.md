@@ -65,6 +65,16 @@ pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 Config is read from the environment (see `.env-example`): `DATABASE_URL`, `PORT`, `HOST`, and the
 seed source (`SOURCE_API_URL`, `SOURCE_SYSTEM`, `SOURCE_PROGRAM_URL_BASE`).
 
+### Process behaviour
+
+- **CORS**: every response carries `Access-Control-Allow-Origin: *`, for `GET`/`HEAD`/`OPTIONS`
+  only. This is a fully public, unauthenticated read API that never mutates, so there are no
+  credentials to protect and no origin allowlist to maintain — and without the headers no browser
+  client can call it at all.
+- **Graceful shutdown**: `SIGTERM`/`SIGINT` stop new connections, let in-flight requests finish and
+  close the pg pool (a Fastify `onClose` hook) before exiting 0. A 10s forced-exit timeout means a
+  hung close can never leave an un-killable process.
+
 > **Migrations were regenerated for the v1.0.0 re-cut.** `src/db/migrations` starts from the
 > drizzle-kit-generated `0000_recut_v1_0_0` baseline; `0001_schema_vnext_org_flip` applies the
 > schema v-next changes (org-array flip, `networks`/`tags`/`extensions` removal, eligibility →
