@@ -4,6 +4,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { registerRoutes } from "./modules/routes/index.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { responseSchemas } from "./openapi/schemas.js";
+import { registerApexHostRule } from "./plugins/apex-host.js";
 import { registerSwagger } from "./plugins/swagger.js";
 
 export interface BuildOptions {
@@ -60,6 +61,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
       .code(404)
       .send({ error: "not_found", message: `route ${request.method} ${request.url} not found` });
   });
+
+  // The apex is reserved for the spec (adr/0007). On that hostname this service answers the
+  // canonical documents and nothing else — registered on the root instance, before the routes,
+  // so it covers every route the service has or gains.
+  registerApexHostRule(app);
 
   await registerSwagger(app); // before routes so their schemas are captured
   await registerRoutes(app);

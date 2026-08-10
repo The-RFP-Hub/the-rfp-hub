@@ -198,7 +198,7 @@ in place in v1.0.0, which is simultaneously declared `stable` and frozen.**
 
 | URL | What it is | Why this shape |
 |---|---|---|
-| `https://ethrfps.app/` | The spec and its site. **Reserved** — no service is ever mounted here. | The one hostname that cannot collide with an identifier. |
+| `https://ethrfps.app/` | The spec and its site. **Reserved** — no service is ever mounted here, and no path outside the spec's own is ever served here. | The one hostname that cannot collide with an identifier. |
 | `https://ethrfps.app/schemas/v<version>/opportunity.schema.json` | Schema `$id`. | Mirrors `packages/standard/` byte-for-byte. Versioned, because the schema is. |
 | `https://ethrfps.app/schemas/v<version>/context.jsonld` | The JSON-LD context document. | Versioned: the **document** is what carries the version. |
 | `https://ethrfps.app/schemas/index.json` | Machine-readable version index. | Versionless by nature — it is the index *of* versions. |
@@ -289,6 +289,22 @@ path that already existed for `/v1/opportunities/schema`, with `application/sche
 `application/ld+json` as appropriate. Serving is mounted at the **root**, not under `/v1/`,
 because the identifiers are not API resources and must not carry an API version.
 
+**The reservation has to be enforced, because one deployable now answers on two hostnames.**
+"Point the apex at the API" is not a way to reserve the apex — it is a way to publish the entire
+`/v1` API at `ethrfps.app`, which would make "no service is ever mounted here" false on the day
+DNS lands and would turn every future apex path into API collision surface. So the contract is
+enforced in two independent places, and both are required:
+
+| Layer | What it enforces |
+|---|---|
+| The application (`packages/api/src/plugins/apex-host.ts`) | An `onRequest` allowlist: on the apex host this service answers the five canonical document paths and 404s everything else, including `/`. The allowlist is derived from the Standard's `baseUrl` and the canonical document table, so it fails closed for routes added later. Asserted with both `Host` headers in `test/integration/apex-host.test.ts`. |
+| The load balancer | The apex listener rule is **path-scoped** to the canonical prefixes (`/schemas/*`, `/meta/*`, `/registries/*`), so apex traffic for `/v1` never reaches a task. `api.` and `api-staging.` keep an unscoped rule. |
+
+Neither layer is redundant: the application rule survives an infrastructure edit, and the
+infrastructure rule survives a routing change in the application. The canonical documents answer
+on **every** host on purpose — an identifier that resolves on only one hostname is not more
+reserved, only harder to serve.
+
 **The tradeoff, stated plainly: spec resolution now rides the API's uptime.** A schema `$id` is a
 permanent, widely-cached identifier and an API is a deployable with a database behind it; those
 have very different availability profiles, and coupling them is a compromise, not a design.
@@ -334,7 +350,10 @@ than claiming a resolution that does not exist.
 
 - **DNS is not done and only a human can do it.** Delegate `ethrfps.app`, front the apex, issue
   the `*.ethrfps.app` wildcard, and route `api.` to the API. Until then every URL in this ADR is
-  correct and unreachable.
+  correct and unreachable. **The apex rule is path-scoped**, per the serving table above — it
+  forwards `/schemas/*`, `/meta/*` and `/registries/*` and nothing else; an unscoped apex rule
+  publishes the whole API at the identifier authority and is the one routing mistake this
+  decision cannot absorb.
 - **Migrate spec serving to static hosting behind a CDN**, per the migration path above, and
   delete the root-mounted routes when it lands.
 - **The deployment configuration still carries placeholder hostnames.** Adopting `api.ethrfps.app`

@@ -35,6 +35,7 @@ import {
   specConfig,
 } from "../../src/modules/shared/canonical-documents.js";
 import { JSONLD_CONTEXT_LINK, JSONLD_CONTEXT_REL } from "../../src/modules/shared/jsonld-link.js";
+import { APEX_HOST } from "../../src/plugins/apex-host.js";
 import { describeWithDb } from "./db-gate.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -183,6 +184,29 @@ describeWithDb("canonical spec documents + JSON-LD context advertisement", () =>
   it("does not leak the advertisement onto unrelated endpoints", async () => {
     for (const url of ["/v1/stats", "/v1/health", "/", "/schemas/index.json"]) {
       const res = await app.inject({ method: "GET", url });
+      expect(res.headers.link, url).toBeUndefined();
+    }
+  });
+
+  // ------------------------------------------------- the apex reservation, with real data ---
+  //
+  // The DB-backed half of test/integration/apex-host.test.ts: the endpoints that need a database
+  // answer on the API host and are absent from the apex, which is what "the apex is reserved for
+  // the spec" has to mean once one deployable answers on both names (adr/0007).
+
+  it("answers the opportunity endpoints on the API host, with the context advertisement", async () => {
+    for (const url of ["/v1/opportunities?ecosystem=CANONTEST", "/v1/opportunities/ctest:1"]) {
+      const res = await app.inject({ method: "GET", url, headers: { host: `api.${APEX_HOST}` } });
+      expect(res.statusCode, url).toBe(200);
+      expect(res.headers.link, url).toBe(JSONLD_CONTEXT_LINK);
+    }
+  });
+
+  it("does not answer them on the apex, and advertises nothing there", async () => {
+    for (const url of ["/v1/opportunities?ecosystem=CANONTEST", "/v1/opportunities/ctest:1"]) {
+      const res = await app.inject({ method: "GET", url, headers: { host: APEX_HOST } });
+      expect(res.statusCode, url).toBe(404);
+      expect(res.json().message, url).toContain("reserved");
       expect(res.headers.link, url).toBeUndefined();
     }
   });

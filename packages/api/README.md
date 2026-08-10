@@ -33,9 +33,31 @@ as one that hashes the file). See [`adr/0007`](../../adr/0007-canonical-domain-a
 | `GET` | `/meta/rfphub-schema.meta.json` | `application/schema+json` |
 | `GET` | `/registries/entry.schema.json` | `application/schema+json` |
 
-These resolve once DNS for `ethrfps.app` is delegated and the apex points here. Spec resolution
-therefore rides this service's uptime for now; the recorded end state is the package directory on
-object storage behind a CDN, which retires these five routes without any identifier changing.
+These resolve once DNS for `ethrfps.app` is delegated and the apex is routed to this service **for
+these five paths**. Spec resolution therefore rides this service's uptime for now; the recorded end
+state is the package directory on object storage behind a CDN, which retires these five routes
+without any identifier changing.
+
+#### Hostnames: what the apex serves, and what it does not
+
+[`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md) reserves the apex for the spec
+— *"no service is ever mounted here"* — and that reservation is the entire reason `/schemas/`,
+`/meta/`, `/registries/` and `/ns/` are safe as permanent identifier paths. Routing the apex to
+this service **wholesale** would not reserve it; it would publish the whole `/v1` API at
+`ethrfps.app`, and every future apex path would become API collision surface.
+
+| Host | What this service answers |
+|---|---|
+| `ethrfps.app` (and `www.`) | The five canonical documents above. Everything else — `/v1/**`, `/v1/docs`, the service-info root — is `404`. |
+| `api.ethrfps.app`, `api-staging.ethrfps.app`, anything else | Everything, including the canonical documents. An identifier that resolves on only one hostname is not more reserved, just harder to serve. |
+
+This is enforced in the application (`src/plugins/apex-host.ts`, an `onRequest` allowlist derived
+from the Standard's own `baseUrl`) and asserted with both `Host` headers in
+`test/integration/apex-host.test.ts`. **The infrastructure must enforce the same contract
+independently**: the apex listener rule belongs path-scoped to `/schemas/*`, `/meta/*` and
+`/registries/*`, so apex traffic for `/v1` never reaches a task at all. Two layers, because the
+application rule survives an infrastructure edit and the infrastructure rule survives a routing
+change here.
 
 ### JSON-LD
 
