@@ -43,6 +43,14 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
   the same graded structure keyed on `label` instead of `severity`.
 - `discretionary` is a **payout model, not absent data** — programs publish numeric and
   case-by-case tiers in one table.
+- **The model is an exclusive discriminator.** Each branch both requires the amounts its model
+  needs and forbids those belonging to the others, so `{"model": "discretionary", "amount": 1}`
+  and `{"model": "fixed", "amount": 10, "max": 99}` do not validate. A first cut only required
+  the applicable fields, which left the tag advisory and contradicted this entry — caught in
+  review.
+- **A security bounty may not carry the scalar `reward` at all.** Requiring `rewardTiers`
+  without forbidding `reward` still permitted the misleading maximum headline the tier table
+  exists to prevent.
 - **Stability.** The whole surface lands `x-stability: provisional`. It has a measured
   publisher corpus and no shipped consumer, and the gate in `PROCESS.md` asks for both.
 - **Not modelled, deliberately**: step functions over funds at risk, TVL-conditional tiers,
@@ -70,10 +78,22 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
   source-agnostic standard.
 - `codegen.mjs`: `DEF_ORDER` gains `rewardTier` and `payout`; `REGISTRY_FOR_FIELD` gains the
   two new registry bindings.
+- Both registries are bundled by the package (`registries`, `isRegistered`, `activeValues`)
+  and enforced by two new advisory checks, `unregistered-tier-severity` and
+  `unregistered-tier-asset-type`. Registering a vocabulary without wiring the warning would
+  have made this entry's "an unregistered value warns" claim false.
 - `rfphub-validate`: the `amount-without-currency` advisory now traverses every
   `rewardTiers[].payout` bound (`amount`, `min`, `max`, `floor`, `cap`). A tier's `percent` is
   **not** a denominated site — it is a share, not an amount.
-- Conformance: 3 new `pass/` and 9 new `fail/` cases, one per rule changed.
+- New advisory check `payout-bounds-inverted`: `min` above `max`, or `floor` above `cap`,
+  describes a tier nobody can be paid under. JSON Schema cannot compare sibling values, so the
+  advisory tier is the only place the rule can live.
+- The generated field tables now render `maximum`, so `percent` documents its 0–100 bound
+  instead of appearing unbounded above.
+- Conformance: 3 new `pass/` and 12 new `fail/` cases, one per rule changed. Each `fail/` case
+  was verified to fail for its **named** rule alone — two of the first cut were rejected by a
+  second, unrelated constraint, which would have let an implementation ignore the rule the
+  filename advertises and still pass the suite.
 
 ### Docs
 
@@ -88,7 +108,8 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
 |---|---|---|---|
 | `bounty.reward` (always required) | `bounty.reward` (required when `bountyKind` is `task`) | reshaped | Migrate a task bounty by adding `"bountyKind": "task"`; the value is untouched. |
 | — | `bounty.bountyKind` | added, **required** | No default. A document without it does not validate. |
-| — | `bounty.rewardTiers[]` | added | Required when `bountyKind` is `security`. |
+| — | `bounty.rewardTiers[]` | added | Required when `bountyKind` is `security`; permitted on either kind. |
+| `bounty.reward` (valid on any bounty) | `bounty.reward` (forbidden when `bountyKind` is `security`) | tightened | A graded program states its amounts in the table only. |
 | — | `bounty.severityScheme`, `bounty.rewardPoolStatus` | added | Optional on either kind. |
 
 ---

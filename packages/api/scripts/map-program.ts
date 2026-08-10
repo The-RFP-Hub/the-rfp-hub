@@ -445,21 +445,28 @@ function typeBlockOf(
   }
   const out = normalizeBlock(picked, hoist);
   if (type === "bounty") {
+    // An empty tier array is not a tier table — the Standard requires minItems 1, so passing it
+    // through would emit an invalid document. Drop it before it can influence the inference.
+    if (Array.isArray(out.rewardTiers) && out.rewardTiers.length === 0) delete out.rewardTiers;
+    const hasTiers = Array.isArray(out.rewardTiers) && out.rewardTiers.length > 0;
     // bountyKind is required by the Standard and upstream does not send it. Infer from the
-    // payout shape: a tier table is a security program, anything else is a task bounty — which
-    // is what this upstream carries, gig-style listings off bounty boards.
+    // payout shape: a tier table AND no scalar reward is a security program. Tiers alone are not
+    // enough — the Standard permits them on a task bounty that grades a placement ladder, and
+    // such a record keeps its reward, so calling it 'security' would both mislabel it and (since
+    // security forbids the scalar reward) make it invalid.
     if (out.bountyKind === undefined) {
-      out.bountyKind =
-        Array.isArray(out.rewardTiers) && out.rewardTiers.length > 0 ? "security" : "task";
+      out.bountyKind = hasTiers && out.reward === undefined ? "security" : "task";
     }
     // reward is required for a task bounty — synthesize from the budget if absent (a plain
     // number now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram).
     // Never synthesized for a security bounty: collapsing a graded table to one number is the
-    // misrepresentation the tier table exists to prevent.
+    // misrepresentation the tier table exists to prevent, and the Standard forbids it there.
     if (out.bountyKind === "task" && out.reward === undefined) {
       const { amount } = parseAmount(p.metadata?.programBudget);
       if (amount !== undefined) out.reward = amount;
     }
+    // A security bounty may not carry the scalar reward at all.
+    if (out.bountyKind === "security") delete out.reward;
   }
   return out;
 }

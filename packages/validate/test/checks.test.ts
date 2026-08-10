@@ -146,19 +146,90 @@ describe("amount-without-currency", () => {
           { severity: "critical", payout: { model: "range" as const, min: 1000, max: 5000 } },
           {
             severity: "high",
-            payout: { model: "percentage_of_value_at_risk" as const, percent: 10, cap: 20000 },
+            payout: {
+              model: "percentage_of_value_at_risk" as const,
+              percent: 10,
+              floor: 500,
+              cap: 20000,
+            },
           },
+          { severity: "medium", payout: { model: "fixed" as const, amount: 750 } },
           { severity: "low", payout: { model: "discretionary" as const } },
         ],
       },
     };
-    const warnings = runChecks(doc);
+    const warnings = runChecks(doc).filter((w) => w.code === "amount-without-currency");
+    // Every denominated bound, and only those: `percent` is a share, not an amount.
     expect(warnings.map((w) => w.instancePath)).toEqual([
       "/fundingDetails/rewardTiers/0/payout/min",
       "/fundingDetails/rewardTiers/0/payout/max",
+      "/fundingDetails/rewardTiers/1/payout/floor",
       "/fundingDetails/rewardTiers/1/payout/cap",
+      "/fundingDetails/rewardTiers/2/payout/amount",
     ]);
     expect(warnings[0]?.message).toContain("reward tier payout.min 1000");
+  });
+
+  it("flags reward-tier payout bounds that cross, in both pairs", () => {
+    const doc = {
+      ...base,
+      fundingType: "bounty" as const,
+      fundingInfo: { currency: "USDC" },
+      fundingDetails: {
+        fundingType: "bounty" as const,
+        bountyKind: "security" as const,
+        rewardTiers: [
+          { severity: "critical", payout: { model: "range" as const, min: 5000, max: 1000 } },
+          {
+            severity: "high",
+            payout: {
+              model: "percentage_of_value_at_risk" as const,
+              percent: 10,
+              floor: 900,
+              cap: 100,
+            },
+          },
+          { severity: "low", payout: { model: "range" as const, min: 1, max: 1 } },
+        ],
+      },
+    };
+    const warnings = runChecks(doc).filter((w) => w.code === "payout-bounds-inverted");
+    // Equal bounds are a fixed amount expressed as a range, not an error.
+    expect(warnings.map((w) => w.instancePath)).toEqual([
+      "/fundingDetails/rewardTiers/0/payout/min",
+      "/fundingDetails/rewardTiers/1/payout/floor",
+    ]);
+  });
+
+  it("flags unregistered reward-tier severity and assetType, ignoring registered ones", () => {
+    const doc = {
+      ...base,
+      fundingType: "bounty" as const,
+      fundingInfo: { currency: "USDC" },
+      fundingDetails: {
+        fundingType: "bounty" as const,
+        bountyKind: "security" as const,
+        rewardTiers: [
+          {
+            severity: "critical",
+            assetType: "smart_contract",
+            payout: { model: "discretionary" as const },
+          },
+          {
+            severity: "showstopper",
+            assetType: "mainframe",
+            payout: { model: "discretionary" as const },
+          },
+        ],
+      },
+    };
+    const warnings = runChecks(doc);
+    expect(
+      warnings.filter((w) => w.code === "unregistered-tier-severity").map((w) => w.instancePath),
+    ).toEqual(["/fundingDetails/rewardTiers/1/severity"]);
+    expect(
+      warnings.filter((w) => w.code === "unregistered-tier-asset-type").map((w) => w.instancePath),
+    ).toEqual(["/fundingDetails/rewardTiers/1/assetType"]);
   });
 
   it("fires on accelerator funding, ignoring an explicit null", () => {

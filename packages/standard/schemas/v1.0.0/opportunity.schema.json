@@ -567,7 +567,7 @@
         "reward": {
           "type": "number",
           "minimum": 0,
-          "description": "The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty leaves this absent and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
+          "description": "The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty is forbidden from carrying it and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent."
         },
         "rewardTiers": {
           "type": "array",
@@ -609,7 +609,7 @@
       "$comment": "Binds the required payout field to the kind. bountyKind is required and has exactly two values, so if/else is total. Each branch names only properties already declared above, so no branch introduces an undeclared property name — see the root $comment. Written as a bare if/then/else rather than an allOf of branches because an allOf at this level defeats the type generator, which emits an index signature instead of the interface.",
       "if": { "properties": { "bountyKind": { "const": "task" } }, "required": ["bountyKind"] },
       "then": { "required": ["reward"] },
-      "else": { "required": ["rewardTiers"] }
+      "else": { "required": ["rewardTiers"], "properties": { "reward": false } }
     },
     "rewardTier": {
       "type": "object",
@@ -650,7 +650,7 @@
         "model": {
           "type": "string",
           "enum": ["fixed", "range", "up_to", "percentage_of_value_at_risk", "discretionary"],
-          "description": "How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.",
+          "description": "How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case, and carries none of the amount fields. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.",
           "x-stability": "provisional"
         },
         "amount": {
@@ -691,18 +691,31 @@
           "x-stability": "provisional"
         }
       },
-      "$comment": "Binds the required amounts to the model, as a nested if/then/else chain rather than an allOf of branches: an allOf at this level defeats the type generator, which emits an index signature instead of the interface. Every branch names only properties already declared above, so none introduces an undeclared property name — see the root $comment. The final else is 'discretionary', which requires no amount.",
+      "$comment": "Binds the amounts to the model, as a nested if/then/else chain rather than an allOf of branches: an allOf at this level defeats the type generator, which emits an index signature instead of the interface. Every branch names only properties already declared above, so none introduces an undeclared property name — see the root $comment. Each branch both requires the amounts its model needs and forbids the ones belonging to other models, so the model tag is a real discriminator rather than a hint: a 'discretionary' payout carrying an amount, or a 'fixed' one carrying a range, does not validate. The final else is 'discretionary', which names no figure at all.",
       "if": { "properties": { "model": { "const": "fixed" } }, "required": ["model"] },
-      "then": { "required": ["amount"], "properties": { "amount": { "type": "number" } } },
+      "then": {
+        "required": ["amount"],
+        "properties": { "amount": { "type": "number" }, "min": false, "max": false, "percent": false, "floor": false, "cap": false }
+      },
       "else": {
         "if": { "properties": { "model": { "const": "range" } }, "required": ["model"] },
-        "then": { "required": ["min", "max"], "properties": { "min": { "type": "number" }, "max": { "type": "number" } } },
+        "then": {
+          "required": ["min", "max"],
+          "properties": { "min": { "type": "number" }, "max": { "type": "number" }, "amount": false, "percent": false, "floor": false, "cap": false }
+        },
         "else": {
           "if": { "properties": { "model": { "const": "up_to" } }, "required": ["model"] },
-          "then": { "required": ["max"], "properties": { "max": { "type": "number" } } },
+          "then": {
+            "required": ["max"],
+            "properties": { "max": { "type": "number" }, "amount": false, "min": false, "percent": false, "floor": false, "cap": false }
+          },
           "else": {
             "if": { "properties": { "model": { "const": "percentage_of_value_at_risk" } }, "required": ["model"] },
-            "then": { "required": ["percent"], "properties": { "percent": { "type": "number" } } }
+            "then": {
+              "required": ["percent"],
+              "properties": { "percent": { "type": "number" }, "amount": false, "min": false, "max": false }
+            },
+            "else": { "properties": { "amount": false, "min": false, "max": false, "percent": false, "floor": false, "cap": false } }
           }
         }
       },

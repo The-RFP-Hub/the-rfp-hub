@@ -1,3 +1,5 @@
+import bountyAssetTypes from "../registries/bounty-asset-types.json";
+import bountySeverities from "../registries/bounty-severities.json";
 import deadlineLabels from "../registries/deadline-labels.json";
 import programModels from "../registries/program-models.json";
 
@@ -27,6 +29,8 @@ export type Registry = Readonly<Record<string, RegistryEntry>>;
  * says, and it would put a process in front of a newly launched chain for no gain.
  */
 export const registries = {
+  "bounty-asset-types": bountyAssetTypes as Registry,
+  "bounty-severities": bountySeverities as Registry,
   "deadline-labels": deadlineLabels as Registry,
   "program-models": programModels as Registry,
 } as const satisfies Record<string, Registry>;

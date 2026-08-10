@@ -46,9 +46,13 @@ measured on Immunefi.
 2. **Add `rewardTiers[]`**, entries of `{severity?, assetType?, label?, payout}`. Required when
    `bountyKind` is `security`; **permitted on either kind**.
 3. **Add `$defs/payout`**, a `model` tag over `fixed | range | up_to |
-   percentage_of_value_at_risk | discretionary`, with the amounts each model requires bound by
-   a nested `if`/`then`/`else`.
-4. **`reward` becomes conditional** — required for `task`, absent for `security`.
+   percentage_of_value_at_risk | discretionary`, bound by a nested `if`/`then`/`else`. Each
+   branch **both requires the amounts its model needs and forbids those belonging to the
+   others**, so the tag is an exclusive discriminator rather than a hint: a `discretionary`
+   payout carrying an amount does not validate.
+4. **`reward` becomes conditional** — required for `task`, and **forbidden** for `security`.
+   Requiring the table without forbidding the scalar would still permit the misleading maximum
+   headline this decision exists to prevent.
 5. **Add `severityScheme` and `rewardPoolStatus`.**
 6. **Govern `severity` and `assetType` by registry**, not by closed enum.
 7. **Land the whole surface `x-stability: provisional`.**
@@ -81,6 +85,12 @@ arithmetic can live in `description` without costing a consumer an answer.
   **no longer synthesizes a `reward` from the program budget for a security bounty** —
   synthesizing one there would manufacture exactly the misleading headline this ADR exists to
   prevent.
+- **The generated TypeScript cannot express either discriminator.** `json-schema-to-typescript`
+  does not read `if`/`then`/`else`, so `BountyDetails.reward` and `Payout.amount` emit as
+  optional and narrowing on the tag does not restore requiredness. The types are a shape hint;
+  the schema is the contract, and a consumer that needs the guarantee validates. Encoding the
+  union by hand in `types.ts` was considered and rejected — a hand-maintained mirror of a
+  generated file drifts silently, which is worse than a known-loose type.
 - **`hackathon.prizes[]` is now an inconsistent sibling.** It is the same graded-payout shape
   — `{track, amount}` — with a plain number where `rewardTiers[]` has a payout union, so it
   cannot express "up to" or a discretionary pool. Worse, `track` is null in every row of all
@@ -108,7 +118,11 @@ severity rows and not others**, so a program-level field would assert the formul
 every tier. It is tier-local.
 
 **A boolean `discretionary` beside optional numbers.** Does not enforce what it claims — a
-document could set the flag and an amount. `discretionary` is a payout model instead.
+document could set the flag and an amount. `discretionary` is a payout model instead, and the
+model branches forbid the amounts they do not use, so the objection that killed the boolean
+does not resurface against its replacement. The first cut of this ADR shipped a model tag that
+only *required* the applicable fields and forbade nothing; review caught that it had inherited
+the same defect, and the branches were tightened.
 
 **A separate `rewardNotes` free-text field.** `description` is already the standard's prose
 carrier. A second one invites drift over which holds what.
@@ -122,6 +136,10 @@ rule stands.
 
 ## Known limitations
 
+- **Cross-field numeric rules are advisory, not schema-enforced.** `min` above `max`, or `floor`
+  above `cap`, validates: portable JSON Schema cannot compare two sibling values. The
+  `payout-bounds-inverted` check in `rfphub-validate` is the only enforcement, the same
+  arrangement the document-wide currency rule has.
 - Reward tiers cannot express a payout denominated differently from the document currency.
 - `percent` has no companion field naming what the percentage is *of*; "value at risk" is fixed
   by the model name, and programs defining it differently (funds directly affected, TVL at the

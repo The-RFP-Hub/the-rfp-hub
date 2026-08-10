@@ -1,9 +1,9 @@
 {
   "specVersion": "1.0.0",
-  "id": "conformance:bountykind-not-in-enum",
+  "id": "conformance:bounty-security-with-reward",
   "fundingType": "bounty",
-  "title": "Bounty with an unregistered bountyKind",
-  "description": "bountyKind is a closed enum of 'task' and 'security'. 'open_ended' is not a kind — intake duration lives in the deadlines array. This document carries a valid tier table, so the unregistered kind is the only thing wrong with it.",
+  "title": "Security bounty carrying a scalar reward",
+  "description": "A security bounty states its amounts as a graded table and is forbidden from also carrying the scalar reward. Permitting both is what lets a publisher headline the maximum, which is the misrepresentation the tier table exists to prevent.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -24,13 +24,14 @@
   ],
   "fundingDetails": {
     "fundingType": "bounty",
-    "bountyKind": "open_ended",
+    "bountyKind": "security",
+    "reward": 250000,
     "rewardTiers": [
       {
         "severity": "critical",
         "payout": {
           "model": "up_to",
-          "max": 50000
+          "max": 250000
         }
       }
     ]

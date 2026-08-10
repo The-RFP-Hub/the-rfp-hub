@@ -3,7 +3,7 @@
   "id": "conformance:bounty-missing-bountykind",
   "fundingType": "bounty",
   "title": "Bounty without bountyKind",
-  "description": "bountyKind is required on every bounty: it is the discriminator that decides whether reward or rewardTiers is the required payout field.",
+  "description": "bountyKind is required on every bounty: it is the discriminator that decides whether reward or rewardTiers is the required payout field. This document carries a valid tier table, so the missing discriminator is the only thing wrong with it.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -24,6 +24,14 @@
   ],
   "fundingDetails": {
     "fundingType": "bounty",
-    "reward": 5000
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "up_to",
+          "max": 50000
+        }
+      }
+    ]
   }
 }

@@ -289,6 +289,7 @@ function constraintsExpr(node) {
   if (node.uniqueItems) c.push("unique");
   if (node.maxLength !== undefined) c.push(`≤${node.maxLength}`);
   if (node.minimum !== undefined) c.push(`≥${node.minimum}`);
+  if (node.maximum !== undefined) c.push(`≤${node.maximum}`);
   if (node.pattern) c.push(`\`${node.pattern}\``);
   return c.length > 0 ? `, ${c.join(", ")}` : "";
 }

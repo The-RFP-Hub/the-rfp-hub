@@ -1,9 +1,9 @@
 {
   "specVersion": "1.0.0",
-  "id": "conformance:bountykind-not-in-enum",
+  "id": "conformance:payout-fixed-with-range-bounds",
   "fundingType": "bounty",
-  "title": "Bounty with an unregistered bountyKind",
-  "description": "bountyKind is a closed enum of 'task' and 'security'. 'open_ended' is not a kind — intake duration lives in the deadlines array. This document carries a valid tier table, so the unregistered kind is the only thing wrong with it.",
+  "title": "Fixed payout carrying range bounds",
+  "description": "Each payout model forbids the amounts belonging to the others. A 'fixed' payout carries amount alone; adding min or max means the tier is really a range and should say so.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -24,12 +24,13 @@
   ],
   "fundingDetails": {
     "fundingType": "bounty",
-    "bountyKind": "open_ended",
+    "bountyKind": "security",
     "rewardTiers": [
       {
         "severity": "critical",
         "payout": {
-          "model": "up_to",
+          "model": "fixed",
+          "amount": 10000,
           "max": 50000
         }
       }

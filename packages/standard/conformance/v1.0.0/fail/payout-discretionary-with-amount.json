@@ -1,9 +1,9 @@
 {
   "specVersion": "1.0.0",
-  "id": "conformance:bountykind-not-in-enum",
+  "id": "conformance:payout-discretionary-with-amount",
   "fundingType": "bounty",
-  "title": "Bounty with an unregistered bountyKind",
-  "description": "bountyKind is a closed enum of 'task' and 'security'. 'open_ended' is not a kind — intake duration lives in the deadlines array. This document carries a valid tier table, so the unregistered kind is the only thing wrong with it.",
+  "title": "Discretionary payout carrying an amount",
+  "description": "The payout model is an exclusive discriminator, not a hint: 'discretionary' means the payer names no figure, so carrying an amount contradicts the model. A tier with a figure uses fixed, range or up_to.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -24,13 +24,13 @@
   ],
   "fundingDetails": {
     "fundingType": "bounty",
-    "bountyKind": "open_ended",
+    "bountyKind": "security",
     "rewardTiers": [
       {
-        "severity": "critical",
+        "severity": "high",
         "payout": {
-          "model": "up_to",
-          "max": 50000
+          "model": "discretionary",
+          "amount": 999999
         }
       }
     ]

@@ -399,7 +399,7 @@ export interface BountyDetails {
    */
   bountyKind: "task" | "security";
   /**
-   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty leaves this absent and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
+   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty is forbidden from carrying it and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
    */
   reward?: number;
   /**
@@ -452,7 +452,7 @@ export interface RewardTier {
  */
 export interface Payout {
   /**
-   * How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.
+   * How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case, and carries none of the amount fields. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.
    */
   model: "fixed" | "range" | "up_to" | "percentage_of_value_at_risk" | "discretionary";
   /**
