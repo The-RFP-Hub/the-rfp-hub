@@ -15,11 +15,11 @@ full normative/informative split and what that means for the release cycle.
 
 - **License:** CC0 1.0 (the standard and its docs are public domain).
 - **Spec version:** `1.0.0` — every entry carries `specVersion: "1.0.0"` exactly.
-- **`$id`:** `https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json`
-  — ⚠️ **provisional.** The project has no canonical domain yet, so the identifier points at the
-  file in the repository, where it dereferences to exactly these bytes (served as `text/plain`).
-  It is stamped from [`spec.config.json`](../../spec.config.json); adopting a domain is one edit
-  there. See [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
+- **`$id`:** `https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json`
+  — **canonical.** `ethrfps.app` is the project's own domain and its apex is reserved for the
+  spec, so this identifier is final for this version. It is stamped from
+  [`spec.config.json`](../../spec.config.json), like every other identifier in the package. HTTP
+  resolution goes live with DNS; see [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
 
 ## Conventions
 

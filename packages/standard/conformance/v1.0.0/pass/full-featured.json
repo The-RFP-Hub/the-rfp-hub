@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json",
+  "$schema": "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
   "specVersion": "1.0.0",
   "id": "conformance:full",
   "fundingType": "rfp",

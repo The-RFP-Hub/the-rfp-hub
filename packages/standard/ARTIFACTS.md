@@ -48,19 +48,29 @@ non-developer curators or translators appear — today it adds a parser and a se
 source-of-truth question), and a **separate publication tree** mirroring `$id` byte-for-byte
 (the right end state, blocked on the same domain decision).
 
-### On identifiers, while the domain is undecided
+### On identifiers — settled 2026-08-10
 
-**The canonical domain is undecided, and no identifier pretends otherwise.** Nothing is minted on
-a domain the project does not own. `$id` — for the schema, the metaschema and the registry entry
-schema — is a `raw.githubusercontent.com` URL that dereferences to exactly the bytes shipped here
-(served as `text/plain`, the one known limitation). `@vocab` carries a `draft` segment so it reads
-as provisional on sight.
+**The canonical domain is `ethrfps.app`, and every identifier is minted on it.** The apex is
+reserved for the spec and its site, so `$id` mirrors this package's own layout —
+`https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json`,
+`https://ethrfps.app/meta/rfphub-schema.meta.json`,
+`https://ethrfps.app/registries/entry.schema.json` — and `@vocab` is
+`https://ethrfps.app/ns/rfp#`, versionless and with no maturity segment. Services live on
+single-label subdomains (`api.ethrfps.app`), which is what keeps one `*.ethrfps.app` wildcard
+certificate sufficient. `.app` is HSTS-preloaded: every URL here is `https://` and there is no
+plaintext variant. See [`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md).
 
-**Swap `spec.config.json` + run `pnpm codegen` when the domain lands.** `baseUrl` and `vocabIri`
-in [`spec.config.json`](./spec.config.json) are the only hand-written identifiers in the package;
-every `$id`, the `@vocab`, and the self-identification examples in the schema are stamped from
-them. `pnpm check` fails if any identifier is hand-written or points at the retired placeholder
-domain, so the swap cannot be done halfway.
+**The swap happened once, and it cannot happen again.** `baseUrl` and `vocabIri` in
+[`spec.config.json`](./spec.config.json) are still the only hand-written identifiers in the
+package — every `$id`, the `@vocab` and the self-identification examples are stamped from them,
+and `pnpm check`'s identity sweep fails on any hand-written copy anywhere in the package, which
+is what made the swap impossible to do halfway. With `v1.0.0` now frozen, the freeze gate
+rejects further identity edits; `identityStatus: "canonical"` in `spec.config.json` records that
+the one-time provisional→canonical adoption has been spent.
+
+**What is not true yet:** the identifiers do not resolve over HTTP until DNS for `ethrfps.app`
+is delegated. The serving path exists — the API serves every canonical document at its canonical
+path (see the two rows promoted to *Shipped* above) — so what remains is operational.
 
 ---
 

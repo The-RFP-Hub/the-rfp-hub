@@ -140,8 +140,25 @@ a version bump regardless of maturity.
 The mechanism, so the rule does not depend on memory: declaring a version stable adds a `FROZEN`
 marker file to its directory, and
 [`.github/workflows/spec-freeze.yml`](../../.github/workflows/spec-freeze.yml) fails any PR that
-touches a version directory containing one. The marker is not present yet — it lands with the
-promotion to `stable`.
+touches a version directory containing one. **`v1.0.0` was declared `stable` on 2026-08-10 and
+its marker is [`schemas/v1.0.0/FROZEN`](./schemas/v1.0.0/FROZEN)** — the draft window that
+permitted the three in-place revisions is closed, and the gate is live.
+
+### The one-time identity adoption
+
+The change that declared `v1.0.0` stable also swapped `baseUrl` and `vocabIri` in
+`spec.config.json` from provisional placeholders to canonical identifiers on `ethrfps.app`
+([`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md)). Both were marked
+PROVISIONAL from the first cut precisely so that swap would be a **planned event with a
+declared trigger**, not a mutation of a published version — the bytes it rewrote are `$id` and
+`@vocab` strings, and nothing a validator does with a document changed.
+
+That is a sanctioned exception, and it is expressed rather than assumed. `spec.config.json`
+carries `identityStatus`, and the freeze gate permits an identity-field change **only** on a
+`provisional` → `canonical` transition that names an existing ADR. The exemption is
+self-extinguishing: after the adoption the base ref always reads `canonical`, so it can never be
+taken a second time, and reverting `identityStatus` to `provisional` is itself rejected. Any
+other identity edit to a frozen version is a normal freeze violation.
 
 ---
 

@@ -241,8 +241,8 @@ not domain fields; they have no crosswalk row.
   for why.
 - ✅ **JSON-LD `@context` shipped** — [`context.jsonld`](./context.jsonld), covering every
   top-level property of the re-cut shape (CI fails on context↔schema drift in either direction).
-  Term IRIs are **versionless** (`https://github.com/The-RFP-Hub/the-rfp-hub/ns/draft/rfp#`, provisional
-  pending a canonical domain); the context *document* is what
+  Term IRIs are **versionless** (`https://ethrfps.app/ns/rfp#`, canonical — the namespace carries
+  neither a version nor a maturity segment); the context *document* is what
   gets versioned. Every field with no schema.org or DAOIP-5 equivalent resolves under the RFP Hub
   vocabulary, so nothing is dropped when a document is read as linked data.
 - ⬜ **DAOIP-5 `grantPools` export** (optional, planned) — a one-way *output adapter* that emits
@@ -259,8 +259,8 @@ The example below is a conforming RFP Hub opportunity:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json",
-  "@context": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/context.jsonld",
+  "$schema": "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
+  "@context": "https://ethrfps.app/schemas/v1.0.0/context.jsonld",
   "@type": "schema:Grant",
   "specVersion": "1.0.0",
   "id": "example:grant-1",

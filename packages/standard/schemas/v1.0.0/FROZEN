@@ -1,0 +1,14 @@
+RFP Hub Standard v1.0.0 — FROZEN 2026-08-10.
+
+This directory and its conformance suite (../../conformance/v1.0.0/) are immutable.
+The presence of this file is what .github/workflows/spec-freeze.yml reads: any PR that
+edits schemas/v1.0.0/**, conformance/v1.0.0/**, meta/**, registries/entry.schema.json or
+the identity fields of spec.config.json fails from here on.
+
+A breaking change takes a NEW version directory. This one stays published and unedited,
+forever. Removing this marker is not a way to land a change — the gate reads it from the
+base ref, and the rule it mechanises is in packages/standard/PROCESS.md ("In-place
+re-cuts") and adr/0001-recut-v1.0.0-in-place.md.
+
+Declared stable in the same change that adopted the canonical identity on ethrfps.app;
+see adr/0007-canonical-domain-and-spec-identity.md and ./STATUS.md.

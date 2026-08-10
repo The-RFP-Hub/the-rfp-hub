@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/meta/rfphub-schema.meta.json",
+  "$id": "https://ethrfps.app/meta/rfphub-schema.meta.json",
   "title": "RFP Hub schema metaschema",
   "description": "Constrains the shape of opportunity.schema.json itself and legalises the x- annotation keywords the standard uses on top of the 2020-12 vocabulary. This is deliberately NOT a JSON Schema $vocabulary or a custom dialect — the standard is an application schema, not a schema language. It exists so the annotations are a machine-checked contract rather than a convention, and so nobody hand-edits one into an invalid shape. Validate the schema file against this in CI.",
   "$comment": "Only three x- keywords exist, and each earns its place by expressing something 2020-12 cannot. Anything 2020-12 CAN express must use the standard keyword: `deprecated`, `examples`, `$comment`, `default`, `readOnly` and `writeOnly` are all native and must never be re-invented with an x- prefix.",
