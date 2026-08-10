@@ -101,6 +101,28 @@ run("/v1 API", () => {
     expect(res.json()).toMatchObject({ status: "ok" });
   });
 
+  // Fully public, unauthenticated read API: without these headers no browser client can call it
+  // at all. Only the read-safe verbs are advertised — this API never mutates.
+  it("answers cross-origin reads from any origin, for read-safe verbs only", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/v1/health",
+      headers: { origin: "https://example.org" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBe("*");
+
+    const preflight = await app.inject({
+      method: "OPTIONS",
+      url: "/v1/opportunities",
+      headers: { origin: "https://example.org", "access-control-request-method": "GET" },
+    });
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe("*");
+    const allowed = String(preflight.headers["access-control-allow-methods"]);
+    expect(allowed.split(/,\s*/).sort()).toEqual(["GET", "HEAD", "OPTIONS"]);
+  });
+
   it("GET /v1/opportunities returns only approved+listed, thin projection, with pagination", async () => {
     const res = await app.inject({ method: "GET", url: `/v1/opportunities?ecosystem=${TAG}` });
     expect(res.statusCode).toBe(200);
