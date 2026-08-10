@@ -444,31 +444,40 @@ function typeBlockOf(
     if (legacy !== undefined && legacy !== null && legacy !== "") picked.fundingMechanisms = legacy;
   }
   const out = normalizeBlock(picked, hoist);
-  if (type === "bounty") {
-    // An empty tier array is not a tier table — the Standard requires minItems 1, so passing it
-    // through would emit an invalid document. Drop it before it can influence the inference.
-    if (Array.isArray(out.rewardTiers) && out.rewardTiers.length === 0) delete out.rewardTiers;
-    const hasTiers = Array.isArray(out.rewardTiers) && out.rewardTiers.length > 0;
-    // bountyKind is required by the Standard and upstream does not send it. Infer from the
-    // payout shape: a tier table AND no scalar reward is a security program. Tiers alone are not
-    // enough — the Standard permits them on a task bounty that grades a placement ladder, and
-    // such a record keeps its reward, so calling it 'security' would both mislabel it and (since
-    // security forbids the scalar reward) make it invalid.
-    if (out.bountyKind === undefined) {
-      out.bountyKind = hasTiers && out.reward === undefined ? "security" : "task";
-    }
-    // reward is required for a task bounty — synthesize from the budget if absent (a plain
-    // number now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram).
-    // Never synthesized for a security bounty: collapsing a graded table to one number is the
-    // misrepresentation the tier table exists to prevent, and the Standard forbids it there.
-    if (out.bountyKind === "task" && out.reward === undefined) {
-      const { amount } = parseAmount(p.metadata?.programBudget);
-      if (amount !== undefined) out.reward = amount;
-    }
-    // A security bounty may not carry the scalar reward at all.
-    if (out.bountyKind === "security") delete out.reward;
+  if (type !== "bounty") return out;
+
+  // The bounty block is the one type whose required field depends on a discriminator, so it is
+  // rebuilt rather than mutated: `reward` and `rewardTiers` are each present or absent, never
+  // present-and-undefined, which is the only shape the Standard's if/then/else accepts.
+  const { bountyKind, reward, rewardTiers, ...rest } = out;
+
+  // An empty array is not a tier table — the Standard requires minItems 1, so passing one
+  // through would emit an invalid document, and it must not influence the inference either.
+  const tiers = Array.isArray(rewardTiers) && rewardTiers.length > 0 ? rewardTiers : undefined;
+
+  // bountyKind is required by the Standard and upstream does not send it. Infer from the payout
+  // shape: a tier table AND no scalar reward is a security program. Tiers alone are not enough —
+  // the Standard permits them on a task bounty that grades a placement ladder, and such a record
+  // keeps its reward, so calling it 'security' would both mislabel it and (since security forbids
+  // the scalar reward) make it invalid.
+  const kind = bountyKind ?? (tiers !== undefined && reward === undefined ? "security" : "task");
+
+  // reward is required for a task bounty — synthesize from the budget if absent (a plain number
+  // now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram). Never
+  // synthesized for a security bounty, which the Standard forbids from carrying it at all:
+  // collapsing a graded table to one number is the misrepresentation the table exists to prevent.
+  let scalarReward = kind === "security" ? undefined : reward;
+  if (kind === "task" && scalarReward === undefined) {
+    const { amount } = parseAmount(p.metadata?.programBudget);
+    if (amount !== undefined) scalarReward = amount;
   }
-  return out;
+
+  return {
+    ...rest,
+    bountyKind: kind,
+    ...(scalarReward !== undefined ? { reward: scalarReward } : {}),
+    ...(tiers !== undefined ? { rewardTiers: tiers } : {}),
+  };
 }
 
 export function mapProgram(
