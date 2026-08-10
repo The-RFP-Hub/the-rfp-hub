@@ -46,7 +46,7 @@ export const specConfig: SpecConfig = JSON.parse(
   readStandardFile("spec.config.json").toString("utf8"),
 );
 
-/** `https://…/schemas/v1.0.0/opportunity.schema.json` → `/schemas/v1.0.0/opportunity.schema.json`. */
+/** `<baseUrl>` + `/schemas/v1.0.0/opportunity.schema.json` → that path, which is the route. */
 function canonicalPath(identifier: string): string {
   const url = new URL(identifier);
   if (`${url.origin}${url.pathname}` !== identifier) {

@@ -112,7 +112,9 @@ there is no `http://` variant of anything here to decide about.
 ### The vocabulary namespace IRI
 
 1. **`https://ethrfps.app/ns/rfp#`** — versionless, maturity-free *(chosen)*
-2. **`https://ethrfps.app/ns/draft/rfp#`** — carry the `draft` segment across from the placeholder
+2. **`ethrfps.app/ns/draft/rfp#`** — carry the `draft` segment across from the placeholder
+   *(written without its scheme throughout: this IRI was never minted, and the repository's
+   identity sweep treats a live-URL copy of a namespace that is not the canonical one as a defect)*
 3. **`https://ethrfps.app/schemas/v1.0.0/rfp#`** — put terms under the version directory
 
 #### Option 1 — versionless
@@ -222,10 +224,11 @@ wildcard sufficient for every service the project will add.
 
 | # | Decision |
 |---|---|
-| 1 | `spec.config.json` `baseUrl` → `https://ethrfps.app`; `vocabIri` → `https://ethrfps.app/ns/rfp#`. Both PROVISIONAL notes rewritten to describe the settled decision. `pnpm codegen` re-stamped four `$id`s, the `@vocab`, both self-identification examples and the versions index. |
+| 1 | `spec.config.json` `baseUrl` → `https://ethrfps.app`; `vocabIri` → `https://ethrfps.app/ns/rfp#`. Both PROVISIONAL notes rewritten to describe the settled decision. `pnpm codegen` re-stamped the **three** published `$id`s (schema, meta-schema, registry entry schema), the `@vocab`, both self-identification examples and the versions index. The context URL and the `@vocab` are identifiers too, but neither is an `$id` member — hence three, not five. |
 | 2 | `status` → `stable`, and `schemas/v1.0.0/FROZEN` lands in the same change. The draft window that permitted three in-place revisions closes permanently. |
 | 3 | `spec.config.json` gains `identityStatus: "canonical"` and `identityAdoption {date, adr, note}` — the machine-readable record that the one-time swap has been spent. |
-| 4 | `check-spec.mjs` gains a **maturity** rule (`status` ∈ {`draft`, `stable`}, and `stable` ⟺ a `FROZEN` marker) and an **identity-provenance** rule (`identityStatus` is a known value, `baseUrl`/`vocabIri` are `https` and share one authority, and a `canonical` status names an ADR that exists). Its identity sweep no longer hard-codes the retired `draft` namespace path, and a new neutrality rule rejects either retired provisional identifier reappearing anywhere in the package. |
+| 4 | `check-spec.mjs` gains a **maturity** rule (`status` ∈ {`draft`, `stable`}, `stable` ⟺ a `FROZEN` marker, and `FIELDS.md`'s banner announces the same maturity) and an **identity-provenance** rule (`identityStatus` is a known value, `baseUrl`/`vocabIri` are `https` and share one authority, and a `canonical` status names an ADR that exists). Its identity sweep no longer hard-codes the retired `draft` namespace path, and a new neutrality rule rejects either retired provisional identifier reappearing anywhere in the package. |
+| 4b | `scripts/check-neutral.mjs` becomes the **repository-wide** half of the same sweep, over `git ls-files`. The package-local copy necessarily walks `packages/standard` only — it also runs from an extracted tarball — so a retired identifier in an API test, a workflow or a root document was invisible to every check the project ran. It also gains the source-neutrality rule the repository's own policy always claimed, which nothing enforced — scoped to the project's own voice: `user-interviews/` is a historical record that quotes real organizations and named interviewees, so the filed records are listed as exempt from that one rule (and only that one). Rewriting a primary source to read as source-neutral does not protect anything; it falsifies the record. The exemption is an explicit per-file list, so it fails closed for anything added to that directory later. |
 | 5 | `spec-freeze.yml` gains the identity-adoption exemption described below. |
 | 6 | The API serves every canonical document at its canonical path, and advertises the context by `Link` header on `application/json` opportunity responses. |
 | 7 | Package axis only: `@the-rfp-hub/standard` takes a **major** bump. The spec axis stays `1.0.0`. |
@@ -351,9 +354,11 @@ than claiming a resolution that does not exist.
   ship — the `Link` header context advertisement, and the publication tree mirroring `$id`.
 - **Good:** the design bet paid. Identity lived in one hand-written file, everything else was
   stamped, and an identity sweep failed on hand-written copies — so the swap was two lines plus
-  `pnpm codegen`, and the sweep caught all five stale copies (two conformance fixtures,
-  `CROSSWALK.md`, `FIELDS.md`, and a test in the API package) that would otherwise have shipped a
-  half-swapped package.
+  `pnpm codegen`, and the sweep caught the four stale copies inside the package (two conformance
+  fixtures, `CROSSWALK.md` and `FIELDS.md`) that would otherwise have shipped half-swapped.
+  A fifth stale copy, in an API package test, was **not** caught by that sweep and could not have
+  been: `check-spec.mjs` walks `packages/standard`. It failed on its own assertion instead, which
+  is luck rather than a control — hence the repository-wide sweep in row 4b above.
 - **Bad — who pays:** any consumer holding the old `$id`/`@vocab` strings. Nobody is known to.
   The strings were published as provisional and the CHANGELOG entry states the swap explicitly.
 - **Bad — who pays:** the API now owns an availability obligation for the spec until static
