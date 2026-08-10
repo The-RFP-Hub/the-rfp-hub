@@ -1,36 +1,40 @@
 /**
- * Open-data export: write the public dataset as JSON + CSV under ./exports and record a
- * `dataset_snapshots` row per format. Exports are released under CC0-1.0, marked both in the JSON
- * envelope and in a LICENSE sidecar written alongside the data.
+ * Open-data export: publish the public dataset as JSON + CSV and record a `dataset_snapshots` row
+ * per format. Exports are released under CC0-1.0, marked both in the JSON envelope and in a
+ * LICENSE sidecar published alongside the data.
  *
- * Every run writes five files, in this order:
+ * Every run publishes five objects, in this order:
  *
- *   LICENSE                             the CC0 rights sidecar, written FIRST so no data file is
- *                                       ever readable without its rights notice beside it
+ *   LICENSE                             the CC0 rights sidecar, FIRST so no data object is ever
+ *                                       readable without its rights notice beside it
  *   opportunities-<date>-<digest>.json  this run's archive, named after a prefix of the sha256
  *   opportunities-<date>-<digest>.csv   of its own bytes
- *   latest.json                         stable names a consumer can hard-code, written LAST so
- *   latest.csv                          they never name a half-written dataset
+ *   latest.json                         stable keys a consumer can hard-code, LAST so they never
+ *   latest.csv                          name a half-written dataset
  *
- * `dataset_snapshots` records the ARCHIVE names — the per-run record — with the sha256 of the
- * bytes stored under them, never the aliases, which move.
+ * WHERE they land is the sink's business (see scripts/upload.ts): a local directory by default, an
+ * S3 bucket when S3_BUCKET is set. `dataset_snapshots` records the ARCHIVE keys — the per-run
+ * record — with the sha256 of the bytes stored under them, never the aliases, which move, and the
+ * URL is whatever the sink reports: a public/CDN URL, an `s3://` URI, or a local path.
  *
- * A run below EXPORT_MIN_COUNT (default 100) writes NOTHING and exits non-zero: an empty or
+ * A run below EXPORT_MIN_COUNT (default 100) publishes NOTHING and exits non-zero: an empty or
  * half-loaded database would otherwise quietly replace `latest.*` with a header-only CSV.
  */
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import { and, asc, eq } from "drizzle-orm";
 import { db, pool } from "../src/db/client.js";
 import { datasetSnapshots, opportunities } from "../src/db/schema.js";
 import { toStandard } from "../src/modules/mappers/opportunity.mapper.js";
 import { toCsv } from "./csv.js";
+import { CACHE_CONTROL, type ExportSink, createSinkFromEnv } from "./upload.js";
 
 const OUT_DIR = "exports";
 const LICENSE = "CC0-1.0";
 const DEFAULT_MIN_COUNT = 100;
+const JSON_TYPE = "application/json; charset=utf-8";
+const CSV_TYPE = "text/csv; charset=utf-8";
+const TEXT_TYPE = "text/plain; charset=utf-8";
 const LICENSE_NOTICE = `SPDX-License-Identifier: CC0-1.0
 
 To the extent possible under law, the publisher of this dataset has waived all
@@ -43,33 +47,36 @@ https://creativecommons.org/publicdomain/zero/1.0/legalcode
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 
 /**
- * Archive names carry a prefix of the sha256 of their own bytes, so one name can never designate
- * two different datasets: a second run on the same UTC day — a re-run after a partial failure, say
- * — writes its own archive instead of overwriting the first. A re-run over unchanged data rewrites
- * byte-identical content under the same name, which is a no-op. The date stays the readable prefix.
+ * Archive keys carry a prefix of the sha256 of their own bytes, so one key can never designate two
+ * different datasets: a second run on the same UTC day — a re-run after a partial failure, say —
+ * writes its own archive instead of overwriting the first. A re-run over unchanged data rewrites
+ * byte-identical content under the same key, which is a no-op. The date stays the readable prefix.
+ * This is also what makes CACHE_CONTROL.immutable an honest header for these objects.
  */
-const archiveName = (date: string, digest: string, ext: string): string =>
+const archiveKey = (date: string, digest: string, ext: string): string =>
   `opportunities-${date}-${digest.slice(0, 12)}.${ext}`;
 
-/** One written file: the name it was written under, and the path it was written to. */
+/** One published object: the key it went under, and the URL recorded for it. */
 export interface ExportArtifact {
-  name: string;
-  path: string;
+  key: string;
+  url: string;
 }
 
 export interface ExportResult {
   count: number;
-  /** UTC date stamp used in the archive names. */
+  /** UTC date stamp used in the archive keys. */
   date: string;
-  /** Directory the files were written to. */
-  outDir: string;
-  /** Every file written, in write order. */
+  /** Human-readable destination, for logs. */
+  destination: string;
+  /** Every object published, in publish order. */
   artifacts: ExportArtifact[];
 }
 
 export interface ExportOptions {
-  /** Where to write. Defaults to `./exports`. */
+  /** Directory for the default local sink. Ignored when a `sink` is supplied. */
   outDir?: string;
+  /** Where to publish. Defaults to the env-selected sink (S3 when S3_BUCKET is set). */
+  sink?: ExportSink;
   /** Minimum live entries required to publish. Defaults to EXPORT_MIN_COUNT, then 100. */
   minCount?: number;
 }
@@ -92,11 +99,11 @@ export class ExportFloorError extends Error {
 }
 
 /**
- * Thrown when a run fails part-way through writing. Nothing makes five files land atomically, so a
- * partial file set is a state a run really can end in — this names which files were written and
- * which one was not, instead of leaving that to be inferred from a bare write error. No
- * `dataset_snapshots` row is recorded for such a run, so the database never claims a publication
- * that did not happen.
+ * Thrown when a run fails part-way through publishing. An object store gives no cross-object
+ * atomicity and neither does a directory, so a partial file set is a state a run really can end in
+ * — this names which objects were written and which one was not, instead of leaving that to be
+ * inferred from a bare PutObject or write error. No `dataset_snapshots` row is recorded for such a
+ * run, so the database never claims a publication that did not happen.
  */
 export class ExportWriteError extends Error {
   constructor(
@@ -138,7 +145,7 @@ function resolveMinCount(explicit: number | undefined): number {
 /** Run the export. Does not close the pool (caller's job). */
 export async function runExport(options: ExportOptions = {}): Promise<ExportResult> {
   const minCount = resolveMinCount(options.minCount);
-  const outDir = options.outDir ?? OUT_DIR;
+  const sink = options.sink ?? createSinkFromEnv(options.outDir ?? OUT_DIR);
 
   const rows = await db
     .select()
@@ -169,59 +176,66 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
   const jsonDigest = sha256(json);
   const csvDigest = sha256(csv);
 
-  await mkdir(outDir, { recursive: true });
   const artifacts: ExportArtifact[] = [];
-  const write = async (name: string, body: string): Promise<string> => {
-    const path = join(outDir, name);
+  const publish = async (
+    key: string,
+    body: string,
+    contentType: string,
+    cacheControl: string,
+  ): Promise<string> => {
+    let url: string;
     try {
-      await writeFile(path, body);
+      url = await sink.put(key, body, contentType, cacheControl);
     } catch (err) {
       throw new ExportWriteError(
-        name,
-        artifacts.map((a) => a.name),
+        key,
+        artifacts.map((a) => a.key),
         err,
       );
     }
-    artifacts.push({ name, path });
-    return path;
+    artifacts.push({ key, url });
+    return url;
   };
 
-  // Rights sidecar first: its content is constant, so re-writing it every run is idempotent, and
-  // going first means no data file is ever readable without it. Then the archive, then the aliases
-  // that point at it — a run that dies part-way leaves `latest.*` on the last COMPLETE dataset
-  // rather than on a partially-written one.
-  await write("LICENSE", LICENSE_NOTICE);
-  const jsonPath = await write(archiveName(date, jsonDigest, "json"), json);
-  const csvPath = await write(archiveName(date, csvDigest, "csv"), csv);
-  await write("latest.json", json);
-  await write("latest.csv", csv);
+  // Rights sidecar first: its content is constant, so re-publishing it every run is idempotent, and
+  // going first means no data object is ever readable without it. Then the archive, then the
+  // aliases that point at it — a run that dies part-way leaves `latest.*` on the last COMPLETE
+  // dataset rather than on a partially-written one. Only the archive keys are content-addressed,
+  // so only they get the immutable header.
+  const fixed = CACHE_CONTROL.immutable;
+  const moving = CACHE_CONTROL.mutable;
+  await publish("LICENSE", LICENSE_NOTICE, TEXT_TYPE, moving);
+  const jsonUrl = await publish(archiveKey(date, jsonDigest, "json"), json, JSON_TYPE, fixed);
+  const csvUrl = await publish(archiveKey(date, csvDigest, "csv"), csv, CSV_TYPE, fixed);
+  await publish("latest.json", json, JSON_TYPE, moving);
+  await publish("latest.csv", csv, CSV_TYPE, moving);
 
   await db.insert(datasetSnapshots).values([
     {
       format: "json",
       entryCount: items.length,
-      url: jsonPath,
+      url: jsonUrl,
       sha256: jsonDigest,
       specVersion: SPEC_VERSION,
     },
     {
       format: "csv",
       entryCount: items.length,
-      url: csvPath,
+      url: csvUrl,
       sha256: csvDigest,
       specVersion: SPEC_VERSION,
     },
   ]);
 
-  return { count: items.length, date, outDir, artifacts };
+  return { count: items.length, date, destination: sink.description, artifacts };
 }
 
 // CLI entry — skipped under Vitest so tests can import runExport without side effects.
 if (!process.env.VITEST) {
   runExport()
-    .then(({ count, artifacts }) => {
-      const written = artifacts.map(({ path }) => `  ${path}`).join("\n");
-      console.log(`✓ exported ${count} opportunities\n${written}`);
+    .then(({ count, destination, artifacts }) => {
+      const published = artifacts.map(({ url }) => `  ${url}`).join("\n");
+      console.log(`✓ exported ${count} opportunities → ${destination}\n${published}`);
     })
     .catch((err) => {
       const expected = err instanceof ExportFloorError || err instanceof ExportWriteError;
