@@ -1,4 +1,4 @@
-# **RFP Hub — Sov’s M1 Research Report**
+# **RFP Hub Research Report**
 
 ## **Introduction**
 
@@ -6,7 +6,7 @@ Web3 funding opportunities are spread across application forms, forums, CRM syst
 
 RFP Hub proposes an open standard and shared dataset for these opportunities, supported by a read API, publisher workflow, and simple reference interface. The practical question is whether a common record can make funding information easier to maintain and reuse across the systems publishers, applicants, and aggregators already depend on.
 
-This report draws on 18 completed contributions collected through interviews and written responses: five publisher records, nine builder and services-firm records, two researcher records, and two aggregator records. Four of the 18 were self-authored by the research lead from operating roles held at those organizations, leaving 14 independent contributions; the disclosure and its effect on the findings is set out under Research scope. It also uses an exploratory audit of Karma platform data and a review of adjacent standards. The research points to a focused starting point for the hub, along with several larger opportunities that merit testing later.
+This report draws on 18 completed contributions collected through interviews and written responses: five publisher records, nine builder and services-firm records, two researcher records, and two aggregator records. Four of the 18 were self-authored by the research lead from operating roles held at those organizations, leaving 14 independent contributions; the disclosure and its effect on the findings is set out under Research scope. It also uses an exploratory audit of data from the [Karma funding map](https://gap.karmahq.xyz/funding-map) and a review of adjacent standards. The research points to a focused starting point for the hub, along with several larger opportunities that merit testing later.
 
 ## **Executive summary**
 
