@@ -1,0 +1,39 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-basis-on-non-percentage-model",
+  "fundingType": "bounty",
+  "title": "Fixed payout carrying a basis",
+  "description": "basis names what a percentage is a share of, so it is meaningful only on the percentage model and forbidden everywhere else — the same exclusivity every other model-specific field carries.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "fixed",
+          "amount": 10000,
+          "basis": "value_at_risk"
+        }
+      }
+    ]
+  }
+}

@@ -8,7 +8,7 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 
 ---
 
-## Spec v1.0.0 fourth draft revision (2026-08-10)
+## Spec v1.0.0 fourth draft revision (2026-08-10, amended through 2026-08-11 in review)
 
 Rides the same draft-window permission argued in
 [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md): `v1.0.0` is still
@@ -63,7 +63,14 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
 - **Every reward tier needs a selector.** `severity`, `assetType` and `label` were each optional
   with no floor, so a row carrying only a payout validated: an anonymous rule nothing can be
   matched against. Expressed as `minProperties: 2` rather than an `anyOf` of required-branches,
-  which reads better but defeats the type generator.
+  which reads better but defeats the type generator. The three selector fields are also
+  **non-nullable**, deliberately breaking the schema's usual optional-means-nullable convention:
+  an explicit null would count toward the floor while selecting nothing.
+- **`basis` is forbidden off the `percentage` model**, with the same branch mechanism that keeps
+  the amounts exclusive. The field arrived after the exclusivity fix and initially escaped it —
+  a fixed payout could carry a dangling `basis` — caught in a final audit pass, and its nullable
+  type was dead code besides: the percentage branch requires a string and every other branch now
+  rejects the key, so null was never reachable.
 - **Stability.** The whole surface lands `x-stability: provisional`. It has a measured
   publisher corpus and no shipped consumer, and the gate in `PROCESS.md` asks for both.
 - **Not modelled, deliberately**: step functions over funds at risk, TVL-conditional tiers,
@@ -103,7 +110,7 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
   advisory tier is the only place the rule can live.
 - The generated field tables now render `maximum`, so `percent` documents its 0–100 bound
   instead of appearing unbounded above.
-- Conformance: 3 new `pass/` and 12 new `fail/` cases, one per rule changed. Each `fail/` case
+- Conformance: 3 new `pass/` and 21 new `fail/` cases, one per rule changed. Each `fail/` case
   was verified to fail for its **named** rule alone — two of the first cut were rejected by a
   second, unrelated constraint, which would have let an implementation ignore the rule the
   filename advertises and still pass the suite.

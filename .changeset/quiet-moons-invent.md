@@ -5,9 +5,10 @@
 
 Split the bounty type into task and security kinds, and give the security kind a payout table.
 
-`BountyDetails` gains a required `bountyKind` (`task | security`), and `reward` becomes
-optional on the type: it is required when `bountyKind` is `task`, while a security bounty
-carries `rewardTiers[]` instead.
+`BountyDetails` gains a required `bountyKind` (`task | security`), and compensation becomes
+exactly one of the scalar `reward` or the `rewardTiers[]` table: a task bounty carries
+whichever describes it (a graded placement ladder is a table), and a security bounty must use
+the table.
 
 **Released as a minor, deliberately, though it is technically breaking.** A TypeScript consumer
 reading `details.reward` without narrowing on `bountyKind` no longer compiles. The maintainers
@@ -17,7 +18,7 @@ signal more churn than the change represents. If you are that consumer, narrow o
 first.
 
 New exported types `RewardTier` and `Payout`. A payout is tagged by `model` —
-`fixed | range | up_to | percentage_of_value_at_risk | discretionary` — and carries the amounts
+`fixed | range | up_to | percentage | discretionary` — and carries the amounts
 that model requires. `discretionary` is a published position, not absent data.
 
 Two new registries govern the tier vocabularies (`bounty-severities`, `bounty-asset-types`);

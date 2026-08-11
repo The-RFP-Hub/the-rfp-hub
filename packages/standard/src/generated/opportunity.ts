@@ -436,15 +436,15 @@ export interface RewardTier {
   /**
    * Severity band this row pays for. An open list rather than a closed enum — conventional values are published in registries/bounty-severities.json, and a program's own vocabulary is valid without a schema change. Name the scheme these are drawn from in severityScheme.
    */
-  severity?: string | null;
+  severity?: string;
   /**
    * Class of in-scope asset this row pays for, where a program grades the same severity differently by what was found. An open list rather than a closed enum — conventional values are published in registries/bounty-asset-types.json. Absent where a program grades on severity alone.
    */
-  assetType?: string | null;
+  assetType?: string;
   /**
    * What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a prize ladder, or a named category. This is a selector, not a caption: it is how a consumer picks the row out when the structured dimensions do not apply. Where it accompanies severity or assetType it reads as a caption, and a consumer that facets should prefer the structured dimensions. Free text.
    */
-  label?: string | null;
+  label?: string;
   payout: Payout;
 }
 /**
@@ -472,9 +472,9 @@ export interface Payout {
    */
   percent?: number | null;
   /**
-   * What the percentage is a share of. Required and non-null where the model is 'percentage', enforced by the if/then/else below. 'value_at_risk' = the funds the finding could have taken, the construction most programs publish; 'economic_damage' = the loss actually caused, which some programs cap against instead. The two are not interchangeable and a program that states one is not stating the other, which is why the model tag no longer asserts a basis of its own. The list grows by spec release as programs attest a new one.
+   * What the percentage is a share of. Required where the model is 'percentage' and forbidden on every other model, enforced by the if/then/else below. 'value_at_risk' = the funds the finding could have taken, the construction most programs publish; 'economic_damage' = the loss actually caused, which some programs cap against instead. The two are not interchangeable and a program that states one is not stating the other, which is why the model tag no longer asserts a basis of its own. The list grows by spec release as programs attest a new one.
    */
-  basis?: "value_at_risk" | "economic_damage" | null;
+  basis?: "value_at_risk" | "economic_damage";
   /**
    * Least the tier pays regardless of the computed figure, where a percentage model states a minimum. Optional; absent means the computation is unbounded below.
    */

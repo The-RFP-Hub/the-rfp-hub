@@ -1,7 +1,7 @@
 # 0007 — Split `bounty` into task and security kinds, and give the security kind a payout table
 
 - **Status:** accepted
-- **Date:** 2026-08-10
+- **Date:** 2026-08-10, revised 2026-08-11 (design review and final audit — see the revision notes below)
 - **Supersedes:** nothing. Extends the `fundingDetails` union established in
   [`0005`](./0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md) and
   respects the single-currency rule set in [`0006`](./0006-document-wide-single-currency.md).
@@ -104,7 +104,12 @@ Three changes followed, and they are folded into the decision above rather than 
    the tag over-promised. `basis` makes the operand explicit and gives a place for future ones
    without a new model per domain.
 3. **Tier selectors got a floor.** All three keying dimensions were optional with no minimum,
-   so `{payout}` alone validated.
+   so `{payout}` alone validated. A final audit tightened this twice more: the selectors are
+   **non-nullable** (an explicit null would satisfy the floor while selecting nothing), and
+   `basis` — added in change 2 — is **forbidden off the `percentage` model**, because it had
+   arrived after the exclusivity fix and initially escaped the very branch discipline that fix
+   introduced. The same defect class caught twice is the argument for the conformance rule that
+   every changed constraint carries a fixture named after it: both tightenings now do.
 
 The alternative the review argued for — renaming the kinds to something like
 `scoped_task | submission_program`, so the discriminator never mentions a domain — was

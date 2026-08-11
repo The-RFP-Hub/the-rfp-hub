@@ -624,19 +624,19 @@
       "description": "One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is a selector — severity and assetType form a compound coordinate where a program grades on both, and label carries a grading axis neither describes. Each is individually optional so a program grading on one axis carries only that one, but at least one is required by the minProperties rule below: a row with no selector is an anonymous rule nothing can be matched against, not a tier. The payout is the other required part, because a tier that names no amount and no payout model is not a tier either.",
       "properties": {
         "severity": {
-          "type": ["string", "null"],
+          "type": "string",
           "description": "Severity band this row pays for. An open list rather than a closed enum — conventional values are published in registries/bounty-severities.json, and a program's own vocabulary is valid without a schema change. Name the scheme these are drawn from in severityScheme.",
           "examples": ["critical", "high"],
           "x-stability": "provisional"
         },
         "assetType": {
-          "type": ["string", "null"],
+          "type": "string",
           "description": "Class of in-scope asset this row pays for, where a program grades the same severity differently by what was found. An open list rather than a closed enum — conventional values are published in registries/bounty-asset-types.json. Absent where a program grades on severity alone.",
           "examples": ["smart_contract", "websites_and_applications"],
           "x-stability": "provisional"
         },
         "label": {
-          "type": ["string", "null"],
+          "type": "string",
           "maxLength": 120,
           "description": "What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a prize ladder, or a named category. This is a selector, not a caption: it is how a consumer picks the row out when the structured dimensions do not apply. Where it accompanies severity or assetType it reads as a caption, and a consumer that facets should prefer the structured dimensions. Free text.",
           "examples": ["1st place", "Best use of the SDK"],
@@ -644,7 +644,7 @@
         },
         "payout": { "$ref": "#/$defs/payout", "description": "What this tier pays, and on which model." }
       },
-      "$comment": "minProperties: 2 is how 'at least one selector' is expressed. payout is required and the object is closed to four properties, so a second property can only be severity, assetType or label. An anyOf of required-branches says the same thing and reads better, but an anyOf at this level defeats the type generator, which emits an index-signature union in place of the interface — the same trap as an allOf here."
+      "$comment": "minProperties: 2 is how 'at least one selector' is expressed. payout is required and the object is closed to four properties, so a second property can only be severity, assetType or label — and all three are non-nullable, deliberately breaking this schema's usual optional-means-nullable convention: a null selector would count toward minProperties while selecting nothing, so for these three absence is the only way to say 'not used'. An anyOf of required-branches would say the same thing and read better, but an anyOf at this level defeats the type generator, which emits an index-signature union in place of the interface — the same trap as an allOf here."
     },
     "payout": {
       "type": "object",
@@ -685,9 +685,9 @@
           "x-stability": "provisional"
         },
         "basis": {
-          "type": ["string", "null"],
-          "enum": ["value_at_risk", "economic_damage", null],
-          "description": "What the percentage is a share of. Required and non-null where the model is 'percentage', enforced by the if/then/else below. 'value_at_risk' = the funds the finding could have taken, the construction most programs publish; 'economic_damage' = the loss actually caused, which some programs cap against instead. The two are not interchangeable and a program that states one is not stating the other, which is why the model tag no longer asserts a basis of its own. The list grows by spec release as programs attest a new one.",
+          "type": "string",
+          "enum": ["value_at_risk", "economic_damage"],
+          "description": "What the percentage is a share of. Required where the model is 'percentage' and forbidden on every other model, enforced by the if/then/else below. 'value_at_risk' = the funds the finding could have taken, the construction most programs publish; 'economic_damage' = the loss actually caused, which some programs cap against instead. The two are not interchangeable and a program that states one is not stating the other, which is why the model tag no longer asserts a basis of its own. The list grows by spec release as programs attest a new one.",
           "x-stability": "provisional"
         },
         "floor": {
@@ -707,19 +707,19 @@
       "if": { "properties": { "model": { "const": "fixed" } }, "required": ["model"] },
       "then": {
         "required": ["amount"],
-        "properties": { "amount": { "type": "number" }, "min": false, "max": false, "percent": false, "floor": false, "cap": false }
+        "properties": { "amount": { "type": "number" }, "min": false, "max": false, "percent": false, "basis": false, "floor": false, "cap": false }
       },
       "else": {
         "if": { "properties": { "model": { "const": "range" } }, "required": ["model"] },
         "then": {
           "required": ["min", "max"],
-          "properties": { "min": { "type": "number" }, "max": { "type": "number" }, "amount": false, "percent": false, "floor": false, "cap": false }
+          "properties": { "min": { "type": "number" }, "max": { "type": "number" }, "amount": false, "percent": false, "basis": false, "floor": false, "cap": false }
         },
         "else": {
           "if": { "properties": { "model": { "const": "up_to" } }, "required": ["model"] },
           "then": {
             "required": ["max"],
-            "properties": { "max": { "type": "number" }, "amount": false, "min": false, "percent": false, "floor": false, "cap": false }
+            "properties": { "max": { "type": "number" }, "amount": false, "min": false, "percent": false, "basis": false, "floor": false, "cap": false }
           },
           "else": {
             "if": { "properties": { "model": { "const": "percentage" } }, "required": ["model"] },
@@ -727,7 +727,7 @@
               "required": ["percent", "basis"],
               "properties": { "percent": { "type": "number" }, "basis": { "type": "string" }, "amount": false, "min": false, "max": false }
             },
-            "else": { "properties": { "amount": false, "min": false, "max": false, "percent": false, "floor": false, "cap": false } }
+            "else": { "properties": { "amount": false, "min": false, "max": false, "percent": false, "basis": false, "floor": false, "cap": false } }
           }
         }
       },
