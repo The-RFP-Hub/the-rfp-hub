@@ -17,9 +17,18 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.0
+      ajv:
+        specifier: ^8.17.1
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.20.0)
       json-schema-to-typescript:
         specifier: ^15.0.3
         version: 15.0.4
+      rfphub-validate:
+        specifier: workspace:*
+        version: link:packages/validate
       tsup:
         specifier: ^8.3.5
         version: 8.5.1(postcss@8.5.15)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)

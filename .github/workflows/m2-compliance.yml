@@ -1,0 +1,98 @@
+# M2 sign-off compliance check — run by hand against a LIVE deployment.
+#
+# Deliberately `workflow_dispatch` only, with no schedule: this is a sign-off tool, not a monitor.
+# A cron would turn "the milestone's completion criteria hold" into a recurring notification about
+# somebody else's uptime, and the two want different thresholds, different owners and different
+# reactions. Point it at an environment when you want the question answered.
+#
+# It reads nothing from repository configuration: both URLs are inputs, so the same workflow runs
+# against a preview environment, a staging host and production without being edited.
+name: M2 compliance
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Origin of the deployed /v1/ API (e.g. https://api.example.org)"
+        required: true
+        type: string
+      export_url:
+        description: "Root the open-data export is published under (holds latest.json, latest.csv, LICENSE)"
+        required: true
+        type: string
+      min_total:
+        description: "Dataset floor for /v1/stats and the export"
+        required: false
+        default: "100"
+        type: string
+      freshness_hours:
+        description: "How old the export may be"
+        required: false
+        default: "24"
+        type: string
+      max_details:
+        description: "Cap on documents validated against the Standard (0 = every one of them)"
+        required: false
+        default: "0"
+        type: string
+      allow_insecure:
+        description: "Permit a plaintext http:// base URL on a non-loopback host (throwaway environments only)"
+        required: false
+        default: false
+        type: boolean
+
+# Read-only: the checker issues GETs against a deployment and writes a report artifact.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # Named after the API under test so the run list says which environment was signed off.
+    name: ${{ inputs.base_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The checker validates documents with the repo's own validator (packages/validate), which is
+      # consumed from its build output — so the workspace has to be built before it can run.
+      - name: Build
+        run: pnpm build
+
+      - name: Check M2 completion criteria
+        run: |
+          node scripts/check-m2.mjs \
+            --base-url "$BASE_URL" \
+            --export-url "$EXPORT_URL" \
+            --min-total "$MIN_TOTAL" \
+            --freshness-hours "$FRESHNESS_HOURS" \
+            --max-details "$MAX_DETAILS" \
+            ${ALLOW_INSECURE:+--allow-insecure} \
+            --json m2-compliance-report.json \
+            --no-color
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          EXPORT_URL: ${{ inputs.export_url }}
+          MIN_TOTAL: ${{ inputs.min_total }}
+          FRESHNESS_HOURS: ${{ inputs.freshness_hours }}
+          MAX_DETAILS: ${{ inputs.max_details }}
+          ALLOW_INSECURE: ${{ inputs.allow_insecure && '1' || '' }}
+
+      # `always()`: a failed run is exactly the one whose report someone needs to read.
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-compliance-report
+          path: m2-compliance-report.json
+          if-no-files-found: warn
