@@ -362,7 +362,7 @@ timestamp — and like every other date here it predates the curation pass, whic
 ### What the corpus contains
 
 142 documents, all validating against v1.0.0 with zero errors: 45 bounties, 44 grants, 44
-hackathons, 5 RFPs, 3 accelerators, 1 VC fund; 78 open and 64 closed; 66 converted (`fundingmap:`)
+hackathons, 5 RFPs, 3 accelerators, 1 VC fund; 76 open and 66 closed; 66 converted (`fundingmap:`)
 and 76 researched (`curated:`). Statuses were re-read from source during curation, so "closed" is a
 finding rather than a default. Those per-type and per-status counts are the inventory at this
 commit, not a CI contract: what CI asserts is the >=130 floor, zero schema errors, unique ids, the
