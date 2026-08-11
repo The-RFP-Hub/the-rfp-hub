@@ -1,9 +1,8 @@
 # @the-rfp-hub/api
 
 The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
-serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a 100+ entry seed dataset ingested
-from a configurable upstream funding-map source and repeatable open-data exports (CC0). This is
-milestone **M2**.
+serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a curated 142-entry dataset
+committed to this repository, and repeatable open-data exports (CC0). This is milestone **M2**.
 
 ## Endpoints (`/v1`)
 
@@ -96,9 +95,7 @@ document points at itself with an atom `link rel="self"`.
 docker compose up -d                     # Postgres 15 (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
-export SOURCE_API_URL=https://…          # upstream funding-map registry API (see .env-example)
-pnpm --filter @the-rfp-hub/api seed          # ingest 100+ entries from SOURCE_API_URL
-pnpm --filter @the-rfp-hub/api seed -- --strict   # ...and fail the run on ANY non-conforming record
+pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # 142 entries, offline
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./exports
 ```
@@ -117,10 +114,12 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). |
-| `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
-| `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
-| `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
 | `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
+
+The seed is deliberately absent from that table: it is not configured through the environment at
+all — it takes a corpus file as its argument. Nothing in `src/` or `scripts/` reads a pointer at
+any upstream; the one variable that does is read by offline tooling and documented with it, under
+[the converter's README](./tools/converter/README.md), rather than as a deployment variable.
 
 ### Process behaviour
 
@@ -276,8 +275,73 @@ cannot reshape the published dataset without a failing test.
 > schema v-next changes (org-array flip, `networks`/`tags`/`extensions` removal, eligibility →
 > text, the renames) forward-only on top of it. `0001` rewrites DDL but NOT pre-existing jsonb
 > payloads — **after migrating a database that already has data, re-run the seed**; every row is
-> re-derivable from the upstream source. Regenerate after a schema change with
+> re-derivable from the committed corpus. Regenerate after a schema change with
 > `pnpm --filter @the-rfp-hub/api db:generate`.
+
+## Seeding: a static, in-repo corpus
+
+**The dataset is a repo artifact.** `data/seed-corpus.json` holds 142 finished RFP Hub Standard
+v1.0.0 documents — reviewed in a pull request, versioned with the code, and diffable like any other
+source file. The seed loader reads that file and nothing else:
+
+```bash
+pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict
+```
+
+No network, no credentials, no upstream: the same file in, the same rows out, on any machine with a
+database. That is what lets CI prove on every PR that a clean checkout seeds the whole corpus with
+nothing rejected. The floor is asserted **before** the first write (<100 valid fails the run with
+the database untouched), and the write phase runs in one transaction, so a failure part-way through
+rolls back rather than publishing a half-updated dataset.
+
+### Why the documents are already Standard
+
+Earlier the seed ingested a foreign registry's rows and mapped them at load time. The shape a
+reviewer could read was the source's, the shape that got served was the mapper's, and the two were
+only ever as close as the mapper was correct. Committing finished Standard documents collapses
+that: what the diff shows is what the API serves.
+
+It also makes the data honest in a way a mapper cannot be. A mapper restates what an upstream said;
+it cannot know that a program closed last month, that a budget was announced in a governance post,
+or that a listing labelled `bounty` is really a hackathon. Every entry here was reconciled against
+the funder's own published pages — their site, docs, blog, governance forum or code host — and
+where the researched value contradicted the converted one, the researched value won. The envelope's
+`note` records that, including the caveat that statuses are a point-in-time reading and go stale.
+
+### Refreshing it
+
+Small corrections are ordinary edits to `data/seed-corpus.json`, reviewed like any other change.
+
+A bulk rebuild is offline maintainer tooling in [`tools/converter/`](./tools/converter/README.md):
+fetch a snapshot of an upstream registry, map it to Standard, then **curate by hand** before
+anything is committed. Nothing in that directory runs at seed time, at request time, in CI or on a
+deploy, and `SOURCE_API_URL` — env-only, never committed with a value — is read by exactly one file
+in it.
+
+### Ids and provenance
+
+A document's id carries its provenance namespace (`fundingmap` in `fundingmap:1459`). The loader
+reads the namespace off the id and records it in the `source_system` column, where it pairs with
+`original_id` in a uniqueness constraint that makes re-seeding idempotent — updating the rows it
+wrote last time instead of inserting a second copy. Taking it from the document rather than from a
+constant or an env var means `source_system` can never disagree with the id consumers already see.
+
+### What the corpus contains
+
+142 documents, all validating against v1.0.0 with zero errors: 45 grants, 45 bounties, 43
+hackathons, 5 RFPs, 3 accelerators, 1 VC fund; 78 open and 64 closed. Statuses were re-read from
+source during curation, so "closed" is a finding rather than a default.
+
+Five documents carry **no `applicationUrl`**, because those programs publish no submission page of
+their own. `applicationUrl` is optional in the Standard; leaving it absent is a fact about the
+program, whereas substituting a listing page would put something in the field consumers read as
+"apply here" that the funder never said.
+
+Of the 45 bounties, **44 are `security` and 1 is `task`**, and each carries exactly one
+compensation shape: a security record's published ceiling is a tier table rather than a scalar
+reward, because a scalar on a bug-bounty listing is a maximum and not a fee. That split and the
+invariant under it are pinned by `test/unit/seed-corpus.test.ts`, so a curation pass cannot quietly
+re-shape a third of the corpus.
 
 ## Architecture
 
@@ -291,21 +355,25 @@ registration lives in `routes/<module>/index.ts`.
   [`docs/data-model.md`](./docs/data-model.md) (which tags what's deferred to M3/M4).
 - **Search**: `ILIKE` over title/summary/description (the generated `tsvector` column is deferred).
 - **Validation/types**: reuses [`@the-rfp-hub/standard`](../standard) (schema + types) and
-  [`rfphub-validate`](../validate). **The seed loader validates every mapped record against the
-  schema before anything reaches the database** (`gateForSeed` in `scripts/seed.ts`), printing each
+  [`rfphub-validate`](../validate). **The seed loader validates every document against the schema
+  before anything reaches the database** (`gateForSeed` in `scripts/seed.ts`), printing each
   rejection with its id and the rules it broke — a rejected record is never silently subtracted
-  from a count. `--strict` (or `SEED_STRICT=1`) turns any rejection into a failed run; it is off by
-  default because the upstream is a third-party feed, so one malformed program should not block a
-  120-record seed.
+  from a count. A curated file is not a trusted file: it is edited by hand, which is exactly why
+  every record is re-validated on the way in. `--strict` (or `SEED_STRICT=1`) turns any rejection
+  into a failed run; CI runs it on, against the committed corpus.
 
 ## Tests
 
 - **unit** (`test/unit`, no DB): mappers round-tripped against the committed Standard examples,
   the `deadlines.ts` derivations (`nextDeadlineAt` / auto-close), the ingest normalization
-  (`fundingDetails` tag stripping/reattachment, self-identification stripping), `map-program`
-  old-upstream→re-cut-Standard, query-param parsing, CSV serialization, and the feed serializer —
-  escaping, entry mapping and both document formats, every assertion made through an independent
-  strict XML parser (`test/helpers/xml.ts`) so a malformed document fails before any element check.
+  (`fundingDetails` tag stripping/reattachment, self-identification stripping), the seed's gate and
+  ordering guards, the committed corpus's own contract (`seed-corpus.test.ts`), query-param
+  parsing, CSV serialization, and the feed serializer — escaping, entry mapping and both document
+  formats, every assertion made through an independent strict XML parser (`test/helpers/xml.ts`) so
+  a malformed document fails before any element check.
+- **converter** (`tools/converter/test`, no DB): the offline mapper's fidelity and its bounty-kind
+  inference, on hand-built upstream fixtures. Nothing on the serving path calls it — see
+  [tools/converter/README.md](./tools/converter/README.md).
 - **integration** (`test/integration`, gated on `DATABASE_URL`): each endpoint via `app.inject()`
   against Postgres, with isolated self-cleaning fixtures.
 

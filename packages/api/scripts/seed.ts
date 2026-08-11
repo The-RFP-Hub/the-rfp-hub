@@ -1,38 +1,110 @@
 /**
- * Seed loader: ingest programs from an upstream funding-map registry API, map each to
- * the RFP Hub Standard, VALIDATE every record against the schema, and upsert only the ones that
- * pass (approved + listed). Target >=100 valid.
+ * Seed loader: read RFP Hub Standard documents FROM A FILE, VALIDATE every one against the schema,
+ * and upsert only the ones that pass (approved + listed). Target >=100 valid.
  *
- * Validation is not optional and not a flag: `gateForSeed` runs on every mapped record before
- * anything reaches the database, and each rejection is printed with its id and the rules it broke.
- * Pass `--strict` (or SEED_STRICT=1) to turn any rejection into a failed run.
+ *   pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict
  *
- * The source is deployment-specific — set SOURCE_API_URL (and optionally SOURCE_SYSTEM /
- * SOURCE_PROGRAM_URL_BASE); see .env-example. The Hub maps external data into the neutral Standard
- * and never couples to any source's internal schema.
+ * ── The corpus is already Standard, on purpose ─────────────────────────────────────
+ * `data/seed-corpus.json` holds finished Standard v1.0.0 documents, not a foreign registry's rows.
+ * The dataset is a repo artifact: it is curated, reviewed and versioned here like any other source
+ * file, so the shape a reviewer reads in the diff is exactly the shape that is served. There is no
+ * mapping step on this path and therefore no mapping to get wrong between review and serve.
  *
- * The upstream registry still speaks the PRE-RE-CUT vocabulary (`type`, a single organization, one
- * `deadline`, per-block date fields, `fundingMechanism`, `totalBudget`). `scripts/map-program.ts`
- * is where that conversion to the re-cut Standard lives, following the same rules the Standard's
- * own examples were regenerated with; everything downstream of it is already re-cut-shaped.
+ * Rebuilding that dataset in bulk from some upstream registry is a DIFFERENT job with a different
+ * failure mode — non-deterministic, credentialed, network-bound — and it lives outside the runtime
+ * entirely, in `tools/converter/` (offline, run by hand, never by CI, never by the server). Nothing
+ * on this path reads an upstream pointer; nothing on this path opens a socket. See
+ * packages/api/README.md ("Seeding: a static, in-repo corpus").
+ *
+ * ── The gate ───────────────────────────────────────────────────────────────────────
+ * Validation is not optional and not a flag: `gateForSeed` runs on every document before anything
+ * reaches the database, and each rejection is printed with its id and the rules it broke. A curated
+ * file is not a trusted file — it is edited by hand, which is precisely why every record is
+ * re-validated on the way in. Pass `--strict` (or SEED_STRICT=1) to turn any rejection into a
+ * failed run; CI runs it on.
+ *
+ * Nothing is written until the whole batch has been validated AND counted: the >=100 floor is
+ * asserted BEFORE the first upsert, so a short or broken run fails with the database untouched
+ * rather than leaving a partial approved+listed dataset live behind it. The write phase itself runs
+ * inside ONE transaction, so a failure at record 57 of 142 (connection reset, statement timeout, a
+ * unique-constraint collision in the organizations directory) rolls the whole batch back instead of
+ * publishing a half-updated mix of this run's and the previous run's rows.
  */
-import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { humanizeErrors, validateOpportunity } from "rfphub-validate";
-import { config } from "../src/config.js";
-import { pool } from "../src/db/client.js";
+import { type DB, db, pool } from "../src/db/client.js";
 import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
-import { type RegistryProgram, mapProgram } from "./map-program.js";
 
-const TARGET = Number(process.env.SEED_TARGET ?? 120);
-const PAGE_LIMIT = 100;
-const MAX_PAGES = 20;
 const MIN_VALID = 100;
-const INVOCATION_ID = randomUUID();
+
+const USAGE = "usage: pnpm seed <path-to-corpus.json> [--strict]";
 
 export interface RejectedRecord {
   id: string;
   errors: string[];
+}
+
+/** How a run is invoked. Never what it validates — the gate does not vary. */
+export interface SeedOptions {
+  /** Path to the corpus of Standard documents. Required: there is no other source. */
+  corpusPath: string;
+  strict: boolean;
+}
+
+/**
+ * Read the run's inputs off argv/env. The corpus path is the one positional argument — with a
+ * single mode there is nothing for a `--from-file` flag to distinguish it from, and a required
+ * argument that is simply missing fails louder than a flag that can be left off.
+ */
+export function parseSeedOptions(
+  argv: readonly string[],
+  env: Record<string, string | undefined> = process.env,
+): SeedOptions {
+  const positional = argv.slice(2).filter((a) => !a.startsWith("-"));
+  if (positional.length === 0) throw new Error(`no corpus file given — ${USAGE}`);
+  if (positional.length > 1) {
+    throw new Error(`expected one corpus file, got ${positional.length} — ${USAGE}`);
+  }
+  const corpusPath = positional[0] as string;
+  if (!corpusPath.trim()) throw new Error(`no corpus file given — ${USAGE}`);
+  return { corpusPath, strict: argv.includes("--strict") || env.SEED_STRICT === "1" };
+}
+
+/**
+ * A corpus is Standard documents — either as a bare array or under `documents` in an envelope that
+ * can carry a note. Anything else is a hard error: a corpus that silently parses to zero documents
+ * would sail past the gate and only surface as a mystifying floor violation.
+ */
+export function documentsFromCorpus(parsed: unknown, path = "corpus"): Opportunity[] {
+  const documents = Array.isArray(parsed)
+    ? parsed
+    : (parsed as { documents?: unknown } | null)?.documents;
+  if (!Array.isArray(documents)) {
+    throw new Error(`${path}: expected an array of Standard documents, or { documents: [...] }`);
+  }
+  if (documents.length === 0) throw new Error(`${path}: contains no documents`);
+  return documents as Opportunity[];
+}
+
+/** The one and only source of documents: a corpus file, read straight off disk. */
+export async function readCorpus(path: string): Promise<Opportunity[]> {
+  return documentsFromCorpus(JSON.parse(await readFile(path, "utf8")), path);
+}
+
+/**
+ * The provenance namespace a document declares, read off its own id (`fundingmap:1459` →
+ * `fundingmap`). It is recorded in the `source_system` column, where it pairs with `original_id` in
+ * a uniqueness constraint that makes re-seeding idempotent.
+ *
+ * Derived rather than configured, and derived from the DOCUMENT rather than from a constant this
+ * script carries: the id is what consumers already see, so a `source_system` taken from anywhere
+ * else could disagree with it. A namespace-free id yields null, which the column permits (the
+ * uniqueness index is partial for exactly that reason).
+ */
+export function sourceSystemOf(id: string | undefined): string | null {
+  const namespace = (id ?? "").split(":")[0];
+  return namespace && namespace !== id ? namespace : null;
 }
 
 export interface SeedGateResult {
@@ -49,10 +121,10 @@ export interface SeedGateResult {
  * it is never counted and dropped in silence, because a silent drop is how a seed quietly loads
  * 40 records and reports success.
  */
-export function gateForSeed(mapped: readonly Opportunity[]): SeedGateResult {
+export function gateForSeed(documents: readonly Opportunity[]): SeedGateResult {
   const accepted: Opportunity[] = [];
   const rejected: RejectedRecord[] = [];
-  for (const record of mapped) {
+  for (const record of documents) {
     const { valid, errors } = validateOpportunity(record, { checks: false });
     if (valid) accepted.push(record);
     else rejected.push({ id: record.id ?? "(no id)", errors: humanizeErrors(errors, record) });
@@ -69,101 +141,104 @@ export function reportRejections(rejected: readonly RejectedRecord[]): void {
 }
 
 /**
- * With `--strict` (or SEED_STRICT=1), a single non-conforming record fails the whole run. Off by
- * default because the upstream is a third-party feed we do not control: one malformed program
- * should not block a 120-record seed. On in CI against a fixed corpus, where it should.
+ * With `--strict` (or SEED_STRICT=1), a single non-conforming record fails the whole run. It is off
+ * by default so that an operator loading their own hand-assembled corpus is not blocked by one bad
+ * record in it. On in CI against the committed corpus, where it should be: that file cannot change
+ * without a reviewed commit, so a single rejection there is a defect, not weather.
  */
 export function assertNoRejections(rejected: readonly RejectedRecord[], strict: boolean): void {
   if (!strict || rejected.length === 0) return;
   throw new Error(
-    `--strict: ${rejected.length} mapped record(s) failed schema validation: ${rejected
+    `--strict: ${rejected.length} document(s) failed schema validation: ${rejected
       .map((r) => r.id)
       .join(", ")}`,
   );
 }
 
-/** Hard floor on the seed: throw (non-zero exit via the top-level catch) if too few loaded. */
-export function assertSeedContract(loaded: number, min = MIN_VALID): void {
-  if (loaded < min) {
+/**
+ * Hard floor on the seed: throw (non-zero exit via the top-level catch) if too few records passed
+ * the gate. Called on the validated batch BEFORE the first upsert — see main().
+ */
+export function assertSeedContract(valid: number, min = MIN_VALID): void {
+  if (valid < min) {
     throw new Error(
-      `seed contract violated: only ${loaded} valid entries (< ${min}) — raise SEED_TARGET or check the source`,
+      `seed contract violated: only ${valid} valid entries (< ${min}) — check the corpus file`,
     );
   }
 }
 
-async function fetchPage(page: number): Promise<{ programs: RegistryProgram[]; hasNext: boolean }> {
-  const url = new URL("/v2/program-registry/search", config.sourceApiUrl);
-  url.searchParams.set("isValid", "accepted");
-  url.searchParams.set("limit", String(PAGE_LIMIT));
-  url.searchParams.set("page", String(page));
-  url.searchParams.set("sortField", "updatedAt");
-  url.searchParams.set("sortOrder", "desc");
+/**
+ * The write phase, and the two guards that come BEFORE it — in that order, in one place, so the
+ * order is a testable property rather than a comment. Everything up to here is read-only: a run
+ * that fails either guard leaves the database exactly as it found it, instead of publishing a
+ * partial approved+listed dataset and only then reporting failure.
+ *
+ * The guards are only half the property, though: a failure INSIDE the loop would leave the records
+ * written so far live. main() therefore calls this inside a single `db.transaction`, so the whole
+ * write phase commits or rolls back as one unit. `write` is injected rather than reached for so
+ * this can be exercised without a database.
+ */
+export async function loadValidated(
+  valid: readonly Opportunity[],
+  rejected: readonly RejectedRecord[],
+  write: (std: Opportunity) => Promise<void>,
+  opts: { strict: boolean; min?: number },
+): Promise<number> {
+  assertNoRejections(rejected, opts.strict);
+  assertSeedContract(valid.length, opts.min);
 
-  const res = await fetch(url, {
-    headers: { "X-Source": "rfp-hub-api:seed", "X-Invocation-Id": INVOCATION_ID },
-  });
-  if (!res.ok) throw new Error(`source registry API ${res.status} on page ${page}`);
-  const body = (await res.json()) as { programs?: RegistryProgram[]; hasNext?: boolean };
-  return { programs: body.programs ?? [], hasNext: Boolean(body.hasNext) };
+  let loaded = 0;
+  for (const std of valid) {
+    await write(std);
+    loaded++;
+  }
+  return loaded;
 }
 
 async function main(): Promise<void> {
-  if (!config.sourceApiUrl) {
-    throw new Error(
-      "SOURCE_API_URL is not set — point it at an upstream funding-map registry API (see .env-example)",
-    );
-  }
-  const mapOpts = {
-    sourceSystem: config.sourceSystem,
-    programUrlBase: config.sourceProgramUrlBase || undefined,
-  };
-  const strict = process.argv.includes("--strict") || process.env.SEED_STRICT === "1";
+  const { corpusPath, strict } = parseSeedOptions(process.argv);
+  const corpus = await readCorpus(corpusPath);
   console.log(
-    `Seeding from ${config.sourceApiUrl} (target ${TARGET} valid${strict ? ", --strict" : ""})…`,
+    `Seeding from ${corpusPath} (${corpus.length} Standard documents${strict ? ", --strict" : ""})…`,
   );
+
+  // One batch, read once, no network. Duplicate ids inside a corpus are dropped rather than
+  // upserted twice, so the count reported is the count of distinct records.
   const seen = new Set<string>();
-  const valid: Opportunity[] = [];
-  const rejected: RejectedRecord[] = [];
-
-  for (let page = 1; page <= MAX_PAGES && valid.length < TARGET; page++) {
-    const { programs, hasNext } = await fetchPage(page);
-    if (programs.length === 0) break;
-
-    const mapped: Opportunity[] = [];
-    for (const program of programs) {
-      const std = mapProgram(program, mapOpts);
-      if (seen.has(std.id)) continue;
-      seen.add(std.id);
-      mapped.push(std);
-    }
-
-    // Every mapped record is schema-validated here, before anything touches the database.
-    const gate = gateForSeed(mapped);
-    valid.push(...gate.accepted);
-    rejected.push(...gate.rejected);
-    reportRejections(gate.rejected);
-
-    console.log(`  page ${page}: ${valid.length} valid, ${rejected.length} rejected`);
-    if (!hasNext) break;
+  const documents: Opportunity[] = [];
+  for (const std of corpus) {
+    if (seen.has(std.id)) continue;
+    seen.add(std.id);
+    documents.push(std);
   }
 
-  assertNoRejections(rejected, strict);
+  // Every document is schema-validated here, before anything touches the database.
+  const { accepted: valid, rejected } = gateForSeed(documents);
+  reportRejections(rejected);
+  console.log(`  ${valid.length} valid, ${rejected.length} rejected`);
 
-  const ctl = new OpportunityService();
-  let loaded = 0;
-  for (const std of valid) {
-    await ctl.upsertFromStandard(std, {
-      reviewStatus: "approved",
-      isListed: true,
-      sourceSystem: config.sourceSystem,
-    });
-    loaded++;
-  }
+  // One transaction for the whole write phase — see loadValidated. The service is bound to the
+  // transaction handle rather than the pool so every upsert (opportunities AND the organizations
+  // directory) joins it; the handle exposes the same query surface as `db` but is not structurally
+  // assignable to it, hence the cast.
+  const loaded = await db.transaction(async (tx) => {
+    const ctl = new OpportunityService(tx as unknown as DB);
+    return loadValidated(
+      valid,
+      rejected,
+      (std) =>
+        ctl.upsertFromStandard(std, {
+          reviewStatus: "approved",
+          isListed: true,
+          sourceSystem: sourceSystemOf(std.id) ?? undefined,
+        }),
+      { strict },
+    );
+  });
 
   console.log(
     `✓ ${loaded} opportunities loaded, ${rejected.length} rejected (schema-invalid, listed above)`,
   );
-  assertSeedContract(loaded);
   await pool.end();
 }
 

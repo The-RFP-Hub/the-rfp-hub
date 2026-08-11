@@ -1,0 +1,233 @@
+/**
+ * The dataset's contract, and the loader's. `data/seed-corpus.json` is a repo artifact — reviewed,
+ * versioned and served — so what it must hold true is asserted here rather than trusted to the
+ * commit that last touched it. No DB and no network: the corpus is read off disk and the writer is
+ * a spy.
+ *
+ * seed.test.ts covers the ingestion gate itself; this file covers WHAT is shipped and HOW a run is
+ * fed and guarded.
+ */
+import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { type DetailsByFundingType, type Opportunity, SPEC_VERSION } from "@the-rfp-hub/standard";
+import { validateOpportunity } from "rfphub-validate";
+import { describe, expect, it, vi } from "vitest";
+import {
+  documentsFromCorpus,
+  gateForSeed,
+  loadValidated,
+  parseSeedOptions,
+  readCorpus,
+} from "../../scripts/seed.js";
+
+const CORPUS_PATH = fileURLToPath(new URL("../../data/seed-corpus.json", import.meta.url));
+
+/**
+ * The floor the SHIPPED corpus has to clear, deliberately under the 142 it carries. A margin means
+ * a curator can retire a stale program without tripping a test; the distance to the seed's own
+ * >=100 contract is what keeps the dataset from quietly eroding down to it.
+ */
+const CORPUS_FLOOR = 130;
+const MIN_VALID = 100;
+
+const DOCUMENTS = documentsFromCorpus(JSON.parse(readFileSync(CORPUS_PATH, "utf8")), CORPUS_PATH);
+
+describe("parseSeedOptions", () => {
+  it("takes the corpus path as the positional argument", () => {
+    expect(parseSeedOptions(["node", "seed.ts", "corpus.json"], {})).toEqual({
+      corpusPath: "corpus.json",
+      strict: false,
+    });
+  });
+
+  it("reads --strict from the flag or SEED_STRICT, in any argument order", () => {
+    expect(parseSeedOptions(["node", "seed.ts", "corpus.json", "--strict"], {})).toEqual({
+      corpusPath: "corpus.json",
+      strict: true,
+    });
+    expect(parseSeedOptions(["node", "seed.ts", "--strict", "corpus.json"], {})).toEqual({
+      corpusPath: "corpus.json",
+      strict: true,
+    });
+    expect(parseSeedOptions(["node", "seed.ts", "corpus.json"], { SEED_STRICT: "1" })).toEqual({
+      corpusPath: "corpus.json",
+      strict: true,
+    });
+  });
+
+  // The corpus file is the loader's ONLY input, so a run without one is a usage error — there is
+  // no upstream left to fall through to, and nothing to guess.
+  it("refuses a run with no corpus file", () => {
+    expect(() => parseSeedOptions(["node", "seed.ts"], {})).toThrow(/no corpus file/);
+    expect(() => parseSeedOptions(["node", "seed.ts", "--strict"], {})).toThrow(/no corpus file/);
+  });
+
+  it("refuses more than one corpus file rather than silently seeding the first", () => {
+    expect(() => parseSeedOptions(["node", "seed.ts", "a.json", "b.json"], {})).toThrow(
+      /expected one corpus file/,
+    );
+  });
+});
+
+/**
+ * The offline guarantee, asserted on the source itself rather than trusted to review. A seed that
+ * can reach an upstream is a seed whose output depends on someone else's uptime and on a credential
+ * CI does not have — so the loader must contain no request at all, and no pointer at an upstream to
+ * make one with. Bulk acquisition lives in tools/converter/, which is not on this path and which
+ * nothing here imports.
+ */
+describe("the seed path cannot reach the network", () => {
+  const SEED_PATH = fileURLToPath(new URL("../../scripts/seed.ts", import.meta.url));
+
+  it("has no request and no upstream pointer in the loader", async () => {
+    // strip comments so the prose explaining the decision cannot fail the check that enforces it
+    const code = (await readFile(SEED_PATH, "utf8"))
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(code, "fetch(").not.toMatch(/\bfetch\s*\(/);
+    expect(code, "an HTTP client").not.toMatch(/node:https?|undici|axios|node-fetch/);
+    expect(code, "SOURCE_API_URL").not.toContain("SOURCE_API_URL");
+    expect(code, "config.source*").not.toMatch(/config\.source/);
+    expect(code, "the offline converter").not.toContain("tools/converter/map-program");
+  });
+});
+
+describe("documentsFromCorpus", () => {
+  it("accepts a bare array and an envelope carrying one", () => {
+    const [one] = DOCUMENTS as [Opportunity];
+    expect(documentsFromCorpus([one])).toEqual([one]);
+    expect(documentsFromCorpus({ note: "curated", documents: [one] })).toEqual([one]);
+  });
+
+  it("refuses a corpus that would silently seed nothing", () => {
+    expect(() => documentsFromCorpus([], "c.json")).toThrow(/no documents/);
+    expect(() => documentsFromCorpus({ documents: {} }, "c.json")).toThrow(/expected an array/);
+    expect(() => documentsFromCorpus(null, "c.json")).toThrow(/expected an array/);
+  });
+});
+
+describe("the committed corpus", () => {
+  it("is Standard documents at the version this package serves, not a foreign registry's rows", () => {
+    expect(DOCUMENTS.length).toBeGreaterThanOrEqual(CORPUS_FLOOR);
+    for (const d of DOCUMENTS) {
+      expect(d.specVersion, d.id).toBe(SPEC_VERSION);
+      expect(d.fundingType, d.id).toBeTruthy();
+      expect(d, d.id).not.toHaveProperty("programId"); // an upstream row's shape, not ours
+    }
+  });
+
+  // The point of committing it: the same file, gated, clears the floor every single run.
+  it("validates end to end with nothing rejected", async () => {
+    const documents = await readCorpus(CORPUS_PATH);
+    const { accepted, rejected } = gateForSeed(documents);
+    expect(rejected).toEqual([]);
+    expect(accepted.length).toBeGreaterThanOrEqual(CORPUS_FLOOR);
+    expect(accepted.length).toBeGreaterThanOrEqual(MIN_VALID);
+  });
+
+  it("passes the advisory checks too, so the shipped data is not merely conforming", () => {
+    const withErrors = DOCUMENTS.filter((d) => !validateOpportunity(d, { checks: true }).valid);
+    expect(withErrors.map((d) => d.id)).toEqual([]);
+  });
+
+  it("gives every document a unique, namespaced id", () => {
+    const ids = DOCUMENTS.map((d) => d.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(id, id).toMatch(/^[a-z0-9-]+:.+/);
+  });
+
+  /**
+   * Statuses are the field most likely to go stale and the one consumers filter on hardest, so the
+   * corpus is required to carry BOTH — an all-open dataset would mean the curation pass never
+   * closed anything, which is the failure mode that made this dataset necessary.
+   */
+  it("carries a live mix of statuses and funding types, not one flat block", () => {
+    const statuses = new Set(DOCUMENTS.map((d) => d.status));
+    expect(statuses.has("open")).toBe(true);
+    expect(statuses.has("closed")).toBe(true);
+    expect(new Set(DOCUMENTS.map((d) => d.fundingType)).size).toBeGreaterThanOrEqual(4);
+  });
+
+  it("names a real operating organization on every document", () => {
+    for (const d of DOCUMENTS) {
+      expect(d.operatingOrganizations.length, d.id).toBeGreaterThan(0);
+      expect(d.operatingOrganizations[0]?.name, d.id).toBeTruthy();
+    }
+  });
+
+  /**
+   * `bountyKind` decides which compensation field a bounty is even ALLOWED to carry, so the split
+   * is pinned here together with the invariant underneath it: exactly one of `reward` /
+   * `rewardTiers`, never both and never neither, and never a bare scalar on a security program.
+   * A curation pass cannot re-shape a third of the corpus without this failing.
+   */
+  it("classifies every bounty, and each carries exactly one compensation shape", () => {
+    const bounties = DOCUMENTS.filter((d) => d.fundingType === "bounty").map(
+      (d) => d.fundingDetails as DetailsByFundingType["bounty"],
+    );
+
+    expect(bounties).toHaveLength(45);
+    const kinds = bounties.map((b) => b.bountyKind);
+    expect(kinds.filter((k) => k === "security")).toHaveLength(44);
+    expect(kinds.filter((k) => k === "task")).toHaveLength(1);
+
+    for (const b of bounties) {
+      const hasScalar = Object.hasOwn(b, "reward");
+      const hasTable = Object.hasOwn(b, "rewardTiers");
+      expect(hasScalar).toBe(!hasTable);
+      // a security bounty is never priced by a bare number — a scalar there is a maximum, not a fee
+      if (b.bountyKind === "security") expect(hasTable).toBe(true);
+    }
+  });
+
+  it("publishes only https URLs, and never a placeholder host", () => {
+    const text = readFileSync(CORPUS_PATH, "utf8");
+    expect(text.match(/"http:\/\/[^"]*"/g) ?? []).toEqual([]);
+    expect(text).not.toMatch(/example\.(com|org)/);
+  });
+
+  it("is committed as text a reviewer can diff", () => {
+    const raw = readFileSync(CORPUS_PATH, "utf8");
+    expect(raw.endsWith("\n")).toBe(true);
+    expect(raw.split("\n").length).toBeGreaterThan(100); // pretty-printed, not one long line
+  });
+});
+
+describe("loadValidated: the floor is asserted before anything is written", () => {
+  const ok = (n: number): Opportunity[] =>
+    Array.from({ length: n }, (_, i) => ({ ...(DOCUMENTS[0] as Opportunity), id: `x:${i}` }));
+
+  it("writes every accepted record once the floor is cleared", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const batch = ok(MIN_VALID);
+    await expect(loadValidated(batch, [], write, { strict: true })).resolves.toBe(MIN_VALID);
+    expect(write).toHaveBeenCalledTimes(MIN_VALID);
+    expect(write).toHaveBeenCalledWith(batch[0]);
+  });
+
+  // The regression this exists for: a short run used to upsert everything it had, THEN fail the
+  // contract — leaving a partial approved+listed dataset live behind a non-zero exit code.
+  it("writes NOTHING when the batch is short of the floor", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    await expect(loadValidated(ok(MIN_VALID - 1), [], write, { strict: false })).rejects.toThrow(
+      /seed contract/,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when --strict trips on a rejection either", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const rejected = [{ id: "fundingmap:bad", errors: ["/status must be one of …"] }];
+    await expect(loadValidated(ok(MIN_VALID), rejected, write, { strict: true })).rejects.toThrow(
+      /fundingmap:bad/,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("honors a custom floor for smaller deployments", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    await expect(loadValidated(ok(3), [], write, { strict: true, min: 3 })).resolves.toBe(3);
+    expect(write).toHaveBeenCalledTimes(3);
+  });
+});
