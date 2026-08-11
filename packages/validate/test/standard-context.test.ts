@@ -133,9 +133,15 @@ describe("the @vocab surface — which terms move when the namespace moves", () 
    * these moved with the namespace on 2026-08-10 and every one of them SHOULD have. Adding a
    * row here is a deliberate act — it means the standard is defining a term rather than
    * borrowing one, which is the decision `CROSSWALK.md` documents.
+   *
+   * The four bounty-split terms (`bountyKind`, `rewardTiers`, `severityScheme`,
+   * `rewardPoolStatus`) are here for that reason and not by omission: neither schema.org nor
+   * DAOIP-5 models a graded award table, so `CROSSWALK.md` records them as coined rather than
+   * borrowed.
    */
   const RFPHUB_TERMS = [
     "allocated",
+    "bountyKind",
     "criteria",
     "deadlines",
     "ecosystems",
@@ -150,8 +156,11 @@ describe("the @vocab surface — which terms move when the namespace moves", () 
     "programModel",
     "recurring",
     "requirements",
+    "rewardPoolStatus",
+    "rewardTiers",
     "scope",
     "serviceAgreement",
+    "severityScheme",
     "skills",
     "socialLinks",
     "socialLinks.platform",
@@ -368,26 +377,39 @@ describe("keyword expansion — the invisible half of @vocab", () => {
    * `check-spec.mjs` requires a context term for every TOP-LEVEL schema property. Nested
    * properties are deliberately left to `@vocab`'s keyword-expansion fallback — a field inside
    * `bounty` or `vc_fund` with no external equivalent is an RFP Hub term either way, and
-   * declaring 20 more one-line mappings would add drift surface for no meaning. Pinning the
+   * declaring 28 more one-line mappings would add drift surface for no meaning. Pinning the
    * list is what keeps that a decision: a nested field that DOES have a schema.org equivalent
    * shows up here as a new entry and has to be mapped or consciously left alone.
+   *
+   * The eight added by the bounty split (`payout`, `model`, `percent`, `basis`, `floor`, `cap`,
+   * `severity`, `assetType`) sit inside `$defs/rewardTier` and `$defs/payout` and take the same
+   * treatment: `rewardTiers` is declared at the top of the context so the container semantics
+   * are stated, and the tier's own interior expands by keyword.
    */
   it("leaves exactly these nested properties to the @vocab fallback", () => {
     expect(unmapped).toEqual([
       "activelyInvesting",
+      "assetType",
+      "basis",
       "batchSize",
+      "cap",
       "checkSize",
       "contactMethod",
       "deadlineType",
       "difficulty",
       "equity",
+      "floor",
       "location",
       "max",
       "min",
+      "model",
       "online",
       "orgType",
+      "payout",
+      "percent",
       "programDurationWeeks",
       "reward",
+      "severity",
       "slug",
       "stage",
       "teamSize",

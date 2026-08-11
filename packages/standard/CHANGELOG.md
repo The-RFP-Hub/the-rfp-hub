@@ -51,12 +51,15 @@ than claiming resolution that does not exist.
 - **`@vocab` moves to `https://ethrfps.app/ns/rfp#`**, and drops the `draft` path segment. That
   segment mirrored the version's maturity, and a namespace that renames itself when the spec
   matures is not a namespace: term IRIs are versioned by the context DOCUMENT, never by the term.
-- **What moved and what did not,** measured from the document: of 70 term definitions, **25**
+- **What moved and what did not,** measured from the document: of 74 term definitions, **29**
   resolve against `@vocab` (the RFP Hub's own vocabulary) and moved; **40** are prefixed
   (36 schema.org, 4 DAOIP-5) and are structurally immune, because a prefix is an absolute IRI;
   **5** are nulled by property-scoped contexts and drop either way. Nothing the standard says
-  about an external vocabulary changed. A further 20 nested properties reach the namespace by
-  `@vocab` keyword expansion rather than an explicit term, and moved with it.
+  about an external vocabulary changed. A further 28 nested properties reach the namespace by
+  `@vocab` keyword expansion rather than an explicit term, and moved with it. Four of the 29 and
+  eight of the 28 arrived with the bounty split recorded below — neither external vocabulary
+  models a graded award table, so the whole surface is coined rather than borrowed, which is why
+  a change that added terms did not move the borrowed count at all.
 - **`@protected` is unaffected — for a document using one context version at a time.** Protection
   forbids REDEFINITION during one document's processing; it says nothing about which IRI a context
   version maps a term to. Exactly one protected term (`deadlines`) is `@vocab`-relative and moved
