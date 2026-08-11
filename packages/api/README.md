@@ -147,6 +147,8 @@ docker compose -f docker-compose.test.yml down
 
 ## Deferred (later in M2 / beyond)
 
-Cloud deploy + public export bucket + nightly cron; full OpenAPI live-spec test suite; TS/Python/curl
-client examples; DAOIP-5 `grantPools` export adapter. The write API, auth, verification, dedup, and
-analytics are M3+ (see `docs/data-model.md`).
+Cloud deploy + public export bucket + nightly cron; full OpenAPI live-spec test suite; DAOIP-5
+`grantPools` export adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
+`docs/data-model.md`).
+
+Runnable curl/TypeScript/Python client examples now live in [`examples/`](../../examples).

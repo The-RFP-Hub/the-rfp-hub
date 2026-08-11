@@ -67,3 +67,22 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      # The TypeScript example is a CONSUMER, not a workspace member: it resolves
+      # @the-rfp-hub/standard from the npm REGISTRY (npm, not pnpm — no workspace linking), so this
+      # typechecks it against the PUBLISHED package and a release that breaks downstream consumers
+      # fails here instead of in their repos.
+      #
+      # `npm ci` against the committed lockfile, not `npm install`: the version resolved is pinned,
+      # so an unrelated transitive publish cannot redden CI on an unrelated PR. Bumping the standard
+      # here is therefore a deliberate lockfile change.
+      #
+      # Scope, so nobody reads more into a green tick than it earns: this step covers ONLY
+      # examples/typescript/index.ts. It issues no HTTP request, so no runtime API behaviour is
+      # verified; it does not look at the curl or Python examples; and because it resolves the
+      # registry copy, a change to packages/standard in this repo cannot fail it.
+      - name: Typecheck the TypeScript client example (as a consumer)
+        working-directory: examples/typescript
+        run: |
+          npm ci
+          npm run typecheck

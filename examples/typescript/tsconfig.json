@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    // `npm start` is a bare `node index.ts`: Node strips the types, it does not compile them, so
+    // only erasable syntax may appear. This makes tsc enforce that — and it is why the example
+    // needs no runtime TypeScript loader as a dependency.
+    "erasableSyntaxOnly": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["index.ts"]
+}
