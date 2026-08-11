@@ -12,7 +12,7 @@ Other documents may supersede it. A machine-readable index of all versions is at
 | **Re-cut in place** | **2026-07-27** |
 | **Second draft revision (in place)** | **2026-08-05** — see [`adr/0004`](../../../../adr/0004-second-draft-revision-org-swap-and-closure.md) |
 | **Third draft revision (in place)** | **2026-08-05**, same day, applied after the second — see [`adr/0005`](../../../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md) |
-| **Fourth draft revision (in place)** | **2026-08-10, amended through 2026-08-11 in review** — the bounty type splits into task and security kinds — see [`adr/0007`](../../../../adr/0007-security-bounty-payout-tiers.md) |
+| **Fourth draft revision (in place)** | **2026-08-10, amended through 2026-08-11 in review** — the bounty type splits into task and security kinds — see [`adr/0007`](../../../../adr/0008-security-bounty-payout-tiers.md) |
 | **Supersedes** | none — this is the first version |
 | **Superseded by** | none — this is the current version |
 | **Feedback** | GitHub issues on [`The-RFP-Hub/the-rfp-hub`](https://github.com/The-RFP-Hub/the-rfp-hub/issues) |

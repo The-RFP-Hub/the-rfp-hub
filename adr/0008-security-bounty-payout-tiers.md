@@ -1,4 +1,4 @@
-# 0007 — Split `bounty` into task and security kinds, and give the security kind a payout table
+# 0008 — Split `bounty` into task and security kinds, and give the security kind a payout table
 
 - **Status:** accepted
 - **Date:** 2026-08-10, revised 2026-08-11 (design review and final audit — see the revision notes below)
@@ -132,10 +132,19 @@ rename was meant to fix is already gone.
   traffic) and preferred not to spend a second major inside one release cycle. Recorded here
   because the deviation is deliberate and the reasoning expires: **once the package has a real
   dependant, a change of this shape is a major**, and the next one should be.
-- **The API's ingest mapper infers `bountyKind`** from payout shape, defaulting to `task`, and
-  **no longer synthesizes a `reward` from the program budget for a security bounty** —
-  synthesizing one there would manufacture exactly the misleading headline this ADR exists to
-  prevent.
+- **The API's ingest mapper infers `bountyKind` from domain signals, not payout shape alone.**
+  A verification sweep against the curated seed corpus proved shape-only inference useless on
+  real data: the corpus carries 46 bounty records, 43 of them genuine security programs (35
+  Immunefi, 8 Cantina, "Lido Bug Bounty" $2M among them), and **every one arrives as a bare
+  scalar** because the upstream never extracts a tier table — so an inference keyed on tiers
+  fired on zero of them and would have labelled them all `task`, the exact misrepresentation
+  this ADR exists to prevent. The mapper now reads the domain — a program calling itself a bug
+  bounty, or living on a platform that hosts nothing else — and synthesizes the honest one-row
+  table from what the source actually publishes: `up_to` the scalar where one exists,
+  `discretionary` where none does, never a scalar `reward` on a security bounty. Verified
+  against the corpus: 46 of 46 map to conforming documents, 44 classified security and the two
+  task-classified records genuinely are tasks. Per-severity tier extraction from the platforms
+  themselves remains the seed pipeline's work, not the mapper's.
 - **The generated TypeScript cannot express either discriminator.** `json-schema-to-typescript`
   does not read `if`/`then`/`else`, so `BountyDetails.reward` and `Payout.amount` emit as
   optional and narrowing on the tag does not restore requiredness. The types are a shape hint;

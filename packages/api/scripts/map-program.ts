@@ -137,6 +137,20 @@ const BLOCK_DEADLINE_LABELS: Partial<Record<FundingType, Record<string, string>>
   rfp: { proposalDeadline: "application" },
 };
 
+/**
+ * Platforms that host security bug bounty programs and nothing else — a listing here IS a
+ * vulnerability-disclosure program regardless of how its name was ingested. Task-bounty boards
+ * (Gitcoin, Layer3, Superteam Earn) are deliberately absent: their listings stay tasks.
+ */
+const SECURITY_BOUNTY_PLATFORMS = new Set([
+  "immunefi",
+  "cantina",
+  "hackenproof",
+  "sherlock",
+  "code4rena",
+  "hats finance",
+]);
+
 const SOCIAL_KEYS: SocialLink["platform"][] = [
   "twitter",
   "discord",
@@ -455,22 +469,46 @@ function typeBlockOf(
   // through would emit an invalid document, and it must not influence the inference either.
   const tiers = Array.isArray(rewardTiers) && rewardTiers.length > 0 ? rewardTiers : undefined;
 
-  // bountyKind is required by the Standard and upstream does not send it. Infer from the payout
-  // shape: a tier table AND no scalar reward is a security program. Tiers alone are not enough —
-  // the Standard allows them on a task bounty grading a placement ladder, so a record carrying
-  // both is more likely a graded task than a security program.
-  const kind = bountyKind ?? (tiers !== undefined && reward === undefined ? "security" : "task");
+  // bountyKind is required by the Standard and upstream does not send it. Payout shape alone
+  // cannot decide it: the real upstream never extracts a tier table, so every security bug
+  // bounty it carries — "Lido Bug Bounty" on Immunefi, and its peers — arrives as a bare
+  // scalar, indistinguishable by shape from a task listing. The kind is the DOMAIN, so it is
+  // inferred from domain signals: the program calling itself a bug bounty, or living on a
+  // platform that hosts nothing else. Shape still decides the one case it can (a tier table
+  // with no scalar is a security program however it is named), and tiers-plus-reward stays a
+  // graded task, since the Standard allows a placement ladder on a task bounty.
+  const nameStr = `${p.name ?? ""} ${p.metadata?.title ?? ""}`;
+  const platformStr = typeof rest.platform === "string" ? rest.platform.trim().toLowerCase() : "";
+  const securityByShape = tiers !== undefined && reward === undefined;
+  const securityByDomain =
+    /\bbug[\s-]*bount/i.test(nameStr) || SECURITY_BOUNTY_PLATFORMS.has(platformStr);
+  const kind = bountyKind ?? (securityByShape || securityByDomain ? "security" : "task");
 
-  // Compensation is EXACTLY ONE of reward or rewardTiers, so the two cannot both be emitted.
-  // The table wins wherever it exists: it is the richer description, and dropping it to keep a
-  // scalar would discard grading the upstream took the trouble to publish. A reward is
-  // synthesized from the budget only when there is no table and none was supplied — never for a
-  // security bounty, which the Standard forbids from carrying one at all, because collapsing a
-  // graded table to a single number is the misrepresentation the table exists to prevent.
+  // Compensation is EXACTLY ONE of reward or rewardTiers. A security bounty must carry the
+  // table and may not carry the scalar, so where upstream published only a number the table is
+  // synthesized from it: one row, selected by label, paying up to that number — which is what
+  // the scalar on a bug bounty listing means. With no figure at all the row is discretionary.
+  // Either way the record says what the source actually knows: this program pays for findings
+  // of any severity, up to X where X is published, and the per-severity breakdown is not
+  // carried by the source. Inventing a task label instead would assert one scoped job paying a
+  // fixed amount — the exact misrepresentation the tier table exists to prevent.
+  if (kind === "security") {
+    const scalar = typeof reward === "number" && reward > 0 ? reward : undefined;
+    const table = tiers ?? [
+      scalar !== undefined
+        ? { label: "any severity", payout: { model: "up_to", max: scalar } }
+        : { label: "any severity", payout: { model: "discretionary" } },
+    ];
+    return { ...rest, bountyKind: kind, rewardTiers: table };
+  }
+
+  // Task path: the table wins where it exists — dropping it to keep a scalar would discard
+  // grading the upstream took the trouble to publish. A reward is synthesized from the budget
+  // only when there is no table and none was supplied.
   let scalarReward: unknown;
   if (tiers === undefined) {
-    scalarReward = kind === "security" ? undefined : reward;
-    if (kind === "task" && scalarReward === undefined) {
+    scalarReward = reward;
+    if (scalarReward === undefined) {
       const { amount } = parseAmount(p.metadata?.programBudget);
       if (amount !== undefined) scalarReward = amount;
     }

@@ -53,7 +53,7 @@ Fields currently at `provisional`: the security-bounty payout surface added 2026
 `bounty.bountyKind`, `bounty.rewardTiers[]`, `bounty.severityScheme`,
 `bounty.rewardPoolStatus`, and every property of `$defs/rewardTier` and `$defs/payout`. It has
 publisher evidence and no consumer implementation, so it sits at `experimental` until one ships
-(see [`adr/0007`](../../adr/0007-security-bounty-payout-tiers.md)).
+(see [`adr/0007`](../../adr/0008-security-bounty-payout-tiers.md)).
 
 An earlier three (`serviceAgreement`, `milestones[]`, `programModel`) were promoted to `stable`
 on 2026-08-05, the maintainers accepting the M1 research round — the decision interviews, plus

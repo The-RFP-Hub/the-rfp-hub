@@ -13,7 +13,7 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 Rides the same draft-window permission argued in
 [`adr/0004`](../../adr/0004-second-draft-revision-org-swap-and-closure.md): `v1.0.0` is still
 `draft` and no external consumer has adopted it, re-verified at merge. The structural record is
-[`adr/0007`](../../adr/0007-security-bounty-payout-tiers.md).
+[`adr/0007`](../../adr/0008-security-bounty-payout-tiers.md).
 
 The `bounty` type described "a single scoped task with a stated reward". Measured against a
 public corpus of 247 live crypto bug bounty programs, **3 were representable** under that shape
@@ -75,7 +75,7 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
   publisher corpus and no shipped consumer, and the gate in `PROCESS.md` asks for both.
 - **Not modelled, deliberately**: step functions over funds at risk, TVL-conditional tiers,
   conditional pool release, per-tier vesting and multipliers. See the design rule recorded in
-  [`FIELDS.md`](./schemas/v1.0.0/FIELDS.md) and ADR-0007.
+  [`FIELDS.md`](./schemas/v1.0.0/FIELDS.md) and ADR-0008.
 - **Authoring note.** Both new conditionals are written as bare `if`/`then`/`else` rather than
   an `allOf` of branches. An `allOf` at `$def` level defeats the type generator, which emits an
   index signature in place of the interface — caught in review, recorded here so it is not
