@@ -12,6 +12,8 @@ milestone **M2**.
 | `GET` | `/v1/opportunities` | List (thin projection). Filters: `fundingType`, `status`, `ecosystem`, `category`, `organization`, `minAward`, `maxAward`, `deadlineAfter`, `deadlineBefore`, `q`; `sort` (`nextDeadlineAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
 | `GET` | `/v1/opportunities/:id` | One full Standard object (e.g. `fundingmap:1459`); `404` if not found. |
 | `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served as `application/schema+json` — semantically identical to the published file (re-serialized, so key order may differ from the raw bytes). |
+| `GET` | `/v1/feeds/opportunities.atom` | Atom 1.0 feed of the most recently published opportunities (`application/atom+xml`). `limit` (1..100, default 50), `status`. |
+| `GET` | `/v1/feeds/opportunities.rss` | The same feed as RSS 2.0 (`application/rss+xml`). |
 | `GET` | `/v1/stats` | Totals + breakdowns by funding type/status/ecosystem. |
 | `GET` | `/v1/health` | Liveness + DB readiness. |
 | `GET` | `/v1/docs` | Swagger UI (OpenAPI 3.1). |
@@ -49,6 +51,34 @@ The API is pre-adoption, so the re-cut renames are applied without a back-compat
 | `?network=` / `?tag=` | removed — the Standard dropped `networks`/`tags` (`?ecosystem=` and `?category=` remain) |
 | `/v1/stats` → `byType` | `/v1/stats` → `byFundingType` |
 
+### Feeds (Atom 1.0 and RSS 2.0)
+
+`/v1/feeds/opportunities.atom` and `/v1/feeds/opportunities.rss` are the same content in the two
+syndication formats: the newest `limit` opportunities (default 50, max 100) ordered by publication
+recency, drawn through the same public read as `/v1/opportunities`, so a pending or unlisted record
+can never surface in one. They accept exactly two parameters — `limit` and `status` — under the
+same strict contract as the list endpoint, because a feed URL is a subscription somebody saves for
+years and a typo in it has to fail loudly rather than quietly return everything. Each entry carries
+the title, the `applicationUrl` (or, for a record without one, its own `/v1/opportunities/{id}`
+URL), a plain-text summary of the description, the funding type and ecosystems as categories, and
+the operating organization as the author — `dc:creator` in RSS, whose own `<author>` element is
+defined as an email address. Every document is served with a strong, content-derived `ETag` and
+`Cache-Control: public, max-age=300, must-revalidate`, so a reader that polls with `If-None-Match`
+gets a `304` and no body; the XML is written by a serializer that escapes by construction
+(`src/modules/shared/xml.ts`), never by string concatenation.
+
+Discovery: the service-info document at `/` lists both feeds under `feeds` (relation, media type,
+href — the same three facts an HTML `<link rel="alternate">` would carry, for an API that serves no
+HTML), the endpoints are documented in Swagger UI at `/v1/docs` under the **feeds** tag, and each
+document points at itself with an atom `link rel="self"`.
+
+> **Set `PUBLIC_BASE_URL` before you publish a feed URL to anyone.** Entry identity (`atom:id`, RSS
+> `guid`) is derived from the record id: `<PUBLIC_BASE_URL>/v1/opportunities/{id}` when a base URL
+> is configured, and the stable-but-not-dereferenceable `urn:rfphub:opportunity:{id}` when it is
+> not — this API never derives its published identity from a request's `Host` header. Both forms
+> are stable, but they are not the *same* identifier, so configuring the base URL afterwards makes
+> every subscriber see the whole feed as new exactly once.
+
 ## Local development
 
 ```bash
@@ -75,7 +105,7 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `HOST` | `0.0.0.0` | HTTP bind address. |
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
-| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. |
+| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). |
 | `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
 | `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
 | `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
@@ -122,7 +152,9 @@ registration lives in `routes/<module>/index.ts`.
 - **unit** (`test/unit`, no DB): mappers round-tripped against the committed Standard examples,
   the `deadlines.ts` derivations (`nextDeadlineAt` / auto-close), the ingest normalization
   (`fundingDetails` tag stripping/reattachment, self-identification stripping), `map-program`
-  old-upstream→re-cut-Standard, query-param parsing, CSV serialization.
+  old-upstream→re-cut-Standard, query-param parsing, CSV serialization, and the feed serializer —
+  escaping, entry mapping and both document formats, every assertion made through an independent
+  strict XML parser (`test/helpers/xml.ts`) so a malformed document fails before any element check.
 - **integration** (`test/integration`, gated on `DATABASE_URL`): each endpoint via `app.inject()`
   against Postgres, with isolated self-cleaning fixtures.
 
