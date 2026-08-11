@@ -3,6 +3,28 @@
   "specVersion": "1.0.0",
   "entrySchema": "entry.schema.json",
   "registries": {
+    "bounty-asset-types": {
+      "file": "bounty-asset-types.json",
+      "count": 3,
+      "active": [
+        "blockchain_dlt",
+        "smart_contract",
+        "websites_and_applications"
+      ],
+      "deprecated": []
+    },
+    "bounty-severities": {
+      "file": "bounty-severities.json",
+      "count": 5,
+      "active": [
+        "critical",
+        "high",
+        "informational",
+        "low",
+        "medium"
+      ],
+      "deprecated": []
+    },
     "deadline-labels": {
       "file": "deadline-labels.json",
       "count": 6,

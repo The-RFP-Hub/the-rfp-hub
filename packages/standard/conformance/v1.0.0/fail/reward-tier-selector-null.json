@@ -1,0 +1,38 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:reward-tier-selector-null",
+  "fundingType": "bounty",
+  "title": "Reward tier whose only selector is an explicit null",
+  "description": "The selector fields are present-or-absent, never null: a null selector would satisfy the at-least-one-selector floor while selecting nothing. This deliberately breaks the schema's usual optional-means-nullable convention, and this case pins it.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": null,
+        "payout": {
+          "model": "fixed",
+          "amount": 1000
+        }
+      }
+    ]
+  }
+}

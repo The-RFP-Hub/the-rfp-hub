@@ -12,7 +12,9 @@ import type {
   HackathonDetails as GenHackathonDetails,
   Milestone as GenMilestone,
   Organization as GenOrganization,
+  Payout as GenPayout,
   Provenance as GenProvenance,
+  RewardTier as GenRewardTier,
   SocialLink as GenSocialLink,
   HackathonPrize,
   RFPDetails,
@@ -50,6 +52,12 @@ export type Milestone = GenMilestone;
 
 export type GrantDetails = GenGrantDetails;
 export type HackathonDetails = GenHackathonDetails;
+/** One row of a bounty's payout table. */
+export type RewardTier = GenRewardTier;
+
+/** What a reward tier pays, tagged by the model that decides which amounts apply. */
+export type Payout = GenPayout;
+
 export type Prize = HackathonPrize;
 export type TeamSize = TeamSizeRange;
 export type BountyDetails = GenBountyDetails;

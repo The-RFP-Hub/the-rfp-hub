@@ -1,0 +1,51 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-security-discretionary",
+  "fundingType": "bounty",
+  "title": "Security bounty mixing a numeric tier with discretionary tiers",
+  "description": "Exercises the 'discretionary' payout model as a published position rather than missing data: a numeric critical tier sits beside high and medium tiers the payer decides case by case. Also exercises rewardPoolStatus 'unfunded', where a program advertises a maximum with nothing escrowed behind it.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "up_to",
+          "max": 16000000
+        }
+      },
+      {
+        "severity": "high",
+        "payout": {
+          "model": "discretionary"
+        }
+      },
+      {
+        "severity": "medium",
+        "payout": {
+          "model": "discretionary"
+        }
+      }
+    ],
+    "rewardPoolStatus": "unfunded"
+  }
+}

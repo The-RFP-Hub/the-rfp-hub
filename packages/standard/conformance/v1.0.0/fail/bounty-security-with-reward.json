@@ -1,0 +1,39 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-security-with-reward",
+  "fundingType": "bounty",
+  "title": "Security bounty carrying a scalar reward",
+  "description": "A security bounty states its amounts as a graded table and is forbidden from also carrying the scalar reward. Permitting both is what lets a publisher headline the maximum, which is the misrepresentation the tier table exists to prevent.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "reward": 250000,
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "up_to",
+          "max": 250000
+        }
+      }
+    ]
+  }
+}

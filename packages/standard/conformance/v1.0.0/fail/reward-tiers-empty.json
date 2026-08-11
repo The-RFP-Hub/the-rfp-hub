@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:reward-tiers-empty",
+  "fundingType": "bounty",
+  "title": "Security bounty with an empty tier table",
+  "description": "An empty array is not a tier table — rewardTiers requires at least one entry. A program with no publishable tiers has no business carrying the field.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": []
+  }
+}

@@ -1,5 +1,11 @@
 import { amountWithoutCurrency } from "./currency.js";
-import { unregisteredDeadlineLabel, unregisteredProgramModel } from "./registry.js";
+import { payoutBoundsInverted } from "./payout.js";
+import {
+  unregisteredDeadlineLabel,
+  unregisteredProgramModel,
+  unregisteredTierAssetType,
+  unregisteredTierSeverity,
+} from "./registry.js";
 import { type Check, type Warning, isRecord } from "./types.js";
 
 /**
@@ -9,7 +15,10 @@ import { type Check, type Warning, isRecord } from "./types.js";
 export const checks: readonly Check[] = [
   unregisteredDeadlineLabel,
   unregisteredProgramModel,
+  unregisteredTierSeverity,
+  unregisteredTierAssetType,
   amountWithoutCurrency,
+  payoutBoundsInverted,
 ];
 
 /** Run every advisory check against one entry. Never throws; non-objects yield no warnings. */
@@ -24,4 +33,11 @@ export function entryPhrase(code: string): string {
 }
 
 export type { Check, Warning };
-export { amountWithoutCurrency, unregisteredDeadlineLabel, unregisteredProgramModel };
+export {
+  amountWithoutCurrency,
+  payoutBoundsInverted,
+  unregisteredDeadlineLabel,
+  unregisteredProgramModel,
+  unregisteredTierAssetType,
+  unregisteredTierSeverity,
+};

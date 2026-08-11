@@ -12,6 +12,7 @@ Other documents may supersede it. A machine-readable index of all versions is at
 | **Re-cut in place** | **2026-07-27** |
 | **Second draft revision (in place)** | **2026-08-05** — see [`adr/0004`](../../../../adr/0004-second-draft-revision-org-swap-and-closure.md) |
 | **Third draft revision (in place)** | **2026-08-05**, same day, applied after the second — see [`adr/0005`](../../../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md) |
+| **Fourth draft revision (in place)** | **2026-08-10, amended through 2026-08-11 in review** — the bounty type splits into task and security kinds — see [`adr/0007`](../../../../adr/0008-security-bounty-payout-tiers.md) |
 | **Supersedes** | none — this is the first version |
 | **Superseded by** | none — this is the current version |
 | **Feedback** | GitHub issues on [`The-RFP-Hub/the-rfp-hub`](https://github.com/The-RFP-Hub/the-rfp-hub/issues) |
@@ -24,12 +25,17 @@ may still change without a new version directory while this maturity holds. Prom
 `stable` freezes this directory: a `FROZEN` marker file lands in it and CI rejects any PR that
 edits it thereafter — see [`PROCESS.md`](../../PROCESS.md).
 
-Feature-level maturity is finer-grained than document-level maturity. No field in this version
-is currently annotated `x-stability: provisional`: the three fields that carried the marker
-(`serviceAgreement`, `milestones[]`, `programModel`) were promoted to `stable` on 2026-08-05 —
-each traces to the M1 research round (the decision interviews, and for `milestones[]` a real
-third-party RFP that required it), which the maintainers accepted as the verification the
-promotion gate asks for. The `provisional` stage itself remains available for future additions.
+Feature-level maturity is finer-grained than document-level maturity. The three fields that
+once carried `x-stability: provisional` (`serviceAgreement`, `milestones[]`, `programModel`)
+were promoted to `stable` on 2026-08-05 — each traces to the M1 research round (the decision
+interviews, and for `milestones[]` a real third-party RFP that required it), which the
+maintainers accepted as the verification the promotion gate asks for.
+
+The stage refilled on 2026-08-10. The security-bounty payout surface — `bountyKind`,
+`rewardTiers[]` and everything inside `$defs/rewardTier` and `$defs/payout`, plus
+`severityScheme` and `rewardPoolStatus` — is annotated `provisional`. It rests on a measured
+corpus of 247 real programs on the publisher side, but no consumer has shipped against it, and
+the gate asks for both. Expect the shape to move.
 
 ## The honest paragraph
 

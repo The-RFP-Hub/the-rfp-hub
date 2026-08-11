@@ -31,6 +31,8 @@ export type {
   VcFundDetails,
   RfpDetails,
   Prize,
+  RewardTier,
+  Payout,
   AmountRange,
   TeamSize,
   DetailsByFundingType,

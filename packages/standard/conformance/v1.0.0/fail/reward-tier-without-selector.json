@@ -1,0 +1,37 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:reward-tier-without-selector",
+  "fundingType": "bounty",
+  "title": "Reward tier carrying a payout but no selector",
+  "description": "A tier row needs something to be selected by — a severity, an assetType, or a label. A row carrying only a payout is an anonymous rule that nothing can be matched against, not a tier.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "payout": {
+          "model": "fixed",
+          "amount": 1000
+        }
+      }
+    ]
+  }
+}

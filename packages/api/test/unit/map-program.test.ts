@@ -93,6 +93,59 @@ describe("mapProgram", () => {
     expect(bounty.difficulty).toBeUndefined(); // invalid enum dropped
   });
 
+  it("classifies a platform bug bounty as security and synthesizes the honest tier table", () => {
+    // The real upstream never extracts a tier table, so its security bug bounties arrive as a
+    // bare scalar — indistinguishable by shape from a task listing. The domain signals decide,
+    // and the scalar becomes the one thing it actually is on such a listing: a ceiling.
+    const o = mapProgram(
+      {
+        programId: "9001",
+        type: "bounty",
+        isActive: true,
+        metadata: { title: "Lido Bug Bounty", description: "Standing bug bounty." },
+        bountyMetadata: { platform: "Immunefi", reward: { amount: 2000000, currency: "USD" } },
+      },
+      { programUrlBase: BASE },
+    );
+    expect(validateOpportunity(o).valid).toBe(true);
+    const bounty = details(o, "bounty");
+    expect(bounty.bountyKind).toBe("security");
+    expect(bounty).not.toHaveProperty("reward"); // forbidden on security — the table carries it
+    expect(bounty.rewardTiers).toEqual([
+      { label: "any severity", payout: { model: "up_to", max: 2000000 } },
+    ]);
+    expect(o.fundingInfo?.currency).toBe("USD");
+  });
+
+  it("classifies a bug bounty by name alone, and with no figure the tier is discretionary", () => {
+    const o = mapProgram(
+      {
+        programId: "9002",
+        type: "bounty",
+        isActive: true,
+        metadata: { title: "Acme Protocol Bug Bounty", description: "Report vulnerabilities." },
+        bountyMetadata: {},
+      },
+      { programUrlBase: BASE },
+    );
+    expect(validateOpportunity(o).valid).toBe(true);
+    const bounty = details(o, "bounty");
+    expect(bounty.bountyKind).toBe("security");
+    expect(bounty.rewardTiers).toEqual([
+      { label: "any severity", payout: { model: "discretionary" } },
+    ]);
+  });
+
+  it("keeps a task-board listing a task even though it is called a bounty", () => {
+    // "Messy Bounty" has 'bounty' in its name but no bug-bounty phrase and no security
+    // platform: it stays a task with its scalar reward. The word alone must not flip the kind.
+    const o = mapProgram(messyProgram, { programUrlBase: BASE });
+    const bounty = details(o, "bounty");
+    expect(bounty.bountyKind).toBe("task");
+    expect(bounty.reward).toBe(110);
+    expect(bounty).not.toHaveProperty("rewardTiers");
+  });
+
   it("hoists an upstream per-item currency into fundingInfo.currency when none is set", () => {
     // No programBudget / rfp.budget currency — the reward's own currency is the only signal.
     const o = mapProgram(

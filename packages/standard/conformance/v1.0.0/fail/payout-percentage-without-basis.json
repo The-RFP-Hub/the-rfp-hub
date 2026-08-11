@@ -1,0 +1,38 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-percentage-without-basis",
+  "fundingType": "bounty",
+  "title": "Percentage payout that does not name its basis",
+  "description": "A percentage is meaningless without naming what it is a share of: 10% of funds at risk and 10% of economic damage are different offers. The model tag deliberately no longer assumes one, so basis is required alongside percent.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "percentage",
+          "percent": 10
+        }
+      }
+    ]
+  }
+}

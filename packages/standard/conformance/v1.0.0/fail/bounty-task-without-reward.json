@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-task-without-reward",
+  "fundingType": "bounty",
+  "title": "Task bounty without a reward",
+  "description": "A task bounty pays one stated amount, so reward is required when bountyKind is 'task'.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "task",
+    "difficulty": "beginner"
+  }
+}

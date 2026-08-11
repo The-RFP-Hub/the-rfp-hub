@@ -1,0 +1,30 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-no-compensation",
+  "fundingType": "bounty",
+  "title": "Bounty carrying neither a reward nor a tier table",
+  "description": "Compensation is exactly one of reward or rewardTiers, so a bounty naming neither states no payout at all.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "task",
+    "difficulty": "beginner"
+  }
+}

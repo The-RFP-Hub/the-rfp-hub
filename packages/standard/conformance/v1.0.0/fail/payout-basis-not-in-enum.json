@@ -1,0 +1,39 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-basis-not-in-enum",
+  "fundingType": "bounty",
+  "title": "Percentage payout with an unregistered basis",
+  "description": "basis is a closed enum: value_at_risk and economic_damage are the two constructions programs attest. A new one enters by spec release, not by writing it into a document.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "percentage",
+          "percent": 10,
+          "basis": "tvl"
+        }
+      }
+    ]
+  }
+}

@@ -202,9 +202,11 @@ describe("schema file conventions", () => {
       "items",
       "uniqueItems",
       "minItems",
+      "minProperties",
       "minLength",
       "maxLength",
       "minimum",
+      "maximum",
       "pattern",
       "format",
       "examples",
@@ -237,7 +239,7 @@ describe("schema file conventions", () => {
 describe("stability annotations", () => {
   const schema = readJson(schemaPath);
 
-  it("carries no provisional fields — the 2026-08-05 promotion emptied the stage", () => {
+  it("stages the bounty payout fields as provisional, and nothing else", () => {
     const provisional: string[] = [];
     const walk = (node: unknown, path: string) => {
       if (!node || typeof node !== "object") return;
@@ -246,7 +248,11 @@ describe("stability annotations", () => {
       for (const [k, v] of Object.entries(rec)) walk(v, `${path}/${k}`);
     };
     walk(schema, "");
-    expect(provisional).toEqual([]);
+    // The 2026-08-05 promotion emptied the stage; the security-bounty payout model refilled it.
+    // These rest on a measured publisher corpus but no shipped consumer, which is the bar for
+    // promotion — see PROCESS.md. Every entry here is inside the bounty payout surface.
+    expect(provisional.every((p) => /\/\$defs\/(bounty|rewardTier|payout)\//.test(p))).toBe(true);
+    expect(provisional.length).toBeGreaterThan(0);
   });
 
   it("keeps the promoted fields present and unannotated (absence means stable)", () => {
@@ -264,8 +270,13 @@ describe("registries", () => {
 
   // `ecosystems` is an open list too, and deliberately has no registry: a registry over
   // chain names reads as an allowed-values list whatever NORMATIVE.md says.
-  it("ships the two vocabularies the standard governs by registry", () => {
-    expect(files).toEqual(["deadline-labels.json", "program-models.json"]);
+  it("ships the four vocabularies the standard governs by registry", () => {
+    expect(files).toEqual([
+      "bounty-asset-types.json",
+      "bounty-severities.json",
+      "deadline-labels.json",
+      "program-models.json",
+    ]);
   });
 
   for (const file of files) {

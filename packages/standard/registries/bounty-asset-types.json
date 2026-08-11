@@ -1,0 +1,20 @@
+{
+  "smart_contract": {
+    "description": "On-chain contract code and the state it governs. The most common in-scope class, and normally the highest-paying: a finding here reaches funds directly.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["smart contract", "smart_contract", "contracts", "on-chain"]
+  },
+  "blockchain_dlt": {
+    "description": "Node software, consensus, cryptography, bridges and other protocol-layer infrastructure, as distinct from application contracts deployed on top of it. Graded separately because the blast radius of a finding is the network rather than one deployment.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["blockchain", "blockchain_dlt", "protocol", "node", "consensus"]
+  },
+  "websites_and_applications": {
+    "description": "Front ends, hosted APIs, and off-chain application infrastructure. Graded separately because the same severity label normally pays less here than on-chain: the failure reaches users rather than principal.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["websites and applications", "web", "frontend", "dapp", "API"]
+  }
+}

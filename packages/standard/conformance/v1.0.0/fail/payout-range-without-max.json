@@ -1,0 +1,38 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-range-without-max",
+  "fundingType": "bounty",
+  "title": "Range payout with only a lower bound",
+  "description": "'range' requires both min and max. A range with one bound is an 'up_to' or an open floor, and should say so.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "high",
+        "payout": {
+          "model": "range",
+          "min": 1000
+        }
+      }
+    ]
+  }
+}

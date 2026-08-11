@@ -1,0 +1,39 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-fixed-with-range-bounds",
+  "fundingType": "bounty",
+  "title": "Fixed payout carrying range bounds",
+  "description": "Each payout model forbids the amounts belonging to the others. A 'fixed' payout carries amount alone; adding min or max means the tier is really a range and should say so.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "fixed",
+          "amount": 10000,
+          "max": 50000
+        }
+      }
+    ]
+  }
+}

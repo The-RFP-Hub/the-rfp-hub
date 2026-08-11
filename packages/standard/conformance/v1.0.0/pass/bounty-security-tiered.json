@@ -1,0 +1,72 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-security-tiered",
+  "fundingType": "bounty",
+  "title": "Security bounty with a severity-by-asset tier table",
+  "description": "Exercises bountyKind 'security': no scalar reward, a rewardTiers table graded on both axes, and three payout models — range, up_to, and percentage with an explicit basis, floor and cap. The same severity pays differently by assetType, which is why the tier row carries both.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC",
+    "budget": 500000,
+    "maxAward": 250000
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "assetType": "smart_contract",
+        "payout": {
+          "model": "percentage",
+          "percent": 10,
+          "basis": "value_at_risk",
+          "floor": 50000,
+          "cap": 250000
+        }
+      },
+      {
+        "severity": "high",
+        "assetType": "smart_contract",
+        "payout": {
+          "model": "range",
+          "min": 10000,
+          "max": 50000
+        }
+      },
+      {
+        "severity": "critical",
+        "assetType": "websites_and_applications",
+        "payout": {
+          "model": "up_to",
+          "max": 25000
+        }
+      },
+      {
+        "severity": "low",
+        "assetType": "websites_and_applications",
+        "payout": {
+          "model": "fixed",
+          "amount": 1000
+        }
+      }
+    ],
+    "severityScheme": "Immunefi Vulnerability Severity Classification System v2.3",
+    "rewardPoolStatus": "funded",
+    "platform": "Example Security Platform"
+  }
+}

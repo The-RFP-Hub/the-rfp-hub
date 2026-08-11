@@ -1,0 +1,38 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:payout-discretionary-with-amount",
+  "fundingType": "bounty",
+  "title": "Discretionary payout carrying an amount",
+  "description": "The payout model is an exclusive discriminator, not a hint: 'discretionary' means the payer names no figure, so carrying an amount contradicts the model. A tier with a figure uses fixed, range or up_to.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "high",
+        "payout": {
+          "model": "discretionary",
+          "amount": 999999
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-task-reward-tiers",
+  "fundingType": "bounty",
+  "title": "Task bounty paying a graded placement ladder",
+  "description": "Exercises rewardTiers on bountyKind 'task': the table is required for a security bounty and is the alternative to the scalar reward on a task bounty that grades its payout. Compensation is exactly one of the two, so a graded task carries the table and no scalar — a reward beside the ladder leaves no way to tell whether it means the winner's payout, a base, or the total purse. Tiers here key on label, the selector for a grading axis severity and assetType do not describe.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "task",
+    "rewardTiers": [
+      {
+        "label": "1st place",
+        "payout": {
+          "model": "fixed",
+          "amount": 3000
+        }
+      },
+      {
+        "label": "2nd place",
+        "payout": {
+          "model": "fixed",
+          "amount": 1500
+        }
+      },
+      {
+        "label": "3rd place",
+        "payout": {
+          "model": "fixed",
+          "amount": 500
+        }
+      }
+    ],
+    "skills": [
+      "Design"
+    ],
+    "platform": "Example Bounty Board"
+  }
+}

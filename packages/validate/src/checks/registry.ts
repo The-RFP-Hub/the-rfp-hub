@@ -53,3 +53,51 @@ export const unregisteredProgramModel: Check = {
     ];
   },
 };
+
+/**
+ * A reward tier's `severity` and `assetType` are open strings for the same reason
+ * `programModel` is: the observed vocabularies come from one platform, and a closed enum would
+ * write that platform's taxonomy into the standard. The registries keep the common values
+ * comparable — which is the whole point of grading a payout, since "which programs pay more
+ * than $X for a critical" is unanswerable if two publishers spell 'critical' differently.
+ */
+const tierVocabulary = (
+  code: string,
+  entryPhrase: string,
+  field: "severity" | "assetType",
+  registry: "bounty-severities" | "bounty-asset-types",
+): Check => ({
+  code,
+  entryPhrase,
+  run(entry) {
+    const details = entry.fundingDetails;
+    if (!isRecord(details) || !Array.isArray(details.rewardTiers)) return [];
+    const out: Warning[] = [];
+    details.rewardTiers.forEach((tier, i) => {
+      if (!isRecord(tier)) return;
+      const value = tier[field];
+      if (typeof value !== "string" || value.length === 0) return;
+      if (isRegistered(registry, value)) return;
+      out.push({
+        code,
+        instancePath: `/fundingDetails/rewardTiers/${i}/${field}`,
+        message: `reward tier ${field} '${value}' is not registered; conventional values are ${shortList(registry)}`,
+      });
+    });
+    return out;
+  },
+});
+
+export const unregisteredTierSeverity = tierVocabulary(
+  "unregistered-tier-severity",
+  "use an unregistered reward-tier severity",
+  "severity",
+  "bounty-severities",
+);
+
+export const unregisteredTierAssetType = tierVocabulary(
+  "unregistered-tier-asset-type",
+  "use an unregistered reward-tier assetType",
+  "assetType",
+  "bounty-asset-types",
+);

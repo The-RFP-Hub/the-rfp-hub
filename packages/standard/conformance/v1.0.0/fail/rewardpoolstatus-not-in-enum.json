@@ -1,0 +1,39 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:rewardpoolstatus-not-in-enum",
+  "fundingType": "bounty",
+  "title": "Bounty with an unregistered rewardPoolStatus",
+  "description": "rewardPoolStatus is a closed enum of funded, unfunded and unknown. A program that cannot say uses 'unknown', which exists precisely so absence of information does not have to masquerade as a value.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "up_to",
+          "max": 50000
+        }
+      }
+    ],
+    "rewardPoolStatus": "escrowed"
+  }
+}

@@ -68,7 +68,8 @@ own: operating = who actually runs the process = the entity consumers need first
 | `fundingInfo.allocated` (committed to date) | — | — |
 | `fundingInfo.minAward` / `maxAward` | — | — |
 | `milestones[]` | — | — (no Grant Pool equivalent) |
-| `fundingDetails.reward` (bounty), `fundingDetails.prizes[].amount` (hackathon), `fundingDetails.funding` (accelerator) | `amount` (loosely) | — |
+| `fundingDetails.reward` (task bounty), `fundingDetails.prizes[].amount` (hackathon), `fundingDetails.funding` (accelerator) | `amount` (loosely) | — |
+| `fundingDetails.rewardTiers[].payout` (security bounty) | — | — (no tiered-award concept in either standard) |
 
 **Denomination.** Since the 2026-08-05 currency unification
 ([`adr/0006`](../../../../adr/0006-document-wide-single-currency.md)), the detail amounts in the
@@ -153,7 +154,14 @@ theirs, not ours.
 ### Detail payloads beyond both standards
 
 The `hackathon`, `bounty`, `accelerator` and `vc_fund` payloads of `fundingDetails` have
-**no equivalent** in either standard.
+**no equivalent** in either standard. The security-bounty payout table added on 2026-08-10 is
+the widest gap of the four: DAOIP-5 knows bounties only as the `grantFundingMechanism` enum
+value `"Bounties"`, a label with no structure beneath it, and schema.org can express a single
+`MonetaryAmount` with `minValue`/`maxValue` but has no way to say that an award is graded by
+severity or by class of asset. An exporter emits `grantFundingMechanism: "Bounties"` for
+DAOIP-5 and, for schema.org, at best one `MonetaryAmount` per tier with the grading discarded.
+No open standard models severity-tiered rewards; the vocabularies here harmonise the de facto
+platform schemas instead.
 DAOIP-5 models grants; schema.org models `Grant`. Everything inside those four shapes —
 tracks, prizes, team sizes, check sizes, investment stages, equity, batch size — is an RFP Hub
 extension and does not round-trip. (The third 2026-08-05 revision moved these shapes under the
@@ -217,6 +225,13 @@ not domain fields; they have no crosswalk row.
   under their unchanged IRIs, the per-type `currency` keys are gone, and
   `fundingInfo.currency` (`schema:currency`) is now the document's only currency site — a
   schema.org or DAOIP-5 exporter pairs it with each amount.
+
+  The **2026-08-10 fourth draft revision** added the `bountyKind` discriminator and the
+  security-bounty payout table. No existing term assignment moved. The new names
+  (`rewardTiers`, `bountyKind`, `severityScheme`, `rewardPoolStatus`) take context terms in
+  the standard's own vocabulary because neither schema.org nor DAOIP-5 offers a target, and
+  `reward` became conditional rather than unconditional — a task bounty still carries it under
+  its unchanged IRI, a security bounty carries the table instead.
 
   See the [field mapping tables](../../CHANGELOG.md#field-mapping-old--new) for the full
   field-by-field record, and

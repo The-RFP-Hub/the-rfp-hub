@@ -9,7 +9,9 @@ import { type Check, type Warning, isRecord } from "./types.js";
  *
  * One warning fires per offending site: the envelope's own amounts (budget, allocated,
  * minAward, maxAward), milestones[].amount, and the per-type fundingDetails amounts —
- * bounty reward, accelerator funding, hackathon prize amounts, and vc_fund checkSize bounds.
+ * bounty reward, every bounty rewardTiers[].payout bound, accelerator funding, hackathon prize
+ * amounts, and vc_fund checkSize bounds. `percent` is deliberately not flagged: it is a share,
+ * not a monetary amount, and the currency rule does not reach it.
  */
 export const amountWithoutCurrency: Check = {
   code: "amount-without-currency",
@@ -38,6 +40,18 @@ export const amountWithoutCurrency: Check = {
     const details = isRecord(entry.fundingDetails) ? entry.fundingDetails : undefined;
     if (details) {
       flag("bounty reward", "/fundingDetails/reward", details.reward);
+      if (Array.isArray(details.rewardTiers)) {
+        details.rewardTiers.forEach((tier, i) => {
+          if (!isRecord(tier) || !isRecord(tier.payout)) return;
+          for (const bound of ["amount", "min", "max", "floor", "cap"] as const) {
+            flag(
+              `reward tier payout.${bound}`,
+              `/fundingDetails/rewardTiers/${i}/payout/${bound}`,
+              tier.payout[bound],
+            );
+          }
+        });
+      }
       flag("accelerator funding", "/fundingDetails/funding", details.funding);
       if (Array.isArray(details.prizes)) {
         details.prizes.forEach((prize, i) => {

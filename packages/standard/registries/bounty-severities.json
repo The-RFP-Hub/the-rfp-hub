@@ -1,0 +1,32 @@
+{
+  "critical": {
+    "description": "The most severe band a program publishes, reserved for findings that put principal directly at risk — theft or permanent loss of funds, protocol insolvency, or a break of the system's core guarantee. Always the top-paying tier where it appears.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["critical", "Critical", "P1"]
+  },
+  "high": {
+    "description": "Serious findings short of direct loss of principal — temporary freezing of funds, theft of yield or fees, or a failure that requires an unusual precondition to reach.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["high", "High", "P2"]
+  },
+  "medium": {
+    "description": "Findings that degrade the system without putting funds at risk — griefing, denial of service against a non-critical path, or contract state that can be made inconsistent without profit.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["medium", "Medium", "P3"]
+  },
+  "low": {
+    "description": "Findings a program pays for but does not treat as a threat to the system — minor correctness issues, and failures whose impact is limited to the reporter.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["low", "Low", "P4"]
+  },
+  "informational": {
+    "description": "Findings a program acknowledges without a monetary tier, or pays only at its discretion — code quality, documentation errors, and best-practice deviations. Registered because programs publish it as a row in the same table, often paired with a discretionary payout.",
+    "status": "active",
+    "since": "1.0.0",
+    "examples": ["informational", "Informational", "none", "P5"]
+  }
+}

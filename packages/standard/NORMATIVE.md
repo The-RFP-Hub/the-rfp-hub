@@ -10,7 +10,7 @@ These define the standard. A claim of conformance is a claim about these files.
 | Artifact | What it governs |
 |---|---|
 | [`schemas/v1.0.0/opportunity.schema.json`](./schemas/v1.0.0/opportunity.schema.json) | **The definition.** A document conforms to v1.0.0 when it validates against this file. |
-| [`registries/`](./registries) — the **registered values** | The conventional values of the two open vocabularies the standard governs by registry: `deadlines[].label` and `fundingDetails.programModel` (the grant payload). See the important qualification below. |
+| [`registries/`](./registries) — the **registered values** | The conventional values of the four open vocabularies the standard governs by registry: `deadlines[].label`, `fundingDetails.programModel` (the grant payload), and `severity` and `assetType` on a bounty reward tier. See the important qualification below. |
 | [`conformance/v1.0.0/`](./conformance/v1.0.0) | The published pass/fail cases. An implementation is conformant with respect to the suite when it accepts everything in `pass/` and rejects everything in `fail/`. |
 | [`spec.config.json`](./spec.config.json) | The spec's identity — version, `$id`, vocabulary IRI, maturity. |
 | [`schemas/v1.0.0/context.jsonld`](./schemas/v1.0.0/context.jsonld) | The term IRIs a document expands to when read as linked data. |
@@ -24,10 +24,10 @@ the one narrow exception at the registry level: a whole registry may be retired 
 governing spec version is `draft`, which is how the former `eligibility-keys` registry left
 when `eligibility` became free text (2026-08-05, ADR-0004).
 
-**Why only two.** `ecosystems` is an open list too, and deliberately has **no** registry. That
+**Why not more.** `ecosystems` is an open list too, and deliberately has **no** registry. That
 distinction above is a fine one, and a registry over a list of chain names would be read as an
 allowed-values list no matter how this document words it — while also putting a review step in
-front of a newly launched chain for no interoperability gain. The two vocabularies that *are*
+front of a newly launched chain for no interoperability gain. The vocabularies that *are*
 registry-governed are the ones where two publishers writing different strings for the same
 concept produce genuinely uncomparable data.
 

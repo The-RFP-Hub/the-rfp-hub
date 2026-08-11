@@ -1,0 +1,35 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:reward-tier-without-payout",
+  "fundingType": "bounty",
+  "title": "Reward tier with no payout",
+  "description": "A tier that names no amount and no payout model is not a tier, so payout is the one required part of a rewardTiers entry. A tier the payer decides case by case uses the 'discretionary' model rather than omitting payout.",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "assetType": "smart_contract"
+      }
+    ]
+  }
+}

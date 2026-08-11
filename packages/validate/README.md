@@ -42,7 +42,10 @@ deliberately leaves open, and never make a document non-conformant on their own:
 |---|---|
 | `unregistered-deadline-label` | a `deadlines[].label` is not in `registries/deadline-labels.json` |
 | `unregistered-program-model` | `fundingDetails.programModel` is not in `registries/program-models.json` |
-| `amount-without-currency` | a monetary amount — an envelope amount, a `milestones[].amount`, or a `fundingDetails` amount (bounty reward, prize amount, accelerator funding, checkSize bound) — is present with no `fundingInfo.currency` to denominate it |
+| `unregistered-tier-severity` | a bounty `rewardTiers[].severity` is not in `registries/bounty-severities.json` |
+| `unregistered-tier-asset-type` | a bounty `rewardTiers[].assetType` is not in `registries/bounty-asset-types.json` |
+| `payout-bounds-inverted` | a reward tier's payout bounds cross — `min` above `max`, or `floor` above `cap` — describing a tier nobody can be paid under; JSON Schema cannot compare sibling values, so the advisory tier is the only home this rule has |
+| `amount-without-currency` | a monetary amount — an envelope amount, a `milestones[].amount`, or a `fundingDetails` amount (bounty reward, reward-tier payout bound, prize amount, accelerator funding, checkSize bound) — is present with no `fundingInfo.currency` to denominate it |
 
 The split is the point. A closed enum built from one publisher's vocabulary would force every
 other publisher into it, so those fields stay open — and the registries would be documentation
