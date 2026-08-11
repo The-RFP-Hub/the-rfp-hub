@@ -3829,6 +3829,3489 @@
           "The proposal is cross-posted to the governance forum thread so it can be discussed in public."
         ]
       }
+    },
+    {
+      "programId": "9101",
+      "type": "grant",
+      "chainID": null,
+      "name": "Ecosystem Support Program (ESP)",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://esp.ethereum.foundation/applicants",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Ecosystem Support Program (ESP)",
+        "description": "Rolling grants program funding open-source public goods for Ethereum via 'Wishlist' items (open problems) and 'RFP' items (defined deliverables); applicants submit proposals reviewed by the Ethereum Foundation's Grants Management team.\n\nThe live program page confirms a rolling six-step application process — browse the Wishlist or the RFP list, apply, Grants Management review, decision within three to six weeks — with no fixed deadline. The Foundation reported $44.4M distributed across 677 projects in 2024.",
+        "shortDescription": "Rolling Ethereum Foundation grants for open-source public goods, applied for against a public Wishlist or a defined RFP.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Public Goods",
+          "Research"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Ethereum Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://esp.ethereum.foundation/",
+        "socialLinks": {
+          "website": "https://esp.ethereum.foundation/",
+          "grantsSite": "https://esp.ethereum.foundation/"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9102",
+      "type": "grant",
+      "chainID": null,
+      "name": "Aave Grants",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://aavegrants.org/apply-for-a-grant/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Aave Grants",
+        "description": "Rolling grants for developers building tools, integrations, and public goods around the Aave protocol, with no cohorts or fixed deadlines. The program is run by Aave Grants DAO, which describes itself as a community grants program.\n\nThe live page states: 'We accept rolling applications throughout the year on our website… no cohorts or application deadlines'; grantees are announced monthly.",
+        "shortDescription": "Rolling grants for tools, integrations and public goods around the Aave protocol; grantees announced monthly.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "DeFi",
+          "Developer Tools"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Aave Grants DAO"
+        ],
+        "programBudget": "",
+        "website": "https://aavegrants.org/",
+        "socialLinks": {
+          "website": "https://aavegrants.org/",
+          "grantsSite": "https://aavegrants.org/"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive",
+        "recurring": false
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9103",
+      "type": "grant",
+      "chainID": null,
+      "name": "Lido Ecosystem Grants Organisation (LEGO)",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://lido.fi/lego",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Lido Ecosystem Grants Organisation (LEGO)",
+        "description": "Tiered rolling grants program funding individuals and projects that benefit the Lido protocol and the broader Ethereum staking ecosystem, from small one-member approvals up to full DAO-vote grants.\n\nThe live page lists a four-tier funding table — up to $1,000 (Sandgrain), up to $10,000 (Pebble), up to $100,000 (Boulder), and $100,000 or more (Mountain, decided by DAO vote) — and a rolling process: pitch a LEGO member on Telegram, then committee review on the Lido research forum. The tier a request lands in determines who approves it, not when it can be submitted.",
+        "shortDescription": "Tiered rolling grants for work that benefits Lido and Ethereum staking, from small committee approvals up to DAO-vote grants.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Staking",
+          "Public Goods"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Lido"
+        ],
+        "programBudget": "",
+        "website": "https://lido.fi/lego",
+        "socialLinks": {
+          "website": "https://lido.fi/lego"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9104",
+      "type": "grant",
+      "chainID": null,
+      "name": "SSV Grants Program",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://ssvnetwork.notion.site/Grants-Program-100708191b0048698bd734fb98642db7",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "SSV Grants Program",
+        "description": "Community-led $5M grants program funding teams building decentralized staking applications, services, and tooling on the ssv.network protocol, reviewed on a rolling basis.\n\nThe live page carries the headline '$5M Grants Program' with an 'Apply for a grant' call to action linking to the application form; no deadline is listed.",
+        "shortDescription": "Community-led $5M program funding decentralized staking apps, services and tooling on ssv.network, reviewed on a rolling basis.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Staking",
+          "Developer Tools"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "SSV Network",
+          "SSV Labs"
+        ],
+        "programBudget": "5000000 USD",
+        "website": "https://ssv.network/get-funded",
+        "socialLinks": {
+          "website": "https://ssv.network/get-funded",
+          "grantsSite": "https://ssv.network/get-funded"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9105",
+      "type": "grant",
+      "chainID": null,
+      "name": "Nouns DAO Small Grants",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://www.nouns.center/funding/smallgrants",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Nouns DAO Small Grants",
+        "description": "Flexible, community-run pool funding small and time-sensitive projects — tech, art, community, marketing, charity — that proliferate the Nouns brand, funded upfront or retroactively.\n\nThe live page confirms a rolling process: post on Discourse with the prefix 'Small Grants:', then share it in the Discord #grants-and-retro-funding channel. There are no deadlines. Typical funding runs 0.1-10 ETH, with larger retroactive grants seen up to roughly 27 ETH.",
+        "shortDescription": "Rolling, community-run pool for small and time-sensitive Nouns projects, funded upfront or retroactively.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Community",
+          "Public Goods"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Nouns DAO"
+        ],
+        "programBudget": "",
+        "website": "https://www.nouns.center/funding/smallgrants",
+        "socialLinks": {
+          "website": "https://www.nouns.center/funding/smallgrants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanisms": [
+          "proactive",
+          "retroactive"
+        ]
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9106",
+      "type": "grant",
+      "chainID": null,
+      "name": "MetaMask Grants Program",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://metamaskgrants.org/apply-for-a-grant",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "MetaMask Grants Program",
+        "description": "Employee-led, Consensys-funded rolling grants program for external developers building impactful tools and experiences within the MetaMask ecosystem, with roughly $2.4M committed annually across the program.\n\nThe live application page confirms that external developers are welcomed to apply via a submission form. Intake is rolling and there is no deadline, but no review timeline is guaranteed.",
+        "shortDescription": "Employee-led, Consensys-funded rolling grants for external developers building in the MetaMask ecosystem.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Developer Tools",
+          "Wallets"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "MetaMask Grants DAO",
+          "Consensys"
+        ],
+        "programBudget": "",
+        "website": "https://metamaskgrants.org/apply-for-a-grant",
+        "socialLinks": {
+          "website": "https://metamaskgrants.org/apply-for-a-grant"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9107",
+      "type": "grant",
+      "chainID": null,
+      "name": "Unichain Grants",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://share.hsforms.com/18Kv3hTvDSt-x1wK9va0OYwsdca9",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Unichain Grants",
+        "description": "Rolling grants funding protocol innovation, developer tooling, DeFi apps, research, governance, and security work across Uniswap v4 and Unichain, including retroactive grants for projects with demonstrated traction.\n\nThe live grants portfolio page links directly to an active application form. Award sizes are published as a range rather than a fixed figure: roughly $7,500 to $1,000,000 and above, depending on the category.",
+        "shortDescription": "Rolling Uniswap Foundation grants across Uniswap v4 and Unichain — protocol, tooling, apps, research, governance and security.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "DeFi",
+          "Developer Tools",
+          "Research"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Uniswap Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://www.uniswapfoundation.org/grants",
+        "socialLinks": {
+          "website": "https://www.uniswapfoundation.org/grants",
+          "grantsSite": "https://www.uniswapfoundation.org/grants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanisms": [
+          "proactive",
+          "retroactive"
+        ]
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9108",
+      "type": "grant",
+      "chainID": null,
+      "name": "Safe Ecosystem Foundation Grants",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://safefoundation.org/grants",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Safe Ecosystem Foundation Grants",
+        "description": "Rolling, unsolicited grant proposals funding developers building smart accounts, self-custody infrastructure, and Safe-integrated applications.\n\nThe live page states that 'The Foundation accepts unsolicited grant proposals on a rolling basis' and promises an initial reply within four weeks. Contact is by email rather than a web form, so the linked page is the program's own instructions rather than a submission form.",
+        "shortDescription": "Rolling, unsolicited grant proposals for smart accounts, self-custody infrastructure and Safe-integrated applications.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Smart Accounts",
+          "Infrastructure"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Safe Ecosystem Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://safefoundation.org/grants",
+        "socialLinks": {
+          "website": "https://safefoundation.org/grants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9109",
+      "type": "grant",
+      "chainID": null,
+      "name": "Arbitrum Audit Program",
+      "isActive": true,
+      "deadline": "2026-08-31T23:59:00.000Z",
+      "submissionUrl": "https://tally.so/r/3xzEzv?program=aap&ref=blog.arbitrum.foundation",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Arbitrum Audit Program",
+        "description": "A $10M ARB fund subsidizing third-party smart contract audits for early-stage and operational projects building on Arbitrum, reviewed on a rolling basis by the Arbitrum Audit Committee. Approved projects must keep audited code exclusive to Arbitrum for a specified period.\n\nThe announcement post confirms the program is live with rolling application review, and the Arbitrum Foundation's own grants index still lists it as Active. The $10,000,000 in ARB is committed over twelve months, and the program was listed with an August 31, 2026 end date, so that date is the close of the current fund rather than a per-application cut-off.",
+        "shortDescription": "Rolling $10M ARB fund subsidizing third-party smart contract audits for projects building on Arbitrum.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Audits"
+        ],
+        "ecosystems": [
+          "Arbitrum",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Arbitrum Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://blog.arbitrum.foundation/arbitrums-10m-audit-program-is-live-apply-to-secure-your-smart-contracts/",
+        "socialLinks": {
+          "website": "https://blog.arbitrum.foundation/arbitrums-10m-audit-program-is-live-apply-to-secure-your-smart-contracts/",
+          "grantsSite": "https://arbitrum.foundation/grants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9110",
+      "type": "grant",
+      "chainID": null,
+      "name": "Alchemy x Arbitrum Grant",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://www.alchemy.com/arbitrum-grant-contact",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Alchemy x Arbitrum Grant",
+        "description": "Alchemy platform credits (up to $500K per team) for builders launching Arbitrum Orbit chains, funded from a $10M pool with roughly $1M remaining, awarded first-come first-served.\n\nThe live page confirms 'first come, first serve' rolling acceptance and states the remaining pool balance. The award is infrastructure credit rather than cash, so the per-team figure is recorded here in words rather than as a cash grant size.",
+        "shortDescription": "Up to $500K in Alchemy infrastructure credits per team for builders launching Arbitrum Orbit chains, first-come first-served.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Infrastructure",
+          "Developer Tools"
+        ],
+        "ecosystems": [
+          "Arbitrum",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Alchemy"
+        ],
+        "programBudget": "",
+        "website": "https://www.alchemy.com/arbitrum-grant",
+        "socialLinks": {
+          "website": "https://www.alchemy.com/arbitrum-grant",
+          "grantsSite": "https://www.alchemy.com/arbitrum-grant"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9111",
+      "type": "grant",
+      "chainID": null,
+      "name": "Starknet Seed Grants",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://tinyurl.com/starknet-seed-grants",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Starknet Seed Grants",
+        "description": "Non-dilutive early-stage funding of up to $25,000 in STRK for teams with an MVP or proof of concept building with Starknet tools, reviewed on a rolling basis.\n\nThe official Starknet Foundation page states ongoing rolling applications with a response time of roughly one month, and links to a live application form.",
+        "shortDescription": "Non-dilutive early-stage funding up to $25,000 in STRK for teams with an MVP building with Starknet tools.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Developer Tools"
+        ],
+        "ecosystems": [
+          "Starknet",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Starknet Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://www.starknet.io/grants/seed-grants",
+        "socialLinks": {
+          "website": "https://www.starknet.io/grants/seed-grants",
+          "grantsSite": "https://www.starknet.io/grants/seed-grants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9112",
+      "type": "grant",
+      "chainID": null,
+      "name": "Starknet Growth Grants",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://tinyurl.com/starknet-growth-grants",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Starknet Growth Grants",
+        "description": "Non-dilutive funding of up to $1M for later-stage Starknet projects with a compelling product and significant onchain traction, across categories like Innovation, Ecosystem Integration, and Bitcoin Builder.\n\nThe official Starknet Foundation page confirms rolling review with a response time of roughly one month, and links to a live application form.",
+        "shortDescription": "Non-dilutive funding up to $1M for later-stage Starknet projects with a product and significant onchain traction.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Growth",
+          "DeFi"
+        ],
+        "ecosystems": [
+          "Starknet",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Starknet Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://www.starknet.io/grants/growth-grants",
+        "socialLinks": {
+          "website": "https://www.starknet.io/grants/growth-grants",
+          "grantsSite": "https://www.starknet.io/grants/growth-grants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9113",
+      "type": "accelerator",
+      "chainID": null,
+      "name": "Starknet Accelerator (Denarii Labs)",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://airtable.com/app249gcLcaJF4qvj/page3HaBQAelT3whO/form",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Starknet Accelerator (Denarii Labs)",
+        "description": "A 12-week remote accelerator for Starknet builders offering a $100K investment with potential follow-on funding up to $200K based on progress, with the next cohort starting Q3 2026.\n\nThe program page displays 'Applications Open' and 'Apply Now' banners alongside the Q3 2026 cohort start date, and the application form is live.",
+        "shortDescription": "12-week remote accelerator for Starknet builders: $100K investment, with up to $200K follow-on based on progress.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Accelerator"
+        ],
+        "ecosystems": [
+          "Starknet",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Denarii Labs"
+        ],
+        "programBudget": "",
+        "website": "https://www.denariilabs.xyz/accelerators/starknet",
+        "socialLinks": {
+          "website": "https://www.denariilabs.xyz/accelerators/starknet",
+          "grantsSite": "https://www.denariilabs.xyz/accelerators/starknet"
+        }
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": {
+        "programDurationWeeks": 12,
+        "funding": {
+          "amount": 100000,
+          "currency": "USD"
+        },
+        "location": "Remote",
+        "online": true
+      },
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9114",
+      "type": "grant",
+      "chainID": null,
+      "name": "World Foundation Spark Track Mini App Grant",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://airtable.com/appftNMpv819abvTc/pagTUNYDigGHZqQ8o/form",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "World Foundation Spark Track Mini App Grant",
+        "description": "Rolling grant track for early-stage builders with a working prototype of a Mini App on World Chain / World App, part of the Foundation's 50M WLD grants pool.\n\nThe live World Foundation grants page confirms rolling acceptance with no set deadline, and the application form is live. Note that the program is restricted for US residents and residents of certain other jurisdictions.",
+        "shortDescription": "Rolling grants for early-stage builders with a working Mini App prototype on World Chain, from the 50M WLD grants pool.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Mini Apps",
+          "Consumer"
+        ],
+        "ecosystems": [
+          "World Chain",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "World Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://world.org/grants",
+        "socialLinks": {
+          "website": "https://world.org/grants",
+          "grantsSite": "https://world.org/grants"
+        }
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9115",
+      "type": "grant",
+      "chainID": null,
+      "name": "World Foundation Scale Track Mini App Grant",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://airtable.com/appftNMpv819abvTc/pagctS69DzXGPR0BR/form",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "World Foundation Scale Track Mini App Grant",
+        "description": "Rolling growth-capital grant track for live Mini Apps on World Chain / World App with active users, part of the Foundation's 50M WLD grants pool.\n\nThe live World Foundation grants page confirms rolling acceptance with no set deadline, and the application form is live. Note that the program is restricted for US residents and residents of certain other jurisdictions.",
+        "shortDescription": "Rolling growth capital for live Mini Apps on World Chain with active users, from the 50M WLD grants pool.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Mini Apps",
+          "Growth"
+        ],
+        "ecosystems": [
+          "World Chain",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "World Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://world.org/grants",
+        "socialLinks": {
+          "website": "https://world.org/grants",
+          "grantsSite": "https://world.org/grants"
+        }
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9116",
+      "type": "grant",
+      "chainID": null,
+      "name": "Taiko Grants (2025 Grant Fund)",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://airtable.com/appiHMc0glvIWmuan/shrvmPOFrTleLFQJd",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Taiko Grants (2025 Grant Fund)",
+        "description": "Ongoing grant fund of $25M supporting developers, researchers, and builders across DeFi, AI, RWA, SocialFi, and gaming on Taiko, reviewed continuously by the Grants Council.\n\nThe live grant-program page states applications are open with continuous Grants Council review and no fixed deadline, and the application form is live. The page's announcement language dates to the fund's original 2025 launch, so its cycle numbering should be treated as approximate.",
+        "shortDescription": "Ongoing $25M Taiko grant fund for DeFi, AI, RWA, SocialFi and gaming work, reviewed continuously by the Grants Council.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "DeFi",
+          "Gaming",
+          "AI"
+        ],
+        "ecosystems": [
+          "Taiko",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Taiko"
+        ],
+        "programBudget": "25000000 USD",
+        "website": "https://taiko.xyz/grant-program",
+        "socialLinks": {
+          "website": "https://taiko.xyz/grant-program",
+          "grantsSite": "https://taiko.xyz/grant-program"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9117",
+      "type": "accelerator",
+      "chainID": null,
+      "name": "Base Ecosystem Fund",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://base.org/ecosystem-fund/apply",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Base Ecosystem Fund",
+        "description": "Base's strategic investment arm backing pre-seed and seed-stage startups building on Base, offering hands-on ecosystem support and Coinbase Ventures access alongside capital.\n\nThe live Base page describes the fund as actively investing and carries a dedicated apply link. Budget and deadline specifics are not disclosed publicly, so no figure is recorded here.",
+        "shortDescription": "Base's strategic investment arm for pre-seed and seed startups on Base, pairing capital with hands-on ecosystem support.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Accelerator",
+          "Early Stage"
+        ],
+        "ecosystems": [
+          "Base",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Base",
+          "Coinbase Ventures"
+        ],
+        "programBudget": "",
+        "website": "https://www.base.org/ecosystem-fund",
+        "socialLinks": {
+          "website": "https://www.base.org/ecosystem-fund",
+          "grantsSite": "https://www.base.org/ecosystem-fund"
+        }
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": {
+        "equity": "Equity investment; terms not publicly disclosed"
+      },
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9118",
+      "type": "grant",
+      "chainID": null,
+      "name": "Polymarket Builders Program",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://builders.polymarket.com",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Polymarket Builders Program",
+        "description": "Rolling grants program (over $2.5M available) for developers building apps, tools, and trading experiments on top of Polymarket, a Polygon-based prediction market protocol, plus weekly volume-based builder rewards.\n\nThe live page states 'Over $2.5M in grants available. Apply now', carries an in-page application form asking for product name, website and contact, and sets no fixed deadline.",
+        "shortDescription": "Rolling grants from a $2.5M+ pool for apps, tools and trading experiments built on Polymarket, plus weekly builder rewards.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Prediction Markets",
+          "Developer Tools"
+        ],
+        "ecosystems": [
+          "Polygon",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Polymarket"
+        ],
+        "programBudget": "",
+        "website": "https://builders.polymarket.com",
+        "socialLinks": {
+          "website": "https://builders.polymarket.com"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9119",
+      "type": "hackathon",
+      "chainID": null,
+      "name": "ETHOnline 2026",
+      "isActive": true,
+      "deadline": "2026-09-13T16:00:00.000Z",
+      "submissionUrl": "https://ethglobal.com/events/ethonline2026/apply",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ETHOnline 2026",
+        "description": "ETHGlobal's flagship async online hackathon, open to builders worldwide across multiple sponsor tracks and prize pools spanning the Ethereum ecosystem.\n\nThe events index lists ETHOnline 2026 as an 'Async Hackathon' with status 'Apply to Attend', running September 4-16, 2026. The event's own data gives a sign-up deadline of 2026-09-06T17:00Z and a submission deadline of 2026-09-13T16:00Z. The prize pool was not yet published when this record was written, so no prize figures are recorded.",
+        "shortDescription": "ETHGlobal's flagship async online Ethereum hackathon, open worldwide, running September 4-16, 2026.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Hackathon"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "ETHGlobal"
+        ],
+        "programBudget": "",
+        "website": "https://ethglobal.com/events/ethonline2026/apply",
+        "socialLinks": {
+          "website": "https://ethglobal.com/events/ethonline2026/apply"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": {
+        "location": "Online",
+        "online": true,
+        "registrationDeadline": "2026-09-06T17:00:00.000Z",
+        "submissionDeadline": "2026-09-13T16:00:00.000Z",
+        "startDate": "2026-09-04T05:00:00.000Z",
+        "endDate": "2026-09-16T05:00:00.000Z"
+      },
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9120",
+      "type": "hackathon",
+      "chainID": null,
+      "name": "ETHGlobal Tokyo 2026",
+      "isActive": true,
+      "deadline": "2026-09-27T00:00:35.194Z",
+      "submissionUrl": "https://ethglobal.com/events/tokyo2026/apply",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ETHGlobal Tokyo 2026",
+        "description": "In-person ETHGlobal hackathon in Tokyo, Japan, bringing together developers to build on Ethereum and partner protocols over a weekend.\n\nThe events index lists ETHGlobal Tokyo 2026 as an 'IRL Hackathon' with status 'Apply to Attend', running September 25-27, 2026. The event's own data gives a sign-up deadline of 2026-09-23T14:59Z and a submission deadline of 2026-09-27T00:00Z. The prize pool was not yet published when this record was written.",
+        "shortDescription": "In-person ETHGlobal hackathon in Tokyo, September 25-27, 2026, building on Ethereum and partner protocols.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Hackathon"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "ETHGlobal"
+        ],
+        "programBudget": "",
+        "website": "https://ethglobal.com/events/tokyo2026/apply",
+        "socialLinks": {
+          "website": "https://ethglobal.com/events/tokyo2026/apply"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": {
+        "location": "Tokyo, Japan",
+        "online": false,
+        "registrationDeadline": "2026-09-23T14:59:06.202Z",
+        "submissionDeadline": "2026-09-27T00:00:35.194Z",
+        "startDate": "2026-09-25T00:00:00.000Z",
+        "endDate": "2026-09-27T00:00:00.000Z"
+      },
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9121",
+      "type": "hackathon",
+      "chainID": null,
+      "name": "ETHGlobal Mumbai",
+      "isActive": true,
+      "deadline": "2026-11-08T03:30:00.000Z",
+      "submissionUrl": "https://ethglobal.com/events/mumbai/apply",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ETHGlobal Mumbai",
+        "description": "In-person ETHGlobal hackathon in Mumbai, India, part of ETHGlobal's global IRL hackathon circuit with multiple sponsor prize tracks.\n\nThe events index lists ETHGlobal Mumbai as an 'IRL Hackathon' with status 'Apply to Attend', running November 6-8, 2026. The event's own data gives a sign-up deadline of 2026-11-03T18:29Z and a submission deadline of 2026-11-08T03:30Z. The prize pool was not yet published when this record was written.",
+        "shortDescription": "In-person ETHGlobal hackathon in Mumbai, November 6-8, 2026, with multiple sponsor prize tracks.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Hackathon"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "ETHGlobal"
+        ],
+        "programBudget": "",
+        "website": "https://ethglobal.com/events/mumbai/apply",
+        "socialLinks": {
+          "website": "https://ethglobal.com/events/mumbai/apply"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": {
+        "location": "Mumbai, India",
+        "online": false,
+        "registrationDeadline": "2026-11-03T18:29:00.000Z",
+        "submissionDeadline": "2026-11-08T03:30:00.000Z",
+        "startDate": "2026-11-06T00:00:00.000Z",
+        "endDate": "2026-11-08T00:00:00.000Z"
+      },
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9122",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Lido Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/lido/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Lido Bug Bounty",
+        "description": "Rolling smart-contract and infrastructure bug bounty for the Lido liquid-staking protocol, Ethereum's largest staking protocol by TVL.\n\nThe program page shows status 'Live Since 22 May 2021', last updated 29 June 2026, with a maximum reward of $2,000,000 for critical vulnerabilities risking $2M or more in assets.",
+        "shortDescription": "Rolling bug bounty for the Lido liquid-staking protocol, paying up to $2,000,000 for a critical finding.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Lido"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/lido/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/lido/"
+        },
+        "maxGrantSize": 2000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 2000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9123",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Aave Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/aave/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Aave Bug Bounty",
+        "description": "Rolling bug bounty covering Aave v2/v3 markets across Ethereum, Polygon, Optimism, Arbitrum, Base, and other deployments, plus governance and the GHO stablecoin.\n\nThe program page shows status 'Live Since 18 October 2023', last updated 17 April 2026, with a maximum reward of $1,000,000 and 83 assets in scope across the Aave v2 and v3 deployments.",
+        "shortDescription": "Rolling bug bounty across Aave v2/v3 markets, governance and GHO, paying up to $1,000,000 for a critical finding.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Aave"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/aave/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/aave/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9124",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Optimism Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/optimism/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Optimism Bug Bounty",
+        "description": "Rolling bug bounty covering Optimism's smart contracts and blockchain/DLT infrastructure (the OP Stack), with severity-based rewards.\n\nThe program page shows the bounty live since 14 January 2022, last updated 27 July 2026, with a maximum reward of $2,000,042 and roughly $2.8M paid out historically.",
+        "shortDescription": "Rolling bug bounty on Optimism's contracts and OP Stack infrastructure, paying up to $2,000,042 for a critical finding.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Optimism",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Optimism Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/optimism/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/optimism/"
+        },
+        "maxGrantSize": 2000042,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 2000042,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9125",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Arbitrum Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/arbitrum/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Arbitrum Bug Bounty",
+        "description": "Rolling bug bounty covering Arbitrum One and Arbitrum Nova mainnet chains and the underlying technology stack.\n\nThe program page shows status 'Live Since 31 August 2021', last updated 30 July 2026, with a maximum reward of $2,000,000 and 181 assets in scope.",
+        "shortDescription": "Rolling bug bounty on Arbitrum One, Arbitrum Nova and the underlying stack, paying up to $2,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Arbitrum",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Arbitrum Foundation",
+          "Offchain Labs"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/arbitrum/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/arbitrum/"
+        },
+        "maxGrantSize": 2000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 2000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9126",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Polygon Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/polygon/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Polygon Bug Bounty",
+        "description": "Rolling bug bounty covering Polygon's L2 scaling infrastructure and smart contracts on Ethereum and Polygon networks.\n\nThe program page shows the bounty live since 13 September 2021, last updated 28 July 2026, with a maximum reward of $250,000 (minimum $20,000 for a critical finding) and 13 assets in scope.",
+        "shortDescription": "Rolling bug bounty on Polygon's scaling infrastructure and contracts, paying $20,000 to $250,000 for a critical finding.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Polygon",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Polygon Labs"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/polygon/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/polygon/"
+        },
+        "maxGrantSize": 250000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 250000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9127",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Sky (MakerDAO) Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/makerdao/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Sky (MakerDAO) Bug Bounty",
+        "description": "Rolling bug bounty for the Sky protocol (formerly MakerDAO), covering its core stablecoin, governance, savings/staking, and bridge contracts.\n\nThe program page, listed under 'Sky', shows active status as of 21 July 2026, with a maximum reward of $10,000,000 — 10% of funds at risk, up to that cap — a $150,000 minimum for a critical finding, 249 assets in scope, and $703.2k paid to date across 19 reports.",
+        "shortDescription": "Rolling bug bounty for Sky (formerly MakerDAO), paying up to $10,000,000 at 10% of funds at risk.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Sky Protocol"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/makerdao/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/makerdao/"
+        },
+        "maxGrantSize": 10000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 10000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9128",
+      "type": "bounty",
+      "chainID": null,
+      "name": "ENS Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/ens/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ENS Bug Bounty",
+        "description": "Rolling bug bounty for the Ethereum Name Service covering smart contracts, infrastructure, and web applications.\n\nThe program page shows 'Live Since 10 May 2024', last updated 17 June 2026, with a maximum reward of $250,000 plus a vault program of roughly $112,908.",
+        "shortDescription": "Rolling bug bounty for ENS contracts, infrastructure and web apps, paying up to $250,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Ethereum Name Service"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/ens/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/ens/"
+        },
+        "maxGrantSize": 250000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 250000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9129",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Uniswap Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/f9df94db-c7b1-434b-bb06-d1360abdd1be",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Uniswap Bug Bounty",
+        "description": "Rolling bug bounty for Uniswap v4 core and periphery contracts, one of the largest bug bounties in crypto history.\n\nThe bounty board reports status 'live' with a total reward pot of $15,500,000 USDC, running since 26 November 2024 with no end date. Uniswap Labs' own blog post confirms the launch of the v4 bug bounty program.",
+        "shortDescription": "Rolling bug bounty for Uniswap v4 core and periphery contracts, with a $15,500,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Uniswap Labs"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/f9df94db-c7b1-434b-bb06-d1360abdd1be",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/f9df94db-c7b1-434b-bb06-d1360abdd1be",
+          "grantsSite": "https://blog.uniswap.org/v4-bug-bounty"
+        },
+        "maxGrantSize": 15500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 15500000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9130",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Coinbase / Base Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/55316f42-3c5e-4746-9bd0-0f18dcbc344b",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Coinbase / Base Bug Bounty",
+        "description": "Rolling bug bounty covering Base (Coinbase's Ethereum L2), plus cbBTC and cbETH contracts across Base, Ethereum, Arbitrum, and Solana.\n\nThe bounty board reports status 'live' with a total reward pot of $5,000,000 USDC, running since 8 July 2025 with no end date; the Tier 0 scope explicitly names Base, 'an L2 that rolls up to Ethereum L1'.",
+        "shortDescription": "Rolling bug bounty covering Base plus cbBTC and cbETH contracts, with a $5,000,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Base",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Coinbase"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/55316f42-3c5e-4746-9bd0-0f18dcbc344b",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/55316f42-3c5e-4746-9bd0-0f18dcbc344b"
+        },
+        "maxGrantSize": 5000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 5000000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9131",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Morpho Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/35a5f0a1-2ffd-432c-8f3b-77d169add8c3",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Morpho Bug Bounty",
+        "description": "Rolling bug bounty for Morpho, a large peer-to-peer optimized lending protocol built on Ethereum (Morpho Blue and vaults).\n\nThe bounty board reports status 'live' with a total reward pot of $2,500,000 USDC, running since 27 March 2024 with no end date.",
+        "shortDescription": "Rolling bug bounty for Morpho Blue and its vaults, with a $2,500,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Morpho Labs"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/35a5f0a1-2ffd-432c-8f3b-77d169add8c3",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/35a5f0a1-2ffd-432c-8f3b-77d169add8c3"
+        },
+        "maxGrantSize": 2500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 2500000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9132",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Pendle Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/fb1f1c54-0cb9-4201-8791-fb1e78e6e600",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Pendle Bug Bounty",
+        "description": "Rolling bug bounty for Pendle, an Ethereum protocol for tokenizing and trading future yield.\n\nThe bounty board reports status 'live' with a total reward pot of $2,000,000 USDC, running since 14 June 2024 with no end date.",
+        "shortDescription": "Rolling bug bounty for Pendle's yield-tokenization protocol, with a $2,000,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Pendle Finance"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/fb1f1c54-0cb9-4201-8791-fb1e78e6e600",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/fb1f1c54-0cb9-4201-8791-fb1e78e6e600"
+        },
+        "maxGrantSize": 2000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 2000000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9133",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Symbiotic Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/acca29a4-d405-4405-a3b3-8c3feb10d1e3",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Symbiotic Bug Bounty",
+        "description": "Rolling bug bounty for Symbiotic, an Ethereum shared-security/restaking protocol used to secure external networks.\n\nThe bounty board reports status 'live' with a total reward pot of $500,000 USD, running since 1 February 2026 with no end date.",
+        "shortDescription": "Rolling bug bounty for Symbiotic's shared-security/restaking protocol, with a $500,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Symbiotic"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/acca29a4-d405-4405-a3b3-8c3feb10d1e3",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/acca29a4-d405-4405-a3b3-8c3feb10d1e3"
+        },
+        "maxGrantSize": 500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 500000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9134",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Agglayer Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/3aaad22b-52ee-4bb2-bed2-4be53b0993cc",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Agglayer Bug Bounty",
+        "description": "Rolling bug bounty for Agglayer, Polygon's cross-chain aggregation layer connecting ZK-based Ethereum L2s.\n\nThe bounty board reports status 'live' with a total reward pot of $250,000 USDC, running since 14 October 2025 with no end date.",
+        "shortDescription": "Rolling bug bounty for Agglayer, Polygon's cross-chain aggregation layer, with a $250,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Polygon",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Polygon Labs"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/3aaad22b-52ee-4bb2-bed2-4be53b0993cc",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/3aaad22b-52ee-4bb2-bed2-4be53b0993cc"
+        },
+        "maxGrantSize": 250000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 250000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9135",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Ethereum Foundation Bug Bounty Program",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://bbp-form.ethereum.org/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Ethereum Foundation Bug Bounty Program",
+        "description": "The Ethereum Foundation's rolling bug bounty for consensus and execution-layer specs, the major client implementations (Geth, Reth, Nethermind, Erigon, Besu, Lighthouse, Prysm, Teku, Nimbus, Lodestar, Grandine), Solidity and Vyper, and the deposit contract.\n\nThe ethereum.org bug bounty page confirms the program is 'Open for submissions' with no end date and severity tiers reaching $1,000,000 for a critical finding, submitted through the Foundation's own report form.",
+        "shortDescription": "The Ethereum Foundation's rolling protocol and client bug bounty, paying up to $1,000,000 for a critical finding.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Ethereum Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://bbp-form.ethereum.org/",
+        "socialLinks": {
+          "website": "https://bbp-form.ethereum.org/",
+          "grantsSite": "https://ethereum.org/en/bug-bounty/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        }
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9136",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Chainlink Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/chainlink/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Chainlink Bug Bounty",
+        "description": "Bounty on Chainlink's oracle infrastructure (price feeds, CCIP, VRF, data streams) as deployed on Ethereum mainnet and its L2s.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,000,000; ecosystem tags include ETH.",
+        "shortDescription": "Bounty on Chainlink's oracle infrastructure on Ethereum and its L2s, paying up to $3,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Chainlink Labs"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/chainlink/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/chainlink/"
+        },
+        "maxGrantSize": 3000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 3000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9137",
+      "type": "bounty",
+      "chainID": null,
+      "name": "The Graph Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/thegraph/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "The Graph Bug Bounty",
+        "description": "Bounty on The Graph's indexing/staking protocol smart contracts (subgraph staking, curation, dispute resolution) on Ethereum and Arbitrum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $50,000; ecosystem tags [Arbitrum, ETH].",
+        "shortDescription": "Bounty on The Graph's indexing and staking contracts on Ethereum and Arbitrum, paying up to $50,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum",
+          "Arbitrum"
+        ],
+        "networks": [],
+        "organizations": [
+          "The Graph Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/thegraph/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/thegraph/"
+        },
+        "maxGrantSize": 50000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 50000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9138",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Synthetix Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/synthetix/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Synthetix Bug Bounty",
+        "description": "Bounty on Synthetix's synthetic-asset DAO, DEX, perpetuals and staking smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Synthetix's synthetic-asset, perpetuals and staking contracts, paying up to $100,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Synthetix"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/synthetix/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/synthetix/"
+        },
+        "maxGrantSize": 100000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 100000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9139",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Balancer Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/balancer/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Balancer Bug Bounty",
+        "description": "Bounty on Balancer's AMM/DEX vault and pool smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Balancer's AMM vault and pool contracts on Ethereum, paying up to $1,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Balancer Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/balancer/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/balancer/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9140",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Compound Finance Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/compoundfinance/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Compound Finance Bug Bounty",
+        "description": "Bounty on Compound's lending-protocol smart contracts (Comet/cTokens, governance) on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Compound's lending-protocol and governance contracts, paying up to $1,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Compound"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/compoundfinance/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/compoundfinance/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9141",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Spark Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/sparklend/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Spark Bug Bounty",
+        "description": "Bounty on SparkLend, the Sky/MakerDAO-affiliated lending-protocol smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $5,000,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on SparkLend's lending-protocol contracts on Ethereum, paying up to $5,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Spark"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/sparklend/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/sparklend/"
+        },
+        "maxGrantSize": 5000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 5000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9142",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Rocket Pool Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/rocketpool/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Rocket Pool Bug Bounty",
+        "description": "Bounty on Rocket Pool's decentralized ETH liquid-staking protocol smart contracts.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $150,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Rocket Pool's decentralized ETH liquid-staking contracts, paying up to $150,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Rocket Pool"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/rocketpool/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/rocketpool/"
+        },
+        "maxGrantSize": 150000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 150000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9143",
+      "type": "bounty",
+      "chainID": null,
+      "name": "StakeWise Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/stakewise/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "StakeWise Bug Bounty",
+        "description": "Bounty on StakeWise's ETH liquid-staking and yield-vault smart contracts on Ethereum mainnet and Gnosis Chain.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags [ETH, Gnosis Chain].",
+        "shortDescription": "Bounty on StakeWise's liquid-staking and yield-vault contracts, paying up to $200,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "StakeWise"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/stakewise/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/stakewise/"
+        },
+        "maxGrantSize": 200000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 200000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9144",
+      "type": "bounty",
+      "chainID": null,
+      "name": "ether.fi Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/etherfi/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ether.fi Bug Bounty",
+        "description": "Bounty on ether.fi's liquid-restaking protocol smart contracts (eETH, weETH, node operator infrastructure) on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on ether.fi's liquid-restaking contracts and node-operator infrastructure, paying up to $500,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "ether.fi"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/etherfi/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/etherfi/"
+        },
+        "maxGrantSize": 500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 500000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9145",
+      "type": "bounty",
+      "chainID": null,
+      "name": "1inch Aqua Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/1inch-aqua/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "1inch Aqua Bug Bounty",
+        "description": "Bounty on 1inch's Aqua intent-based swap smart contracts, part of the wider 1inch DEX aggregation protocol on Ethereum and EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; 1inch also runs separate Web, Business and Wallet bounty tracks, so this record covers the Aqua contracts only.",
+        "shortDescription": "Bounty on 1inch's Aqua intent-based swap contracts, paying up to $100,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "1inch Network"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/1inch-aqua/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/1inch-aqua/"
+        },
+        "maxGrantSize": 100000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 100000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9146",
+      "type": "bounty",
+      "chainID": null,
+      "name": "SushiSwap Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/sushiswap/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "SushiSwap Bug Bounty",
+        "description": "Bounty on SushiSwap's AMM/DEX and staking smart contracts, deployed on Ethereum and numerous EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags include ETH.",
+        "shortDescription": "Bounty on SushiSwap's AMM and staking contracts across Ethereum and EVM chains, paying up to $200,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Sushi"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/sushiswap/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/sushiswap/"
+        },
+        "maxGrantSize": 200000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 200000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9147",
+      "type": "bounty",
+      "chainID": null,
+      "name": "LayerZero Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/layerzero/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "LayerZero Bug Bounty",
+        "description": "Bounty on LayerZero's omnichain messaging protocol smart contracts, with Ethereum as a core endpoint chain among 40+ supported networks.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $15,000,000; the ecosystem list includes ETH.",
+        "shortDescription": "Bounty on LayerZero's omnichain messaging contracts, with Ethereum a core endpoint, paying up to $15,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "LayerZero Labs"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/layerzero/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/layerzero/"
+        },
+        "maxGrantSize": 15000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 15000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9148",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Stargate Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/stargate/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Stargate Bug Bounty",
+        "description": "Bounty on Stargate's LayerZero-based cross-chain liquidity/bridge protocol smart contracts, with Ethereum as a primary deployment chain.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $10,000,000; the page references Ethereum mainnet.",
+        "shortDescription": "Bounty on Stargate's cross-chain liquidity and bridge contracts, paying up to $10,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Stargate Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/stargate/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/stargate/"
+        },
+        "maxGrantSize": 10000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 10000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9149",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Wormhole Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/wormhole/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Wormhole Bug Bounty",
+        "description": "Bounty on Wormhole's cross-chain messaging protocol, covering its Ethereum-deployed core contracts and guardian network alongside other connected chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; the page references Ethereum mainnet contracts.",
+        "shortDescription": "Bounty on Wormhole's cross-chain messaging core contracts and guardian network, paying up to $1,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Wormhole Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/wormhole/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/wormhole/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9150",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Yearn Finance Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/yearnfinance/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Yearn Finance Bug Bounty",
+        "description": "Bounty on Yearn's yield-aggregator vault smart contracts on Ethereum, Arbitrum, Optimism and Fantom.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags include ETH.",
+        "shortDescription": "Bounty on Yearn's yield-aggregator vault contracts, paying up to $200,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Yearn"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/yearnfinance/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/yearnfinance/"
+        },
+        "maxGrantSize": 200000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 200000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9151",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Gearbox Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/gearbox/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Gearbox Bug Bounty",
+        "description": "Bounty on Gearbox's on-chain leverage/composable credit protocol smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $150,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Gearbox's on-chain leverage and composable credit contracts, paying up to $150,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Gearbox"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/gearbox/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/gearbox/"
+        },
+        "maxGrantSize": 150000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 150000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9152",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Instadapp (Fluid) Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/instadapp/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Instadapp (Fluid) Bug Bounty",
+        "description": "Bounty on Instadapp's Fluid lending/DEX and smart-account infrastructure deployed on Ethereum and multiple EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tags include ETH.",
+        "shortDescription": "Bounty on Instadapp's Fluid lending/DEX and smart-account infrastructure, paying up to $500,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Instadapp"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/instadapp/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/instadapp/"
+        },
+        "maxGrantSize": 500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 500000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9153",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Ethena Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/ethena/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Ethena Bug Bounty",
+        "description": "Bounty on Ethena's USDe synthetic-dollar protocol smart contracts and staking (sUSDe) infrastructure on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,000,000; the page references Ethereum and Arbitrum mainnet.",
+        "shortDescription": "Bounty on Ethena's USDe synthetic-dollar and sUSDe staking contracts, paying up to $3,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Ethena Labs"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/ethena/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/ethena/"
+        },
+        "maxGrantSize": 3000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 3000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9154",
+      "type": "bounty",
+      "chainID": null,
+      "name": "SSV Network Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/ssvnetwork/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "SSV Network Bug Bounty",
+        "description": "Bounty on SSV Network's distributed validator technology (DVT) smart contracts used for decentralized Ethereum staking.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $250,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on SSV Network's distributed-validator contracts for decentralized Ethereum staking, paying up to $250,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "SSV Network"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/ssvnetwork/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/ssvnetwork/"
+        },
+        "maxGrantSize": 250000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 250000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9155",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Kelp DAO Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/kelp-dao/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Kelp DAO Bug Bounty",
+        "description": "Bounty on Kelp DAO's liquid-restaking protocol (rsETH) smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $250,000; the product type is listed as Liquid Restaking.",
+        "shortDescription": "Bounty on Kelp DAO's rsETH liquid-restaking contracts on Ethereum, paying up to $250,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Kelp DAO"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/kelp-dao/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/kelp-dao/"
+        },
+        "maxGrantSize": 250000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 250000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9156",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Linea Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/linea/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Linea Bug Bounty",
+        "description": "Bounty on Linea's zkEVM rollup infrastructure and bridge contracts, an Ethereum L2.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; ecosystem tags [ETH, Linea].",
+        "shortDescription": "Bounty on Linea's zkEVM rollup infrastructure and bridge contracts, paying up to $100,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Linea",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Linea",
+          "Consensys"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/linea/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/linea/"
+        },
+        "maxGrantSize": 100000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 100000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9157",
+      "type": "bounty",
+      "chainID": null,
+      "name": "ZKsync Era Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/zksyncera/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ZKsync Era Bug Bounty",
+        "description": "Bounty on ZKsync Era's zkEVM rollup infrastructure and bridge contracts, an Ethereum L2.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $300,000; ecosystem tags [ETH, zkSync].",
+        "shortDescription": "Bounty on ZKsync Era's zkEVM rollup infrastructure and bridge contracts, paying up to $300,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "zkSync Era",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Matter Labs"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/zksyncera/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/zksyncera/"
+        },
+        "maxGrantSize": 300000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 300000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9158",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Euler Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/4d285eee-602e-440a-845e-25e155cec26a",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Euler Bug Bounty",
+        "description": "Bounty on Euler's modular lending-protocol smart contracts on Ethereum.\n\nThe bounty board reports status 'live' with a total reward pot of 7,500,000 (paid in USDC, rEUL and USUAL), live since 21 August 2024.",
+        "shortDescription": "Bounty on Euler's modular lending-protocol contracts on Ethereum, with a $7,500,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Euler Labs"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/4d285eee-602e-440a-845e-25e155cec26a",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/4d285eee-602e-440a-845e-25e155cec26a"
+        },
+        "maxGrantSize": 7500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 7500000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9159",
+      "type": "bounty",
+      "chainID": null,
+      "name": "GMX Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/gmx/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "GMX Bug Bounty",
+        "description": "Bounty on GMX's perpetuals and spot-trading AMM smart contracts on Arbitrum, an Ethereum L2.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $5,000,000; ecosystem tags [Arbitrum, Avalanche].",
+        "shortDescription": "Bounty on GMX's perpetuals and spot-trading contracts on Arbitrum, paying up to $5,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Arbitrum",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "GMX"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/gmx/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/gmx/"
+        },
+        "maxGrantSize": 5000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 5000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9160",
+      "type": "bounty",
+      "chainID": null,
+      "name": "CoW Protocol Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/cowprotocol/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "CoW Protocol Bug Bounty",
+        "description": "Bounty on CoW Protocol's intent-based trading and batch-auction settlement smart contracts on Ethereum and Gnosis Chain.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tags [ETH, Gnosis].",
+        "shortDescription": "Bounty on CoW Protocol's intent-based trading and settlement contracts, paying up to $1,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "CoW DAO"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/cowprotocol/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/cowprotocol/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9161",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Reserve Protocol Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://cantina.xyz/bounties/3709ca85-4050-407e-9b36-51f5d5ea9b00",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Reserve Protocol Bug Bounty",
+        "description": "Bounty on Reserve's RToken asset-backed stablecoin protocol smart contracts on Ethereum.\n\nThe bounty board reports status 'live' with a total reward pot of 10,000,000 USDC, live since 26 March 2026.",
+        "shortDescription": "Bounty on Reserve's RToken asset-backed stablecoin contracts, with a $10,000,000 reward pot.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Reserve"
+        ],
+        "programBudget": "",
+        "website": "https://cantina.xyz/bounties/3709ca85-4050-407e-9b36-51f5d5ea9b00",
+        "socialLinks": {
+          "website": "https://cantina.xyz/bounties/3709ca85-4050-407e-9b36-51f5d5ea9b00"
+        },
+        "maxGrantSize": 10000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 10000000,
+          "currency": "USD"
+        },
+        "platform": "Cantina"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9162",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Maple Finance Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/maple/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Maple Finance Bug Bounty",
+        "description": "Bounty on Maple's institutional/on-chain credit and lending-pool smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Maple's institutional credit and lending-pool contracts, paying up to $500,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Maple Finance"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/maple/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/maple/"
+        },
+        "maxGrantSize": 500000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 500000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9163",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Olympus Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/olympus/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Olympus Bug Bounty",
+        "description": "Bounty on Olympus DAO's OHM protocol-owned-liquidity and treasury smart contracts on Ethereum and several EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,333,333; ecosystem tags include ETH.",
+        "shortDescription": "Bounty on Olympus DAO's OHM liquidity and treasury contracts, paying up to $3,333,333.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Olympus DAO"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/olympus/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/olympus/"
+        },
+        "maxGrantSize": 3333333,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 3333333,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9164",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Gnosis Chain Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/gnosischain/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Gnosis Chain Bug Bounty",
+        "description": "Bounty on Gnosis Chain's consensus/execution client and bridge infrastructure — an Ethereum-aligned chain that shares Ethereum's client software and validator-set model.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $2,000,000; ecosystem tags [BSC, ETH].",
+        "shortDescription": "Bounty on Gnosis Chain's client and bridge infrastructure, paying up to $2,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Gnosis Chain",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Gnosis"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/gnosischain/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/gnosischain/"
+        },
+        "maxGrantSize": 2000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 2000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9165",
+      "type": "bounty",
+      "chainID": null,
+      "name": "Origin Protocol Bug Bounty",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://immunefi.com/bug-bounty/originprotocol/",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Origin Protocol Bug Bounty",
+        "description": "Bounty on Origin Protocol's yield-bearing stablecoin smart contracts (OUSD, OETH) on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
+        "shortDescription": "Bounty on Origin Protocol's OUSD and OETH yield-bearing stablecoin contracts, paying up to $1,000,000.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Security",
+          "Bug Bounty"
+        ],
+        "ecosystems": [
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Origin Protocol"
+        ],
+        "programBudget": "",
+        "website": "https://immunefi.com/bug-bounty/originprotocol/",
+        "socialLinks": {
+          "website": "https://immunefi.com/bug-bounty/originprotocol/"
+        },
+        "maxGrantSize": 1000000,
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": {
+        "reward": {
+          "amount": 1000000,
+          "currency": "USD"
+        },
+        "platform": "Immunefi"
+      },
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9166",
+      "type": "grant",
+      "chainID": null,
+      "name": "The Graph Grants Program",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://thegraph.typeform.com/applynow",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "The Graph Grants Program",
+        "description": "Rolling grants funding open-source contributions to The Graph's protocol, tooling, data services (subgraphs/Substreams), and community initiatives. Over 100 grantees funded across multiple waves to date, overseen by The Graph Foundation and The Graph Council.\n\nThe live grants page carries an active application form and lists four open funding categories — Protocol, Tooling, Data Services, and Community. Note that the separate RFP track currently shows 'no open RFPs at this time'; only that sub-track is empty, and general grant applications remain open.",
+        "shortDescription": "Rolling grants for open-source work on The Graph's protocol, tooling, data services and community, across four open categories.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Developer Tools",
+          "Data"
+        ],
+        "ecosystems": [
+          "Ethereum",
+          "The Graph"
+        ],
+        "networks": [],
+        "organizations": [
+          "The Graph Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://thegraph.com/grants/",
+        "socialLinks": {
+          "website": "https://thegraph.com/grants/",
+          "grantsSite": "https://thegraph.com/grants/"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive",
+        "recurring": true
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9167",
+      "type": "grant",
+      "chainID": null,
+      "name": "Rocket Pool GMC Grants — Round 40",
+      "isActive": true,
+      "deadline": "2026-09-07T23:59:00.000Z",
+      "submissionUrl": "https://dao.rocketpool.net/t/round-40-gmc-call-for-grant-applications-deadline-is-september-7/4019",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Rocket Pool GMC Grants — Round 40",
+        "description": "Monthly rolling grants funded from Rocket Pool's RPL treasury for community-proposed work the applicant will personally carry out, judged on how much it grows node operation, rETH usage, or protocol and community quality of life. Round 40 covers the August 7 - September 7, 2026 cycle.\n\nThe round's call for applications states an application period of August 7 to September 7, 2026, a scoring deadline of September 22, and an award announcement on September 27. The Grants and Marketing Committee treasury receives 16,265.35 RPL every 28 days under RPIP-81, shared across the grants, bounty, and retrospective tracks; the treasury was reported at roughly $29.7k in the August 2026 report, so no single per-grant figure is published.",
+        "shortDescription": "Monthly RPL-funded grants for community work that grows Rocket Pool node operation and rETH usage; Round 40 closes September 7, 2026.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Staking",
+          "Community"
+        ],
+        "ecosystems": [
+          "Ethereum",
+          "Rocket Pool"
+        ],
+        "networks": [],
+        "organizations": [
+          "Rocket Pool DAO"
+        ],
+        "programBudget": "",
+        "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+        "socialLinks": {
+          "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+          "grantsSite": "https://dao.rocketpool.net/c/grant-bounties/13"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive",
+        "recurring": true
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9168",
+      "type": "grant",
+      "chainID": null,
+      "name": "Rocket Pool GMC Retrospective Awards — Round 40",
+      "isActive": true,
+      "deadline": "2026-09-07T23:59:00.000Z",
+      "submissionUrl": "https://dao.rocketpool.net/t/round-40-gmc-call-for-retrospective-applications-deadline-is-september-7/4021",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Rocket Pool GMC Retrospective Awards — Round 40",
+        "description": "Retroactive-funding track of the same Round 40 GMC cycle, rewarding already-completed community work (a July 7 - September 7, 2026 window) that furthered node operation, rETH adoption, or protocol and community quality of life, evaluated against the same GMC scoring rubric as regular grants.\n\nThe round's call for retrospective applications sets a deadline of September 7, 2026 at 23:59 UTC. Awards are paid from the same 16,265.35 RPL per 28-day committee allocation (RPIP-81) shared with the grants and bounty tracks, so no per-award figure is published.",
+        "shortDescription": "Retroactive Rocket Pool awards for already-completed community work in the July 7 - September 7, 2026 window.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Staking",
+          "Retroactive Funding"
+        ],
+        "ecosystems": [
+          "Ethereum",
+          "Rocket Pool"
+        ],
+        "networks": [],
+        "organizations": [
+          "Rocket Pool DAO"
+        ],
+        "programBudget": "",
+        "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+        "socialLinks": {
+          "website": "https://dao.rocketpool.net/c/grant-bounties/13",
+          "grantsSite": "https://dao.rocketpool.net/c/grant-bounties/13"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "retroactive",
+        "recurring": true
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9169",
+      "type": "grant",
+      "chainID": null,
+      "name": "Mantle EcoFund",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://www.mantle.xyz/ecofund",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Mantle EcoFund",
+        "description": "Rolling ecosystem-support fund for early-stage projects seeking a long-term partnership with Mantle Network. Provides deal-structuring and fundraising help, co-promotion, enhanced delegated voting rights, exchange-listing support, and direct access to the Mantle Growth team rather than a fixed grant check.\n\nThe live EcoFund page lists 40+ portfolio companies tagged 'Live' spanning DeFi, gaming, Bitcoin infrastructure and AI, and names ecofund@mantle.xyz as the contact for interested projects; no closing date is shown and no funding figure is disclosed. Intake is that email contact rather than a public form, and the program resembles an investment and partnership vehicle more than a traditional grant.",
+        "shortDescription": "Rolling ecosystem-support fund for early-stage projects partnering with Mantle Network; intake is by email to the address on the program page.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Ecosystem Support"
+        ],
+        "ecosystems": [
+          "Mantle",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Mantle"
+        ],
+        "programBudget": "",
+        "website": "https://www.mantle.xyz/ecofund",
+        "socialLinks": {
+          "website": "https://www.mantle.xyz/ecofund"
+        }
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9170",
+      "type": "grant",
+      "chainID": null,
+      "name": "ArbiFuel (Gas Fee Sponsorship Program)",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://airtable.com/appzb4GfqGfrnDXjW/shrulGIIp6l6ezAlt",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "ArbiFuel (Gas Fee Sponsorship Program)",
+        "description": "Gas-fee sponsorship for early-stage teams building simplified-UX apps, wallets, stablecoin products, or payment applications on Arbitrum, covering onboarding costs through ERC-20 paymasters so users do not need ETH for gas.\n\nThe Arbitrum Foundation's grants index lists ArbiFuel as Active with a live 'Apply now' button. Terms are up to 1,000,000 sponsored transactions in a team's first year, capped at $10,000 in credits per team — sponsorship credit rather than a cash grant, which is why no cash grant size is recorded here.",
+        "shortDescription": "Gas-fee sponsorship on Arbitrum: up to 1,000,000 sponsored transactions in a team's first year, capped at $10,000 in credits.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Infrastructure",
+          "Payments"
+        ],
+        "ecosystems": [
+          "Arbitrum",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "Arbitrum Foundation"
+        ],
+        "programBudget": "",
+        "website": "https://arbitrum.foundation/grants",
+        "socialLinks": {
+          "website": "https://arbitrum.foundation/grants",
+          "grantsSite": "https://arbitrum.foundation/grants"
+        },
+        "anyoneCanJoin": true
+      },
+      "grantMetadata": {
+        "fundingMechanism": "proactive"
+      },
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
+    },
+    {
+      "programId": "9171",
+      "type": "grant",
+      "chainID": null,
+      "name": "Arbitrum Gaming Ventures (AGV)",
+      "isActive": true,
+      "deadline": null,
+      "submissionUrl": "https://thegamingcatalyst.com",
+      "createdAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "metadata": {
+        "title": "Arbitrum Gaming Ventures (AGV)",
+        "description": "An ArbitrumDAO initiative designed to empower builders of gaming projects and infrastructure within the Arbitrum ecosystem. Connect with the AGV team to explore grants, funding opportunities, tools, and collaboration possibilities.\n\nThe Arbitrum Foundation's grants index lists AGV as Active with a live 'Submit Interest' button pointing at the AGV site. The entry point is an expression of interest on a partner site rather than a self-contained grant form, and no funding amount is disclosed.",
+        "shortDescription": "ArbitrumDAO initiative connecting gaming builders on Arbitrum with grants, funding, tools and collaboration; intake is an expression of interest.",
+        "status": "open",
+        "startsAt": "",
+        "endsAt": null,
+        "categories": [
+          "Funding Opportunity",
+          "Gaming"
+        ],
+        "ecosystems": [
+          "Arbitrum",
+          "Ethereum"
+        ],
+        "networks": [],
+        "organizations": [
+          "ArbitrumDAO"
+        ],
+        "programBudget": "",
+        "website": "https://arbitrum.foundation/grants",
+        "socialLinks": {
+          "website": "https://arbitrum.foundation/grants",
+          "grantsSite": "https://arbitrum.foundation/grants"
+        }
+      },
+      "grantMetadata": null,
+      "hackathonMetadata": null,
+      "bountyMetadata": null,
+      "acceleratorMetadata": null,
+      "vcFundMetadata": null,
+      "rfpMetadata": null
     }
   ]
 }
