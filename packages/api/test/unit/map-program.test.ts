@@ -102,16 +102,13 @@ describe("mapProgram", () => {
     // The real upstream never extracts a tier table, so its security bug bounties arrive as a
     // bare scalar — indistinguishable by shape from a task listing. The domain signals decide,
     // and the scalar becomes the one thing it actually is on such a listing: a ceiling.
-    const o = mapProgram(
-      {
-        programId: "9001",
-        type: "bounty",
-        isActive: true,
-        metadata: { title: "Lido Bug Bounty", description: "Standing bug bounty." },
-        bountyMetadata: { platform: "Immunefi", reward: { amount: 2000000, currency: "USD" } },
-      },
-      { programUrlBase: BASE },
-    );
+    const o = mapProgram({
+      programId: "9001",
+      type: "bounty",
+      isActive: true,
+      metadata: { title: "Lido Bug Bounty", description: "Standing bug bounty." },
+      bountyMetadata: { platform: "Immunefi", reward: { amount: 2000000, currency: "USD" } },
+    });
     expect(validateOpportunity(o).valid).toBe(true);
     const bounty = details(o, "bounty");
     expect(bounty.bountyKind).toBe("security");
@@ -123,16 +120,13 @@ describe("mapProgram", () => {
   });
 
   it("classifies a bug bounty by name alone, and with no figure the tier is discretionary", () => {
-    const o = mapProgram(
-      {
-        programId: "9002",
-        type: "bounty",
-        isActive: true,
-        metadata: { title: "Acme Protocol Bug Bounty", description: "Report vulnerabilities." },
-        bountyMetadata: {},
-      },
-      { programUrlBase: BASE },
-    );
+    const o = mapProgram({
+      programId: "9002",
+      type: "bounty",
+      isActive: true,
+      metadata: { title: "Acme Protocol Bug Bounty", description: "Report vulnerabilities." },
+      bountyMetadata: {},
+    });
     expect(validateOpportunity(o).valid).toBe(true);
     const bounty = details(o, "bounty");
     expect(bounty.bountyKind).toBe("security");
@@ -144,7 +138,7 @@ describe("mapProgram", () => {
   it("keeps a task-board listing a task even though it is called a bounty", () => {
     // "Messy Bounty" has 'bounty' in its name but no bug-bounty phrase and no security
     // platform: it stays a task with its scalar reward. The word alone must not flip the kind.
-    const o = mapProgram(messyProgram, { programUrlBase: BASE });
+    const o = mapProgram(messyProgram);
     const bounty = details(o, "bounty");
     expect(bounty.bountyKind).toBe("task");
     expect(bounty.reward).toBe(110);

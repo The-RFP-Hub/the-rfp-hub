@@ -138,6 +138,15 @@ fabrication of the same kind as inventing an organisation from a program title. 
 corpus, 5 of 140 records (4%) have no `applicationUrl` as a result; `applicationUrl` is optional
 in the Standard, so all 140 still validate.
 
+The upstream publishes no `bountyKind`, so the mapper infers it from domain signals — a program
+calling itself a bug bounty, or listed on a platform that hosts nothing but security programs.
+Of the corpus's 46 bounty records, **44 classify as `security` and 2 as `task`**, and each carries
+exactly one compensation shape: a security record's published ceiling becomes a one-row tier table
+(`any severity → up_to X`, or discretionary where no figure exists) rather than a scalar reward,
+because a scalar on a bug-bounty listing is a maximum and not a fee. The split and that invariant
+are pinned by `test/unit/seed-offline.test.ts`, so re-tuning the inference cannot quietly re-shape
+a third of the corpus.
+
 ## Architecture
 
 Layered, module-per-folder — full pattern in [`docs/architecture.md`](./docs/architecture.md):

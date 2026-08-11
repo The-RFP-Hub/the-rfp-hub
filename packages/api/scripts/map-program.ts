@@ -30,6 +30,8 @@
  *   source.url                 → removed; a program's OWN submission/website URL feeds
  *                                `applicationUrl`, and nothing is substituted when it publishes none
  *   every timestamp            → RFC 3339 **UTC** (trailing 'Z') — see `isoDate`
+ *   bounty (no upstream kind)  → fundingDetails.bountyKind, inferred from DOMAIN signals, and the
+ *                                compensation shape that kind requires — see `typeBlockOf`
  *
  * ── Fields the upstream carries that the Standard has a home for ───────────────────
  *   metadata.amountDistributedToDate → fundingInfo.allocated   (only when positive)

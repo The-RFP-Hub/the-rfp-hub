@@ -7,7 +7,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import type { Opportunity } from "@the-rfp-hub/standard";
+import type { DetailsByFundingType, Opportunity } from "@the-rfp-hub/standard";
 import { describe, expect, it, vi } from "vitest";
 import { SOURCE_SYSTEM, mapProgram } from "../../scripts/map-program.js";
 import {
@@ -125,6 +125,34 @@ describe("the frozen corpus", () => {
     const { accepted, rejected } = gateForSeed(mapped);
     expect(rejected).toEqual([]);
     expect(accepted.length).toBeGreaterThanOrEqual(MIN_VALID);
+  });
+
+  /**
+   * `bountyKind` is inferred, not published, and it decides which compensation field the record is
+   * even ALLOWED to carry — so a change to the inference silently re-shapes 46 of the 140 records.
+   * The split is pinned here, on the real corpus, along with the invariant underneath it: exactly
+   * one of `reward` / `rewardTiers`, never both and never neither. A drift in either direction
+   * fails loudly instead of shipping a corpus that still validates while saying something else.
+   */
+  it("classifies every corpus bounty, and each carries exactly one compensation shape", async () => {
+    const programs = await readCorpus(CORPUS_PATH);
+    const bounties = programs
+      .map((p) => mapProgram(p))
+      .filter((o) => o.fundingType === "bounty")
+      .map((o) => o.fundingDetails as DetailsByFundingType["bounty"]);
+
+    expect(bounties).toHaveLength(46);
+    const kinds = bounties.map((b) => b.bountyKind);
+    expect(kinds.filter((k) => k === "security")).toHaveLength(44);
+    expect(kinds.filter((k) => k === "task")).toHaveLength(2);
+
+    for (const b of bounties) {
+      const hasScalar = Object.hasOwn(b, "reward");
+      const hasTable = Object.hasOwn(b, "rewardTiers");
+      expect(hasScalar).toBe(!hasTable);
+      // a security bounty is never priced by a bare number, whatever the source published
+      if (b.bountyKind === "security") expect(hasTable).toBe(true);
+    }
   });
 
   it("carries the real-world variety the mapper has to survive", async () => {
