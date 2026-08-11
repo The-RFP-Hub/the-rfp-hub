@@ -346,10 +346,18 @@ with `original_id` in a partial uniqueness index over the two). Taking it from t
 than from a constant or an env var means `source_system` can never disagree with the id consumers
 already see. Re-seeding is idempotent by public id: every upsert conflicts on it.
 
-`postedAt` follows the same rule. It means "first publicly announced **at the source**", so it is
-present only where the source publishes such a date — 19 of the 76 researched records, each with
-the date quoted in the record's own description — and absent on the rest. It is never the date the
-file was edited; `createdAt`/`updatedAt` are the Hub timestamps and carry that.
+`postedAt` follows the same rule. It means "first publicly announced **at the source**", so it may
+only carry a date the source itself published. It is never the date the file was edited;
+`createdAt`/`updatedAt` are the Hub timestamps and carry that.
+
+All 142 documents now have one. The 57 researched records that shipped without a date — because
+none had been looked for, not because none exists — were researched one by one, and each date is
+written into the record it dates: a bug bounty's "Live Since" line, a governance topic's creation
+date, a launch post, a press release. **Seven of the 57 are archival bounds** where the funder
+published no announcement at all: those records say "publicly visible by", name the first capture
+of the funder's own page, and the field carries that bound. A bound is a source date, not a Hub
+timestamp — and like every other date here it predates the curation pass, which
+`test/unit/seed-corpus.test.ts` asserts document by document.
 
 ### What the corpus contains
 
@@ -377,7 +385,6 @@ Where the honest answer is less data, the corpus carries less data:
   "apply here" that the funder never said.
 - **25 documents carry no `fundingInfo`**, because no page publishes a figure. Two of those lost a
   placeholder — a USD 1 "prize pool" and a USD 3 one — that had survived from a source snapshot.
-- **57 documents carry no `postedAt`**, because no source publishes an announcement date for them.
 
 Of the 45 bounties, **44 are `security` and 1 is `task`**, and each carries exactly one
 compensation shape: a security record's published ceiling is a tier table rather than a scalar

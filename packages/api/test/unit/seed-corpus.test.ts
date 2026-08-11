@@ -233,21 +233,25 @@ describe("the committed corpus", () => {
    * `postedAt` is "when the opportunity was first publicly announced AT THE SOURCE" — not when a
    * curator added it here. Every researched record used to carry the curation date in it, which
    * dated 75 opportunities, several of them years old, to the afternoon this file was written.
+   * Those were removed, leaving 57 records dateless; a dedicated research pass has since found a
+   * published date for all 57, so EVERY document now carries one and the rule the removal
+   * established is asserted on every one of them.
    *
-   * So: absent unless the record's own evidence carries a published date, and never equal to the
-   * Hub timestamp that records the curation pass itself.
+   * Seven of those dates are archival bounds — "publicly visible by", the first capture of the
+   * program's own page, where the funder published no announcement at all. A bound is still a
+   * source date rather than a Hub timestamp: it is when the opportunity was demonstrably public,
+   * it is written into the record as a bound, and like every other date here it predates the
+   * curation pass.
    */
-  it("never passes off a curation timestamp as a posting date", () => {
+  it("dates every document to its source, never to the curation pass", () => {
+    const now = Date.now();
     for (const d of DOCUMENTS) {
-      if (!d.postedAt) continue;
-      expect(new Date(d.postedAt).getTime(), d.id).toBeLessThanOrEqual(
-        new Date(d.createdAt as string).getTime(),
-      );
+      expect(d.postedAt, d.id).toBeTruthy();
+      const postedAt = new Date(d.postedAt as string).getTime();
+      expect(postedAt, d.id).toBeLessThanOrEqual(new Date(d.createdAt as string).getTime());
+      expect(postedAt, d.id).toBeLessThanOrEqual(now); // nothing is announced in the future
       if (d.id.startsWith("curated:")) expect(d.postedAt, d.id).not.toBe(d.createdAt);
     }
-    // Most researched records have no published announcement date, and say so by absence.
-    const curated = DOCUMENTS.filter((d) => d.id.startsWith("curated:"));
-    expect(curated.filter((d) => d.postedAt).length).toBeLessThan(curated.length / 2);
   });
 
   /**

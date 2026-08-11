@@ -1,5 +1,5 @@
 {
-  "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` is the date the source itself announced the opportunity; it is absent where no source publishes one, and is never the date this file was edited. `createdAt`/`updatedAt` are Hub timestamps — for `curated:` records that is the curation date, which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading as of 2026-08-11 and go stale: re-check against the funder before relying on one. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
+  "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` is the date the source itself announced the opportunity — a program page's \"Live Since\" line, a governance topic's creation date, a launch post or press release — and is never the date this file was edited. Seven records carry an archival bound instead (\"publicly visible by\", the first capture of the funder's own page), because their funder published no announcement at all; each of those says so in its own description. `createdAt`/`updatedAt` are Hub timestamps — for `curated:` records that is the curation date, which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading as of 2026-08-11 and go stale: re-check against the funder before relying on one. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
   "documents": [
     {
       "specVersion": "1.0.0",
@@ -6308,7 +6308,7 @@
       "id": "curated:arbitrum-dda-developer-tooling-on-arbitrum-one-and-nova",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Developer Tooling on Arbitrum One and Nova",
-      "description": "The Developer Tooling domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. An elected domain allocator — listed as @Flook_Eth — owns the domain budget, publishes its priorities and decides each award; the domain is shown with Status \"Live\" and \"Available $132k\", which is the domain's remaining envelope rather than a per-award cap. The per-grant soft cap is stated separately as 25,000 ARB.\n\nThe domain page frames scope as four buckets. \"Back to basics\": essential infrastructure for asset visualisation and network interaction — e.g. an RPC built on Alchemy infrastructure, or translation of successful projects' documentation into Mandarin, Japanese, Spanish and French — plus foundations that let dApps and protocols run their own metrics systems, on the explicit view that \"Total Value Locked (TVL) may not be the most appropriate metric\". \"Bring something cool from another chain to Arbitrum\": toolkits and SDKs that make Lens-, Farcaster- or Push-style applications buildable on Arbitrum, including better documentation and MVPs for B2B SaaS-shaped functionality. \"Addressing the current challenges of Arbitrum\": centralization, ecosystem development and security — documentation to help build sequencers, developer SDKs for dApps \"we've never heard of\", and scanners that surface and improve vulnerabilities in deployed contracts. \"DevRel\": developer-first projects that streamline communication between developers and ecosystem stakeholders.\n\nWorked examples the allocator publishes: IDEs for Arbitrum's chains (editor, debugger, compiler, deployer, or Arbitrum support added to existing products); SDKs and libraries for interacting with Arbitrum's smart-contract platform plus testing, deployment and monitoring tooling; testing and debugging frameworks across environments; monitoring and analytics tools covering gas usage, transaction times and user engagement; documentation and tutorial portals covering Arbitrum's API; and community forums and support channels for Arbitrum developers. Projects that lower the barrier for new developers — tutorials, articles, boilerplate, starter projects — are explicitly in scope.\n\nEvaluation: \"Proposals in this domain are typically reviewed directly by the domain allocator. Depending on the proposal content, the domain allocator may consult with allocator(s) in relevant domain(s) and may invite other allocator(s) to provide additional review.\" The rubric is five items each scored 0–5: Team experience; Novelty and quality of the idea; Relevance to our ecosystem; Completeness of the plan; Feasibility of goals and timeline. \"Proposals that score highly in the evaluation rubric are more likely to be funded, but there is no minimum threshold number of points for funding and no threshold that guarantees funding. Grant decisions are heavily influenced by the evaluation rubric but also take into consideration the balancing of project areas.\"\n\nDisbursement is milestone-gated: \"All milestones are required to be filled in disbursements following the following disbursement schedule (template): Compound Milestone Tranches - Alcancía.pdf\". There is no round deadline — proposals are read as they arrive.",
+      "description": "The Developer Tooling domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. An elected domain allocator — listed as @Flook_Eth — owns the domain budget, publishes its priorities and decides each award; the domain is shown with Status \"Live\" and \"Available $132k\", which is the domain's remaining envelope rather than a per-award cap. The per-grant soft cap is stated separately as 25,000 ARB.\n\nThe domain page frames scope as four buckets. \"Back to basics\": essential infrastructure for asset visualisation and network interaction — e.g. an RPC built on Alchemy infrastructure, or translation of successful projects' documentation into Mandarin, Japanese, Spanish and French — plus foundations that let dApps and protocols run their own metrics systems, on the explicit view that \"Total Value Locked (TVL) may not be the most appropriate metric\". \"Bring something cool from another chain to Arbitrum\": toolkits and SDKs that make Lens-, Farcaster- or Push-style applications buildable on Arbitrum, including better documentation and MVPs for B2B SaaS-shaped functionality. \"Addressing the current challenges of Arbitrum\": centralization, ecosystem development and security — documentation to help build sequencers, developer SDKs for dApps \"we've never heard of\", and scanners that surface and improve vulnerabilities in deployed contracts. \"DevRel\": developer-first projects that streamline communication between developers and ecosystem stakeholders.\n\nWorked examples the allocator publishes: IDEs for Arbitrum's chains (editor, debugger, compiler, deployer, or Arbitrum support added to existing products); SDKs and libraries for interacting with Arbitrum's smart-contract platform plus testing, deployment and monitoring tooling; testing and debugging frameworks across environments; monitoring and analytics tools covering gas usage, transaction times and user engagement; documentation and tutorial portals covering Arbitrum's API; and community forums and support channels for Arbitrum developers. Projects that lower the barrier for new developers — tutorials, articles, boilerplate, starter projects — are explicitly in scope.\n\nEvaluation: \"Proposals in this domain are typically reviewed directly by the domain allocator. Depending on the proposal content, the domain allocator may consult with allocator(s) in relevant domain(s) and may invite other allocator(s) to provide additional review.\" The rubric is five items each scored 0–5: Team experience; Novelty and quality of the idea; Relevance to our ecosystem; Completeness of the plan; Feasibility of goals and timeline. \"Proposals that score highly in the evaluation rubric are more likely to be funded, but there is no minimum threshold number of points for funding and no threshold that guarantees funding. Grant decisions are heavily influenced by the evaluation rubric but also take into consideration the balancing of project areas.\"\n\nDisbursement is milestone-gated: \"All milestones are required to be filled in disbursements following the following disbursement schedule (template): Compound Milestone Tranches - Alcancía.pdf\". There is no round deadline — proposals are read as they arrive.\n\n**Go-live.** The DDA program \"went live on the 5th of October\" 2023 with $800k across four domains, of which this is one; Questbook's Phase 2 continuation request on the Arbitrum forum is what dates it. Both original domains in this corpus carry that same go-live as `postedAt`, because the four domains opened together and none of them was announced separately.",
       "summary": "Rolling, milestone-gated funding for developer tooling on Arbitrum One and Nova under the Arbitrum DAO's Delegated Domain Allocation model, decided by the elected domain allocator, with a 25,000 ARB per-grant soft cap.",
       "status": "open",
       "operatingOrganizations": [
@@ -6353,6 +6353,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-10-05T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6367,7 +6368,7 @@
           "The team is evidenced with links to references and socials."
         ]
       },
-      "additionalReferences": "Domain page with scope, rubric and soft cap: https://www.arbitrumhub.io/grant-hub/quest-book/grants/tooling/ · All DDA domains: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Questbook portal for Arbitrum grants, listing Arbitrum DDA 3.0 / 2.0 / 1.0 and the Arbitrum Stylus Sprint: https://arbitrum.questbook.app/ · Arbitrum governance forum: https://forum.arbitrum.foundation/ · Allocator: https://twitter.com/Flook_eth · Per-grant soft cap: 25,000 ARB. Disbursement template: \"Compound Milestone Tranches - Alcancía.pdf\".",
+      "additionalReferences": "Domain page with scope, rubric and soft cap: https://www.arbitrumhub.io/grant-hub/quest-book/grants/tooling/ · All DDA domains: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Questbook portal for Arbitrum grants, listing Arbitrum DDA 3.0 / 2.0 / 1.0 and the Arbitrum Stylus Sprint: https://arbitrum.questbook.app/ · Arbitrum governance forum: https://forum.arbitrum.foundation/ · Allocator: https://twitter.com/Flook_eth · Per-grant soft cap: 25,000 ARB. Disbursement template: \"Compound Milestone Tranches - Alcancía.pdf\". · DDA Phase 2 request for continuation, which dates the program's go-live: https://forum.arbitrum.foundation/t/questbook-dda-program-phase-2-request-for-continuation/21326",
       "categories": [
         "Funding Opportunity",
         "Developer Tooling",
@@ -6403,7 +6404,7 @@
       "id": "curated:arbitrum-dda-education-community-growth-and-events",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Education, Community Growth and Events",
-      "description": "The Education, Community Growth and Events domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. The elected domain allocator is listed as @SEED Latam, reachable through the domain's Discord invite. The domain shows Status \"Live\" with \"Available $120k\" — the remaining envelope, not a per-award cap.\n\nThe allocator states its posture plainly: \"We recognize that communities and the educational realm play an essential role in the growth of an ecosystem… However, we're also aware that this domain is one of the most challenging to evaluate its real impact or the quality of its content. We know it can be susceptible to opportunistic practices, such as 'farming', and sometimes the budgets presented may be excessive. It's vital for us to adopt a critical approach to ensure funds are allocated to initiatives that genuinely have a positive impact on Arbitrum.\"\n\nFour funding verticals are published: Organization of Hackathons (the primary vertical and \"our main focus\"), for web3 hackathons in Arbitrum One, Arbitrum Nova and Arbitrum Orbit ecosystems, with \"special attention to those hackathons that promote the development of tools and products using Stylus\"; Initiatives for Institutional Community Growth, connecting and strengthening the Arbitrum community in universities and educational institutions and reaching beyond software development into Economics, Law, Political Science and others, including innovations in academic development in collaboration with Arbitrum DAO and governance; Educational Materials and Workshops, long-lasting tutorials and videos covering Arbitrum One, Nova, Orbit and Stylus in visual, written or web formats, multilingual, and \"vital that these resources be freely accessible and offered for free\"; and IRL educational events where \"Arbitrum stands out as the protagonist\", with a stated preference for smaller gatherings of 30–60 participants in emerging or unconventional regions.\n\nExplicit exclusions: \"In the educational branch, we won't back sensationalist materials or those about airdrops, ARB token quotations, or fleeting news. Our mission is to promote consistent, long-term educational content.\" On events: \"we won't support two consecutive events from one region or the same country - this is obviously subject to demand\", and content value is prioritised \"rather than purely promotional strategies\".\n\nSix evaluation criteria are published: Team Composition and Experience (web3 plus \"a solid and verifiable background in web2\", trustworthy individuals with an impeccable reputation, no fraudulent behaviour); Innovation and Quality of the Idea (high quality, durable, freely accessible, academic rather than advertising, university collaborations valued); Budget and Plan Depth (justified budgets with a thorough breakdown; excessive or unrelated expenses will be scrutinised; applicants urged to receive funds through a multisig \"not only as a security measure but also to ensure resources aren't under the exclusive control of a single address\"); Roadmap and Milestones (well-defined, realistic, feasible; ambiguous proposals will not be considered; milestones serve as benchmarks for the community to monitor progress); Impact, Outcomes and Metrics (robust assessment methods, open and consistent communication with the Arbitrum community, tangible on-chain or off-chain outcomes, published metrics after a set period); and Long-Term Perspective (sustained vision, no short-lived initiatives).\n\nProposals are read as they arrive; there is no round deadline.",
+      "description": "The Education, Community Growth and Events domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. The elected domain allocator is listed as @SEED Latam, reachable through the domain's Discord invite. The domain shows Status \"Live\" with \"Available $120k\" — the remaining envelope, not a per-award cap.\n\nThe allocator states its posture plainly: \"We recognize that communities and the educational realm play an essential role in the growth of an ecosystem… However, we're also aware that this domain is one of the most challenging to evaluate its real impact or the quality of its content. We know it can be susceptible to opportunistic practices, such as 'farming', and sometimes the budgets presented may be excessive. It's vital for us to adopt a critical approach to ensure funds are allocated to initiatives that genuinely have a positive impact on Arbitrum.\"\n\nFour funding verticals are published: Organization of Hackathons (the primary vertical and \"our main focus\"), for web3 hackathons in Arbitrum One, Arbitrum Nova and Arbitrum Orbit ecosystems, with \"special attention to those hackathons that promote the development of tools and products using Stylus\"; Initiatives for Institutional Community Growth, connecting and strengthening the Arbitrum community in universities and educational institutions and reaching beyond software development into Economics, Law, Political Science and others, including innovations in academic development in collaboration with Arbitrum DAO and governance; Educational Materials and Workshops, long-lasting tutorials and videos covering Arbitrum One, Nova, Orbit and Stylus in visual, written or web formats, multilingual, and \"vital that these resources be freely accessible and offered for free\"; and IRL educational events where \"Arbitrum stands out as the protagonist\", with a stated preference for smaller gatherings of 30–60 participants in emerging or unconventional regions.\n\nExplicit exclusions: \"In the educational branch, we won't back sensationalist materials or those about airdrops, ARB token quotations, or fleeting news. Our mission is to promote consistent, long-term educational content.\" On events: \"we won't support two consecutive events from one region or the same country - this is obviously subject to demand\", and content value is prioritised \"rather than purely promotional strategies\".\n\nSix evaluation criteria are published: Team Composition and Experience (web3 plus \"a solid and verifiable background in web2\", trustworthy individuals with an impeccable reputation, no fraudulent behaviour); Innovation and Quality of the Idea (high quality, durable, freely accessible, academic rather than advertising, university collaborations valued); Budget and Plan Depth (justified budgets with a thorough breakdown; excessive or unrelated expenses will be scrutinised; applicants urged to receive funds through a multisig \"not only as a security measure but also to ensure resources aren't under the exclusive control of a single address\"); Roadmap and Milestones (well-defined, realistic, feasible; ambiguous proposals will not be considered; milestones serve as benchmarks for the community to monitor progress); Impact, Outcomes and Metrics (robust assessment methods, open and consistent communication with the Arbitrum community, tangible on-chain or off-chain outcomes, published metrics after a set period); and Long-Term Perspective (sustained vision, no short-lived initiatives).\n\nProposals are read as they arrive; there is no round deadline.\n\n**Go-live.** The DDA program \"went live on the 5th of October\" 2023 with $800k across four domains, of which this is one; Questbook's Phase 2 continuation request on the Arbitrum forum is what dates it. Both original domains in this corpus carry that same go-live as `postedAt`, because the four domains opened together and none of them was announced separately.",
       "summary": "Rolling, milestone-gated funding for Arbitrum hackathons, academic community growth, free educational materials and small IRL educational events, decided by the elected domain allocator @SEED Latam.",
       "status": "open",
       "operatingOrganizations": [
@@ -6448,6 +6449,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-10-05T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6462,7 +6464,7 @@
           "Impact must be measurable, with metrics and outcomes published to the Arbitrum community after a set period."
         ]
       },
-      "additionalReferences": "Domain page with scope and criteria: https://www.arbitrumhub.io/grant-hub/quest-book/grants/education/ · All DDA domains: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Questbook portal for Arbitrum grants: https://arbitrum.questbook.app/ · Allocator Discord: https://discord.com/invite/zMy9gUzzHH · Arbitrum governance forum: https://forum.arbitrum.foundation/",
+      "additionalReferences": "Domain page with scope and criteria: https://www.arbitrumhub.io/grant-hub/quest-book/grants/education/ · All DDA domains: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Questbook portal for Arbitrum grants: https://arbitrum.questbook.app/ · Allocator Discord: https://discord.com/invite/zMy9gUzzHH · Arbitrum governance forum: https://forum.arbitrum.foundation/ · DDA Phase 2 request for continuation, which dates the program's go-live: https://forum.arbitrum.foundation/t/questbook-dda-program-phase-2-request-for-continuation/21326",
       "categories": [
         "Funding Opportunity",
         "Education",
@@ -6498,7 +6500,7 @@
       "id": "curated:road-to-devcon-8-india-ecosystem-program",
       "fundingType": "rfp",
       "title": "Road to Devcon 8 India — Ecosystem Program",
-      "description": "A Request for Proposals run by the Ethereum Foundation's Ecosystem Support Program (ESP) in the run-up to Devcon 8 (3–6 November 2026, Jio World Centre, Bandra Kurla Complex, Mumbai, India).\n\nThe program \"supports grassroots initiatives that contribute to the Ethereum ecosystem's growth and resilience ahead of Devcon 8… empowering local projects, builders, and ecosystem contributors to create meaningful spaces for learning, experimentation, and coordination, both online and in-person.\" Supported formats are \"meetups, bootcamps, hackathons, roundtables, academic collaborations, and other formats\" that bring new people into Ethereum, strengthen connections across open source communities and the broader technology ecosystem, and encourage hands-on participation and knowledge sharing around CROPS.\n\nStated need: expanding access to Ethereum for new and diverse audiences and lowering barriers to entry through education, experimentation and local initiatives; bridging Ethereum with open source communities; and \"Promoting and putting into practice Ethereum's core values, including: Censorship Resistance, Open Source, Privacy, and Security, through hands-on experiences\" — the CROPS acronym the RFP tests applicants against.\n\nSupport on offer: \"Up to $300 USD in financial support\"; \"Visibility and amplification across Devcon channels\"; \"Non-financial support (connections, guidance, coordination)\"; and \"Limited Devcon tickets (free or discounted), based on contribution and availability\", capped at 5 per request. \"Approved grants under this initiative are paid on-chain in ETH by default.\" Estimated project duration is listed as N/A. ESP tags the RFP \"Community Growth\" and \"Ecosystem\".\n\nApplication window: Opens Jul 3, 2026 · Closes Aug 14, 2026. Applicants apply through the ESP RFP apply route and are asked to follow the published Google Docs submission form.",
+      "description": "A Request for Proposals run by the Ethereum Foundation's Ecosystem Support Program (ESP) in the run-up to Devcon 8 (3–6 November 2026, Jio World Centre, Bandra Kurla Complex, Mumbai, India).\n\nThe program \"supports grassroots initiatives that contribute to the Ethereum ecosystem's growth and resilience ahead of Devcon 8… empowering local projects, builders, and ecosystem contributors to create meaningful spaces for learning, experimentation, and coordination, both online and in-person.\" Supported formats are \"meetups, bootcamps, hackathons, roundtables, academic collaborations, and other formats\" that bring new people into Ethereum, strengthen connections across open source communities and the broader technology ecosystem, and encourage hands-on participation and knowledge sharing around CROPS.\n\nStated need: expanding access to Ethereum for new and diverse audiences and lowering barriers to entry through education, experimentation and local initiatives; bridging Ethereum with open source communities; and \"Promoting and putting into practice Ethereum's core values, including: Censorship Resistance, Open Source, Privacy, and Security, through hands-on experiences\" — the CROPS acronym the RFP tests applicants against.\n\nSupport on offer: \"Up to $300 USD in financial support\"; \"Visibility and amplification across Devcon channels\"; \"Non-financial support (connections, guidance, coordination)\"; and \"Limited Devcon tickets (free or discounted), based on contribution and availability\", capped at 5 per request. \"Approved grants under this initiative are paid on-chain in ETH by default.\" Estimated project duration is listed as N/A. ESP tags the RFP \"Community Growth\" and \"Ecosystem\".\n\nApplication window: Opens Jul 3, 2026 · Closes Aug 14, 2026. Applicants apply through the ESP RFP apply route and are asked to follow the published Google Docs submission form.\n\n**The window on this record is a re-run.** The same RFP page first opened on 25 March 2026 and closed on 20 April 2026 — that first opening is what `postedAt` records, which is why it precedes the July–August window above.",
       "summary": "Ethereum Foundation ESP micro-grants of up to $300 (plus up to 5 Devcon tickets) for grassroots Ethereum meetups, bootcamps, hackathons and roundtables in India held between 1 August and 15 October 2026. Closes 14 August 2026.",
       "status": "open",
       "operatingOrganizations": [
@@ -6557,6 +6559,7 @@
           "label": "eligible activity window end"
         }
       ],
+      "postedAt": "2026-03-25T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6661,6 +6664,7 @@
           "label": "eligible activity window end"
         }
       ],
+      "postedAt": "2026-04-20T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6812,7 +6816,7 @@
       "id": "curated:ethereum-foundation-esp",
       "fundingType": "grant",
       "title": "Ecosystem Support Program (ESP)",
-      "description": "The Ecosystem Support Program (ESP) is an ecosystem-development cluster inside the Ethereum Foundation made up of two teams: Grant Management (allocating resources to the projects most critical to Ethereum's resilience and usability) and Funding Coordination (making it simpler and faster for impactful projects to secure funding, including co-funding work with Octant, Gitcoin and ENS DAO).\n\nESP supports free, open-source, non-commercial work directed at builders rather than end users: Ethereum infrastructure, builder tooling, cryptographic research, education and community development.\n\n**Application process (six steps, rolling, no deadline):**\n1. **Browse** the Wishlist or the RFP list and find an item matching your expertise. Wishlist items name gaps and invite you to propose an approach; RFP items are more prescriptive and time-bound around a defined deliverable.\n2. **Apply** with a proposal covering methodology, timeline and deliverables. You receive a confirmation email.\n3. **Review** by the Grant Management (GM) team together with the EF team that owns the item. May include an interview, project rescoping or budget negotiation.\n4. **Decision** by email. Most applications are reviewed within **3-6 weeks**. Selected projects agree a grant structure with **milestone-based payments**, then complete onboarding including identity verification and a formal grant letter.\n5. **Execute** with a Grant Evaluator assigned for regular check-ins and milestone reviews.\n6. **Complete** by publishing the results publicly in a report or post.\n\n**Funding size:** ESP publishes no fixed award range. Per the ESP FAQ, \"Grant funding is determined based on the scope and complexity of the proposal, unless otherwise specified in the posted Wishlist or RFP item. Where applicable, RFPs may include budget guidance estimates. The GM team will work with applicants to determine final grant amounts.\"\n\n**Payment:** \"Ethereum Foundation grants are paid on-chain in ETH by default\", and recipients must be able to securely receive and manage ETH. Exceptions are considered only in limited cases where legal or operational constraints prevent receiving ETH.\n\nESP's own published allocation history: 136 projects / $26.9M (2021), 397 projects / $30.0M (2022), 498 projects / $61.1M (2023), 677 projects / $44.4M (2024).\n\nYou may apply to multiple Wishlist or RFP items, but each needs a separate application.",
+      "description": "The Ecosystem Support Program (ESP) is an ecosystem-development cluster inside the Ethereum Foundation made up of two teams: Grant Management (allocating resources to the projects most critical to Ethereum's resilience and usability) and Funding Coordination (making it simpler and faster for impactful projects to secure funding, including co-funding work with Octant, Gitcoin and ENS DAO).\n\nESP supports free, open-source, non-commercial work directed at builders rather than end users: Ethereum infrastructure, builder tooling, cryptographic research, education and community development.\n\n**Application process (six steps, rolling, no deadline):**\n1. **Browse** the Wishlist or the RFP list and find an item matching your expertise. Wishlist items name gaps and invite you to propose an approach; RFP items are more prescriptive and time-bound around a defined deliverable.\n2. **Apply** with a proposal covering methodology, timeline and deliverables. You receive a confirmation email.\n3. **Review** by the Grant Management (GM) team together with the EF team that owns the item. May include an interview, project rescoping or budget negotiation.\n4. **Decision** by email. Most applications are reviewed within **3-6 weeks**. Selected projects agree a grant structure with **milestone-based payments**, then complete onboarding including identity verification and a formal grant letter.\n5. **Execute** with a Grant Evaluator assigned for regular check-ins and milestone reviews.\n6. **Complete** by publishing the results publicly in a report or post.\n\n**Funding size:** ESP publishes no fixed award range. Per the ESP FAQ, \"Grant funding is determined based on the scope and complexity of the proposal, unless otherwise specified in the posted Wishlist or RFP item. Where applicable, RFPs may include budget guidance estimates. The GM team will work with applicants to determine final grant amounts.\"\n\n**Payment:** \"Ethereum Foundation grants are paid on-chain in ETH by default\", and recipients must be able to securely receive and manage ETH. Exceptions are considered only in limited cases where legal or operational constraints prevent receiving ETH.\n\nESP's own published allocation history: 136 projects / $26.9M (2021), 397 projects / $30.0M (2022), 498 projects / $61.1M (2023), 677 projects / $44.4M (2024).\n\nYou may apply to multiple Wishlist or RFP items, but each needs a separate application.\n\nESP was introduced on the Ethereum Foundation blog on 19 November 2019 — \"Introducing the Ecosystem Support Program\", published together with a call for applications directing applicants to esp.ethereum.foundation. That is the earliest ESP post on the blog and the date this record carries as `postedAt`.",
       "summary": "Rolling Ethereum Foundation grants for open-source public goods, applied for against a public Wishlist or a defined RFP.",
       "status": "open",
       "operatingOrganizations": [
@@ -6852,6 +6856,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2019-11-19T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6860,7 +6865,7 @@
         "milestoneBased": true,
         "programModel": "grant"
       },
-      "additionalReferences": "Program site: https://esp.ethereum.foundation/",
+      "additionalReferences": "Program site: https://esp.ethereum.foundation/ — introduction and first call for applications (19 November 2019): https://blog.ethereum.org/2019/11/19/ecosystem-support-program-call-for-applications",
       "categories": ["Funding Opportunity", "Public Goods", "Research"],
       "prerequisites": "A proposal must be tied to a specific published Wishlist or RFP item and must detail how you plan to address it, including your methodology, timeline and deliverables, plus how your background and approach align with the project requirements. Separate applications are required for each item. Grant recipients must complete identity verification, sign a formal grant letter, and be able to securely receive and manage on-chain ETH payments.",
       "socialLinks": [
@@ -6888,7 +6893,7 @@
       "id": "curated:aave-grants",
       "fundingType": "grant",
       "title": "Aave Grants",
-      "description": "**This program has been sunset and is no longer accepting or reviewing new grant applications.**\n\nAave Grants DAO (AGD) was approved by the Aave DAO in May 2021 as a community grants program funded through the Aave DAO governance process — effectively a sub-DAO of the Aave DAO — with a group of Reviewers empowered to decide which proposals to fund. It funded contributors across eight categories: applications and integrations; code audits; committees & DAOs serving the Aave ecosystem; community (marketing and educational); developer tooling; events/hackathons/sponsorships; protocol development; and other. Early AGD grantees included Chaos Labs and TokenLogic, both of which later became Aave DAO service providers.\n\n**Wind-down timeline:**\n- August 2024 — \"Update from Aave Grants: Winding Down AGD 1.0 and What's Next\" announced that operations would be wound down and the team disbanded.\n- January 2025 — \"Reflecting on AGD's Journey and Next Steps\" confirmed the wind-down, noting that as new service providers emerged their scope increasingly overlapped with AGD's broad funding mandate.\n- February 2025 — an ARFC to return the remaining AGD treasury (321,768.10 GHO, 259,221.75 OP, 2,275.81 AAVE, 7,281.89 USDT, 6,738.05 USDC, 5,243.26 SAFE, 478.61 DAI) to the Aave DAO collectors passed Snapshot with 723.7K votes.\n- 15 July 2026 — in response to a direct forum question asking whether the program was still active, Aave service provider TokenLogic replied: \"You are correct that Aave Grants DAO has been sunset, and as part of that process, it is no longer accepting or reviewing new grant applications. As such, we wouldn't recommend preparing a submission through the AGD funding process.\"\n\nThe aavegrants.org site and its application form are still reachable and still carry the old rolling-applications copy, but they are stale: the site's news feed has not been updated since 2021 and the intake is not being reviewed. Prospective contributors are directed to engage the Aave DAO governance forum instead.",
+      "description": "**This program has been sunset and is no longer accepting or reviewing new grant applications.**\n\nAave Grants DAO (AGD) was approved by the Aave DAO in May 2021 as a community grants program funded through the Aave DAO governance process — effectively a sub-DAO of the Aave DAO — with a group of Reviewers empowered to decide which proposals to fund. It funded contributors across eight categories: applications and integrations; code audits; committees & DAOs serving the Aave ecosystem; community (marketing and educational); developer tooling; events/hackathons/sponsorships; protocol development; and other. Early AGD grantees included Chaos Labs and TokenLogic, both of which later became Aave DAO service providers.\n\n**Wind-down timeline:**\n- August 2024 — \"Update from Aave Grants: Winding Down AGD 1.0 and What's Next\" announced that operations would be wound down and the team disbanded.\n- January 2025 — \"Reflecting on AGD's Journey and Next Steps\" confirmed the wind-down, noting that as new service providers emerged their scope increasingly overlapped with AGD's broad funding mandate.\n- February 2025 — an ARFC to return the remaining AGD treasury (321,768.10 GHO, 259,221.75 OP, 2,275.81 AAVE, 7,281.89 USDT, 6,738.05 USDC, 5,243.26 SAFE, 478.61 DAI) to the Aave DAO collectors passed Snapshot with 723.7K votes.\n- 15 July 2026 — in response to a direct forum question asking whether the program was still active, Aave service provider TokenLogic replied: \"You are correct that Aave Grants DAO has been sunset, and as part of that process, it is no longer accepting or reviewing new grant applications. As such, we wouldn't recommend preparing a submission through the AGD funding process.\"\n\nThe aavegrants.org site and its application form are still reachable and still carry the old rolling-applications copy, but they are stale: the site's news feed has not been updated since 2021 and the intake is not being reviewed. Prospective contributors are directed to engage the Aave DAO governance forum instead.\n\n**Dating this record.** Aave published no announcement date for AGD, so `postedAt` is an archival bound rather than an announcement: the grants site was publicly visible by 11 May 2021, the first capture of aavegrants.org. The founding forum thread carries the corroborating update — \"UPDATE – May 28, 2021: The proposal was ratified on-chain earlier this month, the grants DAO has been funded and we've started receiving applications.\"",
       "summary": "Aave Grants DAO has been sunset and is no longer accepting or reviewing grant applications. The aavegrants.org site remains online but is stale; its treasury was returned to the Aave DAO in 2025.",
       "status": "closed",
       "operatingOrganizations": [
@@ -6908,6 +6913,7 @@
       "ecosystems": ["Ethereum"],
       "eligibility": "Anyone may apply — no invitation or pre-selection.",
       "applicationUrl": "https://aavegrants.org/apply-for-a-grant/",
+      "postedAt": "2021-05-11T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6916,7 +6922,7 @@
         "fundingMechanisms": ["proactive"],
         "programModel": "grant"
       },
-      "additionalReferences": "Program site: https://aavegrants.org/",
+      "additionalReferences": "Program site: https://aavegrants.org/ — founding governance proposal, ARC: Aave Community Grants Program: https://governance.aave.com/t/arc-aave-community-grants-program/3642",
       "categories": ["Funding Opportunity", "DeFi", "Developer Tools"],
       "socialLinks": [
         {
@@ -6931,7 +6937,7 @@
       "id": "curated:lido-ecosystem-grants-organisation-lego",
       "fundingType": "grant",
       "title": "Lido Ecosystem Grants Organisation (LEGO)",
-      "description": "LEGO (Lido Ecosystem Grants Organization) funds individuals, projects and initiatives that benefit the Lido protocol and the broader blockchain space — developers, crypto enthusiasts and community members with a plan to improve the ecosystem or raise awareness about Ethereum, proof-of-stake and DeFi.\n\n**Grant classification — four tiers, all quoted in USD.** LEGO grants are \"sorted into four different piles by expected size and impact\". The tier determines who approves the grant, not when it may be submitted:\n\n| Tier | Description | Approver | Grant amount |\n|---|---|---|---|\n| **Sandgrain** | Contributions that are nice to have, yet not detrimental. Can be easily evaluated by a single person. | 1 member | up to 1,000 USD |\n| **Pebble** | Non-critical, small things that are beneficial for Lido but not so trivial as to call a sand grain. | 2 members | up to 10,000 USD |\n| **Boulder** | Big, important things that are imperative to be carried out by experts and thoroughly evaluated by core contributors. | Council vote | up to 100,000 USD |\n| **Mountain** | Critical improvements to Lido with significant impact on its growth, security, operations, etc. | DAO vote | 100,000 USD + |\n\nThe Mountain tier has no published upper bound, so the 100,000 USD figure recorded as the maximum award is the top of the Boulder tier — the largest tier with a stated cap.\n\n**Application process (rolling, no deadlines):**\n1. **Contact** — reach the LEGO person responsible for your area of contribution (or any LEGO person, who will forward you) on **Telegram** to introduce yourself and your idea.\n2. **Discuss grant terms** — hash out terms, timelines and deliverables in personal communication with the relevant LEGO member, who takes it through the LEGO approval process.\n3. **Review** — the proposal is shared on the Lido research forum (research.lido.fi) and among LEGO committee members. On approval, communication channels are set up and the nominee receives funding.\n4. **Present** — on completion, the creator presents the work to the LEGO committee.\n\nExecution timelines vary by grant size and by how many committee members must take part.\n\n**Committee:** LEGO has two segments. The **LEGO Council** is 8 partners, each responsible for a segment of Lido, each with a capacity of 15,000 LDO equivalent per quarter to fund sandgrain- and pebble-sized grants; only the Council votes on Boulders. **LEGO Nominees** are up to 20 individuals with a personal budget of 10,000 LDO equivalent per quarter (included in the total LEGO budget), managed by a vote of the LEGO Council. Any LEGO member can send a sandgrain, coordinate on pebbles and motion towards Boulders.\n\nLEGO issues detailed quarterly reports on all granting activity at lego.lido.fi.",
+      "description": "LEGO (Lido Ecosystem Grants Organization) funds individuals, projects and initiatives that benefit the Lido protocol and the broader blockchain space — developers, crypto enthusiasts and community members with a plan to improve the ecosystem or raise awareness about Ethereum, proof-of-stake and DeFi.\n\n**Grant classification — four tiers, all quoted in USD.** LEGO grants are \"sorted into four different piles by expected size and impact\". The tier determines who approves the grant, not when it may be submitted:\n\n| Tier | Description | Approver | Grant amount |\n|---|---|---|---|\n| **Sandgrain** | Contributions that are nice to have, yet not detrimental. Can be easily evaluated by a single person. | 1 member | up to 1,000 USD |\n| **Pebble** | Non-critical, small things that are beneficial for Lido but not so trivial as to call a sand grain. | 2 members | up to 10,000 USD |\n| **Boulder** | Big, important things that are imperative to be carried out by experts and thoroughly evaluated by core contributors. | Council vote | up to 100,000 USD |\n| **Mountain** | Critical improvements to Lido with significant impact on its growth, security, operations, etc. | DAO vote | 100,000 USD + |\n\nThe Mountain tier has no published upper bound, so the 100,000 USD figure recorded as the maximum award is the top of the Boulder tier — the largest tier with a stated cap.\n\n**Application process (rolling, no deadlines):**\n1. **Contact** — reach the LEGO person responsible for your area of contribution (or any LEGO person, who will forward you) on **Telegram** to introduce yourself and your idea.\n2. **Discuss grant terms** — hash out terms, timelines and deliverables in personal communication with the relevant LEGO member, who takes it through the LEGO approval process.\n3. **Review** — the proposal is shared on the Lido research forum (research.lido.fi) and among LEGO committee members. On approval, communication channels are set up and the nominee receives funding.\n4. **Present** — on completion, the creator presents the work to the LEGO committee.\n\nExecution timelines vary by grant size and by how many committee members must take part.\n\n**Committee:** LEGO has two segments. The **LEGO Council** is 8 partners, each responsible for a segment of Lido, each with a capacity of 15,000 LDO equivalent per quarter to fund sandgrain- and pebble-sized grants; only the Council votes on Boulders. **LEGO Nominees** are up to 20 individuals with a personal budget of 10,000 LDO equivalent per quarter (included in the total LEGO budget), managed by a vote of the LEGO Council. Any LEGO member can send a sandgrain, coordinate on pebbles and motion towards Boulders.\n\nLEGO issues detailed quarterly reports on all granting activity at lego.lido.fi.\n\nLEGO was introduced on the Lido research forum on 10 March 2021, in the topic \"Project: Lido Ecosystem Grants Organization\" — \"a draft of the program for funding Lido ecosystem development with grants from the Lido Treasury\".",
       "summary": "Tiered rolling grants for work that benefits Lido and Ethereum staking, from small committee approvals up to DAO-vote grants.",
       "status": "open",
       "operatingOrganizations": [
@@ -6975,6 +6981,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-03-10T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6982,7 +6989,7 @@
         "fundingMechanisms": ["proactive"],
         "programModel": "grant"
       },
-      "additionalReferences": "LEGO quarterly granting reports: https://lego.lido.fi/lego-quarterly-reporting — Lido research forum (where proposals are shared for committee review): https://research.lido.fi/ — Lido documentation: https://docs.lido.fi/",
+      "additionalReferences": "LEGO quarterly granting reports: https://lego.lido.fi/lego-quarterly-reporting — Lido research forum (where proposals are shared for committee review): https://research.lido.fi/ — the post introducing LEGO (10 March 2021): https://research.lido.fi/t/project-lido-ecosystem-grants-organization/406 — Lido documentation: https://docs.lido.fi/",
       "categories": ["Funding Opportunity", "Staking", "Public Goods"],
       "prerequisites": "Prepare a short pitch covering: **Title** — what the grant application is about; **Author(s)** — who will be working on the proposal, with experience and previous major achievements; **Purpose** — how it will aid the Lido ecosystem and why it is important; **Summary** — a brief 3-4 sentence summary of the application; **Details** — timelines and expense estimates. Initial contact is made on Telegram with the LEGO member responsible for your area of contribution.",
       "socialLinks": [
@@ -7018,7 +7025,7 @@
       "id": "curated:ssv-grants-program",
       "fundingType": "grant",
       "title": "SSV Grants Program",
-      "description": "The ssv.network Grants Program, **led by the SSV Foundation**, funds teams building services for the SSV Network ecosystem, with the intent of promoting and accelerating development and innovation by building on top of ssv.network. The program is presented publicly under the headline \"$5M Grants Program\" and is community-led.\n\n**Grant categories:**\n- **Open Grants** — supporting unique use cases for SSV across the ecosystem.\n- **Strategic Partnerships** — partnerships to develop critical components like performance data, monitoring tools and integrations.\n- **Performance and Metadata Providers** — reliable performance and metadata services for the SSV ecosystem.\n- **Alerting & Monitoring Solutions** — tools for real-time network monitoring and alerting.\n- **Alternative Client Implementations** — different client software to improve network resilience and diversification.\n- **Staking Integrations** — partnering with major staking protocols to enhance ecosystem interoperability.\n- **Developer Tools** — tools that assist developers building on the SSV network.\n- **Bug Bounties** — run separately as a $1M program powered by Immunefi.\n- **Micro Grants** — smaller grants for impactful contributions, often awarded retroactively, honouring those who significantly contributed to the community and the project in unforeseen ways. Anyone in the community can be awarded one or suggest a candidate.\n\n**Process:** applications are reviewed on a rolling basis by the **Grants Committee**, which votes on approval and communicates the decision to the applicant. Accepted grant applications are published on the ssv.network forum. Milestone completion is then tracked closely together with the Grants Committee. All grantees must sign agreements with the SSV Foundation and complete **KYC/KYB**.\n\nGrant sizes are negotiated per application rather than published as a range; the program's own showcase cites SSVScan (by DragonStake and Polkastats) as having received a **$300k** grant. Program contact: matthias@ssv.network.",
+      "description": "The ssv.network Grants Program, **led by the SSV Foundation**, funds teams building services for the SSV Network ecosystem, with the intent of promoting and accelerating development and innovation by building on top of ssv.network. The program is presented publicly under the headline \"$5M Grants Program\" and is community-led.\n\n**Grant categories:**\n- **Open Grants** — supporting unique use cases for SSV across the ecosystem.\n- **Strategic Partnerships** — partnerships to develop critical components like performance data, monitoring tools and integrations.\n- **Performance and Metadata Providers** — reliable performance and metadata services for the SSV ecosystem.\n- **Alerting & Monitoring Solutions** — tools for real-time network monitoring and alerting.\n- **Alternative Client Implementations** — different client software to improve network resilience and diversification.\n- **Staking Integrations** — partnering with major staking protocols to enhance ecosystem interoperability.\n- **Developer Tools** — tools that assist developers building on the SSV network.\n- **Bug Bounties** — run separately as a $1M program powered by Immunefi.\n- **Micro Grants** — smaller grants for impactful contributions, often awarded retroactively, honouring those who significantly contributed to the community and the project in unforeseen ways. Anyone in the community can be awarded one or suggest a candidate.\n\n**Process:** applications are reviewed on a rolling basis by the **Grants Committee**, which votes on approval and communicates the decision to the applicant. Accepted grant applications are published on the ssv.network forum. Milestone completion is then tracked closely together with the Grants Committee. All grantees must sign agreements with the SSV Foundation and complete **KYC/KYB**.\n\nGrant sizes are negotiated per application rather than published as a range; the program's own showcase cites SSVScan (by DragonStake and Polkastats) as having received a **$300k** grant. Program contact: matthias@ssv.network.\n\nThe SSV Foundation published no announcement date, so `postedAt` is an archival bound: the program's own public application page was publicly visible by 25 August 2022, its first capture. The SSV DAO forum proposal that created the program (\"Eco-system Grant Program\") was posted 12 April 2022.",
       "summary": "Community-led $5M program funding decentralized staking apps, services and tooling on ssv.network, reviewed on a rolling basis.",
       "status": "open",
       "operatingOrganizations": [
@@ -7056,6 +7063,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-08-25T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7088,7 +7096,7 @@
       "id": "curated:nouns-dao-small-grants",
       "fundingType": "grant",
       "title": "Nouns DAO Small Grants",
-      "description": "The Nouns DAO Small Grants Committee was created by **Nouns proposal 13**. It is run by a group of Nouners to be a \"flexible pool of capital\" that can be deployed when the project is time-sensitive, when the ask is too small for an official Nouns DAO proposal, or when retroactive funding is merited because the work is already done.\n\nThe committee's own scope statement is **\"For projects needing 0.1-10Ξ\"** — grants are denominated natively in ETH. The published grants ledger shows individual awards from 0.1 ETH up to about 27 ETH, with USD equivalents shown alongside for reference only.\n\n**Two funding modes:**\n- **Small Grant** — an upfront payment to fund a project.\n- **Retroactive Funding** — a payment for work already completed.\n\n**Requesting a grant:** open a post on the Nouns Discourse forum and prefix the title with \"Small Grants: \" for visibility. A committee member will then reach out to you, but you can also post the link to your Discourse post in the **#grants-and-retro-funding** channel in the Nouns Discord to get it on their radar. There are no deadlines.\n\n**⚠️ Verification note (checked 2026-08-11):** the Discourse forum that this process depends on no longer exists — `discourse.nouns.wtf` does not resolve in DNS (and neither does `forum.nouns.wtf`), so every historical \"Small Grants:\" thread linked from the instructions is unreachable. The instructions page itself is live and unchanged, and the Nouns Discord invite still resolves, but the documented primary submission venue is dead and the committee's current operating status could not be established from any live page. Prospective applicants should confirm the current route in the Nouns Discord before relying on these instructions.",
+      "description": "The Nouns DAO Small Grants Committee was created by **Nouns proposal 13**. It is run by a group of Nouners to be a \"flexible pool of capital\" that can be deployed when the project is time-sensitive, when the ask is too small for an official Nouns DAO proposal, or when retroactive funding is merited because the work is already done.\n\nThe committee's own scope statement is **\"For projects needing 0.1-10Ξ\"** — grants are denominated natively in ETH. The published grants ledger shows individual awards from 0.1 ETH up to about 27 ETH, with USD equivalents shown alongside for reference only.\n\n**Two funding modes:**\n- **Small Grant** — an upfront payment to fund a project.\n- **Retroactive Funding** — a payment for work already completed.\n\n**Requesting a grant:** open a post on the Nouns Discourse forum and prefix the title with \"Small Grants: \" for visibility. A committee member will then reach out to you, but you can also post the link to your Discourse post in the **#grants-and-retro-funding** channel in the Nouns Discord to get it on their radar. There are no deadlines.\n\n**⚠️ Verification note (checked 2026-08-11):** the Discourse forum that this process depends on no longer exists — `discourse.nouns.wtf` does not resolve in DNS (and neither does `forum.nouns.wtf`), so every historical \"Small Grants:\" thread linked from the instructions is unreachable. The instructions page itself is live and unchanged, and the Nouns Discord invite still resolves, but the documented primary submission venue is dead and the committee's current operating status could not be established from any live page. Prospective applicants should confirm the current route in the Nouns Discord before relying on these instructions.\n\nProposal 13, \"Retroactive Funding and Small Grants Pool\", was proposed on 19 October 2021 by noun22.eth, which is the date this record carries as `postedAt`.",
       "summary": "Rolling, community-run pool for small and time-sensitive Nouns projects, funded upfront or retroactively.",
       "status": "closed",
       "operatingOrganizations": [
@@ -7129,6 +7137,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-10-19T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7156,7 +7165,7 @@
       "id": "curated:metamask-grants-program",
       "fundingType": "grant",
       "title": "MetaMask Grants Program",
-      "description": "MetaMask Grants DAO is an employee-led, Consensys-funded DAO whose mission is to fund the development of high-value projects in the MetaMask ecosystem, supporting developers across the community to build on top of MetaMask while empowering Consensys employees to embrace web3 mechanisms.\n\n**Structure — three parts:**\n1. **Employee-Led DAO** — the body of the DAO, made up of full-time Consensys employees, with a stated intent to decentralize over time and add external contributors.\n2. **Leadership Committee (mini-DAO)** — 7 individuals responsible for finding high-potential projects, creating governance proposals, updating external content, gathering feedback and queuing multisig transactions. If a member leaves Consensys, the remaining members may fill the seat by majority vote. Members are Dan Finlay, Aaron Davis (Kumavis), Taylor Monahan, Christian Montoya, Ryan Jones, Ian Wallis and Jordan Spence.\n3. **Secure MultiSig** — a 2-of-3 Gnosis Safe controlled by Consensys that manages the token contract and treasury and signs disbursements.\n\n**Two grant types:**\n- **Leadership Committee Grants** — voted on exclusively by the Leadership Committee. Any Committee member may propose; proposals with at least **5 'yes' votes** at closing pass. Votes are open for **five days**.\n- **Full DAO Grants** — voted on by the full DAO. Any Committee member may propose; proposals with more 'yes' than 'no' votes at closing pass. Votes are open for **ten days**.\n\nVoting occurs on Activate, Consensys' proprietary platform built on top of Snapshot (the DAO's Snapshot space is `heart.mmgdao.eth`). Governance uses a non-transferable, fungible mainnet token that is mintable and burnable by the multisig and is \"explicitly designed to never be exchanged for value\"; all Consensys employees receive the same number of tokens, minted on joining and burned on departure.\n\n**Intake:** external developers apply via a rolling application form. The DAO's Request for Proposals page states: \"We are not currently running any RFP rounds, but our rolling grant applications remain open.\" There is no guaranteed review timeline — \"We can't guarantee when we will review your request or that it will get approved, but know that our team will review the application pipeline as often as we can.\"\n\nNo per-grant funding range and no annual program budget figure is published anywhere on the DAO's own site.",
+      "description": "MetaMask Grants DAO is an employee-led, Consensys-funded DAO whose mission is to fund the development of high-value projects in the MetaMask ecosystem, supporting developers across the community to build on top of MetaMask while empowering Consensys employees to embrace web3 mechanisms.\n\n**Structure — three parts:**\n1. **Employee-Led DAO** — the body of the DAO, made up of full-time Consensys employees, with a stated intent to decentralize over time and add external contributors.\n2. **Leadership Committee (mini-DAO)** — 7 individuals responsible for finding high-potential projects, creating governance proposals, updating external content, gathering feedback and queuing multisig transactions. If a member leaves Consensys, the remaining members may fill the seat by majority vote. Members are Dan Finlay, Aaron Davis (Kumavis), Taylor Monahan, Christian Montoya, Ryan Jones, Ian Wallis and Jordan Spence.\n3. **Secure MultiSig** — a 2-of-3 Gnosis Safe controlled by Consensys that manages the token contract and treasury and signs disbursements.\n\n**Two grant types:**\n- **Leadership Committee Grants** — voted on exclusively by the Leadership Committee. Any Committee member may propose; proposals with at least **5 'yes' votes** at closing pass. Votes are open for **five days**.\n- **Full DAO Grants** — voted on by the full DAO. Any Committee member may propose; proposals with more 'yes' than 'no' votes at closing pass. Votes are open for **ten days**.\n\nVoting occurs on Activate, Consensys' proprietary platform built on top of Snapshot (the DAO's Snapshot space is `heart.mmgdao.eth`). Governance uses a non-transferable, fungible mainnet token that is mintable and burnable by the multisig and is \"explicitly designed to never be exchanged for value\"; all Consensys employees receive the same number of tokens, minted on joining and burned on departure.\n\n**Intake:** external developers apply via a rolling application form. The DAO's Request for Proposals page states: \"We are not currently running any RFP rounds, but our rolling grant applications remain open.\" There is no guaranteed review timeline — \"We can't guarantee when we will review your request or that it will get approved, but know that our team will review the application pipeline as often as we can.\"\n\nNo per-grant funding range and no annual program budget figure is published anywhere on the DAO's own site.\n\nThe DAO was launched on 27 October 2022, announced by Consensys as issuing grants to developers worldwide; metamaskgrants.org was first captured the same day.",
       "summary": "Employee-led, Consensys-funded rolling grants for external developers building in the MetaMask ecosystem.",
       "status": "open",
       "operatingOrganizations": [
@@ -7182,6 +7191,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-10-27T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7209,7 +7219,7 @@
       "id": "curated:unichain-grants",
       "fundingType": "grant",
       "title": "Unichain Grants",
-      "description": "The Uniswap Foundation funds work across the Uniswap Protocol and Unichain in five focus areas it publishes as: **Developers** (onboarding new developers to build on the Uniswap Protocol and supporting them through the development lifecycle), **Infrastructure** (new core infrastructure and growth strategies), **Governance** (empowering Uniswap governance to support protocol growth and sustain itself), **Research** (seeding DeFi research and its practical implementations), and **Security** (protecting the Protocol's users through investments into security). Its grants page groups the funded portfolio under Ecosystem, Research, Security and Governance.\n\n**Payment currency and mechanics:** the Foundation's FAQ states that \"Grant payments are currently made in fiat USD or USDC.\" During the Selection phase a team member works with the applicant to outline grant milestones, each tied to clear deliverables and to a portion of the overall payment; **grants typically have 2-5 milestones**, defined in the contract executed on approval. The initial payment is disbursed after KYC and contract signature, and subsequent payments on completion of each milestone. Every grantee is assigned a point person for 1-1 support and milestone check-ins.\n\nRepresentative funded work includes the Uniswap Hook Incubator (Atrium Academy, 1,200+ applicants and 400+ developers onboarded), the OpenZeppelin v4 Hooks Library, the Uniswap Foundation Security Fund (Areta), v4 audits (OpenZeppelin, Trail of Bits, Cantina/Spearbit, ABDK, Certora), Unichain infrastructure and DeFi protocol onboarding support, the Protocol Grants Program (Auditless), Doppler (Whetstone), TLDR, and governance work with Agora, Blockful and Butter.\n\n**⚠️ Intake state (checked 2026-08-11):** could not be confirmed. The Uniswap Foundation grants page at uniswapfoundation.org/grants is a funded-grants portfolio and impact page — it contains no application form, no apply call-to-action, and in fact no occurrence of the words \"apply\", \"application\", \"submit\" or \"intake\" anywhere in its markup; /grants/apply and /apply both return HTTP 404. The Foundation's FAQ describes an active application and selection process in the present tense, and the HubSpot form recorded on this program returns HTTP 200, but a HubSpot form shell returns 200 whether or not the round behind it is accepting. No published award range or deadline was found on any Uniswap Foundation page, so no funding figures are asserted here.",
+      "description": "The Uniswap Foundation funds work across the Uniswap Protocol and Unichain in five focus areas it publishes as: **Developers** (onboarding new developers to build on the Uniswap Protocol and supporting them through the development lifecycle), **Infrastructure** (new core infrastructure and growth strategies), **Governance** (empowering Uniswap governance to support protocol growth and sustain itself), **Research** (seeding DeFi research and its practical implementations), and **Security** (protecting the Protocol's users through investments into security). Its grants page groups the funded portfolio under Ecosystem, Research, Security and Governance.\n\n**Payment currency and mechanics:** the Foundation's FAQ states that \"Grant payments are currently made in fiat USD or USDC.\" During the Selection phase a team member works with the applicant to outline grant milestones, each tied to clear deliverables and to a portion of the overall payment; **grants typically have 2-5 milestones**, defined in the contract executed on approval. The initial payment is disbursed after KYC and contract signature, and subsequent payments on completion of each milestone. Every grantee is assigned a point person for 1-1 support and milestone check-ins.\n\nRepresentative funded work includes the Uniswap Hook Incubator (Atrium Academy, 1,200+ applicants and 400+ developers onboarded), the OpenZeppelin v4 Hooks Library, the Uniswap Foundation Security Fund (Areta), v4 audits (OpenZeppelin, Trail of Bits, Cantina/Spearbit, ABDK, Certora), Unichain infrastructure and DeFi protocol onboarding support, the Protocol Grants Program (Auditless), Doppler (Whetstone), TLDR, and governance work with Agora, Blockful and Butter.\n\n**⚠️ Intake state (checked 2026-08-11):** could not be confirmed. The Uniswap Foundation grants page at uniswapfoundation.org/grants is a funded-grants portfolio and impact page — it contains no application form, no apply call-to-action, and in fact no occurrence of the words \"apply\", \"application\", \"submit\" or \"intake\" anywhere in its markup; /grants/apply and /apply both return HTTP 404. The Foundation's FAQ describes an active application and selection process in the present tense, and the HubSpot form recorded on this program returns HTTP 200, but a HubSpot form shell returns 200 whether or not the round behind it is accepting. No published award range or deadline was found on any Uniswap Foundation page, so no funding figures are asserted here.\n\nUnichain Developer Grants were announced by the Uniswap Foundation on 14 October 2024, in the post \"Introducing Unichain Developer Grants\".",
       "summary": "Rolling Uniswap Foundation grants across Uniswap v4 and Unichain — protocol, tooling, apps, research, governance and security.",
       "status": "closed",
       "operatingOrganizations": [
@@ -7247,6 +7257,7 @@
       "ecosystems": ["Ethereum"],
       "eligibility": "Anyone may apply — no invitation or pre-selection.",
       "applicationUrl": "https://share.hsforms.com/18Kv3hTvDSt-x1wK9va0OYwsdca9",
+      "postedAt": "2024-10-14T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7255,7 +7266,7 @@
         "milestoneBased": true,
         "programModel": "grant"
       },
-      "additionalReferences": "Uniswap Foundation FAQs (grant payment currency, milestone mechanics, foundation identity): https://www.uniswapfoundation.org/faqs — grants portfolio: https://www.uniswapfoundation.org/grants — Uniswap governance forum: https://gov.uniswap.org/ — developer docs: https://developers.uniswap.org/docs",
+      "additionalReferences": "Uniswap Foundation FAQs (grant payment currency, milestone mechanics, foundation identity): https://www.uniswapfoundation.org/faqs — grants portfolio: https://www.uniswapfoundation.org/grants — announcement, \"Introducing Unichain Developer Grants\" (14 October 2024): https://www.uniswapfoundation.org/blog/introducing-unichain-developer-grants — Uniswap governance forum: https://gov.uniswap.org/ — developer docs: https://developers.uniswap.org/docs",
       "categories": ["Funding Opportunity", "DeFi", "Developer Tools", "Research"],
       "socialLinks": [
         {
@@ -7282,7 +7293,7 @@
       "id": "curated:safe-ecosystem-foundation-grants",
       "fundingType": "grant",
       "title": "Safe Ecosystem Foundation Grants",
-      "description": "The Safe Ecosystem Foundation supports builders, researchers and communities advancing the adoption and security of smart account infrastructure. Its programs are governed by SafeDAO and powered by the SAFE token.\n\n**What it funds (six areas):**\n- **Protocol & Infrastructure** — core smart account improvements, module development, standards work (e.g. ERC-4337), and interoperability.\n- **Security** — audits, formal verification, vulnerability research, and defensive tooling that hardens the Safe stack.\n- **Developer Tooling & SDKs** — libraries, SDKs, APIs and integrations that make it easier to build on Safe.\n- **Research** — academic and applied research on account abstraction, governance, key management and related topics.\n- **Ecosystem Growth** — educational content, documentation, community events and adoption campaigns.\n- **Applications** — products and services built on Safe that demonstrate novel use cases for smart accounts.\n\n**Spontaneous Grants — the active rolling track.** \"The Foundation accepts unsolicited grant proposals on a rolling basis. If you are building something that advances the Safe ecosystem and need financial support, we want to hear from you.\" Process:\n1. Submit your proposal by email to grants@safefoundation.org.\n2. Include: project description, scope & milestones, budget breakdown, team background, and expected impact.\n3. The Foundation reviews proposals internally. **Expect an initial reply within 4 weeks.**\n4. Approved grants are paid in milestones tied to deliverables.\n\nNo award range is published for the Spontaneous Grants track.\n\n**Other initiatives (for context, not the rolling track):** the SafeDAO Grants Program Wave 1 is concluded (Aug 2023 - Jan 2024; 120 applications, 21 grants awarded, ~$500K deployed across Build, Growth, Research and Govern). SafeDAO OBRA, an outcomes-based allocation model of approximately $1.3M in stablecoins, is temporarily paused. The Safe smart account bug bounty is ongoing and separate, with rewards up to $1,000,000 for High severity, up to $50,000 for Medium and up to $10,000 for Low; six bounties worth $41,500 have been paid to date. Hackathon sponsorship is ongoing, with 100+ winner teams and $250K in prizes distributed.",
+      "description": "The Safe Ecosystem Foundation supports builders, researchers and communities advancing the adoption and security of smart account infrastructure. Its programs are governed by SafeDAO and powered by the SAFE token.\n\n**What it funds (six areas):**\n- **Protocol & Infrastructure** — core smart account improvements, module development, standards work (e.g. ERC-4337), and interoperability.\n- **Security** — audits, formal verification, vulnerability research, and defensive tooling that hardens the Safe stack.\n- **Developer Tooling & SDKs** — libraries, SDKs, APIs and integrations that make it easier to build on Safe.\n- **Research** — academic and applied research on account abstraction, governance, key management and related topics.\n- **Ecosystem Growth** — educational content, documentation, community events and adoption campaigns.\n- **Applications** — products and services built on Safe that demonstrate novel use cases for smart accounts.\n\n**Spontaneous Grants — the active rolling track.** \"The Foundation accepts unsolicited grant proposals on a rolling basis. If you are building something that advances the Safe ecosystem and need financial support, we want to hear from you.\" Process:\n1. Submit your proposal by email to grants@safefoundation.org.\n2. Include: project description, scope & milestones, budget breakdown, team background, and expected impact.\n3. The Foundation reviews proposals internally. **Expect an initial reply within 4 weeks.**\n4. Approved grants are paid in milestones tied to deliverables.\n\nNo award range is published for the Spontaneous Grants track.\n\n**Other initiatives (for context, not the rolling track):** the SafeDAO Grants Program Wave 1 is concluded (Aug 2023 - Jan 2024; 120 applications, 21 grants awarded, ~$500K deployed across Build, Growth, Research and Govern). SafeDAO OBRA, an outcomes-based allocation model of approximately $1.3M in stablecoins, is temporarily paused. The Safe smart account bug bounty is ongoing and separate, with rewards up to $1,000,000 for High severity, up to $50,000 for Medium and up to $10,000 for Low; six bounties worth $41,500 have been paid to date. Hackathon sponsorship is ongoing, with 100+ winner teams and $250K in prizes distributed.\n\nThe Foundation published no announcement post for the grants page, so `postedAt` is an archival bound: the program was publicly visible by 11 March 2026, the first capture of the Foundation homepage that links /grants — the 8 January and 1 February 2026 captures carry no such link — and the grants page itself is first captured 19 April 2026.",
       "summary": "Rolling, unsolicited grant proposals for smart accounts, self-custody infrastructure and Safe-integrated applications.",
       "status": "open",
       "operatingOrganizations": [
@@ -7325,6 +7336,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2026-03-11T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7459,7 +7471,7 @@
       "id": "curated:alchemy-x-arbitrum-grant",
       "fundingType": "grant",
       "title": "Alchemy x Arbitrum Grant",
-      "description": "Alchemy's Arbitrum Grant Fund is a $10,000,000 USD program of Alchemy development-platform credits for teams building or migrating to Arbitrum Orbit rollups. Awards are up to $500,000 USD per team, granted as credits applied directly to Alchemy's development platform rather than as cash, and are accompanied by co-marketing with Arbitrum and Alchemy.\n\nAs of 2026-08-11 the program page still shows **$1,000,000 remaining of the $10M total grant**, so the pool is not exhausted and applications are still being accepted. Awards are made first-come, first-served on a rolling basis with no published deadline. Applications are submitted through the contact form at alchemy.com/arbitrum-grant-contact, which asks for name, email, optional Telegram, company name and website, a description of the project, the team's current web3 infrastructure providers, and the biggest resource Alchemy can help provide.\n\nThe program is listed on the Arbitrum Foundation's own grants index as Active and 'Managed by Alchemy'.",
+      "description": "Alchemy's Arbitrum Grant Fund is a $10,000,000 USD program of Alchemy development-platform credits for teams building or migrating to Arbitrum Orbit rollups. Awards are up to $500,000 USD per team, granted as credits applied directly to Alchemy's development platform rather than as cash, and are accompanied by co-marketing with Arbitrum and Alchemy.\n\nAs of 2026-08-11 the program page still shows **$1,000,000 remaining of the $10M total grant**, so the pool is not exhausted and applications are still being accepted. Awards are made first-come, first-served on a rolling basis with no published deadline. Applications are submitted through the contact form at alchemy.com/arbitrum-grant-contact, which asks for name, email, optional Telegram, company name and website, a description of the project, the team's current web3 infrastructure providers, and the biggest resource Alchemy can help provide.\n\nThe program is listed on the Arbitrum Foundation's own grants index as Active and 'Managed by Alchemy'.\n\nApplications opened on 26 November 2024 — \"On Nov. 26, Alchemy … opened applications for a $10 million grant program\" for Arbitrum Orbit teams — and alchemy.com/arbitrum-grant was first archived the following day.",
       "summary": "Up to $500K USD in Alchemy platform credits per team for Arbitrum Orbit chain builders, first-come first-served from a $10M pool that still shows $1M remaining as of 2026-08-11.",
       "status": "open",
       "operatingOrganizations": [
@@ -7501,6 +7513,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-11-26T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7508,7 +7521,7 @@
         "fundingMechanisms": ["proactive"],
         "milestoneBased": false
       },
-      "additionalReferences": "Program page: https://www.alchemy.com/arbitrum-grant | Application form: https://www.alchemy.com/arbitrum-grant-contact | Arbitrum Foundation grants index listing: https://arbitrum.foundation/grants",
+      "additionalReferences": "Program page: https://www.alchemy.com/arbitrum-grant | Application form: https://www.alchemy.com/arbitrum-grant-contact | Arbitrum Foundation grants index listing: https://arbitrum.foundation/grants | Launch coverage, dating the opening of applications: https://thedefiant.io/news/blockchains/arbitrum-and-alchemy-team-up-on-grants-promoting-orbit-chain-development",
       "categories": ["Funding Opportunity", "Infrastructure", "Developer Tools"],
       "prerequisites": "The application form at alchemy.com/arbitrum-grant-contact requests: first and last name, email address, Telegram (optional), company name, company website, a description of your project, your current web3 infrastructure providers, and the biggest resource Alchemy can help provide to your team.",
       "website": "https://www.alchemy.com/arbitrum-grant"
@@ -7518,7 +7531,7 @@
       "id": "curated:starknet-seed-grants",
       "fundingType": "grant",
       "title": "Starknet Seed Grants",
-      "description": "The Starknet Seed Grants Program provides up to $25,000 in non-dilutive funding to early-stage teams building in the Starknet ecosystem. Amounts are quoted in US dollars and paid out in STRK: the Starknet Foundation's own FAQ answers 'What currency are grants paid in?' with 'Seed Grants are paid out in STRK.'\n\nIntake is continuous — 'you can apply for Seed Grants on an ongoing basis', with applications reviewed in rounds and no application deadlines. The Foundation targets a response in about one month (roughly four weeks).\n\nApplication process, in the Foundation's own five stages: (1) **Application** — apply via the grants submission form; all teams should present a clear plan detailing how the grant will be used within the next three months. (2) **Internal evaluation** — an internal committee assesses each application on potential impact, innovation, milestones, community engagement and track record, and embeddedness with the Starknet ecosystem. (3) **Results** — decisions communicated in approximately four weeks; rejected applicants are also notified. (4) **Onboarding** — after completing KYC/KYB and signing a grant agreement, funds are released. (5) **Post-grant check-in** — after three months the Foundation checks in with grantees to assess results, with grantees expected to share regular updates such as blog posts, videos and AMAs.\n\nApplications are confidential and shared only with the Starknet Foundation and StarkWare teams. Repeat applications are permitted, and teams that have previously received StarkWare or Starknet Foundation funding may apply. Teams needing more than $25,000 are directed to the Growth Grants Program.",
+      "description": "The Starknet Seed Grants Program provides up to $25,000 in non-dilutive funding to early-stage teams building in the Starknet ecosystem. Amounts are quoted in US dollars and paid out in STRK: the Starknet Foundation's own FAQ answers 'What currency are grants paid in?' with 'Seed Grants are paid out in STRK.'\n\nIntake is continuous — 'you can apply for Seed Grants on an ongoing basis', with applications reviewed in rounds and no application deadlines. The Foundation targets a response in about one month (roughly four weeks).\n\nApplication process, in the Foundation's own five stages: (1) **Application** — apply via the grants submission form; all teams should present a clear plan detailing how the grant will be used within the next three months. (2) **Internal evaluation** — an internal committee assesses each application on potential impact, innovation, milestones, community engagement and track record, and embeddedness with the Starknet ecosystem. (3) **Results** — decisions communicated in approximately four weeks; rejected applicants are also notified. (4) **Onboarding** — after completing KYC/KYB and signing a grant agreement, funds are released. (5) **Post-grant check-in** — after three months the Foundation checks in with grantees to assess results, with grantees expected to share regular updates such as blog posts, videos and AMAs.\n\nApplications are confidential and shared only with the Starknet Foundation and StarkWare teams. Repeat applications are permitted, and teams that have previously received StarkWare or Starknet Foundation funding may apply. Teams needing more than $25,000 are directed to the Growth Grants Program.\n\nSeed Grants were announced by the Starknet Foundation on 6 May 2024, in the post \"Announcing the Seed Grant Program\".",
       "summary": "Up to $25,000 (USD-denominated, paid in STRK) in non-dilutive funding for early-stage Starknet teams with an MVP or proof of concept; rolling intake with a decision in about four weeks.",
       "status": "open",
       "operatingOrganizations": [
@@ -7566,6 +7579,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-05-06T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7573,7 +7587,7 @@
         "fundingMechanisms": ["proactive"],
         "milestoneBased": false
       },
-      "additionalReferences": "Program page: https://www.starknet.io/grants/seed-grants/ | Grants overview and stage comparison: https://www.starknet.io/grants/ | Growth Grants (for teams needing more than $25K): https://www.starknet.io/grants/growth-grants/",
+      "additionalReferences": "Program page: https://www.starknet.io/grants/seed-grants/ | Announcement (6 May 2024): https://www.starknet.io/blog/announcing-the-seed-grant-program/ | Grants overview and stage comparison: https://www.starknet.io/grants/ | Growth Grants (for teams needing more than $25K): https://www.starknet.io/grants/growth-grants/",
       "categories": ["Funding Opportunity", "Developer Tools"],
       "prerequisites": "All teams should present a clear plan detailing how the grant will be used within the next three months. A strong application gives a comprehensive overview of the project (objectives, potential impact, alignment with the Starknet ecosystem), clearly articulates the unique value proposition and the challenge or opportunity it addresses, details the team's expertise, experience and contributions, and sets out a well-thought-out plan for allocating the grant money. Repeat applicants are asked whether they have applied before and, if so, to explain how the project has evolved since.",
       "website": "https://www.starknet.io/grants/seed-grants"
@@ -7583,7 +7597,7 @@
       "id": "curated:starknet-growth-grants",
       "fundingType": "grant",
       "title": "Starknet Growth Grants",
-      "description": "The Starknet Growth Grants Program provides non-dilutive funding to later-stage teams actively growing the Starknet ecosystem. The Foundation's grants overview publishes the band as **$25K to $1M STRK** — USD-denominated and paid in STRK — with the Growth Grants page itself stating 'Teams can receive up to $1M in funding'.\n\nGrowth Grants are organised into six categories, each with its own pre-filtered intake form: **Innovation Grants** (next-generation Starknet applications, infrastructure and protocols), **Ecosystem Integration Grants** (bridging Starknet with other networks and expanding interoperability), **Content & Creator Grants** (stories that educate and inspire Starknet users, or apps that make creators the owners of their own stories), **'The Next Billion'™ Grants** (intuitive, secure, accessible experiences that onboard the next billion users without compromising self-custody), **Bitcoin Builder Grant** (applications and infrastructure unlocking cross-chain possibilities between Starknet and Bitcoin), and **Other Grants**.\n\nIntake is rolling with a target response of about one month. The process runs in six stages: (1) **Application** via the grants submission form, presenting a clear plan for using the grant within the next three months; (2) **Internal evaluation** by an internal committee against potential impact, innovation, milestones, community engagement, track record and embeddedness with the Starknet ecosystem; (3) **Interviews** — Growth applicants go through a rigorous interview process to understand their goals and requirements in the ecosystem; (4) **Results** communicated within approximately one month; (5) **Onboarding** after completing KYC and signing a grant agreement; (6) **Post-grant check-in** at three months, with grantees sharing regular updates such as blog posts, videos and AMAs.\n\nThe Starknet Foundation retains sole discretion over recipients and reserves the right to modify, amend or discontinue its grant programmes at any time without notice.",
+      "description": "The Starknet Growth Grants Program provides non-dilutive funding to later-stage teams actively growing the Starknet ecosystem. The Foundation's grants overview publishes the band as **$25K to $1M STRK** — USD-denominated and paid in STRK — with the Growth Grants page itself stating 'Teams can receive up to $1M in funding'.\n\nGrowth Grants are organised into six categories, each with its own pre-filtered intake form: **Innovation Grants** (next-generation Starknet applications, infrastructure and protocols), **Ecosystem Integration Grants** (bridging Starknet with other networks and expanding interoperability), **Content & Creator Grants** (stories that educate and inspire Starknet users, or apps that make creators the owners of their own stories), **'The Next Billion'™ Grants** (intuitive, secure, accessible experiences that onboard the next billion users without compromising self-custody), **Bitcoin Builder Grant** (applications and infrastructure unlocking cross-chain possibilities between Starknet and Bitcoin), and **Other Grants**.\n\nIntake is rolling with a target response of about one month. The process runs in six stages: (1) **Application** via the grants submission form, presenting a clear plan for using the grant within the next three months; (2) **Internal evaluation** by an internal committee against potential impact, innovation, milestones, community engagement, track record and embeddedness with the Starknet ecosystem; (3) **Interviews** — Growth applicants go through a rigorous interview process to understand their goals and requirements in the ecosystem; (4) **Results** communicated within approximately one month; (5) **Onboarding** after completing KYC and signing a grant agreement; (6) **Post-grant check-in** at three months, with grantees sharing regular updates such as blog posts, videos and AMAs.\n\nThe Starknet Foundation retains sole discretion over recipients and reserves the right to modify, amend or discontinue its grant programmes at any time without notice.\n\nGrowth Grants were announced by the Starknet Foundation on 17 September 2024 — \"we are excited to announce the launch of Growth Grants! Growth Grants will provide up to $1M\" — and the program page was first captured the same day.",
       "summary": "Non-dilutive Starknet Growth Grants of $25K–$1M (USD-denominated, paid in STRK) for later-stage teams with a live, production-grade product and significant onchain traction; rolling intake, decision in about a month.",
       "status": "open",
       "operatingOrganizations": [
@@ -7632,6 +7646,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-09-17T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7656,7 +7671,7 @@
       "id": "curated:starknet-x-denarii-labs-accelerator",
       "fundingType": "accelerator",
       "title": "Starknet x Denarii Labs Accelerator",
-      "description": "\"Denarii Labs is partnering with the Starknet ecosystem to invest in and accelerate startups building on Ethereum's most powerful ZK-Rollup. From DeFi and gaming to AI agents and infrastructure — build with unlimited scale, low costs, and Ethereum-grade security.\" Denarii Labs describes itself as \"a premier tokenomics accelerator and consulting agency backed by RedBeard Ventures\".\n\nHeadline terms as published: Start Date Q3 2026 · Duration 12 Weeks · Format Remote · Investment $100K. From the FAQ: \"Each project receives $100K in initial investment. Based on progress, projects may receive an additional $200K in follow-on funding. Terms are founder-friendly, structured as a SAFE or token warrant.\"\n\nProgram structure, four phases over 12 weeks: Weeks 1–2 Foundation & Mentoring (1-on-1 mentor matching, project assessment and gap analysis, token model framework selection, cohort kickoff); Weeks 3–6 Tokenomics Deep Dive (token supply and emission modeling, utility and demand driver design, distribution and vesting strategy, governance framework); Weeks 7–10 Execution & GTM (go-to-market strategy, community and narrative building, exchange listing prep, legal and compliance review); Weeks 11–12 Demo Day & Beyond (investor pitch preparation, Demo Day presentation, follow-on funding introductions, alumni network onboarding).\n\nWhat participants get: \"$100K investment from Denarii Labs; Direct access to the Starknet ecosystem; Weekly 1-on-1 sessions with tokenomics experts; Legal advisory for token models and compliance; Introductions to VCs, exchanges, and market makers; Post-program alumni network and continued advisory support.\"\n\nTarget projects, four buckets: DeFi & Financial Infrastructure (AMMs, DEXs and aggregators; lending, borrowing and yield protocols; perpetuals and structured products; stablecoin and synthetic asset platforms); Gaming & Onchain Worlds (fully onchain games using Dojo; in-game economies and asset systems; autonomous worlds and composable game logic; creator economy and digital collectibles); AI Agents & Verifiable Compute (verifiable AI inference and agent frameworks; provable ML model execution; tamper-proof data pipelines; autonomous onchain agents); Infrastructure & Tooling (Cairo developer tools and libraries; block explorers, indexers and APIs; bridges, oracles and cross-chain infra; SN Stack appchain tooling).\n\nAdmission and commitment, from the FAQ: teams need not already be building on Starknet (\"We welcome teams exploring Starknet as well as those already building with Cairo\") and need not know Cairo (\"Cairo experience is helpful but not required\"); the program is fully remote over 12 weeks with an expected \"10–15 hours per week for mentor sessions, workshops, cohort calls, and independent work on tokenomics deliverables\"; and \"We typically accept 8–12 projects per cohort. We look for strong founding teams with a clear vision, a genuine need for tokenomics expertise, and a product with real traction or a compelling roadmap.\"\n\nAs of 2026-08-11 the page carries an \"Applications Open\" badge and live \"Apply Now\" buttons routing to the Airtable form; no application deadline is published.",
+      "description": "\"Denarii Labs is partnering with the Starknet ecosystem to invest in and accelerate startups building on Ethereum's most powerful ZK-Rollup. From DeFi and gaming to AI agents and infrastructure — build with unlimited scale, low costs, and Ethereum-grade security.\" Denarii Labs describes itself as \"a premier tokenomics accelerator and consulting agency backed by RedBeard Ventures\".\n\nHeadline terms as published: Start Date Q3 2026 · Duration 12 Weeks · Format Remote · Investment $100K. From the FAQ: \"Each project receives $100K in initial investment. Based on progress, projects may receive an additional $200K in follow-on funding. Terms are founder-friendly, structured as a SAFE or token warrant.\"\n\nProgram structure, four phases over 12 weeks: Weeks 1–2 Foundation & Mentoring (1-on-1 mentor matching, project assessment and gap analysis, token model framework selection, cohort kickoff); Weeks 3–6 Tokenomics Deep Dive (token supply and emission modeling, utility and demand driver design, distribution and vesting strategy, governance framework); Weeks 7–10 Execution & GTM (go-to-market strategy, community and narrative building, exchange listing prep, legal and compliance review); Weeks 11–12 Demo Day & Beyond (investor pitch preparation, Demo Day presentation, follow-on funding introductions, alumni network onboarding).\n\nWhat participants get: \"$100K investment from Denarii Labs; Direct access to the Starknet ecosystem; Weekly 1-on-1 sessions with tokenomics experts; Legal advisory for token models and compliance; Introductions to VCs, exchanges, and market makers; Post-program alumni network and continued advisory support.\"\n\nTarget projects, four buckets: DeFi & Financial Infrastructure (AMMs, DEXs and aggregators; lending, borrowing and yield protocols; perpetuals and structured products; stablecoin and synthetic asset platforms); Gaming & Onchain Worlds (fully onchain games using Dojo; in-game economies and asset systems; autonomous worlds and composable game logic; creator economy and digital collectibles); AI Agents & Verifiable Compute (verifiable AI inference and agent frameworks; provable ML model execution; tamper-proof data pipelines; autonomous onchain agents); Infrastructure & Tooling (Cairo developer tools and libraries; block explorers, indexers and APIs; bridges, oracles and cross-chain infra; SN Stack appchain tooling).\n\nAdmission and commitment, from the FAQ: teams need not already be building on Starknet (\"We welcome teams exploring Starknet as well as those already building with Cairo\") and need not know Cairo (\"Cairo experience is helpful but not required\"); the program is fully remote over 12 weeks with an expected \"10–15 hours per week for mentor sessions, workshops, cohort calls, and independent work on tokenomics deliverables\"; and \"We typically accept 8–12 projects per cohort. We look for strong founding teams with a clear vision, a genuine need for tokenomics expertise, and a product with real traction or a compelling roadmap.\"\n\nAs of 2026-08-11 the page carries an \"Applications Open\" badge and live \"Apply Now\" buttons routing to the Airtable form; no application deadline is published.\n\nThe Starknet track was first announced in Denarii Labs' weekly newsletter of 5 March 2026 — \"Join our current accelerator alongside Canton and Starknet\". The 26 February 2026 issue does not mention Starknet and the accelerator index captured 17 January 2026 lists no Starknet track, which brackets the announcement to that date.",
       "summary": "12-week fully remote tokenomics accelerator for Starknet builders: $100K initial investment on a SAFE or token warrant, up to $200K follow-on, 8–12 projects per cohort, next cohort starting Q3 2026.",
       "status": "open",
       "operatingOrganizations": [
@@ -7696,6 +7711,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2026-03-05T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7744,7 +7760,7 @@
       "id": "curated:world-foundation-spark-track-mini-app-grant",
       "fundingType": "grant",
       "title": "World Foundation Spark Track Mini App Grant",
-      "description": "The Spark Track is one of two active Mini App grant tracks in the World Foundation Grants program, which is funded from a pool of **50M WLD** — a token quantity, not a dollar figure. Spark Track is 'for builders and early founders who are turning a clear idea into a working Mini App and are ready to launch something real'; the Foundation looks for a clear problem you're solving, a working demo or prototype, and realistic milestones you can hit on a defined timeline.\n\nGrants are available on a rolling basis — 'apply any time' — and the Foundation states its team will review proposals promptly. No per-track award size is published on world.org/grants.\n\nThe grants program sits alongside a rolling, usage-based **Developer Rewards** pilot: a $300K USD pool paid in WLD across its first three months (launched 27 Mar 2025), distributed monthly pro-rata to qualifying Mini Apps based on verified-human usage metrics, open to any Mini App live in World App that meets the program T&Cs. Rewards can be stacked on top of Spark or Scale funding.\n\nThe World Foundation notes it may, at its discretion, choose to make grants directly in USDC or a similar stablecoin rather than in WLD, for commercial and regulatory reasons. Grant recipients are responsible for any tax payable in their home jurisdiction.\n\n**Intake caveat, verified 2026-08-11:** world.org/grants still lists Spark Track under 'Active Programs' with an 'Apply for a Spark Track Grant' button, but that button's Airtable form (airtable.com/appftNMpv819abvTc/pagTUNYDigGHZqQ8o/form) redirects to an Airtable login page and returns HTTP 403 — it is not publicly reachable. The sibling Scale Track form on the same Airtable base returns HTTP 200, so this is specific to the Spark form rather than a base-wide outage. No alternative Spark Track intake is published on world.org/grants or foundation.world.org.",
+      "description": "The Spark Track is one of two active Mini App grant tracks in the World Foundation Grants program, which is funded from a pool of **50M WLD** — a token quantity, not a dollar figure. Spark Track is 'for builders and early founders who are turning a clear idea into a working Mini App and are ready to launch something real'; the Foundation looks for a clear problem you're solving, a working demo or prototype, and realistic milestones you can hit on a defined timeline.\n\nGrants are available on a rolling basis — 'apply any time' — and the Foundation states its team will review proposals promptly. No per-track award size is published on world.org/grants.\n\nThe grants program sits alongside a rolling, usage-based **Developer Rewards** pilot: a $300K USD pool paid in WLD across its first three months (launched 27 Mar 2025), distributed monthly pro-rata to qualifying Mini Apps based on verified-human usage metrics, open to any Mini App live in World App that meets the program T&Cs. Rewards can be stacked on top of Spark or Scale funding.\n\nThe World Foundation notes it may, at its discretion, choose to make grants directly in USDC or a similar stablecoin rather than in WLD, for commercial and regulatory reasons. Grant recipients are responsible for any tax payable in their home jurisdiction.\n\n**Intake caveat, verified 2026-08-11:** world.org/grants still lists Spark Track under 'Active Programs' with an 'Apply for a Spark Track Grant' button, but that button's Airtable form (airtable.com/appftNMpv819abvTc/pagTUNYDigGHZqQ8o/form) redirects to an Airtable login page and returns HTTP 403 — it is not publicly reachable. The sibling Scale Track form on the same Airtable base returns HTTP 200, so this is specific to the Spark form rather than a base-wide outage. No alternative Spark Track intake is published on world.org/grants or foundation.world.org.\n\nThe Foundation published no announcement post for the track, so `postedAt` is an archival bound: the Spark Track was publicly visible by 14 May 2025, the first capture of world.org/grants, which already lists it with its apply button. The February 2025 developer-docs grants page still described only \"Fast Grants\" and \"Foundation Grants\", so this track framing is newer than that.",
       "summary": "Rolling Spark Track grants from the World Foundation's 50M WLD Mini App pool for early founders taking a validated idea to a working Mini App on World Chain. Note: the Spark intake form linked from world.org/grants returns HTTP 403 behind an Airtable login as of 2026-08-11.",
       "status": "open",
       "operatingOrganizations": [
@@ -7780,6 +7796,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2025-05-14T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7796,7 +7813,7 @@
       "id": "curated:world-foundation-scale-track-mini-app-grant",
       "fundingType": "grant",
       "title": "World Foundation Scale Track Mini App Grant",
-      "description": "The Scale Track is one of two active Mini App grant tracks in the World Foundation Grants program, funded from a pool of **50M WLD** — a token quantity, not a dollar figure. The Foundation describes it as 'Scale Track Grant — supercharge a live Mini App with real users and grow 10×', for live Mini Apps that are already being used by real, verified humans and need capital to grow faster. It looks for strong usage or retention data, a clear go-to-market strategy, and a plan to grow 10× or more from where the product is now.\n\nGrants are available on a rolling basis — 'apply any time' — and the Foundation states its team will review proposals promptly. No per-track award size is published on world.org/grants. The Scale Track Airtable intake form was verified live (HTTP 200) on 2026-08-11.\n\nThe grants program sits alongside a rolling, usage-based **Developer Rewards** pilot: a $300K USD pool paid in WLD across its first three months (launched 27 Mar 2025), distributed monthly pro-rata to qualifying Mini Apps based on verified-human usage metrics, open to any Mini App live in World App that meets the program T&Cs. Rewards can be stacked on top of Spark or Scale funding, turning usage into a recurring revenue stream.\n\nThe World Foundation notes it may, at its discretion, choose to make grants directly in USDC or a similar stablecoin rather than in WLD, for commercial and regulatory reasons. Grant recipients are responsible for any tax payable in their home jurisdiction.\n\nHistoric context published by the Foundation: Wave 0 (Q1 2024) funded 28 projects with approximately 800K WLD total awarded, and Wave 1 (Q3 2024) funded 16 projects with approximately 289K WLD total awarded, for community events and RFPs.",
+      "description": "The Scale Track is one of two active Mini App grant tracks in the World Foundation Grants program, funded from a pool of **50M WLD** — a token quantity, not a dollar figure. The Foundation describes it as 'Scale Track Grant — supercharge a live Mini App with real users and grow 10×', for live Mini Apps that are already being used by real, verified humans and need capital to grow faster. It looks for strong usage or retention data, a clear go-to-market strategy, and a plan to grow 10× or more from where the product is now.\n\nGrants are available on a rolling basis — 'apply any time' — and the Foundation states its team will review proposals promptly. No per-track award size is published on world.org/grants. The Scale Track Airtable intake form was verified live (HTTP 200) on 2026-08-11.\n\nThe grants program sits alongside a rolling, usage-based **Developer Rewards** pilot: a $300K USD pool paid in WLD across its first three months (launched 27 Mar 2025), distributed monthly pro-rata to qualifying Mini Apps based on verified-human usage metrics, open to any Mini App live in World App that meets the program T&Cs. Rewards can be stacked on top of Spark or Scale funding, turning usage into a recurring revenue stream.\n\nThe World Foundation notes it may, at its discretion, choose to make grants directly in USDC or a similar stablecoin rather than in WLD, for commercial and regulatory reasons. Grant recipients are responsible for any tax payable in their home jurisdiction.\n\nHistoric context published by the Foundation: Wave 0 (Q1 2024) funded 28 projects with approximately 800K WLD total awarded, and Wave 1 (Q3 2024) funded 16 projects with approximately 289K WLD total awarded, for community events and RFPs.\n\nThe Foundation published no announcement post for the track, so `postedAt` is an archival bound: the Scale Track was publicly visible by 14 May 2025, the first capture of world.org/grants, which already lists it with its apply button. The February 2025 developer-docs grants page still described only \"Fast Grants\" and \"Foundation Grants\", so this track framing is newer than that.",
       "summary": "Rolling Scale Track growth capital from the World Foundation's 50M WLD Mini App pool for live Mini Apps with real verified-human usage and a plan to grow 10x; intake form verified live on 2026-08-11.",
       "status": "open",
       "operatingOrganizations": [
@@ -7832,6 +7849,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2025-05-14T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7848,7 +7866,7 @@
       "id": "curated:taiko-grants-2025-grant-fund",
       "fundingType": "grant",
       "title": "Taiko Grants (2025 Grant Fund)",
-      "description": "Taiko Grants is an ongoing grant fund announced as 'Taiko Grant Cycle 3: $25M to Support Community Builders and Partners' — the Taiko 2025 Grant Fund, 'with a total of $25 million in funding'. The figure is quoted in US dollars only; the page nowhere denominates the fund in TAIKO tokens, so the record's currency is USD.\n\nThe fund supports developers, researchers and builders working on groundbreaking ideas in DeFi, AI, RWA, SocialFi, Gaming and beyond. Six grant tracks are published — DeFi (lending, borrowing, trading and other financial applications), AI (blockchain + artificial intelligence), RWA (tokenising and managing real-world assets), SocialFi (social networks with financial features), Gaming (gaming applications, NFT projects and metaverse experiences), and Other (projects leveraging Taiko's strengths such as Ethereum-equivalence, based design and permissionless proposing/proving) — and each is marked 'Applications open on an ongoing basis'.\n\nAs of 2026-08-11 the program page is live and unchanged in posture: 'The Grants Council will review applications on a rolling basis and reach out to applicants', the Airtable intake form returns HTTP 200, and no successor cycle or closure notice is published. The site footer reads '© 2026 Taiko Foundation'. No per-grant amount range is published anywhere on the page.\n\nProgram conditions: unless agreed otherwise, all smart contracts and frontend code must be open-sourced from the project's inception; projects involving dApps must choose Taiko as one of their first platforms (they may also deploy and integrate on other L1/L2/L3s); grantees and Taiko must establish a formal legal agreement detailing both parties' expectations and responsibilities; all grantees undergo KYC/KYB checks; and awardees may not disclose the grant — including the number of vested or received tokens — until Taiko has announced it. Grantees may hold grants from other projects concurrently provided all other requirements are met. Taiko also runs a separate ongoing initiative, Taiko Takeoff (takeoff.taiko.xyz).",
+      "description": "Taiko Grants is an ongoing grant fund announced on 19 March 2025 as 'Taiko Grant Cycle 3: $25M to Support Community Builders and Partners' — the Taiko 2025 Grant Fund, 'with a total of $25 million in funding'. The figure is quoted in US dollars only; the page nowhere denominates the fund in TAIKO tokens, so the record's currency is USD.\n\nThe fund supports developers, researchers and builders working on groundbreaking ideas in DeFi, AI, RWA, SocialFi, Gaming and beyond. Six grant tracks are published — DeFi (lending, borrowing, trading and other financial applications), AI (blockchain + artificial intelligence), RWA (tokenising and managing real-world assets), SocialFi (social networks with financial features), Gaming (gaming applications, NFT projects and metaverse experiences), and Other (projects leveraging Taiko's strengths such as Ethereum-equivalence, based design and permissionless proposing/proving) — and each is marked 'Applications open on an ongoing basis'.\n\nAs of 2026-08-11 the program page is live and unchanged in posture: 'The Grants Council will review applications on a rolling basis and reach out to applicants', the Airtable intake form returns HTTP 200, and no successor cycle or closure notice is published. The site footer reads '© 2026 Taiko Foundation'. No per-grant amount range is published anywhere on the page.\n\nProgram conditions: unless agreed otherwise, all smart contracts and frontend code must be open-sourced from the project's inception; projects involving dApps must choose Taiko as one of their first platforms (they may also deploy and integrate on other L1/L2/L3s); grantees and Taiko must establish a formal legal agreement detailing both parties' expectations and responsibilities; all grantees undergo KYC/KYB checks; and awardees may not disclose the grant — including the number of vested or received tokens — until Taiko has announced it. Grantees may hold grants from other projects concurrently provided all other requirements are met. Taiko also runs a separate ongoing initiative, Taiko Takeoff (takeoff.taiko.xyz).",
       "summary": "Ongoing $25M USD Taiko grant fund (the 2025 Grant Fund / Grant Cycle 3) across six tracks — DeFi, AI, RWA, SocialFi, Gaming and Other — reviewed on a rolling basis by the Grants Council; still open and unsuperseded as of 2026-08-11.",
       "status": "open",
       "operatingOrganizations": [
@@ -7900,6 +7918,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2025-03-19T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -7907,7 +7926,7 @@
         "fundingMechanisms": ["proactive"],
         "recurring": true
       },
-      "additionalReferences": "Grant program page: https://taiko.xyz/grant-program | Taiko Takeoff (separate ongoing initiative): https://takeoff.taiko.xyz/ | Docs: https://docs.taiko.xyz | DAO: https://dao.taiko.xyz/ and https://dao-docs.taiko.xyz/",
+      "additionalReferences": "Grant program page: https://taiko.xyz/grant-program | Announcement (19 March 2025): https://paragraph.com/@taiko-labs/taiko-grant-cycle-3-25m-to-support-community-builders-and-partners | Taiko Takeoff (separate ongoing initiative): https://takeoff.taiko.xyz/ | Docs: https://docs.taiko.xyz | DAO: https://dao.taiko.xyz/ and https://dao-docs.taiko.xyz/",
       "categories": ["Funding Opportunity", "DeFi", "AI", "RWA", "SocialFi", "Gaming"],
       "prerequisites": "Submit the application form and 'be sure to include as many relevant details as possible to help us make informed decisions'. Applicants should select the track their project falls under (DeFi, AI, RWA, SocialFi, Gaming, or Other) and be prepared to commit to open-sourcing smart contracts and frontend code from inception, to choosing Taiko as one of the project's first platforms, and to KYC/KYB plus a formal grant agreement.",
       "socialLinks": [
@@ -7939,7 +7958,7 @@
       "id": "curated:base-ecosystem-fund",
       "fundingType": "vc_fund",
       "title": "Base Ecosystem Fund",
-      "description": "\"Base Ecosystem Fund is the strategic investment arm of Base. In partnership with Coinbase Ventures, we invest in pre-seed and seed stage startups that choose Base as their home. Our approach is borderless and uncompromisingly team-centric, focusing on accelerating the elite builders on Base.\" The fund positions itself as \"Pairing early-stage capital with deep ecosystem alignment to ensure the best teams have the resources to achieve venture-scale growth from day one.\"\n\nMission: \"to catalyze the Base economy by backing ambitious founders focused on delivering venture scale outcomes.\" Investment strategy: \"We invest in the world's top talent building the next generation of enduring and high-performance onchain primitives & businesses that drive real economic activity and define the onchain future.\"\n\nWhat portfolio companies get, in three published buckets: White Glove Support — \"Hands-on support from our ecosystem team to unlock partner integrations and amplify distribution\"; Exclusive Perks — \"Unlock credits from our partners including AWS, Azure, Alchemy, Spindl ad credits and more\"; and Coinbase Access — \"Get priority access to Coinbase Prime, Coinbase Business, and Coinbase Onramp API\".\n\nThe Ecosystem Fund is one rung of a published six-stage support ladder: (01) Idea — Base Batches, \"Base's in-house Accelerator program\"; (02) Pre-seed & Seed — Ecosystem Fund; (03) Growth — Coinbase Ventures; (04) Private Fundraise — Echo; (05) Public Token Sale — Sonar by Echo; (06) Listing — Coinbase. Teams at idea stage are therefore routed to Base Batches rather than to this fund.\n\nPortfolio companies named on the page: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC and Zynk, filterable by Trading, Payments, AI Agents and Other.\n\nApplication is a multi-step form at base.org/ecosystem-fund/apply with sections for Company, Team, Idea, Funding and Why Base; the first step asks for Company Name, \"What are you building?\", Website URL and X URL. No fund size, check size, instrument, ownership target, deadline or decision timeline is published.",
+      "description": "\"Base Ecosystem Fund is the strategic investment arm of Base. In partnership with Coinbase Ventures, we invest in pre-seed and seed stage startups that choose Base as their home. Our approach is borderless and uncompromisingly team-centric, focusing on accelerating the elite builders on Base.\" The fund positions itself as \"Pairing early-stage capital with deep ecosystem alignment to ensure the best teams have the resources to achieve venture-scale growth from day one.\"\n\nMission: \"to catalyze the Base economy by backing ambitious founders focused on delivering venture scale outcomes.\" Investment strategy: \"We invest in the world's top talent building the next generation of enduring and high-performance onchain primitives & businesses that drive real economic activity and define the onchain future.\"\n\nWhat portfolio companies get, in three published buckets: White Glove Support — \"Hands-on support from our ecosystem team to unlock partner integrations and amplify distribution\"; Exclusive Perks — \"Unlock credits from our partners including AWS, Azure, Alchemy, Spindl ad credits and more\"; and Coinbase Access — \"Get priority access to Coinbase Prime, Coinbase Business, and Coinbase Onramp API\".\n\nThe Ecosystem Fund is one rung of a published six-stage support ladder: (01) Idea — Base Batches, \"Base's in-house Accelerator program\"; (02) Pre-seed & Seed — Ecosystem Fund; (03) Growth — Coinbase Ventures; (04) Private Fundraise — Echo; (05) Public Token Sale — Sonar by Echo; (06) Listing — Coinbase. Teams at idea stage are therefore routed to Base Batches rather than to this fund.\n\nPortfolio companies named on the page: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC and Zynk, filterable by Trading, Payments, AI Agents and Other.\n\nApplication is a multi-step form at base.org/ecosystem-fund/apply with sections for Company, Team, Idea, Funding and Why Base; the first step asks for Company Name, \"What are you building?\", Website URL and X URL. No fund size, check size, instrument, ownership target, deadline or decision timeline is published.\n\nThe fund was announced on 23 February 2023, in Coinbase's Base launch post: \"We're also announcing the Base Ecosystem Fund, which invests in and supports early stage projects building on Base that meet our investment criteria. If you're interested, please fill out the form here.\" That is the entire announcement — it names no fund size, no check size and no target project count.",
       "summary": "The strategic investment arm of Base, investing pre-seed and seed alongside Coinbase Ventures in startups that choose Base as their home, with hands-on ecosystem support, partner credits and priority Coinbase access. Rolling applications; terms and fund size undisclosed.",
       "status": "open",
       "operatingOrganizations": [
@@ -7965,6 +7984,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-02-23T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -8015,7 +8035,7 @@
         "stages": ["pre-seed", "seed"],
         "thesis": "\"We invest in the world's top talent building the next generation of enduring and high-performance onchain primitives & businesses that drive real economic activity and define the onchain future.\" Mission: \"to catalyze the Base economy by backing ambitious founders focused on delivering venture scale outcomes.\""
       },
-      "additionalReferences": "Fund page: https://www.base.org/ecosystem-fund · Apply: https://www.base.org/ecosystem-fund/apply · Sibling programs on Base's published support ladder — Base Batches (idea-stage accelerator), Coinbase Ventures (growth), Echo (private fundraise), Sonar by Echo (public token sale), Coinbase (listing) · Named portfolio: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC, Zynk.",
+      "additionalReferences": "Fund page: https://www.base.org/ecosystem-fund · Launch announcement (Coinbase, 23 February 2023): https://www.coinbase.com/blog/introducing-base · First-cohort post (7 September 2023): https://blog.base.org/base-ecosystem-fund-announces-first-six-investments · Apply: https://www.base.org/ecosystem-fund/apply · Sibling programs on Base's published support ladder — Base Batches (idea-stage accelerator), Coinbase Ventures (growth), Echo (private fundraise), Sonar by Echo (public token sale), Coinbase (listing) · Named portfolio: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC, Zynk.",
       "categories": ["Funding Opportunity", "Early Stage", "Trading", "Payments", "AI Agents"],
       "prerequisites": "A multi-step application at base.org/ecosystem-fund/apply with sections for Company, Team, Idea, Funding and Why Base. The first step asks for Company Name, \"What are you building?\", Website URL and X URL.",
       "website": "https://www.base.org/ecosystem-fund",
@@ -8034,7 +8054,7 @@
       "id": "curated:polymarket-builders-program",
       "fundingType": "grant",
       "title": "Polymarket Builders Program",
-      "description": "The Polymarket Builders Program offers **over $2.5M in grants** for developers building apps, tools and experiments on top of Polymarket. Amounts are quoted only in US dollars on the program page; the associated weekly builder rewards are explicitly paid in USDC, which Polymarket settles in.\n\nGrants: 'Grants are distributed to the best teams based on product innovation and traction.' Polymarket names the kinds of projects it wants — integrating Polymarket markets inside your app; distributing to a specific vertical or geography; building a pro trading terminal with advanced orders; empowering users with new analytics, portfolio managers and AI decisions; launching a new type of media powered by prediction markets; or creating DeFi primitives such as lending and vaults. A 'Request for Builders' page (builders.polymarket.com/rfb) publishes the team's own idea list — explicitly framed as a prompt rather than a constraint. Support includes technical support and amplification on Polymarket's social channels.\n\nWeekly rewards: separately from grants, 'the most active builders earn extra weekly rewards based on volume'. Polymarket describes it as a weekly USDC rewards program launched to bootstrap Builder Codes integrations, paid on integration volume. Each reward epoch runs from Sunday 00:00 UTC to Saturday 23:59 UTC. Builder Codes are unique credentials that let builders attribute orders to their builder profile and grant access to the Polymarket Relayer API; volume is credited for every matched trade attributed to the builder account and appears on the public Builder Leaderboard within about 24 hours. No per-epoch pool size or payout formula is published. As of 2026-08-11 the leaderboard's top integration shows ~$40.04M of 1-month volume.\n\nJoining is permissionless — 'Polymarket DeFi protocol is free and permissionless to use and access. Just start building to be part of the program!' — and there is no deadline. The grant application is an in-page form on builders.polymarket.com.",
+      "description": "The Polymarket Builders Program offers **over $2.5M in grants** for developers building apps, tools and experiments on top of Polymarket. Amounts are quoted only in US dollars on the program page; the associated weekly builder rewards are explicitly paid in USDC, which Polymarket settles in.\n\nGrants: 'Grants are distributed to the best teams based on product innovation and traction.' Polymarket names the kinds of projects it wants — integrating Polymarket markets inside your app; distributing to a specific vertical or geography; building a pro trading terminal with advanced orders; empowering users with new analytics, portfolio managers and AI decisions; launching a new type of media powered by prediction markets; or creating DeFi primitives such as lending and vaults. A 'Request for Builders' page (builders.polymarket.com/rfb) publishes the team's own idea list — explicitly framed as a prompt rather than a constraint. Support includes technical support and amplification on Polymarket's social channels.\n\nWeekly rewards: separately from grants, 'the most active builders earn extra weekly rewards based on volume'. Polymarket describes it as a weekly USDC rewards program launched to bootstrap Builder Codes integrations, paid on integration volume. Each reward epoch runs from Sunday 00:00 UTC to Saturday 23:59 UTC. Builder Codes are unique credentials that let builders attribute orders to their builder profile and grant access to the Polymarket Relayer API; volume is credited for every matched trade attributed to the builder account and appears on the public Builder Leaderboard within about 24 hours. No per-epoch pool size or payout formula is published. As of 2026-08-11 the leaderboard's top integration shows ~$40.04M of 1-month volume.\n\nJoining is permissionless — 'Polymarket DeFi protocol is free and permissionless to use and access. Just start building to be part of the program!' — and there is no deadline. The grant application is an in-page form on builders.polymarket.com.\n\nPolymarket published no announcement post for the program, so `postedAt` is an archival bound: the Builders Program site was publicly visible by 2 November 2025, its first capture, which is also the start of the weekly builder-rewards program it runs alongside.",
       "summary": "Rolling Polymarket Builders Program: over $2.5M USD in grants for apps, tools and experiments built on Polymarket, awarded on product innovation and traction, plus a weekly USDC rewards program paid on Builder Codes integration volume in Sunday-to-Saturday UTC epochs.",
       "status": "open",
       "operatingOrganizations": [
@@ -8074,6 +8094,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2025-11-02T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -8100,7 +8121,7 @@
       "id": "curated:ethonline-2026",
       "fundingType": "hackathon",
       "title": "ETHOnline 2026",
-      "description": "ETHGlobal's flagship async online hackathon, open to builders worldwide across multiple sponsor tracks and prize pools spanning the Ethereum ecosystem.\n\nThe events index lists ETHOnline 2026 as an 'Async Hackathon' with status 'Apply to Attend', running September 4-16, 2026. The event's own data gives a sign-up deadline of 2026-09-06T17:00Z and a submission deadline of 2026-09-13T16:00Z. The prize pool was not yet published when this record was written, so no prize figures are recorded.",
+      "description": "ETHGlobal's flagship async online hackathon, open to builders worldwide across multiple sponsor tracks and prize pools spanning the Ethereum ecosystem.\n\nThe events index lists ETHOnline 2026 as an 'Async Hackathon' with status 'Apply to Attend', running September 4-16, 2026. The event's own data gives a sign-up deadline of 2026-09-06T17:00Z and a submission deadline of 2026-09-13T16:00Z. The prize pool was not yet published when this record was written, so no prize figures are recorded.\n\nETHGlobal published no announcement post for this edition, so `postedAt` is an archival bound rather than an announcement date: ETHOnline 2026 was publicly visible by 6 May 2026, the first capture of the events index that lists it; the preceding capture, 29 March 2026, does not.",
       "summary": "ETHGlobal's flagship async online Ethereum hackathon, open worldwide, running September 4-16, 2026.",
       "status": "open",
       "operatingOrganizations": [
@@ -8150,6 +8171,7 @@
           "label": "event end"
         }
       ],
+      "postedAt": "2026-05-06T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -8186,6 +8208,7 @@
           "Autonomous On-Chain Automation Platform"
         ]
       },
+      "additionalReferences": "Events index: https://ethglobal.com/events · Event page: https://ethglobal.com/events/ethonline2026",
       "categories": ["Funding Opportunity", "Hackathon"],
       "website": "https://ethglobal.com/events/ethonline2026",
       "sponsoringOrganizations": [
@@ -8278,7 +8301,7 @@
       "id": "curated:ethglobal-tokyo-2026",
       "fundingType": "hackathon",
       "title": "ETHGlobal Tokyo 2026",
-      "description": "In-person ETHGlobal hackathon in Tokyo, Japan, bringing together developers to build on Ethereum and partner protocols over a weekend.\n\nThe events index lists ETHGlobal Tokyo 2026 as an 'IRL Hackathon' with status 'Apply to Attend', running September 25-27, 2026. The event's own data gives a sign-up deadline of 2026-09-23T14:59Z and a submission deadline of 2026-09-27T00:00Z. The prize pool was not yet published when this record was written.",
+      "description": "In-person ETHGlobal hackathon in Tokyo, Japan, bringing together developers to build on Ethereum and partner protocols over a weekend.\n\nThe events index lists ETHGlobal Tokyo 2026 as an 'IRL Hackathon' with status 'Apply to Attend', running September 25-27, 2026. The event's own data gives a sign-up deadline of 2026-09-23T14:59Z and a submission deadline of 2026-09-27T00:00Z. The prize pool was not yet published when this record was written.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
       "summary": "In-person ETHGlobal hackathon in Tokyo, September 25-27, 2026, building on Ethereum and partner protocols.",
       "status": "open",
       "operatingOrganizations": [
@@ -8328,6 +8351,7 @@
           "label": "event end"
         }
       ],
+      "postedAt": "2025-11-24T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -8335,6 +8359,7 @@
         "location": "Tokyo, Japan",
         "online": false
       },
+      "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Events index: https://ethglobal.com/events",
       "categories": ["Funding Opportunity", "Hackathon"],
       "website": "https://ethglobal.com/events/tokyo2026",
       "sponsoringOrganizations": [
@@ -8398,7 +8423,7 @@
       "id": "curated:ethglobal-mumbai",
       "fundingType": "hackathon",
       "title": "ETHGlobal Mumbai",
-      "description": "In-person ETHGlobal hackathon in Mumbai, India, part of ETHGlobal's global IRL hackathon circuit with multiple sponsor prize tracks.\n\nThe events index lists ETHGlobal Mumbai as an 'IRL Hackathon' with status 'Apply to Attend', running November 6-8, 2026. The event's own data gives a sign-up deadline of 2026-11-03T18:29Z and a submission deadline of 2026-11-08T03:30Z. The prize pool was not yet published when this record was written.",
+      "description": "In-person ETHGlobal hackathon in Mumbai, India, part of ETHGlobal's global IRL hackathon circuit with multiple sponsor prize tracks.\n\nThe events index lists ETHGlobal Mumbai as an 'IRL Hackathon' with status 'Apply to Attend', running November 6-8, 2026. The event's own data gives a sign-up deadline of 2026-11-03T18:29Z and a submission deadline of 2026-11-08T03:30Z. The prize pool was not yet published when this record was written.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
       "summary": "In-person ETHGlobal hackathon in Mumbai, November 6-8, 2026, with multiple sponsor prize tracks.",
       "status": "open",
       "operatingOrganizations": [
@@ -8448,6 +8473,7 @@
           "label": "event end"
         }
       ],
+      "postedAt": "2025-11-24T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -8455,6 +8481,7 @@
         "location": "Mumbai, India",
         "online": false
       },
+      "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Events index: https://ethglobal.com/events",
       "categories": ["Funding Opportunity", "Hackathon"],
       "website": "https://ethglobal.com/events/mumbai",
       "sponsoringOrganizations": [
@@ -9178,7 +9205,7 @@
       "id": "curated:sky-makerdao-bug-bounty",
       "fundingType": "bounty",
       "title": "Sky (MakerDAO) Bug Bounty",
-      "description": "Rolling bug bounty for the Sky protocol (formerly MakerDAO), covering its core stablecoin, governance, savings/staking, and bridge contracts.\n\nThe program page, listed under 'Sky', shows active status as of 21 July 2026, with a maximum reward of $10,000,000 — 10% of funds at risk, up to that cap — a $150,000 minimum for a critical finding, 249 assets in scope, and $703.2k paid to date across 19 reports.",
+      "description": "Rolling bug bounty for the Sky protocol (formerly MakerDAO), covering its core stablecoin, governance, savings/staking, and bridge contracts.\n\nThe program page, listed under 'Sky', states 'Live Since 10 February 2022' — the date this record carries as `postedAt` — and shows active status as of 21 July 2026, with a maximum reward of $10,000,000 — 10% of funds at risk, up to that cap — a $150,000 minimum for a critical finding, 249 assets in scope, and $703.2k paid to date across 19 reports.",
       "summary": "Rolling bug bounty for Sky (formerly MakerDAO), paying up to $10,000,000 at 10% of funds at risk.",
       "status": "open",
       "operatingOrganizations": [
@@ -9222,6 +9249,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-02-10T07:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -10350,7 +10378,7 @@
       "id": "curated:ethereum-foundation-bug-bounty-program",
       "fundingType": "bounty",
       "title": "Ethereum Foundation Bug Bounty Program",
-      "description": "The Ethereum Foundation's rolling bug bounty for consensus and execution-layer specs, the major client implementations (Geth, Reth, Nethermind, Erigon, Besu, Lighthouse, Prysm, Teku, Nimbus, Lodestar, Grandine), Solidity and Vyper, and the deposit contract.\n\nThe ethereum.org bug bounty page confirms the program is 'Open for submissions' with no end date and severity tiers reaching $1,000,000 for a critical finding, submitted through the Foundation's own report form.",
+      "description": "The Ethereum Foundation's rolling bug bounty for consensus and execution-layer specs, the major client implementations (Geth, Reth, Nethermind, Erigon, Besu, Lighthouse, Prysm, Teku, Nimbus, Lodestar, Grandine), Solidity and Vyper, and the deposit contract.\n\nThe ethereum.org bug bounty page confirms the program is 'Open for submissions' with no end date and severity tiers reaching $1,000,000 for a critical finding, submitted through the Foundation's own report form.\n\nThe program was introduced publicly on 18 December 2014, in the Foundation's blog post \"A call to all the bug bounty hunters out there…\", which opened bounties on the protocols, the Go implementation and the network code; a follow-up in March 2015 confirms it running from around that time.",
       "summary": "The Ethereum Foundation's rolling protocol and client bug bounty, paying up to $1,000,000 for a critical finding.",
       "status": "open",
       "operatingOrganizations": [
@@ -10392,6 +10420,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2014-12-18T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -10434,7 +10463,7 @@
           }
         ]
       },
-      "additionalReferences": "In scope: protocol soundness (consensus model, wire and p2p protocols, proof of stake), the Consensus Layer and Execution Layer specifications, execution-layer clients (Besu, Erigon, Geth, Nethermind, Reth) and consensus-layer clients (Lighthouse, Lodestar, Nimbus, Teku, Prysm, Grandine), the Solidity and Vyper compilers, the Beacon Chain deposit contract specification and source, and the dependencies C-KZG-4844 and Go-KZG-4844. Out of scope: infrastructure such as webpages, DNS and email; ERC-20 contract bugs; ENS bugs; issues requiring a publicly exposed API such as JSON-RPC or the Beacon API; the Engine API, which is treated as trusted; typographical errors; tests; high-effort single-peer DoS; publicly known issues; and anything without direct impact on Ethereum mainnet. Programme rules and scope: https://ethereum.org/bug-bounty/ (bounty.ethereum.org redirects here). Submission form: https://bbp-form.ethereum.org/ . A public leaderboard of past reporters is published on the rules page.",
+      "additionalReferences": "In scope: protocol soundness (consensus model, wire and p2p protocols, proof of stake), the Consensus Layer and Execution Layer specifications, execution-layer clients (Besu, Erigon, Geth, Nethermind, Reth) and consensus-layer clients (Lighthouse, Lodestar, Nimbus, Teku, Prysm, Grandine), the Solidity and Vyper compilers, the Beacon Chain deposit contract specification and source, and the dependencies C-KZG-4844 and Go-KZG-4844. Out of scope: infrastructure such as webpages, DNS and email; ERC-20 contract bugs; ENS bugs; issues requiring a publicly exposed API such as JSON-RPC or the Beacon API; the Engine API, which is treated as trusted; typographical errors; tests; high-effort single-peer DoS; publicly known issues; and anything without direct impact on Ethereum mainnet. Programme rules and scope: https://ethereum.org/bug-bounty/ (bounty.ethereum.org redirects here). Submission form: https://bbp-form.ethereum.org/ . A public leaderboard of past reporters is published on the rules page. Program announcement (18 December 2014): https://blog.ethereum.org/2014/12/18/call-bug-bounty-hunters.",
       "categories": [
         "Funding Opportunity",
         "Security",
@@ -10452,7 +10481,7 @@
       "id": "curated:chainlink-bug-bounty",
       "fundingType": "bounty",
       "title": "Chainlink Bug Bounty",
-      "description": "Bounty on Chainlink's oracle infrastructure (price feeds, CCIP, VRF, data streams) as deployed on Ethereum mainnet and its L2s.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,000,000; ecosystem tags include ETH.",
+      "description": "Bounty on Chainlink's oracle infrastructure (price feeds, CCIP, VRF, data streams) as deployed on Ethereum mainnet and its L2s.\n\nThe program page states 'Live Since 11 May 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,000,000; ecosystem tags include ETH.",
       "summary": "Bounty on Chainlink's oracle infrastructure on Ethereum and its L2s, paying up to $3,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -10496,6 +10525,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-05-11T05:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -10591,7 +10621,7 @@
       "id": "curated:the-graph-bug-bounty",
       "fundingType": "bounty",
       "title": "The Graph Bug Bounty",
-      "description": "Bounty on The Graph's indexing/staking protocol smart contracts (subgraph staking, curation, dispute resolution) on Ethereum and Arbitrum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $50,000; ecosystem tags [Arbitrum, ETH].",
+      "description": "Bounty on The Graph's indexing/staking protocol smart contracts (subgraph staking, curation, dispute resolution) on Ethereum and Arbitrum.\n\nThe program page states 'Live Since 04 August 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $50,000; ecosystem tags [Arbitrum, ETH].",
       "summary": "Bounty on The Graph's indexing and staking contracts on Ethereum and Arbitrum, paying up to $50,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -10635,6 +10665,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-08-04T17:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -10687,7 +10718,7 @@
       "id": "curated:synthetix-bug-bounty",
       "fundingType": "bounty",
       "title": "Synthetix Bug Bounty",
-      "description": "Bounty on Synthetix's synthetic-asset DAO, DEX, perpetuals and staking smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; ecosystem tag [ETH].",
+      "description": "Bounty on Synthetix's synthetic-asset DAO, DEX, perpetuals and staking smart contracts on Ethereum.\n\nThe program page states 'Live Since 05 March 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; ecosystem tag [ETH].",
       "summary": "Bounty on Synthetix's synthetic-asset, perpetuals and staking contracts, paying up to $100,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -10727,6 +10758,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-03-05T07:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -10809,7 +10841,7 @@
       "id": "curated:balancer-bug-bounty",
       "fundingType": "bounty",
       "title": "Balancer Bug Bounty",
-      "description": "Bounty on Balancer's AMM/DEX vault and pool smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
+      "description": "Bounty on Balancer's AMM/DEX vault and pool smart contracts on Ethereum.\n\nThe program page states 'Live Since 12 May 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
       "summary": "Bounty on Balancer's AMM vault and pool contracts on Ethereum, paying up to $1,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -10849,6 +10881,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-05-12T16:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -10907,7 +10940,7 @@
       "id": "curated:compound-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Compound Finance Bug Bounty",
-      "description": "Bounty on Compound's lending-protocol smart contracts (Comet/cTokens, governance) on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
+      "description": "Bounty on Compound's lending-protocol smart contracts (Comet/cTokens, governance) on Ethereum.\n\nThe program page states 'Live Since 11 December 2024' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
       "summary": "Bounty on Compound's lending-protocol and governance contracts, paying up to $1,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -10947,6 +10980,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-12-11T16:28:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11012,7 +11046,7 @@
       "id": "curated:spark-bug-bounty",
       "fundingType": "bounty",
       "title": "Spark Bug Bounty",
-      "description": "Bounty on SparkLend, the Sky/MakerDAO-affiliated lending-protocol smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $5,000,000; ecosystem tag [ETH].",
+      "description": "Bounty on SparkLend, the Sky/MakerDAO-affiliated lending-protocol smart contracts on Ethereum.\n\nThe program page states 'Live Since 01 November 2023' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $5,000,000; ecosystem tag [ETH].",
       "summary": "Bounty on SparkLend's lending-protocol contracts on Ethereum, paying up to $5,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11056,6 +11090,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-11-01T15:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11133,7 +11168,7 @@
       "id": "curated:rocket-pool-bug-bounty",
       "fundingType": "bounty",
       "title": "Rocket Pool Bug Bounty",
-      "description": "Bounty on Rocket Pool's decentralized ETH liquid-staking protocol smart contracts.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $150,000; ecosystem tag [ETH].",
+      "description": "Bounty on Rocket Pool's decentralized ETH liquid-staking protocol smart contracts.\n\nThe program page states 'Live Since 08 September 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $150,000; ecosystem tag [ETH].",
       "summary": "Bounty on Rocket Pool's decentralized ETH liquid-staking contracts, paying up to $150,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11169,6 +11204,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-09-08T14:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11235,7 +11271,7 @@
       "id": "curated:stakewise-bug-bounty",
       "fundingType": "bounty",
       "title": "StakeWise Bug Bounty",
-      "description": "Bounty on StakeWise's ETH liquid-staking and yield-vault smart contracts on Ethereum mainnet and Gnosis Chain.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags [ETH, Gnosis Chain].",
+      "description": "Bounty on StakeWise's ETH liquid-staking and yield-vault smart contracts on Ethereum mainnet and Gnosis Chain.\n\nThe program page states 'Live Since 31 May 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags [ETH, Gnosis Chain].",
       "summary": "Bounty on StakeWise's liquid-staking and yield-vault contracts, paying up to $200,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11279,6 +11315,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-05-31T17:30:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11342,7 +11379,7 @@
       "id": "curated:ether-fi-bug-bounty",
       "fundingType": "bounty",
       "title": "ether.fi Bug Bounty",
-      "description": "Bounty on ether.fi's liquid-restaking protocol smart contracts (eETH, weETH, node operator infrastructure) on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tag [ETH].",
+      "description": "Bounty on ether.fi's liquid-restaking protocol smart contracts (eETH, weETH, node operator infrastructure) on Ethereum.\n\nThe program page states 'Live Since 27 March 2024' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tag [ETH].",
       "summary": "Bounty on ether.fi's liquid-restaking contracts and node-operator infrastructure, paying up to $500,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11386,6 +11423,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-03-27T01:30:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11488,7 +11526,7 @@
       "id": "curated:1inch-aqua-bug-bounty",
       "fundingType": "bounty",
       "title": "1inch Aqua Bug Bounty",
-      "description": "Bounty on 1inch's Aqua intent-based swap smart contracts, part of the wider 1inch DEX aggregation protocol on Ethereum and EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; 1inch also runs separate Web, Business and Wallet bounty tracks, so this record covers the Aqua contracts only.",
+      "description": "Bounty on 1inch's Aqua intent-based swap smart contracts, part of the wider 1inch DEX aggregation protocol on Ethereum and EVM chains.\n\nThe program page states 'Live Since 11 June 2026' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; 1inch also runs separate Web, Business and Wallet bounty tracks, so this record covers the Aqua contracts only.",
       "summary": "Bounty on 1inch's Aqua intent-based swap contracts, paying up to $100,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11532,6 +11570,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2026-06-11T12:46:32.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11590,7 +11629,7 @@
       "id": "curated:sushiswap-bug-bounty",
       "fundingType": "bounty",
       "title": "SushiSwap Bug Bounty",
-      "description": "Bounty on SushiSwap's AMM/DEX and staking smart contracts, deployed on Ethereum and numerous EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags include ETH.",
+      "description": "Bounty on SushiSwap's AMM/DEX and staking smart contracts, deployed on Ethereum and numerous EVM chains.\n\nThe program page states 'Live Since 26 March 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags include ETH.",
       "summary": "Bounty on SushiSwap's AMM and staking contracts across Ethereum and EVM chains, paying up to $200,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11630,6 +11669,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-03-26T07:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11698,7 +11738,7 @@
       "id": "curated:layerzero-bug-bounty",
       "fundingType": "bounty",
       "title": "LayerZero Bug Bounty",
-      "description": "Bounty on LayerZero's omnichain messaging protocol smart contracts, with Ethereum as a core endpoint chain among 40+ supported networks.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $15,000,000; the ecosystem list includes ETH.",
+      "description": "Bounty on LayerZero's omnichain messaging protocol smart contracts, with Ethereum as a core endpoint chain among 40+ supported networks.\n\nThe program page states 'Live Since 17 May 2023' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $15,000,000; the ecosystem list includes ETH.",
       "summary": "Bounty on LayerZero's omnichain messaging contracts, with Ethereum a core endpoint, paying up to $15,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11738,6 +11778,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-05-17T17:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11802,7 +11843,7 @@
       "id": "curated:stargate-bug-bounty",
       "fundingType": "bounty",
       "title": "Stargate Bug Bounty",
-      "description": "Bounty on Stargate's LayerZero-based cross-chain liquidity/bridge protocol smart contracts, with Ethereum as a primary deployment chain.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $10,000,000; the page references Ethereum mainnet.",
+      "description": "Bounty on Stargate's LayerZero-based cross-chain liquidity/bridge protocol smart contracts, with Ethereum as a primary deployment chain.\n\nThe program page states 'Live Since 24 September 2024' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $10,000,000; the page references Ethereum mainnet.",
       "summary": "Bounty on Stargate's cross-chain liquidity and bridge contracts, paying up to $10,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11842,6 +11883,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-09-24T18:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -11899,7 +11941,7 @@
       "id": "curated:wormhole-bug-bounty",
       "fundingType": "bounty",
       "title": "Wormhole Bug Bounty",
-      "description": "Bounty on Wormhole's cross-chain messaging protocol, covering its Ethereum-deployed core contracts and guardian network alongside other connected chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; the page references Ethereum mainnet contracts.",
+      "description": "Bounty on Wormhole's cross-chain messaging protocol, covering its Ethereum-deployed core contracts and guardian network alongside other connected chains.\n\nThe program page states 'Live Since 11 February 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; the page references Ethereum mainnet contracts.",
       "summary": "Bounty on Wormhole's cross-chain messaging core contracts and guardian network, paying up to $1,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -11939,6 +11981,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-02-11T15:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12040,7 +12083,7 @@
       "id": "curated:yearn-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Yearn Finance Bug Bounty",
-      "description": "Bounty on Yearn's yield-aggregator vault smart contracts on Ethereum, Arbitrum, Optimism and Fantom.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags include ETH.",
+      "description": "Bounty on Yearn's yield-aggregator vault smart contracts on Ethereum, Arbitrum, Optimism and Fantom.\n\nThe program page states 'Live Since 01 July 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $200,000; ecosystem tags include ETH.",
       "summary": "Bounty on Yearn's yield-aggregator vault contracts, paying up to $200,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12084,6 +12127,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-07-01T07:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12142,7 +12186,7 @@
       "id": "curated:gearbox-bug-bounty",
       "fundingType": "bounty",
       "title": "Gearbox Bug Bounty",
-      "description": "Bounty on Gearbox's on-chain leverage/composable credit protocol smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $150,000; ecosystem tag [ETH].",
+      "description": "Bounty on Gearbox's on-chain leverage/composable credit protocol smart contracts on Ethereum.\n\nThe program page states 'Live Since 08 February 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $150,000; ecosystem tag [ETH].",
       "summary": "Bounty on Gearbox's on-chain leverage and composable credit contracts, paying up to $150,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12182,6 +12226,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-02-08T13:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12250,7 +12295,7 @@
       "id": "curated:instadapp-fluid-bug-bounty",
       "fundingType": "bounty",
       "title": "Instadapp (Fluid) Bug Bounty",
-      "description": "Bounty on Instadapp's Fluid lending/DEX and smart-account infrastructure deployed on Ethereum and multiple EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tags include ETH.",
+      "description": "Bounty on Instadapp's Fluid lending/DEX and smart-account infrastructure deployed on Ethereum and multiple EVM chains.\n\nThe program page states 'Live Since 20 September 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tags include ETH.",
       "summary": "Bounty on Instadapp's Fluid lending/DEX and smart-account infrastructure, paying up to $500,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12290,6 +12335,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-09-20T01:30:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12360,7 +12406,7 @@
       "id": "curated:ethena-bug-bounty",
       "fundingType": "bounty",
       "title": "Ethena Bug Bounty",
-      "description": "Bounty on Ethena's USDe synthetic-dollar protocol smart contracts and staking (sUSDe) infrastructure on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,000,000; the page references Ethereum and Arbitrum mainnet.",
+      "description": "Bounty on Ethena's USDe synthetic-dollar protocol smart contracts and staking (sUSDe) infrastructure on Ethereum.\n\nThe program page states 'Live Since 04 April 2024' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,000,000; the page references Ethereum and Arbitrum mainnet.",
       "summary": "Bounty on Ethena's USDe synthetic-dollar and sUSDe staking contracts, paying up to $3,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12404,6 +12450,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-04-04T16:46:29.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12486,7 +12533,7 @@
       "id": "curated:ssv-network-bug-bounty",
       "fundingType": "bounty",
       "title": "SSV Network Bug Bounty",
-      "description": "Bounty on SSV Network's distributed validator technology (DVT) smart contracts used for decentralized Ethereum staking.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $250,000; ecosystem tag [ETH].",
+      "description": "Bounty on SSV Network's distributed validator technology (DVT) smart contracts used for decentralized Ethereum staking.\n\nThe program page states 'Live Since 11 September 2023' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $250,000; ecosystem tag [ETH].",
       "summary": "Bounty on SSV Network's distributed-validator contracts for decentralized Ethereum staking, paying up to $250,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12526,6 +12573,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-09-11T16:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12592,7 +12640,7 @@
       "id": "curated:kelp-dao-bug-bounty",
       "fundingType": "bounty",
       "title": "Kelp DAO Bug Bounty",
-      "description": "Bounty on Kelp DAO's liquid-restaking protocol (rsETH) smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $250,000; the product type is listed as Liquid Restaking.",
+      "description": "Bounty on Kelp DAO's liquid-restaking protocol (rsETH) smart contracts on Ethereum.\n\nThe program page states 'Live Since 02 August 2024' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $250,000; the product type is listed as Liquid Restaking.",
       "summary": "Bounty on Kelp DAO's rsETH liquid-restaking contracts on Ethereum, paying up to $250,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12627,6 +12675,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2024-08-02T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12727,7 +12776,7 @@
       "id": "curated:linea-bug-bounty",
       "fundingType": "bounty",
       "title": "Linea Bug Bounty",
-      "description": "Bounty on Linea's zkEVM rollup infrastructure and bridge contracts, an Ethereum L2.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; ecosystem tags [ETH, Linea].",
+      "description": "Bounty on Linea's zkEVM rollup infrastructure and bridge contracts, an Ethereum L2.\n\nThe program page states 'Live Since 11 July 2023' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $100,000; ecosystem tags [ETH, Linea].",
       "summary": "Bounty on Linea's zkEVM rollup infrastructure and bridge contracts, paying up to $100,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12771,6 +12820,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-07-11T14:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -12824,7 +12874,7 @@
       "id": "curated:zksync-era-bug-bounty",
       "fundingType": "bounty",
       "title": "ZKsync Era Bug Bounty",
-      "description": "Bounty on ZKsync Era's zkEVM rollup infrastructure and bridge contracts, an Ethereum L2.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $300,000; ecosystem tags [ETH, zkSync].",
+      "description": "Bounty on ZKsync Era's zkEVM rollup infrastructure and bridge contracts, an Ethereum L2.\n\nThe program page states 'Live Since 10 March 2023' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $300,000; ecosystem tags [ETH, zkSync].",
       "summary": "Bounty on ZKsync Era's zkEVM rollup infrastructure and bridge contracts, paying up to $300,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -12864,6 +12914,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-03-10T17:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13125,7 +13176,7 @@
       "id": "curated:gmx-bug-bounty",
       "fundingType": "bounty",
       "title": "GMX Bug Bounty",
-      "description": "Bounty on GMX's perpetuals and spot-trading AMM smart contracts on Arbitrum, an Ethereum L2.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $5,000,000; ecosystem tags [Arbitrum, Avalanche].",
+      "description": "Bounty on GMX's perpetuals and spot-trading AMM smart contracts on Arbitrum, an Ethereum L2.\n\nThe program page states 'Live Since 20 October 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $5,000,000; ecosystem tags [Arbitrum, Avalanche].",
       "summary": "Bounty on GMX's perpetuals and spot-trading contracts on Arbitrum, paying up to $5,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -13155,6 +13206,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-10-20T12:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13236,7 +13288,7 @@
       "id": "curated:cow-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "CoW Protocol Bug Bounty",
-      "description": "Bounty on CoW Protocol's intent-based trading and batch-auction settlement smart contracts on Ethereum and Gnosis Chain.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tags [ETH, Gnosis].",
+      "description": "Bounty on CoW Protocol's intent-based trading and batch-auction settlement smart contracts on Ethereum and Gnosis Chain.\n\nThe program page states 'Live Since 15 June 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tags [ETH, Gnosis].",
       "summary": "Bounty on CoW Protocol's intent-based trading and settlement contracts, paying up to $1,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -13276,6 +13328,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-06-15T17:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13437,7 +13490,7 @@
       "id": "curated:maple-finance-bug-bounty",
       "fundingType": "bounty",
       "title": "Maple Finance Bug Bounty",
-      "description": "Bounty on Maple's institutional/on-chain credit and lending-pool smart contracts on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tag [ETH].",
+      "description": "Bounty on Maple's institutional/on-chain credit and lending-pool smart contracts on Ethereum.\n\nThe program page states 'Live Since 25 January 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $500,000; ecosystem tag [ETH].",
       "summary": "Bounty on Maple's institutional credit and lending-pool contracts, paying up to $500,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -13477,6 +13530,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-01-25T21:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13525,7 +13579,7 @@
       "id": "curated:olympus-bug-bounty",
       "fundingType": "bounty",
       "title": "Olympus Bug Bounty",
-      "description": "Bounty on Olympus DAO's OHM protocol-owned-liquidity and treasury smart contracts on Ethereum and several EVM chains.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,333,333; ecosystem tags include ETH.",
+      "description": "Bounty on Olympus DAO's OHM protocol-owned-liquidity and treasury smart contracts on Ethereum and several EVM chains.\n\nThe program page states 'Live Since 06 January 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $3,333,333; ecosystem tags include ETH.",
       "summary": "Bounty on Olympus DAO's OHM liquidity and treasury contracts, paying up to $3,333,333.",
       "status": "open",
       "operatingOrganizations": [
@@ -13565,6 +13619,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-01-06T17:45:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13614,7 +13669,7 @@
       "id": "curated:gnosis-chain-bug-bounty",
       "fundingType": "bounty",
       "title": "Gnosis Chain Bug Bounty",
-      "description": "Bounty on Gnosis Chain's consensus/execution client and bridge infrastructure — an Ethereum-aligned chain that shares Ethereum's client software and validator-set model.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $2,000,000; ecosystem tags [BSC, ETH].",
+      "description": "Bounty on Gnosis Chain's consensus/execution client and bridge infrastructure — an Ethereum-aligned chain that shares Ethereum's client software and validator-set model.\n\nThe program page states 'Live Since 11 February 2022' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $2,000,000; ecosystem tags [BSC, ETH].",
       "summary": "Bounty on Gnosis Chain's client and bridge infrastructure, paying up to $2,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -13654,6 +13709,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2022-02-11T04:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13713,7 +13769,7 @@
       "id": "curated:origin-protocol-bug-bounty",
       "fundingType": "bounty",
       "title": "Origin Protocol Bug Bounty",
-      "description": "Bounty on Origin Protocol's yield-bearing stablecoin smart contracts (OUSD, OETH) on Ethereum.\n\nThe program page was live and the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
+      "description": "Bounty on Origin Protocol's yield-bearing stablecoin smart contracts (OUSD, OETH) on Ethereum.\n\nThe program page states 'Live Since 22 November 2021' — the date this record carries as `postedAt` — and was live with the bounty open-ended when this record was written on 2026-08-11, with a maximum reward of $1,000,000; ecosystem tag [ETH].",
       "summary": "Bounty on Origin Protocol's OUSD and OETH yield-bearing stablecoin contracts, paying up to $1,000,000.",
       "status": "open",
       "operatingOrganizations": [
@@ -13757,6 +13813,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2021-11-22T07:15:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13813,7 +13870,7 @@
       "id": "curated:the-graph-grants-program",
       "fundingType": "grant",
       "title": "The Graph Grants Program",
-      "description": "**⚠️ Applications are paused.** On 6 July 2026 The Graph Foundation announced on its official forum: \"The Graph Foundation is pausing applications to the Grants Program. Over the years, the Grants Program has supported grantees across the ecosystem with millions of dollars in funding. In recent months, we made the decision to pause the Grants Program to reassess our ecosystem strategic priorities.\" No reopening date has been announced.\n\nNote that the public grants page at thegraph.com/grants and its Typeform application link were both still reachable when checked on 2026-08-11 and had not been updated to reflect the pause, so page liveness alone is not evidence that intake is open.\n\n**Program as documented.** The Graph grants program is a gateway for contributing to web3, awarding grants for protocol, tooling, subgraph and dapp development, and growth initiatives, distributed from the community treasury. It is overseen by **The Graph Foundation and The Graph Council**, with support from community domain experts and core contributors. Grants go to individuals, projects and initiatives that are open source and contribute to the growth of The Graph ecosystem — \"You don't have to be technical to receive a grant!\"\n\n**Four categories:**\n- **Protocol** — advance The Graph Network with R&D on smart contracts, network operations, Graph Node, cryptography and other core development.\n- **Tooling** — subgraph and Indexer tooling to improve developer experience, expand features, help users engage with the network and simplify network operations.\n- **Data Services** — create and use subgraphs and Substreams to build new data services, dapps and dashboards.\n- **Community** — grow the network, subgraph usage and web3 knowledge through education, content, events and developer support.\n\nGrants have been awarded in numbered waves; the public grantee directory lists 100 grantees. The separate RFP track shows \"There are no open RFPs at this time\".\n\n**Scale:** The Graph Foundation's 2025 Annual Grants Report states lifetime grant funding exceeding **$16.8M**. In 2025 the program funded five R&D teams delivering Horizon, advanced the Token API to production readiness, integrated AI-native tooling via Subgraph MCP, and expanded multi-chain coverage.",
+      "description": "**⚠️ Applications are paused.** On 6 July 2026 The Graph Foundation announced on its official forum: \"The Graph Foundation is pausing applications to the Grants Program. Over the years, the Grants Program has supported grantees across the ecosystem with millions of dollars in funding. In recent months, we made the decision to pause the Grants Program to reassess our ecosystem strategic priorities.\" No reopening date has been announced.\n\nNote that the public grants page at thegraph.com/grants and its Typeform application link were both still reachable when checked on 2026-08-11 and had not been updated to reflect the pause, so page liveness alone is not evidence that intake is open.\n\n**Program as documented.** The Graph grants program is a gateway for contributing to web3, awarding grants for protocol, tooling, subgraph and dapp development, and growth initiatives, distributed from the community treasury. It is overseen by **The Graph Foundation and The Graph Council**, with support from community domain experts and core contributors. Grants go to individuals, projects and initiatives that are open source and contribute to the growth of The Graph ecosystem — \"You don't have to be technical to receive a grant!\"\n\n**Four categories:**\n- **Protocol** — advance The Graph Network with R&D on smart contracts, network operations, Graph Node, cryptography and other core development.\n- **Tooling** — subgraph and Indexer tooling to improve developer experience, expand features, help users engage with the network and simplify network operations.\n- **Data Services** — create and use subgraphs and Substreams to build new data services, dapps and dashboards.\n- **Community** — grow the network, subgraph usage and web3 knowledge through education, content, events and developer support.\n\nGrants have been awarded in numbered waves; the public grantee directory lists 100 grantees. The separate RFP track shows \"There are no open RFPs at this time\".\n\n**Scale:** The Graph Foundation's 2025 Annual Grants Report states lifetime grant funding exceeding **$16.8M**. In 2025 the program funded five R&D teams delivering Horizon, advanced the Token API to production readiness, integrated AI-native tooling via Subgraph MCP, and expanded multi-chain coverage.\n\nThe program was announced on 11 December 2020, alongside the inaugural Graph Council: \"Announcing The Graph Council members and The Graph Grants Program to support ecosystem development\", with the first grants estimated for Q1 2021.",
       "summary": "The Graph Foundation paused applications to the Grants Program on 6 July 2026 to reassess ecosystem strategic priorities. Lifetime grant funding exceeds $16.8M. The thegraph.com/grants page and its Typeform still load but are not accepting new applications.",
       "status": "closed",
       "operatingOrganizations": [
@@ -13847,6 +13904,7 @@
         "allocated": 16800000,
         "currency": "USD"
       },
+      "postedAt": "2020-12-11T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -13855,7 +13913,7 @@
         "fundingMechanisms": ["proactive"],
         "programModel": "grant"
       },
-      "additionalReferences": "Program site: https://thegraph.com/grants/",
+      "additionalReferences": "Program site: https://thegraph.com/grants/ — announcement (11 December 2020): https://thegraph.com/blog/inaugurating-council-and-grants/",
       "categories": ["Funding Opportunity", "Developer Tools", "Data"],
       "socialLinks": [
         {
@@ -13992,7 +14050,7 @@
       "id": "curated:mantle-ecofund",
       "fundingType": "grant",
       "title": "Mantle EcoFund",
-      "description": "The Mantle EcoFund is Mantle's ecosystem investment vehicle for early-stage projects seeking a long-term partnership with Mantle Network. It was established by Mantle governance proposal MIP-24, which 'authorized the establishment of a US$100 million Mantle EcoFund capitalised by the Mantle Treasury'; capital is drawn down in tranches through governance-approved capital calls denominated in USDC (a first call of US$10 million, then a second call of US$30 million authorised by MIP-29 in February 2024, which also expanded the fund's investment mandate). Mantle's own site currently describes the EcoFund as having 'a $200M catalyzed capital pool… accessing top-tier deal flow through 20 leading VCs like Polychain and Dragonfly' — that larger figure is the catalysed pool including co-investor capital, not the DAO-authorised fund size. Mirana Ventures plays a strategic role supporting the fund.\n\nThis is investment and partnership support rather than a fixed grant cheque. Investment criteria, in Mantle's words, look for projects that are early stage; are seeking a long-term partnership with Mantle; can attract capital from venture firms and allocators; and synergize with other Mantle Ecosystem partners.\n\nSupport provided is split into two tiers. Exclusively for EcoFund portfolio companies: the EcoFund 'EF' tag, and deal-structuring and fundraising support. Prioritized for them (and also provided to top-performing applications on Mantle generally): Mantle co-promotion on media, social and events; enhanced delegated voting; listing recommendations to partnered exchanges; liquidity support via the Economics Committee program; and direct access and regular catch-ups with the Mantle Growth team.\n\nIntake is by email rather than a public form: the EcoFund page's 'Contact Us' resolves to ecofund@mantle.xyz, with the suggested subject line 'Join Mantle EcoFund as a Strategic Venture Partner'. The page lists 40+ portfolio companies across DeFi, gaming, Bitcoin infrastructure, RWA and AI, many tagged 'Live'. No closing date is published. Historic selectivity disclosed in governance: between 1 September 2023 and 15 January 2024 the EcoFund team reviewed 252 projects, took 58 (23%) into deeper due diligence, and invested in 10 (3.9%).",
+      "description": "The Mantle EcoFund is Mantle's ecosystem investment vehicle for early-stage projects seeking a long-term partnership with Mantle Network. It was established by Mantle governance proposal MIP-24, posted to the Mantle forum on 26 February 2023, which 'authorized the establishment of a US$100 million Mantle EcoFund capitalised by the Mantle Treasury'; capital is drawn down in tranches through governance-approved capital calls denominated in USDC (a first call of US$10 million, then a second call of US$30 million authorised by MIP-29 in February 2024, which also expanded the fund's investment mandate). Mantle's own site currently describes the EcoFund as having 'a $200M catalyzed capital pool… accessing top-tier deal flow through 20 leading VCs like Polychain and Dragonfly' — that larger figure is the catalysed pool including co-investor capital, not the DAO-authorised fund size. Mirana Ventures plays a strategic role supporting the fund.\n\nThis is investment and partnership support rather than a fixed grant cheque. Investment criteria, in Mantle's words, look for projects that are early stage; are seeking a long-term partnership with Mantle; can attract capital from venture firms and allocators; and synergize with other Mantle Ecosystem partners.\n\nSupport provided is split into two tiers. Exclusively for EcoFund portfolio companies: the EcoFund 'EF' tag, and deal-structuring and fundraising support. Prioritized for them (and also provided to top-performing applications on Mantle generally): Mantle co-promotion on media, social and events; enhanced delegated voting; listing recommendations to partnered exchanges; liquidity support via the Economics Committee program; and direct access and regular catch-ups with the Mantle Growth team.\n\nIntake is by email rather than a public form: the EcoFund page's 'Contact Us' resolves to ecofund@mantle.xyz, with the suggested subject line 'Join Mantle EcoFund as a Strategic Venture Partner'. The page lists 40+ portfolio companies across DeFi, gaming, Bitcoin infrastructure, RWA and AI, many tagged 'Live'. No closing date is published. Historic selectivity disclosed in governance: between 1 September 2023 and 15 January 2024 the EcoFund team reviewed 252 projects, took 58 (23%) into deeper due diligence, and invested in 10 (3.9%).",
       "summary": "Rolling Mantle EcoFund: a US$100M DAO-authorised ecosystem investment fund (described by Mantle as a $200M catalysed capital pool with 20 co-investing VCs) offering partnership, fundraising and growth support to early-stage projects; intake is by email to ecofund@mantle.xyz.",
       "status": "open",
       "operatingOrganizations": [
@@ -14047,6 +14105,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2023-02-26T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -14054,7 +14113,7 @@
         "fundingMechanisms": ["proactive"],
         "programModel": "investment"
       },
-      "additionalReferences": "EcoFund page: https://www.mantle.xyz/ecofund | Mantle site (EcoFund summary): https://www.mantle.xyz/ | Governance: MIP-29 second capital call and mandate expansion, https://forum.mantle.xyz/t/passed-mip-29-ef-proposal-second-capital-call-and-updates/8653 (which cites the establishing MIP-24) | Mantle forum: https://forum.mantle.xyz/",
+      "additionalReferences": "EcoFund page: https://www.mantle.xyz/ecofund | Governance: MIP-24, which established the EcoFund (26 February 2023), https://forum.mantle.xyz/t/passed-mip-24-mantle-ecofund/4692 | Mantle site (EcoFund summary): https://www.mantle.xyz/ | Governance: MIP-29 second capital call and mandate expansion, https://forum.mantle.xyz/t/passed-mip-29-ef-proposal-second-capital-call-and-updates/8653 (which cites the establishing MIP-24) | Mantle forum: https://forum.mantle.xyz/",
       "categories": ["Funding Opportunity", "Ecosystem Support"],
       "prerequisites": "There is no public application form. Interested projects contact the EcoFund team by email at ecofund@mantle.xyz; the program page suggests the subject line 'Join Mantle EcoFund as a Strategic Venture Partner'. Due diligence covers the founders' experience, product and roadmap, traction, financials, tokenomics, and the project's strategic value to Mantle Network.",
       "website": "https://www.mantle.xyz/ecofund"
@@ -14141,7 +14200,7 @@
       "id": "curated:arbitrum-gaming-ventures-agv",
       "fundingType": "grant",
       "title": "Arbitrum Gaming Ventures (AGV)",
-      "description": "Arbitrum Gaming Ventures (AGV) is the ArbitrumDAO's gaming and consumer venture initiative — the renamed successor to the Gaming Catalyst Program (GCP). The old GCP domain thegamingcatalyst.com now redirects to arbitrumgamingventures.com, confirming the rebrand. The Arbitrum Foundation states AGV is 'Backed by 225M ARB from the ArbitrumDAO'; the figure is a native token quantity, so this record's currency is ARB rather than USD.\n\nAGV describes itself as investing in 'teams creating exceptional experiences at the intersection of blockchain gaming, entertainment, and culture'. It 'deploys investment and grant funding to proven publishers and rising indies, using flexible deal structures such as grants, co-investments, equity, or token models to meet entrepreneurs where they are'. Support extends beyond capital to user-acquisition and scaling capital, strategic partnerships and go-to-market help, for teams ranging from AAA studios to indie creators. Its published thesis pillars are Funding Breakthroughs (projects with breakout potential, retentive user experiences and novel distribution strategies), Arbitrum Everywhere, and Bet on Talent, Big or Small.\n\nGovernance and operations: AGV is run by an operating team (Partners, a General Manager, a Venture Associate, a Grants Program Lead, a General Counsel and a Content and Communications Lead) overseen by an elected AGV Council including an Investment Committee member and an Arbitrum Foundation observer. Council seats run on a calendar-year term with nominations in October, voting in November and transition in December. The program's official start date was 1 January 2025. Its H2 2025 transparency report records the thesis broadening beyond gaming into gamified consumer platforms, prediction markets and other onchain-native experiences, and a more capital-disciplined deployment posture given ARB price volatility.\n\nDisclosed portfolio companies include Giant, Golden Tides, Forkast, The Lost Glitches, Coverd, Hyve Labs, Wildcard, T-Rex, Forge.gg, Jin Anomaly, XAI and Thousands.\n\nIntake: AGV runs a standing expression of interest at arbitrumgamingventures.com/apply — 'If you are working on the next big thing in gaming, entertainment, or consumer, we want to hear from you. Apply to become a part of the AGV portfolio and bring your vision to life on Arbitrum.' There is no published deadline and no per-deal size is disclosed. The Arbitrum Foundation's grants index lists AGV as Active with a 'Submit Interest' button, 'Managed by The ArbitrumDAO'.",
+      "description": "Arbitrum Gaming Ventures (AGV) is the ArbitrumDAO's gaming and consumer venture initiative — the renamed successor to the Gaming Catalyst Program (GCP). The old GCP domain thegamingcatalyst.com now redirects to arbitrumgamingventures.com, confirming the rebrand. The Arbitrum Foundation states AGV is 'Backed by 225M ARB from the ArbitrumDAO'; the figure is a native token quantity, so this record's currency is ARB rather than USD.\n\nAGV describes itself as investing in 'teams creating exceptional experiences at the intersection of blockchain gaming, entertainment, and culture'. It 'deploys investment and grant funding to proven publishers and rising indies, using flexible deal structures such as grants, co-investments, equity, or token models to meet entrepreneurs where they are'. Support extends beyond capital to user-acquisition and scaling capital, strategic partnerships and go-to-market help, for teams ranging from AAA studios to indie creators. Its published thesis pillars are Funding Breakthroughs (projects with breakout potential, retentive user experiences and novel distribution strategies), Arbitrum Everywhere, and Bet on Talent, Big or Small.\n\nGovernance and operations: AGV is run by an operating team (Partners, a General Manager, a Venture Associate, a Grants Program Lead, a General Counsel and a Content and Communications Lead) overseen by an elected AGV Council including an Investment Committee member and an Arbitrum Foundation observer. Council seats run on a calendar-year term with nominations in October, voting in November and transition in December. The program's official start date was 1 January 2025. Its H2 2025 transparency report records the thesis broadening beyond gaming into gamified consumer platforms, prediction markets and other onchain-native experiences, and a more capital-disciplined deployment posture given ARB price volatility.\n\nDisclosed portfolio companies include Giant, Golden Tides, Forkast, The Lost Glitches, Coverd, Hyve Labs, Wildcard, T-Rex, Forge.gg, Jin Anomaly, XAI and Thousands.\n\nIntake: AGV runs a standing expression of interest at arbitrumgamingventures.com/apply — 'If you are working on the next big thing in gaming, entertainment, or consumer, we want to hear from you. Apply to become a part of the AGV portfolio and bring your vision to life on Arbitrum.' There is no published deadline and no per-deal size is disclosed. The Arbitrum Foundation's grants index lists AGV as Active with a 'Submit Interest' button, 'Managed by The ArbitrumDAO'.\n\nAGV was publicly launched under this name on 8 May 2025, in a press release revealing its first $10M investment cohort; arbitrumgamingventures.com was first captured five days later.",
       "summary": "ArbitrumDAO's gaming, entertainment and consumer venture arm (formerly the Gaming Catalyst Program), backed by 225M ARB, deploying grants, co-investments, equity and token deals to game and consumer builders on Arbitrum via a standing expression of interest.",
       "status": "open",
       "operatingOrganizations": [
@@ -14181,6 +14240,7 @@
           "label": "application"
         }
       ],
+      "postedAt": "2025-05-08T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
