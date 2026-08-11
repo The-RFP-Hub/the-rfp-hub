@@ -143,7 +143,7 @@ marker file to its directory, and
 [`scripts/spec-freeze.mjs`](../../scripts/spec-freeze.mjs) — fails any PR that edits a normative
 artifact of a version directory containing one. **`v1.0.0` was declared `stable` on 2026-08-10
 and its marker is [`schemas/v1.0.0/FROZEN`](./schemas/v1.0.0/FROZEN)** — the draft window that
-permitted the three in-place revisions is closed, and the gate is live.
+permitted the four in-place revisions is closed, and the gate is live.
 
 **What "the version directory is frozen" means exactly**, because two rules in this document
 would otherwise contradict each other. The consequences above say informative documents may be
