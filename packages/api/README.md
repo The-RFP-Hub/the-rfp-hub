@@ -111,6 +111,24 @@ dataset rather than a half-written one. Nothing makes five files land atomically
 does fail the error names which files were written and which one was not, and no
 `dataset_snapshots` row is recorded for that run.
 
+### The alias pair
+
+`latest.json` and `latest.csv` are **one promise**: whatever one names, the other names of the same
+run. Going last is not enough to keep it — that protects the pair from a half-written *archive*, not
+from each other. Written in sequence, a failure on the second leaves the first already advanced and
+no way back, and the consumer who reads both (the entire reason both exist) gets two different runs
+stitched together with nothing to signal it.
+
+So the pair is **staged and then promoted**. Both payloads are written to temp files beside their
+destinations and `fsync`ed first, both destinations are checked, and only then are the two renames
+issued back to back — and `rename` is atomic per file, so no reader ever sees a partial alias. Every
+way an alias write realistically fails — a full disk, a read-only directory, a serialization error,
+a destination that is not a file — now fails while the previous pair is still whole and nothing has
+been promoted; the temps are cleaned up and the run exits non-zero. What is left between the two
+renames is a pair of metadata operations on bytes that are already durable and destinations that are
+already checked, and a failure even *there* is not silent: it reports that the two aliases may name
+different runs and that re-running repairs them.
+
 `<digest>` is the first 12 hex of the sha256 of the file's own bytes. That is what makes the
 archive genuinely immutable: one name can never designate two different datasets, so a second run
 on the same UTC day — a re-run after a partial failure, say — writes its own archive instead of

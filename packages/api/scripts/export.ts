@@ -9,8 +9,9 @@
  *                                       ever readable without its rights notice beside it
  *   opportunities-<date>-<digest>.json  this run's archive, named after a prefix of the sha256
  *   opportunities-<date>-<digest>.csv   of its own bytes
- *   latest.json                         stable names a consumer can hard-code, written LAST so
- *   latest.csv                          they never name a half-written dataset
+ *   latest.json                         stable names a consumer can hard-code, promoted LAST and
+ *   latest.csv                          as a PAIR, so they never name a half-written dataset and
+ *                                       never name two different runs as each other
  *
  * `dataset_snapshots` records the ARCHIVE names — the per-run record — with the sha256 of the
  * bytes stored under them, never the aliases, which move.
@@ -18,8 +19,8 @@
  * A run below EXPORT_MIN_COUNT (default 100) writes NOTHING and exits non-zero: an empty or
  * half-loaded database would otherwise quietly replace `latest.*` with a header-only CSV.
  */
-import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import { lstat, mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import { and, asc, eq } from "drizzle-orm";
@@ -97,6 +98,9 @@ export class ExportFloorError extends Error {
  * which one was not, instead of leaving that to be inferred from a bare write error. No
  * `dataset_snapshots` row is recorded for such a run, so the database never claims a publication
  * that did not happen.
+ *
+ * The alias pair is exempt from "partial" in one specific sense: a failure anywhere in `latest.*`
+ * leaves BOTH aliases on the previous run, never one on each (see `promoteAliases`).
  */
 export class ExportWriteError extends Error {
   constructor(
@@ -113,6 +117,31 @@ export class ExportWriteError extends Error {
       ].join(" "),
     );
     this.name = "ExportWriteError";
+  }
+}
+
+/**
+ * Thrown when the alias pair could not be promoted AS A PAIR — the one failure `promoteAliases`
+ * stages so carefully to make unreachable, reported loudly rather than folded into a generic write
+ * failure. Both payloads were fully written and fsynced and both destinations were checked before
+ * either was promoted, so reaching this means a bare `rename(2)` failed with the other alias
+ * already in place: `latest.json` and `latest.csv` may now name two different runs. No snapshot row
+ * is recorded, and re-running the export repairs the pair.
+ */
+export class ExportAliasError extends Error {
+  constructor(
+    readonly failed: string,
+    readonly promoted: string,
+    override readonly cause: unknown,
+  ) {
+    super(
+      [
+        `failed to promote ${failed} after ${promoted} was already promoted —`,
+        `${promoted} and ${failed} may now name DIFFERENT runs.`,
+        "No snapshot row was recorded. Re-run the export to put the pair back on one run.",
+      ].join(" "),
+    );
+    this.name = "ExportAliasError";
   }
 }
 
@@ -133,6 +162,115 @@ function resolveMinCount(explicit: number | undefined): number {
   const raw = process.env.EXPORT_MIN_COUNT;
   if (raw === undefined || raw.trim() === "") return DEFAULT_MIN_COUNT;
   return assertFloor(Number(raw), "EXPORT_MIN_COUNT", raw);
+}
+
+/**
+ * Write `body` to a temp file beside its destination and fsync it, returning the temp path.
+ *
+ * Beside it, not in the system temp directory: `rename` is only atomic within one filesystem. And
+ * fsynced, because promotion has to move bytes that are ALREADY ON DISK — bytes still sitting in a
+ * page cache this process may never get to flush are not a payload a rename can be trusted with.
+ */
+async function stageBeside(dir: string, name: string, body: string): Promise<string> {
+  const tmp = join(dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
+  try {
+    // `wx`: a name collision is loud rather than a silent overwrite of another run's staging.
+    const fh = await open(tmp, "wx");
+    try {
+      await fh.writeFile(body);
+      await fh.sync();
+    } finally {
+      await fh.close();
+    }
+  } catch (err) {
+    await rm(tmp, { force: true });
+    throw err;
+  }
+  return tmp;
+}
+
+/**
+ * Fail unless `rename` could actually replace `path`. A DIRECTORY is the one entry it cannot:
+ * POSIX rename overwrites any other existing file, and an absent destination is the ordinary
+ * first-run case. Learning this AFTER the first alias was promoted is precisely the split the
+ * staging exists to prevent, so both destinations are checked before either is promoted.
+ */
+async function assertPromotable(path: string): Promise<void> {
+  const info = await lstat(path).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  });
+  if (info?.isDirectory()) {
+    throw Object.assign(new Error(`${path} is a directory, not a file the export can replace`), {
+      code: "EISDIR",
+    });
+  }
+}
+
+/**
+ * Put `latest.json` and `latest.csv` on this run — both, or neither.
+ *
+ * The two aliases are ONE promise to a consumer: whatever `latest.json` says, `latest.csv` says of
+ * the same run. Writing them in sequence cannot keep that promise. A failure on the second leaves
+ * the first already overwritten with no way back, so the pair straddles two runs — and the consumer
+ * who reads both, which is the entire reason both exist, gets a mismatched dataset with nothing to
+ * signal it. Ordering the aliases last protects them from a half-written ARCHIVE; it does nothing
+ * about them relative to each other.
+ *
+ * So both payloads are written to temp files beside their destinations and fsynced FIRST, both
+ * destinations are checked, and only then are the two renames issued back to back. Every way an
+ * alias write realistically fails — a full disk, a read-only directory, a serialization error, a
+ * destination that is not a file — now fails while the previous pair is still whole and nothing has
+ * been promoted; the temps are removed and the run raises `ExportWriteError`. What remains between
+ * the two renames is a pair of metadata operations on bytes already durable and destinations
+ * already checked, and a failure even there is not silent: it is `ExportAliasError`.
+ *
+ * Exported because it carries the guarantee on its own and is tested on its own: a full export can
+ * only be made to fail one alias by making that alias's destination unusable, which destroys the
+ * very file a test of the pair has to read back.
+ */
+export async function promoteAliases(
+  outDir: string,
+  aliases: readonly { name: string; body: string }[],
+  written: readonly string[],
+): Promise<ExportArtifact[]> {
+  const staged: { name: string; tmp: string }[] = [];
+  const discard = async (): Promise<void> => {
+    await Promise.all(staged.map(({ tmp }) => rm(tmp, { force: true })));
+  };
+
+  let pending = "";
+  try {
+    for (const { name, body } of aliases) {
+      pending = name;
+      staged.push({ name, tmp: await stageBeside(outDir, name, body) });
+    }
+    for (const { name } of aliases) {
+      pending = name;
+      await assertPromotable(join(outDir, name));
+    }
+  } catch (err) {
+    await discard();
+    throw new ExportWriteError(pending, written, err);
+  }
+
+  const promoted: ExportArtifact[] = [];
+  for (const { name, tmp } of staged) {
+    const path = join(outDir, name);
+    try {
+      await rename(tmp, path);
+    } catch (err) {
+      const done = promoted.map((p) => p.name);
+      // Nothing promoted yet, so the previous pair is untouched: an ordinary failed write.
+      if (done.length === 0) {
+        await discard();
+        throw new ExportWriteError(name, written, err);
+      }
+      throw new ExportAliasError(name, done.join(", "), err);
+    }
+    promoted.push({ name, path });
+  }
+  return promoted;
 }
 
 /** Run the export. Does not close the pool (caller's job). */
@@ -189,12 +327,21 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
   // Rights sidecar first: its content is constant, so re-writing it every run is idempotent, and
   // going first means no data file is ever readable without it. Then the archive, then the aliases
   // that point at it — a run that dies part-way leaves `latest.*` on the last COMPLETE dataset
-  // rather than on a partially-written one.
+  // rather than on a partially-written one. The aliases go through `promoteAliases`, which lands
+  // them as a pair or not at all.
   await write("LICENSE", LICENSE_NOTICE);
   const jsonPath = await write(archiveName(date, jsonDigest, "json"), json);
   const csvPath = await write(archiveName(date, csvDigest, "csv"), csv);
-  await write("latest.json", json);
-  await write("latest.csv", csv);
+  artifacts.push(
+    ...(await promoteAliases(
+      outDir,
+      [
+        { name: "latest.json", body: json },
+        { name: "latest.csv", body: csv },
+      ],
+      artifacts.map((a) => a.name),
+    )),
+  );
 
   await db.insert(datasetSnapshots).values([
     {
@@ -224,7 +371,10 @@ if (!process.env.VITEST) {
       console.log(`✓ exported ${count} opportunities\n${written}`);
     })
     .catch((err) => {
-      const expected = err instanceof ExportFloorError || err instanceof ExportWriteError;
+      const expected =
+        err instanceof ExportFloorError ||
+        err instanceof ExportWriteError ||
+        err instanceof ExportAliasError;
       console.error(expected ? `✗ ${err.message}` : err);
       process.exitCode = 1;
     })

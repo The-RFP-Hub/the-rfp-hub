@@ -2,6 +2,9 @@
  * DB-gated export test: seed a fixture, run the exporter to a temp dir, and assert the written
  * file set + dataset_snapshots rows. Also covers the EXPORT_MIN_COUNT floor, the content-addressed
  * archive names, and the partial-write failure. Self-cleaning. Gated on DATABASE_URL.
+ *
+ * The alias pair's all-or-nothing promotion is pinned twice: end-to-end here, and directly against
+ * `promoteAliases` in the ungated block at the bottom, which needs no database.
  */
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm } from "node:fs/promises";
@@ -9,9 +12,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { eq, like } from "drizzle-orm";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CSV_COLUMNS } from "../../scripts/csv.js";
-import { ExportFloorError, ExportWriteError, runExport } from "../../scripts/export.js";
+import {
+  ExportFloorError,
+  ExportWriteError,
+  promoteAliases,
+  runExport,
+} from "../../scripts/export.js";
 import { db, pool } from "../../src/db/client.js";
 import { datasetSnapshots, opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
@@ -21,6 +29,37 @@ const run = describeWithDb;
 const ROOT = join(tmpdir(), "rfphub-export-test");
 const OUT = join(ROOT, "run");
 const fixtureId = "etest:export-1";
+
+/**
+ * Seed one listed, approved entry. Taking the id makes a row a MARKER: an alias that contains it is
+ * demonstrably on the run that followed the seed, which is what makes "which run is this alias on"
+ * an answerable question at all — over unchanged data the CSV is byte-identical across runs.
+ */
+const seedFixture = async (id: string, title: string): Promise<void> => {
+  await new OpportunityService().upsertFromStandard(
+    {
+      specVersion: "1.0.0",
+      id,
+      fundingType: "grant",
+      title,
+      description: "d",
+      status: "open",
+      operatingOrganizations: [{ name: "Export Org", slug: "export-org" }],
+      source: { ingestedVia: "import", verifiedAgainstSource: null },
+      ecosystems: ["EXPORTTEST"],
+      categories: ["Tooling"],
+      fundingInfo: { budget: 12345, currency: "USD" },
+      deadlines: [
+        { deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" },
+      ],
+      fundingDetails: { fundingType: "grant" },
+    } satisfies Opportunity,
+    { reviewStatus: "approved", isListed: true },
+  );
+};
+
+/** Staging files the promotion should never leave behind. */
+const temps = (names: string[]): string[] => names.filter((n) => n.endsWith(".tmp"));
 
 /** The digest prefix an archive name carries, computed from the bytes stored under it. */
 const digest = (s: string): string => createHash("sha256").update(s).digest("hex").slice(0, 12);
@@ -34,27 +73,7 @@ const archive = (names: string[], ext: string): string => {
 
 run("open-data export", () => {
   beforeAll(async () => {
-    const ctl = new OpportunityService();
-    await ctl.upsertFromStandard(
-      {
-        specVersion: "1.0.0",
-        id: fixtureId,
-        fundingType: "grant",
-        title: "Export Fixture",
-        description: "d",
-        status: "open",
-        operatingOrganizations: [{ name: "Export Org", slug: "export-org" }],
-        source: { ingestedVia: "import", verifiedAgainstSource: null },
-        ecosystems: ["EXPORTTEST"],
-        categories: ["Tooling"],
-        fundingInfo: { budget: 12345, currency: "USD" },
-        deadlines: [
-          { deadlineType: "fixed", date: "2999-01-01T00:00:00.000Z", label: "application" },
-        ],
-        fundingDetails: { fundingType: "grant" },
-      } satisfies Opportunity,
-      { reviewStatus: "approved", isListed: true },
-    );
+    await seedFixture(fixtureId, "Export Fixture");
   });
 
   afterAll(async () => {
@@ -183,24 +202,90 @@ run("open-data export", () => {
 
   // Nothing makes five files land atomically. When one does not land, the failure has to say which
   // ones did — a bare EISDIR from writeFile says nothing about the state of the destination.
-  it("names what was written and what failed when a write fails part-way", async () => {
+  //
+  // The ALIAS PAIR carries a stronger obligation than the rest of the file set: `latest.json` and
+  // `latest.csv` are read together, so a run that cannot finish must advance NEITHER — not the one
+  // that happens to be written first. Writing them in sequence advanced `latest.json` and then
+  // failed on `latest.csv`, leaving the pair straddling two runs with nothing to signal it.
+  it("names what was written and what failed, and advances neither alias, when a write fails", async () => {
     const out = join(ROOT, "partial");
-    // a directory where `latest.csv` should go: the last write of the run fails, the four before it
-    // have already landed
+
+    // a COMPLETE run first — this is the pair the failed run has to leave exactly where it is
+    await runExport({ outDir: out, minCount: 1 });
+    const before = await readFile(join(out, "latest.json"), "utf8");
+    const snapshotsBefore = await db
+      .select()
+      .from(datasetSnapshots)
+      .where(like(datasetSnapshots.url, `${out}%`));
+
+    // a row only a LATER run can carry, so "which run is this alias on" has an answer
+    const marker = "etest:export-partial";
+    await seedFixture(marker, "Export Fixture (partial)");
+    expect(before).not.toContain(marker);
+
+    // a directory where `latest.csv` belongs: rename cannot replace it, so the run cannot complete
+    // its pair. Making a destination unusable is the only way to fail one alias from outside the
+    // exporter, and it costs the test the ability to read `latest.csv` back — which is why the
+    // all-or-nothing contract is ALSO driven straight at `promoteAliases` below, with both aliases
+    // left readable.
+    await rm(join(out, "latest.csv"));
     await mkdir(join(out, "latest.csv"), { recursive: true });
 
     await expect(runExport({ outDir: out, minCount: 1 })).rejects.toThrow(ExportWriteError);
+
+    // THE INVARIANT, asserted before anything about the message: `latest.json` was not moved onto a
+    // run whose `latest.csv` never landed. It is byte-for-byte the alias the last complete run left
+    // behind, and it does not carry the row that only the failed run could have brought.
+    const after = await readFile(join(out, "latest.json"), "utf8");
+    expect(after).toBe(before);
+    expect(after).not.toContain(marker);
+
+    // and the failed run left no staging beside it
+    expect(temps(await readdir(out))).toEqual([]);
+
+    // the sidecar and both archives landed; NEITHER alias is named as written, because neither was
     await expect(runExport({ outDir: out, minCount: 1 })).rejects.toThrow(
-      /failed to write latest\.csv after writing LICENSE, opportunities-.+, opportunities-.+, latest\.json/,
+      /failed to write latest\.csv after writing LICENSE, opportunities-\S+, opportunities-\S+ —/,
     );
 
-    // no snapshot row claims a run that never finished writing
-    expect(
-      await db
-        .select()
-        .from(datasetSnapshots)
-        .where(like(datasetSnapshots.url, `${out}%`)),
-    ).toHaveLength(0);
+    // no snapshot row claims a run that never finished writing — only the complete one is recorded
+    const snapshotsAfter = await db
+      .select()
+      .from(datasetSnapshots)
+      .where(like(datasetSnapshots.url, `${out}%`));
+    expect(snapshotsAfter.map((s) => s.url).sort()).toEqual(
+      snapshotsBefore.map((s) => s.url).sort(),
+    );
+    expect(snapshotsBefore).toHaveLength(2);
+  });
+
+  // The other half of the same promise: when a run DOES complete, both aliases move, together, onto
+  // it. An alias pair that never mismatches by never advancing would satisfy the invariant and be
+  // useless.
+  it("advances both aliases onto the run that completed", async () => {
+    const out = join(ROOT, "pair");
+    const marker = "etest:export-pair";
+
+    await runExport({ outDir: out, minCount: 1 });
+    expect(await readFile(join(out, "latest.json"), "utf8")).not.toContain(marker);
+    expect(await readFile(join(out, "latest.csv"), "utf8")).not.toContain(marker);
+
+    await seedFixture(marker, "Export Fixture (pair)");
+    const second = await runExport({ outDir: out, minCount: 1 });
+    const names = second.artifacts.map((a) => a.name);
+
+    // both aliases carry the new row, and both are byte-identical to THIS run's archives — one run,
+    // named twice, not two runs named once each
+    const latestJson = await readFile(join(out, "latest.json"), "utf8");
+    const latestCsv = await readFile(join(out, "latest.csv"), "utf8");
+    expect(latestJson).toContain(marker);
+    expect(latestCsv).toContain(marker);
+    expect(latestJson).toBe(await readFile(join(out, archive(names, "json")), "utf8"));
+    expect(latestCsv).toBe(await readFile(join(out, archive(names, "csv")), "utf8"));
+    expect(names.slice(-2)).toEqual(["latest.json", "latest.csv"]);
+
+    // promotion leaves no staging behind on the happy path either
+    expect(temps(await readdir(out))).toEqual([]);
   });
 
   it("refuses to publish below the floor, writing nothing, whichever path set the floor", async () => {
@@ -222,5 +307,85 @@ run("open-data export", () => {
     // nothing was written at all: the directory was never even created
     await expect(readdir(out)).rejects.toThrow();
     expect(await db.select().from(datasetSnapshots)).toHaveLength(before.length);
+  });
+});
+
+/**
+ * The alias-pair guarantee on its own terms. No database: `promoteAliases` is a filesystem
+ * operation, and driving it directly is the only way to watch BOTH aliases across a failure —
+ * failing one alias through a full export means making its destination unusable, which destroys the
+ * very file the assertion has to read back. So this runs even when the DB-gated suites above skip.
+ */
+describe("export alias promotion", () => {
+  const ROOT_A = join(tmpdir(), "rfphub-export-alias-test");
+
+  afterAll(async () => {
+    await rm(ROOT_A, { recursive: true, force: true });
+  });
+
+  it("promotes the whole alias set or none of it, leaving every alias on one run", async () => {
+    const out = join(ROOT_A, "atomic");
+    await mkdir(out, { recursive: true });
+    const read = (n: string): Promise<string> => readFile(join(out, n), "utf8");
+    const runA = { json: '{"run":"A"}\n', csv: "run\nA\n" };
+    const runB = { json: '{"run":"B"}\n', csv: "run\nB\n" };
+
+    const promoted = await promoteAliases(
+      out,
+      [
+        { name: "latest.json", body: runA.json },
+        { name: "latest.csv", body: runA.csv },
+      ],
+      [],
+    );
+    expect(promoted.map((a) => a.name)).toEqual(["latest.json", "latest.csv"]);
+    expect(await read("latest.json")).toBe(runA.json);
+    expect(await read("latest.csv")).toBe(runA.csv);
+
+    // Run B cannot complete: one member of the set has a directory for a destination, the one entry
+    // rename cannot replace. The member is a stand-in for whatever makes a promotion impossible —
+    // a full disk, a read-only directory — and its position (last) is the point: the failure is
+    // discovered only after the two real aliases were already staged and ready to go.
+    await mkdir(join(out, "latest.blocked"), { recursive: true });
+    await expect(
+      promoteAliases(
+        out,
+        [
+          { name: "latest.json", body: runB.json },
+          { name: "latest.csv", body: runB.csv },
+          { name: "latest.blocked", body: runB.json },
+        ],
+        ["LICENSE"],
+      ),
+    ).rejects.toThrow(ExportWriteError);
+
+    // BOTH aliases are still on run A. Not one on A and one on B — that mismatch is the whole
+    // point, because a consumer reads the pair together and nothing in the pair would admit to it.
+    expect(await read("latest.json")).toBe(runA.json);
+    expect(await read("latest.csv")).toBe(runA.csv);
+
+    // and nothing staged for the abandoned run is left lying beside them
+    expect((await readdir(out)).sort()).toEqual(["latest.blocked", "latest.csv", "latest.json"]);
+  });
+
+  it("reports which files were already written when it refuses to promote", async () => {
+    const out = join(ROOT_A, "message");
+    await mkdir(join(out, "latest.csv"), { recursive: true });
+
+    await expect(
+      promoteAliases(
+        out,
+        [
+          { name: "latest.json", body: "{}\n" },
+          { name: "latest.csv", body: "x\n" },
+        ],
+        ["LICENSE", "opportunities-2026-01-01-0123456789ab.json"],
+      ),
+    ).rejects.toThrow(
+      /failed to write latest\.csv after writing LICENSE, opportunities-2026-01-01-0123456789ab\.json/,
+    );
+
+    // the first alias was never created, let alone advanced
+    expect((await readdir(out)).sort()).toEqual(["latest.csv"]);
   });
 });
