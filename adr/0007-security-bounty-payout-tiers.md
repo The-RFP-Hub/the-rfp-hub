@@ -21,10 +21,10 @@ unauthenticated, pulled 2026-08-10:
 
 | Measurement | Value |
 |---|---|
-| Programs representable by a single required `reward` | **3 of 247** |
+| Programs representable by a single required `reward` | **3 of 247**, and strictly **1** |
 | Median reward rows per program | **4** |
 | Payout shapes observed | `range` (374 rows), `fixed` (350), `up_to` (87) |
-| Programs grading on more than one asset class | **80 of 247 (32%)** |
+| Programs grading on more than one asset class | **71 of 188 bounties (38%)** |
 | Programs carrying a percentage-of-value-at-risk rule | **169 of 247 (68%)** |
 | Programs with no end date | **188 of 247** |
 | Programs advertising a maximum with no funded pool | **190 of 247** ($130.9M advertised, $18.9M in pools) |
@@ -33,9 +33,20 @@ The corpus also splits cleanly. 59 of the 247 are audit *competitions* — pool-
 severity tiers — and the remaining 188 are bug bounty programs. Those two sets are exactly
 complementary, and **all 188 are representable** by `{severity, assetType, payout}`.
 
+Three of the 247 carry a single fixed reward row; two of those attach a percentage rule the
+scalar cannot express either, so **one** program in the corpus is fully representable under the
+old shape. The table reports 3 because it is the claim that survives the loosest reading.
+
 A hand-read of ~45 programs across five platforms plus Ethereum Foundation and Solana put the
 percentage-of-value-at-risk construction at ~30 of ~45 (67%), independently matching the 68%
 measured on Immunefi.
+
+Re-validated after the design revision below, and against recent data specifically: **28 of 28**
+programs launched in 2026, **140 of 140** updated in 2026, and **34 of 34** live programs on a
+second platform whose API publishes only a program maximum and a list of severity names — those
+convert to discretionary tiers plus a `maxAward`, which is the honest reading of a source that
+does not publish per-tier figures. Across the 140 recent programs, **no** severity or asset-type
+value fell outside the registries.
 
 ## Decision
 
@@ -169,9 +180,11 @@ carrier. A second one invites drift over which holds what.
 **Keeping `rewardTiers` exclusive to `security`.** Requiring a field on one branch is not a
 reason to forbid it on the other, and placement-graded task bounties are common.
 
-**Reopening ADR-0006 for a settlement currency.** Programs that denominate in USD and settle in
-a token are real but rare — 6 of 247. Logged as a known limitation; the document-wide currency
-rule stands.
+**Reopening ADR-0006 for a settlement currency.** Programs that denominate in one asset and
+settle in another are common, not rare — see the corrected figures under Known limitations. The
+rule still stands for this decision, because unpicking a document-wide invariant is a change to
+every funding type and belongs in its own ADR with its own evidence, not folded into a bounty
+revision. Logged rather than fixed.
 
 ## Known limitations
 
@@ -179,7 +192,15 @@ rule stands.
   above `cap`, validates: portable JSON Schema cannot compare two sibling values. The
   `payout-bounds-inverted` check in `rfphub-validate` is the only enforcement, the same
   arrangement the document-wide currency rule has.
-- Reward tiers cannot express a payout denominated differently from the document currency.
+- **Reward tiers cannot express a payout denominated differently from the document currency, and
+  this bites harder than first estimated.** An early note in this ADR put it at 6 of 247 from a
+  narrow string match. Measured properly, **52 of 247 (21%) name more than one settlement asset**
+  — `"USDC, ETH"`, `"BTC, ETH"`, `"CAKE or USDT"`, `"AAVE and stablecoins"` — and a further 15
+  publish none at all, so **67 of 247 (27%) cannot state a single settlement currency cleanly**.
+  Those records keep the program's headline denomination in `fundingInfo.currency` and lose the
+  rest. This is not a reason to reopen [`adr/0006`](./0006-document-wide-single-currency.md)
+  inside this decision, but it is a materially larger gap than "rare", and the next revisit of
+  the currency rule should start here.
 - `percent` has no companion field naming what the percentage is *of*; "value at risk" is fixed
   by the model name, and programs defining it differently (funds directly affected, TVL at the
   moment of report, economic damage) are not distinguished.

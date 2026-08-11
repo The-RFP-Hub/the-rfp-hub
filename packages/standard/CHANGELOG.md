@@ -16,8 +16,8 @@ Rides the same draft-window permission argued in
 [`adr/0007`](../../adr/0007-security-bounty-payout-tiers.md).
 
 The `bounty` type described "a single scoped task with a stated reward". Measured against a
-public corpus of 247 live crypto bug bounty programs, **3 were representable** under that
-shape. The rest publish a graded table — a median of four rows, keyed on severity and on the
+public corpus of 247 live crypto bug bounty programs, **3 were representable** under that shape
+— and strictly one, since two of the three attach a percentage rule a scalar cannot carry. The rest publish a graded table — a median of four rows, keyed on severity and on the
 class of in-scope asset — so a publisher forced into one `reward` number enters the maximum,
 which is the budget-honesty failure the standard separates `budget` from `maxAward` to avoid.
 
