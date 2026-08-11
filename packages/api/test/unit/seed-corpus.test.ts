@@ -143,9 +143,10 @@ describe("the committed corpus", () => {
    * - `unregistered-deadline-label` — same, for labels. An RFP's eligible-activity window and a
    *   rolling solicitation's first-review date are real dates on real postings with no registered
    *   label to take them.
-   * - `amount-without-currency` — the source publishes a figure and no unit. Guessing the unit
-   *   would be worse than carrying the warning, and dropping the figure would lose a published
-   *   fact; the advisory tier is exactly the right place for it to show up.
+   * `amount-without-currency` used to be here too, for the one record that reached the corpus with
+   * a figure and no unit (`fundingmap:1046`). It is gone — not silenced: the program denominates
+   * its own budget in dollars in its own funding text, and its funder's round rules are dollar
+   * -denominated, so the unit was researched rather than guessed and the record now carries it.
    *
    * A NEW warning fails this test, which is the point: the baseline can only move deliberately.
    */
@@ -155,9 +156,6 @@ describe("the committed corpus", () => {
       "fundingmap:1462", // "audit subsidy"
       "curated:mantle-ecofund", // "investment"
       "curated:arbitrum-gaming-ventures-agv", // "venture"
-    ],
-    "amount-without-currency": [
-      "fundingmap:1046", // budget 5000, no currency published anywhere
     ],
     "unregistered-deadline-label": [
       "fundingmap:1398", // "results announced"
@@ -187,10 +185,10 @@ describe("the committed corpus", () => {
     for (const [code, ids] of Object.entries(ADVISORY_BASELINE)) {
       expect(raised[code], code).toEqual(ids);
     }
-    // 11 warnings over 9 documents, as counted in the README.
+    // 10 warnings over 8 documents, as counted in the README.
     expect(total).toBe(Object.values(ADVISORY_BASELINE).flat().length);
-    expect(total).toBe(11);
-    expect(new Set(Object.values(ADVISORY_BASELINE).flat()).size).toBe(9);
+    expect(total).toBe(10);
+    expect(new Set(Object.values(ADVISORY_BASELINE).flat()).size).toBe(8);
   });
 
   it("gives every document a unique, namespaced id", () => {

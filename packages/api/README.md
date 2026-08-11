@@ -368,23 +368,33 @@ finding rather than a default. Those per-type and per-status counts are the inve
 commit, not a CI contract: what CI asserts is the >=130 floor, zero schema errors, unique ids, the
 advisory baseline below, and the bounty split.
 
-The corpus raises **11 advisory warnings across 9 documents**, and the exact list is pinned in
+The corpus raises **10 advisory warnings across 8 documents**, and the exact list is pinned in
 `test/unit/seed-corpus.test.ts` so a new one fails the build: 4 `unregistered-program-model`
-("audit subsidy" ×2, "investment", "venture"), 6 `unregistered-deadline-label` (an RFP's
-eligible-activity window ×4, a rolling solicitation's first-review date, one "results announced")
-and 1 `amount-without-currency`. Those registries are open lists by design — a publisher's own
-vocabulary is valid without a schema change — so these are the advisory tier reporting real data,
-not defects to launder. Note that seed `--strict` is **schema**-strict: the gate runs with advisory
-checks off, and warnings never fail a seed.
+("audit subsidy" ×2, "investment", "venture") and 6 `unregistered-deadline-label` (an RFP's
+eligible-activity window ×4, a rolling solicitation's first-review date, one "results announced").
+Those registries are open lists by design — a publisher's own vocabulary is valid without a schema
+change — so these are the advisory tier reporting real data, not defects to launder. The one
+`amount-without-currency` this list used to carry is gone, and was not silenced: that program
+denominates its own budget in dollars in its own funding text, so the unit was researched rather
+than guessed. Note that seed `--strict` is **schema**-strict: the gate runs with advisory checks
+off, and warnings never fail a seed.
 
 Where the honest answer is less data, the corpus carries less data:
 
-- **Five documents carry no `applicationUrl`**, because those programs publish no submission page
-  of their own. The field is optional in the Standard; leaving it absent is a fact about the
-  program, whereas substituting a listing page would put something in the field consumers read as
-  "apply here" that the funder never said.
-- **25 documents carry no `fundingInfo`**, because no page publishes a figure. Two of those lost a
-  placeholder — a USD 1 "prize pool" and a USD 3 one — that had survived from a source snapshot.
+- **Four documents carry no `applicationUrl`**, and each says in its own description why. Two
+  Optimism programs were submitted through a host that no longer completes a TLS handshake, and
+  their form URLs survive only as archive captures; one Polygon program's funder-branded form URL
+  was never captured at all, and the only live copy of it sits on another ecosystem's branded host;
+  one micro-grant program ran intake through an existing partner network rather than a public form.
+  The field is optional in the Standard; leaving it absent is a fact about the program, whereas
+  substituting a listing page or an archive copy would put something in the field consumers read as
+  "apply here" that the funder never published.
+- **17 documents carry no `fundingInfo`**, and for every one of them the absence has been chased to
+  the funder's own pages and written into the record. Several are deliberate on the funder's part —
+  "This is not a grant program", "Budget envelope: Open — propose your number", hackathons whose
+  prizes are certificates and mentorship — and the rest are programs that fund without ever
+  publishing a number. Two also lost a placeholder — a USD 1 "prize pool" and a USD 3 one — that
+  had survived from a source snapshot.
 
 Of the 45 bounties, **44 are `security` and 1 is `task`**, and each carries exactly one
 compensation shape: a security record's published ceiling is a tier table rather than a scalar

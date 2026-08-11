@@ -181,7 +181,7 @@
       "id": "fundingmap:961",
       "fundingType": "grant",
       "title": "Optimism Audit Service Providers (ASP)",
-      "description": "**Discontinued.** The Audit Service Provider (ASP) track was the delivery mechanism for Optimism's Audit Grants. Rather than projects applying for audit money and then sourcing an auditor, the Grants Council (and, from Season 8, the Developer Advisory Board) pre-whitelisted audit firms; whitelisted ASPs then applied for specific audits and drew directly against the standing audit budget on the project's behalf. The stated aim of the model was to remove per-auditor pre-approved budgets and treat audits like any other grant in the system.\n\n**Governance and process.** In Seasons 8 and 9 the program sat with the Developer Advisory Board under a non-voting Lead plus seven voting Board Members, with two designated Audit Stewards. Applications were accepted on a rolling basis, with a target initial response to every applicant within 14 days (max) of submission; Steward funding recommendations were optimistically approved by the Board, and results were published as per-cycle reports on gov.optimism.io. Members had to declare conflicts of interest (employment, investment, advisory roles, code contributions) with respect to applicants.\n\n**Scale.** Approved audit grants in the Season 8 cycles (41-45) ran from 18,500 OP to 90,300 OP per project. Optimism did not publish a per-audit cap.\n\n**Why it is closed.** Governance Update #12 (3 June 2026) confirmed no dedicated Seasons after Season 9, and on 15 July 2026 the Token House passed the Developer Advisory Board Dissolution Proposal (22.33M OP For / 198.45K Against), dissolving the board that ran the ASP whitelist and the Audit Grants program, effective immediately. The intake site opgrants.io no longer completes a TLS handshake, and no replacement ASP whitelist or audit-grant intake has been published on optimism.io, docs.optimism.io or gov.optimism.io.",
+      "description": "**Discontinued.** The Audit Service Provider (ASP) track was the delivery mechanism for Optimism's Audit Grants. Rather than projects applying for audit money and then sourcing an auditor, the Grants Council (and, from Season 8, the Developer Advisory Board) pre-whitelisted audit firms; whitelisted ASPs then applied for specific audits and drew directly against the standing audit budget on the project's behalf. The stated aim of the model was to remove per-auditor pre-approved budgets and treat audits like any other grant in the system.\n\n**Governance and process.** In Seasons 8 and 9 the program sat with the Developer Advisory Board under a non-voting Lead plus seven voting Board Members, with two designated Audit Stewards. Applications were accepted on a rolling basis, with a target initial response to every applicant within 14 days (max) of submission; Steward funding recommendations were optimistically approved by the Board, and results were published as per-cycle reports on gov.optimism.io. Members had to declare conflicts of interest (employment, investment, advisory roles, code contributions) with respect to applicants.\n\n**Budget, and the season it belongs to.** Every Season 8 audit cycle report restates the same line — \"Season 8 Audit Grants Budget: 581,726.40 OP\" — and the last of them, Cycle 45, closes with \"Remaining Budget: 8,798.40 OP\". So 572,928 OP of that pool was allocated over the season, which the per-cycle approvals confirm exactly: 123,300 + 110,750 + 0 + 111,800 + 227,078. Both figures are **Season 8 only**. They are the audit-only slice carved out of that season's 949k OP Developer Advisory Board mission line, and they are not the sibling Season 9 record's 0.98M OP, which is a combined Audit Grants and Foundation Missions budget. **No Season 9 audit-only budget was ever published** — there is no Season 9 audit cycle report at all, Cycle 45 (December 2025) being the most recent of any season — so nothing here is carried into that season.\n\n**Scale.** Approved audit grants in the Season 8 cycles (41-45) ran from 18,500 OP to 90,300 OP per project. Optimism did not publish a per-audit cap.\n\n**Why it is closed.** Governance Update #12 (3 June 2026) confirmed no dedicated Seasons after Season 9, and on 15 July 2026 the Token House passed the Developer Advisory Board Dissolution Proposal (22.33M OP For / 198.45K Against), dissolving the board that ran the ASP whitelist and the Audit Grants program, effective immediately. The intake site opgrants.io no longer completes a TLS handshake, and no replacement ASP whitelist or audit-grant intake has been published on optimism.io, docs.optimism.io or gov.optimism.io.",
       "summary": "Optimism's Audit Service Provider model let pre-whitelisted audit firms apply for Superchain audit subsidies on a project's behalf, run in Seasons 8-9 by the Developer Advisory Board on a rolling basis with a 14-day initial-response target. The Board was dissolved by Token House vote on 15 July 2026 and the intake site opgrants.io is unreachable; the program is discontinued.",
       "status": "closed",
       "operatingOrganizations": [
@@ -228,7 +228,7 @@
         "fundingMechanisms": ["proactive"],
         "programModel": "grant"
       },
-      "additionalReferences": "Mission Request: Subsidized Audit Grants V2 (defines the ASP whitelist model): https://gov.optimism.io/t/mission-request-subsidized-audit-grants-v2/8856 | DAB Season 8/9 Communication Thread: https://gov.optimism.io/t/seasons-8-9-developer-advisory-board-communication-thread/10214 | DAB Internal Operating Procedures Season 8: https://gov.optimism.io/t/internal-operating-procedures-iop-for-developer-advisory-board-season-8/10213 | DAB Dissolution Proposal: https://gov.optimism.io/t/council-dissolution-proposal-dissolve-the-developer-advisory-board/10734 | Sample cycle report: https://gov.optimism.io/t/cycle-45-results-season-8-audit-grants/10508",
+      "additionalReferences": "Mission Request: Subsidized Audit Grants V2 (defines the ASP whitelist model): https://gov.optimism.io/t/mission-request-subsidized-audit-grants-v2/8856 | DAB Season 8/9 Communication Thread: https://gov.optimism.io/t/seasons-8-9-developer-advisory-board-communication-thread/10214 | DAB Internal Operating Procedures Season 8: https://gov.optimism.io/t/internal-operating-procedures-iop-for-developer-advisory-board-season-8/10213 | DAB Dissolution Proposal: https://gov.optimism.io/t/council-dissolution-proposal-dissolve-the-developer-advisory-board/10734 | Season 8 cycle reports, which carry the budget line: https://gov.optimism.io/t/cycle-41-results-season-8-audit-grants/10285 | https://gov.optimism.io/t/cycle-42-results-season-8-audit-grants/10315 | https://gov.optimism.io/t/cycle-43-results-season-8-audit-grants/10373 | https://gov.optimism.io/t/cycle-44-results-season-8-audit-grants/10414 | https://gov.optimism.io/t/cycle-45-results-season-8-audit-grants/10508 | S8 Governance Fund Missions (the 949k OP line this is a slice of): https://gov.optimism.io/t/s8-governance-fund-missions/10004",
       "categories": ["Security", "Smart Contract Audits", "Developer Adoption"],
       "prerequisites": "Applications were submitted by the whitelisted Audit Service Provider on the project's behalf and had to describe the audit scope and cost. Review included an AI-assisted triage pass on audit scope sizing, cost efficiency and repository completeness, before human review by the Audit Stewards.",
       "socialLinks": [
@@ -248,7 +248,12 @@
           "platform": "blog",
           "url": "https://optimism.io/blog"
         }
-      ]
+      ],
+      "fundingInfo": {
+        "budget": 581726.4,
+        "allocated": 572928,
+        "currency": "OP"
+      }
     },
     {
       "specVersion": "1.0.0",
@@ -596,7 +601,7 @@
       "id": "fundingmap:981",
       "fundingType": "grant",
       "title": "Polygon Growth Partnership Program",
-      "description": "**Intake retired. Not a grant program.** Polygon /grow connected payments-focused projects to Polygon Labs' business-development and founder-support teams for strategic partnerships, integrations and ecosystem growth — explicitly not a funding program.\n\n**Current state as of 11 August 2026.** Its stated window closed on 16 February 2026, and the /grow path itself no longer serves the program: https://polygon.technology/grow now returns an HTTP 301 redirect to https://hadronfc.com, the Hadron Founders Club (the same target as polygon.technology/grants and polygon.technology/village). Hadron describes itself as an exclusive community of founders, builders and creators offering global events, founder bootcamps, mentorship, closed-door speaker sessions, fundraising support and IRL campuses in Dubai and New York — the NYC space is described as being 'for hadron founders & polygon builders'. Intake is via an Airtable application form linked from hadronfc.com. polygon.technology/founders and polygon.technology/build return 404.\n\nThis is the closest live successor to Polygon's founder/partnership intake, but it is a founders' club rather than the /grow BD-partnership funnel described in this record.",
+      "description": "**Intake retired. Not a grant program.** Polygon /grow connected payments-focused projects to Polygon Labs' business-development and founder-support teams for strategic partnerships, integrations and ecosystem growth — explicitly not a funding program.\n\n**Current state as of 11 August 2026.** Its stated window closed on 16 February 2026, and the /grow path itself no longer serves the program: https://polygon.technology/grow now returns an HTTP 301 redirect to https://hadronfc.com, the Hadron Founders Club (the same target as polygon.technology/grants and polygon.technology/village). Hadron describes itself as an exclusive community of founders, builders and creators offering global events, founder bootcamps, mentorship, closed-door speaker sessions, fundraising support and IRL campuses in Dubai and New York — the NYC space is described as being 'for hadron founders & polygon builders'. Intake is via an Airtable application form linked from hadronfc.com. polygon.technology/founders and polygon.technology/build return 404.\n\n**The intake URL, and what is left of it.** Polygon published the form as founders.polygon.technology/programs/981/apply and linked it from polygon.technology/grow (\"Join the Polygon Founders Community Telegram and submit an application to S3\"). The form itself is archived — \"Apply for Polygon Growth Partnership Program\", asking for team and contact details, project description, project vertical, stage of development and current traction — but the host is gone: founders.polygon.technology has no DNS record at all. The URL is on this record because it is the address the funder published for this closed program, not because anything answers on it.\n\nThis is the closest live successor to Polygon's founder/partnership intake, but it is a founders' club rather than the /grow BD-partnership funnel described in this record.",
       "summary": "Polygon /grow was a business-development and partnership funnel for payments-focused projects, not a grant program. Its window closed 16 February 2026 and polygon.technology/grow now redirects to the Hadron Founders Club (hadronfc.com), whose Airtable form is the closest live successor intake.",
       "status": "closed",
       "operatingOrganizations": [
@@ -642,7 +647,7 @@
         "verifiedAgainstSource": null
       },
       "ecosystems": ["Polygon"],
-      "eligibility": "As published by Polygon: a payments-focused MVP deployed on Polygon (cross-border payments, RWAs, DeFi, fintech); seeking business development partnerships or strategic integrations; measurable traction (users, revenue, transaction volume); and a desire to deepen Polygon integration and ecosystem presence. Hadron Founders Club, the current live successor intake, publishes no equivalent eligibility criteria beyond being a founder, builder or creator.",
+      "eligibility": "As published by Polygon: a payments-focused MVP deployed on Polygon (cross-border payments, RWAs, DeFi, fintech); seeking business development partnerships or strategic integrations; measurable traction (users, revenue, transaction volume); and a desire to deepen Polygon integration and ecosystem presence. The intake itself was not payments-only: its project-vertical list read Payments, Tokenization, DeFi, Prediction Markets, Other. Hadron Founders Club, the current live successor intake, publishes no equivalent eligibility criteria beyond being a founder, builder or creator.",
       "deadlines": [
         {
           "deadlineType": "fixed",
@@ -653,6 +658,7 @@
       "postedAt": "2025-10-28T20:04:17.000Z",
       "createdAt": "2025-10-28T20:04:17.000Z",
       "updatedAt": "2026-02-17T18:15:29.000Z",
+      "applicationUrl": "https://founders.polygon.technology/programs/981/apply",
       "fundingDetails": {
         "fundingType": "grant",
         "programModel": "infra"
@@ -693,7 +699,7 @@
       "id": "fundingmap:1046",
       "fundingType": "grant",
       "title": "GEN Ukraine MicroGrant Program",
-      "description": "The GEN Grant Program 01 enables a bioregional network of ecovillages to implement regenerative projects through Ethereum-aligned coordination and transparent on-chain micro-funding. Leveraging DAO governance, ReFi tools, and on-chain verification, the program funds solar resilience, water restoration, biodiversity monitoring, and community infrastructure to strengthen local regenerative capacity and decentralized economic resilience.",
+      "description": "The GEN Grant Program 01 enables a bioregional network of ecovillages to implement regenerative projects through Ethereum-aligned coordination and transparent on-chain micro-funding. Leveraging DAO governance, ReFi tools, and on-chain verification, the program funds solar resilience, water restoration, biodiversity monitoring, and community infrastructure to strengthen local regenerative capacity and decentralized economic resilience.\n\n**Currency.** The 5,000 figure on this record reaches the corpus without a unit, and the unit is USD. The program states its own co-funding as \"Confirmed co-funding of $5,000 is already secured through two on-chain community pools\" and sizes the round it belongs to in dollars throughout — \"We aim to raise a total of $20,000 for this round\", split \"60% - Local Micro-Grants ($12,000) / 20% - Program Operations & Coordination ($4,000)\" and so on. Its funder's round rules are dollar-denominated too: a $125,000 USD matching pool with a \"Grant Range: $5,000 - $20,000 per local program\". The program's implementation report prices every disbursement in dollars as well. USD is recorded as the unit of account; the settlement rails are stablecoins (cUSD, USDC, USDGLO) and are not the denomination.",
       "summary": "Bioregional microgrants for regenerative ecovillages via transparent on-chain funding",
       "status": "closed",
       "operatingOrganizations": [
@@ -714,7 +720,8 @@
       "ecosystems": ["GEN Ukraine"],
       "eligibility": "Not open to all applicants — the program invites or pre-selects participants.",
       "fundingInfo": {
-        "budget": 5000
+        "budget": 5000,
+        "currency": "USD"
       },
       "deadlines": [
         {
@@ -2895,7 +2902,7 @@
       "id": "fundingmap:1480",
       "fundingType": "hackathon",
       "title": "HACKER HOUSE GOA 2026",
-      "description": "India's Premier Builder Residency\nHacker House Goa 2026 is where India's best builders don't just hack - they ship. \n\nOver 4 days at a private beach resort in Goa, 247 selected developers, designers, and AI-native creators will build, scale, launch, and market real products under one roof.\nThe tracks focus on the intersection of AI × Crypto — multichain, real-world use cases, and what's actually getting built next.\n\nYou can expect:\n\n247 builders selected from \n10,000+ registrations\n4 days of intensive building with daily product reviews\n50+ speakers, mentors, and judges on-site\n$50,000 in bounties across tracks\nVCs on the ground watching teams build in real time\nA public demo day with on-chain voting\n\nThe only hacker house in India that guarantees project numbers to partners before the event starts.\n\nBuild something real. Ship before you leave.",
+      "description": "India's Premier Builder Residency\nHacker House Goa 2026 is where India's best builders don't just hack - they ship. \n\nOver 4 days at a private beach resort in Goa, 247 selected developers, designers, and AI-native creators will build, scale, launch, and market real products under one roof.\nThe tracks focus on the intersection of AI × Crypto — multichain, real-world use cases, and what's actually getting built next.\n\nYou can expect:\n\n247 builders selected from \n10,000+ registrations\n4 days of intensive building with daily product reviews\n50+ speakers, mentors, and judges on-site\n$50,000 in bounties across tracks\nVCs on the ground watching teams build in real time\nA public demo day with on-chain voting\n\nThe only hacker house in India that guarantees project numbers to partners before the event starts.\n\nBuild something real. Ship before you leave.\n\n**The bounty pool is published as a floor.** The event description lists \"$50,000+ in bounties\" and the organiser's own site shows the same figure as \"$50k+\" against the label \"Bounties 2026\", so the 50,000 USD on this record is the published minimum of the pool, not an exact total. The bounties are sponsor-side, which is why the hackathon listing's own computed prize value is zero for this event.",
       "summary": "World's largest AI x Crypto Hacker House",
       "status": "open",
       "operatingOrganizations": [
@@ -2929,6 +2936,10 @@
       "ecosystems": ["Ethereum"],
       "eligibility": "Open to anyone with a passion for building; 247 builders are selected from applications. Participants must get themselves to Goa. Teams may be pre-formed or formed at the Day 1 team-formation session.",
       "applicationUrl": "https://hacker-house-goa-2026.devfolio.co",
+      "fundingInfo": {
+        "budget": 50000,
+        "currency": "USD"
+      },
       "deadlines": [
         {
           "deadlineType": "fixed",
@@ -3881,7 +3892,7 @@
       "id": "fundingmap:1462",
       "fundingType": "grant",
       "title": "Uniswap Foundation Security Fund (UFSF)",
-      "description": "**Open — and not a single closed cohort.** The Uniswap Foundation Security Fund (UFSF) provides up to 100% coverage of security-audit costs for projects building in the Uniswap ecosystem, delivered through Areta's audit marketplace.\n\n**Correction to the deadline.** The 7 May 2026 date on this record is a single monthly cut-off, not the end of the program. UFSF runs a **monthly cohort system**: applications close on the **7th of each month at 23:59 UTC**, and the application form **stays open year-round**. An application that misses a month's cut-off automatically enters the next month's cohort. The Uniswap Foundation still links this form directly from its own homepage.\n\n**Application limits.** Each project may apply to UFSF a maximum of 3 times in total; reapplying with materially new information, or consenting to carry an application forward into the next cohort, each counts toward that cap.\n\n**Marketplace route.** Applicants who book an audit through the Areta marketplace are automatically considered for a retroactive subsidy in the next two cohorts, and a campaign incentive makes every 3rd project that accepts an offer on the marketplace eligible for cashback of up to $10,000 (subject to availability and terms). Applicants who are not booking an audit right now can either reapply with new information or carry the application forward.\n\n**Compliance.** Applicants must accept the Head Agreement and Application Conditions at application time and may be required to execute the Foundation's Grant Agreement as part of a KYC/KYB process following a positive subsidy decision.\n\n**Support channel.** Applicants coordinate through the UFSF Telegram group at https://t.me/UFSF_Applicants.",
+      "description": "**Open — and not a single closed cohort.** The Uniswap Foundation Security Fund (UFSF) provides up to 100% coverage of security-audit costs for projects building in the Uniswap ecosystem, delivered through Areta's audit marketplace.\n\n**Correction to the deadline.** The 7 May 2026 date on this record is a single monthly cut-off, not the end of the program. UFSF runs a **monthly cohort system**: applications close on the **7th of each month at 23:59 UTC**, and the application form **stays open year-round**. An application that misses a month's cut-off automatically enters the next month's cohort. The Uniswap Foundation still links this form directly from its own homepage.\n\n**Fund size.** UFSF is a **$1M subsidy pool**, announced on the Uniswap governance forum as \"a fund size of USD $1M created through a Uniswap Foundation grant\" that \"will subsidize up to 100% of the auditing fees of security services for eligible projects building Uniswap v4 hooks\", and restated at Cohort 2 as \"a $1M initiative to support security audits for projects building in the Uniswap ecosystem\". That $1M is the pool across cohorts, not a per-project cap: \"up to 100% of audit costs\" is a coverage rule with no number attached, and no per-project ceiling is published anywhere, so this record carries a budget and no maximum award. The Foundation's grant to the operator is a different and larger figure — $1,200,000, covering the subsidy pool plus program management — and is not the fund size. **Recency caveat:** the $1M was announced at launch in October 2024 and last restated in February 2025; every monthly cohort post since, through August 2026, repeats the coverage rule without restating or topping up a fund size.\n\n**Application limits.** Each project may apply to UFSF a maximum of 3 times in total; reapplying with materially new information, or consenting to carry an application forward into the next cohort, each counts toward that cap.\n\n**Marketplace route.** Applicants who book an audit through the Areta marketplace are automatically considered for a retroactive subsidy in the next two cohorts, and a campaign incentive makes every 3rd project that accepts an offer on the marketplace eligible for cashback of up to $10,000 (subject to availability and terms). Applicants who are not booking an audit right now can either reapply with new information or carry the application forward.\n\n**Compliance.** Applicants must accept the Head Agreement and Application Conditions at application time and may be required to execute the Foundation's Grant Agreement as part of a KYC/KYB process following a positive subsidy decision.\n\n**Support channel.** Applicants coordinate through the UFSF Telegram group at https://t.me/UFSF_Applicants.",
       "summary": "The Uniswap Foundation Security Fund covers up to 100% of smart-contract audit costs for Uniswap-ecosystem teams via vetted auditors on Areta. It runs monthly cohorts — applications close the 7th of each month at 23:59 UTC — and the form stays open year-round, with missed applications rolling into the next cohort. Each project may apply a maximum of three times.",
       "status": "open",
       "operatingOrganizations": [
@@ -3924,6 +3935,10 @@
       "ecosystems": ["Ethereum", "Uniswap"],
       "eligibility": "Applicants must confirm that the project has not deployed on a DEX other than Uniswap, and is not deploying on a DEX other than Uniswap within 6 months after the date of the application. The applicant must be an established legal entity (e.g. LLC, corporation), legally registered and operational in a jurisdiction, with supporting documentation provided in KYB proceedings after a positive subsidy decision. Each project may submit a maximum of 3 UFSF applications in total; reapplying or carrying an application forward counts toward that cap.",
       "applicationUrl": "https://areta.fillout.com/ufsf-projects",
+      "fundingInfo": {
+        "budget": 1000000,
+        "currency": "USD"
+      },
       "deadlines": [
         {
           "deadlineType": "rolling",
@@ -3939,7 +3954,7 @@
         "programModel": "audit subsidy",
         "recurring": true
       },
-      "additionalReferences": "UFSF cohort application form: https://areta.fillout.com/ufsf-projects | Head Agreement and Application Conditions: https://drive.google.com/drive/folders/1doXojQAbAu8Cy0eHkY4FoEtCHEVzgZEE | UFSF applicants Telegram group: https://t.me/UFSF_Applicants | Areta Market: https://areta.market/ | Auditor-side UFSF intake: https://areta.fillout.com/ufsf-auditors",
+      "additionalReferences": "Launch announcement on the Uniswap governance forum, which states the fund size: https://gov.uniswap.org/t/uniswap-foundation-security-fund-launch/24754 | Cohort announcement thread: https://gov.uniswap.org/t/uniswap-foundation-security-fund-ufsf-announcement-thread/24878 | The Foundation's grant to the operator, a separate figure: https://www.uniswapfoundation.org/blog/announcing-usd1-2m-grant-to-areta-for-the-uniswap-foundation-security-fund | UFSF cohort application form: https://areta.fillout.com/ufsf-projects | Head Agreement and Application Conditions: https://drive.google.com/drive/folders/1doXojQAbAu8Cy0eHkY4FoEtCHEVzgZEE | UFSF applicants Telegram group: https://t.me/UFSF_Applicants | Areta Market: https://areta.market/ | Auditor-side UFSF intake: https://areta.fillout.com/ufsf-auditors",
       "categories": ["Security", "Smart Contract Audits", "Audit Subsidy"],
       "prerequisites": "The application form asks for the project name, contact person's name, email and Telegram, the project website, and all relevant deployed smart-contract addresses across every chain the product is deployed on. Applicants must indicate acceptance of the Head Agreement and the Application Conditions, and acknowledge that a successful applicant may be required to execute the Foundation's Grant Agreement supplied as part of the KYC/KYB process.",
       "socialLinks": [
@@ -4156,7 +4171,7 @@
       "id": "fundingmap:1414",
       "fundingType": "accelerator",
       "title": "Yellow Acceleration #2",
-      "description": "Yellow Acceleration #2 is a growth program for startups building with blockchain technologies, run by Yellow (the Layer-3 state-channel clearing network behind the Yellow SDK / NeoDAX). Intake is deliberately low-friction: the published form opens with \"Thanks for your interest in building with Yellow! Whether you already have a clear idea or are still figuring things out - that's totally OK!\" and asks applicants only to \"express your intent to apply to the acceleration program\", after which \"our team will get back to you shortly.\"\n\nThe form collects name, email, Telegram handle, whether the applicant has a team, team/company name, a short description of the team and of what is being built, a GitHub or website link, availability to pitch online, and availability to pitch offline \"during DAPPConference Berlin June 16-17\" in the event of selection to the Final. It also asks applicants to confirm they have joined the Yellow Telegram community.\n\nNo funding amount, equity or token terms, cohort size, cohort dates or application deadline are published anywhere on the form or on yellow.org. The only monetary figure Yellow publishes for builders belongs to a *different* programme — the Yellow Builder Program at yellow.org/build, which offers \"up to $50K for your project\" against four milestones (M0 Acceptance, M1 Kickoff, M2 Live, M3 Scaling) and has its own intake at forms.yellow.org/build. The two should not be conflated.\n\nAs of 2026-08-11 the acceleration form is still live and accepting responses (no closure notice, Submit button present), but the offline Final it points at — DAPP Conference Berlin, June 16–17 — has already passed, and Yellow has published no cohort roster, selection outcome or Round 3 announcement.",
+      "description": "Yellow Acceleration #2 is a growth program for startups building with blockchain technologies, run by Yellow (the Layer-3 state-channel clearing network behind the Yellow SDK / NeoDAX). Intake is deliberately low-friction: the published form opens with \"Thanks for your interest in building with Yellow! Whether you already have a clear idea or are still figuring things out - that's totally OK!\" and asks applicants only to \"express your intent to apply to the acceleration program\", after which \"our team will get back to you shortly.\"\n\nThe form collects name, email, Telegram handle, whether the applicant has a team, team/company name, a short description of the team and of what is being built, a GitHub or website link, availability to pitch online, and availability to pitch offline \"during DAPPConference Berlin June 16-17\" in the event of selection to the Final. It also asks applicants to confirm they have joined the Yellow Telegram community.\n\n**Prizes.** Yellow published 25,000 USD in prizes for this wave, twice and only on its own X account: \"We're accepting applications to Wave 2 of the Yellow Acceleration program … With 25k USD in prizes!\" (23 April 2026) and \"Applications for round 2 are open now, with 25K USD to be won + ongoing support channels.\" (1 May 2026). Both posts link to exactly the application form on this record, which is what ties the figure to this program. Both phrasings are pool-level (\"in prizes\", \"to be won\"), so this is the round's total rather than a per-team award: no split by place, no per-team cap, and no equity or token terms are published anywhere, so no award range is recorded.\n\nNothing else is published: no cohort size, cohort dates or application deadline appear on the form or on yellow.org. The only monetary figure Yellow publishes for builders belongs to a *different* programme — the Yellow Builder Program at yellow.org/build, which offers \"up to $50K for your project\" against four milestones (M0 Acceptance, M1 Kickoff, M2 Live, M3 Scaling) and has its own intake at forms.yellow.org/build. The two should not be conflated.\n\nAs of 2026-08-11 the acceleration form is still live and accepting responses (no closure notice, Submit button present), but the offline Final it points at — DAPP Conference Berlin, June 16–17 — has already passed, and Yellow has published no cohort roster, selection outcome or Round 3 announcement.",
       "summary": "Growth program for startups building with blockchain technologies, run by Yellow. Intake is a short expression-of-interest form; selected teams pitch online, with an offline final at DAPP Conference Berlin.",
       "status": "open",
       "operatingOrganizations": [
@@ -4177,6 +4192,10 @@
       "ecosystems": ["Multi-chain"],
       "eligibility": "Open to startups and individual builders working with blockchain technologies. Applicants need not have a team yet — the form explicitly offers \"No, I'm going to find team later\" — and need not have more than an idea (\"even if it's just an idea\"). Applicants must be able to pitch online; selection to the Final additionally assumes availability to pitch offline at DAPP Conference Berlin on June 16–17. No stage, geography, jurisdiction or entity requirement is published.",
       "applicationUrl": "https://tally.so/r/jaW6E9",
+      "fundingInfo": {
+        "budget": 25000,
+        "currency": "USD"
+      },
       "postedAt": "2026-05-01T14:31:03.000Z",
       "createdAt": "2026-05-01T14:31:03.000Z",
       "updatedAt": "2026-05-06T00:05:42.000Z",
@@ -4185,7 +4204,7 @@
         "location": "Remote intake and online pitches; offline Final held at DAPP Conference Berlin (June 16–17).",
         "online": true
       },
-      "additionalReferences": "Application form (live): https://tally.so/r/jaW6E9 · Yellow Telegram community, membership requested on the form: https://t.me/+cK3-LpmALNY2OTcy · Separate and distinct Yellow Builder Program, up to $50K against milestones M0–M3: https://www.yellow.org/build (intake https://forms.yellow.org/build) · Yellow: https://www.yellow.org/",
+      "additionalReferences": "Application form (live): https://tally.so/r/jaW6E9 · The two Yellow posts announcing the 25,000 USD prize pool for this wave, each linking to that form: https://x.com/Yellow/status/2047333115627024547 and https://x.com/Yellow/status/2050146206890795425 · Yellow Telegram community, membership requested on the form: https://t.me/+cK3-LpmALNY2OTcy · Separate and distinct Yellow Builder Program, up to $50K against milestones M0–M3: https://www.yellow.org/build (intake https://forms.yellow.org/build) · Yellow: https://www.yellow.org/",
       "categories": ["Funding Opportunity"],
       "prerequisites": "A single-page expression-of-interest form asking for: full name; email; Telegram handle; whether the applicant has a team; team/company name; a short description of the team or of the individual; a description of what is being built; a GitHub or website link; confirmation of ability to pitch online; confirmation of ability to pitch offline at DAPP Conference Berlin June 16–17 if selected to the Final; and confirmation of having joined the Yellow Telegram community.",
       "socialLinks": [
@@ -5388,7 +5407,7 @@
       "id": "fundingmap:1362",
       "fundingType": "hackathon",
       "title": "DAYZERO 2.0",
-      "description": "🚀 DayZero 2.0 Where the Future Takes Its First Breath\n\n📍 Chennai | 📅 April 16–17, 2025 | 🌐 Hybrid Experience\n\nDayZero 2.0 isn’t just a hackathon — it’s the moment where ideas stop being thoughts and start becoming reality.\n\nBringing together the boldest builders, developers, designers, and innovators, DayZero is a high-intensity playground for those ready to create what’s next in AI, Web3, and emerging technologies. From zero to breakthrough — this is where it all begins.\n\n💡 Why DayZero 2.0?\n🧠 Build with the Best — collaborate with top mentors & industry leaders\n⚡ From Idea to Impact — turn concepts into real, scalable solutions\n💰 Beyond Winning — unlock grants, funding, and post-hackathon opportunities\n🌍 Solve What Matters — work on real-world challenges with real impact\n🔥 What Makes It Different?\n\nThis isn’t just about coding.\nIt’s about thinking boldly, building fast, and launching ideas that matter.\n\n📲 Stay Connected\n\nFind your team, network, and get updates:\n👉 https://chat.whatsapp.com/KNAUl1z61L84gkg4hoEB6V?mode=gi_t\nThis is not Day One.\nThis is Day Zero where everything begins.\n\n#DayZero2 #BuildFromZero #HackTheFuture #ChennaiHackathon #Web3 #AI #Innovation",
+      "description": "🚀 DayZero 2.0 Where the Future Takes Its First Breath\n\n📍 Chennai | 📅 April 16–17, 2025 | 🌐 Hybrid Experience\n\nDayZero 2.0 isn’t just a hackathon — it’s the moment where ideas stop being thoughts and start becoming reality.\n\nBringing together the boldest builders, developers, designers, and innovators, DayZero is a high-intensity playground for those ready to create what’s next in AI, Web3, and emerging technologies. From zero to breakthrough — this is where it all begins.\n\n💡 Why DayZero 2.0?\n🧠 Build with the Best — collaborate with top mentors & industry leaders\n⚡ From Idea to Impact — turn concepts into real, scalable solutions\n💰 Beyond Winning — unlock grants, funding, and post-hackathon opportunities\n🌍 Solve What Matters — work on real-world challenges with real impact\n🔥 What Makes It Different?\n\nThis isn’t just about coding.\nIt’s about thinking boldly, building fast, and launching ideas that matter.\n\n📲 Stay Connected\n\nFind your team, network, and get updates:\n👉 https://chat.whatsapp.com/KNAUl1z61L84gkg4hoEB6V?mode=gi_t\nThis is not Day One.\nThis is Day Zero where everything begins.\n\n#DayZero2 #BuildFromZero #HackTheFuture #ChennaiHackathon #Web3 #AI #Innovation\n\n**Prize pool.** The organiser's own event site publishes a Grand Prize section reading \"Prize Pool: Rs 1,00,000\" — 100,000 INR in Indian digit grouping, and a pool for the event rather than a per-team award: the page adds only \"Cash rewards for top-performing teams\" and its FAQ answers the prize question with \"cash rewards, recognition, swag, and merch\", never splitting the pool by place. The hackathon's listing publishes no figure at all; the organiser's site is what carries it.",
       "summary": "Zero to One Starts Here",
       "status": "closed",
       "operatingOrganizations": [
@@ -5412,6 +5431,10 @@
       },
       "ecosystems": ["Ethereum"],
       "applicationUrl": "https://dayzero2o.devfolio.co",
+      "fundingInfo": {
+        "budget": 100000,
+        "currency": "INR"
+      },
       "deadlines": [
         {
           "deadlineType": "fixed",
@@ -6893,7 +6916,7 @@
       "id": "curated:aave-grants",
       "fundingType": "grant",
       "title": "Aave Grants",
-      "description": "**This program has been sunset and is no longer accepting or reviewing new grant applications.**\n\nAave Grants DAO (AGD) was approved by the Aave DAO in May 2021 as a community grants program funded through the Aave DAO governance process — effectively a sub-DAO of the Aave DAO — with a group of Reviewers empowered to decide which proposals to fund. It funded contributors across eight categories: applications and integrations; code audits; committees & DAOs serving the Aave ecosystem; community (marketing and educational); developer tooling; events/hackathons/sponsorships; protocol development; and other. Early AGD grantees included Chaos Labs and TokenLogic, both of which later became Aave DAO service providers.\n\n**Wind-down timeline:**\n- August 2024 — \"Update from Aave Grants: Winding Down AGD 1.0 and What's Next\" announced that operations would be wound down and the team disbanded.\n- January 2025 — \"Reflecting on AGD's Journey and Next Steps\" confirmed the wind-down, noting that as new service providers emerged their scope increasingly overlapped with AGD's broad funding mandate.\n- February 2025 — an ARFC to return the remaining AGD treasury (321,768.10 GHO, 259,221.75 OP, 2,275.81 AAVE, 7,281.89 USDT, 6,738.05 USDC, 5,243.26 SAFE, 478.61 DAI) to the Aave DAO collectors passed Snapshot with 723.7K votes.\n- 15 July 2026 — in response to a direct forum question asking whether the program was still active, Aave service provider TokenLogic replied: \"You are correct that Aave Grants DAO has been sunset, and as part of that process, it is no longer accepting or reviewing new grant applications. As such, we wouldn't recommend preparing a submission through the AGD funding process.\"\n\nThe aavegrants.org site and its application form are still reachable and still carry the old rolling-applications copy, but they are stale: the site's news feed has not been updated since 2021 and the intake is not being reviewed. Prospective contributors are directed to engage the Aave DAO governance forum instead.\n\n**Dating this record.** Aave published no announcement date for AGD, so `postedAt` is an archival bound rather than an announcement: the grants site was publicly visible by 11 May 2021, the first capture of aavegrants.org. The founding forum thread carries the corroborating update — \"UPDATE – May 28, 2021: The proposal was ratified on-chain earlier this month, the grants DAO has been funded and we've started receiving applications.\"",
+      "description": "**This program has been sunset and is no longer accepting or reviewing new grant applications.**\n\nAave Grants DAO (AGD) was approved by the Aave DAO in May 2021 as a community grants program funded through the Aave DAO governance process — effectively a sub-DAO of the Aave DAO — with a group of Reviewers empowered to decide which proposals to fund. It funded contributors across eight categories: applications and integrations; code audits; committees & DAOs serving the Aave ecosystem; community (marketing and educational); developer tooling; events/hackathons/sponsorships; protocol development; and other. Early AGD grantees included Chaos Labs and TokenLogic, both of which later became Aave DAO service providers.\n\n**Money.** AGD published one cumulative total for itself, in its September 2023 continuation proposal: \"Since its inception in May 2021, AGD has awarded $4,852,753 across 249 grants\", restated word for word in the Snapshot proposal that carried it. That is the last figure AGD ever published — it kept awarding into August 2024 but never posted the final overview it promised, and the January 2025 retrospective gives only \"over 250 teams were supported\" — so `allocated` here is committed-to-date as of September 2023, not a closing total.\n\nThe $500,000 ceiling is the founding proposal's own tiering: \"Rapid grants: <$100k … Community grants: $100k-$500k … Contributors can also seek grants over $500k but they will not go through the committee. They will have to be posted on Aave's governance forum and approved through an on-chain vote.\" $500k is where this program ended and a DAO vote began. No later renewal restates or revokes the tiering, and aavegrants.org itself publishes no range.\n\n**No `budget`, because AGD never had one envelope.** Aave funded it in five successive tranches, each sized in the proposal that granted it: $1M over two quarters at launch in May 2021; $2M for three months from December 2021; $3M per quarter for six months from May 2022; and $3.25M — $1.625M per quarter — for six months from January 2023. Any single one of them would understate the program and would sit oddly next to an allocated figure larger than it.\n\n**Wind-down timeline:**\n- August 2024 — \"Update from Aave Grants: Winding Down AGD 1.0 and What's Next\" announced that operations would be wound down and the team disbanded.\n- January 2025 — \"Reflecting on AGD's Journey and Next Steps\" confirmed the wind-down, noting that as new service providers emerged their scope increasingly overlapped with AGD's broad funding mandate.\n- February 2025 — an ARFC to return the remaining AGD treasury (321,768.10 GHO, 259,221.75 OP, 2,275.81 AAVE, 7,281.89 USDT, 6,738.05 USDC, 5,243.26 SAFE, 478.61 DAI) to the Aave DAO collectors passed Snapshot with 723.7K votes.\n- 15 July 2026 — in response to a direct forum question asking whether the program was still active, Aave service provider TokenLogic replied: \"You are correct that Aave Grants DAO has been sunset, and as part of that process, it is no longer accepting or reviewing new grant applications. As such, we wouldn't recommend preparing a submission through the AGD funding process.\"\n\nThe aavegrants.org site and its application form are still reachable and still carry the old rolling-applications copy, but they are stale: the site's news feed has not been updated since 2021 and the intake is not being reviewed. Prospective contributors are directed to engage the Aave DAO governance forum instead.\n\n**Dating this record.** Aave published no announcement date for AGD, so `postedAt` is an archival bound rather than an announcement: the grants site was publicly visible by 11 May 2021, the first capture of aavegrants.org. The founding forum thread carries the corroborating update — \"UPDATE – May 28, 2021: The proposal was ratified on-chain earlier this month, the grants DAO has been funded and we've started receiving applications.\"",
       "summary": "Aave Grants DAO has been sunset and is no longer accepting or reviewing grant applications. The aavegrants.org site remains online but is stale; its treasury was returned to the Aave DAO in 2025.",
       "status": "closed",
       "operatingOrganizations": [
@@ -6914,6 +6937,11 @@
       "eligibility": "Anyone may apply — no invitation or pre-selection.",
       "applicationUrl": "https://aavegrants.org/apply-for-a-grant/",
       "postedAt": "2021-05-11T00:00:00.000Z",
+      "fundingInfo": {
+        "allocated": 4852753,
+        "maxAward": 500000,
+        "currency": "USD"
+      },
       "createdAt": "2026-08-11T00:00:00.000Z",
       "updatedAt": "2026-08-11T00:00:00.000Z",
       "fundingDetails": {
@@ -6922,7 +6950,7 @@
         "fundingMechanisms": ["proactive"],
         "programModel": "grant"
       },
-      "additionalReferences": "Program site: https://aavegrants.org/ — founding governance proposal, ARC: Aave Community Grants Program: https://governance.aave.com/t/arc-aave-community-grants-program/3642",
+      "additionalReferences": "Program site: https://aavegrants.org/ — founding governance proposal, which sets the grant tiers and the $500k ceiling, ARC: Aave Community Grants Program: https://governance.aave.com/t/arc-aave-community-grants-program/3642 — continuation proposal carrying the cumulative total and the tranche history: https://governance.aave.com/t/temp-check-aave-grants-continuation-proposal/14831 — wind-down announcement: https://governance.aave.com/t/update-from-aave-grants-winding-down-agd-1-0-and-what-s-next/18707 — retrospective: https://governance.aave.com/t/reflecting-on-agd-s-journey-and-next-steps/20792",
       "categories": ["Funding Opportunity", "DeFi", "Developer Tools"],
       "socialLinks": [
         {
@@ -14282,7 +14310,7 @@
       "id": "fundingmap:1039",
       "fundingType": "grant",
       "title": "ProPGF Batch 2 - Pods Track",
-      "description": "The Pods Track is a coordination track designed to help Filecoin teams organize around clear user outcomes and move faster toward product–market fit (PMF).\n\nInstead of funding isolated projects, the Pods Track supports small, focused pods (cross-functional where possible) that are accountable for shipping a defined scope, validating user needs, and contributing to Filecoin’s 2026 ecosystem goals. Pods are expected to operate like product teams: aligning on a problem, testing assumptions, delivering milestones, and reporting progress through measurable adoption and performance metrics.",
+      "description": "The Pods Track is a coordination track designed to help Filecoin teams organize around clear user outcomes and move faster toward product–market fit (PMF).\n\nInstead of funding isolated projects, the Pods Track supports small, focused pods (cross-functional where possible) that are accountable for shipping a defined scope, validating user needs, and contributing to Filecoin’s 2026 ecosystem goals. Pods are expected to operate like product teams: aligning on a problem, testing assumptions, delivering milestones, and reporting progress through measurable adoption and performance metrics.\n\n**What was allocated, and how that number was arrived at.** No Pods Track pool was ever published: the ProPGF blog announces and reports only the Batch 2 General Track — a $4M round that allocated $3,220,200 across 16 projects — and the Pods Track has no announcement, no results post and no published total anywhere. What the programme does publish is per-pod, in its own financials ledger: Filecoin Onchain Cloud 466,000, the Large Data Onboarding Pod 147,630, and the Web2 Object Storage Pod 267,344. The 880,974 USD on this record is those three figures summed from that ledger and nothing else — a sum of the programme's own per-grant allocations, not a funder-published program total, and not a budget. It is Pods-Track-only and deliberately excludes the General Track, which is a separate record with its own budget and its own allocation. Two of the three grants settle in USDC and the third's milestones are dollar-denominated, which is what denominates the record.",
       "summary": "Pods Track",
       "status": "closed",
       "operatingOrganizations": [
@@ -14301,6 +14329,10 @@
       "ecosystems": ["Filecoin"],
       "eligibility": "Not open to all applicants — the program invites or pre-selects participants.",
       "applicationUrl": "https://app.filpgf.io/programs/1039/apply",
+      "fundingInfo": {
+        "allocated": 880974,
+        "currency": "USD"
+      },
       "deadlines": [
         {
           "deadlineType": "fixed",
@@ -14314,7 +14346,7 @@
       "fundingDetails": {
         "fundingType": "grant"
       },
-      "additionalReferences": "Program site: https://filpgf.io",
+      "additionalReferences": "Program site: https://filpgf.io | Per-grant allocations for the three funded pods: https://app.filpgf.io/financials | Batch 2 General Track results, a separate track and a separate figure: https://www.filecoin.io/blog/filecoin-propgf-batch-2-general-track-322m-allocated-to-core-infrastructure-and-ecosystem-builders",
       "opensAt": "2026-01-18T18:30:00.000Z",
       "website": "https://filpgf.io"
     },
@@ -14412,8 +14444,8 @@
       "id": "fundingmap:1013",
       "fundingType": "grant",
       "title": "Filecoin ProPGF Batch 1",
-      "description": "Filecoin ProPGF Batch 1 is a $3.6M milestone-based funding program.",
-      "summary": "Filecoin ProPGF Batch 1 is a $3.6M milestone-based funding program.",
+      "description": "**Concluded.** Filecoin ProPGF Batch 1 was the first round of the Filecoin ProPGF programme — milestone-based funding for teams building foundational infrastructure, developer tooling and essential services for the Filecoin ecosystem.\n\n**$3.68M awarded, not budgeted.** The figure this program is usually described by is the amount AWARDED, and this record says so: the results post reads \"A total of $3.68M in funding has been allocated to 14 teams\" over a pull-out stat of \"$3,681,800 allocated\", and a later Foundation post restates it as \"In ProPGF Batch 1, $3.68M was awarded across 14 teams, chosen from 38 applications.\" Every published phrasing is retrospective. No Batch 1 pool was ever pre-announced — unlike the Batch 2 General Track, whose $4M ceiling was announced up front — so this record carries `allocated` and deliberately no `budget`. Awards ran from $25,000 to $500,000 per project and settle in USDC, but no eligibility minimum or maximum was ever published, so no award range is recorded either.\n\n**One figure that does not match, and why the announcement's is used.** The programme's own payout ledger reports 3,741,800 for the same 14 grants — roughly $60,000 more, from post-announcement adjustments — and carries an explicit data-quality note that its Batch 1 records were entered retrospectively and in bulk rather than captured in real time. The announced total is the published one and is what this record carries; the two should not be mixed.",
+      "summary": "The first round of Filecoin's ProPGF public-goods program: $3,681,800 awarded to 14 teams building Filecoin infrastructure, developer tooling and essential services, paid against milestones. The round is closed and its results are published.",
       "status": "closed",
       "operatingOrganizations": [
         {
@@ -14431,6 +14463,10 @@
       "ecosystems": ["Filecoin"],
       "eligibility": "Not open to all applicants — the program invites or pre-selects participants.",
       "applicationUrl": "https://app.filpgf.io/programs/1013/apply",
+      "fundingInfo": {
+        "allocated": 3681800,
+        "currency": "USD"
+      },
       "deadlines": [
         {
           "deadlineType": "fixed",
@@ -14444,7 +14480,7 @@
       "fundingDetails": {
         "fundingType": "grant"
       },
-      "additionalReferences": "Results: https://filecoin.io/blog/posts/filecoin-propgf-batch-1-36m-awarded-to-ecosystem-builders/",
+      "additionalReferences": "Results: https://www.filecoin.io/blog/filecoin-propgf-batch-1-36m-awarded-to-ecosystem-builders (the previously cited /blog/posts/ form of this URL redirects here) | Programme context: https://www.filecoin.io/blog/the-future-of-public-goods-funding-in-filecoin-scaling-the-pl-pgf-vision | Payout ledger: https://app.filpgf.io/financials",
       "website": "https://filpgf.io"
     }
   ]
