@@ -78,9 +78,13 @@ arithmetic can live in `description` without costing a consumer an answer.
 - **No new version directory.** `v1.0.0` is `draft` and no external consumer has adopted it —
   the two conditions `PROCESS.md` sets for editing a version in place. Re-verified immediately
   before merge, as the policy requires; **the first external adopter closes this door**.
-- **npm `@the-rfp-hub/standard` 2.0.0 → 3.0.0.** `BountyDetails.reward` becomes optional and
-  the interface gains members: a TypeScript consumer reading `.reward` without narrowing
-  breaks.
+- **npm `@the-rfp-hub/standard` ships this as a minor, not a major, by explicit decision.**
+  `BountyDetails.reward` becomes optional and the interface gains members, so a TypeScript
+  consumer reading `.reward` without narrowing breaks — technically a major under semver. The
+  maintainers judged the package to have no real dependants (its download counts are automated
+  traffic) and preferred not to spend a second major inside one release cycle. Recorded here
+  because the deviation is deliberate and the reasoning expires: **once the package has a real
+  dependant, a change of this shape is a major**, and the next one should be.
 - **The API's ingest mapper infers `bountyKind`** from payout shape, defaulting to `task`, and
   **no longer synthesizes a `reward` from the program budget for a security bounty** —
   synthesizing one there would manufacture exactly the misleading headline this ADR exists to

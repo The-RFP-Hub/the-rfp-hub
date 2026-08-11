@@ -1,5 +1,5 @@
 ---
-"@the-rfp-hub/standard": major
+"@the-rfp-hub/standard": minor
 "rfphub-validate": minor
 ---
 
@@ -7,8 +7,14 @@ Split the bounty type into task and security kinds, and give the security kind a
 
 `BountyDetails` gains a required `bountyKind` (`task | security`), and `reward` becomes
 optional on the type: it is required when `bountyKind` is `task`, while a security bounty
-carries `rewardTiers[]` instead. A TypeScript consumer reading `details.reward` without
-narrowing on `bountyKind` no longer compiles, which is why this is a major.
+carries `rewardTiers[]` instead.
+
+**Released as a minor, deliberately, though it is technically breaking.** A TypeScript consumer
+reading `details.reward` without narrowing on `bountyKind` no longer compiles. The maintainers
+released it as a minor on the judgement that the package has no real dependants yet — the
+download counts are automated traffic — and that a second major inside one release cycle would
+signal more churn than the change represents. If you are that consumer, narrow on `bountyKind`
+first.
 
 New exported types `RewardTier` and `Payout`. A payout is tagged by `model` —
 `fixed | range | up_to | percentage_of_value_at_risk | discretionary` — and carries the amounts
