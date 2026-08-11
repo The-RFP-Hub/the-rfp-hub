@@ -1,20 +1,23 @@
 /**
+ * OFFLINE TOOL — not on the seed path, not on any request path. See tools/converter/README.md.
+ *
  * PURE mapper: an upstream funding-map registry program → RFP Hub Standard `Opportunity`.
- * No network/DB — fully unit-testable. The seed loader validates each result with
- * `rfphub-validate` and skips any that don't conform, so this aims for best-effort fidelity.
+ * No network/DB — fully unit-testable. `convert.ts` validates each result with `rfphub-validate`
+ * and reports the ones that don't conform, so this aims for best-effort fidelity; its output is a
+ * DRAFT for a curator to review, never something loaded straight into a database.
  *
  * Field rules were derived from the committed examples in
  * packages/standard/schemas/v1.0.0/examples. The provenance namespace (id prefix + source_system)
- * and the fallback program URL are supplied by the caller — this mapper is source-agnostic.
+ * is the `SOURCE_SYSTEM` constant below — a data contract, not a caller's knob.
  *
  * ── Old-upstream → re-cut Standard ─────────────────────────────────────────────────
  * The upstream registry still speaks the pre-re-cut vocabulary, so THIS FILE is where the
  * conversion lives (the same rules the Standard's own examples were regenerated with):
  *
  *   type                       → fundingType
- *   organization (single)      → operatingOrganizations[0]   (rfp.issuingOrganization wins the
- *                                name; the upstream org RUNS the program, so it is the operator —
- *                                sponsoringOrganizations stays absent for ingested records)
+ *   metadata.organizations[]   → operatingOrganizations[]     (rfp.issuingOrganization wins the name;
+ *                                                              then the listing community, then — last
+ *                                                              resort — the program title)
  *   deadline / metadata.endsAt → deadlines[{deadlineType:'fixed', date, label:'application'}]
  *   hackathon.registrationDeadline / submissionDeadline / startDate / endDate
  *                              → deadlines[… label 'registration' | 'submission' | 'event start' | 'event end']
@@ -22,21 +25,83 @@
  *                              → deadlines[… label 'application']
  *   funding.totalBudget        → fundingInfo.budget  (rfp.budget folds into the same envelope)
  *   metadata.socialLinks (map) → socialLinks[{platform, url}]
- *   metadata.networks / grantTypes → dropped (the Standard removed networks/tags; accepted loss)
  *   grant.fundingMechanism     → fundingDetails.fundingMechanisms[]
  *   per-item {amount, currency} money (bounty.reward, prizes[], accelerator.funding, checkSize)
  *                              → plain numbers; an upstream per-item currency hoists into the
- *                                document-wide fundingInfo.currency (which wins on disagreement)
+ *                                document-wide fundingInfo.currency (see THE CURRENCY RULE below)
  *   <type>Metadata blob        → fundingDetails { fundingType: <type>, …whitelisted keys }
- *   source.url                 → removed; the program URL now feeds `applicationUrl`
+ *   source.url                 → removed; a program's OWN submission/website URL feeds
+ *                                `applicationUrl`, and nothing is substituted when it publishes none
+ *   every timestamp            → RFC 3339 **UTC** (trailing 'Z') — see `isoDate`
+ *   bounty (no upstream kind)  → fundingDetails.bountyKind, inferred from DOMAIN signals, and the
+ *                                compensation shape that kind requires — see `typeBlockOf`
+ *
+ * ── Fields the upstream carries that the Standard has a home for ───────────────────
+ *   metadata.amountDistributedToDate → fundingInfo.allocated   (only when positive)
+ *   metadata.anyoneCanJoin           → eligibility (free text — the re-cut made it one string)
+ *   socialLinks.grantsSite / metadata.bugBounty → additionalReferences (when not applicationUrl)
+ *   socialLinks.orgWebsite           → operatingOrganizations[0].website
+ *   createdAt                        → postedAt (first listed at the source)
+ *   hackathon/accelerator location "Online" → the block's `online` flag
+ *
+ * ── Fields the upstream carries that the CLOSED CORE has no home for (dropped) ──────
+ * The re-cut closed the core: `additionalProperties:false` at the top level and no `extensions`
+ * escape hatch, so data with no field is data that cannot be published. Each of these was carried
+ * before and is now an accepted, recorded loss rather than a silent one:
+ *   metadata.networks        — `networks` was removed (ecosystems is the surviving axis)
+ *   metadata.grantTypes      — `tags` was removed (categories is the surviving axis)
+ *   metadata.grantsToDate    — award COUNT to date; no field, and not derivable from `allocated`
+ *   chainID                  — payout chain; no field, and not an ecosystem name
+ *
+ * ── THE CURRENCY RULE (one currency per document) ──────────────────────────────────
+ * The re-cut denominates EVERY monetary amount in the document in the single
+ * `fundingInfo.currency`: budget, allocated, minAward/maxAward, prizes[].amount, bounty.reward,
+ * accelerator.funding and vcFund.checkSize. No sub-block carries a currency of its own, so an
+ * upstream record that names more than one cannot be published as-is. The rule, applied in
+ * `mapProgram` and asserted by tests, is deliberate and in this order:
+ *
+ *   1. a DOCUMENT-level currency wins — `metadata.programBudget`'s suffix ("2000000 USDC"),
+ *      then `rfp.budget.currency`. It denominates the program's own envelope, so it is the
+ *      publisher's statement about the program rather than about one line item.
+ *   2. otherwise the first PER-ITEM currency seen is hoisted into `fundingInfo.currency`
+ *      (prizes → reward/funding → checkSize), so a bounty that only ever names "OP" is still
+ *      denominated instead of publishing a bare number.
+ *   3. on DISAGREEMENT the document-level currency wins and every amount is KEPT. Dropping the
+ *      amounts would lose real figures over a label, and re-denominating them would require an
+ *      exchange rate the Hub does not have and must not invent. This is normalization at ingest,
+ *      stated here rather than performed silently.
+ *
+ * Still unmapped because the upstream publishes nothing for them: sponsoringOrganizations (the
+ * upstream names no backer distinct from the operator — see `organizationNamesOf`), prerequisites,
+ * serviceAgreement, milestones, and the three JSON-LD self-identification keys.
  */
-import type {
-  Deadline,
-  FundingType,
-  Opportunity,
-  OpportunityStatus,
-  SocialLink,
+import {
+  type Deadline,
+  type FundingType,
+  type Opportunity,
+  type OpportunityStatus,
+  SPEC_VERSION,
+  type SocialLink,
 } from "@the-rfp-hub/standard";
+
+/**
+ * The provenance namespace for everything this mapper produces. ONE definition, in code, on
+ * purpose — it is a data contract, not a deployment knob, and it was an environment variable
+ * until this commit:
+ *
+ *   - it forms every public id (`<system>:<id>`), so a missing or mistyped value silently
+ *     rewrites every id in the dataset and breaks every link a consumer has stored;
+ *   - it fills the `source_system` column, which carries a uniqueness constraint together with
+ *     `original_id`. Change it and idempotency goes with it: the next run no longer matches the
+ *     rows it wrote last time and inserts duplicates instead of updating them.
+ *
+ * Neither failure is loud. An env var that can be forgotten or fat-fingered in one deployment is
+ * the wrong shape for a value with those consequences, so it is a constant that ships with the
+ * code that depends on it. In M3 a publisher's namespace becomes a property of the publisher
+ * record — per-source data, keyed by the row it describes — rather than one global for the
+ * process; this constant is the single-source stand-in until then.
+ */
+export const SOURCE_SYSTEM = "fundingmap";
 
 export interface RegistryCommunity {
   uid?: string;
@@ -65,10 +130,17 @@ export interface RegistryProgram {
     endsAt?: string | null;
     categories?: string[];
     ecosystems?: string[];
+    /** The real organisations behind the program — the ones that run it, in upstream order. */
     organizations?: string[];
     minGrantSize?: number | string | null;
     maxGrantSize?: number | string | null;
     programBudget?: number | string | null;
+    /** Committed to date. Upstream defaults it to "0", so only a positive value means anything. */
+    amountDistributedToDate?: number | string | null;
+    /** Whether anyone may apply, or the program invites/pre-selects. The one eligibility signal. */
+    anyoneCanJoin?: boolean;
+    /** Bug-bounty page, when the program runs one. Folded into `additionalReferences`. */
+    bugBounty?: string;
     website?: string;
     logoImg?: string;
     bannerImg?: string;
@@ -188,7 +260,14 @@ function num(v: unknown): number | undefined {
   return undefined;
 }
 
-/** Coerce to an RFC 3339 date-time string, or undefined if it doesn't parse. */
+/**
+ * Coerce to an RFC 3339 date-time in **UTC**, or undefined if it doesn't parse.
+ *
+ * The re-cut requires a trailing 'Z' on every timestamp field (`pattern: "Z$"`), and an upstream
+ * that sends a local offset ("2026-06-16T23:59:00+02:00") would otherwise be published verbatim
+ * and rejected by the gate. `Date.toISOString()` is what makes this total: it converts the instant
+ * to UTC rather than trimming the offset, so the moment in time is preserved, not relabelled.
+ */
 function isoDate(v: unknown): string | undefined {
   if (typeof v !== "string" && typeof v !== "number") return undefined;
   if (typeof v === "string" && v.trim() === "") return undefined;
@@ -389,6 +468,105 @@ function socialLinksOf(src: Record<string, string> | undefined): SocialLink[] {
   return out;
 }
 
+/** Standard caps an organization name at 256 characters. */
+const ORG_NAME_MAX = 256;
+
+/** Where an organisation's NAME came from. The caller keys the directory slug off it. */
+export type OrgNameSource = "upstream" | "community" | "title";
+
+/**
+ * The names of the organisations the upstream actually publishes for the program, in its order.
+ *
+ * ── Which ROLE these fill, and why ─────────────────────────────────────────────────
+ * The re-cut split organisations into two roles: `sponsoringOrganizations` (issuer or backer) and
+ * `operatingOrganizations` (whoever runs intake, process and the application funnel — required,
+ * minItems 1, entry 0 primary and the one to display). The upstream draws no such distinction: it
+ * publishes one flat list of the organisations behind the program, and those organisations are the
+ * ones running it. So they fill `operatingOrganizations`, and `sponsoringOrganizations` is left
+ * ABSENT rather than filled with the same names or with the listing community — the Standard says
+ * a backer that is not published simply has no entry, and asserting a funding relationship the
+ * source never states would be a fabrication of exactly the kind this function exists to prevent.
+ *
+ * ── Where the names come from ──────────────────────────────────────────────────────
+ * The upstream carries them in `metadata.organizations`, and for an RFP `rfp.issuingOrganization`
+ * names the issuer as free text — that one wins the primary slot. Names are deduped
+ * case-insensitively, because an upstream list can repeat the issuer.
+ *
+ * The Standard requires at least one operating organisation, and most upstream programs name none,
+ * so there are two fallbacks and the order between them matters:
+ *
+ *   community — the ecosystem community that lists the program ("Filecoin", "Optimism"). A real,
+ *               lookup-able organisation with a slug the upstream itself publishes.
+ *   title     — last resort, and nothing more: a title is not an organisation, and publishing one
+ *               fabricates an org ("Filecoin ProPGF Batch 3") nobody can look up or deduplicate.
+ *               It exists only because the field is required and a record with no organisation at
+ *               all cannot be published; `source` below is what keeps it from doing damage.
+ *
+ * `source` is what stops the two from being mixed. A title-derived name must NEVER be filed under
+ * the community's slug: several programs of one community would then land on a single directory
+ * row under whichever fabricated name was written last, and `?organization=<slug>` would conflate
+ * them. Title fallbacks therefore get their own (title-derived) slug.
+ */
+export function organizationNamesOf(
+  organizations: unknown,
+  issuingOrganization: unknown,
+  fallbacks: { community?: unknown; title: string },
+): { names: string[]; source: OrgNameSource } {
+  const candidates = [
+    ...(nonEmpty(issuingOrganization) ? [issuingOrganization] : []),
+    ...cleanArr(organizations),
+  ];
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of candidates) {
+    const name = raw.trim().slice(0, ORG_NAME_MAX);
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  if (names.length) return { names, source: "upstream" };
+  if (nonEmpty(fallbacks.community)) {
+    return { names: [fallbacks.community.trim().slice(0, ORG_NAME_MAX)], source: "community" };
+  }
+  return { names: [fallbacks.title.trim().slice(0, ORG_NAME_MAX)], source: "title" };
+}
+
+/** A location that literally says the event is remote — the upstream has no `online` flag. */
+const ONLINE_LOCATION = /^\s*(online|virtual|remote)\b/i;
+
+/**
+ * `eligibility` is ONE free-text string in the re-cut — deliberately unstructured, "for reading,
+ * not faceting" — where it used to be an open key-value map. The upstream publishes exactly one
+ * eligibility signal, whether anyone may apply, so that signal becomes the whole sentence. Absent
+ * flag ⇒ no field: silence is not a claim that the program is open, nor that it is closed.
+ */
+function eligibilityOf(anyoneCanJoin: unknown): string | undefined {
+  if (typeof anyoneCanJoin !== "boolean") return undefined;
+  return anyoneCanJoin
+    ? "Anyone may apply — no invitation or pre-selection."
+    : "Not open to all applicants — the program invites or pre-selects participants.";
+}
+
+/**
+ * Supporting links no other Standard field carries, as the re-cut's `additionalReferences` — one
+ * free-form string, "because publishers paste what they have" (it replaced `resourceLinks`).
+ * `applicationUrl` is the single link-back target, so a program that publishes BOTH a submission
+ * URL and a separate program page would otherwise drop the page.
+ */
+function additionalReferencesOf(
+  sl: Record<string, string> | undefined,
+  bugBounty: unknown,
+  applicationUrl: string | undefined,
+): string | undefined {
+  const parts: string[] = [];
+  const programSite = validUri(sl?.grantsSite);
+  if (programSite && programSite !== applicationUrl) parts.push(`Program site: ${programSite}`);
+  const bounty = validUri(bugBounty);
+  if (bounty) parts.push(`Bug bounty: ${bounty}`);
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
 /** The raw upstream metadata blob for a funding type (all of them keep their old key names). */
 function rawBlockOf(p: RegistryProgram, type: FundingType): Record<string, unknown> {
   switch (type) {
@@ -458,6 +636,11 @@ function typeBlockOf(
     if (legacy !== undefined && legacy !== null && legacy !== "") picked.fundingMechanisms = legacy;
   }
   const out = normalizeBlock(picked, hoist);
+  // hackathon/accelerator `online` has no upstream field, but a location of "Online" (or Virtual /
+  // Remote) states it in words — read it rather than leave the flag unset on a remote event.
+  if ((type === "hackathon" || type === "accelerator") && out.online === undefined) {
+    if (nonEmpty(out.location) && ONLINE_LOCATION.test(out.location)) out.online = true;
+  }
   if (type !== "bounty") return out;
 
   // The bounty block is the one type whose required field depends on a discriminator, so it is
@@ -522,11 +705,7 @@ function typeBlockOf(
   };
 }
 
-export function mapProgram(
-  p: RegistryProgram,
-  opts: { sourceSystem?: string; programUrlBase?: string } = {},
-): Opportunity {
-  const sourceSystem = opts.sourceSystem || "fundingmap";
+export function mapProgram(p: RegistryProgram): Opportunity {
   const md = p.metadata ?? {};
   const fundingType: FundingType = (FUNDING_TYPES as string[]).includes(p.type ?? "")
     ? (p.type as FundingType)
@@ -548,9 +727,18 @@ export function mapProgram(
   );
 
   // `rfp.issuingOrganization` was free text describing the real issuer — it now names the primary
-  // operating organization, which is strictly better than the title-derived fallback.
+  // operating organization, ahead of `metadata.organizations`; the community that lists the
+  // program comes next, and the title is the last resort. See organizationNamesOf for why these
+  // fill the OPERATING role and why sponsoringOrganizations is left absent.
   const issuing = fundingType === "rfp" ? rawBlock.issuingOrganization : undefined;
-  const orgName = (nonEmpty(issuing) ? issuing : title).slice(0, 256); // Standard caps name at 256
+  const { names: orgNames, source: orgNameSource } = organizationNamesOf(
+    md.organizations,
+    issuing,
+    {
+      community: community?.name,
+      title,
+    },
+  );
 
   // Per-item currencies the upstream still sends inside prize/reward/funding/checkSize shapes.
   // First one seen wins among themselves; document-level sources outrank them all (below).
@@ -563,32 +751,55 @@ export function mapProgram(
   const budget = parseAmount(md.programBudget);
   // `rfp.budget` ({amount, currency}) folds into the shared top-level funding envelope.
   const rfpBudget = fundingType === "rfp" ? moneyOf(rawBlock.budget) : undefined;
+  // `allocated` is committed-to-date. The upstream defaults it to 0 on programs that never report
+  // it, so only a positive figure is a fact worth publishing.
+  const allocated = num(md.amountDistributedToDate);
   const funding = compact({
-    // Ingest normalization: the re-cut Standard denominates EVERY monetary amount in the document
-    // in the single fundingInfo.currency — no per-type currency exists. So an upstream per-item
-    // currency (prize/reward/funding/checkSize) is hoisted here when no document-level currency
-    // (programBudget / rfp.budget) established one. When they disagree, the document-level
-    // currency wins: the Standard cannot express the disagreement, so ingestion normalizes to the
-    // document-wide denomination and keeps the amounts rather than dropping them (best-effort
-    // fidelity — the seed gate would otherwise lose the whole record over a label).
+    // THE CURRENCY RULE, in one expression — see the file header for the reasoning. Document-level
+    // first (programBudget's suffix, then rfp.budget.currency), a hoisted per-item currency only
+    // when neither named one, and on disagreement the document level wins with every amount kept:
+    // the Standard cannot express two currencies, and the Hub has no rate with which to convert.
+    // `allocated` needs no rule of its own — it is part of this same envelope by construction.
     currency: budget.currency ?? rfpBudget?.currency ?? detailCurrency,
     minAward: num(md.minGrantSize),
     maxAward: num(md.maxGrantSize),
     budget: budget.amount ?? rfpBudget?.amount,
+    allocated: allocated !== undefined && allocated > 0 ? allocated : undefined,
   });
 
   const sl = md.socialLinks;
   const social = socialLinksOf(sl);
-  // `source.url` is gone; `applicationUrl` is now the single link-back target, so the program's
-  // page on the source becomes its last-resort value. Source-agnostic — nothing is fabricated when
-  // the caller supplies no base.
-  const fallbackUrl = opts.programUrlBase
-    ? `${opts.programUrlBase.replace(/\/+$/, "")}/${programId}`
-    : undefined;
+  // `source.url` is gone, which makes `applicationUrl` the single link-back target — but only for
+  // links the PROGRAM published. There is deliberately no last-resort fallback: pointing at the
+  // program's listing page on the aggregator we ingested it from would state, in the field
+  // consumers read as "apply here", a URL the program never gave. That is the same fabrication
+  // this branch removed when it stopped inventing sponsoring organisations out of program titles.
+  // A program that publishes no URL gets no `applicationUrl` — the field is optional, and an
+  // absent value is a fact where a substituted one is a guess.
+  const applicationUrl =
+    validUri(p.submissionUrl) ?? validUri(sl?.grantsSite) ?? validUri(md.website);
+
+  // Array order is semantic: entry 0 is the primary organisation and the one to display. Only it
+  // carries the program's branding; a co-operator the upstream names in passing gets the identity
+  // it actually published. The slug is derived from the name that is actually published, so two
+  // different organisation names can never share one directory row. The single exception is the
+  // community fallback, where the name IS the community's and its own published slug is the more
+  // authoritative spelling.
+  const orgSlug = (name: string): string =>
+    slugify(orgNameSource === "community" && nonEmpty(communitySlug) ? communitySlug : name);
+  const operatingOrganizations = orgNames.map((name, i) =>
+    compact({
+      name,
+      slug: orgSlug(name),
+      website: i === 0 ? validUri(sl?.orgWebsite) : undefined,
+      logoUrl: i === 0 ? validUri(md.logoImg) : undefined,
+      ecosystems: i === 0 ? ecosystems : undefined,
+    }),
+  );
 
   const out: Record<string, unknown> = compact({
-    specVersion: "1.0.0",
-    id: `${sourceSystem}:${programId}`,
+    specVersion: SPEC_VERSION,
+    id: `${SOURCE_SYSTEM}:${programId}`,
     fundingType,
     title,
     description,
@@ -597,17 +808,9 @@ export function mapProgram(
         ? md.shortDescription.slice(0, 500)
         : undefined,
     status: statusOf(p),
-    // The upstream org RUNS the program, so it is the operator ("the real deal"); the Standard
-    // requires operatingOrganizations (minItems 1) and slug (synthesized — upstream has none).
-    // sponsoringOrganizations is deliberately NOT emitted for ingested records.
-    operatingOrganizations: [
-      compact({
-        name: orgName,
-        slug: slugify(nonEmpty(communitySlug) ? communitySlug : orgName),
-        logoUrl: validUri(md.logoImg),
-        ecosystems,
-      }),
-    ],
+    // The upstream's own organisations, in the required OPERATING role. sponsoringOrganizations is
+    // deliberately NOT emitted: the upstream names no backer distinct from the operator.
+    operatingOrganizations,
     source: compact({
       publisher: nonEmpty(communitySlug) ? slugify(communitySlug) : undefined,
       ingestedVia: "import",
@@ -616,11 +819,9 @@ export function mapProgram(
     }),
     ecosystems,
     categories: cleanArr(md.categories),
-    applicationUrl:
-      validUri(p.submissionUrl) ??
-      validUri(sl?.grantsSite) ??
-      validUri(md.website) ??
-      validUri(fallbackUrl),
+    eligibility: eligibilityOf(md.anyoneCanJoin),
+    additionalReferences: additionalReferencesOf(sl, md.bugBounty, applicationUrl),
+    applicationUrl,
     website: validUri(md.website) ?? validUri(sl?.website),
     logoUrl: validUri(md.logoImg),
     bannerUrl: validUri(md.bannerImg),
@@ -628,6 +829,9 @@ export function mapProgram(
     fundingInfo: Object.keys(funding).length ? funding : undefined,
     opensAt: isoDate(md.startsAt),
     deadlines: deadlinesOf(p, fundingType, rawBlock),
+    // The upstream record is created when the program is first listed at the source — the closest
+    // thing it publishes to "first publicly announced", which is what postedAt means.
+    postedAt: isoDate(p.createdAt),
     createdAt: isoDate(p.createdAt),
     updatedAt: isoDate(p.updatedAt),
   });
