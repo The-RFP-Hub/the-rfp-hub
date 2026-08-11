@@ -1,9 +1,9 @@
 {
   "specVersion": "1.0.0",
-  "id": "conformance:payout-percent-above-100",
+  "id": "conformance:payout-percentage-without-basis",
   "fundingType": "bounty",
-  "title": "Percentage payout above 100",
-  "description": "percent is a share of the value at risk expressed on a 0-to-100 scale, so a value above 100 is out of range.",
+  "title": "Percentage payout that does not name its basis",
+  "description": "A percentage is meaningless without naming what it is a share of: 10% of funds at risk and 10% of economic damage are different offers. The model tag deliberately no longer assumes one, so basis is required alongside percent.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -30,8 +30,7 @@
         "severity": "critical",
         "payout": {
           "model": "percentage",
-          "percent": 150,
-          "basis": "value_at_risk"
+          "percent": 10
         }
       }
     ]

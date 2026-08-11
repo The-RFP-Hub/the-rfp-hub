@@ -2,8 +2,8 @@
   "specVersion": "1.0.0",
   "id": "conformance:bounty-task-reward-tiers",
   "fundingType": "bounty",
-  "title": "Task bounty with a graded placement ladder",
-  "description": "Exercises rewardTiers on bountyKind 'task': tiers are required for a security bounty but permitted on any bounty that grades its payout, and a placement ladder grades on the tier label rather than on severity. The required task reward is still present and carries the total.",
+  "title": "Task bounty paying a graded placement ladder",
+  "description": "Exercises rewardTiers on bountyKind 'task': the table is required for a security bounty and is the alternative to the scalar reward on a task bounty that grades its payout. Compensation is exactly one of the two, so a graded task carries the table and no scalar — a reward beside the ladder leaves no way to tell whether it means the winner's payout, a base, or the total purse. Tiers here key on label, the selector for a grading axis severity and assetType do not describe.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -25,7 +25,6 @@
   "fundingDetails": {
     "fundingType": "bounty",
     "bountyKind": "task",
-    "reward": 5000,
     "rewardTiers": [
       {
         "label": "1st place",

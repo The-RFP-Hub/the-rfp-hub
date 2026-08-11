@@ -202,6 +202,7 @@ describe("schema file conventions", () => {
       "items",
       "uniqueItems",
       "minItems",
+      "minProperties",
       "minLength",
       "maxLength",
       "minimum",

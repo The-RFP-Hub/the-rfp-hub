@@ -51,6 +51,19 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
 - **A security bounty may not carry the scalar `reward` at all.** Requiring `rewardTiers`
   without forbidding `reward` still permitted the misleading maximum headline the tier table
   exists to prevent.
+- **Compensation is exactly one of `reward` or `rewardTiers`, on either kind.** Permitting both
+  on a task bounty left two sources of truth for what a participant is paid — the shipped
+  example carried `reward: 5000` beside tiers of 3000/1500/500, where the scalar plainly meant
+  *total purse* while its own description said *paid on completion*. `bountyKind` now names the
+  domain and the present compensation field names the shape.
+- **`percentage_of_value_at_risk` becomes `percentage` with a required `basis`**
+  (`value_at_risk | economic_damage`). Baking the operand into the model tag asserted a
+  comparability the corpus does not support — programs cap against different quantities — and
+  put a security-specific term in an otherwise generic union.
+- **Every reward tier needs a selector.** `severity`, `assetType` and `label` were each optional
+  with no floor, so a row carrying only a payout validated: an anonymous rule nothing can be
+  matched against. Expressed as `minProperties: 2` rather than an `anyOf` of required-branches,
+  which reads better but defeats the type generator.
 - **Stability.** The whole surface lands `x-stability: provisional`. It has a measured
   publisher corpus and no shipped consumer, and the gate in `PROCESS.md` asks for both.
 - **Not modelled, deliberately**: step functions over funds at risk, TVL-conditional tiers,

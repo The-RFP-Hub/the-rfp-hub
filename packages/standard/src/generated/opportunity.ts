@@ -399,11 +399,11 @@ export interface BountyDetails {
    */
   bountyKind: "task" | "security";
   /**
-   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty is forbidden from carrying it and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
+   * The reward paid on completion, in major units of the document-wide fundingInfo.currency. The compensation for a bounty that pays one amount. Exactly one of this and rewardTiers is present on any bounty, enforced by the if/then/else below: they are alternative descriptions of the same money, so a document carrying both leaves a consumer no way to tell which is authoritative. A security bounty is forbidden from carrying it at all and states its amounts in rewardTiers, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent.
    */
   reward?: number;
   /**
-   * The payout table, one entry per tier. Required when bountyKind is 'security', enforced by the if/then/else below, and permitted on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Array order carries no meaning; select by the tier's own severity, assetType or label.
+   * The payout table, one entry per tier. The payout table, one entry per tier. Required when bountyKind is 'security', and the alternative to reward on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Exactly one of this and reward is present, enforced by the if/then/else below. Array order carries no meaning; select by the tier's own severity, assetType or label.
    *
    * @minItems 1
    */
@@ -430,7 +430,7 @@ export interface BountyDetails {
   platform?: string | null;
 }
 /**
- * One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is expressed by severity and assetType on a security bounty and by label on a task bounty; all three are optional so a program that grades on only one axis carries only that one. The payout itself is the one required part, because a tier that names no amount and no payout model is not a tier.
+ * One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is a selector — severity and assetType form a compound coordinate where a program grades on both, and label carries a grading axis neither describes. Each is individually optional so a program grading on one axis carries only that one, but at least one is required by the minProperties rule below: a row with no selector is an anonymous rule nothing can be matched against, not a tier. The payout is the other required part, because a tier that names no amount and no payout model is not a tier either.
  */
 export interface RewardTier {
   /**
@@ -442,7 +442,7 @@ export interface RewardTier {
    */
   assetType?: string | null;
   /**
-   * What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a task bounty's prize ladder, or a named category. Free text.
+   * What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a prize ladder, or a named category. This is a selector, not a caption: it is how a consumer picks the row out when the structured dimensions do not apply. Where it accompanies severity or assetType it reads as a caption, and a consumer that facets should prefer the structured dimensions. Free text.
    */
   label?: string | null;
   payout: Payout;
@@ -452,9 +452,9 @@ export interface RewardTier {
  */
 export interface Payout {
   /**
-   * How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case, and carries none of the amount fields. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.
+   * How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage' pays a share of a quantity the basis field names, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case, and carries none of the amount fields. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table.
    */
-  model: "fixed" | "range" | "up_to" | "percentage_of_value_at_risk" | "discretionary";
+  model: "fixed" | "range" | "up_to" | "percentage" | "discretionary";
   /**
    * The amount paid, where the model is 'fixed'. Required and non-null for that model, enforced by the if/then/else below.
    */
@@ -468,9 +468,13 @@ export interface Payout {
    */
   max?: number | null;
   /**
-   * Share of the value at risk that this tier pays, as a percentage between 0 and 100 — a program paying 'up to 10% of funds affected' carries 10 here. Required and non-null where the model is 'percentage_of_value_at_risk', enforced by the if/then/else below.
+   * Share this tier pays, as a percentage between 0 and 100 — a program paying 'up to 10% of funds affected' carries 10 here. What the share is *of* is named by basis, not assumed. Required and non-null where the model is 'percentage', enforced by the if/then/else below.
    */
   percent?: number | null;
+  /**
+   * What the percentage is a share of. Required and non-null where the model is 'percentage', enforced by the if/then/else below. 'value_at_risk' = the funds the finding could have taken, the construction most programs publish; 'economic_damage' = the loss actually caused, which some programs cap against instead. The two are not interchangeable and a program that states one is not stating the other, which is why the model tag no longer asserts a basis of its own. The list grows by spec release as programs attest a new one.
+   */
+  basis?: "value_at_risk" | "economic_damage" | null;
   /**
    * Least the tier pays regardless of the computed figure, where a percentage model states a minimum. Optional; absent means the computation is unbounded below.
    */

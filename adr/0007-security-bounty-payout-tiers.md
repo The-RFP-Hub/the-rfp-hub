@@ -43,16 +43,19 @@ measured on Immunefi.
    not share a payout shape, and the discriminator is what lets each carry the right required
    field. Not "open-ended" as the axis: intake duration already lives in `deadlines[]`, and
    either kind may be rolling.
-2. **Add `rewardTiers[]`**, entries of `{severity?, assetType?, label?, payout}`. Required when
-   `bountyKind` is `security`; **permitted on either kind**.
-3. **Add `$defs/payout`**, a `model` tag over `fixed | range | up_to |
-   percentage_of_value_at_risk | discretionary`, bound by a nested `if`/`then`/`else`. Each
-   branch **both requires the amounts its model needs and forbids those belonging to the
-   others**, so the tag is an exclusive discriminator rather than a hint: a `discretionary`
-   payout carrying an amount does not validate.
-4. **`reward` becomes conditional** — required for `task`, and **forbidden** for `security`.
-   Requiring the table without forbidding the scalar would still permit the misleading maximum
-   headline this decision exists to prevent.
+2. **Add `rewardTiers[]`**, entries of `{severity?, assetType?, label?, payout}`, each requiring
+   **at least one selector** — a row carrying only a payout is an anonymous rule nothing can be
+   matched against. Required when `bountyKind` is `security`, and the alternative to `reward` on
+   either kind.
+3. **Add `$defs/payout`**, a `model` tag over `fixed | range | up_to | percentage |
+   discretionary`, bound by a nested `if`/`then`/`else`. Each branch **both requires the amounts
+   its model needs and forbids those belonging to the others**, so the tag is an exclusive
+   discriminator rather than a hint: a `discretionary` payout carrying an amount does not
+   validate. `percentage` carries a required `basis` (`value_at_risk | economic_damage`) rather
+   than naming its operand in the tag.
+4. **Compensation is exactly one of `reward` or `rewardTiers`, on either kind**, and `security`
+   additionally requires the table. `bountyKind` names the **domain**; the present compensation
+   field names the **shape**.
 5. **Add `severityScheme` and `rewardPoolStatus`.**
 6. **Govern `severity` and `assetType` by registry**, not by closed enum.
 7. **Land the whole surface `x-stability: provisional`.**
@@ -69,6 +72,34 @@ at risk (one client), TVL-conditional tiers (one program), conditional pool rele
 (competitions only), per-tier vesting and multipliers are **not** structured. Every program
 carrying them still publishes a severity tier and a ceiling the table captures exactly, so the
 arithmetic can live in `description` without costing a consumer an answer.
+
+## Revised after design review
+
+The first cut of this decision made `bountyKind` do two jobs: name the domain *and* select the
+payout structure. `task` required `reward`, `security` required `rewardTiers`, and tiers were
+additionally permitted on a task. That produced a document — the shipped conformance example —
+carrying `reward: 5000` beside tiers of 3000, 1500 and 500, where the scalar plainly meant
+*total purse* while `reward`'s own description said *paid on completion*. Two sources of truth
+for what a participant is paid.
+
+Three changes followed, and they are folded into the decision above rather than appended:
+
+1. **Compensation became exclusive.** Exactly one of `reward` or `rewardTiers`, independent of
+   kind. This is what lets `bountyKind` go back to being a domain label, which is what its name
+   always implied.
+2. **The percentage model was genericised.** `percentage_of_value_at_risk` put a
+   security-specific operand inside an otherwise generic union, and this ADR's own known
+   limitation — that programs mean different things by "value at risk" — was the evidence that
+   the tag over-promised. `basis` makes the operand explicit and gives a place for future ones
+   without a new model per domain.
+3. **Tier selectors got a floor.** All three keying dimensions were optional with no minimum,
+   so `{payout}` alone validated.
+
+The alternative the review argued for — renaming the kinds to something like
+`scoped_task | submission_program`, so the discriminator never mentions a domain — was
+considered and declined. Every program in the corpus is a security bug bounty; naming the value
+`security` is honest about the evidence, and once compensation is exclusive the conflation the
+rename was meant to fix is already gone.
 
 ## Consequences
 
@@ -120,6 +151,10 @@ Registries keep the values interoperable while leaving the fields open.
 bounty rather than the tier. The data rejects it: **164 of 247 programs carry the rule on some
 severity rows and not others**, so a program-level field would assert the formula applies to
 every tier. It is tier-local.
+
+**Renaming the kinds to `scoped_task | submission_program`.** See the revision note above: it
+removes a conflation that making compensation exclusive already removes, at the cost of a value
+name no publisher would recognise for a corpus that is entirely security bug bounties.
 
 **A boolean `discretionary` beside optional numbers.** Does not enforce what it claims — a
 document could set the flag and an amount. `discretionary` is a payout model instead, and the

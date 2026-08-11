@@ -3,7 +3,7 @@
   "id": "conformance:bounty-security-tiered",
   "fundingType": "bounty",
   "title": "Security bounty with a severity-by-asset tier table",
-  "description": "Exercises bountyKind 'security': no single reward, a rewardTiers table graded on both axes, and three payout models — range, up_to and percentage_of_value_at_risk with a floor and a cap. The same severity pays differently by assetType, which is why the tier row carries both.",
+  "description": "Exercises bountyKind 'security': no scalar reward, a rewardTiers table graded on both axes, and three payout models — range, up_to, and percentage with an explicit basis, floor and cap. The same severity pays differently by assetType, which is why the tier row carries both.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -32,8 +32,9 @@
         "severity": "critical",
         "assetType": "smart_contract",
         "payout": {
-          "model": "percentage_of_value_at_risk",
+          "model": "percentage",
           "percent": 10,
+          "basis": "value_at_risk",
           "floor": 50000,
           "cap": 250000
         }

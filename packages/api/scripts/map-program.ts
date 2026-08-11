@@ -457,19 +457,23 @@ function typeBlockOf(
 
   // bountyKind is required by the Standard and upstream does not send it. Infer from the payout
   // shape: a tier table AND no scalar reward is a security program. Tiers alone are not enough —
-  // the Standard permits them on a task bounty that grades a placement ladder, and such a record
-  // keeps its reward, so calling it 'security' would both mislabel it and (since security forbids
-  // the scalar reward) make it invalid.
+  // the Standard allows them on a task bounty grading a placement ladder, so a record carrying
+  // both is more likely a graded task than a security program.
   const kind = bountyKind ?? (tiers !== undefined && reward === undefined ? "security" : "task");
 
-  // reward is required for a task bounty — synthesize from the budget if absent (a plain number
-  // now; the budget's parsed currency reaches fundingInfo via parseAmount in mapProgram). Never
-  // synthesized for a security bounty, which the Standard forbids from carrying it at all:
-  // collapsing a graded table to one number is the misrepresentation the table exists to prevent.
-  let scalarReward = kind === "security" ? undefined : reward;
-  if (kind === "task" && scalarReward === undefined) {
-    const { amount } = parseAmount(p.metadata?.programBudget);
-    if (amount !== undefined) scalarReward = amount;
+  // Compensation is EXACTLY ONE of reward or rewardTiers, so the two cannot both be emitted.
+  // The table wins wherever it exists: it is the richer description, and dropping it to keep a
+  // scalar would discard grading the upstream took the trouble to publish. A reward is
+  // synthesized from the budget only when there is no table and none was supplied — never for a
+  // security bounty, which the Standard forbids from carrying one at all, because collapsing a
+  // graded table to a single number is the misrepresentation the table exists to prevent.
+  let scalarReward: unknown;
+  if (tiers === undefined) {
+    scalarReward = kind === "security" ? undefined : reward;
+    if (kind === "task" && scalarReward === undefined) {
+      const { amount } = parseAmount(p.metadata?.programBudget);
+      if (amount !== undefined) scalarReward = amount;
+    }
   }
 
   return {

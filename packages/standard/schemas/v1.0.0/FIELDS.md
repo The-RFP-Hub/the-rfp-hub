@@ -287,8 +287,8 @@ The fundingDetails payload when fundingType is 'bounty': bounty-specific attribu
 |---|---|:--:|---|---|
 | `fundingType` | `bounty` | ✅ | Names this block's shape; equals the top-level fundingType. | — |
 | `bountyKind` | `task` \| `security` | ✅ | Which kind of bounty this is, and the discriminator for what the payout looks like. 'task' = one scoped piece of work paying a single reward; 'security' = a standing vulnerability-disclosure program paying against a tier table. This is about payout shape, not about how long the bounty stays open: intake duration lives in the top-level deadlines array, and either kind may be rolling. **(provisional)** | — |
-| `reward` | number, ≥0 |  | The reward paid on completion, in major units of the document-wide fundingInfo.currency. Required when bountyKind is 'task', enforced by the if/then/else below. A security bounty is forbidden from carrying it and states its amounts in rewardTiers instead, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
-| `rewardTiers` | [`rewardTier`](#rewardtier)[], min 1 |  | The payout table, one entry per tier. Required when bountyKind is 'security', enforced by the if/then/else below, and permitted on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Array order carries no meaning; select by the tier's own severity, assetType or label. **(provisional)** | — |
+| `reward` | number, ≥0 |  | The reward paid on completion, in major units of the document-wide fundingInfo.currency. The compensation for a bounty that pays one amount. Exactly one of this and rewardTiers is present on any bounty, enforced by the if/then/else below: they are alternative descriptions of the same money, so a document carrying both leaves a consumer no way to tell which is authoritative. A security bounty is forbidden from carrying it at all and states its amounts in rewardTiers, because a graded program has no single reward and collapsing the table to one number overstates what a typical report pays. That denomination rule is a requirement on publishers but crosses two objects, so it is not schema-enforceable; see FIELDS.md. The validator's advisory tier warns when this is present and fundingInfo.currency is absent. | — |
+| `rewardTiers` | [`rewardTier`](#rewardtier)[], min 1 |  | The payout table, one entry per tier. The payout table, one entry per tier. Required when bountyKind is 'security', and the alternative to reward on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Exactly one of this and reward is present, enforced by the if/then/else below. Array order carries no meaning; select by the tier's own severity, assetType or label. **(provisional)** | — |
 | `severityScheme` | string\|null |  | The published classification the tier severities are drawn from, named so a consumer can tell whose definition of 'critical' is in play. Free text, because these schemes are documents rather than a vocabulary worth governing. **(provisional)** | — |
 | `rewardPoolStatus` | `funded` \| `unfunded` \| `unknown`\|null |  | Whether the money behind the advertised amounts is actually held. 'funded' = escrowed or otherwise verifiably reserved; 'unfunded' = advertised as an intent to pay, with nothing set aside; 'unknown' = not published, which is the honest value where the program says nothing and the reason absent does not read as 'unfunded'. Separate from fundingInfo.budget, which carries the amount: a program can name a large maximum and hold nothing against it. **(provisional)** | — |
 | `difficulty` | `beginner` \| `intermediate` \| `advanced`\|null |  | Self-assessed difficulty, as a hint to applicants. Meaningful on a task bounty; a security program grades by severity in rewardTiers instead. | — |
@@ -297,13 +297,13 @@ The fundingDetails payload when fundingType is 'bounty': bounty-specific attribu
 
 ### `rewardTier`
 
-One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is expressed by severity and assetType on a security bounty and by label on a task bounty; all three are optional so a program that grades on only one axis carries only that one. The payout itself is the one required part, because a tier that names no amount and no payout model is not a tier.
+One row of a bounty's payout table: what is being paid for, and what it pays. The 'what for' is a selector — severity and assetType form a compound coordinate where a program grades on both, and label carries a grading axis neither describes. Each is individually optional so a program grading on one axis carries only that one, but at least one is required by the minProperties rule below: a row with no selector is an anonymous rule nothing can be matched against, not a tier. The payout is the other required part, because a tier that names no amount and no payout model is not a tier either.
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
 | `severity` | string\|null |  | Severity band this row pays for. An open list rather than a closed enum — conventional values are published in registries/bounty-severities.json, and a program's own vocabulary is valid without a schema change. Name the scheme these are drawn from in severityScheme. **(provisional)** | [`bounty-severities`](../../registries/bounty-severities.json) |
 | `assetType` | string\|null |  | Class of in-scope asset this row pays for, where a program grades the same severity differently by what was found. An open list rather than a closed enum — conventional values are published in registries/bounty-asset-types.json. Absent where a program grades on severity alone. **(provisional)** | [`bounty-asset-types`](../../registries/bounty-asset-types.json) |
-| `label` | string\|null, ≤120 |  | What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a task bounty's prize ladder, or a named category. Free text. **(provisional)** | — |
+| `label` | string\|null, ≤120 |  | What this row pays for, in the publisher's own words, where severity and assetType do not describe it — a placement in a prize ladder, or a named category. This is a selector, not a caption: it is how a consumer picks the row out when the structured dimensions do not apply. Where it accompanies severity or assetType it reads as a caption, and a consumer that facets should prefer the structured dimensions. Free text. **(provisional)** | — |
 | `payout` | [`payout`](#payout) | ✅ | What this tier pays, and on which model. | — |
 
 ### `payout`
@@ -312,11 +312,12 @@ What a tier pays, tagged by the model that determines which of the amounts below
 
 | Field | Type | Req. | Description | Registry |
 |---|---|:--:|---|---|
-| `model` | `fixed` \| `range` \| `up_to` \| `percentage_of_value_at_risk` \| `discretionary` | ✅ | How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage_of_value_at_risk' pays a share of what the finding put at risk, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case, and carries none of the amount fields. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table. **(provisional)** | — |
+| `model` | `fixed` \| `range` \| `up_to` \| `percentage` \| `discretionary` | ✅ | How this tier's payout is determined. 'fixed' pays one amount; 'range' pays somewhere between two bounds; 'up_to' names a ceiling with no floor; 'percentage' pays a share of a quantity the basis field names, optionally bounded by floor and cap; 'discretionary' names no figure at all, because the payer decides case by case, and carries none of the amount fields. The last is a real published position, not missing data — programs run numeric tiers and discretionary tiers side by side in the same table. **(provisional)** | — |
 | `amount` | number\|null, ≥0 |  | The amount paid, where the model is 'fixed'. Required and non-null for that model, enforced by the if/then/else below. **(provisional)** | — |
 | `min` | number\|null, ≥0 |  | Lower bound, where the model is 'range'. Required and non-null for that model, enforced by the if/then/else below. **(provisional)** | — |
 | `max` | number\|null, ≥0 |  | Upper bound, where the model is 'range' or 'up_to'. Required and non-null for both, enforced by the if/then/else below. **(provisional)** | — |
-| `percent` | number\|null, ≥0, ≤100 |  | Share of the value at risk that this tier pays, as a percentage between 0 and 100 — a program paying 'up to 10% of funds affected' carries 10 here. Required and non-null where the model is 'percentage_of_value_at_risk', enforced by the if/then/else below. **(provisional)** | — |
+| `percent` | number\|null, ≥0, ≤100 |  | Share this tier pays, as a percentage between 0 and 100 — a program paying 'up to 10% of funds affected' carries 10 here. What the share is *of* is named by basis, not assumed. Required and non-null where the model is 'percentage', enforced by the if/then/else below. **(provisional)** | — |
+| `basis` | `value_at_risk` \| `economic_damage`\|null |  | What the percentage is a share of. Required and non-null where the model is 'percentage', enforced by the if/then/else below. 'value_at_risk' = the funds the finding could have taken, the construction most programs publish; 'economic_damage' = the loss actually caused, which some programs cap against instead. The two are not interchangeable and a program that states one is not stating the other, which is why the model tag no longer asserts a basis of its own. The list grows by spec release as programs attest a new one. **(provisional)** | — |
 | `floor` | number\|null, ≥0 |  | Least the tier pays regardless of the computed figure, where a percentage model states a minimum. Optional; absent means the computation is unbounded below. **(provisional)** | — |
 | `cap` | number\|null, ≥0 |  | Most the tier pays regardless of the computed figure, where a percentage model states a maximum. Optional; absent means the computation is unbounded above. **(provisional)** | — |
 
@@ -460,10 +461,15 @@ Collapsing that table to a single `reward` is not lossy in the ordinary sense �
 describes an outcome almost no report reaches. That is the same failure the standard already
 separates `budget` from `minAward`/`maxAward` to avoid.
 
-`rewardTiers[]` is **required** for a security bounty and **permitted on either kind**.
-Requiring it on one kind is not a reason to forbid it on the other: a task bounty with a
-placement ladder — first, second, third — is the same graded structure keyed on the tier
-`label` instead of on `severity`.
+**Compensation is exactly one of `reward` or `rewardTiers`, on either kind.** They are
+alternative descriptions of the same money, so a document carrying both leaves a consumer no way
+to decide which is authoritative — is the scalar the winner's payout, a base payment, the
+maximum, or the total purse? A task bounty with a placement ladder carries the ladder and no
+scalar. A security bounty is additionally required to use the table.
+
+`bountyKind` therefore names the **domain**; which compensation field is present names the
+**shape**. The two were briefly conflated — the kind selected the payout structure — which made
+a graded task expressible two ways at once.
 
 **`discretionary` is a payout model, not missing data.** Programs publish numeric tiers and
 "decided case by case" tiers side by side in one table. A tier the payer will not put a figure
@@ -477,9 +483,14 @@ and can I still submit?"* — and none of these do, because every such program s
 severity tier and a ceiling that the table captures exactly. The arithmetic belongs in
 `description`, the same call `eligibility` makes: for reading, not for faceting.
 
-`percentage_of_value_at_risk` is the one formula that earned structure, on frequency — it is
-the single most repeated construction in the corpus, and "what share of what I recover do I
-keep" is a question a consumer can actually filter on.
+`percentage` is the one formula that earned structure, on frequency — it is the single most
+repeated construction in the corpus, and "what share of what I recover do I keep" is a question
+a consumer can actually filter on. It carries a required `basis` naming what the share is *of*,
+because 10% of funds at risk and 10% of economic damage are different offers and a model tag
+that assumed one would claim a comparability the data does not have.
+
+Every tier needs a **selector** — a `severity`, an `assetType`, or a `label`. A row carrying
+only a payout is an anonymous rule nothing can be matched against.
 
 ### Single currency — document-wide
 

@@ -1,9 +1,9 @@
 {
   "specVersion": "1.0.0",
-  "id": "conformance:payout-percent-above-100",
+  "id": "conformance:reward-tier-without-selector",
   "fundingType": "bounty",
-  "title": "Percentage payout above 100",
-  "description": "percent is a share of the value at risk expressed on a 0-to-100 scale, so a value above 100 is out of range.",
+  "title": "Reward tier carrying a payout but no selector",
+  "description": "A tier row needs something to be selected by — a severity, an assetType, or a label. A row carrying only a payout is an anonymous rule that nothing can be matched against, not a tier.",
   "status": "open",
   "operatingOrganizations": [
     {
@@ -27,11 +27,9 @@
     "bountyKind": "security",
     "rewardTiers": [
       {
-        "severity": "critical",
         "payout": {
-          "model": "percentage",
-          "percent": 150,
-          "basis": "value_at_risk"
+          "model": "fixed",
+          "amount": 1000
         }
       }
     ]

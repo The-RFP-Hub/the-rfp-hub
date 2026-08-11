@@ -1,0 +1,39 @@
+{
+  "specVersion": "1.0.0",
+  "id": "conformance:bounty-reward-and-reward-tiers",
+  "fundingType": "bounty",
+  "title": "Bounty carrying both a scalar reward and a tier table",
+  "description": "Compensation is exactly one of reward or rewardTiers. The two are alternative descriptions of the same money, so a document carrying both leaves a consumer no way to tell which is authoritative — is the scalar the winner's payout, a base payment, or the total purse?",
+  "status": "open",
+  "operatingOrganizations": [
+    {
+      "name": "Example Protocol",
+      "slug": "example-protocol",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {},
+  "fundingInfo": {
+    "currency": "USDC"
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "task",
+    "reward": 5000,
+    "rewardTiers": [
+      {
+        "label": "1st place",
+        "payout": {
+          "model": "fixed",
+          "amount": 3000
+        }
+      }
+    ]
+  }
+}
