@@ -31,12 +31,24 @@ describe("convert", () => {
     for (const d of documents) expect(d.fundingDetails.fundingType).toBe(d.fundingType);
   });
 
-  it("drops a duplicate id instead of emitting the same document twice", () => {
-    const { documents } = convert([
+  /**
+   * Two upstream rows on one id is data loss, not a tidy-up: the second row's content — a different
+   * title here — never reaches the draft, and nothing about a one-document output says a second row
+   * existed. So the collision is NAMED, with its id and how many rows landed on it, and the run
+   * reports failure rather than success. Which row the curator meant is not a question arrival
+   * order gets to answer.
+   */
+  it("names a duplicate id rather than quietly emitting one document for two rows", () => {
+    const { documents, duplicates } = convert([
       grantProgram,
       { ...grantProgram, metadata: { title: "Again" } },
     ]);
     expect(documents).toHaveLength(1);
+    expect(duplicates).toEqual([{ id: documents[0]?.id, count: 2 }]);
+  });
+
+  it("reports no duplicates when every row has its own id", () => {
+    expect(convert(PROGRAMS).duplicates).toEqual([]);
   });
 
   /**

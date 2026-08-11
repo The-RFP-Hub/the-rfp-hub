@@ -21,7 +21,12 @@
  * reaches the database, and each rejection is printed with its id and the rules it broke. A curated
  * file is not a trusted file — it is edited by hand, which is precisely why every record is
  * re-validated on the way in. Pass `--strict` (or SEED_STRICT=1) to turn any rejection into a
- * failed run; CI runs it on.
+ * failed run; CI runs it on. `--strict` is SCHEMA-strict: the gate runs the validator with its
+ * advisory checks off, so a warning never fails a seed. The corpus's advisory baseline is asserted
+ * separately, and itemised, in test/unit/seed-corpus.test.ts.
+ *
+ * Duplicate ids are the one input defect that fails the run with or without `--strict` — see
+ * `assertUniqueIds`. Nothing is deduplicated: every document in the file reaches the gate.
  *
  * Nothing is written until the whole batch has been validated AND counted: the >=100 floor is
  * asserted BEFORE the first upsert, so a short or broken run fails with the database untouched
@@ -94,13 +99,16 @@ export async function readCorpus(path: string): Promise<Opportunity[]> {
 
 /**
  * The provenance namespace a document declares, read off its own id (`fundingmap:1459` →
- * `fundingmap`). It is recorded in the `source_system` column, where it pairs with `original_id` in
- * a uniqueness constraint that makes re-seeding idempotent.
+ * `fundingmap`, `curated:lido-bug-bounty` → `curated`). It is recorded in the `source_system`
+ * column, where it pairs with `original_id` in the partial uniqueness index over the two.
  *
  * Derived rather than configured, and derived from the DOCUMENT rather than from a constant this
  * script carries: the id is what consumers already see, so a `source_system` taken from anywhere
- * else could disagree with it. A namespace-free id yields null, which the column permits (the
- * uniqueness index is partial for exactly that reason).
+ * else could disagree with it. That matters most for the corpus's two provenance classes — records
+ * converted from an upstream registry snapshot keep that registry's namespace and its
+ * `source.originalId`; records researched here from the funder's own pages carry `curated` and no
+ * original id, because they never had one. A namespace-free id yields null, which the column
+ * permits (the uniqueness index is partial for exactly that reason).
  */
 export function sourceSystemOf(id: string | undefined): string | null {
   const namespace = (id ?? "").split(":")[0];
@@ -141,6 +149,32 @@ export function reportRejections(rejected: readonly RejectedRecord[]): void {
 }
 
 /**
+ * Duplicate ids are a CORPUS defect, not a record defect, and they fail the run outright — with or
+ * without `--strict`.
+ *
+ * The loader used to dedupe by id before the gate, which was wrong twice over: the second copy was
+ * never validated, and it was dropped without a word. Two documents sharing an id are two answers
+ * to the same question, and nothing here can tell which one the curator meant — a merge conflict
+ * resolved by taking both sides, a copy-paste that kept the id, an upstream that reissued one. This
+ * is a hand-edited file, so that is exactly the mistake it should be loud about, and "silently kept
+ * the first" is the one resolution a reviewer cannot see in a green run.
+ */
+export function assertUniqueIds(documents: readonly Opportunity[]): void {
+  const counts = new Map<string, number>();
+  for (const d of documents) {
+    const id = d?.id ?? "(no id)";
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  const duplicated = [...counts].filter(([, n]) => n > 1);
+  if (duplicated.length === 0) return;
+  throw new Error(
+    `duplicate id(s) in the corpus: ${duplicated
+      .map(([id, n]) => `${id} (×${n})`)
+      .join(", ")} — ids must be unique; nothing was written`,
+  );
+}
+
+/**
  * With `--strict` (or SEED_STRICT=1), a single non-conforming record fails the whole run. It is off
  * by default so that an operator loading their own hand-assembled corpus is not blocked by one bad
  * record in it. On in CI against the committed corpus, where it should be: that file cannot change
@@ -168,9 +202,9 @@ export function assertSeedContract(valid: number, min = MIN_VALID): void {
 }
 
 /**
- * The write phase, and the two guards that come BEFORE it — in that order, in one place, so the
+ * The write phase, and the three guards that come BEFORE it — in that order, in one place, so the
  * order is a testable property rather than a comment. Everything up to here is read-only: a run
- * that fails either guard leaves the database exactly as it found it, instead of publishing a
+ * that fails any guard leaves the database exactly as it found it, instead of publishing a
  * partial approved+listed dataset and only then reporting failure.
  *
  * The guards are only half the property, though: a failure INSIDE the loop would leave the records
@@ -185,6 +219,7 @@ export async function loadValidated(
   opts: { strict: boolean; min?: number },
 ): Promise<number> {
   assertNoRejections(rejected, opts.strict);
+  assertUniqueIds(valid);
   assertSeedContract(valid.length, opts.min);
 
   let loaded = 0;
@@ -202,18 +237,13 @@ async function main(): Promise<void> {
     `Seeding from ${corpusPath} (${corpus.length} Standard documents${strict ? ", --strict" : ""})…`,
   );
 
-  // One batch, read once, no network. Duplicate ids inside a corpus are dropped rather than
-  // upserted twice, so the count reported is the count of distinct records.
-  const seen = new Set<string>();
-  const documents: Opportunity[] = [];
-  for (const std of corpus) {
-    if (seen.has(std.id)) continue;
-    seen.add(std.id);
-    documents.push(std);
-  }
+  // One batch, read once, no network. Duplicate ids fail the run here, on the RAW input, so a
+  // collision is named even when one of the two copies would also have failed the schema gate.
+  assertUniqueIds(corpus);
 
-  // Every document is schema-validated here, before anything touches the database.
-  const { accepted: valid, rejected } = gateForSeed(documents);
+  // Every document is schema-validated here, before anything touches the database. Nothing is
+  // filtered out on the way in: whatever the file holds, the gate sees.
+  const { accepted: valid, rejected } = gateForSeed(corpus);
   reportRejections(rejected);
   console.log(`  ${valid.length} valid, ${rejected.length} rejected`);
 
