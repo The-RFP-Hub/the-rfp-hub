@@ -5,7 +5,7 @@ Mechanically verifies the four M2 completion criteria against a **live deploymen
 
 ```bash
 pnpm install && pnpm build          # the checker uses the repo's own validator, from its build output
-node scripts/check-m2.mjs \
+pnpm check:m2 \
   --base-url   https://api.example.org \
   --export-url https://data.example.org
 ```
@@ -14,10 +14,10 @@ Human-readable pass/fail per criterion goes to stdout, a machine-readable report
 `m2-compliance-report.json` (`--json <path>`, or `-` for stdout), and the process exits non-zero if
 any criterion failed. `node scripts/check-m2.mjs --help` lists every flag.
 
-There is also a `workflow_dispatch` runner —
-[`.github/workflows/m2-compliance.yml`](../../.github/workflows/m2-compliance.yml) — taking the two
-URLs as inputs and keeping the JSON report as a run artifact. No cron: this answers "does the
-milestone's definition of done hold", which is a question someone asks, not a monitor.
+This is a script, run by hand (or from any external runner) against whichever deployment someone
+wants an answer about — a preview environment, staging, production. It is not wired into CI: this
+answers "does the milestone's definition of done hold", which is a question someone asks, not a
+monitor.
 
 ## What each criterion checks
 

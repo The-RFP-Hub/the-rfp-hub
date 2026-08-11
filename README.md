@@ -97,13 +97,13 @@ served document validated against the Standard, and the CC0 export's freshness a
 `latest.json`/`latest.csv` pair invariant:
 
 ```bash
-node scripts/check-m2.mjs --base-url https://api.example.org --export-url https://data.example.org
+pnpm check:m2 --base-url https://api.example.org --export-url https://data.example.org
 ```
 
 Pass/fail per criterion on stdout, a JSON report alongside, non-zero exit on any failure. Nothing
-about a particular host or dataset is baked in. See
-[`scripts/m2-compliance/README.md`](./scripts/m2-compliance/README.md), or run it from
-[the `workflow_dispatch` workflow](./.github/workflows/m2-compliance.yml).
+about a particular host or dataset is baked in. Run it by hand, or from any external runner, against
+whichever deployment you want an answer about. See
+[`scripts/m2-compliance/README.md`](./scripts/m2-compliance/README.md).
 
 ## Using the API
 
