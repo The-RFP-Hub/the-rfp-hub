@@ -14,13 +14,18 @@ Entries are grouped **Schema / Context / Tooling / Docs**.
 `ethrfps.app`, and the provisional identifiers were replaced with canonical ones on it. Decision
 record: [`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md).
 
-| | Was (provisional) | Is (canonical) |
+The retired strings are written **without their `https://` scheme** below, and everywhere else
+they are recorded. They are dead identifiers, not links, and `pnpm check`'s identity sweep fails
+on any live-URL copy of one anywhere in the package — including in this file. Prepend the scheme
+if you are matching your own pinned string against them.
+
+| | Was (provisional; prepend `https://`) | Is (canonical) |
 |---|---|---|
-| Schema `$id` | `https://raw.githubusercontent.com/…/packages/standard/schemas/v1.0.0/opportunity.schema.json` | `https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json` |
-| Context URL | `…/packages/standard/schemas/v1.0.0/context.jsonld` | `https://ethrfps.app/schemas/v1.0.0/context.jsonld` |
-| Metaschema `$id` | `…/packages/standard/meta/rfphub-schema.meta.json` | `https://ethrfps.app/meta/rfphub-schema.meta.json` |
-| Registry entry `$id` | `…/packages/standard/registries/entry.schema.json` | `https://ethrfps.app/registries/entry.schema.json` |
-| `@vocab` | `https://github.com/The-RFP-Hub/the-rfp-hub/ns/draft/rfp#` | `https://ethrfps.app/ns/rfp#` |
+| Schema `$id` | `raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json` | `https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json` |
+| Context URL | the same base + `/schemas/v1.0.0/context.jsonld` | `https://ethrfps.app/schemas/v1.0.0/context.jsonld` |
+| Metaschema `$id` | the same base + `/meta/rfphub-schema.meta.json` | `https://ethrfps.app/meta/rfphub-schema.meta.json` |
+| Registry entry `$id` | the same base + `/registries/entry.schema.json` | `https://ethrfps.app/registries/entry.schema.json` |
+| `@vocab` | `github.com/The-RFP-Hub/the-rfp-hub/ns/` + `draft` + `/rfp#` | `https://ethrfps.app/ns/rfp#` |
 
 **This is not a change to the data contract.** No property was added, removed, renamed or
 re-typed, and no constraint moved in either direction: under the bidirectional definition in
