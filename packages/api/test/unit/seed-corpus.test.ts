@@ -126,15 +126,128 @@ describe("the committed corpus", () => {
     expect(accepted.length).toBeGreaterThanOrEqual(MIN_VALID);
   });
 
-  it("passes the advisory checks too, so the shipped data is not merely conforming", () => {
-    const withErrors = DOCUMENTS.filter((d) => !validateOpportunity(d, { checks: true }).valid);
-    expect(withErrors.map((d) => d.id)).toEqual([]);
+  /**
+   * The ADVISORY baseline, itemised — every warning the shipped corpus raises, by code and by id.
+   *
+   * This replaces a test that ran the checks and then looked only at `.valid`. Advisory warnings
+   * deliberately never change `.valid`, so that test asserted nothing beyond the schema test above
+   * it while claiming the data "passes the advisory checks"; it was green against 16 warnings.
+   *
+   * Pinning the exact list rather than demanding zero, because these warnings are the registries
+   * doing their job on data that is genuinely outside them, not defects to paper over:
+   *
+   * - `unregistered-program-model` — `programModel` is an OPEN list by design ("a publisher's own
+   *   vocabulary is valid without a schema change"). "audit subsidy", "investment" and "venture"
+   *   are what those programs are; flattening them to `grant` would lose the distinction the field
+   *   exists to carry.
+   * - `unregistered-deadline-label` — same, for labels. An RFP's eligible-activity window and a
+   *   rolling solicitation's first-review date are real dates on real postings with no registered
+   *   label to take them.
+   * - `amount-without-currency` — the source publishes a figure and no unit. Guessing the unit
+   *   would be worse than carrying the warning, and dropping the figure would lose a published
+   *   fact; the advisory tier is exactly the right place for it to show up.
+   *
+   * A NEW warning fails this test, which is the point: the baseline can only move deliberately.
+   */
+  const ADVISORY_BASELINE: Record<string, string[]> = {
+    "unregistered-program-model": [
+      "fundingmap:996", // "audit subsidy"
+      "fundingmap:1462", // "audit subsidy"
+      "curated:mantle-ecofund", // "investment"
+      "curated:arbitrum-gaming-ventures-agv", // "venture"
+    ],
+    "amount-without-currency": [
+      "fundingmap:1046", // budget 5000, no currency published anywhere
+    ],
+    "unregistered-deadline-label": [
+      "fundingmap:1398", // "results announced"
+      "curated:road-to-devcon-8-india-ecosystem-program", // "eligible activity window start"
+      "curated:road-to-devcon-8-india-ecosystem-program", // "eligible activity window end"
+      "curated:road-to-devcon-8-india-university-program", // "eligible activity window start"
+      "curated:road-to-devcon-8-india-university-program", // "eligible activity window end"
+      "curated:rfp-reboot-the-gitcoin-community-for-the-3-3-era", // "first review"
+    ],
+  };
+
+  it("raises exactly the advisory warnings it is documented to raise — no more, no fewer", () => {
+    const raised: Record<string, string[]> = {};
+    let total = 0;
+    for (const d of DOCUMENTS) {
+      const { valid, warnings } = validateOpportunity(d, { checks: true });
+      expect(valid, d.id).toBe(true); // advisory warnings never change this — see above
+      for (const w of warnings) {
+        const forCode = raised[w.code] ?? [];
+        forCode.push(d.id);
+        raised[w.code] = forCode;
+      }
+      total += warnings.length;
+    }
+
+    expect(Object.keys(raised).sort()).toEqual(Object.keys(ADVISORY_BASELINE).sort());
+    for (const [code, ids] of Object.entries(ADVISORY_BASELINE)) {
+      expect(raised[code], code).toEqual(ids);
+    }
+    // 11 warnings over 9 documents, as counted in the README.
+    expect(total).toBe(Object.values(ADVISORY_BASELINE).flat().length);
+    expect(total).toBe(11);
+    expect(new Set(Object.values(ADVISORY_BASELINE).flat()).size).toBe(9);
   });
 
   it("gives every document a unique, namespaced id", () => {
     const ids = DOCUMENTS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(id, id).toMatch(/^[a-z0-9-]+:.+/);
+  });
+
+  /**
+   * PROVENANCE IS NOT DECORATION. The corpus holds two classes of record and the id namespace is
+   * what tells them apart:
+   *
+   * - `fundingmap:` — converted from a snapshot of an upstream registry, so `source.originalId` is
+   *   a real identifier IN THAT SOURCE SYSTEM, which is what the Standard says that field means.
+   * - `curated:` — researched here from the funder's own pages. There is no source system and
+   *   therefore no original id, and inventing one would both assert provenance that does not exist
+   *   and reserve a key the actual registry may later issue to something else.
+   *
+   * These records used to ship in the upstream namespace with a synthetic numeric `originalId`.
+   * They are indistinguishable from converted rows once that is true, which is why it is asserted
+   * here rather than left to a curator to remember.
+   */
+  it("tells its two provenance classes apart, and neither claims the other's identifiers", () => {
+    const namespaces = new Set(DOCUMENTS.map((d) => d.id.split(":")[0]));
+    expect([...namespaces].sort()).toEqual(["curated", "fundingmap"]);
+
+    for (const d of DOCUMENTS) {
+      const originalId = d.source?.originalId;
+      if (d.id.startsWith("curated:")) {
+        expect(originalId ?? null, d.id).toBeNull();
+        expect(d.id, d.id).toMatch(/^curated:[a-z0-9][a-z0-9-]*$/); // a name, not a foreign key
+      } else {
+        expect(originalId, d.id).toBeTruthy();
+        expect(d.id, d.id).toBe(`fundingmap:${originalId}`);
+      }
+    }
+  });
+
+  /**
+   * `postedAt` is "when the opportunity was first publicly announced AT THE SOURCE" — not when a
+   * curator added it here. Every researched record used to carry the curation date in it, which
+   * dated 75 opportunities, several of them years old, to the afternoon this file was written.
+   *
+   * So: absent unless the record's own evidence carries a published date, and never equal to the
+   * Hub timestamp that records the curation pass itself.
+   */
+  it("never passes off a curation timestamp as a posting date", () => {
+    for (const d of DOCUMENTS) {
+      if (!d.postedAt) continue;
+      expect(new Date(d.postedAt).getTime(), d.id).toBeLessThanOrEqual(
+        new Date(d.createdAt as string).getTime(),
+      );
+      if (d.id.startsWith("curated:")) expect(d.postedAt, d.id).not.toBe(d.createdAt);
+    }
+    // Most researched records have no published announcement date, and say so by absence.
+    const curated = DOCUMENTS.filter((d) => d.id.startsWith("curated:"));
+    expect(curated.filter((d) => d.postedAt).length).toBeLessThan(curated.length / 2);
   });
 
   /**
@@ -221,6 +334,21 @@ describe("loadValidated: the floor is asserted before anything is written", () =
     const rejected = [{ id: "fundingmap:bad", errors: ["/status must be one of …"] }];
     await expect(loadValidated(ok(MIN_VALID), rejected, write, { strict: true })).rejects.toThrow(
       /fundingmap:bad/,
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A duplicate id fails the run WITHOUT `--strict` too: unlike a malformed record, which an
+   * operator may reasonably want skipped from their own corpus, a repeated id means the file gives
+   * two answers to one question and nothing here can pick between them.
+   */
+  it("writes nothing when two documents share an id, strict or not", async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const batch = ok(MIN_VALID);
+    const withTwin = [...batch, { ...(batch[0] as Opportunity) }];
+    await expect(loadValidated(withTwin, [], write, { strict: false })).rejects.toThrow(
+      /duplicate id\(s\) in the corpus: x:0 \(×2\)/,
     );
     expect(write).not.toHaveBeenCalled();
   });

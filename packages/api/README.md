@@ -294,6 +294,11 @@ nothing rejected. The floor is asserted **before** the first write (<100 valid f
 the database untouched), and the write phase runs in one transaction, so a failure part-way through
 rolls back rather than publishing a half-updated dataset.
 
+Nothing is filtered on the way in: every document in the file reaches the gate, and **a repeated id
+fails the run** — with or without `--strict`, because two documents under one id are two answers to
+the same question and no loader can pick between them. The seed used to dedupe before validating,
+which meant a second copy was never checked and never mentioned.
+
 ### Why the documents are already Standard
 
 Earlier the seed ingested a foreign registry's rows and mapped them at load time. The shape a
@@ -308,6 +313,11 @@ the funder's own published pages — their site, docs, blog, governance forum or
 where the researched value contradicted the converted one, the researched value won. The envelope's
 `note` records that, including the caveat that statuses are a point-in-time reading and go stale.
 
+That reconciliation is evidenced by `additionalReferences` and by the dated readings written into
+the descriptions — **not** by `source.verifiedAgainstSource`, which is null on all 142. That flag
+records the verification-assist job, which has not run; a human pass is not the same claim and does
+not get to set it.
+
 ### Refreshing it
 
 Small corrections are ordinary edits to `data/seed-corpus.json`, reviewed like any other change.
@@ -320,22 +330,54 @@ in it.
 
 ### Ids and provenance
 
-A document's id carries its provenance namespace (`fundingmap` in `fundingmap:1459`). The loader
-reads the namespace off the id and records it in the `source_system` column, where it pairs with
-`original_id` in a uniqueness constraint that makes re-seeding idempotent — updating the rows it
-wrote last time instead of inserting a second copy. Taking it from the document rather than from a
-constant or an env var means `source_system` can never disagree with the id consumers already see.
+A document's id carries its provenance namespace, and the corpus has **two classes**:
+
+- **`fundingmap:1459`** — converted from a snapshot of an upstream registry and then reconciled.
+  `source.originalId` is that registry's own identifier, which is what the Standard means by "the
+  identifier in the source system"; the public id is the namespace plus that id.
+- **`curated:lido-bug-bounty`** — researched here from the funder's own published pages. There was
+  never an upstream row, so there is **no `source.originalId`** and the id is a name rather than a
+  foreign key. Publishing these in the upstream namespace with a synthetic numeric id would assert
+  provenance they do not have, and would squat on keys that registry may later issue to something
+  else.
+
+The loader reads the namespace off the id and records it in the `source_system` column (it pairs
+with `original_id` in a partial uniqueness index over the two). Taking it from the document rather
+than from a constant or an env var means `source_system` can never disagree with the id consumers
+already see. Re-seeding is idempotent by public id: every upsert conflicts on it.
+
+`postedAt` follows the same rule. It means "first publicly announced **at the source**", so it is
+present only where the source publishes such a date — 19 of the 76 researched records, each with
+the date quoted in the record's own description — and absent on the rest. It is never the date the
+file was edited; `createdAt`/`updatedAt` are the Hub timestamps and carry that.
 
 ### What the corpus contains
 
-142 documents, all validating against v1.0.0 with zero errors: 45 grants, 45 bounties, 43
-hackathons, 5 RFPs, 3 accelerators, 1 VC fund; 78 open and 64 closed. Statuses were re-read from
-source during curation, so "closed" is a finding rather than a default.
+142 documents, all validating against v1.0.0 with zero errors: 45 bounties, 44 grants, 44
+hackathons, 5 RFPs, 3 accelerators, 1 VC fund; 78 open and 64 closed; 66 converted (`fundingmap:`)
+and 76 researched (`curated:`). Statuses were re-read from source during curation, so "closed" is a
+finding rather than a default. Those per-type and per-status counts are the inventory at this
+commit, not a CI contract: what CI asserts is the >=130 floor, zero schema errors, unique ids, the
+advisory baseline below, and the bounty split.
 
-Five documents carry **no `applicationUrl`**, because those programs publish no submission page of
-their own. `applicationUrl` is optional in the Standard; leaving it absent is a fact about the
-program, whereas substituting a listing page would put something in the field consumers read as
-"apply here" that the funder never said.
+The corpus raises **11 advisory warnings across 9 documents**, and the exact list is pinned in
+`test/unit/seed-corpus.test.ts` so a new one fails the build: 4 `unregistered-program-model`
+("audit subsidy" ×2, "investment", "venture"), 6 `unregistered-deadline-label` (an RFP's
+eligible-activity window ×4, a rolling solicitation's first-review date, one "results announced")
+and 1 `amount-without-currency`. Those registries are open lists by design — a publisher's own
+vocabulary is valid without a schema change — so these are the advisory tier reporting real data,
+not defects to launder. Note that seed `--strict` is **schema**-strict: the gate runs with advisory
+checks off, and warnings never fail a seed.
+
+Where the honest answer is less data, the corpus carries less data:
+
+- **Five documents carry no `applicationUrl`**, because those programs publish no submission page
+  of their own. The field is optional in the Standard; leaving it absent is a fact about the
+  program, whereas substituting a listing page would put something in the field consumers read as
+  "apply here" that the funder never said.
+- **25 documents carry no `fundingInfo`**, because no page publishes a figure. Two of those lost a
+  placeholder — a USD 1 "prize pool" and a USD 3 one — that had survived from a source snapshot.
+- **57 documents carry no `postedAt`**, because no source publishes an announcement date for them.
 
 Of the 45 bounties, **44 are `security` and 1 is `task`**, and each carries exactly one
 compensation shape: a security record's published ceiling is a tier table rather than a scalar
