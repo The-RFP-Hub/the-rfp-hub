@@ -75,6 +75,12 @@ jobs:
       # loader's >=100 contract — a curation pass that halves the dataset should redden CI even
       # though the seed itself would still be satisfied. Runs before `pnpm test`, whose fixtures
       # are self-isolating and unaffected.
+      #
+      # The comparisons are against the committed corpus rather than against hard-coded totals, so
+      # this closes the round trip — corpus → seed → Postgres → mapper → export — without pinning
+      # numbers a curator would have to come and edit. The CSV is PARSED (RFC 4180 quoting) and its
+      # id COLUMN compared to the JSON's ids; substring containment would pass on a truncated file,
+      # on duplicated rows, and on an id that only appears inside some other record's text.
       - name: Assert seeded rows and exported files
         working-directory: packages/api
         run: |
@@ -85,6 +91,37 @@ jobs:
           const MIN = 130;
           const dir = "exports";
           const files = readdirSync(dir);
+
+          /** Parse RFC 4180 CSV into rows of cells: quoted fields may hold commas, newlines and "". */
+          const parseCsv = (text) => {
+            const rows = [];
+            let row = [];
+            let cell = "";
+            let quoted = false;
+            for (let i = 0; i < text.length; i++) {
+              const c = text[i];
+              if (quoted) {
+                if (c !== '"') { cell += c; continue; }
+                if (text[i + 1] === '"') { cell += '"'; i++; continue; }
+                quoted = false;
+                continue;
+              }
+              if (c === '"') { quoted = true; continue; }
+              if (c === ",") { row.push(cell); cell = ""; continue; }
+              if (c === "\r") continue;
+              if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; continue; }
+              cell += c;
+            }
+            if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+            return rows;
+          };
+
+          /** Counts by field value, key-sorted so two tallies compare by content, not by insertion order. */
+          const tally = (items, key) => {
+            const counts = {};
+            for (const o of items) counts[o[key]] = (counts[o[key]] ?? 0) + 1;
+            return Object.keys(counts).sort().map((k) => `${k}=${counts[k]}`).join(" ");
+          };
           // Match the dated archive by name rather than taking whichever file readdir happened to
           // list first, so the assertion cannot silently check nothing.
           const dated = (ext) => files.filter((f) => new RegExp(`^opportunities-\\d{4}-\\d{2}-\\d{2}\\.${ext}$`).test(f));
@@ -97,17 +134,50 @@ jobs:
           }
 
           const json = JSON.parse(readFileSync(`${dir}/${datedJson[0]}`, "utf8"));
-          const csv = readFileSync(`${dir}/${datedCsv[0]}`, "utf8");
           const exported = json.opportunities ?? [];
           if (exported.length < MIN || json.count !== exported.length) {
             throw new Error(`${datedJson[0]}: ${exported.length} entries (count=${json.count}), want >= ${MIN}`);
           }
-          // Row count by id membership, not by line count: a quoted field may span lines.
-          const missing = exported.filter((o) => !csv.includes(o.id));
-          if (missing.length) {
-            throw new Error(`${datedCsv[0]}: missing ${missing.length} exported id(s), e.g. ${missing[0].id}`);
+
+          // What was served is what was committed: same ids, same statuses, same funding types.
+          const corpus = JSON.parse(readFileSync("data/seed-corpus.json", "utf8")).documents;
+          const corpusIds = new Set(corpus.map((d) => d.id));
+          const exportedIds = new Set(exported.map((o) => o.id));
+          if (exportedIds.size !== exported.length) {
+            throw new Error(`${datedJson[0]}: ${exported.length - exportedIds.size} duplicate id(s) exported`);
           }
-          console.log(`✓ ${exported.length} entries in ${datedJson[0]} + ${datedCsv[0]}`);
+          const absent = [...corpusIds].filter((id) => !exportedIds.has(id));
+          const extra = [...exportedIds].filter((id) => !corpusIds.has(id));
+          if (absent.length || extra.length) {
+            throw new Error(
+              `${datedJson[0]}: ${absent.length} corpus id(s) missing (e.g. ${absent[0]}), ` +
+                `${extra.length} not in the corpus (e.g. ${extra[0]})`,
+            );
+          }
+          for (const key of ["status", "fundingType"]) {
+            const want = tally(corpus, key);
+            const got = tally(exported, key);
+            if (want !== got) throw new Error(`${key} exported as [${got}], corpus says [${want}]`);
+          }
+
+          // CSV: parsed, not substring-matched. Same row count, same ids, same order, in the id column.
+          const rows = parseCsv(readFileSync(`${dir}/${datedCsv[0]}`, "utf8"));
+          const header = rows.shift() ?? [];
+          const idColumn = header.indexOf("id");
+          if (idColumn === -1) throw new Error(`${datedCsv[0]}: no id column in header: ${header.join(",")}`);
+          if (rows.length !== exported.length) {
+            throw new Error(`${datedCsv[0]}: ${rows.length} data rows, JSON has ${exported.length}`);
+          }
+          const csvIds = rows.map((r) => r[idColumn]);
+          const mismatch = csvIds.findIndex((id, i) => id !== exported[i].id);
+          if (mismatch !== -1) {
+            throw new Error(`${datedCsv[0]}: row ${mismatch + 1} id '${csvIds[mismatch]}' != '${exported[mismatch].id}'`);
+          }
+          const widths = new Set(rows.map((r) => r.length));
+          if (widths.size !== 1 || !widths.has(header.length)) {
+            throw new Error(`${datedCsv[0]}: rows are ${[...widths].join("/")} cells wide, header is ${header.length}`);
+          }
+          console.log(`✓ ${exported.length} entries in ${datedJson[0]} + ${datedCsv[0]}, ids and counts match the corpus`);
 
           const client = new Client({ connectionString: process.env.DATABASE_URL });
           client
@@ -119,6 +189,9 @@ jobs:
             )
             .then(({ rows }) => {
               if (rows[0].n < MIN) throw new Error(`only ${rows[0].n} live rows seeded, want >= ${MIN}`);
+              if (rows[0].n !== corpus.length) {
+                throw new Error(`${rows[0].n} live rows, but the corpus ships ${corpus.length}`);
+              }
               console.log(`✓ ${rows[0].n} live rows, ${exported.length} entries exported`);
             })
             .then(() => client.end())
