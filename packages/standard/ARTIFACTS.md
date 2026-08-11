@@ -24,7 +24,7 @@ re-proposed every few months, and each time costs the same conversation.
 | [`schemas/index.json`](./schemas/index.json) | Machine-readable index of published versions, with `latest`. | `scripts/codegen.mjs` from `spec.config.json`. |
 | [`meta/rfphub-schema.meta.json`](./meta/rfphub-schema.meta.json) | Metaschema constraining our own schema file and legalising the three `x-` annotations (`x-stability`, `x-since`, `x-deprecated`) on top of the native 2020-12 vocabulary — including the rule that `x-deprecated` may only accompany a native `deprecated: true`, never replace it. | Hand-authored, validated in CI. |
 | [`spec.config.json`](./spec.config.json) | The spec's identity. The only place a version string or namespace IRI is hand-written. | Hand-authored. |
-| [`schemas/v1.0.0/examples/`](./schemas/v1.0.0/examples) | 28 curated real-world documents. Illustrative, not normative. | Mapped from a public aggregator API; see `BENCHMARK.md`. |
+| [`schemas/v1.0.0/examples/`](./schemas/v1.0.0/examples) | 30 curated real-world documents. Illustrative, not normative. | 28 mapped from a public aggregator API; 2 security bug bounties transcribed from their publishers' own pages. See `BENCHMARK.md`. |
 | Policy docs — [`PROCESS.md`](./PROCESS.md), [`NORMATIVE.md`](./NORMATIVE.md), [`CHANGELOG.md`](./CHANGELOG.md), [`STATUS.md`](./schemas/v1.0.0/STATUS.md), [`adr/`](../../adr) | Four Markdown files and a decision log. No tooling, highest credibility per hour of anything in this table. | Hand-written. |
 
 ---

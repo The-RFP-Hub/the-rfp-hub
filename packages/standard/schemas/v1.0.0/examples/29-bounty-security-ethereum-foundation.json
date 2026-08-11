@@ -1,0 +1,85 @@
+{
+  "specVersion": "1.0.0",
+  "id": "bugbounty:ethereum-foundation",
+  "fundingType": "bounty",
+  "title": "Ethereum Foundation Bug Bounty Program",
+  "description": "A standing bug bounty for the Ethereum protocol and its client implementations. In scope: the consensus and execution layer specifications; execution clients (Besu, Erigon, Geth, Nethermind, Reth); consensus clients (Lighthouse, Lodestar, Nimbus, Teku, Prysm, Grandine); the Solidity and Vyper compilers; the deposit contract; and critical dependencies including C-KZG-4844 and Go-KZG-4844.\n\nSeverity is scored against impact and likelihood, and every award is capped rather than fixed: the published figures are ceilings, not entitlements. \"Determinations of eligibility, score and all terms related to an award are at the sole and final discretion of the Ethereum Foundation bug bounty panel.\"\n\nRewards are denominated in USD and paid in ETH or DAI. Proof of identity is required for a monetary award; researchers who wish to remain anonymous may donate the reward to charity instead. The program has no end date.\n\nThe severity scale is the program's own, published on the source page alongside the scoring method.",
+  "summary": "Standing bug bounty for the Ethereum protocol, its clients and compilers, paying up to $1,000,000 for a critical finding.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Ethereum Foundation",
+      "slug": "ethereum-foundation",
+      "orgType": "foundation",
+      "website": "https://ethereum.org"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Ethereum Foundation",
+      "slug": "ethereum-foundation",
+      "orgType": "foundation",
+      "website": "https://ethereum.org"
+    }
+  ],
+  "source": {
+    "ingestedVia": "import",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Ethereum"
+  ],
+  "categories": [
+    "Security",
+    "Infrastructure"
+  ],
+  "eligibility": "Open to anyone. Proof of identity is required before a monetary award can be paid; researchers who prefer to stay anonymous may direct the award to a charity instead. Employees of the Ethereum Foundation are not eligible.",
+  "applicationUrl": "https://ethereum.org/bug-bounty/",
+  "website": "https://ethereum.org/bug-bounty/",
+  "fundingInfo": {
+    "currency": "USD",
+    "maxAward": 1000000
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "payout": {
+          "model": "up_to",
+          "max": 1000000
+        }
+      },
+      {
+        "severity": "high",
+        "payout": {
+          "model": "up_to",
+          "max": 50000
+        }
+      },
+      {
+        "severity": "medium",
+        "payout": {
+          "model": "up_to",
+          "max": 10000
+        }
+      },
+      {
+        "severity": "low",
+        "payout": {
+          "model": "up_to",
+          "max": 2000
+        }
+      }
+    ],
+    "severityScheme": "Ethereum Foundation bug bounty impact/likelihood scale",
+    "rewardPoolStatus": "unknown"
+  }
+}

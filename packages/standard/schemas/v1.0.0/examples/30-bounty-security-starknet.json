@@ -1,0 +1,111 @@
+{
+  "specVersion": "1.0.0",
+  "id": "bugbounty:starknet",
+  "fundingType": "bounty",
+  "title": "Starknet Bug Bounty Program",
+  "description": "A standing bug bounty covering the Starknet validity rollup: the chain itself, its smart contracts, and its web properties.\n\nThe reward table is graded on two axes. The same severity does not pay the same amount everywhere: a critical finding against the chain or its contracts pays a share of the funds it put at risk, floored and capped, while a critical finding against a website pays a flat band roughly twenty-five times smaller. That difference is the reason a tier row carries both a severity and an asset class.\n\nRewards are paid in USDC. KYC is required before payout. The program has no end date. No escrowed pool is published, so the advertised maximum is an intent to pay rather than a reserved amount.",
+  "summary": "Standing bug bounty for the Starknet rollup, graded by severity and by class of in-scope asset.",
+  "status": "open",
+  "sponsoringOrganizations": [
+    {
+      "name": "Starknet",
+      "slug": "starknet",
+      "orgType": "protocol"
+    }
+  ],
+  "operatingOrganizations": [
+    {
+      "name": "Starknet",
+      "slug": "starknet",
+      "orgType": "protocol"
+    }
+  ],
+  "source": {
+    "ingestedVia": "import",
+    "verifiedAgainstSource": null
+  },
+  "ecosystems": [
+    "Starknet",
+    "Ethereum"
+  ],
+  "categories": [
+    "Security",
+    "L1/L2"
+  ],
+  "eligibility": "KYC is required before a reward can be paid.",
+  "fundingInfo": {
+    "currency": "USDC",
+    "maxAward": 250000
+  },
+  "deadlines": [
+    {
+      "deadlineType": "rolling",
+      "label": "application"
+    }
+  ],
+  "fundingDetails": {
+    "fundingType": "bounty",
+    "bountyKind": "security",
+    "rewardTiers": [
+      {
+        "severity": "critical",
+        "assetType": "blockchain_dlt",
+        "payout": {
+          "model": "percentage",
+          "percent": 10,
+          "basis": "value_at_risk",
+          "floor": 15000,
+          "cap": 250000
+        }
+      },
+      {
+        "severity": "high",
+        "assetType": "blockchain_dlt",
+        "payout": {
+          "model": "fixed",
+          "amount": 10000
+        }
+      },
+      {
+        "severity": "medium",
+        "assetType": "blockchain_dlt",
+        "payout": {
+          "model": "fixed",
+          "amount": 2500
+        }
+      },
+      {
+        "severity": "critical",
+        "assetType": "smart_contract",
+        "payout": {
+          "model": "percentage",
+          "percent": 10,
+          "basis": "value_at_risk",
+          "floor": 15000,
+          "cap": 250000
+        }
+      },
+      {
+        "severity": "critical",
+        "assetType": "websites_and_applications",
+        "payout": {
+          "model": "range",
+          "min": 5000,
+          "max": 10000
+        }
+      },
+      {
+        "severity": "high",
+        "assetType": "websites_and_applications",
+        "payout": {
+          "model": "range",
+          "min": 1250,
+          "max": 2500
+        }
+      }
+    ],
+    "severityScheme": "Immunefi Vulnerability Severity Classification System v2.3",
+    "rewardPoolStatus": "unfunded",
+    "platform": "Immunefi"
+  }
+}

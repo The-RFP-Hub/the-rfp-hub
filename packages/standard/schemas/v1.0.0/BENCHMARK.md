@@ -7,11 +7,33 @@ funding aggregator's public API, plus a ranked benchmark set for schema/CLI test
 measurement, not a rule.
 
 > ⚠️ **Two measurements, two shapes.** The 311-entry pull below was run against an earlier
-> draft of the schema and has **not** been re-run. The 28 committed example documents **have**
+> draft of the schema and has **not** been re-run. The 30 committed example documents **have**
 > been converted through each draft revision and re-validated after each conversion. Read the
 > corpus-wide numbers as evidence about the data model, and the fixture numbers as evidence
 > about the current schema. See the
 > [field mapping tables](../../CHANGELOG.md#field-mapping-old--new).
+
+## A second source, for the security bounties
+
+The 311-entry pull above is a single aggregator's public API, and it contains **no open-ended
+security bug bounty**: that whole category sits on dedicated platforms the aggregator does not
+index. Two fixtures were therefore transcribed from their publishers' own pages rather than
+mapped from the corpus —
+[`29-bounty-security-ethereum-foundation.json`](./examples/29-bounty-security-ethereum-foundation.json)
+and [`30-bounty-security-starknet.json`](./examples/30-bounty-security-starknet.json).
+
+They were chosen to cover the two shapes the type has to hold: a program grading on **severity
+alone**, every tier a ceiling rather than a fixed figure, with awards at a panel's stated
+discretion; and a program grading on **severity and asset class together**, where a critical
+finding against the chain pays a share of the funds at risk between a floor and a cap, while a
+critical finding against a website pays a flat band roughly twenty-five times smaller. The
+second shape is the argument for the asset axis existing at all.
+
+Worth recording because it bears on coverage rather than on the schema: the Ethereum
+Foundation's own bug bounty is absent from the major aggregating platforms — checked against
+this corpus, against a second platform's public API, and against a third's 321-program listing,
+and it appears in none of them. Fragmentation in this category is not a long tail; it reaches
+the ecosystem's own flagship program.
 
 ## Result
 
@@ -19,7 +41,7 @@ measurement, not a rule.
 |---|---|---|
 | Unique entries pulled | **311** | pre-re-cut shape |
 | Mapped to source-neutral examples + validated | **289 / 289 valid (0 failures)** | pre-re-cut shape |
-| Curated benchmark fixtures | **28** (in [`examples/`](./examples)) | **current shape (2026-08-05 third revision) — 28/28 valid** |
+| Curated benchmark fixtures | **30** (in [`examples/`](./examples)) | **current shape (2026-08-11 fourth revision) — 30/30 valid** |
 | Funding types covered by fixtures | grant, hackathon, bounty, accelerator, rfp | — |
 
 289 of the 311 pulled entries mapped to public-source, source-neutral examples and all validated
@@ -27,7 +49,7 @@ with 0 failures — evidence that the data model is faithful to a real funding c
 remaining ~22 were set aside for lacking a public original-posting URL or to keep the sample free
 of any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace.
 
-The **28 committed fixtures are the live claim**: they were converted field-by-field through
+The **30 committed fixtures are the live claim**: they were converted field-by-field through
 each draft revision, and all 28 validate against the
 current [`opportunity.schema.json`](./opportunity.schema.json). The conversion is not
 purely mechanical and the claim should be read with that in mind: organisation `slug`s are
@@ -37,7 +59,7 @@ a pure script rewrite and lossless (see below).
 
 ```bash
 npx rfphub-validate packages/standard/schemas/v1.0.0/examples
-# 28 passed, 0 failed
+# 30 passed, 0 failed
 ```
 
 ## What the three conversions did to these 28 documents
@@ -134,7 +156,7 @@ standard, and neither is normative.
 
 ## Benchmark fixture set
 
-The 28 fixtures in [`examples/`](./examples) are the top entries by fill, with type diversity
+28 of the fixtures in [`examples/`](./examples) are the top entries by fill, with type diversity
 injected (≥1 of each available type): **19 hackathon, 6 grant, 1 bounty, 1 accelerator, 1 rfp**.
 They serve as (a) the real-data validation corpus, (b) golden inputs for the `rfphub-validate`
 CLI, and (c) realistic seed candidates for the public dataset. They are **examples, not
