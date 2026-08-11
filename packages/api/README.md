@@ -54,7 +54,7 @@ The API is pre-adoption, so the re-cut renames are applied without a back-compat
 docker compose up -d                     # Postgres 15 (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
-pnpm --filter @the-rfp-hub/api seed test/fixtures/seed-corpus.json --strict   # 143 entries, offline
+pnpm --filter @the-rfp-hub/api seed test/fixtures/seed-corpus.json --strict   # 140 entries, offline
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
 ```
@@ -120,7 +120,7 @@ pnpm --filter @the-rfp-hub/api seed test/fixtures/seed-corpus.json --strict
 
 The loader is deliberately the boring half: same file in, same rows out, on any machine with a
 database and no credentials. That is what lets CI prove on every PR that a clean checkout seeds
-143 valid entries with nothing rejected. `SOURCE_API_URL` is read by step 1 only, straight from
+140 valid entries with nothing rejected. `SOURCE_API_URL` is read by step 1 only, straight from
 the environment, and no value for it is ever committed.
 
 The provenance namespace (`fundingmap` in `fundingmap:1459`, and the `source_system` column) is
@@ -135,8 +135,8 @@ A program that publishes no URL of its own gets **no `applicationUrl`**. The map
 fall back to the program's listing page on the platform the record was ingested from: that page is
 not the program's application URL, and putting it in the field consumers read as "apply here" is a
 fabrication of the same kind as inventing an organisation from a program title. In the committed
-corpus, 13 of 143 records (9%) have no `applicationUrl` as a result; `applicationUrl` is optional
-in the Standard, so all 143 still validate.
+corpus, 5 of 140 records (4%) have no `applicationUrl` as a result; `applicationUrl` is optional
+in the Standard, so all 140 still validate.
 
 ## Architecture
 
@@ -155,7 +155,7 @@ registration lives in `routes/<module>/index.ts`.
   rejection with its id and the rules it broke — a rejected record is never silently subtracted
   from a count. `--strict` (or `SEED_STRICT=1`) turns any rejection into a failed run; it is off by
   default because a corpus is a recording of a third-party feed, so one malformed program should
-  not block a 143-record seed. CI runs it on, against the committed corpus.
+  not block a 140-record seed. CI runs it on, against the committed corpus.
 
 ## Tests
 

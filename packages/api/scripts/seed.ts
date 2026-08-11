@@ -21,7 +21,7 @@
  * Nothing is written until the whole batch has been mapped, validated AND counted: the >=100 floor
  * is asserted BEFORE the first upsert, so a short or broken run fails with the database untouched
  * rather than leaving a partial approved+listed dataset live behind it. The write phase itself runs
- * inside ONE transaction, so a failure at record 57 of 143 (connection reset, statement timeout, a
+ * inside ONE transaction, so a failure at record 57 of 140 (connection reset, statement timeout, a
  * unique-constraint collision in the organizations directory) rolls the whole batch back instead of
  * publishing a half-updated mix of this run's and the previous run's rows.
  *
@@ -130,7 +130,7 @@ export function reportRejections(rejected: readonly RejectedRecord[]): void {
 /**
  * With `--strict` (or SEED_STRICT=1), a single non-conforming record fails the whole run. Off by
  * default because a corpus is a recording of a third-party feed we do not control: one malformed
- * program should not block a 143-record seed. On in CI against the committed corpus, where it
+ * program should not block a 140-record seed. On in CI against the committed corpus, where it
  * should — that file cannot change without a reviewed commit.
  */
 export function assertNoRejections(rejected: readonly RejectedRecord[], strict: boolean): void {
