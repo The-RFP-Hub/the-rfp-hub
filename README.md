@@ -88,6 +88,23 @@ pnpm typecheck
 pnpm lint           # biome
 ```
 
+## Verifying a deployment
+
+The milestone's completion criteria are checkable rather than assertable. `scripts/check-m2.mjs`
+runs them against a live deployment — health and TLS, every operation in the *published* OpenAPI
+document executed against the *live* service (including the strict-`400` negative contract), every
+served document validated against the Standard, and the CC0 export's freshness and
+`latest.json`/`latest.csv` pair invariant:
+
+```bash
+pnpm check:m2 --base-url https://api.example.org --export-url https://data.example.org
+```
+
+Pass/fail per criterion on stdout, a JSON report alongside, non-zero exit on any failure. Nothing
+about a particular host or dataset is baked in. Run it by hand, or from any external runner, against
+whichever deployment you want an answer about. See
+[`scripts/m2-compliance/README.md`](./scripts/m2-compliance/README.md).
+
 ## Using the API
 
 Runnable client examples — curl, TypeScript (zero-dependency `fetch`), and Python

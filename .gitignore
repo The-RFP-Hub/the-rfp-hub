@@ -10,3 +10,6 @@ coverage/
 .env
 .env.local
 packages/api/exports/
+
+# report written by scripts/check-m2.mjs (a record of one run against one deployment)
+m2-compliance-report.json
