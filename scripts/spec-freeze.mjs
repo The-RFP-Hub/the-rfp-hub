@@ -60,7 +60,8 @@
 // Usage:  node scripts/spec-freeze.mjs <BASE_SHA> <HEAD_SHA>
 // See packages/standard/PROCESS.md, packages/standard/NORMATIVE.md, adr/0001 and adr/0007.
 import { execFileSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 /** The package the standard lives in. Every path below is relative to the repository root. */
 export const STANDARD = "packages/standard";
@@ -603,6 +604,16 @@ export function main(argv) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Both sides are resolved through realpath before they are compared. `import.meta.url` is ALWAYS
+// the resolved path; `process.argv[1]` is whatever the caller typed. Compare them raw and a run
+// through a symlink — `/tmp` -> `/private/tmp` on macOS, any symlinked `$RUNNER_TEMP`, a symlinked
+// checkout — makes them differ, `main()` never runs, and the gate exits 0 having graded nothing.
+// A gate whose failure mode is a silent pass is worse than no gate, and the workflow's own recipe
+// (`git show BASE:… > "$RUNNER_TEMP/base-gate/spec-freeze.mjs"; node "$gate" …`) is exactly that
+// shape. `scripts/spec-freeze.test.mjs` runs the gate through a symlinked directory to pin this.
+if (
+  process.argv[1] &&
+  realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+) {
   process.exitCode = main(process.argv.slice(2));
 }

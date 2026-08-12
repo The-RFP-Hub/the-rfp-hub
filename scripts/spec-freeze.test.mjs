@@ -9,8 +9,17 @@
  *
  * `evaluate()` takes its repository as a parameter, so these run against an in-memory tree in
  * microseconds and need no clone, no fixtures on disk and no network.
+ *
+ * The one exception is the last block: a gate that grades correctly in-process is worthless if the
+ * COMMAND the workflow runs never reaches `main()`. That block spends a real clone and two real
+ * child processes to pin the entrypoint, because that failure mode is a silent pass.
  */
-import { describe, expect, it } from "vitest";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   STANDARD,
   adoptionRule,
@@ -559,5 +568,95 @@ describe("once a version is frozen at the base ref", () => {
     const result = run(frozenTree(), frozenTree());
     expect(result.ok).toBe(true);
     expect(result.notes).toEqual(["no normative spec artifact touched"]);
+  });
+});
+
+// ------------------------------------------------------- the command the workflow runs ---
+
+/**
+ * Everything above drives `evaluate()` in-process. That proves the RULES, and proves nothing about
+ * the COMMAND: the workflow runs `node "$gate" "$BASE_SHA" "$HEAD_SHA"`, where `$gate` is a path it
+ * has just written into a temporary directory. Temporary roots are routinely symlinks — `/tmp` ->
+ * `/private/tmp` and `os.tmpdir()`'s `/var` -> `/private/var` on macOS, and any checkout reached
+ * through one. The entrypoint guard has to compare two REALPATHS, because `import.meta.url` is
+ * always resolved and `process.argv[1]` never is; comparing them raw made a symlinked invocation
+ * skip `main()` entirely and exit 0 without printing a line. A gate whose failure mode is a SILENT
+ * PASS grades nothing while looking green, so these two cases spend a real clone and real child
+ * processes to pin that the gate both runs and speaks.
+ */
+describe("the gate as the workflow invokes it — a path, possibly a symlinked one", () => {
+  const root = mkdtempSync(join(tmpdir(), "spec-freeze-entrypoint-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  const repo = join(root, "repo");
+  const git = (...args) => execFileSync("git", args, { cwd: repo, encoding: "utf8" });
+  const writeTree = (tree) => {
+    for (const [path, text] of Object.entries(tree)) {
+      const file = join(repo, path);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, text);
+    }
+  };
+  const commit = (message) => {
+    git("add", "-A");
+    git("commit", "-q", "--no-verify", "-m", message);
+    return git("rev-parse", "HEAD").trim();
+  };
+
+  mkdirSync(repo, { recursive: true });
+  git("init", "-q");
+  git("config", "user.email", "gate@example.invalid");
+  git("config", "user.name", "freeze gate test");
+  git("config", "commit.gpgsign", "false");
+  git("config", "core.hooksPath", join(root, "no-hooks"));
+
+  // Base: v1.0.0 published and FROZEN. Head: the enum widened inside it — the plainest violation.
+  writeTree(frozenTree());
+  const base = commit("v1.0.0 frozen");
+  writeTree({ [s("schemas/v1.0.0/opportunity.schema.json")]: schemaDoc(NEW_BASE, ["paused"]) });
+  const head = commit("widen the frozen status enum");
+
+  // Exactly the workflow's recipe: the gate is COPIED to a temp path and run from there, once
+  // through the real directory and once through a symlink to it.
+  const realDir = join(root, "base-gate");
+  const linkDir = join(root, "base-gate-symlink");
+  mkdirSync(realDir, { recursive: true });
+  copyFileSync(
+    fileURLToPath(new URL("./spec-freeze.mjs", import.meta.url)),
+    join(realDir, "spec-freeze.mjs"),
+  );
+  symlinkSync(realDir, linkDir, "dir");
+
+  const invoke = (dir, ...args) =>
+    spawnSync(process.execPath, [join(dir, "spec-freeze.mjs"), ...args], {
+      cwd: repo,
+      encoding: "utf8",
+    });
+
+  it("rejects a frozen-artifact edit when it is reached through a symlinked directory", () => {
+    const real = invoke(realDir, base, head);
+    const linked = invoke(linkDir, base, head);
+
+    // Non-zero AND a diagnostic naming the violation: the defect was exit 0 with nothing said.
+    // `main()` reports violations and FAILURE_MESSAGE on stderr, so stdout alone can be empty.
+    expect(linked.status).toBe(1);
+    expect(linked.stderr).toContain("v1.0.0 is FROZEN");
+    expect(`${linked.stdout}${linked.stderr}`.trim()).not.toBe("");
+    // And it grades identically either way — the path a caller typed is not part of the rule.
+    expect(linked.status).toBe(real.status);
+    expect(linked.stderr).toBe(real.stderr);
+  });
+
+  it("still speaks when it passes, so a silent exit 0 can never be mistaken for a green run", () => {
+    const linked = invoke(linkDir, base, base);
+    expect(linked.status).toBe(0);
+    expect(linked.stdout).toContain("no normative spec artifact touched");
+    expect(linked.stdout).toContain("no frozen spec artifact was modified");
+  });
+
+  it("prints usage rather than passing silently when it is invoked without revisions", () => {
+    const linked = invoke(linkDir);
+    expect(linked.status).toBe(2);
+    expect(linked.stderr).toContain("usage: node scripts/spec-freeze.mjs");
   });
 });
