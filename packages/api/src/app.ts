@@ -74,8 +74,18 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         "/v1/opportunities",
         "/v1/opportunities/:id",
         "/v1/opportunities/schema",
+        "/v1/feeds/opportunities.atom",
+        "/v1/feeds/opportunities.rss",
         "/v1/stats",
         "/v1/health",
+      ],
+      // Feed autodiscovery. There is no HTML page here to carry the usual
+      // `<link rel="alternate" type="application/atom+xml">`, so the service-info document is what
+      // an agent (or a human pointing a reader at the API root) reads instead — same three facts a
+      // discovery link carries: relation, media type, href.
+      feeds: [
+        { rel: "alternate", type: "application/atom+xml", href: "/v1/feeds/opportunities.atom" },
+        { rel: "alternate", type: "application/rss+xml", href: "/v1/feeds/opportunities.rss" },
       ],
     }),
   );

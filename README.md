@@ -119,6 +119,11 @@ That step covers the TypeScript client only: it makes no request, does not read 
 examples, and resolves the standard from the registry, so it catches a *published* release that
 breaks a consumer, not a change to `packages/standard` in this repo.
 
+Two syndication feeds — `/v1/feeds/opportunities.atom` (Atom 1.0) and
+`/v1/feeds/opportunities.rss` (RSS 2.0) — publish the most recent opportunities for any reader or
+bot that would rather subscribe than poll JSON; both are `ETag`-validated, so a poller that sends
+`If-None-Match` gets a `304`. See [`packages/api/README.md`](./packages/api/README.md#feeds-atom-10-and-rss-20).
+
 The API's list query contract is strict — an undefined parameter or an out-of-enum value is a
 `400`, never a silently unfiltered `200` — so the examples show a typo failing loudly.
 
