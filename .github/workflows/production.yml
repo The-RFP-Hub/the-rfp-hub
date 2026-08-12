@@ -1,0 +1,164 @@
+on:
+  push:
+    tags:
+      - 'prod-*'
+  workflow_dispatch:
+
+name: Production RFP Hub API
+
+# Mirrors staging.yml — pulls `.env` from `production/rfp-hub`,
+# bakes into the image, deploys to the production ECS cluster.
+# Triggers ONLY on `prod-*` tags or manual dispatch (no auto-deploy
+# on push to main) so production releases are explicit.
+
+env:
+  ECS_CLUSTER: karma-production
+  ECR_REPOSITORY_MAIN: production-rfp-hub
+  ECS_CONTAINER: rfp-hub-production
+
+jobs:
+  build_image:
+    name: Build docker image
+    if: |
+      !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@master
+        with:
+          install: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PRODUCTION_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Get .env from Secret Manager
+        run: |
+          aws secretsmanager get-secret-value --secret-id production/rfp-hub --query SecretString --output text >> .env
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-prod-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-prod
+
+      - name: Build image
+        id: build-image
+        uses: docker/build-push-action@v5
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY_MAIN }}
+          IMAGE_TAG: ${{ github.sha }}
+        with:
+          context: .
+          builder: ${{ steps.buildx.outputs.name }}
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_MAIN }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_MAIN }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
+
+      - name: Move cache
+        run: |
+          if [ -d /tmp/.buildx-cache-new ]; then
+            rm -rf /tmp/.buildx-cache
+            mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          else
+            echo "No new Buildx cache generated; skipping cache move."
+          fi
+
+      - name: Discord notification
+        uses: sarisia/actions-status-discord@v1
+        if: failure()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+
+  deploy-ecs-service:
+    name: Deploy ECS service
+    needs: [build_image]
+    if: |
+      !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PRODUCTION_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Download task definition
+        id: download-task
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY_MAIN }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws ecs describe-task-definition --task-definition ${{ env.ECS_CONTAINER }} --query taskDefinition > task-definition.json
+          echo "revision=$(cat task-definition.json | jq .revision)" >> "$GITHUB_OUTPUT"
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECS_CONTAINER }}
+          image: ${{ steps.download-task.outputs.image }}
+
+      - name: Deploy Amazon ECS task definition and service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_CONTAINER }}-service
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deregister previous revision
+        run: |
+          aws ecs deregister-task-definition --task-definition ${{ env.ECS_CONTAINER }}:${{ steps.download-task.outputs.revision }} >> /dev/null
+
+      - name: Discord notification
+        uses: sarisia/actions-status-discord@v1
+        if: failure()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+
+  notification:
+    needs: [build_image, deploy-ecs-service]
+    if: |
+      !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Discord success notification
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          title: 'Production RFP Hub API deployed'
+          description: 'Image: ${{ needs.build_image.outputs.image }}'
