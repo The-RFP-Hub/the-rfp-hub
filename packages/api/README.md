@@ -103,8 +103,11 @@ pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./e
 ### Configuration
 
 Config is read from the environment (see `.env-example`) — everything is optional in development
-(localhost defaults), and this table is the whole surface: every key `src/config.ts` and
-`scripts/*.ts` read, and no others.
+(localhost defaults). This table is the deployment/runtime surface: every server key read by
+`src/config.ts`, plus the exporter's `EXPORT_MIN_COUNT`. Seed and converter controls are
+maintainer tooling documented with their commands: `SEED_STRICT` under
+[Seeding](#seeding-a-static-in-repo-corpus), and `SOURCE_API_URL`/`SOURCE_BRAND`/`CORPUS_SIZE`
+under [the converter's README](./tools/converter/README.md).
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -116,9 +119,10 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). |
 | `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 
-The seed is deliberately absent from that table: it is not configured through the environment at
-all — it takes a corpus file as its argument. Nothing in `src/` or `scripts/` reads a pointer at
-any upstream; the one variable that does is read by offline tooling and documented with it, under
+The seed is deliberately absent from that table: its corpus is an argument, not an environment
+pointer. The one variable it reads, `SEED_STRICT=1`, only mirrors the `--strict` flag. Nothing in
+`src/` or `scripts/` reads a pointer at any upstream; the one variable that does is read by
+offline tooling and documented with it, under
 [the converter's README](./tools/converter/README.md), rather than as a deployment variable.
 
 ### Process behaviour
@@ -147,8 +151,9 @@ public id) to `./exports` under **CC0-1.0**. Every run writes **six** files, in 
 
 The order is deliberate. The **sidecar goes first**, so no data file is ever readable without its
 rights notice beside it (its content is constant, so re-writing it each run is idempotent). The
-**aliases go after the archive they alias**, so a run that dies part-way leaves `latest.*` naming
-the last *complete* dataset rather than a half-written one. The **manifest goes last and alone**,
+**aliases go after the archive they alias**, so a run that dies part-way leaves each `latest.*`
+name pointing at a *complete* dataset rather than a half-written one — though not necessarily at
+the same run; see [The alias pair](#the-alias-pair). The **manifest goes last and alone**,
 because its single rename is the instant the run becomes published. Nothing makes six files land
 atomically, so when a write does fail the error names which files were written and which one was
 not, and no `dataset_snapshots` row is recorded for that run.
@@ -467,7 +472,10 @@ docker compose -f docker-compose.test.yml down
 
 Cloud deploy; publishing the export to a public bucket and running it on a schedule (both belong
 with the deployment — no bucket is provisioned, so the export writes locally and `pnpm export` is
-the whole of it here); full OpenAPI live-spec test suite; DAOIP-5 `grantPools` export adapter. The
-write API, auth, verification, dedup, and analytics are M3+ (see `docs/data-model.md`).
+the whole of it here); wiring the live-spec OpenAPI compliance run into an automated suite (the
+checks themselves already exist, script-only, as `pnpm check:m2` — see
+[Verifying a deployment](../../README.md#verifying-a-deployment)); DAOIP-5 `grantPools` export
+adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
+`docs/data-model.md`).
 
 Runnable curl/TypeScript/Python client examples now live in [`examples/`](../../examples).
