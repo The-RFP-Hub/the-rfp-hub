@@ -102,8 +102,13 @@ pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./e
 
 ### Configuration
 
-Config is read from the environment (see `.env-example`) — everything is optional in development
-(localhost defaults). This table is the deployment/runtime surface: every server key read by
+Config is read from the process environment only (see `.env-example`) — everything is optional in
+development (localhost defaults). No `.env` file is loaded: there is no dotenv dependency and no
+`--env-file` flag anywhere in this repo, so `.env-example` is a reference list, not a file that
+takes effect — `export` the variables (or `set -a; . ./.env; set +a`) before running a command, or
+the built-in defaults apply and say so on stderr.
+
+This table is the deployment/runtime surface: every server key read by
 `src/config.ts`, plus the exporter's `EXPORT_MIN_COUNT`. Seed and converter controls are
 maintainer tooling documented with their commands: `SEED_STRICT` under
 [Seeding](#seeding-a-static-in-repo-corpus), and `SOURCE_API_URL`/`SOURCE_BRAND`/`CORPUS_SIZE`
