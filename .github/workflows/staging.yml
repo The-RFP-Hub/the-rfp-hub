@@ -8,16 +8,21 @@ on:
 
 name: Staging RFP Hub API
 
-# Mirrors karma-oauth/.github/workflows/staging.yml: pull `.env` from
-# AWS Secrets Manager into the build context, bake it into the Docker
+# Mirrors our standard staging deploy shape: pull `.env` from AWS
+# Secrets Manager into the build context, bake it into the Docker
 # image, push to ECR, then update the ECS task definition and service.
 #
 # No DB migration job — Drizzle migrations (`pnpm migrate` in
 # packages/api) are a manual operator step against the staging RDS,
 # not a per-deploy task.
 
+# The cluster name is deployment-environment detail rather than anything
+# this public repo describes, so it comes from a repository variable
+# (Settings → Secrets and variables → Actions → Variables) instead of
+# being written here. The ECR repository and container names below are
+# what this project publishes under, and stay literal.
 env:
-  ECS_CLUSTER: karma-staging
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER_STAGING }}
   ECR_REPOSITORY_MAIN: staging-rfp-hub
   ECS_CONTAINER: rfp-hub-staging
 
@@ -30,6 +35,18 @@ jobs:
     outputs:
       image: ${{ steps.build-image.outputs.image }}
     steps:
+      # An unset repository variable expands to the empty string, and an empty
+      # `cluster` makes the ECS deploy action fall back to the account's `default`
+      # cluster — a deploy that reports success against the wrong place. Checked in
+      # this job too, so a missing variable costs nothing rather than an image built
+      # and pushed that then has nowhere to go.
+      - name: Check required repository variables
+        run: |
+          if [ -z "${ECS_CLUSTER:-}" ]; then
+            echo "::error::ECS_CLUSTER_STAGING repository variable is not configured. Set it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -107,6 +124,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # Re-checked here rather than trusted from the build job: this job is the one
+      # that passes `cluster` to the deploy action, and it can be re-run on its own.
+      - name: Check required repository variables
+        run: |
+          if [ -z "${ECS_CLUSTER:-}" ]; then
+            echo "::error::ECS_CLUSTER_STAGING repository variable is not configured. Set it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
