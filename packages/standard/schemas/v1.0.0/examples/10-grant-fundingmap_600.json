@@ -49,7 +49,6 @@
   ],
   "fundingInfo": {
     "budget": 160000,
-    "allocated": 1129670,
     "minAward": 2000,
     "maxAward": 25000
   },

@@ -166,6 +166,28 @@ conformance cases** — the pass/fail rule documents live in
 application deadline, 2026-06-30, has since passed: fixtures are a snapshot of the original
 pull, not live state, so a stale `status`/deadline pair here is expected rather than an error.)
 
+**One figure was removed rather than refreshed.**
+[`10-grant-fundingmap_600.json`](./examples/10-grant-fundingmap_600.json) (Prezenti Mint Round,
+`fundingmap:600`) carried `fundingInfo.allocated: 1129670`. Re-read on 2026-08-12, the round
+announcement — forum.celo.org topic 9139 — states $1.2M cUSD across 70+ grants as Prezenti's
+**cumulative track record before this round opened**, immediately ahead of "APPLICATIONS ARE NOW
+OPEN UNTIL 15th November 2024". It is not this round's committed amount, and nothing in the
+announcement is. The tell is in the document itself: `allocated` sat at **7×** the `budget`
+beside it, and this schema derives "remaining" as `budget` minus `allocated`
+([`opportunity.schema.json`](./opportunity.schema.json), `$defs/funding`), so the fixture
+published a program 969,670 over an envelope it had never spent.
+
+Being a snapshot excuses a stale value; it does not excuse a wrong one. The figure is therefore
+**absent rather than replaced**, which is the standing evidence-or-absence rule: where a figure
+cannot be re-evidenced it is removed and the removal is recorded, because substituting a
+plausible number would fabricate provenance the funder never published. The fixture keeps the
+three tier sizes the announcement *does* publish, as `minAward` 2000 / `maxAward` 25000.
+
+This is a correction to converted data, not a schema change — `allocated` is optional and
+carries no cross-field constraint, so the document still validates and the fixture count and
+30/30 result above are unaffected. The fill score of 35 in the table below is, like every score
+there, "as measured on the pre-re-cut shape at pull time" and is not restated.
+
 ### Top 15 by FILL (most complete entries, original pull)
 
 | # | Fill | Activity | Type | Status | Name | id |
