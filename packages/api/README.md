@@ -40,8 +40,8 @@ no version, including the `/v1/opportunities/schema` alias, is `public, max-age=
 must-revalidate`. No `Last-Modified`: the only timestamp available is the build's, and it changes
 for bytes that did not.
 
-These resolve once DNS for `ethrfps.app` is delegated and the apex is routed to this service **for
-these five paths**. Spec resolution therefore rides this service's uptime for now; the recorded end
+These resolve once the apex is routed to this service **for these five paths** — `ethrfps.app` is
+registered and delegated already, but it points at registrar URL forwarding rather than here. Spec resolution therefore rides this service's uptime for now; the recorded end
 state is the package directory on object storage behind a CDN, which retires these five routes
 without any identifier changing.
 

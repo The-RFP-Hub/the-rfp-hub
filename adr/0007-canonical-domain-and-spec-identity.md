@@ -343,8 +343,10 @@ schedule.
 > depends on resolution, and the freeze makes it safe: the bytes can never change, so a CDN cache
 > with an unbounded TTL is correct.
 
-Until DNS for `ethrfps.app` is delegated, **nothing resolves**, and `STATUS.md` says so rather
-than claiming a resolution that does not exist.
+Until the apex is routed to this service, **nothing resolves**: `ethrfps.app` is registered and
+delegated, but it points at registrar URL forwarding, so `https://` does not answer and `http://`
+redirects to a parking page. `STATUS.md` says so rather than claiming a resolution that does not
+exist.
 
 ## Consequences
 
@@ -374,9 +376,10 @@ than claiming a resolution that does not exist.
 
 ## Follow-ups
 
-- **DNS is not done and only a human can do it.** Delegate `ethrfps.app`, front the apex, issue
-  the `*.ethrfps.app` wildcard, and route `api.` to the API. Until then every URL in this ADR is
-  correct and unreachable. **The apex rule is path-scoped**, per the serving table above — it
+- **The routing is not done and only a human can do it.** `ethrfps.app` is already registered and
+  delegated — it answers today with registrar URL forwarding to a parking page — so what remains is
+  to front the apex, issue the `*.ethrfps.app` wildcard, and route `api.` to the API. Until then
+  every URL in this ADR is correct and unreachable. **The apex rule is path-scoped**, per the serving table above — it
   forwards `/schemas/*`, `/meta/*` and `/registries/*` and nothing else; an unscoped apex rule
   publishes the whole API at the identifier authority and is the one routing mistake this
   decision cannot absorb.

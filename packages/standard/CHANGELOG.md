@@ -36,9 +36,11 @@ in order to validate. **What breaks is string equality:** a consumer that hard-c
 mismatch. Both strings were published as PROVISIONAL, in the artifacts themselves and in
 `STATUS.md`, with this swap named as the pending event.
 
-The identifiers **do not resolve over HTTP yet** — DNS for `ethrfps.app` is not delegated. The
-serving path exists (see Tooling); what remains is operational, and `STATUS.md` says so rather
-than claiming resolution that does not exist.
+The identifiers **do not resolve to these documents yet** — `ethrfps.app` is registered and
+delegated, but it points at registrar URL forwarding rather than at this service: `https://` does
+not answer, and `http://` redirects to a parking page. The serving path exists (see Tooling); what
+remains is routing the apex at it, and `STATUS.md` says so rather than claiming resolution that
+does not exist.
 
 ### Schema
 

@@ -82,9 +82,12 @@ is what made the swap impossible to do halfway. With `v1.0.0` now frozen, the fr
 rejects further identity edits; `identityStatus: "canonical"` in `spec.config.json` records that
 the one-time provisional→canonical adoption has been spent.
 
-**What is not true yet:** the identifiers do not resolve over HTTP until DNS for `ethrfps.app`
-is delegated. The serving path exists — the API serves every canonical document at its canonical
-path (see the two rows promoted to *Shipped* above) — so what remains is operational.
+**What is not true yet:** the identifiers do not resolve to these documents until the apex is
+routed to this service. `ethrfps.app` is registered and delegated, but it currently points at
+registrar URL forwarding: `https://` does not answer and `http://` redirects to a parking page, so
+a dereference gets a connection failure or a parking page's HTML, never one of these documents.
+The serving path exists — the API serves every canonical document at its canonical path (see the
+two rows promoted to *Shipped* above) — so what remains is operational.
 
 ---
 

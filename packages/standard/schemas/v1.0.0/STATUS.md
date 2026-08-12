@@ -124,15 +124,18 @@ change is a version bump regardless of maturity.
     by the context *document*, never by the term, so the namespace carries neither a version nor
     a maturity segment. The `draft` segment the provisional IRI used to carry is gone with the
     maturity it mirrored.
-  - **What is not true yet:** these URLs **do not resolve over HTTP today.** DNS for
-    `ethrfps.app` is not delegated, and until it is, a consumer that dereferences an `$id` or an
-    advertised `@context` gets a name-resolution failure — not a redirect, not a stale document.
+  - **What is not true yet:** these URLs **do not resolve to these documents today.**
+    `ethrfps.app` is registered and delegated, but it currently points at registrar URL
+    forwarding rather than at this service, and nothing answers on `https://`: a consumer that
+    dereferences an `$id` or an advertised `@context` gets a connection failure over `https://`
+    — the form a browser is forced onto, `.app` being HSTS-preloaded — and, over plain `http://`,
+    a redirect to a parking page. Either way it is never one of these documents, and a client
+    that follows the redirect gets HTML rather than the hard failure this note used to promise.
     Nothing in this package depends on resolution: the schema is self-contained (local
     `#/$defs` pointers only), the context ships beside it, and `rfphub-validate` reads both from
-    disk. Resolution goes live when two things land together: DNS delegation for the apex, and
-    the serving path — the API already serves every canonical document at its canonical path
-    (`packages/api`, see [`ARTIFACTS.md`](../../ARTIFACTS.md)), so the remaining work is
-    operational, not editorial.
+    disk. Resolution goes live when the apex is routed to the serving path the API already
+    implements — it serves every canonical document at its canonical path (`packages/api`, see
+    [`ARTIFACTS.md`](../../ARTIFACTS.md)), so the remaining work is operational, not editorial.
   - **The identifiers cannot be swapped again.** They were provisional exactly once, by design;
     the one-time provisional→canonical adoption is recorded in
     [`adr/0007`](../../../../adr/0007-canonical-domain-and-spec-identity.md), machine-recorded as
