@@ -18,7 +18,10 @@
  *   base URL is the API's published identity and this API deliberately never derives it from the
  *   request's `Host` header (see `config.ts`), so with nothing configured there is no absolute URL
  *   to mint and a URN is the honest fallback: still an absolute IRI, still stable, just not
- *   dereferenceable. Entry LINKS degrade the same way, to a site-relative path.
+ *   dereferenceable. LINKS degrade the same way — to a site-relative path in Atom, which RFC 4287
+ *   permits in `link/@href`, and to the same URN forms in RSS, whose specification requires every
+ *   URL-valued element (including the channel's required `<link>`) to begin with an
+ *   IANA-registered URI scheme, so a relative path there would not be a conformant document.
  *
  * That fallback exists for local development. Moving between the two forms CHANGES entry identity
  * — every subscriber would see the whole feed as new once — so a deployment must set
@@ -47,14 +50,17 @@ export interface FeedEntry {
   author?: string;
 }
 
-export interface FeedIdentityOptions {
+interface FeedBaseOptions {
   /** `PUBLIC_BASE_URL` verbatim: an absolute origin with no trailing slash, or `/` when unset. */
   publicBaseUrl: string;
+}
+
+export interface FeedIdentityOptions extends FeedBaseOptions {
   /** Used only when a record carries no timestamp at all (the columns are NOT NULL, so: never). */
   now: Date;
 }
 
-export interface FeedDocumentOptions extends FeedIdentityOptions {
+export interface FeedDocumentOptions extends FeedBaseOptions {
   /** Path of the feed being rendered, e.g. `/v1/feeds/opportunities.atom`. */
   selfPath: string;
 }
@@ -177,17 +183,30 @@ export function rfc822(date: Date): string {
 }
 
 /**
- * The document's own timestamp: the newest entry in it. Derived rather than "now", so the same
- * data always serializes to the same bytes — which is what makes the routes' content-derived
- * `ETag` stable across replicas and repeated polls. An EMPTY feed has nothing to derive from and
- * falls back to the caller's clock; both formats require the field.
+ * The document timestamp of an EMPTY feed: the Unix epoch, a CONSTANT rather than the clock.
+ *
+ * An empty feed has no entry to derive a timestamp from, and both formats want the field. Taking
+ * the clock there would make the one case a poller hits hardest — no matches for a `?status=`
+ * filter, a filtered slice, a fresh deployment — serialize to different bytes on every request,
+ * defeating the content-derived `ETag` exactly where a `304` saves the most work. The epoch is not
+ * a claim about when anything happened; it is the documented sentinel for "this document has
+ * nothing in it to date", and it is what makes the ETag of an empty feed stable across polls,
+ * replicas and restarts like every other feed's.
  */
-function documentUpdated(entries: FeedEntry[], now: Date): Date {
+export const EMPTY_FEED_UPDATED = new Date(0);
+
+/**
+ * The document's own timestamp: the newest entry in it, or `EMPTY_FEED_UPDATED` when there is no
+ * entry at all. Derived rather than taken from the clock, so the same data always serializes to
+ * the same bytes — which is what makes the routes' content-derived `ETag` stable across replicas
+ * and repeated polls, for an empty feed as much as for a full one.
+ */
+function documentUpdated(entries: FeedEntry[]): Date {
   let newest: Date | undefined;
   for (const entry of entries) {
     if (!newest || entry.updated > newest) newest = entry.updated;
   }
-  return newest ?? now;
+  return newest ?? EMPTY_FEED_UPDATED;
 }
 
 // ── Atom 1.0 (RFC 4287) ───────────────────────────────────────────────────────────
@@ -212,7 +231,7 @@ export function renderAtomFeed(entries: FeedEntry[], opts: FeedDocumentOptions):
       text("title", FEED_TITLE),
       text("subtitle", FEED_DESCRIPTION),
       text("id", feedIdentifier(opts.publicBaseUrl, opts.selfPath)),
-      text("updated", rfc3339(documentUpdated(entries, opts.now))),
+      text("updated", rfc3339(documentUpdated(entries))),
       el("link", { rel: "self", type: "application/atom+xml", href: self }),
       el("link", {
         rel: "alternate",
@@ -226,10 +245,33 @@ export function renderAtomFeed(entries: FeedEntry[], opts: FeedDocumentOptions):
 }
 
 // ── RSS 2.0 ───────────────────────────────────────────────────────────────────────
+/** Does this value already begin with a registered URI scheme? (RFC 3986 §3.1 `scheme`.) */
+const ABSOLUTE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+
+/** The RSS identifier for the collection, when there is no base URL to build one from. */
+const COLLECTION_URN = "urn:rfphub:collection:opportunities";
+
+/**
+ * A URL-valued RSS element, kept conformant in both configurations.
+ *
+ * RSS 2.0 is stricter than Atom here: the RSS Advisory Board specification requires the data in
+ * URL-valued elements — including the channel's REQUIRED `<link>` — to begin with an
+ * IANA-registered URI scheme. With `PUBLIC_BASE_URL` unset, `feedUrl`/`recordUrl` yield
+ * site-relative paths, which cannot satisfy that rule, so RSS falls back to the same absolute URN
+ * forms the identifiers already use: stable, honest about not being dereferenceable, and a valid
+ * RSS document rather than an invalid one. Atom needs no equivalent — RFC 4287 permits a relative
+ * IRI reference in `link/@href`, and `atom:id` already falls back to an absolute `urn:` IRI.
+ */
+function rssLink(value: string, fallback: string): string {
+  return ABSOLUTE_URI.test(value) ? value : fallback;
+}
+
 function rssItem(entry: FeedEntry): XmlElement {
   return el("item", undefined, [
     text("title", entry.title),
-    text("link", entry.link),
+    // The entry's own identifier is the fallback: it is this entry's absolute URN when there is
+    // no base URL, which is exactly what the relative link would otherwise have pointed at.
+    text("link", rssLink(entry.link, entry.id)),
     // The identifier is an id, not a page — `isPermaLink="false"` says so explicitly, which is
     // what stops a reader from treating it as a URL to fetch (RSS 2.0 defaults it to true).
     text("guid", entry.id, { isPermaLink: "false" }),
@@ -256,9 +298,9 @@ export function renderRssFeed(entries: FeedEntry[], opts: FeedDocumentOptions): 
       [
         el("channel", undefined, [
           text("title", FEED_TITLE),
-          text("link", feedUrl(opts.publicBaseUrl, COLLECTION_PATH)),
+          text("link", rssLink(feedUrl(opts.publicBaseUrl, COLLECTION_PATH), COLLECTION_URN)),
           text("description", FEED_DESCRIPTION),
-          text("lastBuildDate", rfc822(documentUpdated(entries, opts.now))),
+          text("lastBuildDate", rfc822(documentUpdated(entries))),
           text("generator", GENERATOR),
           // RSS 2.0 has no self-reference of its own; the Atom namespace's link element is the
           // universal convention for one, and every reader and validator expects it here.

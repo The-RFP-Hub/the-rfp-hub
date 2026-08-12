@@ -57,10 +57,11 @@ export class FeedService {
   /**
    * Render one feed.
    *
-   * `now` is injectable and is used for exactly one thing: the document timestamp of an EMPTY
-   * feed. With entries present the timestamp is derived from the newest of them, so the same data
-   * renders to the same bytes every time — which is what the routes' content-derived `ETag`
-   * depends on.
+   * Nothing in the document is taken from the clock: the document timestamp is the newest entry,
+   * or the `EMPTY_FEED_UPDATED` constant when there is no entry, so the same data renders to the
+   * same bytes every time — which is what the routes' content-derived `ETag` depends on, an empty
+   * feed included. `now` is injectable and reaches only the ENTRY mapper, where it stands in for a
+   * record carrying no timestamp at all (the columns are NOT NULL, so: never).
    */
   async render(
     format: FeedFormat,
@@ -69,11 +70,11 @@ export class FeedService {
   ): Promise<RenderedFeed> {
     const { path, contentType, render } = FORMATS[format];
     const page = await this.opportunities.getAll(query);
-    const identity = { publicBaseUrl: config.publicBaseUrl, now };
-    const entries = page.items.map((item) => toFeedEntry(item, identity));
+    const { publicBaseUrl } = config;
+    const entries = page.items.map((item) => toFeedEntry(item, { publicBaseUrl, now }));
 
     return {
-      body: Buffer.from(render(entries, { ...identity, selfPath: path }), "utf8"),
+      body: Buffer.from(render(entries, { publicBaseUrl, selfPath: path }), "utf8"),
       contentType,
       entryCount: entries.length,
     };

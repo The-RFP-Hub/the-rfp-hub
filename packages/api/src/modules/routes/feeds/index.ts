@@ -16,7 +16,8 @@ import { feedQuerySchema } from "./types.js";
  */
 const SHARED_DESCRIPTION = [
   "The most recently published opportunities, newest first — the same public slice as GET /v1/opportunities",
-  "(approved and listed records only), ordered by publication recency and capped at `limit` entries.",
+  "(approved and listed records only), ordered by when the Hub first published each record",
+  "(`createdAt` descending — not the funder's own announcement date, `postedAt`), capped at `limit` entries.",
   "Sent with a strong `ETag`: send `If-None-Match` when polling and get a 304 instead of the document.",
 ].join(" ");
 

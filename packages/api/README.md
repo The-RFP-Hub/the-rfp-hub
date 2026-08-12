@@ -54,18 +54,21 @@ The API is pre-adoption, so the re-cut renames are applied without a back-compat
 ### Feeds (Atom 1.0 and RSS 2.0)
 
 `/v1/feeds/opportunities.atom` and `/v1/feeds/opportunities.rss` are the same content in the two
-syndication formats: the newest `limit` opportunities (default 50, max 100) ordered by publication
-recency, drawn through the same public read as `/v1/opportunities`, so a pending or unlisted record
-can never surface in one. They accept exactly two parameters — `limit` and `status` — under the
-same strict contract as the list endpoint, because a feed URL is a subscription somebody saves for
-years and a typo in it has to fail loudly rather than quietly return everything. Each entry carries
+syndication formats: the newest `limit` opportunities (default 50, max 100) ordered by when the Hub
+first published them (`createdAt desc`; `postedAt`, the funder's own announcement date, is carried
+on each entry as `published` but is not the sort key), drawn through the same public read as
+`/v1/opportunities`, so a pending or unlisted record can never surface in one. They accept exactly
+two parameters — `limit` and `status` — under the same strict contract as the list endpoint, because
+a feed URL is a subscription somebody saves for years and a typo in it has to fail loudly rather
+than quietly return everything. Each entry carries
 the title, the `applicationUrl` (or, for a record without one, its own `/v1/opportunities/{id}`
 URL), a plain-text summary of the description, the funding type and ecosystems as categories, and
 the operating organization as the author — `dc:creator` in RSS, whose own `<author>` element is
 defined as an email address. Every document is served with a strong, content-derived `ETag` and
 `Cache-Control: public, max-age=300, must-revalidate`, so a reader that polls with `If-None-Match`
-gets a `304` and no body; the XML is written by a serializer that escapes by construction
-(`src/modules/shared/xml.ts`), never by string concatenation.
+gets a `304` and no body — an EMPTY feed included, whose own timestamp is a fixed constant rather
+than the clock, so identical data hashes identically there too. The XML is written by a serializer
+that escapes by construction (`src/modules/shared/xml.ts`), never by string concatenation.
 
 Discovery: the service-info document at `/` lists both feeds under `feeds` (relation, media type,
 href — the same three facts an HTML `<link rel="alternate">` would carry, for an API that serves no
@@ -78,6 +81,14 @@ document points at itself with an atom `link rel="self"`.
 > not — this API never derives its published identity from a request's `Host` header. Both forms
 > are stable, but they are not the *same* identifier, so configuring the base URL afterwards makes
 > every subscriber see the whole feed as new exactly once.
+>
+> RSS is stricter than Atom about the link elements, and the fallback follows it: RSS 2.0 requires
+> the data in URL-valued elements — including the channel's **required** `<link>` — to begin with an
+> IANA-registered URI scheme, so with the relative `/` default those elements carry the same
+> `urn:rfphub:…` values as the identifiers rather than site-relative paths, and the document stays
+> conformant in both configurations. What an unconfigured deployment loses is dereferenceability,
+> not validity. Atom needs no equivalent: RFC 4287 permits a relative IRI reference in
+> `link/@href`, and `atom:id` already falls back to an absolute `urn:` IRI.
 
 ## Local development
 

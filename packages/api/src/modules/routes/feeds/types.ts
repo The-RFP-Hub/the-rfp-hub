@@ -41,9 +41,10 @@ function requestedLimit(value: unknown): number {
  * The feed query, normalized onto the list endpoint's own query type.
  *
  * Everything a feed does NOT expose is fixed here rather than defaulted: newest first by
- * `createdAt` (publication recency — a re-ingest of an unchanged record bumps `updatedAt`, so
- * sorting on that would reshuffle the whole feed on every seed run and re-notify every
- * subscriber), and the first page only.
+ * `createdAt` — when the HUB first published the record, not the funder's own announcement date
+ * (`postedAt`), and not `updatedAt`: a re-ingest of an unchanged record bumps `updatedAt`, so
+ * sorting on that would reshuffle the whole feed on every seed run and re-notify every subscriber.
+ * The first page only.
  *
  * `status` goes through `parseOpportunityQuery`, the list endpoint's own normalizer — splitting,
  * trimming and de-duping the list — so the two endpoints cannot drift into disagreeing about what

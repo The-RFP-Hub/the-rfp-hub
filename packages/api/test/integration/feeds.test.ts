@@ -185,9 +185,18 @@ run("GET /v1/feeds/opportunities.{atom,rss}", () => {
     }
     expect(child(channel, "atom:link")?.attrs.rel).toBe("self");
 
+    // RSS 2.0 requires the data in URL-valued elements to begin with an IANA-registered URI scheme
+    // (RSS Advisory Board specification), and the channel <link> is one of the required elements —
+    // so this must hold in the deployment shape the suite actually runs under, whether or not
+    // PUBLIC_BASE_URL is configured. Any registered scheme, not only http(s): unconfigured, the
+    // documents fall back to `urn:` values rather than to site-relative paths.
+    const REGISTERED_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+    expect(textOf(channel, "link"), "channel <link>").toMatch(REGISTERED_SCHEME);
+
     const ours = ourEntries(rss);
     expect(ours.length).toBe(3);
     for (const item of ours) {
+      expect(textOf(item, "link"), "item <link>").toMatch(REGISTERED_SCHEME);
       expect(textOf(item, "guid"), "item <guid>").toBeTruthy();
       expect(child(item, "guid")?.attrs.isPermaLink).toBe("false");
       expect(textOf(item, "title"), "item <title>").toBeTruthy();
@@ -261,9 +270,15 @@ run("GET /v1/feeds/opportunities.{atom,rss}", () => {
     );
     expect(textOf(hostile as XmlNode, "published")).toBe("2026-03-04T05:06:07.000Z");
 
-    // The two formats identify the same records identically.
+    // The two formats identify the same records identically. Scoped to THIS suite's fixtures for
+    // the same reason `settledPoll` retries: the two documents are two separate requests against a
+    // database the other integration suites are concurrently seeding and deleting, so comparing
+    // the whole documents compares two different moments in the dataset. Our own records are the
+    // ones the assertion is actually about, and they are stable for the life of the file.
     const rss = await fetchFeed(`${RSS}?limit=100`, "application/rss+xml");
-    expect(new Set(identifiersOf(rss))).toEqual(new Set(identifiersOf(feed)));
+    const ourIdentifiers = (doc: XmlNode) =>
+      new Set(identifiersOf(doc).filter((id) => id.includes("feedtest:")));
+    expect(ourIdentifiers(rss)).toEqual(ourIdentifiers(feed));
   });
 
   // ── query contract ──────────────────────────────────────────────────────────────

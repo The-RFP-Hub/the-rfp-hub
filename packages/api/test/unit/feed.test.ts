@@ -6,8 +6,9 @@
  * compared are the DECODED ones, so "escaped correctly" means "reads back as the original string"
  * rather than "contains the substring I expected".
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  EMPTY_FEED_UPDATED,
   type FeedEntry,
   entryIdentifier,
   recordUrl,
@@ -22,6 +23,7 @@ import {
   MAX_FEED_LIMIT,
   parseFeedQuery,
 } from "../../src/modules/routes/feeds/types.js";
+import { entityTag, ifNoneMatchSatisfied } from "../../src/modules/shared/http-cache.js";
 import {
   el,
   escapeXmlAttribute,
@@ -70,19 +72,17 @@ const entry = (over: Partial<FeedEntry> = {}): FeedEntry => ({
   ...over,
 });
 
+const atomXml = (entries: FeedEntry[], publicBaseUrl = BASE) =>
+  renderAtomFeed(entries, { publicBaseUrl, selfPath: "/v1/feeds/opportunities.atom" });
+
+const rssXml = (entries: FeedEntry[], publicBaseUrl = BASE) =>
+  renderRssFeed(entries, { publicBaseUrl, selfPath: "/v1/feeds/opportunities.rss" });
+
 const atomOf = (entries: FeedEntry[], publicBaseUrl = BASE) =>
-  parseXml(
-    renderAtomFeed(entries, {
-      publicBaseUrl,
-      selfPath: "/v1/feeds/opportunities.atom",
-      now: NOW,
-    }),
-  );
+  parseXml(atomXml(entries, publicBaseUrl));
 
 const rssOf = (entries: FeedEntry[], publicBaseUrl = BASE) =>
-  parseXml(
-    renderRssFeed(entries, { publicBaseUrl, selfPath: "/v1/feeds/opportunities.rss", now: NOW }),
-  );
+  parseXml(rssXml(entries, publicBaseUrl));
 
 describe("the XML writer escapes by construction", () => {
   it("escapes character data and both quote forms in attributes", () => {
@@ -113,7 +113,7 @@ describe("the XML writer escapes by construction", () => {
     expect(() => renderXmlDocument(el("a", { "bad name": "x" }))).toThrow(/invalid XML name/);
   });
 
-  it("round-trips a hostile string through the parser unchanged", () => {
+  it("round-trips a hostile string through the parser, minus the characters XML cannot carry", () => {
     const doc = parseXml(renderXmlDocument(textNode("t", HOSTILE_TITLE, { v: HOSTILE_TITLE })));
     // Everything survives except the two characters XML cannot carry, which are dropped.
     const expected = HOSTILE_TITLE.replace("\u0007", "").replace("\uD800", "");
@@ -225,11 +225,11 @@ describe("Atom 1.0 (RFC 4287)", () => {
     const older = entry({ updated: new Date("2026-01-01T00:00:00.000Z") });
     const newer = entry({ updated: new Date("2026-05-05T05:05:05.000Z") });
     expect(textOf(atomOf([older, newer]), "updated")).toBe("2026-05-05T05:05:05.000Z");
-    // …and an empty feed, which has nothing to derive from, falls back to the injected clock.
-    expect(textOf(atomOf([]), "updated")).toBe(NOW.toISOString());
+    // …and an empty feed, which has nothing to derive from, uses the documented constant.
+    expect(textOf(atomOf([]), "updated")).toBe(EMPTY_FEED_UPDATED.toISOString());
   });
 
-  it("stays well-formed and lossless with a hostile title", () => {
+  it("stays well-formed and faithful with a hostile title", () => {
     const item = children(
       atomOf([entry({ title: HOSTILE_TITLE, summary: HOSTILE_TITLE })]),
       "entry",
@@ -290,17 +290,100 @@ describe("RSS 2.0", () => {
     expect(rfc822(new Date("2026-12-31T23:59:59.000Z"))).toBe("Thu, 31 Dec 2026 23:59:59 GMT");
   });
 
-  it("stays well-formed and lossless with a hostile title", () => {
+  it("stays well-formed and faithful with a hostile title", () => {
     const channel = child(rssOf([entry({ title: HOSTILE_TITLE })]), "channel");
     const item = child(channel as never, "item");
     expect(item && textOf(item, "title")).toBe(
       HOSTILE_TITLE.replace("\u0007", "").replace("\uD800", ""),
     );
   });
+
+  /**
+   * RSS 2.0 is stricter than Atom about URLs: the RSS Advisory Board specification requires the
+   * data in URL-valued elements to begin with an IANA-registered URI scheme, and the channel
+   * `<link>` is REQUIRED — so a site-relative path there is not a conformant document at all. The
+   * assertion is the SCHEME rule, not `http(s)`, because RSS permits any registered scheme, which
+   * is exactly what the unconfigured fallback relies on.
+   */
+  const REGISTERED_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+
+  it("begins every URL-valued element with a registered URI scheme, configured or not", () => {
+    for (const base of [BASE, "/"]) {
+      const mapped = [
+        toFeedEntry(summary(), { publicBaseUrl: base, now: NOW }),
+        toFeedEntry(summary({ id: "feedtest:2", applicationUrl: "https://example.org/apply" }), {
+          publicBaseUrl: base,
+          now: NOW,
+        }),
+      ];
+      const channel = child(rssOf(mapped, base), "channel");
+      if (!channel) throw new Error("no channel rendered");
+      expect(textOf(channel, "link"), base).toMatch(REGISTERED_SCHEME);
+      for (const item of children(channel, "item")) {
+        expect(textOf(item, "link"), base).toMatch(REGISTERED_SCHEME);
+      }
+    }
+
+    // Configured, those values are the API's own URLs — the self link included…
+    const configured = child(rssOf([entry()], BASE), "channel");
+    expect(textOf(configured as never, "link")).toBe(`${BASE}/v1/opportunities`);
+    expect(child(configured as never, "atom:link")?.attrs.href).toMatch(REGISTERED_SCHEME);
+
+    // …and unconfigured they fall back to the documented URNs rather than to relative paths.
+    const local = child(
+      rssOf([toFeedEntry(summary(), { publicBaseUrl: "/", now: NOW })], "/"),
+      "channel",
+    );
+    expect(textOf(local as never, "link")).toBe("urn:rfphub:collection:opportunities");
+    expect(textOf(child(local as never, "item") as never, "link")).toBe(
+      "urn:rfphub:opportunity:feedtest:1",
+    );
+  });
+});
+
+describe("an empty feed", () => {
+  /**
+   * The whole point of a content-derived `ETag` is that identical data hashes identically, and an
+   * empty feed — no matches for a `?status=` filter, a filtered slice, a fresh deployment — is the
+   * case a poller hits hardest. These assertions carry NO retry loop on purpose: with the document
+   * timestamp taken from a constant rather than from the clock, two renders agree the first time
+   * or the property is broken. (The integration suite's retry loops exist for a shared,
+   * concurrently-mutated database; they are also what kept this instability from surfacing.)
+   */
+  it("renders identical bytes and an identical ETag at two different clocks", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-01T00:00:00.000Z"));
+      const first = { atom: atomXml([]), rss: rssXml([]) };
+      vi.setSystemTime(new Date("2026-08-01T01:23:45.678Z"));
+      const second = { atom: atomXml([]), rss: rssXml([]) };
+
+      for (const format of ["atom", "rss"] as const) {
+        expect(second[format], format).toBe(first[format]);
+        expect(entityTag(second[format]), format).toBe(entityTag(first[format]));
+        // …which is the property a conditional GET needs: the validator handed out by the first
+        // poll still matches the second poll's document, so that poll is a 304, not a transfer.
+        expect(
+          ifNoneMatchSatisfied(entityTag(first[format]), entityTag(second[format])),
+          format,
+        ).toBe(true);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("dates itself from the documented constant, in both formats", () => {
+    expect(EMPTY_FEED_UPDATED.getTime()).toBe(0);
+    expect(textOf(atomOf([]), "updated")).toBe(EMPTY_FEED_UPDATED.toISOString());
+    expect(textOf(child(rssOf([]), "channel") as never, "lastBuildDate")).toBe(
+      rfc822(EMPTY_FEED_UPDATED),
+    );
+  });
 });
 
 describe("the feed query contract", () => {
-  it("defaults to the newest 50, first page, publication-recency order", () => {
+  it("defaults to the newest 50, first page, newest-first by `createdAt`", () => {
     expect(parseFeedQuery({})).toMatchObject({
       limit: DEFAULT_FEED_LIMIT,
       page: 1,
