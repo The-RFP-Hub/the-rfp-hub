@@ -24,7 +24,7 @@ monitor.
 | # | Criterion | What is actually asserted |
 |---|---|---|
 | 1 | **API liveness** | `GET {base}/v1/health` is `200` **and** the body reports `status: ok`, `db: up` — the service's own definition of healthy, so a `200` that says `degraded` is a failure. TLS certificate validity, issuer and remaining lifetime are probed and reported (a certificate under three weeks from expiry is a warning). Round trip timed over three samples. |
-| 2 | **OpenAPI conformance** | The document served at `{base}/v1/docs/json` is the input. Every operation it declares is executed against the live URL and held to *its own* declared status, media type and response schema (ajv, draft 2020-12). Then the negative half: an undocumented query parameter, and a value violating every documented enum, pattern, format and numeric bound, must each be a `400` whose body validates against the declared error schema; a path template documenting a `404` must answer `404`. |
+| 2 | **OpenAPI conformance** | The document served at `{base}/v1/docs/json` is the input. Every operation it declares is executed against the live URL and held to *its own* declared status, media type and response schema (ajv, draft 2020-12) — or, where the declared media type is not JSON (the Atom and RSS feeds), to the documented status, the declared content type, a non-empty body and, for XML, that the document is well-formed, with the report saying that the schema half did not apply. Then the negative half: an undocumented query parameter, and a value violating every documented enum, pattern, format and numeric bound, must each be a `400` whose body validates against the declared error schema; a path template documenting a `404` must answer `404`. |
 | 3 | **Dataset** | `/v1/stats` total is at or above the floor; the list endpoint pages through the whole dataset with a stable total and no repeats; every list item conforms to the published `OpportunitySummary`; **every** listed document is then fetched from the detail endpoint and validated against the Standard with `packages/validate`; and filtered counts agree with `/v1/stats`, partition the dataset, and OR correctly when combined. |
 | 4 | **Export freshness** | `latest.json` and `latest.csv` download and parse; the envelope is CC0-marked and its `generatedAt` is inside the freshness window; a CC0 rights notice sits at the export root; the exported documents validate against the Standard; and the two aliases describe the same **dataset** — same record count, same id set, and identical field values on a sample. Where the export publishes `latest.manifest.json`, the same **run** as well: the manifest is resolved once, every artifact it names is verified against the full sha256 it records, and the alias bytes are hashed against those digests. Without a manifest, run identity cannot be established at all — no run identifier is served, so two same-day runs carrying the same records are indistinguishable — and the check says so rather than inferring it. |
 
@@ -53,6 +53,12 @@ never describes.
 
 - **It issues read-only requests.** A published non-`GET` operation is reported as `skip` with that
   reason, never as a pass. The `/v1/` surface is read-only today, so nothing is skipped in practice.
+- **It does not schema-validate an XML response, and does not pretend to.** A JSON Schema describes
+  a JSON value, and Atom and RSS are defined by RFC 4287 and the RSS 2.0 specification rather than
+  by anything this API publishes. Those responses are held to everything that still applies —
+  documented status, declared content type, non-empty body, and a well-formedness parse, which is
+  what catches the failure that actually happens (an escaping bug still answers `200` with the right
+  content type) — and the check reports which half it verified and which did not apply.
 - **It does not grade the published document's own style**, only whether live responses conform to
   it. A relative `servers[0].url` (what an unset `PUBLIC_BASE_URL` leaves behind) is a warning
   rather than a failure, because it is correct wherever the document is fetched from — but a
