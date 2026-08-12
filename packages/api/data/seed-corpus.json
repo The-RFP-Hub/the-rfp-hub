@@ -717,7 +717,7 @@
         "originalId": "1046",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["GEN Ukraine"],
+      "ecosystems": ["Ethereum", "Celo"],
       "eligibility": "Not open to all applicants — the program invites or pre-selects participants.",
       "fundingInfo": {
         "budget": 5000,
@@ -1135,7 +1135,7 @@
         "originalId": "990",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["Ethereum Foundation", "Localism Fund"],
+      "ecosystems": ["Ethereum"],
       "applicationUrl": "https://www.localism.fund/round-02",
       "fundingInfo": {
         "minAward": 3000,
@@ -1313,7 +1313,7 @@
         {
           "name": "FutureForge Hackathon 2026",
           "slug": "futureforge-hackathon-2026",
-          "ecosystems": ["Ethereum", "HealthTech", "FinTech"]
+          "ecosystems": ["Ethereum"]
         }
       ],
       "source": {
@@ -1321,7 +1321,7 @@
         "originalId": "1494",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["Ethereum", "HealthTech", "FinTech"],
+      "ecosystems": ["Ethereum"],
       "applicationUrl": "https://futureforge-hackathon.devfolio.co",
       "fundingInfo": {
         "budget": 5300.0,
@@ -1368,7 +1368,9 @@
         "Blockchain",
         "Cybersecurity",
         "Cloud Computing",
-        "Open Innovation"
+        "Open Innovation",
+        "HealthTech",
+        "FinTech"
       ],
       "opensAt": "2026-06-17T18:29:00Z",
       "website": "https://futureforge-hackathon.devfolio.co",
@@ -1379,7 +1381,7 @@
       "id": "fundingmap:1491",
       "fundingType": "hackathon",
       "title": "MicroCraft - ArcNight",
-      "description": "ARC Night is the flagship hackathon of [MicroCraft](https://micro-craft.microsoftinnovations.club/), a summer innovation series that has already engaged 2,000+ participants. Inspired by the excitement of arcade gaming, ARC Night brings together developers, designers, and innovators to solve real-world challenges, build impactful solutions, and compete for a ₹2,00,000 prize pool.\n\nWhether you're taking your first step into hackathons or looking to push your limits, ARC Night is where ideas come to life.\n\nPress Start to Innovation.\n\n**Prize pool, as published.** The organiser's own copy states a ₹2,00,000 pool; the listing platform's prize field shows $2,000 for the same event. Neither figure carries a conversion rate or date, and 100:1 is not a market rate, so this record keeps the rupee figure the organiser published rather than a dollar equivalent nobody has explained.\n\n**Announcement date not established.** The hosting platform publishes no date for when this listing went up, the organisers published no dated announcement that could be retrieved, and the first archive capture of the event's own pages post-dates registration opening. `postedAt` is therefore absent — the Standard's \"unknown\" — rather than a guess.",
+      "description": "ARC Night is the flagship hackathon of [MicroCraft](https://micro-craft.microsoftinnovations.club/), a summer innovation series that has already engaged 2,000+ participants (the organiser's own site returns HTTP 402 as of 2026-08-12 and no usable archive capture exists; the Devfolio listing at https://microcarft-arcnight.devfolio.co is the live record). Inspired by the excitement of arcade gaming, ARC Night brings together developers, designers, and innovators to solve real-world challenges, build impactful solutions, and compete for a ₹2,00,000 prize pool.\n\nWhether you're taking your first step into hackathons or looking to push your limits, ARC Night is where ideas come to life.\n\nPress Start to Innovation.\n\n**Prize pool, as published.** The organiser's own copy states a ₹2,00,000 pool; the listing platform's prize field shows $2,000 for the same event. Neither figure carries a conversion rate or date, and 100:1 is not a market rate, so this record keeps the rupee figure the organiser published rather than a dollar equivalent nobody has explained.\n\n**Announcement date not established.** The hosting platform publishes no date for when this listing went up, the organisers published no dated announcement that could be retrieved, and the first archive capture of the event's own pages post-dates registration opening. `postedAt` is therefore absent — the Standard's \"unknown\" — rather than a guess.",
       "summary": "Press Start to Innovate",
       "status": "closed",
       "operatingOrganizations": [
@@ -2168,7 +2170,7 @@
         "tracks": ["Overall prize", "Best Agentic Project", "Grants"]
       },
       "additionalReferences": "Program site: https://blog.arbitrum.foundation/builders-block-016-open-house-london-dates-locked-first-cohort-of-mentorship-program/",
-      "categories": ["Funding Opportunity"],
+      "categories": ["Stablecoins", "Tokenization", "DeFi", "AI", "Developer Tooling"],
       "opensAt": "2026-03-24T16:54:00.000Z",
       "website": "https://blog.arbitrum.foundation/builders-block-016-open-house-london-dates-locked-first-cohort-of-mentorship-program/"
     },
@@ -3386,7 +3388,7 @@
         "originalId": "1458",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["Celo", "celo"],
+      "ecosystems": ["Celo"],
       "eligibility": "What we're looking for: verifiable evidence of real usage (transactions, users, revenue); a clear path to generating meaningful transaction volume on Celo; product-market fit demonstrated elsewhere, or credible pilot results within MiniPay; teams slightly below Stage 2 funding thresholds may be considered where a proven track record and substantial evidence demonstrate imminent viability. Applicants must demonstrate 10k–100k daily transactions on Celo mainnet (or a good level of sustained transactions over a period of time), ideally a sustained daily average over 5,000 tx, and projects should be deployed, open to the public, and open source or published. Not eligible: ongoing salaries, pure marketing spend, events, liquidity provision, token listings, or general VC investment; applications gaming transaction counts without generating underlying value; projects without verifiable traction or credible usage evidence; teams that cannot articulate how they contribute to transaction growth or TVL. Successful applicants are KYC'ed and sign a contract with Prezenti.",
       "applicationUrl": "https://anchor.prezenti.xyz/",
       "fundingInfo": {
@@ -9437,7 +9439,7 @@
         "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
         "platform": "Immunefi"
       },
-      "additionalReferences": "In scope: 8 websites and applications assets, 2 smart contract assets. Representative in-scope assets: https://ens.domains · https://metadata.ens.domains/docs · https://github.com/ensdomains/ensdomains-landing · https://github.com/ensdomains/ens-app-v3 · https://app.ens.domains/ · https://github.com/ensdomains/ens-metadata-service. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-17. Programme page: https://immunefi.com/bug-bounty/ens/information/",
+      "additionalReferences": "In scope: 8 websites and applications assets, 2 smart contract assets. Representative in-scope assets: https://ens.domains · https://metadata.ens.domains/docs · https://github.com/ensdomains/ensdomains-landing · https://github.com/ensdomains/ens-app-v3 · https://app.ens.domains/ · https://github.com/ensdomains/ens-metadata-service. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-17. Programme page: https://immunefi.com/bug-bounty/ens/information/ (as of 2026-08-12 one of the listed asset repositories, ensdomains/ensdomains-landing, returns HTTP 404 on GitHub; it is recorded as the funder publishes it.)",
       "categories": [
         "Funding Opportunity",
         "Security",
@@ -9993,7 +9995,7 @@
           }
         ],
         "platform": "Cantina",
-        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.xyz/cantina-docs/cantina-bounties/bounty-severity-classification)"
+        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.security/standards/severity/bug-bounty)"
       },
       "additionalReferences": "In-scope asset groups: WebApps (8 listed assets), Morpho Midnight and Vault V2 (0 listed assets), Morpho Blue and Vault V1 (0 listed assets). Out-of-scope groups published: Out of Scope Smart Contract, Known Issues, Out of Scope Website and Application. Rewards paid in USDC. Advertised maximum/total reward pot: 2,500,000 USD. Programme created on Cantina 2024-03-27. Some in-scope groups enumerate no individual assets on the asset list; their full scope is set out in prose in the programme instructions on the page. Programme page: https://cantina.xyz/bounties/35a5f0a1-2ffd-432c-8f3b-77d169add8c3",
       "categories": ["Funding Opportunity", "Security", "Bug Bounty"],
@@ -10339,7 +10341,7 @@
           }
         ],
         "platform": "Cantina",
-        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.xyz/cantina-docs/cantina-bounties/bounty-severity-classification)"
+        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.security/standards/severity/bug-bounty)"
       },
       "additionalReferences": "In-scope asset groups: Smart Contracts: (11 listed assets). Out-of-scope groups published: Default Out of Scope:. Rewards paid in USDC. Advertised maximum/total reward pot: 250,000 USD. Programme created on Cantina 2025-09-18. Programme page: https://cantina.xyz/bounties/3aaad22b-52ee-4bb2-bed2-4be53b0993cc",
       "categories": ["Funding Opportunity", "Security", "Bug Bounty"],
@@ -11123,7 +11125,7 @@
         "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
         "platform": "Immunefi"
       },
-      "additionalReferences": "In scope: 355 smart contract assets, 4 websites and applications assets. Representative in-scope assets: https://basescan.org/address/0x983eC82E45C61a42FDDA7B3c43B8C767004c8A74 · https://unichain.blockscout.com/address/0x7B8ee8b0fD62662F7FB1ac9e5E6cEAad5195A3bF · https://github.com/marsfoundation/spark-dev-docs · https://blockscout.com/xdai/mainnet/address/0x1022E390E2457A78E18AEEE0bBf0E96E482EeE19#code · https://arbiscan.io/address/0xcA61540eC2AC74E6954FA558B4aF836d95eCb91b#code · https://etherscan.io/address/0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE#code. Rewards are denominated in USD and paid in DAI on Ethereum. Programme page last updated 2026-07-28. Programme page: https://immunefi.com/bug-bounty/sparklend/information/",
+      "additionalReferences": "In scope: 355 smart contract assets, 4 websites and applications assets. Representative in-scope assets: https://basescan.org/address/0x983eC82E45C61a42FDDA7B3c43B8C767004c8A74 · https://unichain.blockscout.com/address/0x7B8ee8b0fD62662F7FB1ac9e5E6cEAad5195A3bF · https://github.com/marsfoundation/spark-dev-docs · https://blockscout.com/xdai/mainnet/address/0x1022E390E2457A78E18AEEE0bBf0E96E482EeE19#code · https://arbiscan.io/address/0xcA61540eC2AC74E6954FA558B4aF836d95eCb91b#code · https://etherscan.io/address/0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE#code. Rewards are denominated in USD and paid in DAI on Ethereum. Programme page last updated 2026-07-28. Programme page: https://immunefi.com/bug-bounty/sparklend/information/ (as of 2026-08-12 one of the listed asset repositories, marsfoundation/spark-dev-docs, returns HTTP 404 on GitHub; it is recorded as the funder publishes it.)",
       "categories": [
         "Funding Opportunity",
         "Security",
@@ -12250,7 +12252,7 @@
         "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
         "platform": "Immunefi"
       },
-      "additionalReferences": "In scope: 2 smart contract assets. Representative in-scope assets: https://wwwimmunefi.com · https://github.com/Gearbox-protocol/security/blob/main/bug-bounty/v3_1-scope.md. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-29. Programme page: https://immunefi.com/bug-bounty/gearbox/information/",
+      "additionalReferences": "In scope: 2 smart contract assets. Representative in-scope assets: https://github.com/Gearbox-protocol/security/blob/main/bug-bounty/v3_1-scope.md. (Immunefi's asset list also carries a Primacy-of-Impact placeholder whose published URL, https://wwwimmunefi.com, does not resolve — an upstream typo, recorded here rather than corrected.) Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-29. Programme page: https://immunefi.com/bug-bounty/gearbox/information/",
       "categories": [
         "Funding Opportunity",
         "Security",
