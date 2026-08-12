@@ -717,7 +717,7 @@
         "originalId": "1046",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["GEN Ukraine"],
+      "ecosystems": ["Ethereum", "Celo"],
       "eligibility": "Not open to all applicants — the program invites or pre-selects participants.",
       "fundingInfo": {
         "budget": 5000,
@@ -1135,7 +1135,7 @@
         "originalId": "990",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["Ethereum Foundation", "Localism Fund"],
+      "ecosystems": ["Ethereum"],
       "applicationUrl": "https://www.localism.fund/round-02",
       "fundingInfo": {
         "minAward": 3000,
@@ -1313,7 +1313,7 @@
         {
           "name": "FutureForge Hackathon 2026",
           "slug": "futureforge-hackathon-2026",
-          "ecosystems": ["Ethereum", "HealthTech", "FinTech"]
+          "ecosystems": ["Ethereum"]
         }
       ],
       "source": {
@@ -1321,7 +1321,7 @@
         "originalId": "1494",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["Ethereum", "HealthTech", "FinTech"],
+      "ecosystems": ["Ethereum"],
       "applicationUrl": "https://futureforge-hackathon.devfolio.co",
       "fundingInfo": {
         "budget": 5300.0,
@@ -1368,7 +1368,9 @@
         "Blockchain",
         "Cybersecurity",
         "Cloud Computing",
-        "Open Innovation"
+        "Open Innovation",
+        "HealthTech",
+        "FinTech"
       ],
       "opensAt": "2026-06-17T18:29:00Z",
       "website": "https://futureforge-hackathon.devfolio.co",
@@ -1379,7 +1381,7 @@
       "id": "fundingmap:1491",
       "fundingType": "hackathon",
       "title": "MicroCraft - ArcNight",
-      "description": "ARC Night is the flagship hackathon of [MicroCraft](https://micro-craft.microsoftinnovations.club/), a summer innovation series that has already engaged 2,000+ participants. Inspired by the excitement of arcade gaming, ARC Night brings together developers, designers, and innovators to solve real-world challenges, build impactful solutions, and compete for a ₹2,00,000 prize pool.\n\nWhether you're taking your first step into hackathons or looking to push your limits, ARC Night is where ideas come to life.\n\nPress Start to Innovation.\n\n**Prize pool, as published.** The organiser's own copy states a ₹2,00,000 pool; the listing platform's prize field shows $2,000 for the same event. Neither figure carries a conversion rate or date, and 100:1 is not a market rate, so this record keeps the rupee figure the organiser published rather than a dollar equivalent nobody has explained.\n\n**Announcement date not established.** The hosting platform publishes no date for when this listing went up, the organisers published no dated announcement that could be retrieved, and the first archive capture of the event's own pages post-dates registration opening. `postedAt` is therefore absent — the Standard's \"unknown\" — rather than a guess.",
+      "description": "ARC Night is the flagship hackathon of [MicroCraft](https://micro-craft.microsoftinnovations.club/), a summer innovation series that has already engaged 2,000+ participants (the organiser's own site returns HTTP 402 as of 2026-08-12 and no usable archive capture exists; the Devfolio listing at https://microcarft-arcnight.devfolio.co is the live record). Inspired by the excitement of arcade gaming, ARC Night brings together developers, designers, and innovators to solve real-world challenges, build impactful solutions, and compete for a ₹2,00,000 prize pool.\n\nWhether you're taking your first step into hackathons or looking to push your limits, ARC Night is where ideas come to life.\n\nPress Start to Innovation.\n\n**Prize pool, as published.** The organiser's own copy states a ₹2,00,000 pool; the listing platform's prize field shows $2,000 for the same event. Neither figure carries a conversion rate or date, and 100:1 is not a market rate, so this record keeps the rupee figure the organiser published rather than a dollar equivalent nobody has explained.\n\n**Announcement date not established.** The hosting platform publishes no date for when this listing went up, the organisers published no dated announcement that could be retrieved, and the first archive capture of the event's own pages post-dates registration opening. `postedAt` is therefore absent — the Standard's \"unknown\" — rather than a guess.",
       "summary": "Press Start to Innovate",
       "status": "closed",
       "operatingOrganizations": [
@@ -2088,7 +2090,7 @@
       "id": "fundingmap:1412",
       "fundingType": "hackathon",
       "title": "Arbitrum Open House London: Online Buildathon",
-      "description": "3-week online Buildathon for early-stage builders creating products on Arbitrum, offering technical workshops, mentorship, and investor pitching opportunities, followed by in-person Founder House event. Part of a larger program with $115K in prizes and grants available for Buildathon participants. Applications currently open.\n\n**Announcement.** `postedAt` is the publication timestamp the hosting platform records for this listing, 24 March 2026 — 72 minutes before registration opened on the same day.",
+      "description": "3-week online Buildathon for early-stage builders creating products on Arbitrum, offering technical workshops, mentorship, and investor pitching opportunities, followed by in-person Founder House event. Part of a larger program with $115K in prizes and grants available for Buildathon participants.\n\n**Announcement.** `postedAt` is the publication timestamp the hosting platform records for this listing, 24 March 2026 — 72 minutes before registration opened on the same day.",
       "summary": "A three-week online Buildathon opening Arbitrum's Open House London, with $115K in prizes and grants; the in-person Founder House in London followed on 10–12 July with a further $300K.",
       "status": "closed",
       "operatingOrganizations": [
@@ -2168,7 +2170,7 @@
         "tracks": ["Overall prize", "Best Agentic Project", "Grants"]
       },
       "additionalReferences": "Program site: https://blog.arbitrum.foundation/builders-block-016-open-house-london-dates-locked-first-cohort-of-mentorship-program/",
-      "categories": ["Funding Opportunity"],
+      "categories": ["Stablecoins", "Tokenization", "DeFi", "AI", "Developer Tooling"],
       "opensAt": "2026-03-24T16:54:00.000Z",
       "website": "https://blog.arbitrum.foundation/builders-block-016-open-house-london-dates-locked-first-cohort-of-mentorship-program/"
     },
@@ -3386,7 +3388,7 @@
         "originalId": "1458",
         "verifiedAgainstSource": null
       },
-      "ecosystems": ["Celo", "celo"],
+      "ecosystems": ["Celo"],
       "eligibility": "What we're looking for: verifiable evidence of real usage (transactions, users, revenue); a clear path to generating meaningful transaction volume on Celo; product-market fit demonstrated elsewhere, or credible pilot results within MiniPay; teams slightly below Stage 2 funding thresholds may be considered where a proven track record and substantial evidence demonstrate imminent viability. Applicants must demonstrate 10k–100k daily transactions on Celo mainnet (or a good level of sustained transactions over a period of time), ideally a sustained daily average over 5,000 tx, and projects should be deployed, open to the public, and open source or published. Not eligible: ongoing salaries, pure marketing spend, events, liquidity provision, token listings, or general VC investment; applications gaming transaction counts without generating underlying value; projects without verifiable traction or credible usage evidence; teams that cannot articulate how they contribute to transaction growth or TVL. Successful applicants are KYC'ed and sign a contract with Prezenti.",
       "applicationUrl": "https://anchor.prezenti.xyz/",
       "fundingInfo": {
@@ -3605,7 +3607,7 @@
       "id": "fundingmap:600",
       "fundingType": "grant",
       "title": "Prezenti Mint Round",
-      "description": "The Mint Round was an open round of Prezenti's Celo grant funding, following approval of the CeloPG H2 2024 funding. **It is closed** — applications ran from 1 October 2024 until 15 November 2024, and the Charmverse application space used to run it no longer exists (Charmverse ceased trading in May 2026; Prezenti's application links now point to Tally Forms for its current pools).\n\n**Three grant types were offered, all denominated in cUSD:**\n\n- **MICRO — $2,000 cUSD.** For one-off contributions that significantly enhance the Celo community: financial assistance to projects at the very start of their journey, or retroactive funding for those who have already made notable contributions — community management, open-source code contributions, governance and educational content.\n- **PILOT — $10,000 cUSD.** For new projects yet to build and deploy a feasibility study, pilot, low-fidelity prototype or MVP. Small ticket size for getting something off the ground; applicants are expected to deliver at least to testnet (if technical) at a quality that could plausibly continue if the pilot succeeds. Projects must open-source their code and communicate what they learned. Priority to public-goods-style projects over commercial enterprises, though the latter is not disqualifying.\n- **GROWTH — $25,000 cUSD.** For incremental features for ecosystem mainstays or public goods. VC-funded, private, for-profit companies are not disqualified as a hard rule if they are clearly delivering something pivotal to the community.\n\nAt the time the round opened, Prezenti reported having received over 300 applications and granted $1.2M cUSD across more than 70 grants.\n\n**Announcement date not established.** Prezenti's forum post *Prezenti Opens Mint Round for Applications* is dated 1 October 2024, but that cannot be the first public notice: the round was already recorded elsewhere on 19 September 2024. No earlier announcement was found on the Celo forum or Prezenti's own pages, so `postedAt` is absent rather than a date known to be late.",
+      "description": "The Mint Round was an open round of Prezenti's Celo grant funding, following approval of the CeloPG H2 2024 funding. **It is closed** — applications ran from 1 October 2024 until 15 November 2024, and the Charmverse application space used to run it no longer exists (Charmverse ceased trading in May 2026; Prezenti's application links now point to Tally Forms for its current pools).\n\n**Three grant types were offered, all denominated in cUSD:**\n\n- **MICRO — $2,000 cUSD.** For one-off contributions that significantly enhance the Celo community: financial assistance to projects at the very start of their journey, or retroactive funding for those who have already made notable contributions — community management, open-source code contributions, governance and educational content.\n- **PILOT — $10,000 cUSD.** For new projects yet to build and deploy a feasibility study, pilot, low-fidelity prototype or MVP. Small ticket size for getting something off the ground; applicants are expected to deliver at least to testnet (if technical) at a quality that could plausibly continue if the pilot succeeds. Projects must open-source their code and communicate what they learned. Priority to public-goods-style projects over commercial enterprises, though the latter is not disqualifying.\n- **GROWTH — $25,000 cUSD.** For incremental features for ecosystem mainstays or public goods. VC-funded, private, for-profit companies are not disqualified as a hard rule if they are clearly delivering something pivotal to the community.\n\nAt the time the round opened, Prezenti reported having received over 300 applications and granted $1.2M cUSD across more than 70 grants.\n\n**No round envelope was published.** The round announcement — forum.celo.org topic 9139, re-read on 2026-08-12 — gives the three tier sizes ($2,000 / $10,000 / $25,000) and no total; the string \"160,000\" does not appear in it. The CeloPG H2 2024 budget thread (topic 8231) sizes the programme rather than this round. The $1.2M cUSD above is stated there as Prezenti's track record before this round opened, immediately ahead of \"APPLICATIONS ARE NOW OPEN UNTIL 15th November 2024\", so it is not this round's allocation either. This record therefore carries the tier sizes as `minAward`/`maxAward` and no `budget` or `allocated`.\n\n**Announcement date not established.** Prezenti's forum post *Prezenti Opens Mint Round for Applications* is dated 1 October 2024, but that cannot be the first public notice: the round was already recorded elsewhere on 19 September 2024. No earlier announcement was found on the Celo forum or Prezenti's own pages, so `postedAt` is absent rather than a date known to be late.",
       "status": "closed",
       "operatingOrganizations": [
         {
@@ -3656,8 +3658,6 @@
       "fundingInfo": {
         "minAward": 2000,
         "maxAward": 25000,
-        "budget": 160000,
-        "allocated": 1129670,
         "currency": "USD"
       },
       "deadlines": [
@@ -5565,7 +5565,7 @@
       "id": "fundingmap:1291",
       "fundingType": "accelerator",
       "title": "Web3 X Incubation Program — Batch 07",
-      "description": "Batch 07 of the Web3 X Incubation Program, an execution-focused 6-week online incubation run by Web3 X (\"Since 2023, Web3 X has supported builders across the global Web3 ecosystem\"; the site claims 40+ startups incubated, $12M+ raised by alumni, 25+ ecosystem partnerships, 300+ investor connections and 10+ exchange listings supported).\n\nBatch 07 schedule as published: REGISTRATION 15.03 – 15.04; KICK-OFF May; PHASE 2 INVESTMENT TRAINING May – June; DEMO DAY August 2026. The core training is 6 weeks; all sessions are conducted online \"to allow global teams to participate, with additional opportunities for in-person networking during major Web3 events\".\n\nWhat teams get: \"The Opportunity To Invest Up To 50,000 USD After Graduation\"; \"Grant upto 100.000 USD and further support such as Investment, Liquidity, MKT, Listing from Ecosystem Partner\"; \"Exclusive Credits And Discounts Worth 500,000 USD From Our Partners\"; an \"Offline - DemoDay in one of the biggest blockchain event in Asia\"; \"Fast Track to other Incubation program such as MVB from BNB chain\"; mentorship, networking, and practical instruction in legal, listing, market making, tokenomics and fundraising.\n\nCohort workshop curriculum: Kick-off; Finding the right co-founder; Legal — how to set up a Web3 company; Pricing & Tokenomics; MKT and Go-To-Market in Web3; How Market Makers work; VC score cards; Closing ceremony & next steps. Demo Day track: VC insights panel; blockchain foundation insights panel; presenting effectively; pitching practice; security in Web3; metrics & benchmarks.\n\nTerms: \"There are no upfront fees to join Web3 X… In return for our support, investment access, and long-term partnership, we may request a small allocation of equity or tokens, depending on your project structure and fundraising plans.\"\n\nAs of 2026-08-11 the registration window (15.03 – 15.04) has closed and Batch 07 is at its Demo Day stage; the page still carries an active Apply Now form and no later batch has replaced Batch 07.\n\n**Announcement.** `postedAt` is 16 March 2026, the date Web3 X announced this batch: \"Applications for Web3 X Incubation Batch 07 are open\". The announcement followed the stated intake opening by a day.",
+      "description": "Batch 07 of the Web3 X Incubation Program, an execution-focused 6-week online incubation run by Web3 X (\"Since 2023, Web3 X has supported builders across the global Web3 ecosystem\"; the site claims 40+ startups incubated, $12M+ raised by alumni, 25+ ecosystem partnerships, 300+ investor connections and 10+ exchange listings supported).\n\nBatch 07 schedule as published: REGISTRATION 15.03 – 15.04; KICK-OFF May; PHASE 2 INVESTMENT TRAINING May – June; DEMO DAY August 2026. The core training is 6 weeks; all sessions are conducted online \"to allow global teams to participate, with additional opportunities for in-person networking during major Web3 events\".\n\nWhat teams get: \"The Opportunity To Invest Up To 50,000 USD After Graduation\"; \"Grant upto 100.000 USD and further support such as Investment, Liquidity, MKT, Listing from Ecosystem Partner\"; \"Exclusive Credits And Discounts Worth 500,000 USD From Our Partners\"; an \"Offline - DemoDay in one of the biggest blockchain event in Asia\"; \"Fast Track to other Incubation program such as MVB from BNB chain\"; mentorship, networking, and practical instruction in legal, listing, market making, tokenomics and fundraising.\n\nCohort workshop curriculum: Kick-off; Finding the right co-founder; Legal — how to set up a Web3 company; Pricing & Tokenomics; MKT and Go-To-Market in Web3; How Market Makers work; VC score cards; Closing ceremony & next steps. Demo Day track: VC insights panel; blockchain foundation insights panel; presenting effectively; pitching practice; security in Web3; metrics & benchmarks.\n\nTerms: \"There are no upfront fees to join Web3 X… In return for our support, investment access, and long-term partnership, we may request a small allocation of equity or tokens, depending on your project structure and fundraising plans.\"\n\nAs of 2026-08-11 the registration window (15.03 – 15.04) has closed and Batch 07 is at its Demo Day stage; the page still carries an active Apply Now form and no later batch has replaced Batch 07.\n\n**Announcement.** `postedAt` is 16 March 2026, the date Web3 X announced this batch: \"Applications for Web3 X Incubation Batch 07 are open\". The announcement followed the stated intake opening by a day.\n\n**No cohort envelope is published.** w3x.network/incubation, re-read on 2026-08-12, publishes only per-team figures — \"The Opportunity To Invest Up To 50,000 USD After Graduation\", \"Grant upto 100.000 USD\" from an ecosystem partner, and \"Credits And Discounts Worth 500,000 USD\" — and no total for the batch on any page. The USD 50 this record used to carry as a budget was a broken magnitude rather than a published figure; the real ceiling, 50,000 USD, is carried as `maxAward`.",
       "summary": "Web3 X's 6-week online incubation for MVP/pre-seed/seed Web3 teams: up to $50,000 investment after graduation, up to $100,000 in partner ecosystem grants, $500,000+ in partner credits, and an offline Demo Day in Asia.",
       "status": "closed",
       "operatingOrganizations": [
@@ -5587,7 +5587,6 @@
       "applicationUrl": "https://forms.clickup.com/9018573221/f/8crt0d5-26918/BWOVOFB8AMT993WNEF",
       "fundingInfo": {
         "currency": "USD",
-        "budget": 50,
         "maxAward": 50000
       },
       "deadlines": [
@@ -6302,8 +6301,8 @@
       "specVersion": "1.0.0",
       "id": "curated:arbitrum-dda-developer-tooling-on-arbitrum-one-and-nova",
       "fundingType": "rfp",
-      "title": "Arbitrum DDA — Developer Tooling on Arbitrum One and Nova",
-      "description": "The Developer Tooling domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. An elected domain allocator — listed as @Flook_Eth — owns the domain budget, publishes its priorities and decides each award; the domain is shown with Status \"Live\" and \"Available $132k\", which is the domain's remaining envelope rather than a per-award cap. The per-grant soft cap is stated separately as 25,000 ARB.\n\nThe domain page frames scope as four buckets. \"Back to basics\": essential infrastructure for asset visualisation and network interaction — e.g. an RPC built on Alchemy infrastructure, or translation of successful projects' documentation into Mandarin, Japanese, Spanish and French — plus foundations that let dApps and protocols run their own metrics systems, on the explicit view that \"Total Value Locked (TVL) may not be the most appropriate metric\". \"Bring something cool from another chain to Arbitrum\": toolkits and SDKs that make Lens-, Farcaster- or Push-style applications buildable on Arbitrum, including better documentation and MVPs for B2B SaaS-shaped functionality. \"Addressing the current challenges of Arbitrum\": centralization, ecosystem development and security — documentation to help build sequencers, developer SDKs for dApps \"we've never heard of\", and scanners that surface and improve vulnerabilities in deployed contracts. \"DevRel\": developer-first projects that streamline communication between developers and ecosystem stakeholders.\n\nWorked examples the allocator publishes: IDEs for Arbitrum's chains (editor, debugger, compiler, deployer, or Arbitrum support added to existing products); SDKs and libraries for interacting with Arbitrum's smart-contract platform plus testing, deployment and monitoring tooling; testing and debugging frameworks across environments; monitoring and analytics tools covering gas usage, transaction times and user engagement; documentation and tutorial portals covering Arbitrum's API; and community forums and support channels for Arbitrum developers. Projects that lower the barrier for new developers — tutorials, articles, boilerplate, starter projects — are explicitly in scope.\n\nEvaluation: \"Proposals in this domain are typically reviewed directly by the domain allocator. Depending on the proposal content, the domain allocator may consult with allocator(s) in relevant domain(s) and may invite other allocator(s) to provide additional review.\" The rubric is five items each scored 0–5: Team experience; Novelty and quality of the idea; Relevance to our ecosystem; Completeness of the plan; Feasibility of goals and timeline. \"Proposals that score highly in the evaluation rubric are more likely to be funded, but there is no minimum threshold number of points for funding and no threshold that guarantees funding. Grant decisions are heavily influenced by the evaluation rubric but also take into consideration the balancing of project areas.\"\n\nDisbursement is milestone-gated: \"All milestones are required to be filled in disbursements following the following disbursement schedule (template): Compound Milestone Tranches - Alcancía.pdf\". There is no round deadline — proposals are read as they arrive.\n\n**Go-live.** The DDA program \"went live on the 5th of October\" 2023 with $800k across four domains, of which this is one; Questbook's Phase 2 continuation request on the Arbitrum forum is what dates it. Both original domains in this corpus carry that same go-live as `postedAt`, because the four domains opened together and none of them was announced separately.",
+      "title": "Arbitrum DDA — Dev Tooling on One and Stylus",
+      "description": "The Developer Tooling domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. An elected domain allocator owns the domain budget, publishes its priorities and decides each award.\n\nThe domain page frames scope as four buckets. \"Back to basics\": essential infrastructure for asset visualisation and network interaction — e.g. an RPC built on Alchemy infrastructure, or translation of successful projects' documentation into Mandarin, Japanese, Spanish and French — plus foundations that let dApps and protocols run their own metrics systems, on the explicit view that \"Total Value Locked (TVL) may not be the most appropriate metric\". \"Bring something cool from another chain to Arbitrum\": toolkits and SDKs that make Lens-, Farcaster- or Push-style applications buildable on Arbitrum, including better documentation and MVPs for B2B SaaS-shaped functionality. \"Addressing the current challenges of Arbitrum\": centralization, ecosystem development and security — documentation to help build sequencers, developer SDKs for dApps \"we've never heard of\", and scanners that surface and improve vulnerabilities in deployed contracts. \"DevRel\": developer-first projects that streamline communication between developers and ecosystem stakeholders.\n\nWorked examples the allocator publishes: IDEs for Arbitrum's chains (editor, debugger, compiler, deployer, or Arbitrum support added to existing products); SDKs and libraries for interacting with Arbitrum's smart-contract platform plus testing, deployment and monitoring tooling; testing and debugging frameworks across environments; monitoring and analytics tools covering gas usage, transaction times and user engagement; documentation and tutorial portals covering Arbitrum's API; and community forums and support channels for Arbitrum developers. Projects that lower the barrier for new developers — tutorials, articles, boilerplate, starter projects — are explicitly in scope.\n\nEvaluation: \"Proposals in this domain are typically reviewed directly by the domain allocator. Depending on the proposal content, the domain allocator may consult with allocator(s) in relevant domain(s) and may invite other allocator(s) to provide additional review.\" The rubric is five items each scored 0–5: Team experience; Novelty and quality of the idea; Relevance to our ecosystem; Completeness of the plan; Feasibility of goals and timeline. \"Proposals that score highly in the evaluation rubric are more likely to be funded, but there is no minimum threshold number of points for funding and no threshold that guarantees funding. Grant decisions are heavily influenced by the evaluation rubric but also take into consideration the balancing of project areas.\"\n\nDisbursement is milestone-gated: \"All milestones are required to be filled in disbursements following the following disbursement schedule (template): Compound Milestone Tranches - Alcancía.pdf\". There is no round deadline — proposals are read as they arrive.\n\n**Go-live.** The DDA program \"went live on the 5th of October\" 2023 with $800k across four domains, of which this is one; Questbook's Phase 2 continuation request on the Arbitrum forum is what dates it. Both original domains in this corpus carry that same go-live as `postedAt`, because the four domains opened together and none of them was announced separately.\n\n**No current domain budget is recorded.** The \"Status Live\" and \"Available $132k\" this record used to carry were read off arbitrumhub.io, a third-party aggregator still showing the domain's Season 1/2 state, and no live source replaces them. Four places were checked on 2026-08-12: the arbitrumhub.io domain page (still \"Status Live\", still \"Available $132k\", still naming the Season 1/2 allocator); arbitrum.questbook.app, the DAO's actual intake, which is a JavaScript application serving no figures to fetch; and the DAO's own Season 3 RFC and election threads on forum.arbitrum.foundation (topics 27584 and 27909), which size the seasons — Season 1 at \"$250,000 per domain, totaling $1 million\" with a \"soft cap of $25,000 per project\", Season 2 \"expanded funding to $1,000,000 per domain\" — but publish no remaining balance for this domain. So the record carries no `fundingInfo` rather than a number describing a finished season, and no allocator is named: election thread 27909 opens candidacy for this domain afresh. That thread is also where the Season 3 name used in the title comes from — \"Dev Tooling on One and Stylus\"; \"Dev Tooling on One and Nova\" was the Season 1/2 name, and is what this record's identifier was minted from.",
       "summary": "Rolling, milestone-gated funding for developer tooling on Arbitrum One and Nova under the Arbitrum DAO's Delegated Domain Allocation model, decided by the elected domain allocator, with a 25,000 ARB per-grant soft cap.",
       "status": "open",
       "operatingOrganizations": [
@@ -6315,18 +6314,8 @@
           "ecosystems": ["Arbitrum"],
           "socialLinks": [
             {
-              "platform": "twitter",
-              "url": "https://twitter.com/Flook_eth"
-            },
-            {
               "platform": "forum",
               "url": "https://forum.arbitrum.foundation/"
-            }
-          ],
-          "contacts": [
-            {
-              "name": "@Flook_Eth",
-              "role": "Domain allocator, Developer Tooling on Arbitrum One and NOVA"
             }
           ]
         }
@@ -6337,11 +6326,7 @@
       },
       "ecosystems": ["Arbitrum"],
       "eligibility": "Open to teams and individuals building developer tooling, open-source dApps and documentation for Arbitrum One and Arbitrum Nova. Proposals belonging to other Arbitrum DDA domains (Education/Community/Events, Gaming, New Protocols and Ideas) should be submitted to those domains' own allocators instead.",
-      "applicationUrl": "https://www.arbitrumhub.io/grant-hub/quest-book/grants/tooling/",
-      "fundingInfo": {
-        "currency": "USD",
-        "budget": 132000
-      },
+      "applicationUrl": "https://arbitrum.questbook.app/",
       "deadlines": [
         {
           "deadlineType": "rolling",
@@ -6363,7 +6348,7 @@
           "The team is evidenced with links to references and socials."
         ]
       },
-      "additionalReferences": "Domain page with scope, rubric and soft cap: https://www.arbitrumhub.io/grant-hub/quest-book/grants/tooling/ · All DDA domains: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Questbook portal for Arbitrum grants, listing Arbitrum DDA 3.0 / 2.0 / 1.0 and the Arbitrum Stylus Sprint: https://arbitrum.questbook.app/ · Arbitrum governance forum: https://forum.arbitrum.foundation/ · Allocator: https://twitter.com/Flook_eth · Per-grant soft cap: 25,000 ARB. Disbursement template: \"Compound Milestone Tranches - Alcancía.pdf\". · DDA Phase 2 request for continuation, which dates the program's go-live: https://forum.arbitrum.foundation/t/questbook-dda-program-phase-2-request-for-continuation/21326",
+      "additionalReferences": "Questbook portal for Arbitrum grants, listing Arbitrum DDA 3.0 / 2.0 / 1.0 and the Arbitrum Stylus Sprint: https://arbitrum.questbook.app/ · Season 3 RFC, which sizes Seasons 1 and 2 and restates the domain scope: https://forum.arbitrum.foundation/t/27584 · Season 3 election and application thread, which names the domain \"Dev Tooling on One and Stylus\": https://forum.arbitrum.foundation/t/27909 · Arbitrum governance forum: https://forum.arbitrum.foundation/ · Domain page on arbitrumhub.io — a third-party aggregator last tracked at the domain's Season 1/2 state, and the source of the scope, rubric and soft-cap text quoted above rather than of any current figure: https://www.arbitrumhub.io/grant-hub/quest-book/grants/tooling/ · All DDA domains on that aggregator: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Per-grant soft cap: 25,000 ARB. Disbursement template: \"Compound Milestone Tranches - Alcancía.pdf\". · DDA Phase 2 request for continuation, which dates the program's go-live: https://forum.arbitrum.foundation/t/questbook-dda-program-phase-2-request-for-continuation/21326",
       "categories": [
         "Funding Opportunity",
         "Developer Tooling",
@@ -6375,15 +6360,11 @@
       "prerequisites": "The domain publishes the questions a good proposal answers: What are you building (less than 400 characters — \"We will have follow-up calls to dig deeper about the product. Be concise on the application.\"); In which stage is the project currently at? (\"Extra points if you have already started developing the project\"); Where are you heading with this grant? (company vs. open-source; plans to continue building after a successful grant completion); What are your metrics of success? (the domain focuses on pre- and post-deployment metrics); Tell us about the team — why you? (links to references and socials proving the experience); and a funding disbursement schedule using the domain's milestone-tranche template.",
       "socialLinks": [
         {
-          "platform": "twitter",
-          "url": "https://twitter.com/Flook_eth"
-        },
-        {
           "platform": "forum",
           "url": "https://forum.arbitrum.foundation/"
         }
       ],
-      "website": "https://www.arbitrumhub.io/grant-hub/quest-book/grants/tooling/",
+      "website": "https://arbitrum.questbook.app/",
       "sponsoringOrganizations": [
         {
           "name": "Arbitrum DAO",
@@ -6399,7 +6380,7 @@
       "id": "curated:arbitrum-dda-education-community-growth-and-events",
       "fundingType": "rfp",
       "title": "Arbitrum DDA — Education, Community Growth and Events",
-      "description": "The Education, Community Growth and Events domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. The elected domain allocator is listed as @SEED Latam, reachable through the domain's Discord invite. The domain shows Status \"Live\" with \"Available $120k\" — the remaining envelope, not a per-award cap.\n\nThe allocator states its posture plainly: \"We recognize that communities and the educational realm play an essential role in the growth of an ecosystem… However, we're also aware that this domain is one of the most challenging to evaluate its real impact or the quality of its content. We know it can be susceptible to opportunistic practices, such as 'farming', and sometimes the budgets presented may be excessive. It's vital for us to adopt a critical approach to ensure funds are allocated to initiatives that genuinely have a positive impact on Arbitrum.\"\n\nFour funding verticals are published: Organization of Hackathons (the primary vertical and \"our main focus\"), for web3 hackathons in Arbitrum One, Arbitrum Nova and Arbitrum Orbit ecosystems, with \"special attention to those hackathons that promote the development of tools and products using Stylus\"; Initiatives for Institutional Community Growth, connecting and strengthening the Arbitrum community in universities and educational institutions and reaching beyond software development into Economics, Law, Political Science and others, including innovations in academic development in collaboration with Arbitrum DAO and governance; Educational Materials and Workshops, long-lasting tutorials and videos covering Arbitrum One, Nova, Orbit and Stylus in visual, written or web formats, multilingual, and \"vital that these resources be freely accessible and offered for free\"; and IRL educational events where \"Arbitrum stands out as the protagonist\", with a stated preference for smaller gatherings of 30–60 participants in emerging or unconventional regions.\n\nExplicit exclusions: \"In the educational branch, we won't back sensationalist materials or those about airdrops, ARB token quotations, or fleeting news. Our mission is to promote consistent, long-term educational content.\" On events: \"we won't support two consecutive events from one region or the same country - this is obviously subject to demand\", and content value is prioritised \"rather than purely promotional strategies\".\n\nSix evaluation criteria are published: Team Composition and Experience (web3 plus \"a solid and verifiable background in web2\", trustworthy individuals with an impeccable reputation, no fraudulent behaviour); Innovation and Quality of the Idea (high quality, durable, freely accessible, academic rather than advertising, university collaborations valued); Budget and Plan Depth (justified budgets with a thorough breakdown; excessive or unrelated expenses will be scrutinised; applicants urged to receive funds through a multisig \"not only as a security measure but also to ensure resources aren't under the exclusive control of a single address\"); Roadmap and Milestones (well-defined, realistic, feasible; ambiguous proposals will not be considered; milestones serve as benchmarks for the community to monitor progress); Impact, Outcomes and Metrics (robust assessment methods, open and consistent communication with the Arbitrum community, tangible on-chain or off-chain outcomes, published metrics after a set period); and Long-Term Perspective (sustained vision, no short-lived initiatives).\n\nProposals are read as they arrive; there is no round deadline.\n\n**Go-live.** The DDA program \"went live on the 5th of October\" 2023 with $800k across four domains, of which this is one; Questbook's Phase 2 continuation request on the Arbitrum forum is what dates it. Both original domains in this corpus carry that same go-live as `postedAt`, because the four domains opened together and none of them was announced separately.",
+      "description": "The Education, Community Growth and Events domain of the Arbitrum DAO's Delegated Domain Allocation (DDA) program, administered on Questbook. The elected domain allocator is reachable through the domain's Discord invite.\n\nThe allocator states its posture plainly: \"We recognize that communities and the educational realm play an essential role in the growth of an ecosystem… However, we're also aware that this domain is one of the most challenging to evaluate its real impact or the quality of its content. We know it can be susceptible to opportunistic practices, such as 'farming', and sometimes the budgets presented may be excessive. It's vital for us to adopt a critical approach to ensure funds are allocated to initiatives that genuinely have a positive impact on Arbitrum.\"\n\nFour funding verticals are published: Organization of Hackathons (the primary vertical and \"our main focus\"), for web3 hackathons in Arbitrum One, Arbitrum Nova and Arbitrum Orbit ecosystems, with \"special attention to those hackathons that promote the development of tools and products using Stylus\"; Initiatives for Institutional Community Growth, connecting and strengthening the Arbitrum community in universities and educational institutions and reaching beyond software development into Economics, Law, Political Science and others, including innovations in academic development in collaboration with Arbitrum DAO and governance; Educational Materials and Workshops, long-lasting tutorials and videos covering Arbitrum One, Nova, Orbit and Stylus in visual, written or web formats, multilingual, and \"vital that these resources be freely accessible and offered for free\"; and IRL educational events where \"Arbitrum stands out as the protagonist\", with a stated preference for smaller gatherings of 30–60 participants in emerging or unconventional regions.\n\nExplicit exclusions: \"In the educational branch, we won't back sensationalist materials or those about airdrops, ARB token quotations, or fleeting news. Our mission is to promote consistent, long-term educational content.\" On events: \"we won't support two consecutive events from one region or the same country - this is obviously subject to demand\", and content value is prioritised \"rather than purely promotional strategies\".\n\nSix evaluation criteria are published: Team Composition and Experience (web3 plus \"a solid and verifiable background in web2\", trustworthy individuals with an impeccable reputation, no fraudulent behaviour); Innovation and Quality of the Idea (high quality, durable, freely accessible, academic rather than advertising, university collaborations valued); Budget and Plan Depth (justified budgets with a thorough breakdown; excessive or unrelated expenses will be scrutinised; applicants urged to receive funds through a multisig \"not only as a security measure but also to ensure resources aren't under the exclusive control of a single address\"); Roadmap and Milestones (well-defined, realistic, feasible; ambiguous proposals will not be considered; milestones serve as benchmarks for the community to monitor progress); Impact, Outcomes and Metrics (robust assessment methods, open and consistent communication with the Arbitrum community, tangible on-chain or off-chain outcomes, published metrics after a set period); and Long-Term Perspective (sustained vision, no short-lived initiatives).\n\nProposals are read as they arrive; there is no round deadline.\n\n**Go-live.** The DDA program \"went live on the 5th of October\" 2023 with $800k across four domains, of which this is one; Questbook's Phase 2 continuation request on the Arbitrum forum is what dates it. Both original domains in this corpus carry that same go-live as `postedAt`, because the four domains opened together and none of them was announced separately.\n\n**No current domain budget is recorded.** The \"Status Live\" and \"Available $120k\" this record used to carry were read off arbitrumhub.io, a third-party aggregator still showing the domain's Season 1/2 state, and no live source replaces them. Four places were checked on 2026-08-12: the arbitrumhub.io domain page (still \"Status Live\", still \"Available $120k\"); arbitrum.questbook.app, the DAO's actual intake, which is a JavaScript application serving no figures to fetch; and the DAO's own Season 3 RFC and election threads on forum.arbitrum.foundation (topics 27584 and 27909), which size the seasons — Season 1 at \"$250,000 per domain, totaling $1 million\", Season 2 \"expanded funding to $1,000,000 per domain\" — but publish no remaining balance for this domain. Topic 27909 lists \"Education, Community Growth and Events\" as a live Season 3 domain, which is why this record stays open under its own name and carries no `fundingInfo` rather than a figure describing a finished season.",
       "summary": "Rolling, milestone-gated funding for Arbitrum hackathons, academic community growth, free educational materials and small IRL educational events, decided by the elected domain allocator @SEED Latam.",
       "status": "open",
       "operatingOrganizations": [
@@ -6433,11 +6414,7 @@
       },
       "ecosystems": ["Arbitrum"],
       "eligibility": "Open to teams and individuals running Arbitrum-focused hackathons, university and institutional community programs, free educational materials, and small IRL educational events. Technical build work belongs to the other DDA domains. Geographic diversity is an explicit selection factor for events, and two consecutive events from one region or country will not be supported. Applicants are urged to receive funds through a multisig rather than a single address.",
-      "applicationUrl": "https://www.arbitrumhub.io/grant-hub/quest-book/grants/education/",
-      "fundingInfo": {
-        "currency": "USD",
-        "budget": 120000
-      },
+      "applicationUrl": "https://arbitrum.questbook.app/",
       "deadlines": [
         {
           "deadlineType": "rolling",
@@ -6459,7 +6436,7 @@
           "Impact must be measurable, with metrics and outcomes published to the Arbitrum community after a set period."
         ]
       },
-      "additionalReferences": "Domain page with scope and criteria: https://www.arbitrumhub.io/grant-hub/quest-book/grants/education/ · All DDA domains: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Questbook portal for Arbitrum grants: https://arbitrum.questbook.app/ · Allocator Discord: https://discord.com/invite/zMy9gUzzHH · Arbitrum governance forum: https://forum.arbitrum.foundation/ · DDA Phase 2 request for continuation, which dates the program's go-live: https://forum.arbitrum.foundation/t/questbook-dda-program-phase-2-request-for-continuation/21326",
+      "additionalReferences": "Questbook portal for Arbitrum grants: https://arbitrum.questbook.app/ · Season 3 RFC, which sizes Seasons 1 and 2: https://forum.arbitrum.foundation/t/27584 · Season 3 election and application thread, which lists this domain as live: https://forum.arbitrum.foundation/t/27909 · Domain page on arbitrumhub.io — a third-party aggregator last tracked at the domain's Season 1/2 state, and the source of the scope and criteria quoted above rather than of any current figure: https://www.arbitrumhub.io/grant-hub/quest-book/grants/education/ · All DDA domains on that aggregator: https://www.arbitrumhub.io/grant-hub/quest-book/grants/ · Allocator Discord: https://discord.com/invite/zMy9gUzzHH · Arbitrum governance forum: https://forum.arbitrum.foundation/ · DDA Phase 2 request for continuation, which dates the program's go-live: https://forum.arbitrum.foundation/t/questbook-dda-program-phase-2-request-for-continuation/21326",
       "categories": [
         "Funding Opportunity",
         "Education",
@@ -6479,7 +6456,7 @@
           "url": "https://forum.arbitrum.foundation/"
         }
       ],
-      "website": "https://www.arbitrumhub.io/grant-hub/quest-book/grants/education/",
+      "website": "https://arbitrum.questbook.app/",
       "sponsoringOrganizations": [
         {
           "name": "Arbitrum DAO",
@@ -7219,9 +7196,9 @@
       "id": "curated:unichain-grants",
       "fundingType": "grant",
       "title": "Unichain Grants",
-      "description": "The Uniswap Foundation funds work across the Uniswap Protocol and Unichain in five focus areas it publishes as: **Developers** (onboarding new developers to build on the Uniswap Protocol and supporting them through the development lifecycle), **Infrastructure** (new core infrastructure and growth strategies), **Governance** (empowering Uniswap governance to support protocol growth and sustain itself), **Research** (seeding DeFi research and its practical implementations), and **Security** (protecting the Protocol's users through investments into security). Its grants page groups the funded portfolio under Ecosystem, Research, Security and Governance.\n\n**Payment currency and mechanics:** the Foundation's FAQ states that \"Grant payments are currently made in fiat USD or USDC.\" During the Selection phase a team member works with the applicant to outline grant milestones, each tied to clear deliverables and to a portion of the overall payment; **grants typically have 2-5 milestones**, defined in the contract executed on approval. The initial payment is disbursed after KYC and contract signature, and subsequent payments on completion of each milestone. Every grantee is assigned a point person for 1-1 support and milestone check-ins.\n\nRepresentative funded work includes the Uniswap Hook Incubator (Atrium Academy, 1,200+ applicants and 400+ developers onboarded), the OpenZeppelin v4 Hooks Library, the Uniswap Foundation Security Fund (Areta), v4 audits (OpenZeppelin, Trail of Bits, Cantina/Spearbit, ABDK, Certora), Unichain infrastructure and DeFi protocol onboarding support, the Protocol Grants Program (Auditless), Doppler (Whetstone), TLDR, and governance work with Agora, Blockful and Butter.\n\n**⚠️ Intake state (checked 2026-08-11):** could not be confirmed. The Uniswap Foundation grants page at uniswapfoundation.org/grants is a funded-grants portfolio and impact page — it contains no application form, no apply call-to-action, and in fact no occurrence of the words \"apply\", \"application\", \"submit\" or \"intake\" anywhere in its markup; /grants/apply and /apply both return HTTP 404. The Foundation's FAQ describes an active application and selection process in the present tense, and the HubSpot form recorded on this program returns HTTP 200, but a HubSpot form shell returns 200 whether or not the round behind it is accepting. No published award range or deadline was found on any Uniswap Foundation page, so no funding figures are asserted here.\n\nUnichain Developer Grants were announced by the Uniswap Foundation on 14 October 2024, in the post \"Introducing Unichain Developer Grants\".\n\n**Why no figure is recorded.** The Foundation publishes no award range and no Unichain-earmarked envelope. The number that does exist is foundation-wide: the Uniswap Unleashed proposal, executed on-chain in March 2025, requested \"an investment of $95.4M into the UF grants budget, and $25.1M to fund operations, for the next 2 years\", with \"projected grants budgets for 2025 and 2026 [of] $57.9M and $41.5M respectively\" — across Ecosystem, Research, Security and Governance, and across both Uniswap protocol and Unichain work. Putting it on this record would assert an attribution the Foundation never made. The same proposal names the Unichain-specific programs (Developer Growth Programs, a Unichain Infrastructure Allocation, a Unichain DeFi Partner Allocation, Unigames) without sizing any of them; the per-program breakdown exists only inside an embedded chart image. The sibling $45M is liquidity incentives, not grants.\n\nThe one publication that might have carried a Unichain-earmarked figure — the original announcement on Mirror — is unrecoverable: Mirror migrated to Paragraph, the URL now serves that platform's own homepage and no capture of the post exists. The Foundation's blog post announcing the program, referenced above, is the live equivalent and carries no figure.",
+      "description": "The Uniswap Foundation funds work across the Uniswap Protocol and Unichain in five focus areas it publishes as: **Developers** (onboarding new developers to build on the Uniswap Protocol and supporting them through the development lifecycle), **Infrastructure** (new core infrastructure and growth strategies), **Governance** (empowering Uniswap governance to support protocol growth and sustain itself), **Research** (seeding DeFi research and its practical implementations), and **Security** (protecting the Protocol's users through investments into security). Its grants page groups the funded portfolio under Ecosystem, Research, Security and Governance.\n\n**Payment currency and mechanics:** the Foundation's FAQ states that \"Grant payments are currently made in fiat USD or USDC.\" During the Selection phase a team member works with the applicant to outline grant milestones, each tied to clear deliverables and to a portion of the overall payment; **grants typically have 2-5 milestones**, defined in the contract executed on approval. The initial payment is disbursed after KYC and contract signature, and subsequent payments on completion of each milestone. Every grantee is assigned a point person for 1-1 support and milestone check-ins.\n\nRepresentative funded work includes the Uniswap Hook Incubator (Atrium Academy, 1,200+ applicants and 400+ developers onboarded), the OpenZeppelin v4 Hooks Library, the Uniswap Foundation Security Fund (Areta), v4 audits (OpenZeppelin, Trail of Bits, Cantina/Spearbit, ABDK, Certora), Unichain infrastructure and DeFi protocol onboarding support, the Protocol Grants Program (Auditless), Doppler (Whetstone), TLDR, and governance work with Agora, Blockful and Butter.\n\n**Intake state (re-checked 2026-08-12): open.** The Foundation's current Build on Uniswap page carries a \"Unichain grants\" entry reading \"Unichain DeFi projects with $250K+ TVL and infrastructure projects can apply for product and GTM support, with up to $7.5K in grants funding\", and links exactly the HubSpot form this record carries as its `applicationUrl`. The separate grants page at uniswapfoundation.org/grants is a funded-portfolio and impact view rather than an intake: it carries no application form and no occurrence of \"apply\", \"application\", \"submit\" or \"intake\" anywhere in its markup, and /grants/apply and /apply both return HTTP 404. Nothing on any Foundation page or on gov.uniswap.org announces a closure, pause or sunset. No deadline is published; applications are read as they arrive.\n\nUnichain Developer Grants were announced by the Uniswap Foundation on 14 October 2024, in the post \"Introducing Unichain Developer Grants\".\n\n**Why no envelope is recorded.** The only Unichain-attributed figure the Foundation publishes is the per-grant ceiling quoted above — \"up to $7.5K in grants funding\" — which is a maximum award and not a programme budget. It publishes no Unichain-earmarked envelope. The number that does exist is foundation-wide: the Uniswap Unleashed proposal, executed on-chain in March 2025, requested \"an investment of $95.4M into the UF grants budget, and $25.1M to fund operations, for the next 2 years\", with \"projected grants budgets for 2025 and 2026 [of] $57.9M and $41.5M respectively\" — across Ecosystem, Research, Security and Governance, and across both Uniswap protocol and Unichain work. Putting it on this record would assert an attribution the Foundation never made. The same proposal names the Unichain-specific programs (Developer Growth Programs, a Unichain Infrastructure Allocation, a Unichain DeFi Partner Allocation, Unigames) without sizing any of them; the per-program breakdown exists only inside an embedded chart image. The sibling $45M is liquidity incentives, not grants.\n\nThe one publication that might have carried a Unichain-earmarked figure — the original announcement on Mirror — is unrecoverable: Mirror migrated to Paragraph, the URL now serves that platform's own homepage and no capture of the post exists. The Foundation's blog post announcing the program, referenced above, is the live equivalent and carries no figure.",
       "summary": "Rolling Uniswap Foundation grants across Uniswap v4 and Unichain — protocol, tooling, apps, research, governance and security.",
-      "status": "closed",
+      "status": "open",
       "operatingOrganizations": [
         {
           "name": "Uniswap Foundation",
@@ -7266,7 +7243,7 @@
         "milestoneBased": true,
         "programModel": "grant"
       },
-      "additionalReferences": "Uniswap Foundation FAQs (grant payment currency, milestone mechanics, foundation identity): https://www.uniswapfoundation.org/faqs — grants portfolio: https://www.uniswapfoundation.org/grants — announcement, \"Introducing Unichain Developer Grants\" (14 October 2024): https://www.uniswapfoundation.org/blog/introducing-unichain-developer-grants — Uniswap governance forum: https://gov.uniswap.org/ — developer docs: https://developers.uniswap.org/docs",
+      "additionalReferences": "Build on Uniswap, which carries the Unichain grants call to apply and links this record's application form: https://www.uniswapfoundation.org/build — Uniswap Foundation FAQs (grant payment currency, milestone mechanics, foundation identity): https://www.uniswapfoundation.org/faqs — grants portfolio: https://www.uniswapfoundation.org/grants — announcement, \"Introducing Unichain Developer Grants\" (14 October 2024): https://www.uniswapfoundation.org/blog/introducing-unichain-developer-grants — Uniswap governance forum: https://gov.uniswap.org/ — developer docs: https://developers.uniswap.org/docs",
       "categories": ["Funding Opportunity", "DeFi", "Developer Tools", "Research"],
       "socialLinks": [
         {
@@ -8121,7 +8098,7 @@
       "id": "curated:ethonline-2026",
       "fundingType": "hackathon",
       "title": "ETHOnline 2026",
-      "description": "ETHGlobal's flagship async online hackathon, open to builders worldwide across multiple sponsor tracks and prize pools spanning the Ethereum ecosystem.\n\nThe events index lists ETHOnline 2026 as an 'Async Hackathon' with status 'Apply to Attend', running September 4-16, 2026. The event's own data gives a sign-up deadline of 2026-09-06T17:00Z and a submission deadline of 2026-09-13T16:00Z. The prize pool was not yet published when this record was written, so no prize figures are recorded.\n\nETHGlobal published no announcement post for this edition, so `postedAt` is an archival bound rather than an announcement date: ETHOnline 2026 was publicly visible by 6 May 2026, the first capture of the events index that lists it; the preceding capture, 29 March 2026, does not.",
+      "description": "ETHGlobal's flagship async online hackathon, open to builders worldwide across multiple sponsor tracks and prize pools spanning the Ethereum ecosystem.\n\nThe events index lists ETHOnline 2026 as an 'Async Hackathon' with status 'Apply to Attend', running September 4-16, 2026. The event's own data gives a sign-up deadline of 2026-09-06T17:00Z and a submission deadline of 2026-09-13T16:00Z. The prize pool published on the event's prizes page totals $85,000 across 8 sponsors; that total is recorded as the budget. The prizes and tracks arrays below sample one sponsor's tracks (Hedera, five tracks totalling $15,000) and are not exhaustive; the other seven sponsors' pages still read \"Prize details coming soon\".\n\nETHGlobal published no announcement post for this edition, so `postedAt` is an archival bound rather than an announcement date: ETHOnline 2026 was publicly visible by 6 May 2026, the first capture of the events index that lists it; the preceding capture, 29 March 2026, does not.",
       "summary": "ETHGlobal's flagship async online Ethereum hackathon, open worldwide, running September 4-16, 2026.",
       "status": "open",
       "operatingOrganizations": [
@@ -8208,7 +8185,7 @@
           "Autonomous On-Chain Automation Platform"
         ]
       },
-      "additionalReferences": "Events index: https://ethglobal.com/events · Event page: https://ethglobal.com/events/ethonline2026",
+      "additionalReferences": "Events index: https://ethglobal.com/events · Event page: https://ethglobal.com/events/ethonline2026 · Prizes page, which carries the sponsor breakdown behind the recorded budget: https://ethglobal.com/events/ethonline2026/prizes",
       "categories": ["Funding Opportunity", "Hackathon"],
       "website": "https://ethglobal.com/events/ethonline2026",
       "sponsoringOrganizations": [
@@ -8301,7 +8278,7 @@
       "id": "curated:ethglobal-tokyo-2026",
       "fundingType": "hackathon",
       "title": "ETHGlobal Tokyo 2026",
-      "description": "In-person ETHGlobal hackathon in Tokyo, Japan, bringing together developers to build on Ethereum and partner protocols over a weekend.\n\nThe events index lists ETHGlobal Tokyo 2026 as an 'IRL Hackathon' with status 'Apply to Attend', running September 25-27, 2026. The event's own data gives a sign-up deadline of 2026-09-23T14:59Z and a submission deadline of 2026-09-27T00:00Z. The prize pool was not yet published when this record was written.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
+      "description": "In-person ETHGlobal hackathon in Tokyo, Japan, bringing together developers to build on Ethereum and partner protocols over a weekend.\n\nThe events index lists ETHGlobal Tokyo 2026 as an 'IRL Hackathon' with status 'Apply to Attend', running September 25-27, 2026. The event's own data gives a sign-up deadline of 2026-09-23T14:59Z and a submission deadline of 2026-09-27T00:00Z. The prize pool published on the event's prizes page totals $45,000 across 5 sponsors; that total is recorded as the budget.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
       "summary": "In-person ETHGlobal hackathon in Tokyo, September 25-27, 2026, building on Ethereum and partner protocols.",
       "status": "open",
       "operatingOrganizations": [
@@ -8359,7 +8336,7 @@
         "location": "Tokyo, Japan",
         "online": false
       },
-      "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Events index: https://ethglobal.com/events",
+      "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Events index: https://ethglobal.com/events · Prizes page, which carries the sponsor breakdown behind the recorded budget: https://ethglobal.com/events/tokyo2026/prizes",
       "categories": ["Funding Opportunity", "Hackathon"],
       "website": "https://ethglobal.com/events/tokyo2026",
       "sponsoringOrganizations": [
@@ -8423,7 +8400,7 @@
       "id": "curated:ethglobal-mumbai",
       "fundingType": "hackathon",
       "title": "ETHGlobal Mumbai",
-      "description": "In-person ETHGlobal hackathon in Mumbai, India, part of ETHGlobal's global IRL hackathon circuit with multiple sponsor prize tracks.\n\nThe events index lists ETHGlobal Mumbai as an 'IRL Hackathon' with status 'Apply to Attend', running November 6-8, 2026. The event's own data gives a sign-up deadline of 2026-11-03T18:29Z and a submission deadline of 2026-11-08T03:30Z. The prize pool was not yet published when this record was written.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
+      "description": "In-person ETHGlobal hackathon in Mumbai, India, part of ETHGlobal's global IRL hackathon circuit with multiple sponsor prize tracks.\n\nThe events index lists ETHGlobal Mumbai as an 'IRL Hackathon' with status 'Apply to Attend', running November 6-8, 2026. The event's own data gives a sign-up deadline of 2026-11-03T18:29Z and a submission deadline of 2026-11-08T03:30Z. The prize pool published on the event's prizes page totals $95,000 across 6 sponsors; that total is recorded as the budget.\n\nETHGlobal announced its 2026 in-person hackathon calendar, this event included, on 24 November 2025; the events index carried no such event on 22 November 2025 and listed it on 26 November, which is what dates `postedAt` here.",
       "summary": "In-person ETHGlobal hackathon in Mumbai, November 6-8, 2026, with multiple sponsor prize tracks.",
       "status": "open",
       "operatingOrganizations": [
@@ -8481,7 +8458,7 @@
         "location": "Mumbai, India",
         "online": false
       },
-      "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Events index: https://ethglobal.com/events",
+      "additionalReferences": "ETHGlobal's announcement of the 2026 in-person hackathon calendar: https://x.com/ETHGlobal/status/1992919708589576215 · Events index: https://ethglobal.com/events · Prizes page, which carries the sponsor breakdown behind the recorded budget: https://ethglobal.com/events/mumbai/prizes",
       "categories": ["Funding Opportunity", "Hackathon"],
       "website": "https://ethglobal.com/events/mumbai",
       "sponsoringOrganizations": [
@@ -9462,7 +9439,7 @@
         "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
         "platform": "Immunefi"
       },
-      "additionalReferences": "In scope: 8 websites and applications assets, 2 smart contract assets. Representative in-scope assets: https://ens.domains · https://metadata.ens.domains/docs · https://github.com/ensdomains/ensdomains-landing · https://github.com/ensdomains/ens-app-v3 · https://app.ens.domains/ · https://github.com/ensdomains/ens-metadata-service. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-17. Programme page: https://immunefi.com/bug-bounty/ens/information/",
+      "additionalReferences": "In scope: 8 websites and applications assets, 2 smart contract assets. Representative in-scope assets: https://ens.domains · https://metadata.ens.domains/docs · https://github.com/ensdomains/ensdomains-landing · https://github.com/ensdomains/ens-app-v3 · https://app.ens.domains/ · https://github.com/ensdomains/ens-metadata-service. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-17. Programme page: https://immunefi.com/bug-bounty/ens/information/ (as of 2026-08-12 one of the listed asset repositories, ensdomains/ensdomains-landing, returns HTTP 404 on GitHub; it is recorded as the funder publishes it.)",
       "categories": [
         "Funding Opportunity",
         "Security",
@@ -10018,7 +9995,7 @@
           }
         ],
         "platform": "Cantina",
-        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.xyz/cantina-docs/cantina-bounties/bounty-severity-classification)"
+        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.security/standards/severity/bug-bounty)"
       },
       "additionalReferences": "In-scope asset groups: WebApps (8 listed assets), Morpho Midnight and Vault V2 (0 listed assets), Morpho Blue and Vault V1 (0 listed assets). Out-of-scope groups published: Out of Scope Smart Contract, Known Issues, Out of Scope Website and Application. Rewards paid in USDC. Advertised maximum/total reward pot: 2,500,000 USD. Programme created on Cantina 2024-03-27. Some in-scope groups enumerate no individual assets on the asset list; their full scope is set out in prose in the programme instructions on the page. Programme page: https://cantina.xyz/bounties/35a5f0a1-2ffd-432c-8f3b-77d169add8c3",
       "categories": ["Funding Opportunity", "Security", "Bug Bounty"],
@@ -10364,7 +10341,7 @@
           }
         ],
         "platform": "Cantina",
-        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.xyz/cantina-docs/cantina-bounties/bounty-severity-classification)"
+        "severityScheme": "Cantina bounty severity classification (https://docs.cantina.security/standards/severity/bug-bounty)"
       },
       "additionalReferences": "In-scope asset groups: Smart Contracts: (11 listed assets). Out-of-scope groups published: Default Out of Scope:. Rewards paid in USDC. Advertised maximum/total reward pot: 250,000 USD. Programme created on Cantina 2025-09-18. Programme page: https://cantina.xyz/bounties/3aaad22b-52ee-4bb2-bed2-4be53b0993cc",
       "categories": ["Funding Opportunity", "Security", "Bug Bounty"],
@@ -11148,7 +11125,7 @@
         "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
         "platform": "Immunefi"
       },
-      "additionalReferences": "In scope: 355 smart contract assets, 4 websites and applications assets. Representative in-scope assets: https://basescan.org/address/0x983eC82E45C61a42FDDA7B3c43B8C767004c8A74 · https://unichain.blockscout.com/address/0x7B8ee8b0fD62662F7FB1ac9e5E6cEAad5195A3bF · https://github.com/marsfoundation/spark-dev-docs · https://blockscout.com/xdai/mainnet/address/0x1022E390E2457A78E18AEEE0bBf0E96E482EeE19#code · https://arbiscan.io/address/0xcA61540eC2AC74E6954FA558B4aF836d95eCb91b#code · https://etherscan.io/address/0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE#code. Rewards are denominated in USD and paid in DAI on Ethereum. Programme page last updated 2026-07-28. Programme page: https://immunefi.com/bug-bounty/sparklend/information/",
+      "additionalReferences": "In scope: 355 smart contract assets, 4 websites and applications assets. Representative in-scope assets: https://basescan.org/address/0x983eC82E45C61a42FDDA7B3c43B8C767004c8A74 · https://unichain.blockscout.com/address/0x7B8ee8b0fD62662F7FB1ac9e5E6cEAad5195A3bF · https://github.com/marsfoundation/spark-dev-docs · https://blockscout.com/xdai/mainnet/address/0x1022E390E2457A78E18AEEE0bBf0E96E482EeE19#code · https://arbiscan.io/address/0xcA61540eC2AC74E6954FA558B4aF836d95eCb91b#code · https://etherscan.io/address/0x02C3eA4e34C0cBd694D2adFa2c690EECbC1793eE#code. Rewards are denominated in USD and paid in DAI on Ethereum. Programme page last updated 2026-07-28. Programme page: https://immunefi.com/bug-bounty/sparklend/information/ (as of 2026-08-12 one of the listed asset repositories, marsfoundation/spark-dev-docs, returns HTTP 404 on GitHub; it is recorded as the funder publishes it.)",
       "categories": [
         "Funding Opportunity",
         "Security",
@@ -12275,7 +12252,7 @@
         "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
         "platform": "Immunefi"
       },
-      "additionalReferences": "In scope: 2 smart contract assets. Representative in-scope assets: https://wwwimmunefi.com · https://github.com/Gearbox-protocol/security/blob/main/bug-bounty/v3_1-scope.md. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-29. Programme page: https://immunefi.com/bug-bounty/gearbox/information/",
+      "additionalReferences": "In scope: 2 smart contract assets. Representative in-scope assets: https://github.com/Gearbox-protocol/security/blob/main/bug-bounty/v3_1-scope.md. (Immunefi's asset list also carries a Primacy-of-Impact placeholder whose published URL, https://wwwimmunefi.com, does not resolve — an upstream typo, recorded here rather than corrected.) Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-29. Programme page: https://immunefi.com/bug-bounty/gearbox/information/",
       "categories": [
         "Funding Opportunity",
         "Security",

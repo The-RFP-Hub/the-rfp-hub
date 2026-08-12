@@ -397,12 +397,15 @@ Where the honest answer is less data, the corpus carries less data:
   The field is optional in the Standard; leaving it absent is a fact about the program, whereas
   substituting a listing page or an archive copy would put something in the field consumers read as
   "apply here" that the funder never published.
-- **17 documents carry no `fundingInfo`**, and for every one of them the absence has been chased to
+- **19 documents carry no `fundingInfo`**, and for every one of them the absence has been chased to
   the funder's own pages and written into the record. Several are deliberate on the funder's part —
   "This is not a grant program", "Budget envelope: Open — propose your number", hackathons whose
   prizes are certificates and mentorship — and the rest are programs that fund without ever
   publishing a number. Two also lost a placeholder — a USD 1 "prize pool" and a USD 3 one — that
-  had survived from a source snapshot.
+  had survived from a source snapshot. The two Arbitrum DDA domains joined this list when their
+  budgets could not be re-evidenced: the only source for them was a third-party aggregator frozen
+  at the program's Season 1/2 state, and the DAO's own governance threads size the seasons without
+  publishing a remaining balance per domain. Each record names the places that were checked.
 
 Of the 45 bounties, **44 are `security` and 1 is `task`**, and each carries exactly one
 compensation shape: a security record's published ceiling is a tier table rather than a scalar
