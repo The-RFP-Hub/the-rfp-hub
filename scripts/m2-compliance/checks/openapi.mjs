@@ -6,6 +6,12 @@
  * says about it: the status must be one the operation documents, the content type must be one it
  * declares, and the body must validate against the schema declared for that pair.
  *
+ * "Validate against the schema" is a JSON sentence, and not every operation here serves JSON — the
+ * syndication feeds serve Atom and RSS. Those responses are held to everything that still applies
+ * (documented status, declared content type, non-empty body, and, for an XML media type, that the
+ * document is actually parseable), and the report SAYS that the schema half was not applicable
+ * rather than quietly claiming a validation that never happened. See `validateAgainstResponse`.
+ *
  * Nothing is enumerated from the repo. The path list, the parameter list, the accepted values and
  * the error contract are all read out of the served document, so this fails when the deployment
  * and its own published spec disagree — which is precisely the failure the in-process test in
@@ -17,6 +23,7 @@
  */
 import { url, asJson, mediaType, request } from "../http.mjs";
 import { OpenApiBundle } from "../schema.mjs";
+import { checkWellFormed } from "../xml.mjs";
 
 const DOC_PATHS = ["/v1/docs/json", "/v1/docs/openapi.json", "/v1/openapi.json"];
 const UNKNOWN_PARAM = "definitely_not_a_documented_parameter";
@@ -260,7 +267,7 @@ async function exerciseOperation(c, ctx, bundle, { path, method, operation, path
   if (detail.ok) {
     c.pass(
       `${label} conforms to its published contract`,
-      `→ ${res.status} ${res.contentType} in ${res.elapsedMs} ms, body validates against ${detail.against}`,
+      `→ ${res.status} ${res.contentType} in ${res.elapsedMs} ms, ${summarize(detail)}`,
     );
   } else {
     c.fail(`${label} conforms to its published contract`, `→ ${res.status}: ${detail.problem}`);
@@ -277,7 +284,14 @@ function responseFor(responses, status) {
   );
 }
 
-/** Hold one live response to one declared response object: media type, then schema. */
+/**
+ * Hold one live response to one declared response object: media type, then schema.
+ *
+ * A successful result carries either `against` (what the body was validated against, for the JSON
+ * case) or `verified` (a full phrase, for the case where schema validation does not apply); render
+ * both through `summarize` so the report never says "validates against" about something it did not
+ * validate.
+ */
 function validateAgainstResponse(bundle, response, res) {
   const content = response.content;
   if (!content || Object.keys(content).length === 0) {
@@ -295,6 +309,11 @@ function validateAgainstResponse(bundle, response, res) {
       problem: `served as ${res.contentType || "(no content-type)"}, which the operation does not declare (it declares ${Object.keys(content).join(", ")})`,
     };
   }
+  // A JSON Schema describes a JSON value. When the declared media type is not one, the declared
+  // schema cannot be applied to the body — parsing it as JSON is not a stricter check, it is a
+  // wrong one — so the non-JSON branch verifies what is verifiable and reports the difference.
+  if (!isJson(key)) return verifyNonJsonBody(key, res);
+
   const schema = content[key].schema;
   if (!schema) return { ok: true, against: `${key} with no declared schema` };
 
@@ -315,6 +334,62 @@ function validateAgainstResponse(bundle, response, res) {
       .map((e) => `  - ${e}`)
       .join("\n")}${errors.length > 8 ? `\n  … and ${errors.length - 8} more` : ""}`,
   };
+}
+
+/** `application/json`, `application/schema+json`, `text/json` — anything a JSON Schema applies to. */
+function isJson(type) {
+  const value = mediaType(type);
+  return value === "application/json" || value === "text/json" || value.endsWith("+json");
+}
+
+/** `application/xml`, `text/xml`, `application/atom+xml`, `application/rss+xml`, … */
+function isXml(type) {
+  const value = mediaType(type);
+  return value === "application/xml" || value === "text/xml" || value.endsWith("+xml");
+}
+
+/**
+ * Everything a response whose media type is not JSON can still be held to.
+ *
+ * The status was already matched to a documented response and the content type to a declared media
+ * type — that is how the caller found `key` — so what is left is the body: it must not be empty,
+ * and if the media type says XML it must be a document a reader could actually parse. That last
+ * one is the check with teeth: a serializer that forgets to escape an ampersand in a title still
+ * answers 200 with the right content type, and only a parse catches it.
+ *
+ * What is NOT claimed is said out loud. A pass here means "these things held and the schema half
+ * did not apply", never "the body validated".
+ */
+function verifyNonJsonBody(key, res) {
+  const bytes = res.body.length;
+  if (bytes === 0) {
+    return {
+      ok: false,
+      problem: `served as ${key} with an empty body, but the operation declares a body for this status`,
+    };
+  }
+  if (!isXml(key)) {
+    return {
+      ok: true,
+      verified: `${key} is not a JSON media type: schema validation is not applicable; verified the documented status, the declared content type and a non-empty body (${bytes} bytes)`,
+    };
+  }
+  const xml = checkWellFormed(res.body);
+  if (!xml.ok) {
+    return {
+      ok: false,
+      problem: `served as ${key}, but the body is not well-formed XML: ${xml.error}`,
+    };
+  }
+  return {
+    ok: true,
+    verified: `${key} is an XML media type: schema validation is not applicable; verified the documented status, the declared content type, a non-empty body (${bytes} bytes) and well-formedness (root <${xml.root}>, ${xml.elements} elements)`,
+  };
+}
+
+/** How one validation result reads in the report — and it only says "validates" when it did. */
+function summarize(detail) {
+  return detail.verified ?? `body validates against ${detail.against}`;
 }
 
 /**
@@ -392,7 +467,7 @@ async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
     c.expect(
       detail.ok,
       `GET ${path} answers 404 for a record that does not exist`,
-      `→ 404, body validates against ${detail.against}`,
+      `→ 404, ${summarize(detail)}`,
       `→ 404, but ${detail.problem}`,
     );
   }
@@ -418,12 +493,7 @@ async function expect400(c, ctx, bundle, operation, { name, target, why }) {
     return;
   }
   const detail = validateAgainstResponse(bundle, declared, res);
-  c.expect(
-    detail.ok,
-    name,
-    `→ 400, body validates against ${detail.against}`,
-    `→ 400, but ${detail.problem}`,
-  );
+  c.expect(detail.ok, name, `→ 400, ${summarize(detail)}`, `→ 400, but ${detail.problem}`);
 }
 
 /**
