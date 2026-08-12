@@ -66,6 +66,13 @@ export interface ExportResult {
   outDir: string;
   /** Every file written, in write order. */
   artifacts: ExportArtifact[];
+  /**
+   * Whether the export directory could actually be fsynced. False means the platform refused to
+   * open a directory for fsync, so the names are durable only when the filesystem gets round to
+   * them — reported rather than asserted, because the alternative is claiming a durability the run
+   * did not obtain.
+   */
+  directorySynced: boolean;
 }
 
 export interface ExportOptions {
@@ -170,6 +177,8 @@ function resolveMinCount(explicit: number | undefined): number {
  * Beside it, not in the system temp directory: `rename` is only atomic within one filesystem. And
  * fsynced, because promotion has to move bytes that are ALREADY ON DISK — bytes still sitting in a
  * page cache this process may never get to flush are not a payload a rename can be trusted with.
+ *
+ * This makes the CONTENT durable. The NAME is a separate question, and `syncDir` is what asks it.
  */
 async function stageBeside(dir: string, name: string, body: string): Promise<string> {
   const tmp = join(dir, `.${name}.${randomBytes(6).toString("hex")}.tmp`);
@@ -187,6 +196,57 @@ async function stageBeside(dir: string, name: string, body: string): Promise<str
     throw err;
   }
   return tmp;
+}
+
+/**
+ * Errors that mean "this platform will not let a directory be opened and fsynced" rather than
+ * "the filesystem failed". Windows refuses the open outright; some filesystems refuse the fsync.
+ * Everything NOT in this set — EIO, ENOSPC, EROFS — is a real I/O failure and is propagated: a
+ * directory fsync that swallows every error and then reports success is worse than not doing it.
+ */
+const DIR_SYNC_UNSUPPORTED = new Set([
+  "EPERM",
+  "EACCES",
+  "EISDIR",
+  "EINVAL",
+  "ENOTSUP",
+  "EOPNOTSUPP",
+  "ENOSYS",
+]);
+
+const unsupported = (err: unknown): boolean =>
+  DIR_SYNC_UNSUPPORTED.has((err as NodeJS.ErrnoException)?.code ?? "");
+
+/**
+ * fsync a DIRECTORY, so the entries created or replaced inside it survive a crash. A file fsync
+ * makes the BYTES durable; only this makes the NAME durable — without it a crash right after a
+ * successful export can leave one, both or neither rename applied.
+ *
+ * Best-effort in one specific, reported sense: returns `false` when the platform does not permit
+ * it, and throws when the attempt fails for a reason that is actually about the filesystem. The
+ * caller carries the result rather than the prose claiming an fsync that may not have happened.
+ *
+ * This buys PREFIX durability — the renames are journalled in the order they were issued — and not
+ * pair atomicity. A crash-consistent pair and a concurrently-observable pair are different
+ * problems, and no directory fsync closes the second one.
+ */
+async function syncDir(dir: string): Promise<boolean> {
+  let fh: Awaited<ReturnType<typeof open>>;
+  try {
+    fh = await open(dir, "r");
+  } catch (err) {
+    if (unsupported(err)) return false;
+    throw err;
+  }
+  try {
+    await fh.sync();
+    return true;
+  } catch (err) {
+    if (unsupported(err)) return false;
+    throw err;
+  } finally {
+    await fh.close();
+  }
 }
 
 /**
@@ -222,8 +282,9 @@ async function assertPromotable(path: string): Promise<void> {
  * alias write realistically fails — a full disk, a read-only directory, a serialization error, a
  * destination that is not a file — now fails while the previous pair is still whole and nothing has
  * been promoted; the temps are removed and the run raises `ExportWriteError`. What remains between
- * the two renames is a pair of metadata operations on bytes already durable and destinations
- * already checked, and a failure even there is not silent: it is `ExportAliasError`.
+ * the two renames is a pair of metadata operations on bytes already fsynced, in a directory whose
+ * own fsync has been attempted, onto destinations already checked, and a failure even there is not
+ * silent: it is `ExportAliasError`.
  *
  * Exported because it carries the guarantee on its own and is tested on its own: a full export can
  * only be made to fail one alias by making that alias's destination unusable, which destroys the
@@ -245,6 +306,9 @@ export async function promoteAliases(
       pending = name;
       staged.push({ name, tmp: await stageBeside(outDir, name, body) });
     }
+    // The temps' own directory entries, made durable before a rename is asked to move them.
+    pending = outDir;
+    await syncDir(outDir);
     for (const { name } of aliases) {
       pending = name;
       await assertPromotable(join(outDir, name));
@@ -270,6 +334,8 @@ export async function promoteAliases(
     }
     promoted.push({ name, path });
   }
+  // The renames themselves, made durable. Prefix durability, in issue order — not pair atomicity.
+  await syncDir(outDir);
   return promoted;
 }
 
@@ -332,6 +398,8 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
   await write("LICENSE", LICENSE_NOTICE);
   const jsonPath = await write(archiveName(date, jsonDigest, "json"), json);
   const csvPath = await write(archiveName(date, csvDigest, "csv"), csv);
+  // The archives' names, made durable before the aliases that point at them are promoted.
+  const directorySynced = await syncDir(outDir);
   artifacts.push(
     ...(await promoteAliases(
       outDir,
@@ -360,15 +428,20 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
     },
   ]);
 
-  return { count: items.length, date, outDir, artifacts };
+  return { count: items.length, date, outDir, artifacts, directorySynced };
 }
 
 // CLI entry — skipped under Vitest so tests can import runExport without side effects.
 if (!process.env.VITEST) {
   runExport()
-    .then(({ count, artifacts }) => {
+    .then(({ count, artifacts, directorySynced }) => {
       const written = artifacts.map(({ path }) => `  ${path}`).join("\n");
-      console.log(`✓ exported ${count} opportunities\n${written}`);
+      // The fsync outcome is printed rather than assumed: on a platform that refuses it, the run
+      // still succeeded and the operator should know which guarantee they actually got.
+      const durability = directorySynced
+        ? "directory fsynced"
+        : "directory fsync attempted, not permitted on this platform";
+      console.log(`✓ exported ${count} opportunities (${durability})\n${written}`);
     })
     .catch((err) => {
       const expected =

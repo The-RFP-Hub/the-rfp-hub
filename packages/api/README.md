@@ -125,8 +125,9 @@ issued back to back — and `rename` is atomic per file, so no reader ever sees 
 way an alias write realistically fails — a full disk, a read-only directory, a serialization error,
 a destination that is not a file — now fails while the previous pair is still whole and nothing has
 been promoted; the temps are cleaned up and the run exits non-zero. What is left between the two
-renames is a pair of metadata operations on bytes that are already durable and destinations that are
-already checked, and a failure even *there* is not silent: it reports that the two aliases may name
+renames is a pair of metadata operations on bytes that are already `fsync`ed, in a directory whose
+own `fsync` has been attempted, onto destinations that are already checked, and a failure even
+*there* is not silent: it reports that the two aliases may name
 different runs and that re-running repairs them.
 
 `<digest>` is the first 12 hex of the sha256 of the file's own bytes. That is what makes the
