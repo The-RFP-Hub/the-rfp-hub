@@ -67,7 +67,7 @@ jobs:
       - name: Seed from the committed corpus (offline, strict)
         run: pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict
 
-      - name: Export the open-data slice (JSON + CSV)
+      - name: Export the open-data slice (archives, aliases, manifest)
         run: pnpm --filter @the-rfp-hub/api export
 
       # Assert what actually landed: live rows in Postgres, and every export file carrying every
@@ -81,11 +81,16 @@ jobs:
       # numbers a curator would have to come and edit. The CSV is PARSED (RFC 4180 quoting) and its
       # id COLUMN compared to the JSON's ids; substring containment would pass on a truncated file,
       # on duplicated rows, and on an id that only appears inside some other record's text.
+      #
+      # The export publishes six files: the CC0 sidecar, two digest-named archives, the two
+      # `latest.*` aliases and `latest.manifest.json`. The manifest is checked as a consumer would
+      # have to — re-hashing the bytes it points at rather than believing the counts it states.
       - name: Assert seeded rows and exported files
         working-directory: packages/api
         run: |
           node <<'EOF'
           const { readdirSync, readFileSync } = require("node:fs");
+          const { createHash } = require("node:crypto");
           const { Client } = require("pg");
 
           const MIN = 130;
@@ -123,14 +128,25 @@ jobs:
             return Object.keys(counts).sort().map((k) => `${k}=${counts[k]}`).join(" ");
           };
           // Match the dated archive by name rather than taking whichever file readdir happened to
-          // list first, so the assertion cannot silently check nothing.
-          const dated = (ext) => files.filter((f) => new RegExp(`^opportunities-\\d{4}-\\d{2}-\\d{2}\\.${ext}$`).test(f));
+          // list first, so the assertion cannot silently check nothing. The name carries the first
+          // 12 hex of the sha256 of the file's own bytes, which is re-derived and checked below.
+          const dated = (ext) =>
+            files.filter((f) => new RegExp(`^opportunities-\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{12}\\.${ext}$`).test(f));
           const [datedJson, datedCsv] = [dated("json"), dated("csv")];
           if (datedJson.length !== 1 || datedCsv.length !== 1) {
             throw new Error(`expected exactly one dated JSON + CSV archive in ${dir}/, got: ${files.join(", ")}`);
           }
-          if (!files.includes("LICENSE")) {
-            throw new Error(`expected the CC0 LICENSE sidecar in ${dir}/, got: ${files.join(", ")}`);
+          // The published layout is exactly six files: the CC0 sidecar, the two immutable archives,
+          // the two aliases, and the manifest. Asserting the whole set (not just presence) catches a
+          // stray leftover temp file from a half-finished promotion as well as a missing artifact.
+          const want = ["LICENSE", datedJson[0], datedCsv[0], "latest.json", "latest.csv", "latest.manifest.json"];
+          const missing = want.filter((f) => !files.includes(f));
+          const unexpected = files.filter((f) => !want.includes(f));
+          if (missing.length || unexpected.length) {
+            throw new Error(
+              `${dir}/ should hold exactly ${want.length} files; missing [${missing.join(", ")}], ` +
+                `unexpected [${unexpected.join(", ")}]`,
+            );
           }
 
           const json = JSON.parse(readFileSync(`${dir}/${datedJson[0]}`, "utf8"));
@@ -178,6 +194,52 @@ jobs:
             throw new Error(`${datedCsv[0]}: rows are ${[...widths].join("/")} cells wide, header is ${header.length}`);
           }
           console.log(`✓ ${exported.length} entries in ${datedJson[0]} + ${datedCsv[0]}, ids and counts match the corpus`);
+
+          // The manifest is the run's single authoritative pointer, so CI checks it the way a
+          // consumer must: resolve it once, fetch what it NAMES, and verify the bytes against the
+          // digest it records. Trusting the manifest's own count would only restate it — each
+          // artifact is re-hashed here, so a pointer that names a file it does not describe fails.
+          const manifest = JSON.parse(readFileSync(`${dir}/latest.manifest.json`, "utf8"));
+          if (manifest.license !== "CC0-1.0") {
+            throw new Error(`latest.manifest.json: license is ${JSON.stringify(manifest.license)}, want "CC0-1.0"`);
+          }
+          if (!/^[0-9a-f]{32}$/.test(manifest.runId ?? "")) {
+            throw new Error(`latest.manifest.json: runId ${JSON.stringify(manifest.runId)} is not 32 hex`);
+          }
+          if (manifest.count !== exported.length) {
+            throw new Error(`latest.manifest.json: count ${manifest.count}, archives hold ${exported.length}`);
+          }
+          const byFormat = Object.fromEntries((manifest.artifacts ?? []).map((a) => [a.format, a]));
+          if (manifest.artifacts?.length !== 2 || !byFormat.json || !byFormat.csv) {
+            throw new Error(
+              `latest.manifest.json: want exactly one json + one csv artifact, got ` +
+                `[${(manifest.artifacts ?? []).map((a) => a.format).join(", ")}]`,
+            );
+          }
+          for (const [format, archive] of [["json", datedJson[0]], ["csv", datedCsv[0]]]) {
+            const entry = byFormat[format];
+            if (entry.href !== archive) {
+              throw new Error(`latest.manifest.json: ${format} href '${entry.href}' != archive '${archive}'`);
+            }
+            if (entry.count !== exported.length) {
+              throw new Error(`latest.manifest.json: ${format} count ${entry.count}, archives hold ${exported.length}`);
+            }
+            const bytes = readFileSync(`${dir}/${archive}`);
+            const digest = createHash("sha256").update(bytes).digest("hex");
+            if (entry.sha256 !== digest) {
+              throw new Error(`${archive}: sha256 ${digest} != manifest's ${entry.sha256}`);
+            }
+            // The name's 12-hex prefix is derived from the same bytes, so the two must agree.
+            if (!archive.endsWith(`-${digest.slice(0, 12)}.${format}`)) {
+              throw new Error(`${archive}: name does not carry the digest prefix ${digest.slice(0, 12)}`);
+            }
+            // The alias must be this run's archive byte-for-byte, not a leftover from an earlier one.
+            const alias = `latest.${format}`;
+            if (!readFileSync(`${dir}/${alias}`).equals(bytes)) {
+              throw new Error(`${alias} is not byte-identical to ${archive} — the aliases name a different run`);
+            }
+          }
+          console.log(`✓ manifest run ${manifest.runId} lists both archives at ${manifest.count}, digests and aliases verified`);
 
           const client = new Client({ connectionString: process.env.DATABASE_URL });
           client
