@@ -166,26 +166,51 @@ conformance cases** — the pass/fail rule documents live in
 application deadline, 2026-06-30, has since passed: fixtures are a snapshot of the original
 pull, not live state, so a stale `status`/deadline pair here is expected rather than an error.)
 
-**One figure was removed rather than refreshed.**
+**Both program-level totals were removed rather than refreshed.**
 [`10-grant-fundingmap_600.json`](./examples/10-grant-fundingmap_600.json) (Prezenti Mint Round,
-`fundingmap:600`) carried `fundingInfo.allocated: 1129670`. Re-read on 2026-08-12, the round
-announcement — forum.celo.org topic 9139 — states $1.2M cUSD across 70+ grants as Prezenti's
-**cumulative track record before this round opened**, immediately ahead of "APPLICATIONS ARE NOW
-OPEN UNTIL 15th November 2024". It is not this round's committed amount, and nothing in the
-announcement is. The tell is in the document itself: `allocated` sat at **7×** the `budget`
-beside it, and this schema derives "remaining" as `budget` minus `allocated`
-([`opportunity.schema.json`](./opportunity.schema.json), `$defs/funding`), so the fixture
-published a program 969,670 over an envelope it had never spent.
+`fundingmap:600`) carried `fundingInfo.budget: 160000` and `fundingInfo.allocated: 1129670`.
+Neither survives its sources, re-read on 2026-08-12. The document also contradicted itself on its
+face: `allocated` sat at **7×** the `budget` beside it, and this schema derives "remaining" as
+`budget` minus `allocated` ([`opportunity.schema.json`](./opportunity.schema.json),
+`$defs/funding`), so the fixture published a program **969,670 over an envelope it had never
+spent**.
 
-Being a snapshot excuses a stale value; it does not excuse a wrong one. The figure is therefore
+Where both numbers actually come from is visible in one table. Prezenti's *2024 Retrospective*
+(forum.celo.org topic 9687) publishes grant metrics for the program's whole life:
+
+| Total Granted | 2022–2023 | 2024 | 2024 (Apricot) | 2024 (Mint) | Total |
+|---|--:|--:|--:|--:|--:|
+| | $919,670 | $210K | **$160K** | **$132K** | $1.42M |
+
+- **`allocated: 1129670` is the program's cumulative track record, not this round's.**
+  919,670 + 210,000 = **1,129,670** exactly. The round announcement (topic 9139) says the same
+  thing in prose — $1.2M cUSD across 70+ grants — and says it as history, immediately ahead of
+  "APPLICATIONS ARE NOW OPEN UNTIL 15th November 2024".
+- **`budget: 160000` is the sibling round's figure, and it is not a budget.** $160K is the column
+  headed **Apricot**; the Mint Round's own entry is $132K. So the value was wrong twice over — it
+  belongs to a different round, and "Total Granted" is money *awarded*, which this schema calls
+  `allocated`, never `budget`.
+
+No source publishes an envelope for this round at all. Checked: the round announcement (topic
+9139), the CeloPG H2 2024 budget thread that funded the program (topic 8231 — it tops Prezenti up
+by 250,000 cUSD and sizes the program, not this round), the 2024 retrospective (topic 9687), the
+Season 3 plan (topic 13598), and prezenti.xyz. The string "160,000" appears in none of them; the
+only 160 in the set is the Apricot cell above.
+
+Being a snapshot excuses a stale value; it does not excuse a wrong one. Both figures are therefore
 **absent rather than replaced**, which is the standing evidence-or-absence rule: where a figure
-cannot be re-evidenced it is removed and the removal is recorded, because substituting a
-plausible number would fabricate provenance the funder never published. The fixture keeps the
-three tier sizes the announcement *does* publish, as `minAward` 2000 / `maxAward` 25000.
+cannot be re-evidenced it is removed and the removal is recorded, because substituting a plausible
+number would fabricate provenance the funder never published. The fixture keeps the three tier
+sizes the announcement *does* publish, as `minAward` 2000 / `maxAward` 25000.
 
-This is a correction to converted data, not a schema change — `allocated` is optional and
-carries no cross-field constraint, so the document still validates and the fixture count and
-30/30 result above are unaffected. The fill score of 35 in the table below is, like every score
+Deliberately **not** applied: the retrospective's $132K for Mint is a real, sourced figure and
+would be a defensible `allocated`. It is left out because it is a data *addition* — a post-round
+number for a fixture that is a snapshot of the original pull — and adding it is a curation
+decision, not a correction. It is recorded here so the next reader does not have to re-derive it.
+
+This is a correction to converted data, not a schema change — `budget` and `allocated` are both
+optional and carry no cross-field constraint, so the document still validates and the fixture
+count and 30/30 result above are unaffected. The fill score of 35 in the table below is, like every score
 there, "as measured on the pre-re-cut shape at pull time" and is not restated.
 
 ### Top 15 by FILL (most complete entries, original pull)
