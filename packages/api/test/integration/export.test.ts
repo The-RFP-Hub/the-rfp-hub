@@ -17,6 +17,7 @@ import { CSV_COLUMNS } from "../../scripts/csv.js";
 import {
   ExportFloorError,
   ExportWriteError,
+  MANIFEST_NAME,
   promoteAliases,
   runExport,
 } from "../../scripts/export.js";
@@ -98,6 +99,7 @@ run("open-data export", () => {
       archive(names, "csv"),
       "latest.json",
       "latest.csv",
+      MANIFEST_NAME,
     ]);
     expect(archive(names, "json")).toMatch(
       new RegExp(`^opportunities-${date}-[0-9a-f]{12}\\.json$`),
@@ -211,7 +213,7 @@ run("open-data export", () => {
     const out = join(ROOT, "partial");
 
     // a COMPLETE run first — this is the pair the failed run has to leave exactly where it is
-    await runExport({ outDir: out, minCount: 1 });
+    const complete = await runExport({ outDir: out, minCount: 1 });
     const before = await readFile(join(out, "latest.json"), "utf8");
     const snapshotsBefore = await db
       .select()
@@ -242,6 +244,12 @@ run("open-data export", () => {
 
     // and the failed run left no staging beside it
     expect(temps(await readdir(out))).toEqual([]);
+
+    // the manifest is still the last COMPLETE run's: the pointer never advanced onto a run that
+    // could not finish, so a consumer resolving it gets the newest run that actually published
+    const manifest = JSON.parse(await readFile(join(out, MANIFEST_NAME), "utf8"));
+    expect(manifest.runId).toBe(complete.manifest.runId);
+    expect(manifest).toEqual(complete.manifest);
 
     // the sidecar and both archives landed; NEITHER alias is named as written, because neither was
     await expect(runExport({ outDir: out, minCount: 1 })).rejects.toThrow(
@@ -282,10 +290,82 @@ run("open-data export", () => {
     expect(latestCsv).toContain(marker);
     expect(latestJson).toBe(await readFile(join(out, archive(names, "json")), "utf8"));
     expect(latestCsv).toBe(await readFile(join(out, archive(names, "csv")), "utf8"));
-    expect(names.slice(-2)).toEqual(["latest.json", "latest.csv"]);
+    expect(names.slice(-3)).toEqual(["latest.json", "latest.csv", MANIFEST_NAME]);
 
     // promotion leaves no staging behind on the happy path either
     expect(temps(await readdir(out))).toEqual([]);
+  });
+
+  /**
+   * The manifest is the answer to the question the alias pair cannot answer. Two independently
+   * named mutable files cannot be replaced as a pair, so a consumer fetching both can catch one of
+   * each run; a consumer that reads the manifest ONCE gets a single run's identity plus the
+   * immutable names and full digests of both archives, and can verify what it downloaded.
+   *
+   * So what is pinned here is exactly the consumer's procedure: resolve the pointer once, fetch
+   * what it names, hash the bytes, compare.
+   */
+  it("publishes a manifest naming both archives with their full digests, promoted last", async () => {
+    const out = join(ROOT, "manifest");
+    const { artifacts, manifest, count, date, directorySynced } = await runExport({
+      outDir: out,
+      minCount: 1,
+    });
+    const names = artifacts.map((a) => a.name);
+
+    // ONE rename, and it is the last thing the run does: everything the manifest names was on disk
+    // before the pointer to it existed, so a manifest a consumer can read never outruns its data.
+    expect(names.at(-1)).toBe(MANIFEST_NAME);
+
+    const published = JSON.parse(await readFile(join(out, MANIFEST_NAME), "utf8"));
+    expect(published).toEqual(manifest);
+    expect(published.runId).toMatch(/^[0-9a-f]{32}$/);
+    expect(published.count).toBe(count);
+    expect(published.license).toBe("CC0-1.0");
+    expect(published.specVersion).toBe("1.0.0");
+    expect(Date.parse(published.generatedAt)).toBeGreaterThan(0);
+
+    // It names the IMMUTABLE archives, never the aliases — an alias href would reintroduce exactly
+    // the mutability the manifest exists to route around.
+    expect(published.artifacts.map((a: { format: string }) => a.format)).toEqual(["json", "csv"]);
+    for (const artifact of published.artifacts) {
+      expect(artifact.href).toBe(archive(names, artifact.format));
+      expect(artifact.href).not.toContain("latest.");
+      expect(artifact.count).toBe(count);
+      // the FULL sha256, not the 12-hex prefix the name carries: a consumer verifies the bytes it
+      // downloaded, and 48 bits of name is an addressing scheme rather than a checksum
+      expect(artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+      const bytes = await readFile(join(out, artifact.href), "utf8");
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(artifact.sha256);
+      expect(artifact.href).toContain(artifact.sha256.slice(0, 12));
+      expect(artifact.href).toContain(date);
+    }
+
+    // The directory fsync is reported, not asserted: everywhere it is permitted it is expected to
+    // have happened, and where it is not the run says so instead of claiming a durability it
+    // did not obtain.
+    expect(typeof directorySynced).toBe("boolean");
+    if (process.platform !== "win32") expect(directorySynced).toBe(true);
+  });
+
+  // A run identity the alias pair genuinely cannot carry: over unchanged data the CSV is
+  // byte-identical across same-day runs, so its archive name is too. The manifest is what tells
+  // two such runs apart, and what a later run advances as one indivisible step.
+  it("mints a fresh run id per run and advances the manifest to the newest one", async () => {
+    const out = join(ROOT, "manifest-runs");
+    const first = await runExport({ outDir: out, minCount: 1 });
+    const second = await runExport({ outDir: out, minCount: 1 });
+
+    expect(second.manifest.runId).not.toBe(first.manifest.runId);
+    const current = JSON.parse(await readFile(join(out, MANIFEST_NAME), "utf8"));
+    expect(current.runId).toBe(second.manifest.runId);
+
+    // the first run's archives are still on disk and still hash to what its manifest recorded, so a
+    // consumer holding the older manifest keeps a consistent, verifiable pair
+    for (const artifact of first.manifest.artifacts) {
+      const bytes = await readFile(join(out, artifact.href), "utf8");
+      expect(createHash("sha256").update(bytes).digest("hex")).toBe(artifact.sha256);
+    }
   });
 
   it("refuses to publish below the floor, writing nothing, whichever path set the floor", async () => {

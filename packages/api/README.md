@@ -94,7 +94,7 @@ Config is read from the environment (see `.env-example`) — everything is optio
 ## Open-data export
 
 `pnpm export` writes the public dataset (`review_status = 'approved' AND is_listed`, ordered by
-public id) to `./exports` under **CC0-1.0**. Every run writes **five** files, in this order:
+public id) to `./exports` under **CC0-1.0**. Every run writes **six** files, in this order:
 
 | # | File | Purpose |
 |---|---|---|
@@ -103,21 +103,23 @@ public id) to `./exports` under **CC0-1.0**. Every run writes **five** files, in
 | 3 | `opportunities-<YYYY-MM-DD>-<digest>.csv` | Same data, flat. |
 | 4 | `latest.json` | Stable name a consumer can hard-code. |
 | 5 | `latest.csv` | Ditto. |
+| 6 | `latest.manifest.json` | The run's single authoritative pointer: a run id, and the href + full sha256 of both archives. |
 
 The order is deliberate. The **sidecar goes first**, so no data file is ever readable without its
 rights notice beside it (its content is constant, so re-writing it each run is idempotent). The
-**aliases go last**, so a run that dies part-way leaves `latest.*` naming the last *complete*
-dataset rather than a half-written one. Nothing makes five files land atomically, so when a write
-does fail the error names which files were written and which one was not, and no
-`dataset_snapshots` row is recorded for that run.
+**aliases go after the archive they alias**, so a run that dies part-way leaves `latest.*` naming
+the last *complete* dataset rather than a half-written one. The **manifest goes last and alone**,
+because its single rename is the instant the run becomes published. Nothing makes six files land
+atomically, so when a write does fail the error names which files were written and which one was
+not, and no `dataset_snapshots` row is recorded for that run.
 
 ### The alias pair
 
-`latest.json` and `latest.csv` are **one promise**: whatever one names, the other names of the same
-run. Going last is not enough to keep it — that protects the pair from a half-written *archive*, not
-from each other. Written in sequence, a failure on the second leaves the first already advanced and
-no way back, and the consumer who reads both (the entire reason both exist) gets two different runs
-stitched together with nothing to signal it.
+`latest.json` and `latest.csv` are meant to be read together, so a run must not leave them on
+different datasets for any longer than it has to. Two independently named files cannot be replaced
+atomically as a pair on POSIX; what staging buys is that the window shrinks from two full file
+writes to two adjacent `rename(2)` calls, and that every predictable failure now lands before either
+rename.
 
 So the pair is **staged and then promoted**. Both payloads are written to temp files beside their
 destinations and `fsync`ed first, both destinations are checked, and only then are the two renames
@@ -127,15 +129,61 @@ a destination that is not a file — now fails while the previous pair is still 
 been promoted; the temps are cleaned up and the run exits non-zero. What is left between the two
 renames is a pair of metadata operations on bytes that are already `fsync`ed, in a directory whose
 own `fsync` has been attempted, onto destinations that are already checked, and a failure even
-*there* is not silent: it reports that the two aliases may name
-different runs and that re-running repairs them.
+*there* is not silent: it reports that the two aliases may name different runs and that re-running
+repairs them.
 
-`<digest>` is the first 12 hex of the sha256 of the file's own bytes. That is what makes the
-archive genuinely immutable: one name can never designate two different datasets, so a second run
-on the same UTC day — a re-run after a partial failure, say — writes its own archive instead of
-overwriting the first, and a digest recorded in `dataset_snapshots` stays true for the name it was
-recorded against. A re-run over *unchanged* data rewrites byte-identical content under the same
-name, so re-runs do not pile up.
+A reader that fetches `latest.json` and `latest.csv` as two separate requests can still, rarely,
+catch one of each run. That window is **minimized, not eliminated**, and no rearrangement of the
+promotion code closes it — it is a property of the reader resolving two mutable names, not of the
+writer. Consumers that need a guaranteed-consistent pair read the manifest instead.
+
+### The manifest
+
+`latest.manifest.json` is the export's **single authoritative pointer**, and the one file whose
+replacement is genuinely atomic: it is staged and promoted with **one** `rename(2)`, so there is no
+gap for a reader to fall into.
+
+```json
+{
+  "specVersion": "1.0.0",
+  "license": "CC0-1.0",
+  "runId": "9f2c…",
+  "generatedAt": "2026-08-11T09:41:07.512Z",
+  "count": 142,
+  "artifacts": [
+    { "format": "json", "href": "opportunities-2026-08-11-<digest>.json", "sha256": "<64 hex>", "count": 142 },
+    { "format": "csv",  "href": "opportunities-2026-08-11-<digest>.csv",  "sha256": "<64 hex>", "count": 142 }
+  ]
+}
+```
+
+The consumer contract is three steps, and the third is what makes it a proof rather than a promise:
+
+1. **Resolve the pointer once.** Fetch `latest.manifest.json` a single time and hold the result.
+   Resolving it once per artifact reintroduces the window it exists to remove.
+2. **Fetch what it names.** The `href`s are the digest-named archives, which are immutable — an
+   older manifest keeps working, because nothing overwrites what it points at.
+3. **Verify.** Each artifact carries the *full* sha256 of its bytes, so a consumer checks what it
+   downloaded rather than trusting it. Two artifacts listed under one `runId`, each verified against
+   its recorded digest, is a pair that is provably one run's.
+
+`runId` is minted fresh per run. It lives only in the manifest: the JSON envelope and the 17-column
+CSV are unchanged, so an unchanged CSV stays byte-stable across runs and no consumer's parser
+breaks. That byte-stability is also exactly why the aliases cannot identify a run on their own, and
+why the identifier had to go somewhere neither payload could carry it.
+
+This is also the only shape that survives a move to object storage, where `rename(2)` does not
+exist and a single-key pointer is the only atomic primitive available.
+
+`<digest>` is the first 12 hex of the sha256 of the file's own bytes. That makes the archive
+*effectively* immutable: the name is derived from the content, so a second run on the same UTC day —
+a re-run after a partial failure, say — writes its own archive instead of overwriting the first, and
+a digest recorded in `dataset_snapshots` stays true for the name it was recorded against. A re-run
+over *unchanged* data rewrites byte-identical content under the same name, so re-runs do not pile
+up. It is a 48-bit content-addressed name, not a storage-enforced write-once guarantee: the name is
+scoped by UTC date and carries 48 bits of the digest, which puts an accidental same-day collision
+far outside anything this export will produce, but nothing in the code would refuse one. The
+manifest carries the full 256-bit digest for consumers that want to verify rather than address.
 
 Ordering by public id makes the **CSV** byte-identical across runs over unchanged data. The
 **JSON** is not: its envelope stamps `generatedAt` from the clock, so an unchanged dataset yields

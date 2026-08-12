@@ -3,15 +3,28 @@
  * `dataset_snapshots` row per format. Exports are released under CC0-1.0, marked both in the JSON
  * envelope and in a LICENSE sidecar written alongside the data.
  *
- * Every run writes five files, in this order:
+ * Every run writes six files, in this order:
  *
  *   LICENSE                             the CC0 rights sidecar, written FIRST so no data file is
  *                                       ever readable without its rights notice beside it
  *   opportunities-<date>-<digest>.json  this run's archive, named after a prefix of the sha256
  *   opportunities-<date>-<digest>.csv   of its own bytes
- *   latest.json                         stable names a consumer can hard-code, promoted LAST and
- *   latest.csv                          as a PAIR, so they never name a half-written dataset and
- *                                       never name two different runs as each other
+ *   latest.json                         stable names a consumer can hard-code, promoted after the
+ *   latest.csv                          archives and staged as a pair, so they never name a
+ *                                       half-written dataset, and the window in which they can
+ *                                       name two different runs is two adjacent rename(2) calls
+ *                                       rather than two file writes
+ *   latest.manifest.json                the run's SINGLE authoritative pointer, promoted LAST with
+ *                                       ONE rename: a run id, and the href plus full sha256 of
+ *                                       both archives
+ *
+ * The two aliases and the manifest answer different questions, and the difference matters. The
+ * aliases are a convenience: two independently named mutable files cannot be replaced as a pair on
+ * POSIX, so a consumer fetching both can still, rarely, catch one of each run — a window this code
+ * minimizes but cannot eliminate. The MANIFEST is the answer for a consumer that needs the pair to
+ * be guaranteed consistent: it is replaced by a single `rename(2)`, so it is never observed
+ * half-updated, and everything it names is immutable. Read it once, then fetch the archives it
+ * lists, and the pair is provably one run's.
  *
  * `dataset_snapshots` records the ARCHIVE names — the per-run record — with the sha256 of the
  * bytes stored under them, never the aliases, which move.
@@ -32,6 +45,8 @@ import { toCsv } from "./csv.js";
 const OUT_DIR = "exports";
 const LICENSE = "CC0-1.0";
 const DEFAULT_MIN_COUNT = 100;
+/** The single mutable pointer a consumer resolves to get a guaranteed-consistent artifact set. */
+export const MANIFEST_NAME = "latest.manifest.json";
 const LICENSE_NOTICE = `SPDX-License-Identifier: CC0-1.0
 
 To the extent possible under law, the publisher of this dataset has waived all
@@ -44,10 +59,15 @@ https://creativecommons.org/publicdomain/zero/1.0/legalcode
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 
 /**
- * Archive names carry a prefix of the sha256 of their own bytes, so one name can never designate
- * two different datasets: a second run on the same UTC day — a re-run after a partial failure, say
- * — writes its own archive instead of overwriting the first. A re-run over unchanged data rewrites
+ * Archive names carry a prefix of the sha256 of their own bytes, so in practice one name does not
+ * designate two different datasets: the name is scoped by UTC date and carries 48 bits of the
+ * digest, which puts an accidental same-day collision far outside anything this export will
+ * produce. A second run on the same UTC day — a re-run after a partial failure, say — writes its
+ * own archive instead of overwriting the first. A re-run over unchanged data rewrites
  * byte-identical content under the same name, which is a no-op. The date stays the readable prefix.
+ *
+ * A 48-bit content-addressed name, not a storage-enforced write-once guarantee: `write()` does not
+ * refuse a colliding name, it just would not be given one.
  */
 const archiveName = (date: string, digest: string, ext: string): string =>
   `opportunities-${date}-${digest.slice(0, 12)}.${ext}`;
@@ -58,6 +78,32 @@ export interface ExportArtifact {
   path: string;
 }
 
+/** One immutable archive, as the manifest names it: enough to fetch it and verify what arrived. */
+export interface ManifestArtifact {
+  format: "json" | "csv";
+  /** The archive's filename, relative to the export root the manifest itself was fetched from. */
+  href: string;
+  /** The FULL sha256 of the bytes stored under `href` — not the 12-hex prefix in the name. */
+  sha256: string;
+  /** Records in that archive. Identical across formats; carried per-artifact so each is checkable. */
+  count: number;
+}
+
+/**
+ * The run's authoritative description of itself. Promoted with ONE rename, so a consumer never
+ * observes it half-updated, and every artifact it names is immutable — which is what makes
+ * "these two files are the same run" a thing a consumer can establish rather than assume.
+ */
+export interface ExportManifest {
+  specVersion: string;
+  license: string;
+  /** Fresh per run. The identity `latest.json` and `latest.csv` cannot carry between them. */
+  runId: string;
+  generatedAt: string;
+  count: number;
+  artifacts: ManifestArtifact[];
+}
+
 export interface ExportResult {
   count: number;
   /** UTC date stamp used in the archive names. */
@@ -66,6 +112,8 @@ export interface ExportResult {
   outDir: string;
   /** Every file written, in write order. */
   artifacts: ExportArtifact[];
+  /** This run's manifest, exactly as published under `latest.manifest.json`. */
+  manifest: ExportManifest;
   /**
    * Whether the export directory could actually be fsynced. False means the platform refused to
    * open a directory for fsync, so the names are durable only when the filesystem gets round to
@@ -100,14 +148,15 @@ export class ExportFloorError extends Error {
 }
 
 /**
- * Thrown when a run fails part-way through writing. Nothing makes five files land atomically, so a
+ * Thrown when a run fails part-way through writing. Nothing makes six files land atomically, so a
  * partial file set is a state a run really can end in — this names which files were written and
  * which one was not, instead of leaving that to be inferred from a bare write error. No
  * `dataset_snapshots` row is recorded for such a run, so the database never claims a publication
  * that did not happen.
  *
- * The alias pair is exempt from "partial" in one specific sense: a failure anywhere in `latest.*`
- * leaves BOTH aliases on the previous run, never one on each (see `promoteAliases`).
+ * Alias failures are split across two error types: everything before the first rename raises this
+ * error with the previous pair intact, and a failure BETWEEN the two renames raises
+ * `ExportAliasError`, which is the one case where the pair really can straddle two runs.
  */
 export class ExportWriteError extends Error {
   constructor(
@@ -228,7 +277,7 @@ const unsupported = (err: unknown): boolean =>
  *
  * This buys PREFIX durability — the renames are journalled in the order they were issued — and not
  * pair atomicity. A crash-consistent pair and a concurrently-observable pair are different
- * problems, and no directory fsync closes the second one.
+ * problems; the manifest is the answer to the second one.
  */
 async function syncDir(dir: string): Promise<boolean> {
   let fh: Awaited<ReturnType<typeof open>>;
@@ -268,23 +317,25 @@ async function assertPromotable(path: string): Promise<void> {
 }
 
 /**
- * Put `latest.json` and `latest.csv` on this run — both, or neither.
+ * Put `latest.json` and `latest.csv` on this run, narrowing the window in which they can disagree
+ * to the gap between two rename(2) calls.
  *
- * The two aliases are ONE promise to a consumer: whatever `latest.json` says, `latest.csv` says of
- * the same run. Writing them in sequence cannot keep that promise. A failure on the second leaves
- * the first already overwritten with no way back, so the pair straddles two runs — and the consumer
- * who reads both, which is the entire reason both exist, gets a mismatched dataset with nothing to
- * signal it. Ordering the aliases last protects them from a half-written ARCHIVE; it does nothing
- * about them relative to each other.
+ * Two independently named mutable files cannot be replaced atomically as a pair on POSIX, and no
+ * better rename call fixes that — it is a property of the READER's path resolution, not of the
+ * writer. What staging buys is a much smaller window and a much better failure mode. Written in
+ * sequence, the window is two full file writes and a failure on the second leaves the first already
+ * overwritten with no way back. Here both payloads are written to temp files beside their
+ * destinations and fsynced FIRST, both destinations are checked, and only then are the renames
+ * issued back to back. Every way an alias write realistically fails — a full disk, a read-only
+ * directory, a serialization error, a destination that is not a file — now fails while the previous
+ * pair is still whole and nothing has been promoted; the temps are removed and the run raises
+ * `ExportWriteError`. What remains between the two renames is a pair of metadata operations on
+ * bytes already fsynced, in a directory whose own fsync has been attempted, onto destinations
+ * already checked, and a failure even there is not silent:
+ * it is `ExportAliasError`.
  *
- * So both payloads are written to temp files beside their destinations and fsynced FIRST, both
- * destinations are checked, and only then are the two renames issued back to back. Every way an
- * alias write realistically fails — a full disk, a read-only directory, a serialization error, a
- * destination that is not a file — now fails while the previous pair is still whole and nothing has
- * been promoted; the temps are removed and the run raises `ExportWriteError`. What remains between
- * the two renames is a pair of metadata operations on bytes already fsynced, in a directory whose
- * own fsync has been attempted, onto destinations already checked, and a failure even there is not
- * silent: it is `ExportAliasError`.
+ * The residual window is minimized, not eliminated. `latest.manifest.json` is what eliminates it,
+ * by being a set of ONE: a single rename has no gap to observe.
  *
  * Exported because it carries the guarantee on its own and is tested on its own: a full export can
  * only be made to fail one alias by making that alias's destination unusable, which destroys the
@@ -396,9 +447,12 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
   // rather than on a partially-written one. The aliases go through `promoteAliases`, which lands
   // them as a pair or not at all.
   await write("LICENSE", LICENSE_NOTICE);
-  const jsonPath = await write(archiveName(date, jsonDigest, "json"), json);
-  const csvPath = await write(archiveName(date, csvDigest, "csv"), csv);
-  // The archives' names, made durable before the aliases that point at them are promoted.
+  const jsonName = archiveName(date, jsonDigest, "json");
+  const csvName = archiveName(date, csvDigest, "csv");
+  const jsonPath = await write(jsonName, json);
+  const csvPath = await write(csvName, csv);
+  // The archives' names, made durable BEFORE anything points at them: no pointer this run publishes
+  // should be able to outlive the entries it names.
   const directorySynced = await syncDir(outDir);
   artifacts.push(
     ...(await promoteAliases(
@@ -407,6 +461,30 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
         { name: "latest.json", body: json },
         { name: "latest.csv", body: csv },
       ],
+      artifacts.map((a) => a.name),
+    )),
+  );
+
+  // The manifest goes LAST and alone. Its rename is the instant this run becomes published: one
+  // metadata operation, so no consumer can observe it half-updated, and everything it names was on
+  // disk and fsynced before it was issued. `promoteAliases` with a set of one is exactly that —
+  // staged, destination checked, one rename, and a failure raises `ExportWriteError` with the
+  // previous manifest still whole.
+  const manifest: ExportManifest = {
+    specVersion: SPEC_VERSION,
+    license: LICENSE,
+    runId: randomBytes(16).toString("hex"),
+    generatedAt,
+    count: items.length,
+    artifacts: [
+      { format: "json", href: jsonName, sha256: jsonDigest, count: items.length },
+      { format: "csv", href: csvName, sha256: csvDigest, count: items.length },
+    ],
+  };
+  artifacts.push(
+    ...(await promoteAliases(
+      outDir,
+      [{ name: MANIFEST_NAME, body: `${JSON.stringify(manifest, null, 2)}\n` }],
       artifacts.map((a) => a.name),
     )),
   );
@@ -428,20 +506,22 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
     },
   ]);
 
-  return { count: items.length, date, outDir, artifacts, directorySynced };
+  return { count: items.length, date, outDir, artifacts, manifest, directorySynced };
 }
 
 // CLI entry — skipped under Vitest so tests can import runExport without side effects.
 if (!process.env.VITEST) {
   runExport()
-    .then(({ count, artifacts, directorySynced }) => {
+    .then(({ count, artifacts, manifest, directorySynced }) => {
       const written = artifacts.map(({ path }) => `  ${path}`).join("\n");
       // The fsync outcome is printed rather than assumed: on a platform that refuses it, the run
       // still succeeded and the operator should know which guarantee they actually got.
       const durability = directorySynced
         ? "directory fsynced"
         : "directory fsync attempted, not permitted on this platform";
-      console.log(`✓ exported ${count} opportunities (${durability})\n${written}`);
+      console.log(
+        `✓ exported ${count} opportunities as run ${manifest.runId} (${durability})\n${written}`,
+      );
     })
     .catch((err) => {
       const expected =
