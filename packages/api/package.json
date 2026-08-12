@@ -17,7 +17,9 @@
     "db:generate": "drizzle-kit generate",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
-    "export": "tsx scripts/export.ts"
+    "export": "tsx scripts/export.ts",
+    "corpus:fetch": "tsx tools/converter/fetch-corpus.ts",
+    "corpus:convert": "tsx tools/converter/convert.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

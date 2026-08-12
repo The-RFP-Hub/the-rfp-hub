@@ -13,3 +13,8 @@ packages/api/exports/
 
 # report written by scripts/check-m2.mjs (a record of one run against one deployment)
 m2-compliance-report.json
+
+# offline converter working files (raw upstream snapshot + draft corpus) — see
+# packages/api/tools/converter/README.md. The CURATED dataset it feeds is
+# packages/api/data/seed-corpus.json, which IS committed.
+packages/api/tools/converter/out/

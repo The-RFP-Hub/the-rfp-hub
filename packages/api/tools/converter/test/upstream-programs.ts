@@ -5,14 +5,14 @@
  * to prove the mapper's output conforms.
  *
  * The upstream still speaks the PRE-RE-CUT vocabulary (single `organization`, one `deadline`,
- * per-block date fields, scalar `fundingMechanism`, `totalBudget`); `scripts/map-program.ts` is
- * where the conversion to the re-cut Standard happens. Every shape here therefore doubles as a
- * regression test for that conversion.
+ * per-block date fields, scalar `fundingMechanism`, `totalBudget`); `map-program.ts` is where the
+ * conversion to the re-cut Standard happens. Every shape here therefore doubles as a regression
+ * test for that conversion.
  *
  * Adding a fixture to `UPSTREAM_PROGRAMS` below automatically enrolls it in the
  * "mapper output validates against the real schema" suite — nothing else to wire up.
  */
-import type { RegistryProgram } from "../../scripts/map-program.js";
+import type { RegistryProgram } from "../map-program.js";
 
 // The upstream still speaks the PRE-RE-CUT vocabulary (single org, one `deadline`, per-block date
 // fields, `fundingMechanism`) — mapProgram is where the conversion to the re-cut shape happens.
@@ -140,6 +140,55 @@ export const mechanismProgram: RegistryProgram = {
   },
 };
 
+/**
+ * The upstream names the REAL organisations behind a program in `metadata.organizations`, and this
+ * shape is the one that used to be mapped worst: the program title was published as the
+ * organisation's name and the community slug as its identity. It also carries the fields that had
+ * no mapping at all — committed-to-date, the open/closed applicant flag, an org website, and a
+ * program page distinct from the submission URL — plus `grantsToDate` and a non-UTC timestamp,
+ * which the closed core and the UTC rule respectively have something to say about.
+ */
+export const multiOrgProgram: RegistryProgram = {
+  programId: "2050",
+  type: "grant",
+  isActive: true,
+  submissionUrl: "https://apply.example.org/frontier",
+  communities: [{ name: "Solana", slug: "solana" }],
+  // a LOCAL-OFFSET timestamp: the same instant as 10:00Z, which the mapper must convert rather
+  // than relabel (the re-cut requires a trailing 'Z' on every timestamp)
+  createdAt: "2026-01-05T07:00:00.000-03:00",
+  updatedAt: "2026-02-05T10:00:00.000Z",
+  metadata: {
+    title: "Frontier Builders Round",
+    description: "Grants for frontier builders.",
+    // two real organisations, plus a case-variant repeat of the first — the upstream is not deduped
+    organizations: ["Solana Foundation", "Colosseum", "solana foundation"],
+    anyoneCanJoin: true,
+    amountDistributedToDate: "125000",
+    // award COUNT to date — the closed core has no field for it, so it is a recorded loss
+    grantsToDate: 12,
+    socialLinks: {
+      orgWebsite: "https://foundation.example.org",
+      grantsSite: "https://example.org/frontier-round",
+    },
+  },
+};
+
+/** Same shape with nothing but the title to go on — the fallback path, and an invite-only program. */
+export const unnamedOrgProgram: RegistryProgram = {
+  programId: "2051",
+  type: "grant",
+  isActive: true,
+  communities: [{ name: "Base", slug: "base" }],
+  metadata: {
+    title: "Anonymous Builders Round",
+    description: "A program whose organisations the upstream never names.",
+    organizations: ["", "   "], // present but empty — still "genuinely absent"
+    anyoneCanJoin: false,
+    amountDistributedToDate: "0", // upstream's default: no information, not a fact
+  },
+};
+
 /** Every recorded upstream shape, by the funding type it exercises. */
 export const UPSTREAM_PROGRAMS: Record<string, RegistryProgram> = {
   grant: grantProgram,
@@ -149,4 +198,6 @@ export const UPSTREAM_PROGRAMS: Record<string, RegistryProgram> = {
   rfp: rfpProgram,
   accelerator: acceleratorProgram,
   "grant (legacy scalar mechanism)": mechanismProgram,
+  "grant (named organisations)": multiOrgProgram,
+  "grant (unnamed organisation)": unnamedOrgProgram,
 };

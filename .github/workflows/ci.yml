@@ -59,6 +59,213 @@ jobs:
       - name: Migrate API database (for integration tests)
         run: pnpm --filter @the-rfp-hub/api migrate
 
+      # The seed, on a clean checkout, from the dataset this repo ships. The loader reads ONE input
+      # — the corpus committed at packages/api/data/seed-corpus.json — and has no other source: no
+      # network, no credentials, same rows every run. (Rebuilding that dataset in bulk is
+      # tools/converter, offline maintainer tooling CI never runs.) `--strict` fails the build on a
+      # single schema-invalid document, and the >=100 floor is asserted before the first write.
+      - name: Seed from the committed corpus (offline, strict)
+        run: pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict
+
+      - name: Export the open-data slice (archives, aliases, manifest)
+        run: pnpm --filter @the-rfp-hub/api export
+
+      # Assert what actually landed: live rows in Postgres, and every export file carrying every
+      # one of them. The floor here is the CORPUS floor (130, under the 142 shipped), not the
+      # loader's >=100 contract — a curation pass that halves the dataset should redden CI even
+      # though the seed itself would still be satisfied. Runs before `pnpm test`, whose fixtures
+      # are self-isolating and unaffected.
+      #
+      # The comparisons are against the committed corpus rather than against hard-coded totals, so
+      # this closes the round trip — corpus → seed → Postgres → mapper → export — without pinning
+      # numbers a curator would have to come and edit. The CSV is PARSED (RFC 4180 quoting) and its
+      # id COLUMN compared to the JSON's ids; substring containment would pass on a truncated file,
+      # on duplicated rows, and on an id that only appears inside some other record's text.
+      #
+      # The export publishes six files: the CC0 sidecar, two digest-named archives, the two
+      # `latest.*` aliases and `latest.manifest.json`. The manifest is checked as a consumer would
+      # have to — re-hashing the bytes it points at rather than believing the counts it states.
+      - name: Assert seeded rows and exported files
+        working-directory: packages/api
+        run: |
+          node <<'EOF'
+          const { readdirSync, readFileSync } = require("node:fs");
+          const { createHash } = require("node:crypto");
+          const { Client } = require("pg");
+
+          const MIN = 130;
+          const dir = "exports";
+          const files = readdirSync(dir);
+
+          /** Parse RFC 4180 CSV into rows of cells: quoted fields may hold commas, newlines and "". */
+          const parseCsv = (text) => {
+            const rows = [];
+            let row = [];
+            let cell = "";
+            let quoted = false;
+            for (let i = 0; i < text.length; i++) {
+              const c = text[i];
+              if (quoted) {
+                if (c !== '"') { cell += c; continue; }
+                if (text[i + 1] === '"') { cell += '"'; i++; continue; }
+                quoted = false;
+                continue;
+              }
+              if (c === '"') { quoted = true; continue; }
+              if (c === ",") { row.push(cell); cell = ""; continue; }
+              if (c === "\r") continue;
+              if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; continue; }
+              cell += c;
+            }
+            if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+            return rows;
+          };
+
+          /** Counts by field value, key-sorted so two tallies compare by content, not by insertion order. */
+          const tally = (items, key) => {
+            const counts = {};
+            for (const o of items) counts[o[key]] = (counts[o[key]] ?? 0) + 1;
+            return Object.keys(counts).sort().map((k) => `${k}=${counts[k]}`).join(" ");
+          };
+          // Match the dated archive by name rather than taking whichever file readdir happened to
+          // list first, so the assertion cannot silently check nothing. The name carries the first
+          // 12 hex of the sha256 of the file's own bytes, which is re-derived and checked below.
+          const dated = (ext) =>
+            files.filter((f) => new RegExp(`^opportunities-\\d{4}-\\d{2}-\\d{2}-[0-9a-f]{12}\\.${ext}$`).test(f));
+          const [datedJson, datedCsv] = [dated("json"), dated("csv")];
+          if (datedJson.length !== 1 || datedCsv.length !== 1) {
+            throw new Error(`expected exactly one dated JSON + CSV archive in ${dir}/, got: ${files.join(", ")}`);
+          }
+          // The published layout is exactly six files: the CC0 sidecar, the two immutable archives,
+          // the two aliases, and the manifest. Asserting the whole set (not just presence) catches a
+          // stray leftover temp file from a half-finished promotion as well as a missing artifact.
+          const want = ["LICENSE", datedJson[0], datedCsv[0], "latest.json", "latest.csv", "latest.manifest.json"];
+          const missing = want.filter((f) => !files.includes(f));
+          const unexpected = files.filter((f) => !want.includes(f));
+          if (missing.length || unexpected.length) {
+            throw new Error(
+              `${dir}/ should hold exactly ${want.length} files; missing [${missing.join(", ")}], ` +
+                `unexpected [${unexpected.join(", ")}]`,
+            );
+          }
+
+          const json = JSON.parse(readFileSync(`${dir}/${datedJson[0]}`, "utf8"));
+          const exported = json.opportunities ?? [];
+          if (exported.length < MIN || json.count !== exported.length) {
+            throw new Error(`${datedJson[0]}: ${exported.length} entries (count=${json.count}), want >= ${MIN}`);
+          }
+
+          // What was served is what was committed: same ids, same statuses, same funding types.
+          const corpus = JSON.parse(readFileSync("data/seed-corpus.json", "utf8")).documents;
+          const corpusIds = new Set(corpus.map((d) => d.id));
+          const exportedIds = new Set(exported.map((o) => o.id));
+          if (exportedIds.size !== exported.length) {
+            throw new Error(`${datedJson[0]}: ${exported.length - exportedIds.size} duplicate id(s) exported`);
+          }
+          const absent = [...corpusIds].filter((id) => !exportedIds.has(id));
+          const extra = [...exportedIds].filter((id) => !corpusIds.has(id));
+          if (absent.length || extra.length) {
+            throw new Error(
+              `${datedJson[0]}: ${absent.length} corpus id(s) missing (e.g. ${absent[0]}), ` +
+                `${extra.length} not in the corpus (e.g. ${extra[0]})`,
+            );
+          }
+          for (const key of ["status", "fundingType"]) {
+            const want = tally(corpus, key);
+            const got = tally(exported, key);
+            if (want !== got) throw new Error(`${key} exported as [${got}], corpus says [${want}]`);
+          }
+
+          // CSV: parsed, not substring-matched. Same row count, same ids, same order, in the id column.
+          const rows = parseCsv(readFileSync(`${dir}/${datedCsv[0]}`, "utf8"));
+          const header = rows.shift() ?? [];
+          const idColumn = header.indexOf("id");
+          if (idColumn === -1) throw new Error(`${datedCsv[0]}: no id column in header: ${header.join(",")}`);
+          if (rows.length !== exported.length) {
+            throw new Error(`${datedCsv[0]}: ${rows.length} data rows, JSON has ${exported.length}`);
+          }
+          const csvIds = rows.map((r) => r[idColumn]);
+          const mismatch = csvIds.findIndex((id, i) => id !== exported[i].id);
+          if (mismatch !== -1) {
+            throw new Error(`${datedCsv[0]}: row ${mismatch + 1} id '${csvIds[mismatch]}' != '${exported[mismatch].id}'`);
+          }
+          const widths = new Set(rows.map((r) => r.length));
+          if (widths.size !== 1 || !widths.has(header.length)) {
+            throw new Error(`${datedCsv[0]}: rows are ${[...widths].join("/")} cells wide, header is ${header.length}`);
+          }
+          console.log(`✓ ${exported.length} entries in ${datedJson[0]} + ${datedCsv[0]}, ids and counts match the corpus`);
+
+          // The manifest is the run's single authoritative pointer, so CI checks it the way a
+          // consumer must: resolve it once, fetch what it NAMES, and verify the bytes against the
+          // digest it records. Trusting the manifest's own count would only restate it — each
+          // artifact is re-hashed here, so a pointer that names a file it does not describe fails.
+          const manifest = JSON.parse(readFileSync(`${dir}/latest.manifest.json`, "utf8"));
+          if (manifest.license !== "CC0-1.0") {
+            throw new Error(`latest.manifest.json: license is ${JSON.stringify(manifest.license)}, want "CC0-1.0"`);
+          }
+          if (!/^[0-9a-f]{32}$/.test(manifest.runId ?? "")) {
+            throw new Error(`latest.manifest.json: runId ${JSON.stringify(manifest.runId)} is not 32 hex`);
+          }
+          if (manifest.count !== exported.length) {
+            throw new Error(`latest.manifest.json: count ${manifest.count}, archives hold ${exported.length}`);
+          }
+          const byFormat = Object.fromEntries((manifest.artifacts ?? []).map((a) => [a.format, a]));
+          if (manifest.artifacts?.length !== 2 || !byFormat.json || !byFormat.csv) {
+            throw new Error(
+              `latest.manifest.json: want exactly one json + one csv artifact, got ` +
+                `[${(manifest.artifacts ?? []).map((a) => a.format).join(", ")}]`,
+            );
+          }
+          for (const [format, archive] of [["json", datedJson[0]], ["csv", datedCsv[0]]]) {
+            const entry = byFormat[format];
+            if (entry.href !== archive) {
+              throw new Error(`latest.manifest.json: ${format} href '${entry.href}' != archive '${archive}'`);
+            }
+            if (entry.count !== exported.length) {
+              throw new Error(`latest.manifest.json: ${format} count ${entry.count}, archives hold ${exported.length}`);
+            }
+            const bytes = readFileSync(`${dir}/${archive}`);
+            const digest = createHash("sha256").update(bytes).digest("hex");
+            if (entry.sha256 !== digest) {
+              throw new Error(`${archive}: sha256 ${digest} != manifest's ${entry.sha256}`);
+            }
+            // The name's 12-hex prefix is derived from the same bytes, so the two must agree.
+            if (!archive.endsWith(`-${digest.slice(0, 12)}.${format}`)) {
+              throw new Error(`${archive}: name does not carry the digest prefix ${digest.slice(0, 12)}`);
+            }
+            // The alias must be this run's archive byte-for-byte, not a leftover from an earlier one.
+            const alias = `latest.${format}`;
+            if (!readFileSync(`${dir}/${alias}`).equals(bytes)) {
+              throw new Error(`${alias} is not byte-identical to ${archive} — the aliases name a different run`);
+            }
+          }
+          console.log(`✓ manifest run ${manifest.runId} lists both archives at ${manifest.count}, digests and aliases verified`);
+
+          const client = new Client({ connectionString: process.env.DATABASE_URL });
+          client
+            .connect()
+            .then(() =>
+              client.query(
+                "select count(*)::int as n from opportunities where review_status = 'approved' and is_listed",
+              ),
+            )
+            .then(({ rows }) => {
+              if (rows[0].n < MIN) throw new Error(`only ${rows[0].n} live rows seeded, want >= ${MIN}`);
+              if (rows[0].n !== corpus.length) {
+                throw new Error(`${rows[0].n} live rows, but the corpus ships ${corpus.length}`);
+              }
+              console.log(`✓ ${rows[0].n} live rows, ${exported.length} entries exported`);
+            })
+            .then(() => client.end())
+            .catch((err) => {
+              console.error(err.message);
+              process.exit(1);
+            });
+          EOF
+          # Machine-written output, gitignored but not invisible to biome (it does not read
+          # .gitignore here) — drop it so the repo-wide lint below only sees authored files.
+          rm -rf exports
+
       - name: Typecheck
         run: pnpm typecheck
 
