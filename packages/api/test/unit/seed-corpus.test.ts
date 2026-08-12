@@ -229,27 +229,47 @@ describe("the committed corpus", () => {
 
   /**
    * `postedAt` is "when the opportunity was first publicly announced AT THE SOURCE" — not when a
-   * curator added it here. Every researched record used to carry the curation date in it, which
-   * dated 75 opportunities, several of them years old, to the afternoon this file was written.
-   * Those were removed, leaving 57 records dateless; a dedicated research pass has since found a
-   * published date for all 57, so EVERY document now carries one and the rule the removal
-   * established is asserted on every one of them.
+   * curator added it here, and not when anything else recorded the program. The Standard makes it
+   * optional and says null means unknown, so the rule this file enforces is not "everyone has a
+   * date": it is that a date, IF PRESENT, came from the source.
    *
-   * Seven of those dates are archival bounds — "publicly visible by", the first capture of the
-   * program's own page, where the funder published no announcement at all. A bound is still a
-   * source date rather than a Hub timestamp: it is when the opportunity was demonstrably public,
-   * it is written into the record as a bound, and like every other date here it predates the
-   * curation pass.
+   * Two passes established that. The first found published dates for the 57 `curated:` records
+   * that shipped dateless, seven of them as archival bounds — "publicly visible by", the first
+   * capture of the program's own page — where the funder published no announcement at all. The
+   * second dealt with the converted class, whose `postedAt` was byte-identical to `createdAt` on
+   * 65 of 66 records because both were inherited from the upstream snapshot's own row: those were
+   * ingestion timestamps, several shared to the second by unrelated programs and most of them
+   * later than the program's own `opensAt`. 26 were replaced with a date the funder or organiser
+   * published; the other 39 carry no `postedAt` at all, because absence is what the Standard has
+   * for unknown and prose cannot turn a row timestamp into an announcement.
+   *
+   * That is why the equality guard below now runs on EVERY document rather than on `curated:`
+   * only — the class it used to be scoped around is the class that no longer carries the values
+   * it was scoped around.
    */
-  it("dates every document to its source, never to the curation pass", () => {
+  it("dates a document to its source or not at all, never to a Hub timestamp", () => {
     const now = Date.now();
     for (const d of DOCUMENTS) {
-      expect(d.postedAt, d.id).toBeTruthy();
-      const postedAt = new Date(d.postedAt as string).getTime();
+      if (d.postedAt === undefined || d.postedAt === null) continue; // unknown, per the Standard
+      const postedAt = new Date(d.postedAt).getTime();
       expect(postedAt, d.id).toBeLessThanOrEqual(new Date(d.createdAt as string).getTime());
       expect(postedAt, d.id).toBeLessThanOrEqual(now); // nothing is announced in the future
-      if (d.id.startsWith("curated:")) expect(d.postedAt, d.id).not.toBe(d.createdAt);
+      expect(d.postedAt, d.id).not.toBe(d.createdAt); // a Hub timestamp is not an announcement
     }
+  });
+
+  /**
+   * The split itself, pinned so it cannot drift back in silence: no converted record may reuse the
+   * snapshot's row timestamp again, and the honest count of what is actually dated is a number a
+   * reviewer can check rather than a claim in prose.
+   */
+  it("carries a source date on 103 documents and says nothing on the rest", () => {
+    const dated = DOCUMENTS.filter((d) => d.postedAt !== undefined && d.postedAt !== null);
+    expect(dated).toHaveLength(103);
+
+    const byClass = (prefix: string) => dated.filter((d) => d.id.startsWith(prefix)).length;
+    expect(byClass("curated:")).toBe(76); // every researched record
+    expect(byClass("fundingmap:")).toBe(27); // 26 re-researched here, plus fundingmap:1382
   });
 
   /**

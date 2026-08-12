@@ -348,16 +348,24 @@ already see. Re-seeding is idempotent by public id: every upsert conflicts on it
 
 `postedAt` follows the same rule. It means "first publicly announced **at the source**", so it may
 only carry a date the source itself published. It is never the date the file was edited;
-`createdAt`/`updatedAt` are the Hub timestamps and carry that.
+`createdAt`/`updatedAt` are the Hub timestamps and carry that. The Standard makes the field
+optional and says null means unknown, so a record without one is a record whose announcement date
+could not be established — not a record nobody looked at.
 
-All 142 documents now have one. The 57 researched records that shipped without a date — because
-none had been looked for, not because none exists — were researched one by one, and each date is
-written into the record it dates: a bug bounty's "Live Since" line, a governance topic's creation
-date, a launch post, a press release. **Seven of the 57 are archival bounds** where the funder
-published no announcement at all: those records say "publicly visible by", name the first capture
-of the funder's own page, and the field carries that bound. A bound is a source date, not a Hub
-timestamp — and like every other date here it predates the curation pass, which
-`test/unit/seed-corpus.test.ts` asserts document by document.
+**103 of the 142 documents carry one.** All 76 researched records do: the 57 that shipped dateless
+were researched one by one, and each date is written into the record it dates — a bug bounty's
+"Live Since" line, a governance topic's creation date, a launch post, a press release. **Seven of
+those are archival bounds** where the funder published no announcement at all: those records say
+"publicly visible by", name the first capture of the funder's own page, and the field carries that
+bound. A bound is a source date, not a Hub timestamp.
+
+On the converted side the field had been inherited from the upstream snapshot's own row timestamp,
+byte-identical to `createdAt` on 65 of the 66 — an ingestion time, not an announcement. Those were
+re-researched: **26 now carry a date the funder or organiser published** (11 exact, 13 dated launch
+announcements, 2 archival bounds) and **39 carry no `postedAt` at all**, because that is what the
+Standard has for unknown. Each of the 39 says in its own description what was searched.
+`test/unit/seed-corpus.test.ts` asserts the rule document by document — a date, if present,
+predates its own `createdAt` and never equals it — and pins the 103/76/27 split so it cannot drift.
 
 ### What the corpus contains
 
