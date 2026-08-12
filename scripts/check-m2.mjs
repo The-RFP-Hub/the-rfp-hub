@@ -11,7 +11,8 @@
  *   3. Dataset               >= the floor, pages consistently, EVERY served document validates
  *                            against the Standard, filtered counts agree with the aggregate
  *   4. Export freshness      latest.json + latest.csv download, parse, validate, carry CC0, are
- *                            inside the freshness window, and describe the SAME RUN
+ *                            inside the freshness window, and describe the same DATASET — and,
+ *                            where a manifest is published, the same verified RUN
  *
  * Everything is parameterized: nothing about any particular host, domain or dataset size is baked
  * in beyond the floors the milestone itself states, which are flags with those floors as defaults.
@@ -21,7 +22,8 @@
  * Usage:
  *   node scripts/check-m2.mjs --base-url https://api.example.org --export-url https://data.example.org
  *
- * Exit codes: 0 all criteria pass · 1 at least one criterion failed · 2 the run could not be made.
+ * Exit codes: 0 all criteria pass · 1 at least one criterion failed or could not be exercised ·
+ * 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
 import { checkDataset } from "./m2-compliance/checks/dataset.mjs";
@@ -39,7 +41,8 @@ const USAGE = `M2 sign-off compliance checker
 Required
   --base-url <url>        Origin of the deployed /v1/ API (e.g. https://api.example.org).
   --export-url <url>      Root the open-data export is published under; latest.json,
-                          latest.csv and LICENSE are read directly beneath it.
+                          latest.csv, latest.manifest.json and LICENSE are read directly
+                          beneath it.
 
 Options
   --json <path>           Where to write the machine-readable report.

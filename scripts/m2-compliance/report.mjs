@@ -11,6 +11,10 @@
  *
  * `skip` existing separately from `pass` is the whole point: a sign-off tool that silently
  * downgrades "I could not check this" to "this is fine" is worse than no tool.
+ *
+ * The same rule applies one level up, where it is easier to lose. A criterion nothing could be
+ * checked in is not a criterion that passed, so the RUN has three outcomes rather than two — see
+ * `Report.result`.
  */
 
 export const PASS = "pass";
@@ -18,6 +22,9 @@ export const FAIL = "fail";
 export const WARN = "warn";
 export const SKIP = "skip";
 export const INFO = "info";
+
+/** Run-level only: no criterion failed, but at least one was never exercised. */
+export const INCOMPLETE = "incomplete";
 
 const MARK = { [PASS]: "✓", [FAIL]: "✗", [WARN]: "!", [SKIP]: "-", [INFO]: "i" };
 const COLOR = { [PASS]: 32, [FAIL]: 31, [WARN]: 33, [SKIP]: 90, [INFO]: 36 };
@@ -92,21 +99,62 @@ export class Report {
     return c;
   }
 
+  /**
+   * Criteria the run could not exercise at all — every check skipped, or no check ran.
+   *
+   * `Criterion.status` returns SKIP for both, and the second case is the quiet one: a criterion
+   * that recorded nothing satisfies `every()` vacuously, so it looks the same as one that was
+   * deliberately skipped. Neither is a sign-off.
+   */
+  get notExercised() {
+    return this.criteria.filter((c) => c.status === SKIP);
+  }
+
+  /** Individual checks that could not be performed, across every criterion. */
+  get skippedChecks() {
+    return this.criteria.reduce((n, c) => n + c.tally().skip, 0);
+  }
+
+  /**
+   * Three outcomes, because a sign-off has three:
+   *
+   *   pass        every criterion was exercised and held
+   *   fail        a criterion was exercised and did not hold
+   *   incomplete  nothing failed, but a criterion was never exercised — so the run does not
+   *               establish the milestone, and must not exit 0 as though it did
+   *
+   * A criterion with no criteria at all is FAIL: a report about nothing is not a green report.
+   *
+   * Note the level this operates at. A check-level `skip` INSIDE an exercised criterion is
+   * legitimate and stays green — a plaintext loopback origin has no transport to verify, and that
+   * must not redden a run — but it is surfaced in the headline either way, so it is never invisible.
+   */
+  get result() {
+    if (this.criteria.length === 0) return FAIL;
+    if (this.criteria.some((c) => c.status === FAIL)) return FAIL;
+    if (this.notExercised.length > 0) return INCOMPLETE;
+    return PASS;
+  }
+
   /** The run is green only when no criterion failed AND every criterion was actually exercised. */
   get ok() {
-    return this.criteria.length > 0 && this.criteria.every((c) => c.status !== FAIL);
+    return this.result === PASS;
   }
 
   toJSON() {
     return {
       tool: "m2-compliance",
+      // `ok` stays a boolean for consumers that only ask "is this green"; `result` is the one that
+      // distinguishes a run that failed from a run that never got to look.
       ok: this.ok,
+      result: this.result,
       startedAt: this.startedAt,
       finishedAt: new Date().toISOString(),
       target: this.meta,
       summary: {
         criteria: this.criteria.length,
         failed: this.criteria.filter((c) => c.status === FAIL).length,
+        notExercised: this.notExercised.length,
         checks: this.criteria.reduce((sum, c) => sum + c.checks.length, 0),
         ...this.criteria.reduce(
           (totals, c) => {
@@ -163,7 +211,29 @@ export class Report {
       );
     }
     out.push("");
-    out.push(paint(this.ok ? PASS : FAIL, `RESULT: ${this.ok ? "PASS" : "FAIL"}`));
+
+    // The headline carries the skip counts even when the run passes. A legitimate skip inside an
+    // exercised criterion — the loopback TLS probe — is green and should stay green, but a reader
+    // signing this off is entitled to see that something was not looked at without opening the JSON.
+    const result = this.result;
+    const notes = [];
+    if (result === INCOMPLETE) {
+      notes.push(
+        `${this.notExercised.length} criterion(s) never exercised: ${this.notExercised
+          .map((c) => c.id)
+          .join(", ")}`,
+      );
+    }
+    const skipped = this.skippedChecks;
+    if (skipped > 0) notes.push(`${skipped} check(s) skipped`);
+
+    const label = result === PASS ? "PASS" : result === FAIL ? "FAIL" : "INCOMPLETE";
+    out.push(
+      paint(
+        result === PASS ? PASS : result === FAIL ? FAIL : WARN,
+        `RESULT: ${label}${notes.length ? ` (${notes.join("; ")})` : ""}`,
+      ),
+    );
     return out.join("\n");
   }
 }
