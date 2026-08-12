@@ -28,16 +28,18 @@ which is the budget-honesty failure the standard separates `budget` from `maxAwa
   it carries the tag. Migration: add `"bountyKind": "task"` — the previous shape *was* a task
   bounty in everything but name.
 - **Breaking — loosening** (previously invalid documents now validate). `bounty.reward` is no
-  longer unconditionally required. It is required when `bountyKind` is `task`, and a security
-  bounty carries `rewardTiers` instead. Enforced by a bare `if`/`then`/`else` on `$defs/bounty`.
+  longer unconditionally required. A security bounty may not carry it at all and must carry
+  `rewardTiers`; a task bounty carries exactly one of the two (see *Compensation is exactly one
+  of…* below). Enforced by a nested `if`/`then`/`else` on `$defs/bounty`.
 - **Breaking — loosenings.** New optional properties on `$defs/bounty`: `rewardTiers[]`,
   `severityScheme`, `rewardPoolStatus`. Every object in this schema is
   `additionalProperties: false`, so each addition turns previously-rejected documents into
   valid ones — breaking under the bidirectional rule in [`PROCESS.md`](./PROCESS.md), which
   governs over the "new optional fields" bullet in that file's Consequences list.
 - **New `$defs`.** `rewardTier` (`severity`, `assetType`, `label`, and a required `payout`) and
-  `payout` (a `model` tag over `fixed | range | up_to | percentage_of_value_at_risk |
-  discretionary`, with the amounts each model requires bound by a nested `if`/`then`/`else`).
+  `payout` (a `model` tag over `fixed | range | up_to | percentage | discretionary`, with the
+  amounts each model requires bound by a nested `if`/`then`/`else`; the tag shipped as
+  `percentage_of_value_at_risk` in the first cut and was renamed in review — see below).
 - `rewardTiers[]` is **required for `security` and permitted on either kind**. Requiring it on
   one kind is not a reason to forbid it on the other: a task bounty with a placement ladder is
   the same graded structure keyed on `label` instead of `severity`.
@@ -314,7 +316,7 @@ The short form: the vow governed re-cutting bytes that had been published as fin
 revision exercises the standing `PROCESS.md` rule that a version directory may be edited in
 place **only while its maturity is `draft` and no external consumer has adopted it**. Both
 conditions hold (maturity `draft`, zero known adopters), one leg of the original basis does
-not (the npm package is published now, at 1.0.x), and the whole permission ends at promotion
+not (the npm package is published now), and the whole permission ends at promotion
 to `stable`, when the `FROZEN` marker lands. A document valid against the 2026-07-27 bytes is
 **not** valid against these.
 

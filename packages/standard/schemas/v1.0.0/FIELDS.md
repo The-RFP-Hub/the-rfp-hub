@@ -57,9 +57,10 @@ Write the ecosystem's usual name.
    inside it is optional** — `"source": {}` validates. There is no required source URL and no
    required provenance field of any kind. "Every entry is traceable to an original posting" is
    therefore asserted by **ingestion policy**, not by schema validation: the Hub's ingestion
-   layer always sets `source.ingestedVia` server-side and records `submittedBy`/`submittedAt`,
-   and a publisher's own pipeline is expected to do the equivalent. A validator will not catch a
-   record with empty provenance, because a validator is the wrong place to catch it. *(This
+   layer always sets `source.ingestedVia` server-side, and records `submittedBy`/`submittedAt` on
+   the submission and publisher-API paths (M2 ships only the `import` seed path, which sets
+   neither). A publisher's own pipeline is expected to do the equivalent. A validator will not
+   catch a record with empty provenance, because a validator is the wrong place to catch it. *(This
    replaces the earlier principle "every entry MUST carry a `source.url`" — that field no longer
    exists; see the field-mapping table in [`CHANGELOG.md`](../../CHANGELOG.md).)*
 3. **Closed core, open values.** The top-level object and every detail shape under
@@ -87,9 +88,12 @@ lowercase `t`/`z` are all rejected.
 Fractional seconds are permitted and optional. `null` means "not known", and is distinct from
 the field being absent, which means "not provided".
 
-Two consequences follow. First, values sort lexicographically into chronological order
-(RFC 3339 §5.1) — a consumer may sort them as plain strings. Second, local-time intent is not
-representable: a publisher whose deadline is "23:59 local" converts to UTC before publishing.
+Two consequences follow. First, values of equal fractional-second precision sort
+lexicographically into chronological order (RFC 3339 §5.1, which grants string-sortability only
+for equal precision) — so a consumer may sort them as plain strings where precision is uniform,
+and must parse them where it is not, since fractional seconds are optional here. Second,
+local-time intent is not representable: a publisher whose deadline is "23:59 local" converts to
+UTC before publishing.
 This is deliberate; see [`adr/0002`](../../../../adr/0002-v-next-field-recut.md) #9.
 
 The standard does not currently use RFC 9557 (IXDTF) suffixes such as `[Europe/London]`. They

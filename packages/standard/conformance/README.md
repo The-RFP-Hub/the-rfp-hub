@@ -47,9 +47,11 @@ it, and an implementation must therefore validate with format assertion enabled 
 validator uses `ajv-formats`). They do
 not cover the advisory checks (`packages/validate/src/checks/`), which report *warnings* about
 things the schema deliberately leaves open: unregistered
-deadline labels, unregistered program models, and monetary amounts present without a
-`fundingInfo.currency` to denominate them (the document-wide denomination rule crosses
-objects, so warning is its only enforcement).
+deadline labels, program models, bounty tier severities and tier asset types; inverted
+reward-tier payout bounds; and monetary amounts present without a `fundingInfo.currency` to
+denominate them (the bounds rule and the document-wide denomination rule both cross objects, so
+warning is their only enforcement). The current list is in
+[`packages/validate/README.md`](../../validate/README.md#two-tiers-errors-and-warnings).
 A document may be conformant and still raise warnings; that is the point of the split.
 
 ## Contributing a case

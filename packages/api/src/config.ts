@@ -41,6 +41,25 @@ if (isProduction && !process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+const LOCAL_DATABASE_URL = "postgres://rfphub:rfphub@localhost:5432/rfphub";
+
+/**
+ * Off the production path the fallback stands — but it announces itself, because nothing in this
+ * repo loads a .env file (no dotenv, no --env-file) and a variable that never reached the process
+ * environment is otherwise indistinguishable from one nobody meant to set. An operator who put a
+ * remote DATABASE_URL in a .env and ran a migration gets this localhost default in silence, and
+ * learns about it only from whatever the connection error happens to say. Admin commands run from
+ * a laptop don't set NODE_ENV, so the fail-fast above is not the thing that catches them.
+ *
+ * Module scope, so it prints at most once per process no matter how many modules import `config`.
+ * The credentials are left out of the line: it names the target, it is not a copyable value.
+ */
+if (!isProduction && !process.env.DATABASE_URL) {
+  console.error(
+    "DATABASE_URL unset — using the local docker-compose default postgres://rfphub@localhost:5432/rfphub (nothing here loads a .env file; export DATABASE_URL to point elsewhere).",
+  );
+}
+
 const DEFAULT_PORT = 3001;
 
 /**
@@ -135,9 +154,7 @@ export function readPublicBaseUrl(raw: string | undefined, fallback = "/"): stri
 }
 
 export const config: AppConfig = {
-  databaseUrl:
-    process.env.DATABASE_URL ??
-    (isProduction ? "" : "postgres://rfphub:rfphub@localhost:5432/rfphub"),
+  databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
   port: readPort(process.env.PORT),
   host: process.env.HOST ?? "0.0.0.0",
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),

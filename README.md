@@ -7,10 +7,12 @@
 An open, neutral aggregation layer and **standard** for **Ethereum-ecosystem funding
 opportunities** — grants, hackathons, bounties, accelerators, VC funds, and RFPs. It indexes,
 verifies, and distributes opportunities through a standard format, a public API, open data
-exports, and agent-friendly tooling — and each entry's **application link** sends you to the
-opportunity's own submission channel to apply. (That guarantee is ingestion policy on the Hub's
-own data; the schema itself leaves `applicationUrl` optional, so third-party documents may omit
-it.)
+exports, and agent-friendly tooling (M2 ships these as running, tested code; no public deployment
+is live yet) — and where an entry carries an **application link**, it sends you to the
+opportunity's own submission channel to apply. (Carrying one is ingestion policy on the Hub's own
+data, with named exceptions — four of the 142 seeded entries have no public application URL, each
+documented in [the API README](./packages/api/README.md); the schema itself leaves
+`applicationUrl` optional, so third-party documents may omit it.)
 
 That link (`applicationUrl`) is the single link-back target in the standard, and it carries
 whatever the submission channel actually is — an application portal, a form, or a forum thread
@@ -50,8 +52,10 @@ npx rfphub-validate opportunity.json
 | `packages/mcp` | `@the-rfp-hub/mcp` | MIT | MCP server + agent skill *(planned)*. |
 | `packages/frontend` | — | MIT | Reference frontend *(planned)*. |
 
-Every package depends only on `@the-rfp-hub/standard` for the contract — never on each other's
-internals (dependency inversion at the package level).
+Every package takes its *contract* from `@the-rfp-hub/standard` alone, and never reaches into
+another package's internals (dependency inversion at the package level). The only non-Standard
+cross-package dependency is `packages/api` → `rfphub-validate`, through that package's published
+API, so the Hub validates with the same reference implementation everyone else runs.
 
 **Two version axes.** A package's `version` is its npm distribution version and moves freely; the
 **spec version** (`1.0.0`, in `specVersion` and the schema `$id`) is the data contract and moves
@@ -73,8 +77,9 @@ The standard is governed by written process, not by whoever is around:
 Developed as one pnpm workspace for fast iteration (the schema and its generated types move
 together in a single change), and published as independent npm packages. At handoff the
 packages can be split into per-component repos (`the-rfp-hub/standard`, `the-rfp-hub/validate`,
-…) via `git subtree split` — the per-package `LICENSE`/`README`/`package.json` already make
-each one split-ready.
+…) via `git subtree split`. The per-package `LICENSE`, `README` and `package.json` provide the
+metadata for a future split. Before splitting, replace `workspace:*` dependencies with registry
+ranges and verify standalone install, build and test; `packages/api` is not published.
 
 ## Develop
 
