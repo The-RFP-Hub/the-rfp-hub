@@ -2,7 +2,7 @@
 
 The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
 serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a 100+ entry seed dataset ingested
-from a configurable upstream funding-map source and nightly open-data exports (CC0). This is
+from a configurable upstream funding-map source and repeatable open-data exports (CC0). This is
 milestone **M2**.
 
 ## Endpoints (`/v1`)
@@ -59,7 +59,7 @@ export SOURCE_API_URL=https://…          # upstream funding-map registry API (
 pnpm --filter @the-rfp-hub/api seed          # ingest 100+ entries from SOURCE_API_URL
 pnpm --filter @the-rfp-hub/api seed -- --strict   # ...and fail the run on ANY non-conforming record
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
-pnpm --filter @the-rfp-hub/api export        # write JSON + CSV to ./exports
+pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./exports
 ```
 
 ### Configuration
@@ -79,6 +79,7 @@ Config is read from the environment (see `.env-example`) — everything is optio
 | `SOURCE_API_URL` | — | Upstream funding-map registry API the seed loader ingests from. |
 | `SOURCE_SYSTEM` | `fundingmap` | Provenance namespace stamped on seeded entries. |
 | `SOURCE_PROGRAM_URL_BASE` | — | Last-resort `applicationUrl` base for a program with no submission/website URL. |
+| `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 
 ### Process behaviour
 
@@ -89,6 +90,145 @@ Config is read from the environment (see `.env-example`) — everything is optio
 - **Graceful shutdown**: `SIGTERM`/`SIGINT` stop new connections, let in-flight requests finish and
   close the pg pool (a Fastify `onClose` hook) before exiting 0. A 10s forced-exit timeout means a
   hung close can never leave an un-killable process.
+
+## Open-data export
+
+`pnpm export` writes the public dataset (`review_status = 'approved' AND is_listed`, ordered by
+public id) to `./exports` under **CC0-1.0**. Every run writes **six** files, in this order:
+
+| # | File | Purpose |
+|---|---|---|
+| 1 | `LICENSE` | CC0 rights sidecar (SPDX), so a bare file set is machine-detectable as CC0 without reading the JSON envelope. |
+| 2 | `opportunities-<YYYY-MM-DD>-<digest>.json` | This run's archive. |
+| 3 | `opportunities-<YYYY-MM-DD>-<digest>.csv` | Same data, flat. |
+| 4 | `latest.json` | Stable name a consumer can hard-code. |
+| 5 | `latest.csv` | Ditto. |
+| 6 | `latest.manifest.json` | The run's single authoritative pointer: a run id, and the href + full sha256 of both archives. |
+
+The order is deliberate. The **sidecar goes first**, so no data file is ever readable without its
+rights notice beside it (its content is constant, so re-writing it each run is idempotent). The
+**aliases go after the archive they alias**, so a run that dies part-way leaves `latest.*` naming
+the last *complete* dataset rather than a half-written one. The **manifest goes last and alone**,
+because its single rename is the instant the run becomes published. Nothing makes six files land
+atomically, so when a write does fail the error names which files were written and which one was
+not, and no `dataset_snapshots` row is recorded for that run.
+
+### The alias pair
+
+`latest.json` and `latest.csv` are meant to be read together, so a run must not leave them on
+different datasets for any longer than it has to. Two independently named files cannot be replaced
+atomically as a pair on POSIX; what staging buys is that the window shrinks from two full file
+writes to two adjacent `rename(2)` calls, and that every predictable failure now lands before either
+rename.
+
+So the pair is **staged and then promoted**. Both payloads are written to temp files beside their
+destinations and `fsync`ed first, both destinations are checked, and only then are the two renames
+issued back to back — and `rename` is atomic per file, so no reader ever sees a partial alias. Every
+way an alias write realistically fails — a full disk, a read-only directory, a serialization error,
+a destination that is not a file — now fails while the previous pair is still whole and nothing has
+been promoted; the temps are cleaned up and the run exits non-zero. What is left between the two
+renames is a pair of metadata operations on bytes that are already `fsync`ed, in a directory whose
+own `fsync` has been attempted, onto destinations that are already checked, and a failure even
+*there* is not silent: it reports that the two aliases may name different runs and that re-running
+repairs them.
+
+A reader that fetches `latest.json` and `latest.csv` as two separate requests can still, rarely,
+catch one of each run. That window is **minimized, not eliminated**, and no rearrangement of the
+promotion code closes it — it is a property of the reader resolving two mutable names, not of the
+writer. Consumers that need a guaranteed-consistent pair read the manifest instead.
+
+### The manifest
+
+`latest.manifest.json` is the export's **single authoritative pointer**, and the one file whose
+replacement is genuinely atomic: it is staged and promoted with **one** `rename(2)`, so there is no
+gap for a reader to fall into.
+
+```json
+{
+  "specVersion": "1.0.0",
+  "license": "CC0-1.0",
+  "runId": "9f2c…",
+  "generatedAt": "2026-08-11T09:41:07.512Z",
+  "count": 142,
+  "artifacts": [
+    { "format": "json", "href": "opportunities-2026-08-11-<digest>.json", "sha256": "<64 hex>", "count": 142 },
+    { "format": "csv",  "href": "opportunities-2026-08-11-<digest>.csv",  "sha256": "<64 hex>", "count": 142 }
+  ]
+}
+```
+
+The consumer contract is three steps, and the third is what makes it a proof rather than a promise:
+
+1. **Resolve the pointer once.** Fetch `latest.manifest.json` a single time and hold the result.
+   Resolving it once per artifact reintroduces the window it exists to remove.
+2. **Fetch what it names.** The `href`s are the digest-named archives, which are immutable — an
+   older manifest keeps working, because nothing overwrites what it points at.
+3. **Verify.** Each artifact carries the *full* sha256 of its bytes, so a consumer checks what it
+   downloaded rather than trusting it. Two artifacts listed under one `runId`, each verified against
+   its recorded digest, is a pair that is provably one run's.
+
+`runId` is minted fresh per run. It lives only in the manifest: the JSON envelope and the 17-column
+CSV are unchanged, so an unchanged CSV stays byte-stable across runs and no consumer's parser
+breaks. That byte-stability is also exactly why the aliases cannot identify a run on their own, and
+why the identifier had to go somewhere neither payload could carry it.
+
+This is also the only shape that survives a move to object storage, where `rename(2)` does not
+exist and a single-key pointer is the only atomic primitive available.
+
+`<digest>` is the first 12 hex of the sha256 of the file's own bytes. That makes the archive
+*effectively* immutable: the name is derived from the content, so a second run on the same UTC day —
+a re-run after a partial failure, say — writes its own archive instead of overwriting the first, and
+a digest recorded in `dataset_snapshots` stays true for the name it was recorded against. A re-run
+over *unchanged* data rewrites byte-identical content under the same name, so re-runs do not pile
+up. It is a 48-bit content-addressed name, not a storage-enforced write-once guarantee: the name is
+scoped by UTC date and carries 48 bits of the digest, which puts an accidental same-day collision
+far outside anything this export will produce, but nothing in the code would refuse one. The
+manifest carries the full 256-bit digest for consumers that want to verify rather than address.
+
+Ordering by public id makes the **CSV** byte-identical across runs over unchanged data. The
+**JSON** is not: its envelope stamps `generatedAt` from the clock, so an unchanged dataset yields
+JSON that differs in that one field — and therefore in its digest and its archive name.
+
+`dataset_snapshots` records one row per **data** format (not the sidecar), each pointing at the
+**archive** — the per-run record — with its `sha256` and entry count, never at an alias, which
+moves.
+
+`EXPORT_MIN_COUNT` (default `100`) is a floor asserted **before** anything is serialized or
+written: a run below it writes nothing and exits non-zero, rather than quietly replacing `latest.*`
+with a header-only CSV after a broken seed. The same validation covers a floor passed
+programmatically, so no caller gets a weaker guard than the environment variable does.
+
+Where the files go from `./exports` is not this repo's business yet: no public bucket is deployed,
+and scheduling a recurring run belongs with the deployment. The export is a plain, repeatable
+command.
+
+### CSV columns
+
+The JSON export carries the full Standard object. The CSV is a **flat projection derived from the
+Standard**, so the v1.0.0 re-cut is what fixes its column set:
+
+```
+id,fundingType,status,title,organization,organizationSlug,ecosystems,categories,
+currency,minAward,maxAward,budget,allocated,opensAt,nextDeadlineAt,rollingDeadline,applicationUrl
+```
+
+- `organization`/`organizationSlug` are `operatingOrganizations[0]` — the org that actually runs
+  the intake, and the one to display. Sponsors are a separate role and are **not** flattened into
+  the display columns; read `sponsoringOrganizations` in the JSON export for those.
+- `categories` survived the closed core; `networks` and `tags` did not, so there are no `networks`
+  or `tags` columns.
+- **One `currency` column** denominates every amount column in the row (`minAward`, `maxAward`,
+  `budget`, `allocated`) — the Standard permits exactly one currency per document, so a
+  per-amount currency column would be unrepresentable noise.
+- `nextDeadlineAt` + `rollingDeadline` flatten `deadlines[]`: the earliest upcoming *fixed*
+  deadline, plus a boolean so a rolling program is distinguishable from one that simply has no
+  upcoming date. The full array is in the JSON export.
+- Multi-valued columns (`ecosystems`, `categories`) are `|`-joined. Any cell opening with
+  `= + - @` or a tab/CR is prefixed with `'` to neutralize spreadsheet formula injection from
+  untrusted upstream text.
+
+The export test asserts this header **verbatim**, not as a prefix, so a later change to the core
+cannot reshape the published dataset without a failing test.
 
 > **Migrations were regenerated for the v1.0.0 re-cut.** `src/db/migrations` starts from the
 > drizzle-kit-generated `0000_recut_v1_0_0` baseline; `0001_schema_vnext_org_flip` applies the
@@ -147,8 +287,9 @@ docker compose -f docker-compose.test.yml down
 
 ## Deferred (later in M2 / beyond)
 
-Cloud deploy + public export bucket + nightly cron; full OpenAPI live-spec test suite; DAOIP-5
-`grantPools` export adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
-`docs/data-model.md`).
+Cloud deploy; publishing the export to a public bucket and running it on a schedule (both belong
+with the deployment — no bucket is provisioned, so the export writes locally and `pnpm export` is
+the whole of it here); full OpenAPI live-spec test suite; DAOIP-5 `grantPools` export adapter. The
+write API, auth, verification, dedup, and analytics are M3+ (see `docs/data-model.md`).
 
 Runnable curl/TypeScript/Python client examples now live in [`examples/`](../../examples).
