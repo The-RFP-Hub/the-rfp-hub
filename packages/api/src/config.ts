@@ -8,6 +8,13 @@
  * variable declared here is a variable every deployment has to reason about — so a variable no
  * request path reads does not belong here.
  */
+import { config as loadDotenv } from "dotenv";
+
+// Load .env (from the working directory — packages/api for every pnpm script here) before any
+// process.env read below. dotenv never overwrites variables that already reached the process, so
+// exported shell vars and a deployment's injected environment always win over the file.
+loadDotenv({ quiet: true });
+
 export interface AppConfig {
   databaseUrl: string;
   port: number;
@@ -44,19 +51,18 @@ if (isProduction && !process.env.DATABASE_URL) {
 const LOCAL_DATABASE_URL = "postgres://rfphub:rfphub@localhost:5432/rfphub";
 
 /**
- * Off the production path the fallback stands — but it announces itself, because nothing in this
- * repo loads a .env file (no dotenv, no --env-file) and a variable that never reached the process
- * environment is otherwise indistinguishable from one nobody meant to set. An operator who put a
- * remote DATABASE_URL in a .env and ran a migration gets this localhost default in silence, and
- * learns about it only from whatever the connection error happens to say. Admin commands run from
- * a laptop don't set NODE_ENV, so the fail-fast above is not the thing that catches them.
+ * Off the production path the fallback stands — but it announces itself: with the dotenv load
+ * above, a DATABASE_URL that is still unset here means no exported variable AND no .env next to
+ * this package's package.json, which is otherwise indistinguishable from one nobody meant to set.
+ * Admin commands run from a laptop don't set NODE_ENV, so the fail-fast above is not the thing
+ * that catches them.
  *
  * Module scope, so it prints at most once per process no matter how many modules import `config`.
  * The credentials are left out of the line: it names the target, it is not a copyable value.
  */
 if (!isProduction && !process.env.DATABASE_URL) {
   console.error(
-    "DATABASE_URL unset — using the local docker-compose default postgres://rfphub@localhost:5432/rfphub (nothing here loads a .env file; export DATABASE_URL to point elsewhere).",
+    "DATABASE_URL unset — using the local docker-compose default postgres://rfphub@localhost:5432/rfphub (no packages/api/.env found and nothing exported; copy .env-example to .env to point elsewhere).",
   );
 }
 
