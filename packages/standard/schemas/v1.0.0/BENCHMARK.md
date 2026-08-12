@@ -49,10 +49,10 @@ with 0 failures — evidence that the data model is faithful to a real funding c
 remaining ~22 were set aside for lacking a public original-posting URL or to keep the sample free
 of any one aggregator's branding. Example ids use a neutral `fundingmap:` namespace.
 
-The **30 committed fixtures are the live claim**: they were converted field-by-field through
-each draft revision, and all 28 validate against the
-current [`opportunity.schema.json`](./opportunity.schema.json). The conversion is not
-purely mechanical and the claim should be read with that in mind: organisation `slug`s are
+The **30 committed fixtures are the live claim**: 28 of them were converted field-by-field
+through each draft revision (the other two are the hand-transcribed security bounties), and all
+30 validate against the current [`opportunity.schema.json`](./opportunity.schema.json). The
+conversion is not purely mechanical and the claim should be read with that in mind: organisation `slug`s are
 **invented data** (derived from names, not carried from the source), and the `tags`/`networks`
 values the source did carry were dropped (see below). The third conversion, by contrast, was
 a pure script rewrite and lossless (see below).

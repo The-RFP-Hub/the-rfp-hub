@@ -60,7 +60,7 @@ This sits in tension with the earlier record's "in-place re-cuts end here", and 
 resolved on the record, not waved away: the standing `PROCESS.md` rule permits in-place edits
 **while maturity is `draft` and no external consumer has adopted the version** — both true —
 while the once-only sentence governed re-cutting bytes published as final. One honest weakening
-since 2026-07-27: the npm package **is** published now (1.0.x), so the basis is draft maturity
+since 2026-07-27: the npm package **is** published now, so the basis is draft maturity
 plus zero known adopters, no longer unpublishedness. See
 [`adr/0004`](../../../../adr/0004-second-draft-revision-org-swap-and-closure.md).
 
@@ -122,7 +122,9 @@ change is a version bump regardless of maturity.
     ever is.
 - **Status granularity** — the four-value `status` enum is the most-questioned part of the
   standard. It is unresolved, not settled.
-- **`vc_fund` has no real-data coverage** — see [`BENCHMARK.md`](./BENCHMARK.md).
+- **`vc_fund` has no benchmark-fixture coverage** — none of the 30 fixtures in
+  [`BENCHMARK.md`](./BENCHMARK.md) is a VC fund, so within this repository the type is exercised
+  by one hand-researched entry in the Hub's seed corpus and no benchmark fixture.
 - **Anyone holding pre-2026-08-05 documents holds an invalid shape with no automated signal** —
   `specVersion` reads `1.0.0` on every side of every in-place change, exactly as it did
   across the re-cut. That now includes documents shaped by the *second* 2026-08-05 revision
