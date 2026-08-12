@@ -622,10 +622,10 @@ conformance; a conforming document may raise warnings, which is the point of the
 
 ## Open items
 
-- **Canonical domain** — undecided. Identifiers are provisional but honest: `$id` dereferences
-  to the file in the repository, and `@vocab` is visibly marked `draft`. Both are stamped from
-  `spec.config.json`, so adopting a domain is a one-line change. See
-  [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
+- **Canonical domain** — decided: `ethrfps.app`, adopted in
+  [`adr/0007`](../../../../adr/0007-canonical-domain-and-spec-identity.md) and stamped from
+  `spec.config.json`. The identifiers are canonical; public dereference is deployment-gated and
+  not live yet. See [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
 - **Status granularity** — the four-value enum is the most-questioned part of the standard
   (`in review`, `paused`, `awarded` have all been asked for). It remains open on its own terms;
   the no-`draft` ruling above does not close it.
