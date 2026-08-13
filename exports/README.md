@@ -42,6 +42,13 @@ be consistent: it names both archives by their immutable filenames and records t
 each, so what you download can be verified rather than assumed. Resolve the manifest once, fetch
 what it names, hash the bytes, compare.
 
+These files are a **nightly snapshot**: at most ~24 hours old, and in exchange, immutable and
+verifiable. The API serves the same dataset **live**, from the same serializer, at
+`/v1/export/opportunities.json` and `/v1/export/opportunities.csv` — one call, no pagination, byte
+for byte the same per record. That response is current but carries no run id and no digest, so
+nothing can vouch for it after the fact. Use the endpoint for today's answer; use these files when
+you need an artifact you can cite, verify or diff against later.
+
 The dataset is released under [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/) — the
 same terms in the JSON envelope, in the manifest and in the `LICENSE` sidecar beside them. The
 repository's own MIT licence covers the code, not this data.

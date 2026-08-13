@@ -214,6 +214,36 @@ curl -s "${RFPHUB_API_BASE:-http://localhost:3001}/v1/opportunities/schema" \
   | jq '{title, "$id": .["$id"], "$schema": .["$schema"]}'
 ```
 
+## Download the whole dataset
+
+Every public record in one call — no pagination, no parameters (any query string at all is a `400`).
+`-OJ` saves it under the filename the server offers, `opportunities-<UTC date>.json`:
+
+```bash
+curl -sOJ "${RFPHUB_API_BASE:-http://localhost:3001}/v1/export/opportunities.json"
+```
+
+The same dataset as a flat CSV, one row per opportunity:
+
+```bash
+curl -sOJ "${RFPHUB_API_BASE:-http://localhost:3001}/v1/export/opportunities.csv"
+```
+
+The response carries an `ETag` that moves only when the dataset does, so a scheduled sync should
+send back the one it saw last and get a `304` with no body instead of the whole dataset again:
+
+```bash
+etag=$(curl -sI "${RFPHUB_API_BASE:-http://localhost:3001}/v1/export/opportunities.csv" \
+  | awk -F': ' 'tolower($1)=="etag" {print $2}' | tr -d '\r')
+curl -si -H "If-None-Match: ${etag}" \
+  "${RFPHUB_API_BASE:-http://localhost:3001}/v1/export/opportunities.csv" | head -1
+```
+
+This is a **live** download: it reflects the database at the moment of the request. The nightly
+snapshot published in the repository is the same bytes per record, at most a day old, and — unlike
+this response — immutable and digest-verifiable. See
+[`exports/README.md`](../../exports/README.md) for which one to build on.
+
 ## Dataset stats
 
 Totals and breakdowns by funding type, status and top ecosystems

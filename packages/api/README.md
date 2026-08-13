@@ -13,6 +13,8 @@ committed to this repository, and repeatable open-data exports (CC0). This is mi
 | `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served as `application/schema+json`, byte-for-byte as the package ships it. A convenience alias of the canonical route below; the `$id` it carries names the canonical URL, not this one. |
 | `GET` | `/v1/feeds/opportunities.atom` | Atom 1.0 feed of the most recently published opportunities (`application/atom+xml`). `limit` (1..100, default 50), `status`. |
 | `GET` | `/v1/feeds/opportunities.rss` | The same feed as RSS 2.0 (`application/rss+xml`). |
+| `GET` | `/v1/export/opportunities.json` | The **whole** public dataset in one response (`application/json`), in the published export envelope. Sent as an attachment; no pagination, no parameters. |
+| `GET` | `/v1/export/opportunities.csv` | The same dataset as the published flat CSV projection (`text/csv`). |
 | `GET` | `/v1/stats` | Totals + breakdowns by funding type/status/ecosystem. |
 | `GET` | `/v1/health` | Liveness + DB readiness. |
 | `GET` | `/v1/docs` | Swagger UI (OpenAPI 3.1). |
@@ -272,18 +274,36 @@ because its single rename is the instant the run becomes published. Nothing make
 atomically, so when a write does fail the error names which files were written and which one was
 not, and no `dataset_snapshots` row is recorded for that run.
 
-### Two sources, one writer
+### Two sources, one writer, one format
 
 The export has two **sources** and exactly one **writer**. The writer
 (`scripts/export-writer.ts`) takes records and writes the six files; it opens no connection and
-knows nothing about where its input came from. Everything above — the format, the digests, the
-ordering, the floor, the promotion order — is its single implementation, so neither source can
-drift from the published shape:
+knows nothing about where its input came from. Everything above about *publishing files* — the
+digests, the archive names, the floor, the promotion order, the manifest — is its single
+implementation, so neither source can drift from the published shape:
 
 | Command | Source | Reads | Records |
 |---|---|---|---|
-| `pnpm export` | `scripts/export.ts` | the database directly | writes a `dataset_snapshots` row per format |
+| `pnpm export` | `scripts/export.ts` | the database, through `OpportunityService` | writes a `dataset_snapshots` row per format |
 | `pnpm export:api` | `scripts/export-from-api.ts` | a deployed `/v1/` API over HTTP | nothing — there is no database on this path |
+
+The **format** is one level below that, in `src/modules/shared/export-format.ts`: the published
+order (by `id` ascending, compared by code unit), the JSON envelope, and the CSV projection. It sits
+in `src/` rather than beside the writer because the API serves it too — `/v1/export/*` is a live
+download of the same dataset, and a server cannot import a script. So there are three consumers of
+one serializer, and a record's bytes are the same in all three:
+
+| | Produces | Floor | Ordering | Envelope |
+|---|---|---|---|---|
+| `pnpm export` | six files | `EXPORT_MIN_COUNT` | `orderForExport` | `toExportJson` |
+| `pnpm export:api` | six files | `EXPORT_MIN_COUNT` | `orderForExport` | `toExportJson` |
+| `GET /v1/export/*` | one HTTP response | **none** — see below | `orderForExport` | `toExportJson` |
+
+The download deliberately does **not** inherit the floor. The floor exists to stop a short or
+half-loaded run from replacing a good published dataset; a download replaces nothing, so an empty
+database gets a valid empty envelope and a header-only CSV rather than an error. It writes no
+`dataset_snapshots` row and no `LICENSE` sidecar either — nothing was published — so the CC0 grant
+travels in the JSON envelope's `license` field and in the CSV operation's OpenAPI description.
 
 The API source needs no database credentials and no network path to Postgres, which is what lets it
 run from CI against a public deployment. It publishes what the public actually receives, so it is
@@ -424,6 +444,26 @@ visible slightly after it lands.
 
 `exports/` holds exactly **one** run — this design keeps clones small; superseded snapshots stay in
 git history rather than in the directory.
+
+### Live download vs nightly snapshot
+
+Two ways to get the whole dataset, serving the same bytes per record from the same serializer. They
+are not interchangeable in *guarantees*, and the choice is about which guarantee you need:
+
+| | **Live download** — `GET /v1/export/opportunities.{json,csv}` | **Nightly snapshot** — the `raw.githubusercontent.com` URLs above |
+|---|---|---|
+| Freshness | as of the request | up to ~24h old |
+| Identity | none — nothing republishes or names this response | `runId`, digest-named archives, `latest.manifest.json` |
+| Verifiable | no — there is no digest to check it against | yes — re-hash the bytes the manifest names |
+| Stable over time | no — the dataset moves under it | yes — an archive URL is immutable |
+| Costs | a database read and a full serialization per request | a CDN fetch; the API is not involved |
+| Revalidation | `ETag` + `If-None-Match` → `304` | HTTP caching on the raw host |
+
+Take the **live download** when you want what the Hub knows *now* — a one-off pull, a sync that
+already ran this morning, a script that would otherwise page through `/v1/opportunities`. Take the
+**nightly snapshot** when you need an artifact you can cite, verify or diff against later, or when
+you would rather not put load on the API at all; that is the one to build a pipeline on. Both are
+CC0-1.0.
 
 Two properties of the job are worth stating plainly:
 
