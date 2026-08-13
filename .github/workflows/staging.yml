@@ -2,6 +2,12 @@ on:
   push:
     branches:
       - main
+    # The nightly export commits its dataset to `exports/` on main (see nightly-export.yml).
+    # Publishing data must not roll the service: a push whose every changed file is under
+    # `exports/` skips this workflow entirely, while a push that also touches anything else
+    # deploys exactly as before. Tag pushes are unaffected — GitHub does not evaluate path filters
+    # for them.
+    paths-ignore: ['exports/**']
     tags:
       - 'stage-*'
   workflow_dispatch:
