@@ -1,0 +1,172 @@
+name: Nightly open-data export
+
+# Publishes the open-data export into THIS repository — `exports/` on the default branch — and then
+# verifies the publication from the outside before the job is allowed to go green.
+#
+# Why the data is committed here: the export needs somewhere public, immutable and versioned to
+# live, and a repository already is all three. Every snapshot is a commit, so "what did the dataset
+# say last Tuesday" is `git log`, and raw.githubusercontent.com serves the files over TLS with no
+# bucket, no credentials and no infrastructure to keep alive. The trade is that a data commit lands
+# on the same branch as the code, which is what the `paths-ignore: ['exports/**']` filters in ci.yml
+# and staging.yml are for: publishing a dataset must never deploy a service.
+#
+# Why the data comes from the API rather than the database: this job needs no database credentials
+# and no network path to Postgres. It publishes exactly what the public receives, which also makes
+# the export a check ON the deployment — see packages/api/scripts/export-from-api.ts, which fails
+# the run rather than publishing anything if the API disagrees with itself or serves a record the
+# Standard rejects.
+#
+# A green run means PUBLISHED AND INDEPENDENTLY VERIFIED, never merely "ran": the last two steps
+# re-download what was pushed from the public URL and hold the deployment plus the published files
+# to the M2 compliance criteria.
+
+on:
+  workflow_dispatch:
+  # Enabled in a follow-up commit, after one manual dispatch has published and verified a snapshot
+  # end to end. Scheduled workflows are read from the DEFAULT BRANCH, so this file has to be on
+  # main before a cron here can fire at all — which is why it is merged in this state rather than
+  # left on a branch until it is proven.
+  # schedule:
+  #   - cron: "17 3 * * *"
+
+# The whole point of the job: it writes a commit to the default branch.
+permissions:
+  contents: write
+
+# One publisher at a time, and never cancelled part-way. Two overlapping runs would race on the
+# same six file names and push two snapshots at each other; a run cancelled between the commit and
+# the verification would leave a published dataset nobody checked.
+concurrency:
+  group: nightly-export
+  cancel-in-progress: false
+
+env:
+  API_BASE_URL: https://api.ethrfps.app
+  EXPORT_ROOT_URL: https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports
+
+jobs:
+  publish:
+    name: Publish and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # Full history: the push below rebases onto whatever main has become, which a shallow clone
+      # cannot do.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # A prerequisite of the export, not a check on it: the exporter imports the Standard and the
+      # validator as workspace packages, which resolve to their built `dist`.
+      - name: Build
+        run: pnpm build
+
+      # Writes to a scratch directory rather than straight into the working tree, so a failed or
+      # short run cannot leave a half-replaced `exports/` behind for the commit step to find. The
+      # exporter's own floor (EXPORT_MIN_COUNT, default 100) means an empty or half-loaded API
+      # publishes NOTHING and fails here instead.
+      - name: Export the dataset from the live API
+        env:
+          EXPORT_API_URL: ${{ env.API_BASE_URL }}
+          EXPORT_OUT_DIR: ${{ runner.temp }}/export
+        run: pnpm --filter @the-rfp-hub/api export:api
+
+      # `exports/` holds exactly ONE run: this run's six files, replacing the six before them. The
+      # superseded snapshots are not lost — every one of them is in git history, which is a better
+      # archive than a directory that grows by two files a day and that every clone has to carry.
+      - name: Stage the snapshot
+        run: |
+          set -euo pipefail
+          mkdir -p exports
+          find exports -maxdepth 1 -type f ! -name README.md -delete
+          cp "$RUNNER_TEMP"/export/* exports/
+          ls -l exports
+
+      - name: Commit and push to main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add exports
+
+          if git diff --cached --quiet; then
+            echo "nothing to publish — the export is byte-identical to what main already carries"
+            exit 0
+          fi
+
+          git commit -m "data(exports): nightly snapshot $(date -u +%F)"
+
+          # A human merge landing between this job's checkout and its push must not fail the job.
+          # The commit is data only, so it rebases cleanly onto anything that is not itself an
+          # `exports/` change — and nothing else writes that directory. A conflict therefore means
+          # something genuinely unexpected touched the same files, which is worth stopping for
+          # rather than resolving blind.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "push rejected (attempt ${attempt}/5) — rebasing onto origin/main"
+            git fetch origin main
+            git rebase origin/main || {
+              git rebase --abort || true
+              echo "rebase conflicted: something else changed exports/ — not resolving it here"
+              exit 1
+            }
+            sleep $((attempt * 5))
+          done
+
+          echo "could not push after 5 attempts"
+          exit 1
+
+      # A commit is not a publication. raw.githubusercontent.com serves through a CDN that caches
+      # for a few minutes, so this waits for the bytes a CONSUMER would actually receive —
+      # deliberately with no cache-busting query parameter, which would prove something no consumer
+      # can observe. The manifest is the right thing to poll: it is the run's single authoritative
+      # pointer, replaced with one rename, so matching it means the whole file set is this run's.
+      - name: Wait for the published manifest to be served
+        run: |
+          set -euo pipefail
+          want="$(sha256sum exports/latest.manifest.json | cut -d ' ' -f 1)"
+          echo "waiting for ${EXPORT_ROOT_URL}/latest.manifest.json to serve ${want}"
+          deadline=$(( $(date +%s) + 600 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            got="$(curl -fsS "${EXPORT_ROOT_URL}/latest.manifest.json" | sha256sum | cut -d ' ' -f 1 || true)"
+            if [ "$got" = "$want" ]; then
+              echo "published manifest is being served"
+              exit 0
+            fi
+            echo "  not yet (serving ${got}) — retrying"
+            sleep 20
+          done
+          echo "the published manifest was still not being served after 10 minutes"
+          exit 1
+
+      # The gate. Downloads the export from its public URL and exercises the deployed API against
+      # the M2 criteria: liveness, every published OpenAPI operation, every served document against
+      # the Standard, and the export's own freshness, licence and manifest — re-hashing the archives
+      # the manifest names rather than believing the counts it states. Non-zero fails the job, so a
+      # green run cannot mean "published something nobody looked at".
+      - name: Verify the publication with the compliance checker
+        run: node scripts/check-m2.mjs --base-url "$API_BASE_URL" --export-url "$EXPORT_ROOT_URL"
+
+      # Kept whether the check passed or failed: a failing run is exactly when the itemized report
+      # is worth reading.
+      - name: Upload the compliance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-compliance-report
+          path: m2-compliance-report.json
+          if-no-files-found: ignore
