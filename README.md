@@ -7,8 +7,8 @@
 An open, neutral aggregation layer and **standard** for **Ethereum-ecosystem funding
 opportunities** — grants, hackathons, bounties, accelerators, VC funds, and RFPs. It indexes,
 verifies, and distributes opportunities through a standard format, a public API, open data
-exports, and agent-friendly tooling (M2 ships these as running, tested code; no public deployment
-is live yet) — and where an entry carries an **application link**, it sends you to the
+exports, and agent-friendly tooling (M2 ships these as running, tested code) — and where an entry
+carries an **application link**, it sends you to the
 opportunity's own submission channel to apply. (Carrying one is ingestion policy on the Hub's own
 data, with named exceptions — four of the 142 seeded entries have no public application URL, each
 documented in [the API README](./packages/api/README.md); the schema itself leaves
@@ -109,6 +109,35 @@ Pass/fail per criterion on stdout, a JSON report alongside, non-zero exit on any
 about a particular host or dataset is baked in. Run it by hand, or from any external runner, against
 whichever deployment you want an answer about. See
 [`scripts/m2-compliance/README.md`](./scripts/m2-compliance/README.md).
+
+The nightly publishing job runs exactly this, against the deployment and the export it has just
+pushed, and fails if it does not pass — so the job going green means *published and independently
+verified*, not merely "ran". See [Open data](#open-data).
+
+## Open data
+
+The dataset is published to [`exports/`](./exports) on the default branch by a scheduled workflow
+([`.github/workflows/nightly-export.yml`](./.github/workflows/nightly-export.yml)), under
+**CC0-1.0**. No bucket and no credentials: the files are served directly, over TLS, from the
+repository, and every snapshot is a commit, so what the dataset said on any past day is `git log`.
+
+```
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/latest.json
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/latest.csv
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/latest.manifest.json
+```
+
+`latest.json` and `latest.csv` are two independently named mutable files, so a consumer fetching
+both can, rarely, catch one of each run. **`latest.manifest.json` is the answer to that**: it is
+replaced by a single atomic operation, and it names both archives by immutable, content-addressed
+filenames with the full sha256 of each. Resolve it once, fetch what it names, hash the bytes,
+compare — and the pair is *provably* one run's rather than assumed to be.
+
+The publishing job sources its data from the live API rather than from a database, validates every
+record against the Standard before writing anything, and refuses to publish a dataset that is empty,
+short, or inconsistent with what `/v1/stats` reports. See
+[`packages/api/README.md`](./packages/api/README.md#open-data-export) for the file layout, the
+manifest contract and the guarantees each one carries.
 
 ## Using the API
 

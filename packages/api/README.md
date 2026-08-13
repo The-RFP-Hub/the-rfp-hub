@@ -168,6 +168,9 @@ pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the
 pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # 142 entries, offline
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./exports
+
+# the same six files, sourced from a running API instead of the database (no DATABASE_URL needed)
+EXPORT_API_URL=http://localhost:3001 pnpm --filter @the-rfp-hub/api export:api
 ```
 
 ### Configuration
@@ -193,7 +196,9 @@ under [the converter's README](./tools/converter/README.md).
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). It is read by the apex reservation too, which uses it to tell a caller it refused where the API is; the `/` default names no host, so the message says so plainly instead. |
-| `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
+| `EXPORT_MIN_COUNT` | `100` | Floor below which an export writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
+| `EXPORT_API_URL` | — | **Required by `pnpm export:api`**, ignored by everything else: the bare origin of the API to publish, e.g. `https://api.example.org`. Must be `https://` for any host that is not loopback — this value decides what gets published, so plaintext would let the network path choose the dataset. A path, query or fragment is an error rather than being trimmed off. |
+| `EXPORT_OUT_DIR` | `exports` | Where `pnpm export:api` writes its six files. Relative paths resolve against the working directory. |
 
 The seed is deliberately absent from that table: its corpus is an argument, not an environment
 pointer. The one variable it reads, `SEED_STRICT=1`, only mirrors the `--strict` flag. Nothing in
@@ -266,6 +271,43 @@ the same run; see [The alias pair](#the-alias-pair). The **manifest goes last an
 because its single rename is the instant the run becomes published. Nothing makes six files land
 atomically, so when a write does fail the error names which files were written and which one was
 not, and no `dataset_snapshots` row is recorded for that run.
+
+### Two sources, one writer
+
+The export has two **sources** and exactly one **writer**. The writer
+(`scripts/export-writer.ts`) takes records and writes the six files; it opens no connection and
+knows nothing about where its input came from. Everything above — the format, the digests, the
+ordering, the floor, the promotion order — is its single implementation, so neither source can
+drift from the published shape:
+
+| Command | Source | Reads | Records |
+|---|---|---|---|
+| `pnpm export` | `scripts/export.ts` | the database directly | writes a `dataset_snapshots` row per format |
+| `pnpm export:api` | `scripts/export-from-api.ts` | a deployed `/v1/` API over HTTP | nothing — there is no database on this path |
+
+The API source needs no database credentials and no network path to Postgres, which is what lets it
+run from CI against a public deployment. It publishes what the public actually receives, so it is
+also a **check on** the deployment rather than a second, privileged view of it. Before it writes
+anything it proves four things, and fails the whole run — publishing nothing — if any of them does
+not hold:
+
+1. every page of `/v1/opportunities` was read, and the pages joined without a repeated id;
+2. the number of records fetched equals `/v1/stats` `total`. Two independently computed counts
+   agreeing is evidence; disagreement means a dropped page or a dataset that changed mid-walk, and
+   neither is worth replacing a good export with;
+3. **every** record validates against the Standard — one by one, not a sample. Advisory check-tier
+   warnings are not consulted: a warning describes quality, not conformance;
+4. `EXPORT_MIN_COUNT` is met. An API with no data loaded yet is exactly this case: it publishes
+   nothing and exits non-zero rather than replacing `latest.*` with an empty dataset.
+
+Records are hydrated one by one from the **detail** endpoint, at bounded concurrency, because the
+list endpoint serves a thin projection that omits `fundingDetails` — a required property of the
+Standard, so a list item is not a record this export could publish or even validate.
+
+Both sources publish the same records in the same order, and their **CSV output is byte-identical**.
+Their JSON differs in one respect: property order follows the source, since the API's response
+serializer emits schema-declared properties first. Same data, same records, different bytes — so the
+two sources' JSON archives carry different digests.
 
 ### The alias pair
 
@@ -343,18 +385,58 @@ Ordering by public id makes the **CSV** byte-identical across runs over unchange
 **JSON** is not: its envelope stamps `generatedAt` from the clock, so an unchanged dataset yields
 JSON that differs in that one field — and therefore in its digest and its archive name.
 
+That order is imposed by the **writer**, comparing ids by code unit, rather than taken from
+whichever source produced the records: it makes the published bytes a function of the data alone.
+A database orders by its own collation, which is a property of the server rather than of the
+dataset, and an API list endpoint has no `id` sort key to ask for at all.
+
 `dataset_snapshots` records one row per **data** format (not the sidecar), each pointing at the
 **archive** — the per-run record — with its `sha256` and entry count, never at an alias, which
-moves.
+moves. It is written by the database source only, and only after the writer returns, so no row can
+claim a publication that did not happen.
 
 `EXPORT_MIN_COUNT` (default `100`) is a floor asserted **before** anything is serialized or
 written: a run below it writes nothing and exits non-zero, rather than quietly replacing `latest.*`
 with a header-only CSV after a broken seed. The same validation covers a floor passed
 programmatically, so no caller gets a weaker guard than the environment variable does.
 
-Where the files go from `./exports` is not this repo's business yet: no public bucket is deployed,
-and scheduling a recurring run belongs with the deployment. The export is a plain, repeatable
-command.
+### Nightly publication
+
+The export is published **into this repository**, at [`exports/`](../../exports) on the default
+branch, by a scheduled workflow ([`.github/workflows/nightly-export.yml`](../../.github/workflows/nightly-export.yml)).
+The job runs `pnpm export:api` against the deployed API, replaces the six files under `exports/`,
+and commits them as the Actions bot. No bucket, no credentials, no infrastructure to keep alive —
+and every snapshot is a commit, so what the dataset said on any past day is `git log`.
+
+The files are served directly, over TLS, at:
+
+```
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/latest.json
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/latest.csv
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/latest.manifest.json
+https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports/LICENSE
+```
+
+The manifest contract above is what a consumer should use: resolve
+`latest.manifest.json` once, fetch the digest-named archives it lists, hash the bytes, compare.
+Note that the raw host serves from a CDN with a cache of a few minutes, so a fresh commit is
+visible slightly after it lands.
+
+`exports/` holds exactly **one** run — this design keeps clones small; superseded snapshots stay in
+git history rather than in the directory.
+
+Two properties of the job are worth stating plainly:
+
+- **A green run means published AND independently verified**, never merely "ran". After pushing, the
+  job polls the public raw URL until it serves the manifest it just published, then runs
+  `node scripts/check-m2.mjs` against the deployment and the published export root. The checker
+  re-downloads the files as any consumer would and re-hashes the archives the manifest names; a
+  non-zero exit fails the job.
+- **Publishing data never deploys anything.** `ci.yml` and `staging.yml` carry
+  `paths-ignore: ['exports/**']` on their push triggers, so a push whose every changed file is under
+  `exports/` starts neither. A push that also touches source still runs both, exactly as before.
+  `production.yml` needs no such filter: it triggers only on `prod-*` tags and manual dispatch, so a
+  push to the default branch cannot start it at all.
 
 ### CSV columns
 
@@ -582,12 +664,9 @@ docker compose -f docker-compose.test.yml down
 
 ## Deferred (later in M2 / beyond)
 
-Cloud deploy; publishing the export to a public bucket and running it on a schedule (both belong
-with the deployment — no bucket is provisioned, so the export writes locally and `pnpm export` is
-the whole of it here); wiring the live-spec OpenAPI compliance run into an automated suite (the
-checks themselves already exist, script-only, as `pnpm check:m2` — see
-[Verifying a deployment](../../README.md#verifying-a-deployment)); DAOIP-5 `grantPools` export
-adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
+Cloud deploy; object storage for the export (the nightly job publishes it to this repository, which
+needs no bucket — the manifest's single-pointer shape is deliberately the one that survives a move
+to object storage, where `rename(2)` does not exist); DAOIP-5 `grantPools` export adapter. The write API, auth, verification, dedup, and analytics are M3+ (see
 `docs/data-model.md`).
 
 Runnable curl/TypeScript/Python client examples now live in [`examples/`](../../examples).
