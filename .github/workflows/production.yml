@@ -12,7 +12,12 @@ name: Production RFP Hub API
 # on push to main) so production releases are explicit.
 
 env:
-  ECS_CLUSTER: karma-production
+  # The cluster is the hosting account's own resource name, not a fact about this project, so
+  # it is a repository VARIABLE rather than a literal in a public, source-neutral tree (see
+  # scripts/check-neutral.mjs). Set `PRODUCTION_ECS_CLUSTER` under Settings -> Secrets and
+  # variables -> Actions -> Variables. The deploy job below refuses to run while it is unset,
+  # because an empty `cluster:` silently means ECS's `default` cluster.
+  ECS_CLUSTER: ${{ vars.PRODUCTION_ECS_CLUSTER }}
   ECR_REPOSITORY_MAIN: production-rfp-hub
   ECS_CONTAINER: rfp-hub-production
 
@@ -100,6 +105,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Fail before touching AWS rather than after: `cluster:` empty is not an error to the
+      # deploy action, it is a request for the account's `default` cluster.
+      - name: Require the cluster variable
+        run: |
+          if [ -z "${{ env.ECS_CLUSTER }}" ]; then
+            echo "::error::Repository variable PRODUCTION_ECS_CLUSTER is unset (Settings -> Secrets and variables -> Actions -> Variables)."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

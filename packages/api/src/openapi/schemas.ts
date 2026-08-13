@@ -126,6 +126,45 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "JsonLdContext",
+    type: "object",
+    additionalProperties: true,
+    description:
+      "The RFP Hub Standard's JSON-LD context document, served verbatim as application/ld+json at its canonical URL. Its single top-level member is `@context`; the term mappings inside it are the Standard's, not this API's.",
+    required: ["@context"],
+    properties: {
+      "@context": {
+        type: "object",
+        additionalProperties: true,
+        description: "Term definitions mapping every Standard field to an IRI.",
+      },
+    },
+  },
+  {
+    $id: "SpecVersionIndex",
+    type: "object",
+    additionalProperties: true,
+    description:
+      "Machine-readable index of published RFP Hub Standard versions, served verbatim at its canonical URL. `latest` names the current spec version; each entry's `path` is a sibling directory of the index.",
+    required: ["versions", "latest"],
+    properties: {
+      versions: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: true,
+          required: ["version", "path", "status"],
+          properties: {
+            version: { type: "string", description: "The spec version, e.g. 1.0.0." },
+            path: { type: "string", description: "Directory holding that version's artifacts." },
+            status: { type: "string", description: "Maturity: draft or stable." },
+          },
+        },
+      },
+      latest: { type: "string", description: "The current spec version." },
+    },
+  },
+  {
     $id: "Health",
     type: "object",
     additionalProperties: false,

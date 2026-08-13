@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json",
+  "$id": "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
   "title": "RFP Hub Opportunity",
   "description": "RFP Hub Standard v1.0.0 — the normative definition of a funding opportunity in the Ethereum ecosystem. A document conforms to this version of the standard when it validates against this file. Covers six funding types: grant, hackathon, bounty, accelerator, vc_fund, rfp. Aligns conceptually with DAOIP-5 (Grants Metadata) and schema.org/Grant. Published under CC0 1.0 Universal. The field reference is FIELDS.md, the normative/informative split is NORMATIVE.md, and both ship alongside this file in the @the-rfp-hub/standard package and at https://github.com/The-RFP-Hub/the-rfp-hub.",
   "$comment": "AUTHORING NOTES (not for consumers). (1) `additionalProperties: false` at this level is safe alongside `allOf` only because no branch introduces an undeclared property name: each branch's `then` narrows `fundingDetails`, which is already declared in this object's `properties`, and every other name the branches mention is declared there too. That is the classic 2020-12 trap avoided by construction rather than by `unevaluatedProperties`, which is deliberately not used — it would relax this object from closed to 'closed after evaluation' for no gain. Any future branch that mentions a property name not declared here MUST be paired with a switch to `unevaluatedProperties: false`. The same reasoning applies inside $defs/deadline, whose `then` narrows `date`, a property already declared in its own `properties`. (2) Absence of `x-stability` means `stable`; only fields resting on narrow evidence are annotated `provisional`. (3) Property order is grouped identity → classification → organisations → provenance → content → money → time → fundingDetails, and `required` follows property order, so diffs stay reviewable.",
@@ -24,12 +24,12 @@
       "type": "string",
       "format": "uri",
       "description": "Optional self-identification: the URL of the RFP Hub schema this document claims to conform to. Permitted so a generic validator can discover the contract from the instance alone. Ignored by validation — naming a different schema here does not change which schema the document is validated against.",
-      "examples": ["https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json"]
+      "examples": ["https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json"]
     },
     "@context": {
       "anyOf": [{ "type": "string" }, { "type": "object" }, { "type": "array" }],
       "description": "Optional JSON-LD context: a URL, an inline context object, or an array of either. Permitted so an instance can be consumed as linked data. Ignored by validation — the standard makes no claim about its contents.",
-      "examples": ["https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/context.jsonld"]
+      "examples": ["https://ethrfps.app/schemas/v1.0.0/context.jsonld"]
     },
     "@type": {
       "anyOf": [{ "type": "string" }, { "type": "array" }],

@@ -10,12 +10,82 @@ committed to this repository, and repeatable open-data exports (CC0). This is mi
 |---|---|---|
 | `GET` | `/v1/opportunities` | List (thin projection). Filters: `fundingType`, `status`, `ecosystem`, `category`, `organization`, `minAward`, `maxAward`, `deadlineAfter`, `deadlineBefore`, `q`; `sort` (`nextDeadlineAt\|opensAt\|postedAt\|updatedAt\|createdAt`), `order`, `page`, `limit`. |
 | `GET` | `/v1/opportunities/:id` | One full Standard object (e.g. `fundingmap:1459`); `404` if not found. |
-| `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served as `application/schema+json` — semantically identical to the published file (re-serialized, so key order may differ from the raw bytes). |
+| `GET` | `/v1/opportunities/schema` | The canonical v1.0.0 JSON Schema, served as `application/schema+json`, byte-for-byte as the package ships it. A convenience alias of the canonical route below; the `$id` it carries names the canonical URL, not this one. |
 | `GET` | `/v1/feeds/opportunities.atom` | Atom 1.0 feed of the most recently published opportunities (`application/atom+xml`). `limit` (1..100, default 50), `status`. |
 | `GET` | `/v1/feeds/opportunities.rss` | The same feed as RSS 2.0 (`application/rss+xml`). |
 | `GET` | `/v1/stats` | Totals + breakdowns by funding type/status/ecosystem. |
 | `GET` | `/v1/health` | Liveness + DB readiness. |
 | `GET` | `/v1/docs` | Swagger UI (OpenAPI 3.1). |
+
+### The spec's own documents (unversioned, at the root)
+
+Every identifier the Standard publishes is an absolute URL on `ethrfps.app`, and each one is
+served here at exactly the path it names — deliberately **not** under `/v1/`: these are the
+spec's identifiers, not API resources, and an identifier must not carry an API version. Bytes
+are the package's own, served verbatim (a consumer that hashes the response gets the same digest
+as one that hashes the file). See [`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md).
+
+| Method | Path | Media type |
+|---|---|---|
+| `GET` | `/schemas/v1.0.0/opportunity.schema.json` | `application/schema+json` |
+| `GET` | `/schemas/v1.0.0/context.jsonld` | `application/ld+json` |
+| `GET` | `/schemas/index.json` | `application/json` |
+| `GET` | `/meta/rfphub-schema.meta.json` | `application/schema+json` |
+| `GET` | `/registries/entry.schema.json` | `application/schema+json` |
+
+Each carries an explicit cache policy and a strong `ETag` (send `If-None-Match` for a `304`).
+`/schemas/v<version>/**` is `public, max-age=31536000, immutable` — the version is in the path and
+the directory is frozen, so those bytes can never change at that URL. Everything whose URL carries
+no version, including the `/v1/opportunities/schema` alias, is `public, max-age=3600,
+must-revalidate`. No `Last-Modified`: the only timestamp available is the build's, and it changes
+for bytes that did not.
+
+These resolve once the apex is routed to this service **for these five paths** — `ethrfps.app` is
+registered and delegated already, but it points at registrar URL forwarding rather than here. Spec resolution therefore rides this service's uptime for now; the recorded end
+state is the package directory on object storage behind a CDN, which retires these five routes
+without any identifier changing.
+
+#### Hostnames: what the apex serves, and what it does not
+
+[`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md) reserves the apex for the spec
+— *"no service is ever mounted here"* — and that reservation is the entire reason `/schemas/`,
+`/meta/`, `/registries/` and `/ns/` are safe as permanent identifier paths. Routing the apex to
+this service **wholesale** would not reserve it; it would publish the whole `/v1` API at
+`ethrfps.app`, and every future apex path would become API collision surface.
+
+| Host | What this service answers |
+|---|---|
+| `ethrfps.app` (and `www.`) | The five canonical documents above. Everything else — `/v1/**`, `/v1/docs`, the service-info root — is `404`. |
+| `api.ethrfps.app`, `api-staging.ethrfps.app`, anything else | Everything, including the canonical documents. An identifier that resolves on only one hostname is not more reserved, just harder to serve. |
+
+This is enforced in the application (`src/plugins/apex-host.ts`, an `onRequest` allowlist derived
+from the Standard's own `baseUrl`) and asserted with both `Host` headers in
+`test/integration/apex-host.test.ts`. **The infrastructure must enforce the same contract
+independently**: the apex listener rule belongs path-scoped to `/schemas/*`, `/meta/*` and
+`/registries/*`, so apex traffic for `/v1` never reaches a task at all. Two layers, because the
+application rule survives an infrastructure edit and the infrastructure rule survives a routing
+change here.
+
+The apex `404` says where the API actually is, and takes that from `PUBLIC_BASE_URL` — the same
+value the OpenAPI document publishes, because it is the same fact and a second variable for it
+would only be a way for a deployment to contradict itself. At its `/` default nothing has been
+configured, so the message says the API is on a different host without naming one. What it never
+does is name the apex: sending a caller back to the hostname that just refused them is a redirect
+loop written in prose.
+
+### JSON-LD
+
+`application/json` opportunity responses (list and detail, `200` only) carry
+
+```
+Link: <https://ethrfps.app/schemas/v1.0.0/context.jsonld>; rel="http://www.w3.org/ns/json-ld#context"; type="application/ld+json"
+```
+
+so a conformant JSON-LD 1.1 processor reads them as linked data with no `@context` in the
+payload. It is deliberately absent from the `application/schema+json` and `application/ld+json`
+routes above and from error bodies: a processor MUST follow an advertised context on any `+json`
+type that is not `ld+json`, so advertising there would instruct it to read a JSON Schema document
+as an opportunity.
 
 Public reads return only `review_status = 'approved' AND is_listed` rows. List responses omit
 `fundingDetails` — the type-specific details slot, a tagged union whose own required `fundingType`
@@ -122,7 +192,7 @@ under [the converter's README](./tools/converter/README.md).
 | `HOST` | `0.0.0.0` | HTTP bind address. |
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
-| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). |
+| `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). It is read by the apex reservation too, which uses it to tell a caller it refused where the API is; the `/` default names no host, so the message says so plainly instead. |
 | `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 
 The seed is deliberately absent from that table: its corpus is an argument, not an environment

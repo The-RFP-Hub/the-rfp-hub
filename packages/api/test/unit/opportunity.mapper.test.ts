@@ -306,10 +306,8 @@ describe("ingest normalization", () => {
   it("accepts and STRIPS the self-identification properties", () => {
     const selfIdentifying = {
       ...BASE,
-      $schema:
-        "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json",
-      "@context":
-        "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/context.jsonld",
+      $schema: "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
+      "@context": "https://ethrfps.app/schemas/v1.0.0/context.jsonld",
       "@type": "schema:Grant",
     } as Opportunity;
     const rebuilt = toStandard(rowFromInsert(fromStandard(selfIdentifying).opp)) as Record<

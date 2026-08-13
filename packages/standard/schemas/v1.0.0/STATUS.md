@@ -7,23 +7,31 @@ Other documents may supersede it. A machine-readable index of all versions is at
 | | |
 |---|---|
 | **Version** | `1.0.0` |
-| **Maturity** | **`draft`** |
-| **Identifiers** | Stamped from [`spec.config.json`](../../spec.config.json) — **no canonical domain yet**, see Known issues |
+| **Maturity** | **`stable`** — declared 2026-08-10; this directory is frozen (`FROZEN`) |
+| **Identifiers** | **Canonical**, on `ethrfps.app`. Stamped from [`spec.config.json`](../../spec.config.json) — see [`adr/0007`](../../../../adr/0007-canonical-domain-and-spec-identity.md) |
 | **Re-cut in place** | **2026-07-27** |
 | **Second draft revision (in place)** | **2026-08-05** — see [`adr/0004`](../../../../adr/0004-second-draft-revision-org-swap-and-closure.md) |
 | **Third draft revision (in place)** | **2026-08-05**, same day, applied after the second — see [`adr/0005`](../../../../adr/0005-third-draft-revision-utc-timestamps-and-tagged-funding-details.md) |
-| **Fourth draft revision (in place)** | **2026-08-10, amended through 2026-08-11 in review** — the bounty type splits into task and security kinds — see [`adr/0007`](../../../../adr/0008-security-bounty-payout-tiers.md) |
+| **Fourth draft revision (in place)** | **2026-08-10, amended through 2026-08-11 in review** — the bounty type splits into task and security kinds — see [`adr/0008`](../../../../adr/0008-security-bounty-payout-tiers.md) |
+| **Canonical identity adopted** | **2026-08-10**, in the same change that declared this version stable — see [`adr/0007`](../../../../adr/0007-canonical-domain-and-spec-identity.md) |
 | **Supersedes** | none — this is the first version |
 | **Superseded by** | none — this is the current version |
 | **Feedback** | GitHub issues on [`The-RFP-Hub/the-rfp-hub`](https://github.com/The-RFP-Hub/the-rfp-hub/issues) |
 | **License** | CC0 1.0 |
 
-## Maturity: `draft`
+## Maturity: `stable`
 
-`draft` means the shape is **usable and stable enough to publish against, but not frozen**. It
-may still change without a new version directory while this maturity holds. Promotion to
-`stable` freezes this directory: a `FROZEN` marker file lands in it and CI rejects any PR that
-edits it thereafter — see [`PROCESS.md`](../../PROCESS.md).
+**This version is frozen.** `stable` means the bytes in this directory, and the conformance
+suite that defines what conformance to them observably is, will never change again. The
+`FROZEN` marker file sits beside this document and
+[`.github/workflows/spec-freeze.yml`](../../../../.github/workflows/spec-freeze.yml) fails any
+PR that edits this directory, the conformance suite, the meta-schema, the registry entry schema,
+or the identity fields of `spec.config.json` — see [`PROCESS.md`](../../PROCESS.md). A breaking
+change from here takes a **new version directory**; this one stays published and unedited.
+
+The four in-place draft revisions recorded in the table above — the last of them the bounty
+split of 2026-08-10 — happened while the maturity was `draft`, which is the only window
+`PROCESS.md` ever permitted them in. That window is now closed permanently.
 
 Feature-level maturity is finer-grained than document-level maturity. The three fields that
 once carried `x-stability: provisional` (`serviceAgreement`, `milestones[]`, `programModel`)
@@ -104,22 +112,35 @@ change is a version bump regardless of maturity.
 
 ## Known issues in this version
 
-- **There is no canonical domain yet, and the identifiers say so.** The project does not own a
-  domain, so nothing is minted on one. Instead:
-  - **`$id`** — for the schema, the metaschema and the registry entry schema — is a
-    `raw.githubusercontent.com` URL on the default branch. It **does dereference**, to exactly
-    the bytes shipped here. *Known limitation:* GitHub serves it as `text/plain`, not
-    `application/schema+json`. A URL that resolves to the real document with the wrong
-    Content-Type is strictly better than one that resolves to a parking page or to nothing.
-  - **`@vocab`** is `https://github.com/The-RFP-Hub/the-rfp-hub/ns/draft/rfp#` and **does not
-    dereference**. A vocabulary namespace must be versionless, so it cannot live under
-    `schemas/<version>/`, and no versionless document exists to point it at. The `draft` segment
-    mirrors this version's maturity so the IRI reads as provisional on sight, and the authority
-    is one the project demonstrably controls.
-  - **Swapping in the real domain is a one-line edit** to `baseUrl`/`vocabIri` in
-    [`spec.config.json`](../../spec.config.json) followed by `pnpm codegen`. Every identifier in
-    the package is stamped from that file; none is hand-written, and `pnpm check` fails if one
-    ever is.
+- **The identifiers are canonical; HTTP resolution is not live yet.** This is the honest
+  successor to the "no canonical domain" caveat this section carried until 2026-08-10. The
+  project owns `ethrfps.app`, its apex is reserved for the spec, and every identifier this
+  version publishes is now minted there and is **final** — the freeze covers them.
+  - **`$id`** — for the schema, the metaschema and the registry entry schema — is
+    `https://ethrfps.app/…`, mirroring this package's own directory layout
+    (`/schemas/v1.0.0/opportunity.schema.json`, `/meta/rfphub-schema.meta.json`,
+    `/registries/entry.schema.json`).
+  - **`@vocab`** is `https://ethrfps.app/ns/rfp#`, versionless by rule: term IRIs are versioned
+    by the context *document*, never by the term, so the namespace carries neither a version nor
+    a maturity segment. The `draft` segment the provisional IRI used to carry is gone with the
+    maturity it mirrored.
+  - **What is not true yet:** these URLs **do not resolve to these documents today.**
+    `ethrfps.app` is registered and delegated, but it currently points at registrar URL
+    forwarding rather than at this service, and nothing answers on `https://`: a consumer that
+    dereferences an `$id` or an advertised `@context` gets a connection failure over `https://`
+    — the form a browser is forced onto, `.app` being HSTS-preloaded — and, over plain `http://`,
+    a redirect to a parking page. Either way it is never one of these documents, and a client
+    that follows the redirect gets HTML rather than the hard failure this note used to promise.
+    Nothing in this package depends on resolution: the schema is self-contained (local
+    `#/$defs` pointers only), the context ships beside it, and `rfphub-validate` reads both from
+    disk. Resolution goes live when the apex is routed to the serving path the API already
+    implements — it serves every canonical document at its canonical path (`packages/api`, see
+    [`ARTIFACTS.md`](../../ARTIFACTS.md)), so the remaining work is operational, not editorial.
+  - **The identifiers cannot be swapped again.** They were provisional exactly once, by design;
+    the one-time provisional→canonical adoption is recorded in
+    [`adr/0007`](../../../../adr/0007-canonical-domain-and-spec-identity.md), machine-recorded as
+    `identityStatus: "canonical"` in [`spec.config.json`](../../spec.config.json), and the
+    freeze workflow rejects any further identity change — including a revert to `provisional`.
 - **Status granularity** — the four-value `status` enum is the most-questioned part of the
   standard. It is unresolved, not settled.
 - **`vc_fund` has no benchmark-fixture coverage** — none of the 30 fixtures in

@@ -15,6 +15,7 @@ import { config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
+import { canonicalDocuments } from "../../src/modules/shared/canonical-documents.js";
 import { describeWithDb } from "./db-gate.js";
 
 const run = describeWithDb;
@@ -111,6 +112,8 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "/v1/opportunities/schema",
       "/v1/stats",
       "/v1/health",
+      // The spec's own documents, at the paths their identifiers name (adr/0007).
+      ...canonicalDocuments.map((d) => d.path),
     ]) {
       expect(doc.paths?.[path]?.get, `documents GET ${path}`).toBeTruthy();
     }
@@ -120,6 +123,8 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "PaginatedOpportunities",
       "Stats",
       "SchemaResponse",
+      "JsonLdContext",
+      "SpecVersionIndex",
       "Health",
     ]) {
       expect(doc.components?.schemas?.[name], `components has ${name}`).toBeTruthy();
@@ -297,6 +302,41 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("application/schema+json");
     assertConformsTo("/v1/opportunities/schema", res.json());
+  });
+
+  /**
+   * The canonical spec routes. Same live-spec discipline as every other endpoint: what the
+   * document declares must be what the route serves — and for these, the declared media type is
+   * the interoperability contract (`application/schema+json` / `application/ld+json`), not a
+   * detail. They are also the one group of operations that must NOT be under `/v1/`.
+   */
+  for (const canonicalDoc of canonicalDocuments) {
+    it(`GET ${canonicalDoc.path} declares and serves ${canonicalDoc.mediaType}`, async () => {
+      const operation = doc.paths[canonicalDoc.path].get;
+      expect(operation.tags).toEqual(["spec"]);
+      expect(Object.keys(operation.responses["200"].content)).toEqual([canonicalDoc.mediaType]);
+      expect(operation.responses["200"].content[canonicalDoc.mediaType].schema.$ref).toBe(
+        `#/components/schemas/${canonicalDoc.component}`,
+      );
+
+      const res = await app.inject({ method: "GET", url: canonicalDoc.path });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toContain(canonicalDoc.mediaType);
+      assertConformsTo(canonicalDoc.path, res.json());
+    });
+  }
+
+  it("keeps the spec's identifiers out of the API's version namespace", () => {
+    for (const canonicalDoc of canonicalDocuments) {
+      expect(canonicalDoc.path, "an identifier must not carry an API version").not.toMatch(
+        /^\/v\d+\//,
+      );
+    }
+    // and every spec-tagged operation is one of them — nothing else claims that tag
+    const tagged = Object.entries<Record<string, { tags?: string[] }>>(doc.paths)
+      .filter(([, ops]) => ops.get?.tags?.includes("spec"))
+      .map(([path]) => path);
+    expect(tagged.sort()).toEqual(canonicalDocuments.map((d) => d.path).sort());
   });
 
   it("GET /v1/stats conforms to its declared 200 schema", async () => {

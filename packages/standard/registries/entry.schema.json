@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/registries/entry.schema.json",
+  "$id": "https://ethrfps.app/registries/entry.schema.json",
   "title": "RFP Hub registry file",
   "description": "The shape of every registry file under packages/standard/registries/. A registry governs one open vocabulary in the standard: the schema keeps the field open (free text), and the registry keeps the values interoperable. Registered values are normative; the schema does not enforce them and unregistered values remain valid. Entries are NEVER deleted — set status to 'deprecated' and point replacedBy at the successor.",
   "type": "object",

@@ -1,9 +1,15 @@
 import type { FastifyInstance } from "fastify";
+import { advertiseJsonLdContext } from "../../shared/jsonld-link.js";
 import { opportunityController } from "./opportunity.controller.js";
 import { listQuerySchema } from "./types.js";
 
 /** Registers the /v1/opportunities routes (mounted with that prefix by the aggregator). */
 export const opportunities = async (router: FastifyInstance): Promise<void> => {
+  // Every application/json opportunity response advertises the canonical JSON-LD context, so a
+  // conformant processor reads it as linked data without an `@context` in the payload. Scoped
+  // to this plugin: it must never land on the `application/schema+json` route below.
+  advertiseJsonLdContext(router);
+
   router.get(
     "/",
     {
@@ -39,6 +45,7 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
               "application/schema+json": { schema: { $ref: "SchemaResponse#" } },
             },
           },
+          304: { description: "Not modified — the entity-tag you hold is current." },
         },
       },
     },

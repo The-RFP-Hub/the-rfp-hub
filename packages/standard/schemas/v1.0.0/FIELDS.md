@@ -1,7 +1,9 @@
 # RFP Hub Standard v1.0.0 — Field Reference
 
-> **Maturity: `draft`.** While a version is draft its contents may still change; the revision
-> history lives in [`STATUS.md`](./STATUS.md), the field-mapping tables in
+> **Maturity: `stable`** — declared 2026-08-10, and this directory is frozen (`FROZEN`). The
+> normative bytes of this version will never change again; a breaking change takes a new version
+> directory. This file is informative and stays corrigible (see below). The revision history
+> lives in [`STATUS.md`](./STATUS.md), the field-mapping tables in
 > [`CHANGELOG.md`](../../CHANGELOG.md), and the reasoning in the [ADRs](../../../../adr).
 
 The **RFP Hub Standard** is a canonical, ecosystem-neutral representation of a funding
@@ -15,11 +17,11 @@ full normative/informative split and what that means for the release cycle.
 
 - **License:** CC0 1.0 (the standard and its docs are public domain).
 - **Spec version:** `1.0.0` — every entry carries `specVersion: "1.0.0"` exactly.
-- **`$id`:** `https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/packages/standard/schemas/v1.0.0/opportunity.schema.json`
-  — ⚠️ **provisional.** The project has no canonical domain yet, so the identifier points at the
-  file in the repository, where it dereferences to exactly these bytes (served as `text/plain`).
-  It is stamped from [`spec.config.json`](../../spec.config.json); adopting a domain is one edit
-  there. See [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
+- **`$id`:** `https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json`
+  — **canonical.** `ethrfps.app` is the project's own domain and its apex is reserved for the
+  spec, so this identifier is final for this version. It is stamped from
+  [`spec.config.json`](../../spec.config.json), like every other identifier in the package. HTTP
+  resolution goes live with DNS; see [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
 
 ## Conventions
 
@@ -620,10 +622,10 @@ conformance; a conforming document may raise warnings, which is the point of the
 
 ## Open items
 
-- **Canonical domain** — undecided. Identifiers are provisional but honest: `$id` dereferences
-  to the file in the repository, and `@vocab` is visibly marked `draft`. Both are stamped from
-  `spec.config.json`, so adopting a domain is a one-line change. See
-  [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
+- **Canonical domain** — decided: `ethrfps.app`, adopted in
+  [`adr/0007`](../../../../adr/0007-canonical-domain-and-spec-identity.md) and stamped from
+  `spec.config.json`. The identifiers are canonical; public dereference is deployment-gated and
+  not live yet. See [`STATUS.md`](./STATUS.md#known-issues-in-this-version).
 - **Status granularity** — the four-value enum is the most-questioned part of the standard
   (`in review`, `paused`, `awarded` have all been asked for). It remains open on its own terms;
   the no-`draft` ruling above does not close it.
