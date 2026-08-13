@@ -29,12 +29,11 @@ name: Nightly open-data export
 
 on:
   workflow_dispatch:
-  # Enabled in a follow-up commit, after one manual dispatch has published and verified a snapshot
-  # end to end. Scheduled workflows are read from the DEFAULT BRANCH, so this file has to be on
-  # main before a cron here can fire at all — which is why it is merged in this state rather than
-  # left on a branch until it is proven.
-  # schedule:
-  #   - cron: "17 3 * * *"
+  # Enabled after one manual dispatch (run 31742168996, 2026-08-13) published and verified a
+  # snapshot end to end. Scheduled workflows are read from the DEFAULT BRANCH, so the cron only
+  # fires once this file is on main.
+  schedule:
+    - cron: "17 3 * * *"
 
 # The whole point of the job: it writes a commit to the default branch.
 permissions:
