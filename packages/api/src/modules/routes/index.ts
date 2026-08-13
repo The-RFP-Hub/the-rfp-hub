@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { canonical } from "./canonical/index.js";
+import { datasetExport } from "./export/index.js";
 import { feeds } from "./feeds/index.js";
 import { health } from "./health/index.js";
 import { opportunities } from "./opportunities/index.js";
@@ -9,6 +10,9 @@ import { stats } from "./stats/index.js";
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(opportunities, { prefix: "/v1/opportunities" });
   await app.register(feeds, { prefix: "/v1/feeds" });
+  // `export` is a reserved word, so the module's binding is `datasetExport`; the PREFIX is the
+  // singular `/v1/export`, symmetric with `/v1/feeds` — one noun naming what the routes under it do.
+  await app.register(datasetExport, { prefix: "/v1/export" });
   await app.register(stats, { prefix: "/v1/stats" });
   await app.register(health, { prefix: "/v1/health" });
   // No prefix, deliberately: these routes ARE the spec's identifiers, and an identifier must

@@ -24,6 +24,7 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
       tags: [
         { name: "opportunities", description: "Funding opportunities" },
         { name: "feeds", description: "Syndication feeds (Atom 1.0, RSS 2.0)" },
+        { name: "export", description: "Full-dataset downloads (JSON, CSV)" },
         { name: "stats", description: "Dataset statistics" },
         { name: "meta", description: "Service metadata" },
         {
