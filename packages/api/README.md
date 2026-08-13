@@ -125,6 +125,10 @@ under [the converter's README](./tools/converter/README.md).
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). |
 | `EXPORT_MIN_COUNT` | `100` | Floor below which `pnpm export` writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 
+The publication step has its own three (`S3_BUCKET`, `S3_PREFIX`, `AWS_REGION`), documented with
+the command that reads them under [Publishing the export](#publishing-the-export) — none of them is
+read by the server, and no bucket name is committed anywhere in this repo.
+
 The seed is deliberately absent from that table: its corpus is an argument, not an environment
 pointer. The one variable it reads, `SEED_STRICT=1`, only mirrors the `--strict` flag. Nothing in
 `src/` or `scripts/` reads a pointer at any upstream; the one variable that does is read by
@@ -143,15 +147,17 @@ offline tooling and documented with it, under
 
 ### One-off tasks
 
-`migrate`, `seed` and `export` are built into the container image as their own entry points, so a
-deployment can create its schema and load its data with the **same image** it serves from — no
-`tsx`, no TypeScript sources, no second image. Each is a plain command a one-off task runner can
-launch (a task-runner API, `docker run`, `kubectl run`), overriding the image's server command:
+`migrate`, `seed`, `export` and `publish` are built into the container image as their own entry
+points, so a deployment can create its schema, load its data and publish its dataset with the
+**same image** it serves from — no `tsx`, no TypeScript sources, no second image. Each is a plain
+command a one-off task runner can launch (a task-runner API, `docker run`, `kubectl run`),
+overriding the image's server command:
 
 ```bash
 node packages/api/dist/migrate.js
 node packages/api/dist/seed.js packages/api/data/seed-corpus.json --strict
 node packages/api/dist/export.js
+node packages/api/dist/publish.js --dry-run
 ```
 
 `DATABASE_URL` comes from the **task environment**, exactly as it does for the server: the image's
@@ -173,6 +179,11 @@ Notes on each:
 - **export** writes its six files to `./exports`, a directory the image creates and hands to the
   `node` user. Mount a volume over it to keep the output past the task's lifetime; the floor
   (`EXPORT_MIN_COUNT`) applies as usual. See [Open-data export](#open-data-export).
+- **publish** uploads that directory to `S3_BUCKET` and touches no database, so it needs neither
+  `DATABASE_URL` nor the migrations or corpus the other tasks read — only the export's own output
+  and an identity holding `s3:PutObject`. It is the one task that must run in the *same* task as
+  the export, or against the same mounted volume: it publishes what is on disk. `--dry-run` prints
+  the plan and uploads nothing. See [Publishing the export](#publishing-the-export).
 
 ## Open-data export
 
@@ -282,9 +293,78 @@ written: a run below it writes nothing and exits non-zero, rather than quietly r
 with a header-only CSV after a broken seed. The same validation covers a floor passed
 programmatically, so no caller gets a weaker guard than the environment variable does.
 
-Where the files go from `./exports` is not this repo's business yet: no public bucket is deployed,
-and scheduling a recurring run belongs with the deployment. The export is a plain, repeatable
-command.
+### Publishing the export
+
+`pnpm publish:export` uploads a **finished** export directory to an S3 bucket. It runs after
+`pnpm export`, shares nothing with it but the directory, and reads no database:
+
+```bash
+export S3_BUCKET=…                                   # required; never committed here
+pnpm --filter @the-rfp-hub/api export
+pnpm --filter @the-rfp-hub/api publish:export --dry-run   # print the plan, upload nothing
+pnpm --filter @the-rfp-hub/api publish:export
+```
+
+The archive filenames come out of `latest.manifest.json`, never re-derived from today's date and a
+digest: the manifest is what that run published as its own description of itself, and a publish
+step with a second copy of the writer's naming rule is a publish step that can disagree with the
+pointer it is uploading. Before the first upload the plan is checked whole — every file the
+manifest names is on disk, and both archives hash to the `sha256` it records.
+
+The upload order **mirrors the writer's**, and the manifest goes **last**:
+
+| # | Key | Content type | `Cache-Control` |
+|---|---|---|---|
+| 1 | `LICENSE` | `text/plain` | `public, max-age=300` |
+| 2 | `opportunities-<date>-<digest>.json` | `application/json` | `public, max-age=31536000, immutable` |
+| 3 | `opportunities-<date>-<digest>.csv` | `text/csv` | `public, max-age=31536000, immutable` |
+| 4 | `latest.json` | `application/json` | `public, max-age=300` |
+| 5 | `latest.csv` | `text/csv` | `public, max-age=300` |
+| 6 | `latest.manifest.json` | `application/json` | `public, max-age=300` |
+
+A bucket has no `rename(2)` and no way to replace two keys together, so **the order is the whole
+guarantee**. Uploads are sequential and fail-fast: a run that dies part-way has not replaced the
+manifest, so a consumer following [the manifest contract](#the-manifest) still resolves the
+previous run, whole — and the archives that run names are content-addressed, so a partial
+publication cannot have overwritten them either. What a partial publication *can* leave straddling
+two runs is the `latest.*` alias pair, which is the same caveat [the local writer
+carries](#the-alias-pair) and the same reason the manifest exists. The error names what landed and
+what did not; re-running completes the publication.
+
+`immutable` is claimed only for the digest-named archives, whose key is derived from their own
+bytes. Everything under a stable key gets the short TTL — the **manifest emphatically included**: a
+long TTL there would keep serving a previous run's `generatedAt` after a publication that did
+everything right, failing a ≤24h freshness check with no invalidation step to rescue it.
+
+**Public read is a property of the bucket, not of the upload.** The bucket policy grants
+`s3:GetObject` where the bucket is created; this script sets **no ACL** on anything, and the
+identity it runs as needs `s3:PutObject` and nothing more. On a bucket with object ownership
+enforced an ACL-bearing request is rejected outright, so an ACL here would not be harmless
+belt-and-braces — it would fail every upload.
+
+Configuration is environment-only, and **no bucket name is committed anywhere in this repo**:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `S3_BUCKET` | — | **Required.** The bucket *name* — not a URI, not a path. Validated locally (3–63 chars, DNS-compatible) so a typo fails immediately instead of as an opaque SDK error. |
+| `S3_PREFIX` | *(empty)* | Key prefix. Slashes are normalized: `/open-data/` and `open-data` both give keys under `open-data/`. |
+| `AWS_REGION` | *(SDK default chain)* | Read only so the printed plan can name the region the upload will use. Unset falls through to the SDK's own resolution (config file, instance role). Credentials are never read by this code at all — they are the SDK's default chain, as usual. |
+
+`--dry-run` prints the exact plan — key, content type, cache policy, byte size, order — and uploads
+nothing. It needs no credentials, so it is how an operator checks a prefix layout before pointing
+this at a real bucket.
+
+Two things this deliberately does not do: it does not create, configure or police the bucket (that
+is infrastructure, provisioned elsewhere), and it does not schedule itself. Recording the public
+URL in `dataset_snapshots.url` is also still open — that column holds the local path the exporter
+wrote, and a URL recorded *before* the upload would claim a published object that may not exist
+yet.
+
+`@aws-sdk/client-s3` is pinned to `~3.967.0`, the last release whose own `engines.node` is `>=18`;
+`3.968.0` raised it to `>=20`, which this workspace does not declare. CI runs Node 22 and would
+have hidden the contradiction rather than resolved it. The script issues `PutObject` and nothing
+else, so the older line costs nothing — lift the pin deliberately, when the workspace raises its
+Node floor on its own merits.
 
 ### CSV columns
 
@@ -512,9 +592,10 @@ docker compose -f docker-compose.test.yml down
 
 ## Deferred (later in M2 / beyond)
 
-Cloud deploy; publishing the export to a public bucket and running it on a schedule (both belong
-with the deployment — no bucket is provisioned, so the export writes locally and `pnpm export` is
-the whole of it here); wiring the live-spec OpenAPI compliance run into an automated suite (the
+Cloud deploy; **scheduling** the export/publish pair and pointing it at a provisioned bucket (the
+uploader itself now ships — see [Publishing the export](#publishing-the-export) — but nothing here
+runs it on a timer, and no bucket name lives in this repo); recording the published URL in
+`dataset_snapshots.url`; wiring the live-spec OpenAPI compliance run into an automated suite (the
 checks themselves already exist, script-only, as `pnpm check:m2` — see
 [Verifying a deployment](../../README.md#verifying-a-deployment)); DAOIP-5 `grantPools` export
 adapter. The write API, auth, verification, dedup, and analytics are M3+ (see

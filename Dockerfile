@@ -10,12 +10,15 @@
 #   folders and the standard package's runtime assets (schemas, registries,
 #   conformance, meta) that its package.json exports point at.
 #
-# The image serves the API *and* runs its three one-off admin tasks —
-# `migrate`, `seed` and `export` — as separate entry points under
+# The image serves the API *and* runs its four one-off admin tasks —
+# `migrate`, `seed`, `export` and `publish` — as separate entry points under
 # `packages/api/dist`, so a task runner can launch any of them against the
 # same image the service runs (see "One-off tasks" in packages/api/README.md).
 # Each needs data the server does not: the Drizzle migrations, the seed
 # corpus, and a writable directory to export into. Those are copied below.
+# `publish` needs none of them — it uploads the directory `export` wrote,
+# so it runs in the same task (or against the same mounted volume) as that
+# export, and its destination comes entirely from the task environment.
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
