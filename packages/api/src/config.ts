@@ -9,6 +9,7 @@
  * request path reads does not belong here.
  */
 import { config as loadDotenv } from "dotenv";
+import { isLoopbackHost } from "./shared/loopback.js";
 
 // Load .env (from the working directory — packages/api for every pnpm script here) before any
 // process.env read below. dotenv never overwrites variables that already reached the process, so
@@ -97,30 +98,6 @@ export function readDbPoolMax(raw: string | undefined, fallback = DEFAULT_DB_POO
   const parsed = Number((raw ?? "").trim());
   const usable = Number.isInteger(parsed) && parsed > 0;
   return usable ? parsed : fallback;
-}
-
-/**
- * Hosts whose traffic never leaves the machine — the only ones allowed to advertise a plaintext
- * base URL, because there is no network segment on which that plaintext could be observed or
- * tampered with. The set is deliberately narrow, and deliberately says nothing about any
- * particular domain:
- *
- * - `localhost` and any `*.localhost` name: RFC 6761 §6.3 reserves the whole subtree to resolve to
- *   loopback, so `http://api.localhost:3001` is a legitimate development origin;
- * - the entire IPv4 loopback block `127.0.0.0/8` (RFC 1122 §3.2.1.3), not merely `127.0.0.1` —
- *   every address in it is loopback, and per-service aliases like `127.0.0.2` are a common habit;
- * - `::1`, the IPv6 loopback (RFC 4291 §2.5.3). `new URL()` reports IPv6 hosts bracketed, so the
- *   brackets are stripped before comparing.
- *
- * Deliberately NOT loopback: private LAN ranges (10/8, 172.16/12, 192.168/16) and mDNS `*.local`
- * names — traffic to those crosses a real network, where plaintext is really exposed. `0.0.0.0` is
- * a wildcard bind address rather than a host any client can reach, so it is excluded too.
- */
-function isLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host.endsWith(".localhost")) return true;
-  if (host === "::1") return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
 }
 
 /**

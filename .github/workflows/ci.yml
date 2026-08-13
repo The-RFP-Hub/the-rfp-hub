@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    # `exports/` is machine-written data published by nightly-export.yml, not source: nothing in it
+    # can change what the test suite does. A push whose every changed file is under `exports/` is
+    # skipped; a push that touches anything else still runs in full, including one that also
+    # happens to carry data. The pull_request trigger below is deliberately NOT filtered — a pull
+    # request proposing a change to the published data is a change worth checking.
+    paths-ignore: ['exports/**']
   pull_request:
 
 jobs:

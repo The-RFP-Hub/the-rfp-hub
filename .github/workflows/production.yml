@@ -1,4 +1,7 @@
 on:
+  # No paths-ignore for the nightly `exports/` commits, and none is needed: this workflow has no
+  # branch trigger at all, so a push to main cannot start it — and GitHub does not evaluate path
+  # filters for tag pushes, which would make one here dead config that merely looked protective.
   push:
     tags:
       - 'prod-*'

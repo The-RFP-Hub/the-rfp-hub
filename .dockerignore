@@ -6,3 +6,6 @@ node_modules
 user-interviews
 adr
 docs
+# Published open data, not an image input: the Dockerfile copies named paths and never this one,
+# so keeping it out of the build context spares the daemon a transfer nothing in the image uses.
+exports

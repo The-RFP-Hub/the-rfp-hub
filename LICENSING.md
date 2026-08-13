@@ -7,7 +7,7 @@ for data)"* — different artifacts carry different permissive licenses:
 | Path | Artifact | License |
 |---|---|---|
 | `packages/standard/` | RFP Hub Standard — JSON Schema, generated types, field docs (the standard / "data") | **CC0-1.0** |
-| dataset exports & snapshots (published to the public bucket / releases) | open data | **CC0-1.0** |
+| `exports/` | dataset exports & snapshots, published nightly | **CC0-1.0** (declared in the JSON envelope, in the manifest, and in the `exports/LICENSE` sidecar beside the data) |
 | everything else — `packages/validate`, `packages/api`, client/frontend/agent tooling | code | **MIT** |
 
 How this is expressed:

@@ -12,7 +12,8 @@
       "**/schemas/**",
       "**/fixtures/**",
       "**/conformance/**",
-      "**/registries/index.json"
+      "**/registries/index.json",
+      "**/exports/**"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

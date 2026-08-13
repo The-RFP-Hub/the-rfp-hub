@@ -9,6 +9,9 @@ coverage/
 # local env + API data exports (M2)
 .env
 .env.local
+# The exporter's LOCAL output directory, and only that one: the pattern is deliberately anchored
+# to this path rather than written as a bare `exports/`, because the repo-root `exports/` is the
+# PUBLISHED dataset and has to stay tracked (see .github/workflows/nightly-export.yml).
 packages/api/exports/
 
 # report written by scripts/check-m2.mjs (a record of one run against one deployment)
