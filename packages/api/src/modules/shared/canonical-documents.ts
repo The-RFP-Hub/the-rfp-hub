@@ -26,6 +26,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname } from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -33,6 +34,21 @@ const require = createRequire(import.meta.url);
 function readStandardFile(subpath: string): Buffer {
   return readFileSync(require.resolve(`@the-rfp-hub/standard/${subpath}`));
 }
+
+/**
+ * Where the installed `@the-rfp-hub/standard` package sits on disk.
+ *
+ * Resolved through the package's own `exports` map — `spec.config.json` is exported at the
+ * package root, so its directory IS the package root — rather than assembled from this module's
+ * URL and a run of `..` segments, which would be wrong the moment the API is bundled to
+ * `dist/server.js` (one directory level) instead of run from `src/` (three).
+ *
+ * `spec-artifacts.ts` walks the published trees below it. Nothing derived from a REQUEST is ever
+ * joined onto this path.
+ */
+export const standardPackageRoot = dirname(
+  require.resolve("@the-rfp-hub/standard/spec.config.json"),
+);
 
 interface SpecConfig {
   specVersion: string;
@@ -81,6 +97,17 @@ export const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 export const REVALIDATE_CACHE = "public, max-age=3600, must-revalidate";
 
 /**
+ * The cache policy a spec path earns, derived from the path itself.
+ *
+ * The version in the URL is the whole licence for the unbounded lifetime, so a new version
+ * directory — and every file inside it — inherits the right policy with no edit here. Shared with
+ * `spec-artifacts.ts`: two modules serving files out of one frozen directory must not disagree
+ * about how long its bytes may be held.
+ */
+export const cachePolicyFor = (path: string): string =>
+  /^\/schemas\/v[^/]+\//.test(path) ? IMMUTABLE_CACHE : REVALIDATE_CACHE;
+
+/**
  * A strong entity-tag over the exact bytes served.
  *
  * Content-derived, so it is identical across every replica and every deploy of the same package —
@@ -92,25 +119,37 @@ export const REVALIDATE_CACHE = "public, max-age=3600, must-revalidate";
 export const entityTag = (body: Buffer): string =>
   `"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`;
 
-export interface CanonicalDocument {
+/**
+ * Everything a route needs to send one of the Standard's files: the bytes, what they are, how
+ * long they may be held, and the validator over them.
+ *
+ * Both `CanonicalDocument` (the five identifiers) and `SpecArtifact` (the rest of the published
+ * tree) satisfy it, which is what lets one sender in `routes/canonical` serve both — so the
+ * cache, validator and 304 semantics cannot come out different for two files sitting in the same
+ * frozen directory.
+ */
+export interface ServedSpecDocument {
+  mediaType: string;
+  body: Buffer;
+  /** `Cache-Control` for this document — see `cachePolicyFor` above. */
+  cacheControl: string;
+  /** Strong `ETag` over `body`. */
+  etag: string;
+}
+
+export interface CanonicalDocument extends ServedSpecDocument {
   /** The identifier this document is published under. */
   url: string;
   /** The route path — the identifier's own path component, by construction. */
   path: string;
   /** The package subpath the bytes come from; equal to `path` minus its leading slash. */
   source: string;
-  mediaType: string;
   operationId: string;
   summary: string;
   /** The OpenAPI response component describing it. */
   component: string;
   /** True when the document carries an `$id` that must equal `url`. */
   selfIdentifying: boolean;
-  body: Buffer;
-  /** `Cache-Control` for this document — see IMMUTABLE_CACHE / REVALIDATE_CACHE above. */
-  cacheControl: string;
-  /** Strong `ETag` over `body`. */
-  etag: string;
 }
 
 function document(
@@ -126,9 +165,7 @@ function document(
     path,
     source,
     body,
-    // The version in the path is what licenses the unbounded lifetime — derived, not declared
-    // per document, so a new version directory inherits the right policy with no edit here.
-    cacheControl: /^\/schemas\/v[^/]+\//.test(path) ? IMMUTABLE_CACHE : REVALIDATE_CACHE,
+    cacheControl: cachePolicyFor(path),
     etag: entityTag(body),
   };
 }

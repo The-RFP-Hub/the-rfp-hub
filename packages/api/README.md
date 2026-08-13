@@ -42,10 +42,56 @@ no version, including the `/v1/opportunities/schema` alias, is `public, max-age=
 must-revalidate`. No `Last-Modified`: the only timestamp available is the build's, and it changes
 for bytes that did not.
 
-These resolve once the apex is routed to this service **for these five paths** — `ethrfps.app` is
+These resolve once the apex is routed to this service — `ethrfps.app` is
 registered and delegated already, but it points at registrar URL forwarding rather than here. Spec resolution therefore rides this service's uptime for now; the recorded end
-state is the package directory on object storage behind a CDN, which retires these five routes
+state is the package directory on object storage behind a CDN, which retires these routes
 without any identifier changing.
+
+#### The rest of the publication tree
+
+The five URLs above are the ones the Standard *mints an identifier for*. The API also mirrors the
+**whole of the three directories they live in**, read-only, at the paths the package's own layout
+gives them — because `schemas/v1.0.0/STATUS.md` says the identifiers mirror "this package's own
+directory layout", and a tree that reproduces the layout for five files and `404`s the rest is a
+shortlist, not a mirror. The served documents cross-link (`FIELDS.md` → `./context.jsonld`,
+`CROSSWALK.md` → `./opportunity.schema.json`, both → `../../registries/…`), and those links resolve
+against the URL the document was fetched from.
+
+| Path | Media type |
+|---|---|
+| `/schemas/index.json` | `application/json` |
+| `/schemas/v1.0.0/opportunity.schema.json` | `application/schema+json` |
+| `/schemas/v1.0.0/context.jsonld` | `application/ld+json` |
+| `/schemas/v1.0.0/{FIELDS,CROSSWALK,BENCHMARK,STATUS}.md` | `text/markdown; charset=utf-8` |
+| `/schemas/v1.0.0/FROZEN` | `text/plain; charset=utf-8` |
+| `/schemas/v1.0.0/examples/*.json` (30 documents) | `application/json` |
+| `/meta/rfphub-schema.meta.json` | `application/schema+json` |
+| `/registries/entry.schema.json` | `application/schema+json` |
+| `/registries/{index,deadline-labels,program-models,bounty-severities,bounty-asset-types}.json` | `application/json` |
+
+Everything above is `GET`/`HEAD`, `200` and never a redirect, with `Access-Control-Allow-Origin: *`
+(browsers fetch contexts and `$ref`s cross-origin) and the same cache policy and `ETag` rules as
+the identifiers. The directories the load balancer forwards to the apex are exactly these three,
+so `conformance/` is deliberately **not** served: it ships in the npm package for implementers to
+run offline, and no identifier names it.
+
+**Identifiers versus locators.** `https://ethrfps.app/…` stays the canonical identifier of every
+one of these documents — that is what an `$id` or a `@context` names, and it does not change when
+the serving arrangement does; `https://api.ethrfps.app/…` is merely a locator that happens to hold
+the same bytes today, and the apex will serve these same paths when the project site ships.
+
+There are **no directory listings**: `GET /schemas/v1.0.0/` is a `404`. The package ships no index
+for that directory, and synthesising one would put an API-shaped document — whose format could
+change — inside a directory whose entire promise is that its bytes cannot. `/schemas/index.json` is
+the shipped, machine-readable entry point.
+
+These routes are deliberately **absent from the OpenAPI document**, which describes the `/v1`
+surface: forty-odd operations differing only in path would outnumber the API's real ones in the
+docs UI and in every generated client, and they describe files belonging to the identifier
+authority rather than to `servers[0]`. The five identifiers stay documented; the mirror is
+documented here. Implementation: `src/modules/shared/spec-artifacts.ts` (the directory walk) and
+`src/modules/routes/spec-artifacts/` (one route per file), asserted in
+`test/integration/spec-artifacts.test.ts`.
 
 #### Hostnames: what the apex serves, and what it does not
 
@@ -57,8 +103,8 @@ this service **wholesale** would not reserve it; it would publish the whole `/v1
 
 | Host | What this service answers |
 |---|---|
-| `ethrfps.app` (and `www.`) | The five canonical documents above. Everything else — `/v1/**`, `/v1/docs`, the service-info root — is `404`. |
-| `api.ethrfps.app`, `api-staging.ethrfps.app`, anything else | Everything, including the canonical documents. An identifier that resolves on only one hostname is not more reserved, just harder to serve. |
+| `ethrfps.app` (and `www.`) | The publication tree above — the five canonical documents and the rest of `/schemas/`, `/meta/`, `/registries/`. Everything else — `/v1/**`, `/v1/docs`, the service-info root — is `404`. |
+| `api.ethrfps.app`, `api-staging.ethrfps.app`, anything else | Everything, including the publication tree. An identifier that resolves on only one hostname is not more reserved, just harder to serve. |
 
 This is enforced in the application (`src/plugins/apex-host.ts`, an `onRequest` allowlist derived
 from the Standard's own `baseUrl`) and asserted with both `Host` headers in

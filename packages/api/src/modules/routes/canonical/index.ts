@@ -1,19 +1,22 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   type CanonicalDocument,
+  type ServedSpecDocument,
   assertSelfIdentifies,
   canonicalDocuments,
   ifNoneMatchSatisfied,
 } from "../../shared/canonical-documents.js";
 
 /**
- * Send one canonical document with its cache policy and validator.
+ * Send one of the Standard's files with its cache policy and validator.
  *
- * Shared with `/v1/opportunities/schema`, which serves the same bytes: two URLs for one document
- * must not disagree about how long it may be cached or what its entity-tag is.
+ * Shared with `/v1/opportunities/schema`, which serves the same bytes as the canonical schema URL —
+ * two URLs for one document must not disagree about how long it may be cached or what its
+ * entity-tag is — and with `routes/spec-artifacts`, the mirror of the rest of the published tree,
+ * so a `FIELDS.md` out of the frozen directory gets exactly the semantics its neighbours get.
  */
 export async function sendCanonical(
-  doc: CanonicalDocument,
+  doc: ServedSpecDocument,
   req: FastifyRequest,
   res: FastifyReply,
 ): Promise<FastifyReply> {

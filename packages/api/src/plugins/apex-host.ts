@@ -15,11 +15,12 @@
  *
  * The rule, stated as narrowly as it can be:
  *
- *   - On the apex host, this service answers ONLY the spec's canonical documents. Everything
- *     else is 404 — `/v1/**`, the service-info root, the docs UI, all of it.
+ *   - On the apex host, this service answers ONLY the Standard's own published files — the
+ *     canonical documents and the directories they live in. Everything else is 404 — `/v1/**`,
+ *     the service-info root, the docs UI, all of it.
  *   - On every other host (`api.ethrfps.app`, `api-staging.ethrfps.app`, `localhost:3001`, an
- *     ALB target-group health check hitting the task IP), nothing changes. The canonical
- *     documents deliberately answer everywhere: an identifier that only resolves on one hostname
+ *     ALB target-group health check hitting the task IP), nothing changes. Those files
+ *     deliberately answer everywhere: an identifier that only resolves on one hostname
  *     is not more reserved, just harder to serve.
  *
  * The apex is derived from the Standard's own `baseUrl`, never typed here — the same rule the
@@ -33,12 +34,23 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { config } from "../config.js";
 import { canonicalDocuments, specConfig } from "../modules/shared/canonical-documents.js";
+import { specArtifactPaths } from "../modules/shared/spec-artifacts.js";
 
 /** `https://ethrfps.app` → `ethrfps.app`. The one hostname reserved for the spec. */
 export const APEX_HOST = new URL(specConfig.baseUrl).host;
 
-/** Exactly what the apex serves: the documents whose identifiers name it, and nothing else. */
-const APEX_PATHS: ReadonlySet<string> = new Set(canonicalDocuments.map((doc) => doc.path));
+/**
+ * Exactly what the apex serves: the Standard's own published files, and nothing else.
+ *
+ * The documents whose identifiers name this host, plus the rest of the directories those
+ * identifiers live in (`modules/shared/spec-artifacts.ts`) — which is the same set the ADR's
+ * path-scoped load-balancer rule forwards, `/schemas/*` `/meta/*` `/registries/*`. Still derived,
+ * never typed: a route added anywhere else is invisible here on the day it is written.
+ */
+const APEX_PATHS: ReadonlySet<string> = new Set([
+  ...canonicalDocuments.map((doc) => doc.path),
+  ...specArtifactPaths,
+]);
 
 /**
  * Does this request address the apex?

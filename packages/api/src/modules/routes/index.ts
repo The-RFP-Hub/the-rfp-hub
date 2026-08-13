@@ -4,6 +4,7 @@ import { datasetExport } from "./export/index.js";
 import { feeds } from "./feeds/index.js";
 import { health } from "./health/index.js";
 import { opportunities } from "./opportunities/index.js";
+import { specArtifactMirror } from "./spec-artifacts/index.js";
 import { stats } from "./stats/index.js";
 
 /** Mounts every route module under its /v1 prefix — except the spec's own documents. */
@@ -18,4 +19,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // No prefix, deliberately: these routes ARE the spec's identifiers, and an identifier must
   // not carry an API version. See modules/shared/canonical-documents.ts and adr/0007.
   await app.register(canonical);
+  // The rest of the directories those identifiers live in, mirrored read-only at the same root —
+  // the publication tree adr/0007 describes. Registered after `canonical`, which owns the five
+  // identifier paths; this module skips them rather than redeclaring them.
+  await app.register(specArtifactMirror);
 }
