@@ -8,7 +8,7 @@ on:
 
 name: Staging RFP Hub API
 
-# Mirrors karma-oauth/.github/workflows/staging.yml: pull `.env` from
+# Mirrors the operator's existing service deployment: pull `.env` from
 # AWS Secrets Manager into the build context, bake it into the Docker
 # image, push to ECR, then update the ECS task definition and service.
 #
@@ -17,7 +17,12 @@ name: Staging RFP Hub API
 # not a per-deploy task.
 
 env:
-  ECS_CLUSTER: karma-staging
+  # The cluster is the hosting account's own resource name, not a fact about this project, so
+  # it is a repository VARIABLE rather than a literal in a public, source-neutral tree (see
+  # scripts/check-neutral.mjs). Set `STAGING_ECS_CLUSTER` under Settings -> Secrets and
+  # variables -> Actions -> Variables. The deploy job below refuses to run while it is unset,
+  # because an empty `cluster:` silently means ECS's `default` cluster.
+  ECS_CLUSTER: ${{ vars.STAGING_ECS_CLUSTER }}
   ECR_REPOSITORY_MAIN: staging-rfp-hub
   ECS_CONTAINER: rfp-hub-staging
 
@@ -109,6 +114,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Fail before touching AWS rather than after: `cluster:` empty is not an error to the
+      # deploy action, it is a request for the account's `default` cluster.
+      - name: Require the cluster variable
+        run: |
+          if [ -z "${{ env.ECS_CLUSTER }}" ]; then
+            echo "::error::Repository variable STAGING_ECS_CLUSTER is unset (Settings -> Secrets and variables -> Actions -> Variables)."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
