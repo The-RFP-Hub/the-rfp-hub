@@ -19,6 +19,7 @@
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
     "export": "tsx scripts/export.ts",
+    "export:api": "tsx scripts/export-from-api.ts",
     "corpus:fetch": "tsx tools/converter/fetch-corpus.ts",
     "corpus:convert": "tsx tools/converter/convert.ts"
   },
