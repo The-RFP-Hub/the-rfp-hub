@@ -28,6 +28,7 @@ import {
   fetchDataset,
   parseApiExportOptions,
   readApiBaseUrl,
+  readBodyCapped,
   runApiExport,
 } from "../../scripts/export-from-api.js";
 import { ExportFloorError, MANIFEST_NAME } from "../../scripts/export-writer.js";
@@ -67,6 +68,17 @@ interface Stub {
   pageSize?: number;
   /** Replace one document's detail response, by id. */
   detail?: (id: string) => { status: number; body: unknown } | undefined;
+  /**
+   * A list endpoint that never runs out: it reports these totals and then serves a full page of
+   * FRESH ids for any page number it is asked for, `docs` notwithstanding. Set `totalPages` high
+   * and the walk only ends if the client stops it.
+   */
+  endless?: { total: number; totalPages: number };
+  /**
+   * Answer `/v1/stats` with a `content-length` far past the client's cap, without sending the
+   * bytes. A body a client refuses on the header alone is one it never has to receive.
+   */
+  oversizedStats?: boolean;
 }
 
 interface Stubbed {
@@ -84,14 +96,25 @@ async function startApi(stub: Stub): Promise<Stubbed> {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     requests.push(`${url.pathname}${url.search}`);
+    // A stub that lies about its own content-length, or whose reader hangs up mid-body, makes the
+    // socket error — which is the behaviour under test, not a failure of the test.
+    req.on("error", () => {});
+    res.on("error", () => {});
     const send = (status: number, body: unknown): void => {
       res.writeHead(status, { "content-type": "application/json" });
       res.end(JSON.stringify(body));
     };
 
     if (url.pathname === "/v1/stats") {
+      if (stub.oversizedStats) {
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "content-length": "999999999999",
+        });
+        return res.end("{}");
+      }
       return send(200, {
-        total: stub.statsTotal ?? stub.docs.length,
+        total: stub.statsTotal ?? stub.endless?.total ?? stub.docs.length,
         byFundingType: {},
         byStatus: {},
         topEcosystems: [],
@@ -101,6 +124,14 @@ async function startApi(stub: Stub): Promise<Stubbed> {
 
     if (url.pathname === "/v1/opportunities") {
       const page = Number(url.searchParams.get("page") ?? "1");
+      if (stub.endless) {
+        // Fresh ids on every page, forever — the id set grows past the total this same response
+        // reports, which is the only way to tell a bounded walk from an unbounded one.
+        const items = Array.from({ length: pageSize }, (_, i) =>
+          summarize(fixture((page - 1) * pageSize + i + 1)),
+        );
+        return send(200, { items, page, limit: pageSize, ...stub.endless });
+      }
       const items = stub.docs.slice((page - 1) * pageSize, page * pageSize).map(summarize);
       return send(200, {
         items,
@@ -303,6 +334,40 @@ describe("API-sourced export", () => {
     await expect(readdir(out)).rejects.toThrow();
   });
 
+  /**
+   * A publisher reading a remote service must be bounded by numbers the service stated up front,
+   * not by how long it is willing to keep talking. Both of these hold against a service that is
+   * lying or broken rather than merely wrong — the difference between an error and an
+   * out-of-memory failure in a job that can write to the default branch.
+   */
+  it("stops walking a list endpoint that serves more records than it says it holds", async () => {
+    const out = join(ROOT, "endless");
+    // stats and the list agree on 2 records; the list then serves 2 fresh ones per page, and
+    // claims a million pages to walk
+    const { baseUrl, requests } = await startApi({
+      docs: [],
+      endless: { total: 2, totalPages: 1_000_000 },
+      pageSize: 2,
+    });
+
+    await expect(runApiExport({ baseUrl, outDir: out, minCount: 1 })).rejects.toThrow(
+      /served more records than the dataset reports holding/,
+    );
+    // it stopped on the SECOND page — the bound is the reported total, not the page count
+    expect(requests.filter((r) => r.startsWith("/v1/opportunities?"))).toHaveLength(2);
+    await expect(readdir(out)).rejects.toThrow();
+  });
+
+  it("refuses a response whose declared length is over the cap, without reading it", async () => {
+    const out = join(ROOT, "oversized");
+    const { baseUrl } = await startApi({ docs: [1, 2].map(fixture), oversizedStats: true });
+
+    await expect(runApiExport({ baseUrl, outDir: out, minCount: 1 })).rejects.toThrow(
+      /declares 999999999999 bytes, over the \d+-byte cap — not read/,
+    );
+    await expect(readdir(out)).rejects.toThrow();
+  });
+
   it("returns the fetched dataset without writing anything", async () => {
     const docs = [2, 1].map(fixture);
     const { baseUrl } = await startApi({ docs });
@@ -311,6 +376,45 @@ describe("API-sourced export", () => {
     expect(reported).toBe(2);
     // the SOURCE hands over what the API served, in the API's order — ordering is the writer's job
     expect(items.map((i) => i.id)).toEqual(["etest:api-2", "etest:api-1"]);
+  });
+});
+
+/**
+ * The body cap's streamed half, driven directly.
+ *
+ * `content-length` is the cheap check and the easy one to test through a whole export run; it is
+ * also the one a response can simply omit. What actually holds the line is the counter over the
+ * arriving stream, and proving THAT through an export would mean moving the cap's worth of bytes
+ * over a socket. Driving the function with a cap small enough to state in a test proves the same
+ * property in microseconds.
+ */
+describe("response body cap", () => {
+  it("stops and cancels a body with no declared length once it crosses the cap", async () => {
+    const chunk = new TextEncoder().encode("x".repeat(64));
+    let cancelled = false;
+    // an endless body: it will keep arriving for exactly as long as it is read
+    const stream = new ReadableStream({
+      pull: (controller) => {
+        controller.enqueue(chunk);
+      },
+      cancel: () => {
+        cancelled = true;
+      },
+    });
+    const res = new Response(stream);
+    expect(res.headers.get("content-length")).toBeNull();
+
+    await expect(readBodyCapped(res, "http://api.test/x", 256)).rejects.toThrow(
+      /exceeds the 256-byte cap — transfer cancelled/,
+    );
+    // cancelled, not drained: the connection closes rather than politely reading to an end that
+    // may never come
+    expect(cancelled).toBe(true);
+  });
+
+  it("reads a body under the cap whole", async () => {
+    const res = new Response('{"ok":true}');
+    expect(JSON.parse(await readBodyCapped(res, "http://api.test/x", 256))).toEqual({ ok: true });
   });
 });
 

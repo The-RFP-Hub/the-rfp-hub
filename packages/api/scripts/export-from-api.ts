@@ -62,6 +62,17 @@ const TIMEOUT_MS = 30_000;
 const ATTEMPTS = 3;
 /** Errors reported per failing check before the rest are summarized. */
 const SHOWN = 5;
+/**
+ * Largest response body this client will read, in bytes.
+ *
+ * A publisher reading a remote service has to bound what that service can make it hold: an
+ * endpoint that answers a page request with an endless body would otherwise be an out-of-memory
+ * failure in a job that has `contents: write`, rather than an error. The cap is deliberately far
+ * above anything the contract can legitimately produce — a full page of 100 documents is orders
+ * of magnitude smaller — so it is a backstop against a service behaving pathologically, never a
+ * limit a healthy deployment can reach.
+ */
+const MAX_BODY_BYTES = 64 * 1024 * 1024;
 
 export interface ApiExportOptions {
   /** Origin of the API to publish, e.g. `https://api.example.org`. */
@@ -189,6 +200,56 @@ export function parseApiExportOptions(
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Read a response body as text, refusing one larger than `cap`.
+ *
+ * BOTH halves are necessary and they guard different things. `content-length`, when the response
+ * declares one, is checked before a single byte is read — the cheap case, and the only one that
+ * can refuse a body without receiving it. But that header is advisory: a chunked response omits
+ * it, and a hostile or broken one can simply understate it. So the stream is ALSO counted as it
+ * arrives and cancelled the moment it crosses the cap, which is the check that actually holds.
+ *
+ * Cancelling rather than draining matters: it closes the connection instead of politely reading an
+ * unbounded body to its end just to discard it.
+ *
+ * Exported for its own test. Proving the streamed half from a full export run would mean moving
+ * `cap` bytes over a socket; driving it directly proves the counter with a cap small enough to
+ * state in a test.
+ */
+export async function readBodyCapped(
+  res: Response,
+  url: string,
+  cap = MAX_BODY_BYTES,
+): Promise<string> {
+  const declared = Number(res.headers.get("content-length") ?? Number.NaN);
+  if (Number.isFinite(declared) && declared > cap) {
+    throw new ExportSourceError(
+      `${url}: response declares ${declared} bytes, over the ${cap}-byte cap — not read`,
+    );
+  }
+
+  const body = res.body;
+  if (!body) return "";
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > cap) {
+      await reader.cancel().catch(() => {});
+      throw new ExportSourceError(
+        `${url}: response body exceeds the ${cap}-byte cap — transfer cancelled`,
+      );
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+/**
  * GET one JSON document, with a bounded retry.
  *
  * Retried: a transport failure, a timeout, 429, and 5xx — the failures that say "ask again", and
@@ -215,8 +276,22 @@ async function getJson(url: string): Promise<unknown> {
       last = err;
       continue;
     }
+    let text: string;
     try {
-      return await res.json();
+      text = await readBodyCapped(res, url);
+    } catch (err) {
+      // An oversized body is a decision about the response, not a hiccup in delivering it: asking
+      // again would read the same too-large thing. A failure part-way THROUGH the stream is the
+      // opposite — a dropped connection — and is retried like any other transport failure.
+      if (err instanceof ExportSourceError) throw err;
+      last = new ExportSourceError(
+        `${url}: reading the response failed — ${(err as Error).message}`,
+        err,
+      );
+      continue;
+    }
+    try {
+      return JSON.parse(text);
     } catch (err) {
       // A body that is not JSON is a broken deployment, not a transient one (a proxy's error page,
       // a truncated response); it is reported as-is rather than retried into a timeout.
@@ -294,9 +369,16 @@ async function fetchPage(baseUrl: string, page: number): Promise<ListPage> {
  * Every id in the public dataset, in one pass over the list endpoint, held against the total
  * `/v1/stats` already reported.
  *
- * The loop is bounded by the `totalPages` the API itself reports, so a service that always answers
- * with a full page cannot spin it forever; a page that comes back empty before the ids are all in
- * ends the run rather than publishing what happened to arrive.
+ * The walk is bounded twice over, because one bound is only as good as the number the API chose to
+ * put in it. `totalPages` stops a service that answers every page with a full page — but a service
+ * reporting a billion pages would satisfy that bound while walking forever. So the accumulated ids
+ * are ALSO held against the total from `/v1/stats` on every record: the moment one more arrives
+ * than the dataset is supposed to contain, the walk stops. The run would fail the count check at
+ * the end regardless; failing at the first excess record is what keeps memory and time bounded by
+ * a number the API stated up front rather than by how long it is willing to keep talking.
+ *
+ * A page that comes back empty before the ids are all in ends the run too, rather than publishing
+ * what happened to arrive.
  */
 async function fetchIds(baseUrl: string, reported: number): Promise<string[]> {
   const first = await fetchPage(baseUrl, 1);
@@ -323,6 +405,16 @@ async function fetchIds(baseUrl: string, reported: number): Promise<string[]> {
       }
       seen.add(item.id);
       ids.push(item.id);
+      // One record past what the dataset claims to hold. The count check at the end of the walk
+      // would catch this too — but only after reading however much the API cared to send, which
+      // is not a bound at all. This is where the walk actually stops being open-ended.
+      if (ids.length > reported) {
+        throw new ExportCountError(
+          ids.length,
+          reported,
+          `page ${number} served more records than the dataset reports holding, so the walk was stopped`,
+        );
+      }
     }
   };
 
