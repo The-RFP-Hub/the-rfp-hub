@@ -19,6 +19,13 @@ name: Nightly open-data export
 # A green run means PUBLISHED AND INDEPENDENTLY VERIFIED, never merely "ran": the last two steps
 # re-download what was pushed from the public URL and hold the deployment plus the published files
 # to the M2 compliance criteria.
+#
+# Every action is pinned to a full commit SHA, with the release it belongs to in the trailing
+# comment. This is the one workflow in the repository that can WRITE to the default branch, so
+# "which code ran" has to be a fact rather than whatever a mutable tag pointed at last night: a
+# `v4` tag can be moved onto new code by whoever controls the action's repository, and a job with
+# `contents: write` is exactly what such a move would be worth aiming at. Upgrading is then a
+# deliberate edit to this file — read the release notes, change the SHA and the comment together.
 
 on:
   workflow_dispatch:
@@ -53,14 +60,22 @@ jobs:
     steps:
       # Full history: the push below rebases onto whatever main has become, which a shallow clone
       # cannot do.
+      #
+      # `persist-credentials: false` is the load-bearing setting on this job. By default the
+      # checkout leaves a credential for the job's token in `.git/config`, where every later step
+      # inherits it — including `pnpm install`, which runs third-party lifecycle scripts, and the
+      # export, which parses data fetched from the network. THE INVARIANT: no credential exists in
+      # the working copy while any of that runs; the push step below is the only place a token is
+      # present, and it supplies one explicitly for the length of one command.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: pnpm
@@ -94,7 +109,12 @@ jobs:
           cp "$RUNNER_TEMP"/export/* exports/
           ls -l exports
 
+      # The ONLY step that holds a credential. The checkout deliberately left none behind, so the
+      # token is supplied here, to this step, and reaches nothing that ran before it. The runner
+      # masks it in logs, so a git error quoting the remote URL cannot print it.
       - name: Commit and push to main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -108,18 +128,24 @@ jobs:
 
           git commit -m "data(exports): nightly snapshot $(date -u +%F)"
 
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
           # A human merge landing between this job's checkout and its push must not fail the job.
           # The commit is data only, so it rebases cleanly onto anything that is not itself an
           # `exports/` change — and nothing else writes that directory. A conflict therefore means
           # something genuinely unexpected touched the same files, which is worth stopping for
           # rather than resolving blind.
+          #
+          # The fetch names a URL rather than the `origin` remote, so it updates FETCH_HEAD instead
+          # of a remote-tracking ref — which is what the rebase targets. Nothing here depends on
+          # the working copy carrying a configured credential, which is the point.
           for attempt in 1 2 3 4 5; do
-            if git push origin HEAD:main; then
+            if git push "$remote" HEAD:main; then
               exit 0
             fi
-            echo "push rejected (attempt ${attempt}/5) — rebasing onto origin/main"
-            git fetch origin main
-            git rebase origin/main || {
+            echo "push rejected (attempt ${attempt}/5) — rebasing onto the current main"
+            git fetch "$remote" main
+            git rebase FETCH_HEAD || {
               git rebase --abort || true
               echo "rebase conflicted: something else changed exports/ — not resolving it here"
               exit 1
@@ -165,7 +191,7 @@ jobs:
       # is worth reading.
       - name: Upload the compliance report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: m2-compliance-report
           path: m2-compliance-report.json
