@@ -102,10 +102,11 @@ pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./e
 
 ### Configuration
 
-Config is read from the process environment only (see `.env-example`) — everything is optional in
-development (localhost defaults). No `.env` file is loaded: there is no dotenv dependency and no
-`--env-file` flag anywhere in this repo, so `.env-example` is a reference list, not a file that
-takes effect — `export` the variables (or `set -a; . ./.env; set +a`) before running a command, or
+Config is read from the process environment (see `.env-example`) — everything is optional in
+development (localhost defaults). `src/config.ts` also loads a `.env` from the working directory,
+which for every `pnpm` script here is `packages/api`. **A real environment variable always wins**:
+dotenv never overwrites something that already reached the process, so an exported shell variable
+or a deployment's injected value overrides the file rather than the other way round. With neither,
 the built-in defaults apply and say so on stderr.
 
 This table is the deployment/runtime surface: every server key read by
@@ -139,6 +140,39 @@ offline tooling and documented with it, under
 - **Graceful shutdown**: `SIGTERM`/`SIGINT` stop new connections, let in-flight requests finish and
   close the pg pool (a Fastify `onClose` hook) before exiting 0. A 10s forced-exit timeout means a
   hung close can never leave an un-killable process.
+
+### One-off tasks
+
+`migrate`, `seed` and `export` are built into the container image as their own entry points, so a
+deployment can create its schema and load its data with the **same image** it serves from — no
+`tsx`, no TypeScript sources, no second image. Each is a plain command a one-off task runner can
+launch (a task-runner API, `docker run`, `kubectl run`), overriding the image's server command:
+
+```bash
+node packages/api/dist/migrate.js
+node packages/api/dist/seed.js packages/api/data/seed-corpus.json --strict
+node packages/api/dist/export.js
+```
+
+`DATABASE_URL` comes from the **task environment**, exactly as it does for the server: the image's
+baked `.env` if there is one, and the task definition's own environment on top of it — a real
+environment variable always wins over the file (see [Configuration](#configuration)). Nothing here
+takes a connection string on the command line.
+
+Notes on each:
+
+- **migrate** applies pending Drizzle migrations from `src/db/migrations`, which the image carries
+  as SQL files (they are data, not code, so nothing bundles them). The entry point resolves them
+  relative to its own module, so it works from any working directory.
+- **seed** takes the corpus as its one argument — the same committed file, run offline, no network
+  and no credentials, so a container run loads exactly what CI loads. Under `--strict` a single
+  schema-invalid document fails the run; a repeated id fails it with or without the flag; and the
+  ≥100 floor is asserted **before the first write**, so a short or broken run leaves the database
+  untouched. The write phase is one transaction. See
+  [Seeding](#seeding-a-static-in-repo-corpus).
+- **export** writes its six files to `./exports`, a directory the image creates and hands to the
+  `node` user. Mount a volume over it to keep the output past the task's lifetime; the floor
+  (`EXPORT_MIN_COUNT`) applies as usual. See [Open-data export](#open-data-export).
 
 ## Open-data export
 

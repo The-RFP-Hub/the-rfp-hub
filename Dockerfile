@@ -9,6 +9,13 @@
 #   (which recreates the workspace symlinks), then copies the built dist
 #   folders and the standard package's runtime assets (schemas, registries,
 #   conformance, meta) that its package.json exports point at.
+#
+# The image serves the API *and* runs its three one-off admin tasks —
+# `migrate`, `seed` and `export` — as separate entry points under
+# `packages/api/dist`, so a task runner can launch any of them against the
+# same image the service runs (see "One-off tasks" in packages/api/README.md).
+# Each needs data the server does not: the Drizzle migrations, the seed
+# corpus, and a writable directory to export into. Those are copied below.
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
@@ -49,13 +56,35 @@ COPY --from=builder /app/packages/standard/meta packages/standard/meta
 COPY --from=builder /app/packages/standard/spec.config.json packages/standard/spec.config.json
 COPY --from=builder /app/packages/validate/dist packages/validate/dist
 
+# Inputs the one-off tasks read, which the server never touches.
+#
+# The migrations are SQL files, not code, so nothing bundles them: the
+# `migrate` entry point resolves them relative to its own module URL, which
+# puts them here whether it runs as `dist/migrate.js` or as `scripts/migrate.ts`
+# under tsx. The `meta/` journal inside is part of the folder drizzle reads.
+#
+# The corpus is the seed's one and only input — a repo artifact, reviewed and
+# versioned like source — and it is passed to the task as an argument, so a
+# seed run in this image is the same offline, reproducible run CI makes.
+COPY --from=builder /app/packages/api/src/db/migrations packages/api/src/db/migrations
+COPY --from=builder /app/packages/api/data/seed-corpus.json packages/api/data/seed-corpus.json
+
+# The export writes six files to ./exports relative to the working directory,
+# and /app is root-owned while the container runs as `node` — so the directory
+# is created and handed over here rather than left to fail at write time. An
+# export task that needs its output to outlive the task mounts a volume over
+# this path; the ordinary run leaves it in the container's own layer.
+RUN mkdir -p /app/exports && chown node:node /app/exports
+
 # Bake `.env` into the image. The CI workflow pulls the file from AWS
 # Secrets Manager (staging/rfp-hub or production/rfp-hub) before the
 # Docker build so this COPY picks it up. Glob form (`.env*`) means the
 # build doesn't fail when no .env is present (e.g. local `docker build`
-# during dev). The app reads process.env directly (no dotenv), so the
-# CMD loads the file via Node's --env-file; real environment variables
-# still win over .env values.
+# during dev). `src/config.ts` loads it with dotenv, and the CMD also
+# passes Node's --env-file-if-exists; both paths leave real environment
+# variables winning over .env values, so a task definition that supplies
+# DATABASE_URL overrides whatever was baked in. That is what lets the
+# one-off tasks below run as a bare `node …` with no flag of their own.
 COPY .env* ./
 
 # PORT is fixed here rather than in the secret so it always matches the
