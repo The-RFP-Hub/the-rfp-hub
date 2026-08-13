@@ -19,8 +19,8 @@ import {
   ExportWriteError,
   MANIFEST_NAME,
   promoteAliases,
-  runExport,
-} from "../../scripts/export.js";
+} from "../../scripts/export-writer.js";
+import { runExport } from "../../scripts/export.js";
 import { db, pool } from "../../src/db/client.js";
 import { datasetSnapshots, opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
