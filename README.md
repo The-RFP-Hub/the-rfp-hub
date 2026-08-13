@@ -135,7 +135,14 @@ compare — and the pair is *provably* one run's rather than assumed to be.
 
 The publishing job sources its data from the live API rather than from a database, validates every
 record against the Standard before writing anything, and refuses to publish a dataset that is empty,
-short, or inconsistent with what `/v1/stats` reports. See
+short, or inconsistent with what `/v1/stats` reports.
+
+If you want the dataset **as of right now** rather than as of last night, the API serves the same
+thing live, in one call, from the same serializer — `GET /v1/export/opportunities.json` and
+`GET /v1/export/opportunities.csv`. The trade is deliberate: a live download is current but
+anonymous, while a nightly snapshot is up to a day old and *verifiable* — immutable, digest-named,
+and vouched for by the manifest. Build a pipeline on the snapshot; reach for the endpoint when you
+want today's answer. See
 [`packages/api/README.md`](./packages/api/README.md#open-data-export) for the file layout, the
 manifest contract and the guarantees each one carries.
 

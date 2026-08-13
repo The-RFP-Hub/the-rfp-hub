@@ -13,7 +13,6 @@ import { join } from "node:path";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { eq, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CSV_COLUMNS } from "../../scripts/csv.js";
 import {
   ExportFloorError,
   ExportWriteError,
@@ -24,6 +23,7 @@ import { runExport } from "../../scripts/export.js";
 import { db, pool } from "../../src/db/client.js";
 import { datasetSnapshots, opportunities, organizations } from "../../src/db/schema.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
+import { CSV_COLUMNS } from "../../src/modules/shared/export-format.js";
 import { describeWithDb } from "./db-gate.js";
 
 const run = describeWithDb;

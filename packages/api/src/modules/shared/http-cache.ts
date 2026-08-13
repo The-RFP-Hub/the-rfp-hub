@@ -1,6 +1,6 @@
 /**
  * Validator + freshness helpers for the responses this API serves as BYTES rather than as a JSON
- * object — today the syndication feeds.
+ * object — the syndication feeds and the full-dataset downloads.
  *
  * A feed is polled, not browsed: a reader fetches the same URL every few minutes forever. Without
  * a validator every one of those polls transfers the whole document again, so the feed routes send
@@ -27,6 +27,18 @@ import { createHash } from "node:crypto";
 export const FEED_CACHE_CONTROL = "public, max-age=300, must-revalidate";
 
 /**
+ * Download cache policy: the same window as a feed, for a different reason.
+ *
+ * A full-dataset download is the most expensive response this API serves, so the value of a cache
+ * hit is far higher — but the acceptable staleness is the same, because it is the same dataset
+ * behind both and the same ingest that moves it. `must-revalidate` keeps a shared cache from
+ * serving a stale dataset past the window, and the `ETag` makes that revalidation a 304 rather
+ * than a second full transfer. Kept as its own constant so the two policies can diverge without
+ * one of them changing by accident.
+ */
+export const DOWNLOAD_CACHE_CONTROL = "public, max-age=300, must-revalidate";
+
+/**
  * A strong entity-tag over the exact bytes served.
  *
  * 27 base64url characters carry 162 bits of the SHA-256 (each character encodes 6) — far past any
@@ -34,6 +46,20 @@ export const FEED_CACHE_CONTROL = "public, max-age=300, must-revalidate";
  */
 export function entityTag(body: Buffer | string): string {
   return `"${createHash("sha256").update(body).digest("base64url").slice(0, 27)}"`;
+}
+
+/**
+ * The same tag, marked WEAK (RFC 9110 §8.8.1).
+ *
+ * For representations whose bytes are not a pure function of the data — the JSON download stamps
+ * every response with `generatedAt` — so two 200s carrying the same tag really can differ byte for
+ * byte. A strong tag would be a claim of byte-equality this API cannot honour, and a strong tag
+ * taken from the BODY instead would change on every single request and never yield a 304. Weak is
+ * the honest third option: same dataset, possibly different bytes, and `If-None-Match` still
+ * matches (the comparison below is the weak one either way).
+ */
+export function weakTag(etag: string): string {
+  return `W/${etag}`;
 }
 
 /**

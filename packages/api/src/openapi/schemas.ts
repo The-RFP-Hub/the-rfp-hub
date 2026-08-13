@@ -93,6 +93,42 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "DatasetExport",
+    type: "object",
+    description:
+      "The whole public dataset in the published export envelope, as served by GET /v1/export/opportunities.json and as published in `exports/latest.json`. The two are the same bytes per record — only `generatedAt` differs, because a live download stamps itself with the time of the request.",
+    additionalProperties: false,
+    required: ["specVersion", "license", "generatedAt", "count", "opportunities"],
+    properties: {
+      specVersion: {
+        type: "string",
+        description: "RFP Hub Standard version every record in this document conforms to.",
+      },
+      license: {
+        type: "string",
+        description:
+          "SPDX identifier the dataset is released under. Always `CC0-1.0` — the data is public domain; the repository's own MIT licence covers the code, not this.",
+      },
+      generatedAt: {
+        type: "string",
+        format: "date-time",
+        description:
+          "When this representation was produced — the time of the request, not of an ingest. The one field here that is not data.",
+      },
+      count: {
+        type: "integer",
+        description:
+          "Records in `opportunities`. Zero is a valid answer: a download of an empty dataset is a complete document, not an error.",
+      },
+      opportunities: {
+        type: "array",
+        description:
+          "Every public record as a full Standard object, ascending by `id` compared by code unit — the order the published archives use, imposed on the records rather than taken from a database collation.",
+        items: { $ref: "Opportunity" },
+      },
+    },
+  },
+  {
     $id: "Stats",
     type: "object",
     additionalProperties: false,

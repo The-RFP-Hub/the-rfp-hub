@@ -84,6 +84,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         "/v1/opportunities/schema",
         "/v1/feeds/opportunities.atom",
         "/v1/feeds/opportunities.rss",
+        "/v1/export/opportunities.json",
+        "/v1/export/opportunities.csv",
         "/v1/stats",
         "/v1/health",
       ],

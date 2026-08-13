@@ -36,6 +36,7 @@ import { listQuerySchema } from "../../src/modules/routes/opportunities/types.js
 import type { Page } from "../../src/modules/services/opportunities/opportunity.service.js";
 import type { StatsSummary } from "../../src/modules/services/stats/stats.service.js";
 import { canonicalDocuments } from "../../src/modules/shared/canonical-documents.js";
+import { type ExportEnvelope, toExportJson } from "../../src/modules/shared/export-format.js";
 import { responseSchemas } from "../../src/openapi/schemas.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -231,6 +232,7 @@ describe("closed response components vs their producers", () => {
 
   it("guards every component that closes its shape", () => {
     expect(closed).toEqual([
+      "DatasetExport",
       "ErrorResponse",
       "Health",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
@@ -270,6 +272,31 @@ describe("closed response components vs their producers", () => {
     expect(Object.fromEntries(canonicalDocuments.map((d) => [d.path, d.mediaType]))).toEqual(
       expected,
     );
+  });
+
+  /**
+   * The export envelope is the one component that is ALSO a published file format: the same five
+   * keys are what `exports/latest.json` carries. A field added to `ExportEnvelope` therefore
+   * changes the open data as well as the API, and has to be declared in both places — this is what
+   * makes the second half impossible to forget.
+   */
+  it("DatasetExport declares exactly what the export format emits", () => {
+    const sample: ExportEnvelope = {
+      specVersion: "1.0.0",
+      license: "CC0-1.0",
+      generatedAt: "2026-08-13T09:41:00.000Z",
+      count: 0,
+      opportunities: [],
+    };
+    expect(declaredKeys("DatasetExport")).toEqual(Object.keys(sample).sort());
+    // …and the same keys really do come out of the serializer, not just out of the type.
+    expect(declaredKeys("DatasetExport")).toEqual(
+      Object.keys(JSON.parse(toExportJson([], sample.generatedAt))).sort(),
+    );
+
+    // Records are documented as the SAME component the detail endpoint serves, not a copy of it.
+    const records = propertiesOf("DatasetExport").opportunities as JsonSchema;
+    expect((records.items as JsonSchema).$ref).toBe("Opportunity");
   });
 
   it("Stats declares exactly what StatsService.summary() returns", () => {
