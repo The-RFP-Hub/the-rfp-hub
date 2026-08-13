@@ -3,6 +3,7 @@ import {
   type SQL,
   and,
   arrayOverlaps,
+  asc,
   count,
   desc,
   eq,
@@ -157,6 +158,28 @@ export class OpportunityService {
       total,
       totalPages: Math.max(1, Math.ceil(total / limit)),
     };
+  }
+
+  /**
+   * EVERY publicly visible record, as full Standard objects — no filters, no pagination.
+   *
+   * The one unbounded read in this service, and it exists because the dataset is published whole:
+   * the open-data export writes it to files and `/v1/export/*` streams it to a caller. Both go
+   * through here rather than each running its own `select`, so the two can never disagree about
+   * which rows are public — that predicate is `approved AND is_listed`, the same invariant
+   * `liveFilters` opens every other public read with.
+   *
+   * Ordered by `public_id` at the database, which is a stable, index-backed order to read in; the
+   * PUBLISHED order is not this one and is not a database concern — `orderForExport` imposes it on
+   * the records afterwards, identically for every consumer (see modules/shared/export-format.ts).
+   */
+  async listAll(): Promise<Opportunity[]> {
+    const rows = await this.db
+      .select()
+      .from(opportunities)
+      .where(and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true)))
+      .orderBy(asc(opportunities.publicId));
+    return rows.map(toStandard);
   }
 
   /** Fetch one full opportunity by its public id; null if absent or not publicly visible. */

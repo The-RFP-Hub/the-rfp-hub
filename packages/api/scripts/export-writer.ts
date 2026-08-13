@@ -1,5 +1,5 @@
 /**
- * THE WRITER: the one implementation of the open-data export's published format.
+ * THE WRITER: the one implementation of the open-data export's PUBLICATION.
  *
  * A run writes the public dataset as JSON + CSV under an output directory, released under CC0-1.0
  * and marked as such both in the JSON envelope and in a LICENSE sidecar written alongside the data.
@@ -32,7 +32,7 @@
  * ── Why this is a module of its own ────────────────────────────────────────────────
  * It takes RECORDS and writes FILES. It opens no connection, reads no configuration and knows
  * nothing about where its input came from, which is what lets two sources publish through it and
- * makes the format impossible to fork:
+ * makes the publication impossible to fork:
  *
  *   export.ts            the DATABASE source — live rows, plus the `dataset_snapshots` row
  *   export-from-api.ts   the API source — a deployed `/v1/` API, no database at all
@@ -40,15 +40,28 @@
  * The separation is structural rather than a convention: an export that runs where there is no
  * database must not import one, or a missing DATABASE_URL becomes a startup failure of a run that
  * never needed it.
+ *
+ * ── Where the FORMAT lives ─────────────────────────────────────────────────────────
+ * Not here. The published order, the JSON envelope and the CSV projection are
+ * `src/modules/shared/export-format.ts`, because the API SERVES them too: `/v1/export/*` is a live
+ * download of the same dataset in the same bytes per record, and a server cannot import a script.
+ * What is left here is everything that is about publishing FILES — the digests, the archive names,
+ * the CC0 sidecar, the floor, the promotion order and the manifest — none of which a live download
+ * has or should have.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { lstat, mkdir, open, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type Opportunity, SPEC_VERSION } from "@the-rfp-hub/standard";
-import { toCsv } from "./csv.js";
+import { SPEC_VERSION } from "@the-rfp-hub/standard";
+import type { Opportunity } from "@the-rfp-hub/standard";
+import {
+  EXPORT_LICENSE,
+  orderForExport,
+  toCsv,
+  toExportJson,
+} from "../src/modules/shared/export-format.js";
 
 const OUT_DIR = "exports";
-const LICENSE = "CC0-1.0";
 const DEFAULT_MIN_COUNT = 100;
 /** The single mutable pointer a consumer resolves to get a guaranteed-consistent artifact set. */
 export const MANIFEST_NAME = "latest.manifest.json";
@@ -397,23 +410,11 @@ export async function promoteAliases(
 }
 
 /**
- * The published order: by `id`, ascending, compared by code unit — imposed by the WRITER rather
- * than left to whichever source produced the records.
- *
- * Ordering is part of the published format, not a side effect of how the records were obtained.
- * Sorting here makes the archive bytes a function of the DATA alone: a database orders by its own
- * collation (which is a property of the server, so two deployments of the same data could publish
- * two orders), and an API's list endpoint has no `id` sort key at all. Both hand their records to
- * this comparison instead, and the same records publish the same file either way.
- */
-const byId = (a: Opportunity, b: Opportunity): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-
-/**
  * Serialize `items` and publish the six-file set — or write nothing at all.
  *
- * Every source goes through here, so the format, the digests, the ordering, the floor and the
- * promotion order have exactly one implementation between them. Purely a filesystem operation: it
- * takes records, not a connection.
+ * Every source goes through here, so the digests, the floor and the promotion order have exactly
+ * one implementation between them, over payloads produced by the one shared format module. Purely
+ * a filesystem operation: it takes records, not a connection.
  */
 export async function writeExport(
   items: readonly Opportunity[],
@@ -429,18 +430,11 @@ export async function writeExport(
   const generatedAt = new Date().toISOString();
   const date = generatedAt.slice(0, 10);
 
-  const ordered = [...items].sort(byId);
-  const json = `${JSON.stringify(
-    {
-      specVersion: SPEC_VERSION,
-      license: LICENSE,
-      generatedAt,
-      count: ordered.length,
-      opportunities: ordered,
-    },
-    null,
-    2,
-  )}\n`;
+  // The published order and both serializations, from the shared format module — the same three
+  // calls the live `/v1/export/*` routes make, which is what makes an archive and a live download
+  // byte-identical per record.
+  const ordered = orderForExport(items);
+  const json = toExportJson(ordered, generatedAt);
   const csv = toCsv(ordered);
   const jsonDigest = sha256(json);
   const csvDigest = sha256(csv);
@@ -493,7 +487,7 @@ export async function writeExport(
   // previous manifest still whole.
   const manifest: ExportManifest = {
     specVersion: SPEC_VERSION,
-    license: LICENSE,
+    license: EXPORT_LICENSE,
     runId: randomBytes(16).toString("hex"),
     generatedAt,
     count: ordered.length,

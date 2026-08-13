@@ -20,7 +20,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { CSV_COLUMNS } from "../../scripts/csv.js";
 import {
   ExportCountError,
   ExportSchemaError,
@@ -32,6 +31,7 @@ import {
   runApiExport,
 } from "../../scripts/export-from-api.js";
 import { ExportFloorError, MANIFEST_NAME } from "../../scripts/export-writer.js";
+import { CSV_COLUMNS } from "../../src/modules/shared/export-format.js";
 
 const ROOT = join(tmpdir(), "rfphub-export-api-test");
 

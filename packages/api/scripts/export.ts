@@ -4,11 +4,14 @@
  *
  *   pnpm --filter @the-rfp-hub/api export
  *
- * The published FORMAT is not here — it is `export-writer.ts`, which every source shares, so the
- * six files this run writes are byte-for-byte the ones any other source would write from the same
- * records (see `export-from-api.ts`, which publishes a deployed API instead). What is here is
- * everything that is genuinely about the database: which rows are public, and the snapshot row the
- * run leaves behind.
+ * Neither the published format nor the publication is here — the format is
+ * `src/modules/shared/export-format.ts` and the file publication is `export-writer.ts`, which every
+ * source shares, so the six files this run writes are byte-for-byte the ones any other source would
+ * write from the same records (see `export-from-api.ts`, which publishes a deployed API instead).
+ * Which rows are public is not here either: that predicate belongs to `OpportunityService`, where
+ * every public read in the API already gets it, so an export cannot publish a record the API hides
+ * or hide one it publishes. What is left here is the one thing that is genuinely this source's —
+ * the snapshot row the run leaves behind.
  *
  * `dataset_snapshots` stays on this path deliberately. It records the ARCHIVE names — the per-run
  * record — with the sha256 of the bytes stored under them, never the aliases, which move; and a
@@ -16,10 +19,9 @@
  * database has no other knowledge of.
  */
 import { join } from "node:path";
-import { and, asc, eq } from "drizzle-orm";
 import { db, pool } from "../src/db/client.js";
-import { datasetSnapshots, opportunities } from "../src/db/schema.js";
-import { toStandard } from "../src/modules/mappers/opportunity.mapper.js";
+import { datasetSnapshots } from "../src/db/schema.js";
+import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
 import {
   ExportAliasError,
   ExportFloorError,
@@ -38,13 +40,9 @@ import {
  * exactly what the manifest published, so the two can never describe different files.
  */
 export async function runExport(options: ExportOptions = {}): Promise<ExportResult> {
-  const rows = await db
-    .select()
-    .from(opportunities)
-    .where(and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true)))
-    .orderBy(asc(opportunities.publicId));
+  const records = await new OpportunityService().listAll();
 
-  const result = await writeExport(rows.map(toStandard), options);
+  const result = await writeExport(records, options);
 
   await db.insert(datasetSnapshots).values(
     result.manifest.artifacts.map((artifact) => ({
