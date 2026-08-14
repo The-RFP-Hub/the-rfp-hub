@@ -12,6 +12,7 @@
     "codegen:check": "pnpm -r --if-present codegen:check",
     "check": "pnpm -r --if-present check",
     "check:neutral": "node scripts/check-neutral.mjs",
+    "check:deploy": "node scripts/check-deploy.mjs",
     "check:m2": "node scripts/check-m2.mjs",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
