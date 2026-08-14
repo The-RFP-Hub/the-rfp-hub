@@ -16,9 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     # Postgres for the @the-rfp-hub/api integration tests (gated on DATABASE_URL; otherwise skipped).
+    # pgvector's image, matching packages/api/docker-compose{,.test}.yml: the migrations create the
+    # `vector` extension and an HNSW index, neither of which exists on the plain image.
     services:
       postgres:
-        image: postgres:15-alpine
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_USER: rfphub
           POSTGRES_PASSWORD: rfphub

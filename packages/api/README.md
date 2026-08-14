@@ -210,7 +210,7 @@ document points at itself with an atom `link rel="self"`.
 ## Local development
 
 ```bash
-docker compose up -d                     # Postgres 15 (see docker-compose.yml)
+docker compose up -d                     # Postgres 15 + pgvector (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
 pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # 142 entries, offline
@@ -220,6 +220,29 @@ pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./e
 # the same six files, sourced from a running API instead of the database (no DATABASE_URL needed)
 EXPORT_API_URL=http://localhost:3001 pnpm --filter @the-rfp-hub/api export:api
 ```
+
+### Upgrading an existing dev database to the pgvector image
+
+`docker-compose.yml` now pins `pgvector/pgvector:pg15` instead of `postgres:15-alpine`, because
+M3's embeddings need `CREATE EXTENSION vector`. The major version is unchanged, so **the data
+directory and the `rfphub_pgdata` volume are reused** — an image change recreates the *container*,
+not the volume. What does change is the C library, alpine/musl → debian/glibc, and with it the
+collation provider: indexes built under the old one can be mis-ordered under the new one.
+
+If you already have a `rfphub-postgres` container, run the upgrade through the script rather than
+by hand. It dumps first, counts rows before and after, reindexes, refreshes the recorded collation
+version, applies migrations, and prints the way back if the counts disagree:
+
+```bash
+packages/api/scripts/upgrade-dev-postgres.sh
+```
+
+It never runs `docker compose down` and never removes a volume — it refuses any argument at all, so
+there is nothing to pass it that could. If the new image will not start, the escape hatch is to
+keep musl: build a local image `FROM postgres:15-alpine` with pgvector compiled in and point
+`docker-compose.yml` at it; the data directory is untouched either way.
+
+A **fresh** database needs none of this — `docker compose up -d` and `migrate` do the whole thing.
 
 ### Configuration
 
@@ -247,6 +270,23 @@ under [the converter's README](./tools/converter/README.md).
 | `EXPORT_MIN_COUNT` | `100` | Floor below which an export writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 | `EXPORT_API_URL` | — | **Required by `pnpm export:api`**, ignored by everything else: the bare origin of the API to publish, e.g. `https://api.example.org`. Must be `https://` for any host that is not loopback — this value decides what gets published, so plaintext would let the network path choose the dataset. A path, query or fragment is an error rather than being trimmed off. |
 | `EXPORT_OUT_DIR` | `exports` | Where `pnpm export:api` writes its six files. Relative paths resolve against the working directory. |
+| `TRUST_PROXY` | unset | What may be believed about `X-Forwarded-For`, and therefore what `request.ip` is. **Not a boolean** — `true` is rejected at boot, because it means "believe whatever the client claims its address is", and that address is an analytics input. A hop count (`1`) or a comma-separated list of proxy addresses/CIDRs. Unset trusts nothing. |
+
+### M3 variables
+
+The write API, duplicate detection, verification-assist and publisher analytics add the variables
+below. Every one is optional: unset, each feature either uses a safe default or reports itself
+unavailable, and the M2 read surface is unaffected. Full descriptions — including the reasoning
+behind each default — are in [`.env-example`](./.env-example); which of them are secrets, and how
+they reach a deployment, is in [`docs/deploy.md`](./docs/deploy.md).
+
+| Group | Variables | Notes |
+|---|---|---|
+| Authentication | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_JWKS_URL`, `PRIVY_APP_SECRET`, `BOOTSTRAP_ADMIN_PRIVY_DIDS`, `BOOTSTRAP_ADMIN_WALLETS` | The PEM verification key is the documented mechanism; `PRIVY_JWKS_URL` is an **unverified** override. `PRIVY_APP_SECRET` is used only by account enrichment, which is queued and never on the auth path. Bootstrap admins are matched by DID and re-evaluated on every login; the wallet list is inert without the app secret, and the API says so at boot. |
+| Duplicate detection | `EMBEDDING_PROVIDER`, `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_TIMEOUT_MS`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` | Provider defaults to `openai` with a key and `disabled` without one — never `deterministic`, which is the credential-free CI provider and is not a semantic model. The threshold's default is **per provider**: the same number means different things in different embedding spaces. |
+| Verification-assist | `VERIFICATION_ENABLED`, `VERIFY_ON_SUBMIT`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFY_QUEUE_MAX`, `VERIFY_ALLOW_PRIVATE_HOSTS`, `VERIFIER_EGRESS_PROXY` | `VERIFY_ALLOW_PRIVATE_HOSTS` disables the fetcher's SSRF address checks and exists for one loopback test: with `NODE_ENV=production` the process **refuses to start** rather than serving with the guard off. |
+| Analytics | `ANALYTICS_ENABLED`, `ANALYTICS_HMAC_KEY`, `ANALYTICS_RETENTION_DAYS` | The HMAC key is a secret injected at runtime. Unset degrades rather than fails: a random per-boot key keeps the hashes unlinkable to an address, and only session de-duplication across restarts is lost. |
+| Staleness | `STALENESS_INACTIVE_DAYS` | Days without a publisher touch after which an open entry carrying no future fixed deadline is auto-closed. |
 
 The seed is deliberately absent from that table: its corpus is an argument, not an environment
 pointer. The one variable it reads, `SEED_STRICT=1`, only mirrors the `--strict` flag. Nothing in
@@ -256,10 +296,19 @@ offline tooling and documented with it, under
 
 ### Process behaviour
 
-- **CORS**: every response carries `Access-Control-Allow-Origin: *`, for `GET`/`HEAD`/`OPTIONS`
-  only. This is a fully public, unauthenticated read API that never mutates, so there are no
-  credentials to protect and no origin allowlist to maintain — and without the headers no browser
-  client can call it at all.
+- **CORS**: every response carries `Access-Control-Allow-Origin: *`, for the read verbs and the
+  write ones (`GET`, `HEAD`, `OPTIONS`, `POST`, `PUT`, `PATCH`, `DELETE`), allowing `Content-Type`
+  and `Authorization`, with `credentials: false`.
+
+  **The invariant that makes `*` safe: every credential is header-borne, never cookie-borne.** A
+  cross-site request therefore carries no ambient authority — a browser attaches nothing the
+  calling page does not already hold, and a page that holds the token did not need CORS to use it.
+  Introducing any cookie credential breaks this and forces an explicit origin allowlist with
+  `credentials: true`. The change that breaks it will not look like a CORS change, which is why it
+  is written down here and in `src/app.ts`.
+- **Rate limiting**: registered with `global: false` — no route is limited unless it opts in. A
+  blanket limit would cap the public read surface this project exists to serve, and would be
+  measured per IP, which behind a shared egress is one number for a whole organization.
 - **Graceful shutdown**: `SIGTERM`/`SIGINT` stop new connections, let in-flight requests finish and
   close the pg pool (a Fastify `onClose` hook) before exiting 0. A 10s forced-exit timeout means a
   hung close can never leave an un-killable process.
