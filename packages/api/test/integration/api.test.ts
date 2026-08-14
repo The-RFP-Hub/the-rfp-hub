@@ -101,9 +101,16 @@ run("/v1 API", () => {
     expect(res.json()).toMatchObject({ status: "ok" });
   });
 
-  // Fully public, unauthenticated read API: without these headers no browser client can call it
-  // at all. Only the read-safe verbs are advertised — this API never mutates.
-  it("answers cross-origin reads from any origin, for read-safe verbs only", async () => {
+  // Without these headers no browser client can call the API at all. Any origin is allowed, and
+  // since M3 that includes the write verbs and the `Authorization` header.
+  //
+  // WHAT MAKES `*` SAFE, and what this case is really pinning: `credentials: false`. Every
+  // credential this API accepts is header-borne, so a cross-site request carries no ambient
+  // authority — a browser attaches nothing the calling page does not already hold. The day a
+  // cookie credential is introduced, `*` becomes a request-forgery surface and this has to become
+  // an origin allowlist with `credentials: true`. The assertion below fails if that flips, which
+  // is the point: the change that breaks the invariant will not look like a CORS change.
+  it("answers cross-origin requests from any origin, without credentials", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/v1/health",
@@ -120,7 +127,20 @@ run("/v1 API", () => {
     expect(preflight.statusCode).toBe(204);
     expect(preflight.headers["access-control-allow-origin"]).toBe("*");
     const allowed = String(preflight.headers["access-control-allow-methods"]);
-    expect(allowed.split(/,\s*/).sort()).toEqual(["GET", "HEAD", "OPTIONS"]);
+    expect(allowed.split(/,\s*/).sort()).toEqual([
+      "DELETE",
+      "GET",
+      "HEAD",
+      "OPTIONS",
+      "PATCH",
+      "POST",
+      "PUT",
+    ]);
+    expect(
+      String(preflight.headers["access-control-allow-headers"]).toLowerCase().split(/,\s*/),
+    ).toEqual(["content-type", "authorization"]);
+    // The invariant itself: no credentialed cross-origin request is ever permitted.
+    expect(preflight.headers["access-control-allow-credentials"]).toBeUndefined();
   });
 
   it("GET /v1/opportunities returns only approved+listed, thin projection, with pagination", async () => {

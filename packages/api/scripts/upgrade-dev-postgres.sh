@@ -99,8 +99,22 @@ echo "→ new image: $(docker inspect -f '{{.Config.Image}}' "$CONTAINER")"
 # honestly rather than merely quieting it.
 echo "→ REINDEX DATABASE $DB (collation provider changed: musl → glibc)"
 docker exec -i "$CONTAINER" psql -U "$USER" -d "$DB" -c "REINDEX DATABASE $DB;"
+
+# The REINDEX above is the part that makes the indexes correct; this only updates the version
+# Postgres RECORDS for the database, which is what stops it warning on every connection.
+#
+# It is best-effort, and observed to fail with "invalid collation version change" on exactly this
+# transition: the alpine/musl build records no collation version at all (`datcollversion` is NULL),
+# and Postgres will not accept the move from "none recorded" to a glibc version. A database with no
+# recorded version emits no warning either, so there is nothing left to fix — and failing the whole
+# upgrade over a bookkeeping column, after the indexes have already been rebuilt, would be worse
+# than saying so.
 echo "→ ALTER DATABASE $DB REFRESH COLLATION VERSION"
-docker exec -i "$CONTAINER" psql -U "$USER" -d postgres -c "ALTER DATABASE $DB REFRESH COLLATION VERSION;"
+if ! docker exec -i "$CONTAINER" psql -U "$USER" -d postgres \
+  -c "ALTER DATABASE $DB REFRESH COLLATION VERSION;" 2>/dev/null; then
+  echo "  (refused — normal when the old image recorded no collation version. The REINDEX above is"
+  echo "   what mattered; nothing further is owed.)"
+fi
 
 # ── 4. migrations (this is where CREATE EXTENSION vector runs) ──────────────────────────────────
 echo "→ applying migrations"

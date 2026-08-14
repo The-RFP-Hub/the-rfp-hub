@@ -797,6 +797,15 @@ DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub npx vitest run test/
 docker compose -f docker-compose.test.yml down
 ```
 
+The test file declares its own Compose **project name** (`name: rfphub-test`), and that line is
+load-bearing. Compose derives a project name from the directory when a file does not declare one
+and keys containers on (project, service) — and both files sit in this directory with a service
+called `postgres`. Without it, `-f docker-compose.test.yml up -d` resolves to the same identity as
+the dev database and **recreates it** under the test configuration; the distinct `container_name`
+does not prevent that, because it is a label rather than an identity Compose keys on. (The named
+volume survives, so the data is recoverable by bringing `docker-compose.yml` back up — but a test
+command should not be able to reach the persistent database at all.)
+
 ## Deferred (later in M2 / beyond)
 
 Cloud deploy; object storage for the export (the nightly job publishes it to this repository, which
