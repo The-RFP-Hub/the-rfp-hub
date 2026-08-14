@@ -5,7 +5,21 @@
  * database instance, and a published `servers[0].url` has no safe fallback to guess at.
  */
 import { describe, expect, it } from "vitest";
-import { readDbPoolMax, readPort, readPublicBaseUrl } from "../../src/config.js";
+import {
+  DEFAULT_SIMILARITY_THRESHOLD,
+  readAllowPrivateHosts,
+  readAnalyticsHmacKey,
+  readBoolean,
+  readDbPoolMax,
+  readEmbeddingProvider,
+  readList,
+  readPem,
+  readPort,
+  readPositiveInt,
+  readPublicBaseUrl,
+  readSimilarityThreshold,
+  readTrustProxy,
+} from "../../src/config.js";
 
 describe("readPort", () => {
   it("uses the default when PORT is unset", () => {
@@ -128,5 +142,169 @@ describe("readPublicBaseUrl", () => {
     for (const raw of ["api.example.org", "https://", "//api.example.org", "not a url"]) {
       expect(() => readPublicBaseUrl(raw), raw).toThrow(/PUBLIC_BASE_URL/);
     }
+  });
+});
+
+// ── M3 readers ───────────────────────────────────────────────────────────────────────────────
+//
+// The line these draw, and it is drawn per variable: a set-but-unusable value FALLS BACK where the
+// wrong value is merely wrong, and THROWS where the wrong value is dangerous. Two variables are in
+// the second group and both are here — `VERIFY_ALLOW_PRIVATE_HOSTS`, which would silently disable
+// the verifier's SSRF checks, and `TRUST_PROXY`, whose obvious value (`true`) hands control of
+// `request.ip` to the client.
+
+describe("readBoolean", () => {
+  it("reads the usual affirmatives and negatives", () => {
+    for (const raw of ["1", "true", "TRUE", " yes ", "on"]) {
+      expect(readBoolean(raw, false), raw).toBe(true);
+    }
+    for (const raw of ["0", "false", "No", "off"]) {
+      expect(readBoolean(raw, true), raw).toBe(false);
+    }
+  });
+
+  // The single most common way a feature flag lies: `Boolean("false")` is true.
+  it("does not treat the string 'false' as true", () => {
+    expect(readBoolean("false", true)).toBe(false);
+  });
+
+  it("falls back for unset and unrecognised values", () => {
+    for (const raw of [undefined, "", "  ", "maybe"]) {
+      expect(readBoolean(raw, true), JSON.stringify(raw)).toBe(true);
+      expect(readBoolean(raw, false), JSON.stringify(raw)).toBe(false);
+    }
+  });
+});
+
+describe("readPositiveInt", () => {
+  it("reads a whole number and falls back for anything else", () => {
+    expect(readPositiveInt("42", 7)).toBe(42);
+    for (const raw of [undefined, "", "  ", "0", "-1", "1.5", "lots"]) {
+      expect(readPositiveInt(raw, 7), JSON.stringify(raw)).toBe(7);
+    }
+  });
+});
+
+describe("readList", () => {
+  it("splits, trims, drops blanks and de-duplicates while keeping order", () => {
+    expect(readList(" a, b ,,a , c ")).toEqual(["a", "b", "c"]);
+    expect(readList(undefined)).toEqual([]);
+    expect(readList("   ")).toEqual([]);
+  });
+});
+
+describe("readPem", () => {
+  // A one-line secret store and a multi-line PEM only meet if the escape is restored, and the
+  // failure without it is an opaque parse error that looks like a wrong key.
+  it("restores newlines written as the two-character escape", () => {
+    expect(readPem("-----BEGIN PUBLIC KEY-----\\nabc\\n-----END PUBLIC KEY-----")).toBe(
+      "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----",
+    );
+  });
+
+  it("leaves a real multi-line value alone, and treats blank as unset", () => {
+    expect(readPem("a\nb")).toBe("a\nb");
+    expect(readPem("   ")).toBeUndefined();
+    expect(readPem(undefined)).toBeUndefined();
+  });
+});
+
+describe("readEmbeddingProvider", () => {
+  it("takes an explicit provider", () => {
+    expect(readEmbeddingProvider("deterministic", undefined)).toBe("deterministic");
+    expect(readEmbeddingProvider(" OpenAI ", undefined)).toBe("openai");
+    expect(readEmbeddingProvider("disabled", "sk-test")).toBe("disabled");
+  });
+
+  // Falling back to `deterministic` would leave a deployment reporting duplicate checks it is not
+  // really performing, which is worse than reporting none.
+  it("defaults to openai with a key and disabled without one — never deterministic", () => {
+    expect(readEmbeddingProvider(undefined, "sk-test")).toBe("openai");
+    expect(readEmbeddingProvider("", undefined)).toBe("disabled");
+  });
+
+  it("rejects an unknown provider rather than silently picking one", () => {
+    expect(() => readEmbeddingProvider("word2vec", undefined)).toThrow(/EMBEDDING_PROVIDER/);
+  });
+});
+
+describe("readSimilarityThreshold", () => {
+  // A threshold is a property of an embedding space, so one shared default would be wrong for at
+  // least one provider.
+  it("defaults per provider", () => {
+    expect(readSimilarityThreshold(undefined, "openai")).toBe(DEFAULT_SIMILARITY_THRESHOLD.openai);
+    expect(readSimilarityThreshold("", "deterministic")).toBe(
+      DEFAULT_SIMILARITY_THRESHOLD.deterministic,
+    );
+    expect(DEFAULT_SIMILARITY_THRESHOLD.openai).not.toBe(
+      DEFAULT_SIMILARITY_THRESHOLD.deterministic,
+    );
+  });
+
+  it("takes a value in range", () => {
+    expect(readSimilarityThreshold("0.9", "openai")).toBe(0.9);
+    expect(readSimilarityThreshold("0", "openai")).toBe(0);
+  });
+
+  it("rejects a value that is not a cosine similarity", () => {
+    for (const raw of ["-0.1", "1.5", "86%", "high"]) {
+      expect(() => readSimilarityThreshold(raw, "openai"), raw).toThrow(/DEDUPE_SIMILARITY/);
+    }
+  });
+});
+
+describe("readAllowPrivateHosts", () => {
+  it("is off by default and may be enabled outside production", () => {
+    expect(readAllowPrivateHosts(undefined, false)).toBe(false);
+    expect(readAllowPrivateHosts("true", false)).toBe(true);
+  });
+
+  // THE GUARD. Enabling this lets the verifier reach loopback, private and link-local addresses —
+  // including the instance metadata endpoint. There is no deployment in which that is right, so it
+  // refuses to start rather than serving with the check off.
+  it("refuses to boot under NODE_ENV=production", () => {
+    expect(() => readAllowPrivateHosts("true", true)).toThrow(/VERIFY_ALLOW_PRIVATE_HOSTS/);
+    expect(() => readAllowPrivateHosts("1", true)).toThrow(/production/);
+    // …and is a no-op when it is not enabled.
+    expect(readAllowPrivateHosts("false", true)).toBe(false);
+    expect(readAllowPrivateHosts(undefined, true)).toBe(false);
+  });
+});
+
+describe("readTrustProxy", () => {
+  it("reads a hop count or an address list", () => {
+    expect(readTrustProxy("1")).toBe(1);
+    expect(readTrustProxy(" 2 ")).toBe(2);
+    expect(readTrustProxy("10.0.0.0/8, 192.168.0.0/16")).toEqual(["10.0.0.0/8", "192.168.0.0/16"]);
+    expect(readTrustProxy("loopback")).toEqual(["loopback"]);
+  });
+
+  it("trusts nothing when unset", () => {
+    expect(readTrustProxy(undefined)).toBeUndefined();
+    expect(readTrustProxy("  ")).toBeUndefined();
+  });
+
+  // The value everyone reaches for, and it means "believe whatever the client claims its address
+  // is" — which turns the analytics hash into client-controlled input.
+  it("rejects a boolean, and says what to write instead", () => {
+    for (const raw of ["true", "TRUE", "false", "yes"]) {
+      expect(() => readTrustProxy(raw), raw).toThrow(/hop count/);
+    }
+  });
+});
+
+describe("readAnalyticsHmacKey", () => {
+  it("uses a supplied key as-is", () => {
+    expect(readAnalyticsHmacKey(" secret ")).toEqual({ key: "secret", generated: false });
+  });
+
+  // Unset is survivable — the hashes stay unlinkable — so it degrades rather than refusing. What
+  // is lost is continuity across restarts, and the caller is told which case it is in.
+  it("generates a per-boot key when unset, and says so", () => {
+    const first = readAnalyticsHmacKey(undefined);
+    const second = readAnalyticsHmacKey("");
+    expect(first.generated).toBe(true);
+    expect(first.key).toMatch(/^[0-9a-f]{64}$/);
+    expect(first.key).not.toBe(second.key);
   });
 });

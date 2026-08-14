@@ -1,6 +1,8 @@
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import { config } from "./config.js";
 import { registerRoutes } from "./modules/routes/index.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { responseSchemas } from "./openapi/schemas.js";
@@ -28,13 +30,38 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // before `additionalProperties: false` can reject them — a misspelled filter would silently
     // return the whole dataset. Turn it off so the schema's strictness actually reaches the client.
     ajv: { customOptions: { removeAdditional: false } },
+    // What may be believed about `X-Forwarded-For`, and therefore what `request.ip` is. Never
+    // `true`: the header is client-supplied, so blanket trust would let any caller choose the
+    // address that ends up in an analytics hash or a rate-limit key. `undefined` trusts nothing.
+    // See `readTrustProxy` in config.ts.
+    trustProxy: config.trustProxy,
   });
 
-  // Fully public, unauthenticated read API — no browser client can call it today because no
-  // response carries CORS headers. Any origin is allowed, and only the read-safe verbs are
-  // permitted (this API never mutates), so there are no credentials to protect and no origin
-  // allowlist to maintain.
-  await app.register(cors, { origin: "*", methods: ["GET", "HEAD", "OPTIONS"] });
+  // Any origin, and now the write verbs too.
+  //
+  // `credentials: false` is the load-bearing half. EVERY credential this API accepts is
+  // header-borne — `Authorization: Bearer …` for a session token or an API key — so a cross-site
+  // request carries no ambient authority: a browser will not attach anything the attacker's page
+  // does not already possess, and a page that possesses the token did not need CORS to use it.
+  //
+  // THE INVARIANT: this is only safe while no credential is a cookie. Introducing one turns `*`
+  // into a cross-site request forgery surface and forces this to become an explicit origin
+  // allowlist with `credentials: true`. Stated here and in docs/auth.md because the change that
+  // breaks it will not look like a CORS change.
+  await app.register(cors, {
+    origin: "*",
+    methods: ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false,
+    maxAge: 600,
+  });
+
+  // Registered with `global: false`: no route is rate-limited by opting out, only by opting in.
+  // A blanket limit here would cap the public read surface — the list, the feeds, the full-dataset
+  // export — which is the traffic this project exists to serve, and would be measured per IP,
+  // which behind a shared egress is one number for a whole organization. The write, auth and
+  // redirect routes attach their own `config.rateLimit` where a limit is meaningful.
+  await app.register(rateLimit, { global: false });
 
   // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
   for (const schema of responseSchemas) app.addSchema(schema);

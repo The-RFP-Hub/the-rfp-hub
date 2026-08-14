@@ -1,0 +1,20 @@
+-- CUSTOM migration (drizzle-kit generate --custom --name pgvector_extension).
+--
+-- The embeddings table that follows declares a `vector(1536)` column and an HNSW index, and neither
+-- the type nor the access method exists until this extension is installed. Ordering is the whole
+-- point: this migration carries a LOWER index than the one that creates the column, so drizzle's
+-- journal applies it first, on every database, in the same order everywhere.
+--
+-- It is a versioned migration rather than a line in scripts/migrate.ts on purpose. Schema bootstrap
+-- that lives in application code is invisible to anyone reading the migration chain, cannot be
+-- reviewed as a schema change, and does not exist for an operator who applies the SQL by hand.
+--
+-- `IF NOT EXISTS` because a managed instance may have the extension pre-installed by the platform.
+--
+-- REQUIRES: the server must ship pgvector. Locally and in CI that is the pgvector/pgvector:pg15
+-- image (docker-compose.yml, docker-compose.test.yml, .github/workflows/ci.yml). On a managed
+-- instance, availability is a property of the engine version and parameter group and is NOT
+-- recorded in this repository — `SHOW rds.extensions;` on the instance is the authoritative check
+-- and is a prerequisite step in packages/api/docs/deploy.md. Installing an extension also needs a
+-- privileged role, which is why the migration credential is separate from the runtime one.
+CREATE EXTENSION IF NOT EXISTS vector;

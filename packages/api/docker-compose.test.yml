@@ -9,7 +9,10 @@
 #   docker compose -f docker-compose.test.yml down
 services:
   postgres:
-    image: postgres:15-alpine
+    # Same image as the dev database and as CI: the migrations create the `vector` extension, so a
+    # test database without it cannot run them, and a test database on a DIFFERENT image is not
+    # testing what runs anywhere else.
+    image: pgvector/pgvector:pg15
     container_name: rfphub-test-pg
     environment:
       POSTGRES_USER: rfphub

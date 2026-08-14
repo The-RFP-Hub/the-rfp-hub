@@ -8,6 +8,7 @@
  * variable declared here is a variable every deployment has to reason about — so a variable no
  * request path reads does not belong here.
  */
+import { randomBytes } from "node:crypto";
 import { config as loadDotenv } from "dotenv";
 import { isLoopbackHost } from "./shared/loopback.js";
 
@@ -15,6 +16,53 @@ import { isLoopbackHost } from "./shared/loopback.js";
 // process.env read below. dotenv never overwrites variables that already reached the process, so
 // exported shell vars and a deployment's injected environment always win over the file.
 loadDotenv({ quiet: true });
+
+/** Access-token verification and the optional server-side enrichment credential. */
+export interface PrivyConfig {
+  /** The app id. Also the token `aud`, so a token minted for another app is rejected. */
+  appId: string | undefined;
+  /** The app's PEM verification key — the documented mechanism for app access tokens. */
+  verificationKey: string | undefined;
+  /** An UNVERIFIED override: no JWKS endpoint is documented for app access tokens. */
+  jwksUrl: string | undefined;
+  /** Server-side secret. Enrichment only, never the auth path. Absent → enrichment is inert. */
+  appSecret: string | undefined;
+}
+
+export type EmbeddingProvider = "openai" | "deterministic" | "disabled";
+
+export interface EmbeddingConfig {
+  provider: EmbeddingProvider;
+  apiKey: string | undefined;
+  model: string;
+  timeoutMs: number;
+}
+
+export interface DedupeConfig {
+  /** Cosine similarity at or above which a pair is recorded as suspected. Per-provider. */
+  similarityThreshold: number;
+  maxMatches: number;
+}
+
+export interface VerificationConfig {
+  enabled: boolean;
+  onSubmit: boolean;
+  timeoutMs: number;
+  maxBytes: number;
+  queueMax: number;
+  /** SSRF escape hatch for one loopback test. Refused outright under NODE_ENV=production. */
+  allowPrivateHosts: boolean;
+  egressProxy: string | undefined;
+}
+
+export interface AnalyticsConfig {
+  enabled: boolean;
+  /** HMAC key for the session/IP hashes. */
+  hmacKey: string;
+  /** True when no key was supplied and a per-boot random one is in use. */
+  hmacKeyGenerated: boolean;
+  retentionDays: number;
+}
 
 export interface AppConfig {
   databaseUrl: string;
@@ -42,6 +90,32 @@ export interface AppConfig {
    * with no shared-instance constraints needs no configuration.
    */
   dbPoolMax: number;
+  /**
+   * What Fastify is told to trust for `request.ip` and `request.protocol`.
+   *
+   * DELIBERATELY NEVER `true`. `X-Forwarded-For` is a client-supplied header, and trusting it
+   * unconditionally lets any caller choose the address that ends up in the analytics hash and in
+   * any rate-limit key. A hop count or a CIDR list names the proxy that is actually in front of
+   * this process. `undefined` (the default) trusts nothing.
+   */
+  trustProxy: number | string[] | undefined;
+  privy: PrivyConfig;
+  embedding: EmbeddingConfig;
+  dedupe: DedupeConfig;
+  verification: VerificationConfig;
+  analytics: AnalyticsConfig;
+  /**
+   * Accounts that become admins on login, matched by DID. Re-evaluated on EVERY login, so adding
+   * one takes effect without touching the database.
+   */
+  bootstrapAdminPrivyDids: string[];
+  /**
+   * The same, matched against a wallet the identity provider has VERIFIED — never a wallet the
+   * request asserts. Inert without `privy.appSecret`, since nothing fills the verified wallet in.
+   */
+  bootstrapAdminWallets: string[];
+  /** Days of no publisher touch after which a deadline-less open entry is closed as inactive. */
+  stalenessInactiveDays: number;
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -141,10 +215,254 @@ export function readPublicBaseUrl(raw: string | undefined, fallback = "/"): stri
   return url.href.replace(/\/+$/, "");
 }
 
+// ── M3 readers ───────────────────────────────────────────────────────────────────────────────
+//
+// One reader per variable, each exported and unit-tested. The shared shape: a blank or absent
+// value is "unset" and takes the default; a SET-but-unusable value takes the default too, EXCEPT
+// where a wrong value is dangerous rather than merely wrong, in which case it throws at boot. The
+// line between those two is drawn deliberately below, per variable.
+
+/** A trimmed value, or undefined when absent/blank. Blank is unset — an unsubstituted template. */
+export function readOptional(raw: string | undefined): string | undefined {
+  const value = (raw ?? "").trim();
+  return value === "" ? undefined : value;
+}
+
+/**
+ * A boolean flag. `1/true/yes/on` and `0/false/no/off`, case-insensitively; anything else — and
+ * anything blank — is the default. Deliberately not `Boolean(raw)`, under which the string
+ * `"false"` is true, which is the single most common way a feature flag lies.
+ */
+export function readBoolean(raw: string | undefined, fallback: boolean): boolean {
+  const value = (raw ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(value)) return true;
+  if (["0", "false", "no", "off"].includes(value)) return false;
+  return fallback;
+}
+
+/** A whole number > 0, or the default. Same `Number("") === 0` trap as `readPort`. */
+export function readPositiveInt(raw: string | undefined, fallback: number): number {
+  const parsed = Number((raw ?? "").trim());
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** A comma-separated list, trimmed, blanks dropped, duplicates removed, order preserved. */
+export function readList(raw: string | undefined): string[] {
+  return [
+    ...new Set(
+      (raw ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v !== ""),
+    ),
+  ];
+}
+
+/**
+ * A PEM key from an environment variable.
+ *
+ * PEM is multi-line and most secret stores, task definitions and shells are happier with one line,
+ * so `\n` written as two characters is the near-universal way this value arrives. Restoring the
+ * newlines here means a key pasted either way verifies tokens, instead of failing with an opaque
+ * parse error that looks like a wrong key.
+ */
+export function readPem(raw: string | undefined): string | undefined {
+  const value = readOptional(raw);
+  return value === undefined ? undefined : value.replace(/\\n/g, "\n");
+}
+
+const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ["openai", "deterministic", "disabled"];
+
+/**
+ * Which embedding provider backs duplicate detection.
+ *
+ * The default is deliberately conservative in both directions: with an API key present, `openai`;
+ * without one, `disabled` — never `deterministic`. The deterministic provider is a hashed token
+ * bag: it is exactly right for CI, where dedupe tests must run without a credential, and it is not
+ * a semantic model. Falling back to it silently would leave a deployment reporting duplicate
+ * checks it is not really performing, which is worse than reporting none.
+ */
+export function readEmbeddingProvider(
+  raw: string | undefined,
+  apiKey: string | undefined,
+): EmbeddingProvider {
+  const value = (raw ?? "").trim().toLowerCase();
+  if ((EMBEDDING_PROVIDERS as string[]).includes(value)) return value as EmbeddingProvider;
+  if (value !== "") {
+    throw new Error(
+      `EMBEDDING_PROVIDER must be one of ${EMBEDDING_PROVIDERS.join(", ")}, got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return apiKey === undefined ? "disabled" : "openai";
+}
+
+/**
+ * Per-provider similarity defaults. A threshold is a property of an embedding space, not a
+ * universal constant: the same number means different things to a 1536-dimension model and to a
+ * hashed token bag, so one shared default would be wrong for at least one of them.
+ *
+ * Both are PROVISIONAL operating points, to be settled against the committed corpus by the
+ * threshold sweep (`scripts/dedupe-threshold-report.ts`) and recorded in docs/data-model.md.
+ */
+export const DEFAULT_SIMILARITY_THRESHOLD: Record<EmbeddingProvider, number> = {
+  openai: 0.86,
+  deterministic: 0.72,
+  disabled: 1,
+};
+
+/** A similarity threshold in [0, 1]. Out of range is meaningless rather than merely wrong. */
+export function readSimilarityThreshold(
+  raw: string | undefined,
+  provider: EmbeddingProvider,
+): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return DEFAULT_SIMILARITY_THRESHOLD[provider];
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(
+      `DEDUPE_SIMILARITY_THRESHOLD must be a cosine similarity in [0, 1], got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * The SSRF escape hatch, and the one reader that refuses rather than falls back.
+ *
+ * Enabling it lets the verifier fetch loopback, link-local and private addresses — which is what
+ * one end-to-end test needs and what an attacker would need to reach the instance metadata
+ * endpoint. There is no deployment in which that is the right setting, so under
+ * `NODE_ENV=production` it is not a value that gets ignored: the process refuses to start, loudly,
+ * rather than serving with the guard off.
+ */
+export function readAllowPrivateHosts(raw: string | undefined, production: boolean): boolean {
+  const allow = readBoolean(raw, false);
+  if (allow && production) {
+    throw new Error(
+      "VERIFY_ALLOW_PRIVATE_HOSTS is enabled under NODE_ENV=production. It disables the verifier's " +
+        "SSRF address checks — including the block on the link-local metadata endpoint — and exists " +
+        "only for one loopback test. Unset it.",
+    );
+  }
+  return allow;
+}
+
+/**
+ * What sits in front of this process, for `X-Forwarded-For` purposes.
+ *
+ * A hop count (`1`) or a CIDR/address list (`10.0.0.0/8,192.168.0.0/16`), passed through to
+ * Fastify. `true` is REJECTED rather than accepted: it is the value everyone reaches for, and it
+ * means "believe whatever the client claims its address is", which turns the analytics hash into
+ * client-controlled input. Unset trusts nothing.
+ */
+export function readTrustProxy(raw: string | undefined): number | string[] | undefined {
+  const value = (raw ?? "").trim();
+  if (value === "") return undefined;
+  if (["true", "false", "yes", "no"].includes(value.toLowerCase())) {
+    throw new Error(
+      `TRUST_PROXY is not a boolean: it names WHICH proxy to trust. Use a hop count (e.g. 1) or a comma-separated list of proxy addresses/CIDRs (e.g. 10.0.0.0/8). Got ${JSON.stringify(raw)}.`,
+    );
+  }
+  const hops = Number(value);
+  if (Number.isInteger(hops) && hops > 0) return hops;
+  const list = readList(value);
+  if (list.length === 0) {
+    throw new Error(
+      `TRUST_PROXY must be a hop count or an address list, got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return list;
+}
+
+/**
+ * The analytics HMAC key.
+ *
+ * Unset is survivable, so it does not throw: a random per-boot key still keeps the hashes
+ * unlinkable to an IP address, which is the privacy property. What it costs is continuity —
+ * session de-duplication resets on every restart — so it warns, and says which of the two it is.
+ * The key is never derived from anything in the image; see docs/deploy.md.
+ */
+export function readAnalyticsHmacKey(raw: string | undefined): {
+  key: string;
+  generated: boolean;
+} {
+  const value = readOptional(raw);
+  if (value !== undefined) return { key: value, generated: false };
+  return { key: randomBytes(32).toString("hex"), generated: true };
+}
+
+const embeddingApiKey = readOptional(process.env.OPENAI_API_KEY);
+const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER, embeddingApiKey);
+const analyticsHmac = readAnalyticsHmacKey(process.env.ANALYTICS_HMAC_KEY);
+
 export const config: AppConfig = {
   databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
   port: readPort(process.env.PORT),
   host: process.env.HOST ?? "0.0.0.0",
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
+  trustProxy: readTrustProxy(process.env.TRUST_PROXY),
+
+  privy: {
+    appId: readOptional(process.env.PRIVY_APP_ID),
+    verificationKey: readPem(process.env.PRIVY_VERIFICATION_KEY),
+    jwksUrl: readOptional(process.env.PRIVY_JWKS_URL),
+    appSecret: readOptional(process.env.PRIVY_APP_SECRET),
+  },
+
+  embedding: {
+    provider: embeddingProvider,
+    apiKey: embeddingApiKey,
+    model: readOptional(process.env.EMBEDDING_MODEL) ?? "text-embedding-3-small",
+    timeoutMs: readPositiveInt(process.env.EMBEDDING_TIMEOUT_MS, 5_000),
+  },
+
+  dedupe: {
+    similarityThreshold: readSimilarityThreshold(
+      process.env.DEDUPE_SIMILARITY_THRESHOLD,
+      embeddingProvider,
+    ),
+    maxMatches: readPositiveInt(process.env.DEDUPE_MAX_MATCHES, 5),
+  },
+
+  verification: {
+    enabled: readBoolean(process.env.VERIFICATION_ENABLED, true),
+    // Default-on where it earns its keep and off under test, where a submission fixture must not
+    // reach out to the network as a side effect of being created.
+    onSubmit: readBoolean(process.env.VERIFY_ON_SUBMIT, process.env.NODE_ENV !== "test"),
+    timeoutMs: readPositiveInt(process.env.VERIFY_TIMEOUT_MS, 10_000),
+    maxBytes: readPositiveInt(process.env.VERIFY_MAX_BYTES, 2 * 1024 * 1024),
+    queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
+    allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
+    egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
+  },
+
+  analytics: {
+    enabled: readBoolean(process.env.ANALYTICS_ENABLED, true),
+    hmacKey: analyticsHmac.key,
+    hmacKeyGenerated: analyticsHmac.generated,
+    retentionDays: readPositiveInt(process.env.ANALYTICS_RETENTION_DAYS, 180),
+  },
+
+  bootstrapAdminPrivyDids: readList(process.env.BOOTSTRAP_ADMIN_PRIVY_DIDS),
+  // Lowercased because an address is case-insensitive in every form that matters here, and a
+  // checksummed paste must not silently fail to match the same address written flat.
+  bootstrapAdminWallets: readList(process.env.BOOTSTRAP_ADMIN_WALLETS).map((w) => w.toLowerCase()),
+  stalenessInactiveDays: readPositiveInt(process.env.STALENESS_INACTIVE_DAYS, 90),
 };
+
+// Announced only where it costs something: a run with analytics off never touches the key, and a
+// test run generates one on purpose. Both cases are noise, and noise is how a real warning gets
+// missed.
+if (config.analytics.enabled && analyticsHmac.generated && process.env.NODE_ENV !== "test") {
+  console.error(
+    "ANALYTICS_HMAC_KEY unset — using a random per-boot key. The hashes stay unlinkable to an address either way; what is lost is continuity, so session de-duplication resets on every restart. Supply the key through the task definition's secrets (packages/api/docs/deploy.md).",
+  );
+}
+
+// Said once, at boot, because the alternative is a variable that looks set and does nothing.
+if (config.bootstrapAdminWallets.length > 0 && config.privy.appSecret === undefined) {
+  console.error(
+    "BOOTSTRAP_ADMIN_WALLETS is set but PRIVY_APP_SECRET is not, so no wallet is ever verified and the list matches nothing. Use BOOTSTRAP_ADMIN_PRIVY_DIDS, which needs no enrichment.",
+  );
+}

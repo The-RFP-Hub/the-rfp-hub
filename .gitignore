@@ -17,6 +17,13 @@ packages/api/exports/
 # report written by scripts/check-m2.mjs (a record of one run against one deployment)
 m2-compliance-report.json
 
+# The safety dump scripts/upgrade-dev-postgres.sh takes before moving the dev database onto a new
+# image. It is a copy of one developer's local data — not a repo artifact, and potentially large.
+packages/api/.local-backup-*.sql
+
+# Next.js build output (the dashboard, M3). Machine-written, and big.
+packages/dashboard/.next/
+
 # offline converter working files (raw upstream snapshot + draft corpus) — see
 # packages/api/tools/converter/README.md. The CURATED dataset it feeds is
 # packages/api/data/seed-corpus.json, which IS committed.

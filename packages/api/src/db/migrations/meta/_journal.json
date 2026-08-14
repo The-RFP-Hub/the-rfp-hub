@@ -15,6 +15,13 @@
       "when": 1785958400781,
       "tag": "0001_schema_vnext_org_flip",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786748291072,
+      "tag": "0002_pgvector_extension",
+      "breakpoints": true
     }
   ]
 }
