@@ -9,8 +9,10 @@ on:
 
 name: Production RFP Hub API
 
-# Mirrors staging.yml — pulls `.env` from `production/rfp-hub`,
-# bakes into the image, deploys to the production ECS cluster.
+# Mirrors staging.yml, against the production ECS cluster. The image
+# carries no configuration: the task definition's `secrets:` array
+# resolves keys of the `production/rfp-hub` Secrets Manager value at task
+# start (packages/api/docs/deploy.md).
 # Triggers ONLY on `prod-*` tags or manual dispatch (no auto-deploy
 # on push to main) so production releases are explicit.
 
@@ -49,9 +51,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Get .env from Secret Manager
-        run: |
-          aws secretsmanager get-secret-value --secret-id production/rfp-hub --query SecretString --output text >> .env
+      # NOTE: no secret is fetched into the build context — see the same note in staging.yml and
+      # packages/api/docs/deploy.md. Configuration reaches the container through the ECS task
+      # definition's `secrets:` array, resolving keys of the `production/rfp-hub` Secrets Manager
+      # value at task start, never through a build layer.
 
       - name: Login to Amazon ECR
         id: login-ecr

@@ -9,3 +9,23 @@ docs
 # Published open data, not an image input: the Dockerfile copies named paths and never this one,
 # so keeping it out of the build context spares the daemon a transfer nothing in the image uses.
 exports
+
+# Environment files never enter the build context, so no layer — and no layer cache — can carry a
+# secret even if a Dockerfile line were added that copied one. This is the second half of the rule
+# the Dockerfile states: secrets reach the container through the ECS task definition's `secrets:`
+# array, never through the image. `scripts/check-deploy.mjs` fails CI if either half is removed.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# The dashboard is not an input to the API image. It is deployed on its own (see its README) and
+# the API image must not be able to fail — and so block an ECS deploy — on a package the service
+# never runs, which `pnpm -r build` / `pnpm -r typecheck` in the builder stage would otherwise do.
+#
+# NOTE for whoever adds packages/dashboard: the builder runs `pnpm install --frozen-lockfile`, and
+# a workspace member present in pnpm-lock.yaml but missing from the context makes that command
+# refuse the lockfile. Excluding the directory therefore has to come with keeping the dashboard out
+# of the API's lockfile importers (its own lockfile / not a `packages/*` workspace member), or with
+# copying it in and building only the API package. Validate with a local `docker build` at that point.
+packages/dashboard
