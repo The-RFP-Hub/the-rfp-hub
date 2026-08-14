@@ -63,9 +63,22 @@ export function query(params) {
  *
  * `elapsedMs` measures the whole exchange including the body read, which is the number a sign-off
  * report wants: it is what a consumer waits for, not the time to first byte.
+ *
+ * REDIRECTS ARE NOT FOLLOWED BY DEFAULT, and that is a deliberate reversal.
+ *
+ * This client executes every operation the published OpenAPI document declares. Once the API
+ * publishes an operation whose documented answer IS a redirect — the link-out routes, which
+ * answer `302` with a `Location` — following it would fetch the destination site and judge that
+ * site's `200 text/html` against a declared `302`. Every such operation would fail criterion 2,
+ * and the nightly workflow fails the job on a non-zero exit. A checker that cannot tell a correct
+ * redirect from a broken one is not a checker.
+ *
+ * `follow: true` is the opt-in, for the callers whose question really is "what is at the end of
+ * this": the published export artifacts, which are served by static file hosts that redirect as a
+ * matter of course, and the documentation discovery probes.
  */
 export async function request(target, options = {}) {
-  const { method = "GET", timeoutMs = 15000, headers = {} } = options;
+  const { method = "GET", timeoutMs = 15000, headers = {}, follow = false } = options;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = performance.now();
@@ -74,7 +87,7 @@ export async function request(target, options = {}) {
       method,
       headers: { accept: "*/*", "user-agent": "rfphub-m2-compliance", ...headers },
       signal: controller.signal,
-      redirect: "follow",
+      redirect: follow ? "follow" : "manual",
     });
     const text = method === "HEAD" ? "" : await res.text();
     return {
@@ -84,6 +97,10 @@ export async function request(target, options = {}) {
       status: res.status,
       headers: Object.fromEntries(res.headers.entries()),
       contentType: mediaType(res.headers.get("content-type")),
+      /** Where a 3xx points. Absent on every other status. */
+      location: res.headers.get("location") ?? undefined,
+      /** Whether this result is the end of a redirect chain or the first hop of one. */
+      followed: follow,
       body: text,
       elapsedMs: Math.round((performance.now() - startedAt) * 10) / 10,
     };
