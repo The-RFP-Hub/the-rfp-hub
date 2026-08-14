@@ -1,5 +1,5 @@
 {
-  "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` means the date the SOURCE ITSELF announced the opportunity, and it is never the date this file was edited. On the 76 `curated:` records it is a date the funder published — a program page's \"Live Since\" line, a governance topic's creation date, a launch post or a press release — written into the description of the record it dates; seven of those are archival bounds instead (\"publicly visible by\", the first capture of the funder's own page), because their funder published no announcement at all, and each says so in its own description.\n\nOn the `fundingmap:` records the field used to carry the timestamp the upstream snapshot held for its own row — when that registry recorded the program, not when the funder announced it. Those values were not announcement dates and no longer ship: 65 of the 66 were re-researched here. 26 now carry a date the funder or organiser itself published (11 exact — a forum topic's creation time, a listing's own publication timestamp, a press release dateline; 13 dated launch announcements; 2 archival bounds), each written into the description of the record it dates. For the other 39 no publishable date could be established, so `postedAt` is absent — the Standard's \"unknown\" — and each of those records says in its own description what was searched. `fundingmap:1382` keeps the date researched for it earlier. 103 of the 142 documents therefore carry a `postedAt`, and every one of them is a source date.\n\n`createdAt`/`updatedAt` are Hub timestamps — on `curated:` records the curation date, on `fundingmap:` records the snapshot's own row timestamp — which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading and go stale: re-check against the funder before relying on one. The curation pass read them on 2026-08-11; a pre-review pass on 2026-08-13 re-read a subset against the funder and corrected what had moved, and each record it touched carries its own dated reading. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
+  "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` means the date the SOURCE ITSELF announced the opportunity, and it is never the date this file was edited. On the 94 `curated:` records it is a date the funder published — a program page's \"Live Since\" line, a governance topic's creation date, a launch post or a press release — written into the description of the record it dates; seven of those are archival bounds instead (\"publicly visible by\", the first capture of the funder's own page), because their funder published no announcement at all, and each says so in its own description.\n\nOn the `fundingmap:` records the field used to carry the timestamp the upstream snapshot held for its own row — when that registry recorded the program, not when the funder announced it. Those values were not announcement dates and no longer ship: 65 of the 66 were re-researched here. 26 now carry a date the funder or organiser itself published (11 exact — a forum topic's creation time, a listing's own publication timestamp, a press release dateline; 13 dated launch announcements; 2 archival bounds), each written into the description of the record it dates. For the other 39 no publishable date could be established, so `postedAt` is absent — the Standard's \"unknown\" — and each of those records says in its own description what was searched. `fundingmap:1382` keeps the date researched for it earlier. 121 of the 160 documents therefore carry a `postedAt`, and every one of them is a source date.\n\n`createdAt`/`updatedAt` are Hub timestamps — on `curated:` records the curation date, on `fundingmap:` records the snapshot's own row timestamp — which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading and go stale: re-check against the funder before relying on one. The curation pass read them on 2026-08-11 (eighteen security-bounty records researched from their Sherlock, HackenProof and Immunefi programme pages were added and read on 2026-08-14); a pre-review pass on 2026-08-13 re-read a subset against the funder and corrected what had moved, and each record it touched carries its own dated reading. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
   "documents": [
     {
       "specVersion": "1.0.0",
@@ -14401,6 +14401,1683 @@
       },
       "additionalReferences": "Results: https://www.filecoin.io/blog/filecoin-propgf-batch-1-36m-awarded-to-ecosystem-builders (the previously cited /blog/posts/ form of this URL redirects here) | Programme context: https://www.filecoin.io/blog/the-future-of-public-goods-funding-in-filecoin-scaling-the-pl-pgf-vision | Payout ledger: https://app.filpgf.io/financials | Introducing FIL ProPGF, which carries the round's only published window: https://www.filecoin.io/blog/introducing-fil-propgf-a-new-era-in-community-led-public-goods-funding-for-the-filecoin-ecosystem | Reflections from ProPGF Batch 1 (17 October 2025): https://www.filecoin.io/blog/reflections-from-propgf-batch-1-what-we-learned-about-funding-impact-in-the-filecoin-ecosystem",
       "website": "https://filpgf.io"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:usual-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Usual Protocol Bug Bounty",
+      "description": "Rolling bug bounty for the Usual Protocol — issuer of **USD0**, a stablecoin fully collateralized by real-world assets — covering the protocol's smart contracts deployed on Ethereum mainnet, hosted on Sherlock.\n\nThe Sherlock listing shows the program live since 8 April 2025, with a maximum reward of $16,000,000 for a critical finding, capped at 10% of funds at risk at the time of submission. High and Medium findings are paid at Usual Labs' discretion — the program's own words: \"High severity payouts will be determined case-by-case by Usual Labs (amount will reflect the impact)\" — and Low or Informational issues are not eligible for rewards. Severity and validity are judged by Sherlock's security team, not by Usual Labs.\n\n**Scope splits by severity ceiling.** The core contracts (`USD0`, `USD0PP`, `DaoCollateral`, `RegistryAccess`, `RegistryContract`, `SwapperEngine`, `ClassicalOracle`, `TokenMapping`) form the Critical tier; all other deployed Usual contracts (`Usual.sol`, `EulerOracle`, `UsualX`, the Distribution module, `UsualUSDtB`, `UsualM`) are eligible for High or Medium only. Euler-vault-related code is explicitly referred to a separate bounty on Cantina rather than covered here.\n\nOne reading note on chain scope: the brief's Scope section states \"Ethereum Mainnet only. (Smart contracts on any other networks or testnets are out-of-scope.)\", while its Additional Context section lists \"Ethereum, Arbitrum\" as chains in scope. The Scope section is the operative one — only contracts currently deployed on mainnet are in scope — and the record follows it.",
+      "summary": "Rolling bug bounty for the Usual RWA-stablecoin protocol on Sherlock, paying up to $16,000,000 for a critical finding capped at 10% of funds at risk.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Usual Labs",
+          "slug": "usual-labs",
+          "orgType": "company",
+          "website": "https://usual.money"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "Reporters must not appear on any sanctions list, including the U.S. Treasury OFAC SDN list; must not be current or former contributors to the Usual project or employed by or directly affiliated with Usual Labs; must be legally permitted to participate in bug bounty programs and receive funds in their jurisdiction; and must not have audited, reviewed or assessed the Usual Protocol in an official capacity — independent researchers only, though affected researchers may contact Usual Labs for permission. Sherlock decides validity, severity and reward in accordance with the published criteria.",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/56",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 16000000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2025-04-08T11:51:13.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Sherlock",
+        "severityScheme": "The programme's own severity definitions published in the Sherlock brief (Critical: 5%-100% of TVL at risk, core contracts only; High: ~1%-5% of TVL; Medium: user-level loss), judged by Sherlock",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "cap": 16000000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "discretionary"
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "discretionary"
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: Usual Protocol contracts deployed on Ethereum mainnet — core contracts USD0, USD0PP, DaoCollateral, RegistryAccess, RegistryContract, SwapperEngine, ClassicalOracle and TokenMapping at the Critical tier; Usual.sol, EulerOracle, UsualX, the Distribution module, UsualUSDtB and UsualM at High/Medium. Out of scope: anything not deployed on mainnet, known issues from prior audits, front-ends (discretionary only), third-party integrations and oracles, RWA tokenizer contracts, privileged-access-only issues, gas optimizations, and bridge-implementation issues (LayerZero, Chainlink CCIP). Euler-vault code is covered by a separate Cantina bounty: https://cantina.xyz/bounties/4d285eee-602e-440a-845e-25e155cec26a. Rewards are denominated in USD and paid in USDC. Sixteen prior audit reports (Sherlock, Spearbit/Cantina, Halborn, Blackthorn, Paladin, OAK Security, 2024-2025) are linked from the brief. Programme page: https://audits.sherlock.xyz/bug-bounties/56 — Sherlock platform rules: https://docs.sherlock.xyz/bug-bounties/post-launch-bounty/platform-rules — protocol docs: https://docs.usual.money — technical docs: https://tech.usual.money/",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Stablecoin",
+        "Smart Contract"
+      ],
+      "prerequisites": "A coded proof of concept with instructions to run it is required with every report. Vulnerabilities must be reported within 24 hours of discovery, and must not be disclosed publicly or to any third party until Usual Labs has been notified, the issue is fully fixed on mainnet, and explicit permission to disclose has been granted. Where the team can pause or upgrade against an exploit, potential damage is assessed over a 1-hour exploit period. Known issues from prior audits are ineligible.",
+      "website": "https://audits.sherlock.xyz/bug-bounties/56"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:scroll-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Scroll Bug Bounty",
+      "description": "Rolling bug bounty for Scroll, the EVM-compatible zk-Rollup scaling Ethereum, covering both the blockchain/DLT layer and the bridge and rollup smart contracts, hosted on Sherlock.\n\nThe Sherlock listing shows the program live since 2 April 2026, with a maximum reward of $250,000. Critical blockchain/DLT findings pay $20,000-$250,000, scaled linearly by the program's published \"risk ratio\" — funds at risk divided by Scroll's market cap, the latter averaged between CoinMarketCap and CoinGecko at submission time — with the $20,000 floor paid \"in order to incentivize security researchers against withholding on a bug report\". Critical smart-contract findings pay 10% of the funds directly affected, with a $50,000 minimum and the same $250,000 cap; High findings pay 100% of the funds affected up to $20,000; Medium smart-contract findings pay a flat $5,000. Repeatable attacks decay: subsequent attacks are counted at a 25% reduction per hour (blockchain/DLT) or per 300 blocks (smart contracts) where the vulnerable component cannot be paused or upgraded.\n\nOne reading note: the brief's smart-contract reward table headlines Critical at \"20,000 USD - 250,000 USD\", while its own reward-calculation section sets the smart-contract Critical minimum at $50,000. The calculation section is the more specific rule and the record follows it; the $20,000 floor belongs to the blockchain/DLT tier.\n\nThe program text carries `utm_source=immunefi` on its audit-report links — it migrated from Scroll's former Immunefi listing, which advertised a $1,000,000 maximum. The Sherlock program, with its $250,000 maximum, is the current one, and this record describes it rather than the retired listing.",
+      "summary": "Rolling bug bounty for the Scroll zk-Rollup on Sherlock, paying up to $250,000 for a critical finding across the chain and its bridge contracts.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Scroll",
+          "slug": "scroll",
+          "orgType": "protocol",
+          "website": "https://scroll.io/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Scroll"],
+      "eligibility": "Current and past employees, vendors (auditors), partners and contractors of Scroll are not eligible to participate. Unfixed vulnerabilities already named in the published audit reports are not eligible for a reward.",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/272",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 250000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-04-02T10:40:12.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Sherlock",
+        "severityScheme": "The programme's own severity definitions published in the Sherlock brief (Critical: definite significant loss or >1-year freeze of funds; High: considerable direct loss, >1% and >$10; Medium: constrained or conditional loss, >0.01% and >$10)",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "blockchain_dlt",
+            "payout": {
+              "model": "range",
+              "min": 20000,
+              "max": 250000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "blockchain_dlt",
+            "payout": {
+              "model": "range",
+              "min": 10000,
+              "max": 20000
+            }
+          },
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 50000,
+              "cap": 250000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 10000,
+              "max": 20000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 5000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the Scroll zkEVM blockchain/DLT layer and the bridge and rollup smart contracts; repositories at https://github.com/scroll-tech/. Out of scope: best-practice recommendations, L1 gas pricing, rebase and interest-bearing token logic errors, deposit/withdraw limit attacks, upstream geth issues not caused by Scroll's changes, JSON-RPC issues, deprecated components (case-by-case), and OpenVM issues, which go to security@openvm.dev instead. Rewards are denominated in USD and paid in USDC. Prior audits linked from the brief: Trail of Bits (zkTrie, L2geth, EIP-4844 blob support, Euclid upgrade phases 1-2), OpenZeppelin (twelve reviews from Phase 1 through Batch Token Bridge) and Zellic (v1, v2, Lido Gateway). Programme page: https://audits.sherlock.xyz/bug-bounties/272 — Sherlock platform rules: https://docs.sherlock.xyz/bug-bounties/post-launch-bounty/platform-rules — validity criteria: https://docs.sherlock.xyz/bug-bounties/criteria-for-bug-bounty-reports-validity — Scroll documentation: https://docs.scroll.io/en/home",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "L2",
+        "Blockchain/DLT",
+        "Smart Contract",
+        "Infrastructure"
+      ],
+      "prerequisites": "A coded proof of concept with instructions to run it is required with every report. Where the team can pause or upgrade against an exploit, potential damage is assessed over a 1-hour exploit period. The scope tab's repository link may point at an older commit; the newest commit of the codebase is the one to audit. Unfixed issues already named in the published audit reports are ineligible.",
+      "website": "https://audits.sherlock.xyz/bug-bounties/272"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:midas-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Midas Bug Bounty",
+      "description": "Rolling bug bounty for Midas, a platform for composable onchain investment products that turns institutional strategies into compliant tokens composable across DeFi protocols such as Morpho and Pendle, hosted on Sherlock.\n\nThe Sherlock listing shows the program live since 19 May 2026, with a headline maximum of $500,000 — the Ethereum-contract Critical ceiling. The reward table splits four ways: **Ethereum contracts** (Critical $25,000-$500,000, High $5,000-$25,000, Medium flat $5,000, Low $500-$1,000), **Solana contracts**, **contract configuration** and the **web interface** (the latter two each: Critical $2,500-$50,000, High $500-$2,500, Medium $250-$500). The Solana sub-scope (critical $10,000-$200,000 down to low $250-$500, hard-capped at $400,000) is real but sits outside this dataset's Ethereum-ecosystem scope, so this record's structured tier table carries the Ethereum-side scopes only and the Solana figures live in this prose.\n\nThe arithmetic behind the contract Critical tiers is published: \"the reward amount will be calculated as 10% of the funds directly affected, up to the maximum cap defined in the applicable reward range\", assessed at submission time, with a minimum reward granted to discourage withholding — and a vulnerability must place at least $10,000 at direct risk to classify as Critical at all. High-severity rewards are capped at up to 100% of the funds directly affected within their ranges. The program also publishes hard caps per scope — $1M Ethereum contracts, $400,000 Solana contracts, $100,000 configuration, $100,000 web — with total payouts never exceeding $1,000,000, allocated first-come-first-served by submission timestamp if cumulative valid reports would exceed a cap.",
+      "summary": "Rolling bug bounty for the Midas onchain investment-product platform on Sherlock, paying up to $500,000 for a critical Ethereum-contract finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Midas",
+          "slug": "midas",
+          "orgType": "company",
+          "website": "https://midas.app"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "First verifiable reporter of a previously unknown, non-public vulnerability; where the same issue arrives through multiple platforms, only the earliest verifiable timestamp is rewarded. Reporters must not have exploited the issue maliciously or disclosed it to third parties before permission; must comply with program rules and the laws of their jurisdiction; must not be a current or former employee, vendor or contractor involved in developing the affected code; must be of legal age and not resident in sanctioned countries; and must provide any requested identity verification (KYC) or documentation necessary for reward processing. Eligibility and reward decisions are at the program owner's sole discretion.",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/122",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 500000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-05-19T15:20:08.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Sherlock",
+        "severityScheme": "The programme's own Impact x Likelihood risk classification matrix, published in the Sherlock brief",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "label": "Ethereum contracts",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 25000,
+              "cap": 500000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "label": "Ethereum contracts",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 25000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "label": "Ethereum contracts",
+            "payout": {
+              "model": "fixed",
+              "amount": 5000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "label": "Ethereum contracts",
+            "payout": {
+              "model": "range",
+              "min": 500,
+              "max": 1000
+            }
+          },
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "label": "Contract configuration",
+            "payout": {
+              "model": "range",
+              "min": 2500,
+              "max": 50000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "label": "Contract configuration",
+            "payout": {
+              "model": "range",
+              "min": 500,
+              "max": 2500
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "label": "Contract configuration",
+            "payout": {
+              "model": "range",
+              "min": 250,
+              "max": 500
+            }
+          },
+          {
+            "severity": "critical",
+            "assetType": "websites_and_applications",
+            "label": "Web interface",
+            "payout": {
+              "model": "range",
+              "min": 2500,
+              "max": 50000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "websites_and_applications",
+            "label": "Web interface",
+            "payout": {
+              "model": "range",
+              "min": 500,
+              "max": 2500
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "websites_and_applications",
+            "label": "Web interface",
+            "payout": {
+              "model": "range",
+              "min": 250,
+              "max": 500
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: Ethereum contracts at https://github.com/midas-apps/contracts (contracts/**/*.sol, excluding mocks and testers), Solana programs at https://github.com/midas-apps/contracts-solana (programs/**/*.rs — outside this dataset's Ethereum scope and therefore not in this record's tier table), misconfiguration of deployed production contracts, and the web interface at https://midas.app. Out of scope: weird/non-compliant ERC-20 behaviour, centralization risks, admin and user error, malicious-admin scenarios, speculation on future code, known issues, theoretical issues without a proof of concept, third-party dependencies, DoS without demonstrated impact, and a long published web-security exclusion list (self-XSS, clickjacking, rate limiting, SPF/DKIM/DMARC, automated-scanner output and similar). Rewards are denominated in USD and paid in USDC. Strategy managers named on the program include BlackRock, Hyperithm and M1 Capital. Programme page: https://audits.sherlock.xyz/bug-bounties/122 — Midas documentation: https://docs.midas.app/",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Asset Management",
+        "Smart Contract",
+        "Websites and Applications"
+      ],
+      "prerequisites": "A clear, actionable report with a reproducible proof of concept (steps and/or exploit code minimized to demonstrate impact) is required, ideally within 24 hours of discovery, including the exact conditions, potential attack scenarios, and relevant logs or transaction hashes. No public or third-party disclosure before the issue is fixed and permission is granted. Identity verification (KYC) may be requested before eligibility or rewards are processed. Low-risk issues already identified in previous external audits are excluded.",
+      "website": "https://audits.sherlock.xyz/bug-bounties/122"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:metamask-validator-staking-bug-bounty",
+      "fundingType": "bounty",
+      "title": "MetaMask Validator Staking Bug Bounty",
+      "description": "Rolling bug bounty for the smart contracts behind MetaMask Portfolio's 32-ETH Validator Staking — the Kiln On-Chain v1 staking contracts — hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 18 March 2024 — its catalogue entry reports a last update on 15 May 2026 — with rewards denominated in ETH: 20-200 ETH for a critical finding (the platform's sidebar renders that as roughly $70,000-$700,000 at current prices), 5-20 ETH for high, 1-5 ETH for medium and 0.25-1 ETH for low. The critical rule is published: 10% of the funds directly affected, calculated at report-submission time, capped at the table maximum with the table minimum as a guaranteed floor; high rewards are capped at 100% of the funds affected within their range.\n\nThe scope is deliberately narrow: the mainnet staking contract at 0xdc71affc862fceb6ad32be58e098423a7727bebd (no proxy) and the pinned kilnfi/staking-contracts repository at commit f33eb8d. The portfolio.metamask.io web application is explicitly out of scope, as are known issues from the program's three published audits. The listing reports 262 submissions from 131 hackers and **$0 in total rewards paid** — a live program that has yet to validate a paying finding.",
+      "summary": "Rolling bug bounty for MetaMask Portfolio's validator staking contracts on HackenProof, paying 20-200 ETH for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "MetaMask (Consensys)",
+          "slug": "metamask-consensys",
+          "orgType": "company",
+          "website": "https://metamask.io"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "Reporters need at least 100 HackenProof reputation points to submit. Known issues already identified in the Halborn, Spearbit and Consensys Diligence audits are ineligible. Testing must be performed on local forks only, never against the live mainnet contract.",
+      "applicationUrl": "https://hackenproof.com/programs/metamask-validator-staking-smart-contracts",
+      "fundingInfo": {
+        "currency": "ETH",
+        "maxAward": 200
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2024-03-18T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "HackenProof",
+        "severityScheme": "HackenProof severity classification as published on the programme page, with the programme's own 10%-of-funds-affected critical rule",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 20,
+              "cap": 200
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5,
+              "max": 20
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 1,
+              "max": 5
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 0.25,
+              "max": 1
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the Kiln On-Chain v1 staking contract on Ethereum mainnet, 0xdc71affc862fceb6ad32be58e098423a7727bebd (no proxy), and the pinned repository https://github.com/kilnfi/staking-contracts at commit f33eb8d. Out of scope: the portfolio.metamask.io web application and known issues from the published audits (Halborn, July 2022; Spearbit, May 2023; Consensys Diligence, August 2023). All reward figures are published in ETH; the programme page does not state the settlement asset, so none is claimed here. Response SLAs published on the listing: first response 3 business days, triage 3, reward 3, resolution 14. The program carries HackenProof's \"Triaged by HackenProof\" and funded-deposit (\"Trusted Payer\") badges. Programme page: https://hackenproof.com/programs/metamask-validator-staking-smart-contracts — staking product: https://portfolio.metamask.io",
+      "categories": ["Funding Opportunity", "Security", "Bug Bounty", "Staking", "Smart Contract"],
+      "prerequisites": "A proof of concept is required with every report at every severity. Reporters need 100 HackenProof reputation points. Testing is restricted to local forks of the contract.",
+      "website": "https://hackenproof.com/programs/metamask-validator-staking-smart-contracts"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:starknet-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Starknet Bug Bounty (Blockchain/DLT)",
+      "description": "Bug bounty for the Starknet validity-rollup's core stack — the Starknet OS written in Cairo, the sequencer, the L1 core contracts in Solidity and the Cairo common library — hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 1 July 2026 with a listed end date of 30 September 2026 — a bounded submission window rather than an open-ended one, which the deadline on this record carries — and $11,000 paid across 80 submissions from 36 hackers in its first weeks; its catalogue entry reports a last update on 10 August 2026. Critical findings pay from a $15,000 floor up to $250,000, computed as 10% of the funds directly affected — scaled by the ratio of funds at risk across all affected projects on the chain to Starknet's market cap, averaged between CoinMarketCap and CoinGecko at submission time. High findings — total network shutdown or an unintended chain split — pay a fixed $10,000, and medium findings, explicitly including STWO verifier soundness bugs, a fixed $2,500. Low findings are listed but carry no reward, which is why no low tier appears in this record's table.\n\nThe program is one of a family of three Starknet listings launched on HackenProof the same day — the sibling \"Starknet Web & SC\" program covers the StarkGate bridge contracts and starkgate.starknet.io, and \"Starknet Staking\" advertises up to $100,000. This record carries the flagship Blockchain/DLT program, whose $250,000 ceiling is the family's largest.",
+      "summary": "Bug bounty for Starknet's core rollup stack on HackenProof, open through 30 September 2026, paying up to $250,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Starknet",
+          "slug": "starknet",
+          "orgType": "protocol",
+          "website": "https://starknet.io"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Starknet"],
+      "eligibility": "KYC is required. Reporters need at least 150 HackenProof reputation points and pay a $5 submission fee. AI-generated reports without a runnable proof of concept are rejected, and simultaneous submission of the same finding to other platforms is prohibited. Malicious-operator exploits are out of scope until the network decentralizes.",
+      "applicationUrl": "https://hackenproof.com/programs/starknet-blockchain-slash-dlt",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 250000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "fixed",
+          "date": "2026-09-30T00:00:00.000Z",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-07-01T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "HackenProof",
+        "severityScheme": "HackenProof severity classification as published on the programme page (High is defined as total network shutdown or an unintended chain split; medium explicitly includes STWO verifier soundness bugs)",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "blockchain_dlt",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 15000,
+              "cap": 250000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "blockchain_dlt",
+            "payout": {
+              "model": "fixed",
+              "amount": 10000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "blockchain_dlt",
+            "payout": {
+              "model": "fixed",
+              "amount": 2500
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the Starknet OS in Cairo and the sequencer (starkware-libs/sequencer, main-v0.14.3), the Starknet L1 core contracts in Solidity (starkware-libs/cairo-lang), and the full Cairo common library (32 pinned .cairo files). Out of scope: malicious-operator exploits until decentralization. The programme page does not state the settlement asset, so none is claimed here. Response SLAs published on the listing: first response 3 business days, triage 3, reward 3, resolution 14. Sibling programs launched the same day: Starknet Web & SC (StarkGate bridge, smart-contract critical $15,000-$250,000, web critical $5,000-$10,000): https://hackenproof.com/programs/starknet-web-and-sc — Starknet Staking (up to $100,000): https://hackenproof.com/programs/starknet-staking. Programme page: https://hackenproof.com/programs/starknet-blockchain-slash-dlt — documentation: https://docs.starknet.io",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "L2",
+        "Blockchain/DLT",
+        "Infrastructure"
+      ],
+      "prerequisites": "A runnable proof of concept is required — AI-generated reports without one are rejected. KYC is required, reporters need 150 HackenProof reputation points, and each submission carries a $5 fee. The same finding must not be submitted simultaneously on another platform.",
+      "website": "https://hackenproof.com/programs/starknet-blockchain-slash-dlt"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:treehouse-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Treehouse Bug Bounty",
+      "description": "Rolling bug bounty for Treehouse Finance — the LST-fi protocol behind tETH and Decentralized Offered Rates (DOR) — covering 68 pinned in-scope targets, all but two of them Ethereum mainnet contracts, hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 10 April 2025 — its catalogue entry reports a last update on 7 August 2026 — with 437 submissions from 188 hackers — one of the platform's most-worked Ethereum programs — and its total rewards paid marked \"Private\" by the program owner, so no payout figure is claimed here. The reward table is range-based per severity with no percentage formula: $100,000-$250,000 for critical, $25,000-$50,000 for high, $5,000-$10,000 for medium and $1,000-$2,000 for low.\n\nThe scope pins contracts by address on Etherscan: the tETH token (proxy and implementation), the Router, Vault and Redemption stack (V2 and Fastlane), internal accounting, the strategy stack across Aave Core and Prime, Spark, Gearbox and Lido wrap/unwrap/stake actions, Curve tETH gauges, rate providers and oracles, the protocol multisigs, and on Arbitrum the tETH token with its mint/burn and lock/release bridge pools. One in-scope Etherscan target is mislabeled \"Web\" type on the listing — a data-entry quirk on the program's side, noted here so the count reads right.",
+      "summary": "Rolling bug bounty for the Treehouse tETH protocol on HackenProof, paying $100,000-$250,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Treehouse Finance",
+          "slug": "treehouse-finance",
+          "orgType": "protocol",
+          "website": "https://www.treehouse.finance"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Arbitrum"],
+      "eligibility": "Reporters need at least 100 HackenProof reputation points to submit. The programme page publishes no KYC requirement at program level.",
+      "applicationUrl": "https://hackenproof.com/programs/treehouse-smart-contracts",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 250000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2025-04-10T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "HackenProof",
+        "severityScheme": "HackenProof severity classification as published on the programme page",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 100000,
+              "max": 250000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 25000,
+              "max": 50000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 10000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 1000,
+              "max": 2000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 68 pinned targets by explorer address (66 on Ethereum mainnet, 2 on Arbitrum) — the tETH token (proxy and implementation), Router/Vault/Redemption (V2 and Fastlane), internal accounting, the strategy stack (Aave Core and Prime, Spark, Gearbox, Lido wrap/unwrap/stake actions), Curve tETH gauges, rate providers and oracles, and the protocol multisigs — plus the Arbitrum tETH token and its mint/burn and lock/release bridge pools. The programme page does not state the settlement asset, so none is claimed here. Response SLAs published on the listing: first response 3 business days, triage 3, reward 3, resolution 14. Programme page: https://hackenproof.com/programs/treehouse-smart-contracts — protocol documentation: https://docs.treehouse.finance/protocol",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Liquid Staking",
+        "Smart Contract"
+      ],
+      "prerequisites": "A proof of concept is required with every report. Reporters need 100 HackenProof reputation points.",
+      "website": "https://hackenproof.com/programs/treehouse-smart-contracts"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:aave-v4-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Aave V4 Bug Bounty",
+      "description": "Rolling bug bounty for **Aave V4** — the protocol's new Hub-and-Spoke architecture, where a Liquidity Hub is the canonical accounting layer and governance-permissioned Spokes implement asset-specific supply and borrow logic — hosted on Sherlock. It is a separate program from the long-running Aave v2/v3 bounty on Immunefi, which this corpus carries as its own record; the two cover different codebases and publish different tables.\n\nThe Sherlock listing shows the program live since 29 July 2026, with a $2,500,000 maximum. The tier arithmetic is published: a critical pays 10% of the funds directly affected at submission time, floored at $100,000 and capped at $2,500,000, with an absolute minimum of $10,000 at risk for a finding to classify as critical at all; a high pays up to 100% of the funds affected within $10,000-$25,000; medium ($5,000-$10,000) and low ($1,000-$5,000) carry their own published minimums. Rewards are paid in USD-pegged stablecoins, and the program names bonus considerations — report quality, a provided fix, novel attack vectors, multi-component findings — on top of the table.\n\nChains in scope are Ethereum and Avalanche, with all in-scope deployments maintained in the aave-address-book repository. Privileged roles (the Aave DAO and governance-approved executors) are trusted, only whitelisted standard ERC-20s are assumed, and Spokes are governance-permissioned and therefore trusted — a malicious Spoke is explicitly out of scope.",
+      "summary": "Rolling bug bounty for Aave V4's Hub-and-Spoke codebase on Sherlock, paying up to $2,500,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Aave",
+          "slug": "aave",
+          "orgType": "protocol",
+          "website": "https://aave.com/",
+          "description": "Aave is a decentralized non-custodial liquidity protocol where users can participate as suppliers or borrowers in a common pool. Suppliers provide liquidity to earn a passive income, while borrowers are able to borrow in an overcollateralized (perpetually) or undercollateralized (one-block liquidity) fashion.",
+          "socialLinks": [
+            {
+              "platform": "twitter",
+              "url": "https://x.com/aave"
+            },
+            {
+              "platform": "github",
+              "url": "https://github.com/aave"
+            },
+            {
+              "platform": "discord",
+              "url": "https://discord.com/invite/aave"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "Reports go exclusively through the Sherlock platform. Known issues, findings from previous audits pending fixes, issues requiring privileged access, and third-party dependency issues are ineligible. Testing on public mainnet deployments is prohibited — local environments or testnets only — as are social engineering, denial of service, and attempts on Aave infrastructure. Critical and High submissions carry a 250 deposit.",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/300",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 2500000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-07-29T16:42:48.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Sherlock",
+        "severityScheme": "The programme's own Impact x Likelihood classification published in the Sherlock brief (Critical requires at least $100,000 of user funds at direct risk, with a $10,000 absolute floor for the classification)",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 100000,
+              "cap": 2500000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 10000,
+              "max": 25000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 10000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 1000,
+              "max": 5000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the Aave V4 codebase on Ethereum and Avalanche, deployments tracked in https://github.com/aave-dao/aave-address-book/ (AaveV4Ethereum.sol, AaveV4Avalanche.sol). Out of scope: third-party oracle data (Chainlink feeds are assumed correct), known and previously audited issues pending fixes, blockchain-level issues, third-party libraries, theoretical findings without a PoC, privileged-access issues, economic issues without direct fund loss, and one-block DOS unless the functionality is clearly time-sensitive. Rewards are denominated in USD and paid in USD-pegged stablecoins. Programme page: https://audits.sherlock.xyz/bug-bounties/300 — Sherlock platform rules: https://docs.sherlock.xyz/bug-bounties/post-launch-bounty/platform-rules — Aave V4 documentation: https://aave.com/docs/aave-v4 — technical overview: https://github.com/aave/aave-v4/blob/main/docs/overview.md — governance origin: https://governance.aave.com/t/the-potential-of-aave-v4/23150",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Lending",
+        "Smart Contract"
+      ],
+      "prerequisites": "A coded proof of concept with instructions to run it is required with every report. Where the team can pause or upgrade against an exploit, potential damage is assessed over a 1-hour exploit period. Vulnerabilities must not be disclosed publicly until verified, fixed and cleared for disclosure by the Aave team.",
+      "website": "https://audits.sherlock.xyz/bug-bounties/300"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:moonwell-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Moonwell Bug Bounty",
+      "description": "Rolling bug bounty for Moonwell, the open lending and borrowing protocol built on Base, Optimism, Moonbeam and Moonriver, hosted on Sherlock and focused on the protocol's smart contracts, with a small Web2 tier for the moonwell.fi and mamo.bot domains.\n\nThe Sherlock listing shows the program live since 16 July 2026, with a $250,000 maximum. Smart-contract payouts scale with the funds at risk in the impacted contracts at submission time, as a published ladder over each tier's bounty: 10% of the tier's bounty when less than $5M is at risk, 25% between $5M and $10M, 50% to $50M, 75% to $250M, and 100% above $250M. The published ranges are $20,000-$250,000 for critical, $10,000-$20,000 for high, $1,000-$5,000 for medium (the brief's own words: a \"Gratuity range\") and $1,000-$5,000 for Web2 domain-takeover findings.\n\nOne reading note: the brief's per-tier minimum-reward list puts the High minimum at $15,000 while its reward table opens the High range at $10,000 — the record keeps the table, and the guaranteed minimum belongs to the prose. Chains in scope are Ethereum mainnet, Base, Optimism and Moonbeam; the program publishes an unusually thorough known-issues list, from Wormhole-dependency failure modes for its multichain governance to specific reward-accrual quirks, all ineligible.",
+      "summary": "Rolling bug bounty for the Moonwell lending protocol on Sherlock, paying up to $250,000 for a critical finding scaled by funds at risk.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Moonwell",
+          "slug": "moonwell",
+          "orgType": "protocol",
+          "website": "https://moonwell.fi/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Base", "Optimism"],
+      "eligibility": "Current and past contractors or employees of Lunar Labs, Solidity Labs, and the Moonwell Foundation are not eligible. Known issues — including the program's long published list covering governance, Wormhole-dependency and reward-accrual behaviours — and findings from past audits are ineligible. Critical, High and Medium submissions carry a 250 deposit.",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/350",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 250000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-07-16T07:31:07.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Sherlock",
+        "severityScheme": "The programme's own Impact x Conditions classification published in the Sherlock brief (loss thresholds: critical >10% of the affected party's funds, high >1%, medium >0.01%, each above $100)",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 20000,
+              "max": 250000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 10000,
+              "max": 20000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 1000,
+              "max": 5000
+            }
+          },
+          {
+            "assetType": "websites_and_applications",
+            "label": "Web2 domain takeover",
+            "payout": {
+              "model": "range",
+              "min": 1000,
+              "max": 5000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: Moonwell's smart contracts across Ethereum mainnet, Base, Optimism and Moonbeam (public repos at https://github.com/moonwell-fi/moonwell-contracts-v2), plus the moonwell.fi and mamo.bot websites for the Web2 tier. Expected tokens: WETH, cbBTC, USDC, USDT, OP, wstETH, rETH, wBTC, DAI, cbETH, WELL. Out of scope: third-party oracle data (Chainlink feeds assumed correct), known and previously audited issues, blockchain-level issues, privileged-access issues, economic issues without direct loss, and one-block DOS unless clearly time-sensitive; the deliberate omission of Chainlink's L2 sequencer-liveness oracle is a stated design choice, not a finding. Rewards are denominated in USD and paid in USD-pegged stablecoins. Programme page: https://audits.sherlock.xyz/bug-bounties/350 — Sherlock platform rules: https://docs.sherlock.xyz/bug-bounties/post-launch-bounty/platform-rules — documentation: https://docs.moonwell.fi/moonwell — past audits: https://docs.moonwell.fi/moonwell/protocol-information/audits",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Lending",
+        "Smart Contract",
+        "Websites and Applications"
+      ],
+      "prerequisites": "A coded proof of concept with instructions to run it is required with every report. Where the team can pause or upgrade against an exploit, potential damage is assessed over a 1-hour exploit period. Testing on public mainnet deployments is prohibited — local environments or testnets only. Vulnerabilities must be reported exclusively through the Sherlock platform and not disclosed until verified, fixed and cleared for disclosure.",
+      "website": "https://audits.sherlock.xyz/bug-bounties/350"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:cap-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Cap Bug Bounty",
+      "description": "Rolling bug bounty for Cap, the stablecoin protocol behind cUSD that secures collateral for borrowing operations through the Symbiotic and EigenLayer shared-security networks, hosted on Sherlock and scoped to Ethereum mainnet only.\n\nThe Sherlock listing shows the program live since 24 October 2025, with a $1,000,000 maximum for a critical finding, capped at 10% of funds at risk at the time of submission. Only vulnerabilities in the core contracts — AccessControl, Delegation, FeeAuction, FeeReceiver, Oracle, Lender, Vault, FractionalReserve and Minter, plus their inherited contracts — qualify for the critical severity. The program accepts High submissions (they carry the same 250 deposit as criticals) but publishes no figure for them: rewards are decided on validation by Sherlock \"up to the caps listed above\", which is why the high tier in this record's table is discretionary rather than numbered. Low and informational findings are not eligible.\n\nSeverity and validity are judged by Sherlock. Front-end issues are judged at the Cap team's discretion, and Gelato, external protocol integrations and known audit issues are out of scope.",
+      "summary": "Rolling bug bounty for the Cap stablecoin protocol on Sherlock, paying up to $1,000,000 for a critical finding capped at 10% of funds at risk.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Cap Labs",
+          "slug": "cap-labs",
+          "orgType": "protocol",
+          "website": "https://cap.app"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "Reporters must not appear on any sanctions list, including the U.S. Treasury OFAC SDN list, and must be legally permitted to participate in bug bounty programs and receive funds in their jurisdiction. Known issues from prior audits are ineligible. Critical and High submissions carry a 250 deposit.",
+      "applicationUrl": "https://audits.sherlock.xyz/bug-bounties/114",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 1000000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2025-10-24T19:15:48.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Sherlock",
+        "severityScheme": "The programme's own severity definitions published in the Sherlock brief (Critical: definite significant loss or >1-year freeze of funds, core contracts only), judged by Sherlock",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "cap": 1000000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "discretionary"
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the core contracts on Ethereum mainnet — AccessControl.sol, Delegation.sol, FeeAuction.sol, FeeReceiver.sol, Oracle.sol, Lender.sol, Vault.sol, FractionalReserve.sol and Minter.sol, with inherited contracts. Out of scope: undeployed contracts, known audit issues, Gelato, external protocol integrations, and NatSpec/documentation hygiene; front-end issues are judged at the Cap team's discretion. Price feeds are Chainlink and RedStone; protocol admins (multisig, developer EOA) are trusted. Rewards are denominated in USD and paid in USDC. Programme page: https://audits.sherlock.xyz/bug-bounties/114 — Sherlock platform rules: https://docs.sherlock.xyz/bug-bounties/post-launch-bounty/platform-rules — documentation and audit list: https://docs.cap.app — contracts: https://github.com/cap-labs-dev/cap-contracts",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Stablecoin",
+        "Smart Contract"
+      ],
+      "prerequisites": "A coded proof of concept with instructions to run it is required with every report. Where the team can pause or upgrade against an exploit, potential damage is assessed over a 1-hour exploit period.",
+      "website": "https://audits.sherlock.xyz/bug-bounties/114"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:ondo-finance-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Ondo Finance Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Ondo Finance, the tokenized real-world-asset protocol behind USDY and OUSG, hosted on Immunefi.\n\nThe program page shows status 'Live Since 7 March 2023', last updated 28 July 2026, with a maximum reward of $1,000,000 for a critical finding, calculated as 10% of the funds directly affected with a $50,000 floor. The repeatable-attack rule caps the funds-at-risk window at the first 45 minutes from the first attack. High findings pay $11,000-$50,000, medium a flat $10,000 and low a flat $1,000. The scope is smart contracts only — no web or application assets — 88 of them, centred on Ethereum (48 Etherscan-listed assets) with deployments on BNB Chain, Solana, Mantle, Polygon, Arbitrum, Sei and others.",
+      "summary": "Rolling bug bounty for the Ondo RWA protocol on Immunefi, paying up to $1,000,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Ondo Finance",
+          "slug": "ondo-finance",
+          "orgType": "protocol",
+          "website": "https://ondo.finance"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "KYC is required for payout: full name, date of birth, proof of address, and a passport or government-issued ID. Critical smart-contract findings run under primacy of impact; all other tiers under primacy of rules.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/ondofinance/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 1000000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2023-03-07T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 50000,
+              "cap": 1000000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 11000,
+              "max": 50000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 10000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 1000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 88 smart contract assets, no web or application assets. Representative in-scope assets: the USDY token, the OUSG token, USDYOracleWrapper, OndoIDRegistry, IssuanceHours and OndoMintBurnAdapter. Deployments centre on Ethereum with others on BNB Chain, Solana, Mantle, Polygon, Arbitrum, Sei and Plume. The repeatable-attack rule computes funds at risk over the first 45 minutes from the first attack. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-07-28. Programme page: https://immunefi.com/bug-bounty/ondofinance/information/",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Asset Management",
+        "Smart Contract"
+      ],
+      "prerequisites": "A proof of concept is required with every report, at every smart-contract severity. The programme follows the Immunefi Standard.",
+      "website": "https://immunefi.com/bug-bounty/ondofinance/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:veda-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Veda Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Veda, the BoringVault infrastructure that powers vault products across DeFi, hosted on Immunefi — a genuinely recent listing, live since 21 January 2026.\n\nThe program page shows last updated 12 June 2026, with a two-tier table: a critical pays 10% of the funds directly affected, floored at $100,000 and capped at $1,000,000; a high pays $10,000-$25,000, capped at 100% of the funds at risk. The program publishes tight arithmetic around both: repeatable attacks count one cumulative attack per 3,600 blocks, temporary-freeze findings double per additional 24 hours of freeze up to the high cap, and the definition of \"funds directly affected\" excludes MEV, oracle behaviour and theoretical drainability. All impacts run under primacy of rules.\n\nThe scope is 52 smart-contract assets across Ethereum mainnet (18), Scroll (18) and Ink (16): the BoringVault core, TellerWithYieldStreaming, AccountantWithYieldStreaming, BoringOnChainQueue, BoringSolver, RolesAuthority and Pauser among them. Immunefi lists the program as KYC-required, though the program text does not spell out which documents; that reading is recorded here rather than guessed at.",
+      "summary": "Rolling bug bounty for Veda's BoringVault infrastructure on Immunefi, paying up to $1,000,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Veda Labs",
+          "slug": "veda-labs",
+          "orgType": "protocol",
+          "website": "https://veda.tech/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Scroll"],
+      "eligibility": "Immunefi lists the program as KYC-required; the program text does not itemize the documents. All impacts run under primacy of rules, with a published definition of funds directly affected that excludes MEV, oracle behaviour and theoretical drainability.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/veda/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 1000000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-01-21T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "The programme's own rules text on Immunefi — no versioned Immunefi classification system is cited",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 100000,
+              "cap": 1000000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 10000,
+              "max": 25000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 52 smart contract assets across Ethereum mainnet (18), Scroll (18) and Ink (16). Representative in-scope assets: the BoringVault core, TellerWithYieldStreaming, AccountantWithYieldStreaming, BoringOnChainQueue, BoringSolver, RolesAuthority and Pauser. Repeatable attacks are counted as one cumulative attack per 3,600 blocks; temporary-freeze rewards double per additional 24 hours of freeze up to the high cap. Boost and Safe Harbor features are enabled on the listing. Rewards are denominated in USD and paid in USDC on Ethereum. Programme page last updated 2026-06-12. Programme page: https://immunefi.com/bug-bounty/veda/information/ — contracts: https://github.com/Veda-Labs/boring-vault/",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Asset Management",
+        "Smart Contract"
+      ],
+      "prerequisites": "A proof of concept is required for critical and high findings, the only tiers the program offers.",
+      "website": "https://immunefi.com/bug-bounty/veda/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:nado-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Nado Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Nado, the orderbook DEX built on Ink — Kraken's Ethereum L2 — hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 17 November 2025 — its catalogue entry reports a last update on 13 May 2026 — with $18,750 paid across 1,142 submissions from 358 hackers. The reward table is range-based per severity: $50,000-$500,000 for critical, $5,000-$50,000 for high, $2,000-$5,000 for medium and $50-$1,000 for low.\n\nThe scope is a single asset: the nado-contracts repository, with no pinned commit and no on-chain addresses enumerated on the listing. Theoretical issues, imported contracts, gas and style findings, and front-run-only vectors are out of scope. KYC is not required, and unlike the platform's flagship listings the program carries no funded-deposit (\"Trusted Payer\") badge — a fact recorded here rather than assumed away.",
+      "summary": "Rolling bug bounty for the Nado orderbook DEX on Ink, paying $50,000-$500,000 for a critical finding via HackenProof.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Nado",
+          "slug": "nado",
+          "orgType": "protocol",
+          "website": "https://testnet.nado.xyz"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Ink"],
+      "eligibility": "Reporters need at least 100 HackenProof reputation points. KYC is not required. Vulnerabilities must be reported within 24 hours of discovery, through the platform only.",
+      "applicationUrl": "https://hackenproof.com/programs/nado-smart-contracts",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 500000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2025-11-17T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "HackenProof",
+        "severityScheme": "HackenProof severity classification as published on the programme page",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 50000,
+              "max": 500000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 50000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 2000,
+              "max": 5000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 50,
+              "max": 1000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the https://github.com/nadohq/nado-contracts repository (no pinned commit, no on-chain addresses listed). Out of scope: theoretical issues, imported contracts, gas and style findings, front-run-only vectors, and old or unlocked compiler issues. The HackenProof company profile links only the testnet site, https://testnet.nado.xyz, so that is the website recorded here. The programme page does not state the settlement asset, so none is claimed. Response SLAs published on the listing: first response 3 business days, triage 7, reward 3, resolution 14. Triaged by HackenProof; no funded-deposit badge. Programme page: https://hackenproof.com/programs/nado-smart-contracts",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "DEX",
+        "Smart Contract"
+      ],
+      "prerequisites": "A runnable proof of concept is required — AI-generated reports without one are rejected. Reporters need 100 HackenProof reputation points, and findings must be reported within 24 hours of discovery.",
+      "website": "https://hackenproof.com/programs/nado-smart-contracts"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:arcadia-finance-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Arcadia Finance Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Arcadia Finance, the margin-account lending protocol deployed on Base, Optimism and Unichain, hosted on HackenProof and triaged by the platform.\n\nThe HackenProof listing shows the program live since 10 June 2026 — its catalogue entry reports a last update on 30 June 2026 — with $1,250 paid across 105 submissions from 60 hackers. Every tier is an explicit ceiling with no floor — the program's own words: \"the Max reward tier is the highest payout available for an asset, not a floor\" — which is why this record's payouts are up-to rather than ranges: up to $25,000 for critical, up to $7,500 for high, up to $2,000 for medium; low findings are unrewarded and carry no tier here.\n\nThe program publishes unusually disciplined primacy-of-impact severity rules: recoverable or reversible losses never classify as critical, a single-user loss is capped at high, trusted roles and trusted third parties (Chainlink, CoW Protocol solvers) are out of scope, live on-chain state is the sole reference for realistic preconditions, and exposure-cap issues without realized loss grade as low or informational.",
+      "summary": "Rolling bug bounty for the Arcadia Finance lending protocol on Base, Optimism and Unichain, paying up to $25,000 for a critical finding via HackenProof.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Arcadia Finance",
+          "slug": "arcadia-finance",
+          "orgType": "protocol",
+          "website": "https://www.arcadia.finance/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Base", "Optimism", "Unichain"],
+      "eligibility": "KYC is required. Reporters need at least 50 HackenProof reputation points, and each submission carries a $5 fee. Findings must be reported within 24 hours of discovery, through the platform only. Only Arcadia-developed deployed code is in scope; tests, mocks, scripts and third-party dependencies are excluded, and trusted roles and trusted third parties (Chainlink, CoW Protocol solvers) are out of scope.",
+      "applicationUrl": "https://hackenproof.com/programs/arcadia-finance-company-smart-contracts",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 25000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-06-10T00:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "HackenProof",
+        "severityScheme": "The programme's own primacy-of-impact severity rules published on the HackenProof page (recoverable losses never critical; single-user loss capped at high; live on-chain state as the sole reference for realistic preconditions)",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "up_to",
+              "max": 25000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "up_to",
+              "max": 7500
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "up_to",
+              "max": 2000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: https://github.com/arcadia-finance/accounts-v2, https://github.com/arcadia-finance/lending-v2 and https://github.com/arcadia-finance/asset-managers (no pinned commits), with deployed addresses maintained at https://docs.arcadia.finance/developers/contract-addresses; the SpotToMarginMigrator.sol contract in accounts-v2 is explicitly out of scope. All targets are deployed on Base, Optimism and/or Unichain. The programme page does not state the settlement asset, so none is claimed. Response SLAs published on the listing: first response 3 business days, triage 3, reward 3, resolution 14. Triaged by HackenProof; no funded-deposit badge. Programme page: https://hackenproof.com/programs/arcadia-finance-company-smart-contracts — protocol site: https://www.arcadia.finance/",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Lending",
+        "Smart Contract"
+      ],
+      "prerequisites": "A runnable Foundry proof of concept is mandatory for critical and high findings, run against the in-scope commit or a mainnet fork with live configuration; AI-generated reports without a runnable PoC are rejected. KYC is required, reporters need 50 reputation points, and each submission carries a $5 fee.",
+      "website": "https://hackenproof.com/programs/arcadia-finance-company-smart-contracts"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:royco-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Royco Bug Bounty",
+      "description": "Rolling bug bounty for Royco Dawn — the non-custodial yield-structuring protocol that splits a yield source into Senior, Junior and Senior-Liquidity-Provider tranches — hosted on Immunefi and a genuinely recent listing, live since 17 February 2026.\n\nThe program page shows last updated 12 August 2026, with a maximum reward of $250,000 for a critical smart-contract finding, calculated as 10% of the funds directly affected with a $50,000 floor. The websites-and-applications critical tier pays $2,000-$10,000, with the $10,000 figure reserved for two named impacts — a loss of funds requiring no user action, or private-key leakage giving access to user funds — and a flat $2,000 for every other critical web impact. Repeatable attacks on unpausable contracts decay 25% per 300 blocks from the first attack.\n\nThe scope is 10 assets — 8 smart contracts (tranche tokens, the multisig strategy, and the market-deploying factory on Avalanche among them) and 2 web properties around dawn.royco.org — across Ethereum, Arbitrum, Base and Avalanche. The program follows the Immunefi Standard and Responsible Publication Category 3 (approval required).",
+      "summary": "Rolling bug bounty for the Royco Dawn yield-tranching protocol on Immunefi, paying up to $250,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Royco",
+          "slug": "royco",
+          "orgType": "protocol",
+          "website": "https://www.royco.org/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Arbitrum", "Base"],
+      "eligibility": "KYC is required for payout. Reporters must not be on the OFAC SDN list, and official contributors, employees and auditors of the project are ineligible.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/royco/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 250000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-02-17T10:24:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "Immunefi Vulnerability Severity Classification System (critical tiers only; the program publishes no lower severity levels)",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 50000,
+              "cap": 250000
+            }
+          },
+          {
+            "severity": "critical",
+            "assetType": "websites_and_applications",
+            "payout": {
+              "model": "range",
+              "min": 2000,
+              "max": 10000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 8 smart contract assets and 2 websites and applications assets across Ethereum, Arbitrum, Base and Avalanche — among them the Senior Royco USDC token (srRoyUSDC), the multisig strategy, the Royco Vault Makina strategy, the market-deploying Royco Factory on Avalanche, and the Royco Dawn web app and subpages. Rewards are denominated in USD and paid in USDC on Ethereum by the Royco Dawn team, with the net amount priced at the CoinMarketCap/CoinGecko average at submission time. The program follows the Immunefi Standard and Responsible Publication Category 3. Programme page last updated 2026-08-12. Programme page: https://immunefi.com/bug-bounty/royco/information/ — protocol site: https://www.royco.org/ — Dawn app: https://dawn.royco.org/ — contracts: https://github.com/roycoprotocol",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Yield Aggregator",
+        "Smart Contract",
+        "Websites and Applications"
+      ],
+      "prerequisites": "A proof of concept is required for critical findings on both asset classes — the only tiers the program publishes.",
+      "website": "https://immunefi.com/bug-bounty/royco/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:enzyme-onyx-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Enzyme Onyx Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Onyx by Enzyme Finance, the tokenization protocol for asset-management vehicles — bespoke ERC-20 share issuance with fee and valuation-accounting tooling — hosted on Immunefi, live since 4 September 2025.\n\nThe program page shows last updated 11 August 2026, with a maximum reward of $200,000 for a critical finding, calculated as 10% of the funds directly affected with a $20,000 floor. High findings pay $5,000-$20,000 and medium $1,000-$5,000, per the Immunefi Vulnerability Severity Classification System v2.3.\n\nThe scope is 44 smart-contract assets — the valuation, fee-tracking, call-forwarding and share-accounting stack (ValuationHandler, ContinuousFlatRateManagementFeeTracker, LinearCreditDebtTracker, AccountERC20Tracker and peers) — with networks in scope Ethereum, Arbitrum, Base, MegaETH and Plume, and deployments tracked in the protocol's onyx-sdk repository.",
+      "summary": "Rolling bug bounty for Enzyme's Onyx tokenization protocol on Immunefi, paying up to $200,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Enzyme Finance",
+          "slug": "enzyme-finance",
+          "orgType": "protocol",
+          "website": "https://enzyme.finance/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Arbitrum", "Base"],
+      "eligibility": "The listing publishes no KYC requirement. A proof of concept is required at every published severity.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/enzyme-onyx/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 200000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2025-09-04T10:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 20000,
+              "cap": 200000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 20000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 1000,
+              "max": 5000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 44 smart contract assets — the Onyx valuation, fee-tracking, call-forwarding and share-accounting stack, including ValuationHandler, ContinuousFlatRateManagementFeeTracker, LinearCreditDebtTracker, AccountERC20Tracker, OneToOneAggregator and the access-limited call forwarders. Networks in scope: Ethereum, Arbitrum, Base, MegaETH and Plume; deployments tracked at https://github.com/enzymefinance/onyx-sdk/tree/main/packages/environment/src/deployments. Rewards are denominated in USD and paid in USDC. Programme page last updated 2026-08-11. Programme page: https://immunefi.com/bug-bounty/enzyme-onyx/information/ — contracts: https://github.com/enzymefinance/protocol-onyx",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Asset Management",
+        "Smart Contract"
+      ],
+      "prerequisites": "A proof of concept is required at every published severity (critical, high, medium).",
+      "website": "https://immunefi.com/bug-bounty/enzyme-onyx/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:0x-bug-bounty",
+      "fundingType": "bounty",
+      "title": "0x Bug Bounty",
+      "description": "Rolling bug bounty for 0x, the open-source settlement layer for permissionless exchange, covering the 0x Settler contracts, the swap and gasless APIs and the Matcha website, hosted on Immunefi.\n\nThe program page shows status 'Live Since 30 July 2024', last updated 14 July 2026, with a maximum reward of $1,000,000. A critical smart-contract finding — running under primacy of impact — pays 10% of the funds directly affected, floored at $100,000; only direct theft of user funds **at rest** is eligible for the full $1,000,000, with every other critical capped at $500,000. High smart-contract findings pay $35,000-$100,000 and medium a flat $5,000. The web/app table pays $15,000-$50,000 for critical, a flat $10,000 for high and a flat $1,000 for medium. Temporary-freeze rewards double per additional 24 hours frozen, up to the high cap.\n\nThe KYC terms are unusually concrete: a W-9 for US reporters or W-8BEN otherwise — and a researcher who declines KYC still receives 70% of the earned reward, a published fallback few programs offer. The program's own scope text lists twenty supported mainnet chains, most of them Ethereum and its L2 family.",
+      "summary": "Rolling bug bounty for the 0x settlement layer and APIs on Immunefi, paying up to $1,000,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "0x",
+          "slug": "0x",
+          "orgType": "company",
+          "website": "https://0x.org/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Base", "Arbitrum"],
+      "eligibility": "KYC is requested for full payout — a W-9 (US) or W-8BEN (non-US) with full name, date of birth or citizenship, address and tax identification number; declining KYC reduces the payout to 70% of the earned reward. Reporters must not be on the OFAC SDN list, and official contributors, employees and auditors are ineligible. Critical smart-contract findings run under primacy of impact.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/0x/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 1000000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2024-07-30T16:00:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 100000,
+              "cap": 1000000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 35000,
+              "max": 100000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 5000
+            }
+          },
+          {
+            "severity": "critical",
+            "assetType": "websites_and_applications",
+            "payout": {
+              "model": "range",
+              "min": 15000,
+              "max": 50000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "websites_and_applications",
+            "payout": {
+              "model": "fixed",
+              "amount": 10000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "websites_and_applications",
+            "payout": {
+              "model": "fixed",
+              "amount": 1000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 6 assets — the 0x Settler smart contracts and the DEX meta-aggregator, plus the Matcha website, the swap API and the gasless API. The program's scope text names twenty supported mainnet chains: Ethereum and its L2 family (Base, Optimism, Arbitrum, Scroll, Linea, Mantle, Unichain, Ink, Abstract, World Chain, HyperEVM) plus Polygon, Avalanche, BNB Chain, Monad, Berachain, Fantom Sonic, Tempo and Plasma. Only direct theft of user funds at rest is eligible for the full $1,000,000 critical maximum; other criticals cap at $500,000. Critical repeatable attacks on unpausable contracts are rewarded on cumulative impact. Rewards are denominated in USD and paid in USDC on Ethereum. The program follows the Immunefi Standard. Programme page last updated 2026-07-14. Programme page: https://immunefi.com/bug-bounty/0x/information/",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "DEX",
+        "Smart Contract",
+        "Websites and Applications"
+      ],
+      "prerequisites": "A proof of concept is required at every published severity on both asset classes.",
+      "website": "https://immunefi.com/bug-bounty/0x/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:strata-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Strata Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Strata, the Ethereum tranching protocol splitting yield into Junior and Senior tranches through a CDO-style architecture, hosted on Immunefi and live since 1 October 2025.\n\nThe program page shows last updated 8 July 2026, with a maximum reward of $250,000 for a critical finding, calculated as 10% of the funds directly affected with a $10,000 floor. High findings pay $5,000-$10,000, medium $1,000-$5,000 and low a flat $1,000, all under primacy of rules and the Immunefi Vulnerability Severity Classification System V2.3. Temporary-freeze rewards double per additional 48 hours frozen, up to the high cap.\n\nThe scope is 11 smart-contract assets on Ethereum — tranche and cooldown contracts, exit-fee governance and routing helpers. The PoC bar is unusually specific: submissions must reflect a deployable protocol state with each tranche seeded with at least 10 assets, and findings that depend on a tranche sitting at the protocol's one-asset accounting floor are closed as invalid.",
+      "summary": "Rolling bug bounty for the Strata tranching protocol on Immunefi, paying up to $250,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Strata",
+          "slug": "strata",
+          "orgType": "protocol",
+          "website": "https://strata.markets"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum"],
+      "eligibility": "KYC is required for payout. Reporters must not be on the OFAC SDN list, and official contributors, employees and auditors are ineligible. All tiers run under primacy of rules.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/strata/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 250000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2025-10-01T10:01:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "Immunefi Vulnerability Severity Classification System V2.3",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 10000,
+              "cap": 250000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 10000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 1000,
+              "max": 5000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 1000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: 11 smart contract assets on Ethereum — the tranche stack (CDO base components, tranches and accountant), the UnstakeCooldown and base cooldown contracts, the two-step exit-fee governance contract, and a token-conversion routing helper. PoC validity requires a deployable protocol state: both tranches seeded with at least 10 assets; findings depending on the one-asset accounting floor (ONE_ASSET) are closed as invalid. Critical repeatable attacks on unpausable contracts are rewarded on cumulative impact. Rewards are denominated in USD and paid in USDC. Programme page last updated 2026-07-08. Programme page: https://immunefi.com/bug-bounty/strata/information/ — contracts: https://github.com/Strata-Markets",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Yield Aggregator",
+        "Smart Contract"
+      ],
+      "prerequisites": "A proof of concept is required at every severity, and it must reflect a deployable protocol state — each tranche initialized with at least 10 assets, per the program's own PoC requirements.",
+      "website": "https://immunefi.com/bug-bounty/strata/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:alchemix-bug-bounty",
+      "fundingType": "bounty",
+      "title": "Alchemix Bug Bounty",
+      "description": "Rolling smart-contract bug bounty for Alchemix, the self-repaying-loan protocol, covering the Alchemix v3 contracts, hosted on Immunefi — a fresh 2026 listing, live since 26 February 2026, distinct from the protocol's earlier Immunefi program.\n\nThe program page shows last updated 10 July 2026, with a maximum reward of $150,000 for a critical finding, calculated as 10% of the funds directly affected with a $20,000 floor. High findings pay $5,000-$20,000, medium a flat $3,000 and low a flat $1,000. One reading note: the high-tier calculation text mentions a range reaching $35,000 while capping at \"the maximum high reward\", which the tier table sets at $20,000 — the cap governs, and the record keeps the table. Temporary-freeze rewards double per additional 24 hours frozen, up to the high cap.\n\nThe program adheres to primacy of impact for critical, high, medium and low smart-contract findings, and gates participation by researcher level: only reporters at Immunefi's Intermediate level or higher are reviewed, a published triage-bandwidth decision. Rewards are paid in USDC on Ethereum, Arbitrum and Optimism.",
+      "summary": "Rolling bug bounty for the Alchemix v3 self-repaying-loan protocol on Immunefi, paying up to $150,000 for a critical finding.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Alchemix",
+          "slug": "alchemix",
+          "orgType": "protocol",
+          "website": "https://alchemix.fi/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Arbitrum", "Optimism"],
+      "eligibility": "Only researchers at Immunefi's Intermediate level or higher are reviewed — the program's published triage-bandwidth policy; Novice and Junior reporters are invited back once levelled up. The listing publishes no KYC requirement. Critical, high, medium and low smart-contract findings run under primacy of impact.",
+      "applicationUrl": "https://immunefi.com/bug-bounty/alchemix-1/information/",
+      "fundingInfo": {
+        "currency": "USD",
+        "maxAward": 150000
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-02-26T19:26:00.000Z",
+      "createdAt": "2026-08-14T00:00:00.000Z",
+      "updatedAt": "2026-08-14T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "bounty",
+        "bountyKind": "security",
+        "platform": "Immunefi",
+        "severityScheme": "Immunefi severity classification as published on the programme page, with primacy of impact on critical, high, medium and low smart-contract findings",
+        "rewardTiers": [
+          {
+            "severity": "critical",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "percentage",
+              "percent": 10,
+              "basis": "value_at_risk",
+              "floor": 20000,
+              "cap": 150000
+            }
+          },
+          {
+            "severity": "high",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "range",
+              "min": 5000,
+              "max": 20000
+            }
+          },
+          {
+            "severity": "medium",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 3000
+            }
+          },
+          {
+            "severity": "low",
+            "assetType": "smart_contract",
+            "payout": {
+              "model": "fixed",
+              "amount": 1000
+            }
+          }
+        ]
+      },
+      "additionalReferences": "In scope: the Alchemix v3 contracts (2 published assets, including a primacy-of-impact declaration), deployed across Ethereum, Arbitrum, Optimism and Base. If an upgradable or pausable contract is affected, only the initial attack is rewarded. Rewards are denominated in USD and paid in USDC on Ethereum, Arbitrum and Optimism. Programme page last updated 2026-07-10. Programme page: https://immunefi.com/bug-bounty/alchemix-1/information/ — contracts: https://github.com/alchemix-finance",
+      "categories": [
+        "Funding Opportunity",
+        "Security",
+        "Bug Bounty",
+        "Defi",
+        "Lending",
+        "CDP",
+        "Smart Contract"
+      ],
+      "prerequisites": "A proof of concept is required for critical, high and medium findings. Reporters must hold Immunefi's Intermediate researcher level or higher to have reports reviewed.",
+      "website": "https://immunefi.com/bug-bounty/alchemix-1/"
     }
   ]
 }

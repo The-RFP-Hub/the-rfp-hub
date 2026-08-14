@@ -263,12 +263,12 @@ describe("the committed corpus", () => {
    * snapshot's row timestamp again, and the honest count of what is actually dated is a number a
    * reviewer can check rather than a claim in prose.
    */
-  it("carries a source date on 103 documents and says nothing on the rest", () => {
+  it("carries a source date on 121 documents and says nothing on the rest", () => {
     const dated = DOCUMENTS.filter((d) => d.postedAt !== undefined && d.postedAt !== null);
-    expect(dated).toHaveLength(103);
+    expect(dated).toHaveLength(121);
 
     const byClass = (prefix: string) => dated.filter((d) => d.id.startsWith(prefix)).length;
-    expect(byClass("curated:")).toBe(76); // every researched record
+    expect(byClass("curated:")).toBe(94); // every researched record
     expect(byClass("fundingmap:")).toBe(27); // 26 re-researched here, plus fundingmap:1382
   });
 
@@ -302,9 +302,9 @@ describe("the committed corpus", () => {
       (d) => d.fundingDetails as DetailsByFundingType["bounty"],
     );
 
-    expect(bounties).toHaveLength(45);
+    expect(bounties).toHaveLength(63);
     const kinds = bounties.map((b) => b.bountyKind);
-    expect(kinds.filter((k) => k === "security")).toHaveLength(44);
+    expect(kinds.filter((k) => k === "security")).toHaveLength(62);
     expect(kinds.filter((k) => k === "task")).toHaveLength(1);
 
     for (const b of bounties) {
