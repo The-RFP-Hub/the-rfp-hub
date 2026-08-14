@@ -7,6 +7,21 @@
 #   DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run migrate
 #   DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub npx vitest run test/integration
 #   docker compose -f docker-compose.test.yml down
+#
+# ── `name:` IS LOAD-BEARING. DO NOT REMOVE IT. ──────────────────────────────────────────────────
+# Compose derives a project name from the DIRECTORY when a file does not declare one, and it keys
+# containers on (project, service). This file and docker-compose.yml sit in the same directory and
+# both call their service `postgres` — so without this line, `-f docker-compose.test.yml up -d`
+# resolves to the same (project, service) as the DEV database and RECREATES IT under this file's
+# configuration. The dev container is replaced by the test one, and the distinct `container_name`
+# does not prevent that: it is a label on the container, not an identity Compose keys on.
+#
+# The named volume survives (nothing here removes volumes), so the dev data is recoverable by
+# bringing docker-compose.yml back up — but the persistent dev database is not something a test
+# command should be able to touch by accident. Declaring the project name puts this file in its own
+# project, where `up`, `down` and `down -v` reach nothing but the throwaway container.
+name: rfphub-test
+
 services:
   postgres:
     # Same image as the dev database and as CI: the migrations create the `vector` extension, so a
