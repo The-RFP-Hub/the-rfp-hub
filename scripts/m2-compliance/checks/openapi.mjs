@@ -36,7 +36,13 @@ export async function checkOpenApi(report, ctx) {
   );
 
   // ── the document itself ──────────────────────────────────────────────────────────────────
-  const ui = await request(url(ctx.baseUrl, "/v1/docs"), { timeoutMs: ctx.timeoutMs });
+  // `follow: true` on the two discovery probes: the question here is "is the documentation
+  // reachable", and a UI that redirects to its own trailing-slash form is reachable. The operation
+  // loop below is the opposite case and runs with redirects UNfollowed.
+  const ui = await request(url(ctx.baseUrl, "/v1/docs"), {
+    timeoutMs: ctx.timeoutMs,
+    follow: true,
+  });
   c.expect(
     ui.ok && ui.status === 200,
     "GET /v1/docs serves the API documentation UI",
@@ -47,7 +53,10 @@ export async function checkOpenApi(report, ctx) {
   let docRes;
   let docPath;
   for (const candidate of DOC_PATHS) {
-    docRes = await request(url(ctx.baseUrl, candidate), { timeoutMs: ctx.timeoutMs });
+    docRes = await request(url(ctx.baseUrl, candidate), {
+      timeoutMs: ctx.timeoutMs,
+      follow: true,
+    });
     if (docRes.ok && docRes.status === 200) {
       docPath = candidate;
       break;
@@ -293,6 +302,11 @@ function responseFor(responses, status) {
  * validate.
  */
 function validateAgainstResponse(bundle, response, res) {
+  // A redirect is not a body to validate — it is a Location to check. The request that produced
+  // `res` did NOT follow it (see `request`'s `follow` option), so this is the redirect the
+  // operation itself issued rather than whatever sits at the end of the chain.
+  if (res.status >= 300 && res.status < 400) return verifyRedirect(response, res);
+
   const content = response.content;
   if (!content || Object.keys(content).length === 0) {
     return res.body.length === 0
@@ -333,6 +347,58 @@ function validateAgainstResponse(bundle, response, res) {
       .slice(0, 8)
       .map((e) => `  - ${e}`)
       .join("\n")}${errors.length > 8 ? `\n  … and ${errors.length - 8} more` : ""}`,
+  };
+}
+
+/**
+ * Everything a documented redirect can be held to.
+ *
+ * A `302` with no `Location` is a dead end that no client can act on; a `Location` naming a scheme
+ * a browser will not navigate to is worse, because it looks like a working link-out until someone
+ * clicks it. Neither shows up in a body check, which is why following the redirect — the previous
+ * behaviour — could not verify a redirect operation at all: it verified the destination SITE, and
+ * then failed the operation for answering `200 text/html` where `302` was declared.
+ *
+ * What is NOT checked is deliberate. The destination is a third party's URL that the entry's
+ * publisher chose; whether it resolves today is a question for the verification-assist job, not
+ * for a conformance run that must not make a request to someone else's server for every published
+ * record.
+ */
+function verifyRedirect(response, res) {
+  const location = res.location;
+  if (!location) {
+    return {
+      ok: false,
+      problem: `answered ${res.status} with no Location header, so no client can follow it`,
+    };
+  }
+
+  let resolved;
+  try {
+    resolved = new URL(location, res.url);
+  } catch {
+    return { ok: false, problem: `Location is not a usable URL: ${JSON.stringify(location)}` };
+  }
+
+  if (resolved.protocol !== "https:" && resolved.protocol !== "http:") {
+    return {
+      ok: false,
+      problem: `Location uses the ${resolved.protocol} scheme — a link-out must be http(s): ${location}`,
+    };
+  }
+
+  // The document may declare the header; when it does, say so, because a declared `Location` is
+  // what tells a generated client the operation is a redirect rather than an empty response.
+  const declaresLocation = Object.keys(response.headers ?? {}).some(
+    (name) => name.toLowerCase() === "location",
+  );
+  const note = declaresLocation
+    ? "the operation declares the Location header"
+    : "the operation does not declare a Location header, so a generated client is not told this is a link-out";
+
+  return {
+    ok: true,
+    verified: `a documented redirect: ${res.status} → ${resolved.protocol}//${resolved.host}${resolved.pathname} (${note}); the destination is a third party's URL and is deliberately not fetched`,
   };
 }
 
