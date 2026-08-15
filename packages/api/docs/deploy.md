@@ -80,7 +80,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `VERIFY_TIMEOUT_MS` | `10000` | |
 | `VERIFY_MAX_BYTES` | `2097152` | Streamed cap |
 | `VERIFY_QUEUE_MAX` | `100` | Full → the submit-time trigger is skipped and the entry stays in the job's predicate |
-| `VERIFY_ALLOW_PRIVATE_HOSTS` | **never set** | A deliberate SSRF escape hatch for one loopback test. The process **refuses to boot** with it enabled under `NODE_ENV=production` |
+| `VERIFY_ALLOW_PRIVATE_HOSTS` | **never set in ANY deployed task definition** — service or maintenance, staging or production | A deliberate SSRF escape hatch that exists so one integration test can drive the real fetcher against a loopback server. Setting it in a deployment would let a submitted `applicationUrl` reach the instance metadata endpoint and the private network. The process **refuses to boot** with it enabled under `NODE_ENV=production`, so this row is defence in depth rather than the only control |
 | `VERIFIER_EGRESS_PROXY` | optional | The network-layer backstop; application-level address validation should not be the only control |
 | `ANALYTICS_ENABLED` | `true` | |
 | `ANALYTICS_RETENTION_DAYS` | `180` | Enforced by the retention sweep, not by the schema |
@@ -160,7 +160,43 @@ edge.
 
 ---
 
-## 6. Remediation owed: rotate, then purge
+## 6. Running the maintenance jobs
+
+The nightly maintenance work runs as **one-off tasks on the same image**, started by
+`.github/workflows/jobs-nightly.yml` with the credentials the deploy workflows already hold:
+
+```sh
+node packages/api/dist/jobs.js <job> --json      # inside the image
+```
+
+There is **no public job endpoint and no shared job token**, deliberately: a credential that can
+start a job has to live somewhere, and a token in repository secrets that the internet-facing API
+accepts forever is a worse somewhere than the deploy role that already exists.
+`POST /v1/admin/jobs/{job}/run` is a signed-in administrator's convenience, not a machine
+credential.
+
+### Operator prerequisites
+
+| Repository variable | What it names |
+|---|---|
+| `MAINTENANCE_ECS_CLUSTER` | The cluster the one-off task runs in |
+| `MAINTENANCE_ECS_TASK_DEFINITION` | A task definition on the deployed image, with the **runtime** `DATABASE_URL` — never the DDL role |
+| `MAINTENANCE_ECS_CONTAINER` | The container name inside it, for the command override |
+| `MAINTENANCE_ECS_SUBNETS` | Comma-separated subnet ids with egress (the verification job makes outbound requests) |
+| `MAINTENANCE_ECS_SECURITY_GROUPS` | Comma-separated security group ids |
+
+Until all five are set, the scheduled run announces a `::warning::` and stays green — the open-data
+export is chained to that workflow, and failing over a resource that has never existed would stop
+the dataset publishing. A **manual `workflow_dispatch` fails instead**, so an operator validating
+the wiring gets a real answer. Prove it with one dispatch before relying on the schedule.
+
+The task definition may reuse the service's `secrets` and `environment` verbatim. The full
+schedule, the idempotency and locking guarantees, and the per-job configuration are in
+[`jobs.md`](./jobs.md).
+
+---
+
+## 7. Remediation owed: rotate, then purge
 
 **Treat this as an incident, not a cleanup.**
 

@@ -20,6 +20,7 @@
     "seed": "tsx scripts/seed.ts",
     "export": "tsx scripts/export.ts",
     "jobs": "tsx scripts/jobs/run-job.ts",
+    "demo:traffic": "tsx scripts/demo-traffic.ts",
     "export:api": "tsx scripts/export-from-api.ts",
     "corpus:fetch": "tsx tools/converter/fetch-corpus.ts",
     "corpus:convert": "tsx tools/converter/convert.ts",

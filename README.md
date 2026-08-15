@@ -47,10 +47,10 @@ npx rfphub-validate opportunity.json
 |---|---|---|---|
 | `packages/standard` | `@the-rfp-hub/standard` | CC0-1.0 | Canonical JSON Schema, generated TS types, registries, conformance suite, migration table. Zero runtime deps. **SSoT.** |
 | `packages/validate` | `rfphub-validate` | MIT | `npx rfphub-validate` CLI + typed validation library, with an advisory warning tier over the registries. |
-| `packages/api` | — | MIT | Public `/v1/` REST API (Fastify + Postgres). |
+| `packages/api` | — | MIT | Public `/v1/` REST API (Fastify + Postgres), plus the authenticated write, review and administration surfaces. |
+| `packages/dashboard` | — | MIT | Publisher dashboard (Next.js) — submit, claim, review, keys, and per-entry analytics. See [`packages/dashboard/README.md`](./packages/dashboard/README.md). |
 | `packages/client` | `@the-rfp-hub/client` | MIT | Typed HTTP client *(planned)*. |
 | `packages/mcp` | `@the-rfp-hub/mcp` | MIT | MCP server + agent skill *(planned)*. |
-| `packages/frontend` | — | MIT | Reference frontend *(planned)*. |
 
 Every package takes its *contract* from `@the-rfp-hub/standard` alone, and never reaches into
 another package's internals (dependency inversion at the package level). The only non-Standard
@@ -93,6 +93,22 @@ pnpm typecheck
 pnpm lint           # biome
 ```
 
+**Already have a dev database from M2?** It needs one upgrade before the current migrations will
+apply. `packages/api/docker-compose.yml` now pins `pgvector/pgvector:pg15` instead of
+`postgres:15-alpine`, because `CREATE EXTENSION vector` ships as a migration. Same major version, so
+the data directory is compatible and the named volume is reused — but the C library underneath
+changes with the image, and with it the collation provider. Run the script; it dumps first, refreshes
+the collation version, reindexes, migrates, and compares row counts before and after:
+
+```bash
+packages/api/scripts/upgrade-dev-postgres.sh
+```
+
+It takes no arguments and **refuses** anything resembling `down -v`, because the one-word-shorter
+version of this operation destroys the seeded dev corpus. Details, and the escape hatch if the
+collation change causes trouble, are in
+[`packages/api/README.md`](./packages/api/README.md#upgrading-an-existing-dev-database-to-the-pgvector-image).
+
 ## Verifying a deployment
 
 The milestone's completion criteria are checkable rather than assertable. `scripts/check-m2.mjs`
@@ -113,6 +129,22 @@ whichever deployment you want an answer about. See
 The nightly publishing job runs exactly this, against the deployment and the export it has just
 pushed, and fails if it does not pass — so the job going green means *published and independently
 verified*, not merely "ran". See [Open data](#open-data).
+
+`scripts/check-m3.mjs` does the same for the write surface — the publisher lifecycle, the review
+queue, the audit trail, duplicate detection, source verification, publisher analytics and the
+staleness job:
+
+```bash
+pnpm check:m3 --base-url https://api.staging.example.org --namespace my-org --privy-token "$SESSION"
+```
+
+**It writes**, which is why it is stricter about being allowed to run: it refuses to start without
+credentials and a namespace, and refuses a target that does not look like staging unless
+`--allow-production` is passed in those words. Everything it creates is prefixed `m3check-` and is
+rejected and unlisted at the end. It is deliberately **not** wired into CI — CI has no deployment to
+write to, and a sign-off tool needing a standing publisher credential in repository secrets would be
+a worse thing to have than a tool somebody runs. See
+[`scripts/m3-compliance/README.md`](./scripts/m3-compliance/README.md).
 
 ## Open data
 
@@ -167,6 +199,59 @@ bot that would rather subscribe than poll JSON; both are `ETag`-validated, so a 
 
 The API's list query contract is strict — an undefined parameter or an out-of-enum value is a
 `400`, never a silently unfiltered `200` — so the examples show a typo failing loudly.
+
+## Publishing to the Hub
+
+Reading is public and unauthenticated, and stays that way. **Writing** is authenticated, and the
+credential you hold decides not only whether a submission is accepted but whether it goes live:
+
+```sh
+API=https://api.ethrfps.app
+
+# Who am I, and what may I do?
+curl -H "Authorization: Bearer $TOKEN" $API/v1/me
+
+# Mint a publishing key. The secret is in this response and nowhere else, ever.
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"programme-sync","scopes":["read","write","publish"]}' $API/v1/keys
+
+# Submit. Live on arrival only if the key carries `publish` AND the account is a verified member
+# of the namespace in the entry's id; otherwise it is stored and queued for review.
+curl -X POST -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
+  --data-binary @opportunity.json $API/v1/opportunities
+```
+
+Two credential kinds share one header: a signed-in **session**, and a long-lived scoped **API key**
+(`rfph_…`). Which one you present decides real authority — keys are refused outright on the routes
+that manage credentials, change account identity, review or administer, so a leaked key cannot mint
+a stronger one. The tiers, the scopes, the per-route matrix and the reasoning are in
+[`packages/api/docs/auth.md`](./packages/api/docs/auth.md).
+
+**To publish under your own namespace without review**, apply as a verified publisher:
+[`PUBLISHERS.md`](./PUBLISHERS.md) is the whole process — what qualifies, what is checked, what
+approval grants, and how it is revoked.
+
+Beyond the public read surface, the API serves:
+
+| | |
+|---|---|
+| **Write** | `POST /v1/opportunities` · `PUT /v1/opportunities/:id` · `POST /v1/opportunities/:id/claim` |
+| **Provenance** | `GET /v1/opportunities/:id/audit` · `/duplicates` · `/verification` |
+| **Account** | `GET\|PATCH /v1/me` · `/v1/me/opportunities[/:id]` · `/v1/me/duplicates` · `GET\|POST /v1/keys` · `DELETE /v1/keys/:id` |
+| **Publishers** | `GET /v1/publishers` (public) · `PATCH /v1/organizations/:slug` |
+| **Insights** | `GET /v1/insights/opportunities/:id` · `GET /v1/insights/me/summary` |
+| **Link-outs** | `GET /v1/r/:id/apply` · `GET /v1/r/:id/source` — `302` to the opportunity's own channel |
+| **Review (T3)** | `/v1/review/opportunities` · `/claims` · `/duplicates` · `/organizations` · `/accounts` |
+| **Administration (T4)** | `/v1/admin/accounts/:id/role` · `/direct-create` · `/v1/admin/jobs/:job/run` |
+
+Every mutation — by a person, a key, or a job — writes a row to an append-only trail enforced by a
+database trigger, and the trail for any entry is publicly readable.
+
+The nightly maintenance jobs that close past-due and long-abandoned listings, roll up analytics and
+backfill source checks are documented, schedule and runbook, in
+[`packages/api/docs/jobs.md`](./packages/api/docs/jobs.md). The open-data export runs on their
+success rather than on a clock, so a published snapshot never advertises a programme the API has
+already closed.
 
 ## Licensing
 
