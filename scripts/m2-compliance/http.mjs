@@ -78,7 +78,7 @@ export function query(params) {
  * matter of course, and the documentation discovery probes.
  */
 export async function request(target, options = {}) {
-  const { method = "GET", timeoutMs = 15000, headers = {}, follow = false } = options;
+  const { method = "GET", timeoutMs = 15000, headers = {}, follow = false, body } = options;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = performance.now();
@@ -86,6 +86,10 @@ export async function request(target, options = {}) {
     const res = await fetch(target, {
       method,
       headers: { accept: "*/*", "user-agent": "rfphub-m2-compliance", ...headers },
+      // Inert for every M2 caller — this client only reads. It exists because the M3 checker
+      // WRITES (it submits entries and mints a key) and reuses this transport rather than
+      // maintaining a second copy of the redirect, timeout and error handling above.
+      ...(body === undefined ? {} : { body }),
       signal: controller.signal,
       redirect: follow ? "follow" : "manual",
     });
