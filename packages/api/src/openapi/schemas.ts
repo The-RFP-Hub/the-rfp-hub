@@ -427,6 +427,87 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "InsightsTotals",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "API reads and link-outs, NOT page views. The four counts are kept apart because a publisher's real question is whether anyone clicked through to apply, which a merged `views` cannot answer.",
+    required: ["listViews", "detailViews", "sourceClicks", "applyClicks"],
+    properties: {
+      listViews: { type: "integer", description: "Appearances in a list response." },
+      detailViews: { type: "integer", description: "Reads of the full record." },
+      sourceClicks: {
+        type: "integer",
+        description: "Link-outs to `website` via /v1/r/{id}/source.",
+      },
+      applyClicks: {
+        type: "integer",
+        description: "Link-outs to `applicationUrl` via /v1/r/{id}/apply.",
+      },
+    },
+  },
+  {
+    $id: "InsightsPoint",
+    type: "object",
+    additionalProperties: false,
+    required: ["day", "listViews", "detailViews", "sourceClicks", "applyClicks"],
+    properties: {
+      day: { type: "string", description: "`YYYY-MM-DD`, UTC." },
+      listViews: { type: "integer" },
+      detailViews: { type: "integer" },
+      sourceClicks: { type: "integer" },
+      applyClicks: { type: "integer" },
+    },
+  },
+  {
+    $id: "InsightsSeries",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One entry's daily series. BEST-EFFORT: our own automation is excluded by name, crawlers and `DNT: 1` are dropped, and capture is buffered in memory and so crash-lossy. Days before today come from the nightly rollup; today is aggregated live from the raw events, so traffic from an hour ago is already here.",
+    required: ["opportunityId", "title", "from", "to", "totals", "days"],
+    properties: {
+      opportunityId: { type: "string" },
+      title: { type: "string" },
+      from: { type: "string" },
+      to: { type: "string" },
+      totals: { $ref: "InsightsTotals" },
+      days: {
+        type: "array",
+        items: { $ref: "InsightsPoint" },
+        description: "Zero-filled: a day with no traffic is a zero, never a gap in the series.",
+      },
+    },
+  },
+  {
+    $id: "InsightsEntry",
+    type: "object",
+    additionalProperties: false,
+    required: ["opportunityId", "title", "listViews", "detailViews", "sourceClicks", "applyClicks"],
+    properties: {
+      opportunityId: { type: "string" },
+      title: { type: "string" },
+      listViews: { type: "integer" },
+      detailViews: { type: "integer" },
+      sourceClicks: { type: "integer" },
+      applyClicks: { type: "integer" },
+    },
+  },
+  {
+    $id: "InsightsSummary",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "Every entry this account submitted or publishes, totalled over the window. Same best-effort caveat as InsightsSeries.",
+    required: ["from", "to", "totals", "opportunities"],
+    properties: {
+      from: { type: "string" },
+      to: { type: "string" },
+      totals: { $ref: "InsightsTotals" },
+      opportunities: { type: "array", items: { $ref: "InsightsEntry" } },
+    },
+  },
+  {
     $id: "ClaimResult",
     type: "object",
     additionalProperties: false,

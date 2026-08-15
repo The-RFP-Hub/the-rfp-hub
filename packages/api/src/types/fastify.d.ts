@@ -1,4 +1,5 @@
 import type { RequestPrincipal } from "../modules/services/auth/principal.service.js";
+import type { AnalyticsContext } from "../plugins/analytics-context.js";
 /**
  * Type augmentation for the decorators `plugins/auth.ts` adds to the root instance.
  *
@@ -22,5 +23,16 @@ declare module "fastify" {
      * treating an unauthenticated request as anonymous.
      */
     principal: RequestPrincipal | null;
+
+    /**
+     * Who this request is, for counting purposes — and whether to count it at all.
+     *
+     * Computed on first read and memoised, because most requests to this API are never counted and
+     * should not pay for the hashes. See plugins/analytics-context.ts.
+     */
+    readonly analyticsContext: AnalyticsContext;
+
+    /** The memoisation slot behind `analyticsContext`. Not read anywhere else. */
+    analyticsContextCache: AnalyticsContext | null;
   }
 }

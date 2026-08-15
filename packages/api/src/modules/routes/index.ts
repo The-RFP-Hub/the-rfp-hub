@@ -4,12 +4,14 @@ import { canonical } from "./canonical/index.js";
 import { datasetExport } from "./export/index.js";
 import { feeds } from "./feeds/index.js";
 import { health } from "./health/index.js";
+import { insights } from "./insights/index.js";
 import { keys } from "./keys/index.js";
 import { me } from "./me/index.js";
 import { opportunities } from "./opportunities/index.js";
 import { opportunityMeta } from "./opportunity-meta/index.js";
 import { organizations } from "./organizations/index.js";
 import { publishers } from "./publishers/index.js";
+import { redirects } from "./redirects/index.js";
 import { review } from "./review/index.js";
 import { specArtifactMirror } from "./spec-artifacts/index.js";
 import { stats } from "./stats/index.js";
@@ -37,6 +39,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(admin, { prefix: "/v1/admin" });
   await app.register(publishers, { prefix: "/v1/publishers" });
   await app.register(organizations, { prefix: "/v1/organizations" });
+  await app.register(insights, { prefix: "/v1/insights" });
+  // Short on purpose: `/v1/r/:id/apply` is a URL that ends up in emails, newsletters and social
+  // posts, and every character of it is carried by whoever pastes it.
+  await app.register(redirects, { prefix: "/v1/r" });
   // No prefix, deliberately: these routes ARE the spec's identifiers, and an identifier must
   // not carry an API version. See modules/shared/canonical-documents.ts and adr/0007.
   await app.register(canonical);

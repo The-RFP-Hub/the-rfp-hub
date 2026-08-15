@@ -1,15 +1,15 @@
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
-import { pool } from "./db/client.js";
 
-const app = await buildApp({ logger: true });
-
-// The pg pool is a module-level singleton shared with the services (see db/client.ts) — it has no
-// lifecycle of its own, so tie it to the server's Fastify instance here rather than in buildApp(),
-// which the integration tests also use and where they close/end the pool themselves.
-app.addHook("onClose", async () => {
-  await pool.end();
-});
+// The pg pool is a module-level singleton shared with the services (see db/client.ts) and has no
+// lifecycle of its own, so the SERVER owns it — the integration suites end it themselves after
+// their own cleanup, which is why this is a flag rather than something buildApp always does.
+//
+// It is passed IN rather than registered out here as an `onClose` hook of its own: Fastify runs
+// those hooks LIFO, so a hook added after `buildApp` returned would run before the analytics buffer
+// had drained, and the shutdown flush would write into a closed pool. `buildApp` registers both, in
+// order, for exactly that reason.
+const app = await buildApp({ logger: true, closePool: true });
 
 try {
   await app.listen({ port: config.port, host: config.host });
