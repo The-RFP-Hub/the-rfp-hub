@@ -101,19 +101,43 @@ prerequisite is met, publish now".
 ### Which deployment a run maintains
 
 `environment` is a required `workflow_dispatch` input (`production` | `staging`) and is **empty on
-the schedule, which means `production`** — the deployment the open-data export reads. Both the AWS
-credentials and the ECS resource names are selected from that name:
+the schedule, which means `production`** — the deployment the open-data export reads. The AWS
+credential and the cluster are selected from that name:
 
-| Environment | Credentials | Resource variables |
+| Environment | Credentials | Cluster |
 |---|---|---|
-| `production` (and every scheduled run) | `PRODUCTION_AWS_ACCESS_KEY_ID` / `PRODUCTION_AWS_SECRET_ACCESS_KEY` — the same pair `production.yml` deploys with | `PRODUCTION_MAINTENANCE_ECS_*` |
-| `staging` (dispatch only) | `STAGING_AWS_ACCESS_KEY_ID` / `STAGING_AWS_SECRET_ACCESS_KEY` | `STAGING_MAINTENANCE_ECS_*` |
+| `production` (and every scheduled run) | `PRODUCTION_AWS_ACCESS_KEY_ID` / `PRODUCTION_AWS_SECRET_ACCESS_KEY` — the same pair `production.yml` deploys with | `PRODUCTION_ECS_CLUSTER` — the same variable |
+| `staging` (dispatch only) | `STAGING_AWS_ACCESS_KEY_ID` / `STAGING_AWS_SECRET_ACCESS_KEY` | `STAGING_ECS_CLUSTER` |
 
 The lookups are `secrets[format(...)]` / `vars[format(...)]` **index** expressions rather than the
 `&&`/`||` fallback idiom: a fallback treats an unset staging variable as false and silently reaches
-for the production resource, which is the exact accident this parameterisation exists to prevent.
-An unset variable stays unset and `run-ecs-job.sh` names it — prefixed with the environment, so the
-message says which set is missing.
+for the production cluster, which is the exact accident this parameterisation exists to prevent. An
+unset variable stays unset and `run-ecs-job.sh` names it, with the environment in the message.
+
+### What the runner uses, and what it therefore does not need
+
+**A job is the deployed image with a different command**, so it runs on the API **service's own
+task definition** and inherits everything already assembled there — the image, the runtime
+`DATABASE_URL`, every key of the `secrets:` array, the execution and task roles. Nothing about a
+job is different except `command`, which `run-ecs-job.sh` supplies as a container override.
+
+Everything else is derived from the names the deploy workflows already hardcode, or discovered at
+run time:
+
+| What | Where it comes from |
+|---|---|
+| Cluster | `<ENV>_ECS_CLUSTER` — **the only repository variable**, and the deploy workflow for that environment already requires it |
+| Task definition family, container name | `rfp-hub-<env>`, derived in `run-ecs-job.sh` (overridable via `ECS_TASK_DEFINITION` / `ECS_CONTAINER`) |
+| Service | `rfp-hub-<env>-service`, likewise (`ECS_SERVICE`) |
+| Subnets, security groups, `assignPublicIp`, launch type | **read from the service** with `aws ecs describe-services … --query 'services[0].networkConfiguration.awsvpcConfiguration'`, and reused verbatim |
+
+The network configuration is discovered rather than configured for the same reason the task
+definition is reused: restating the VPC layout in repository variables is asking an operator to
+keep a copy of it in sync by hand, and a stale copy starts the job in a subnet that cannot reach the
+database. Reading the service means **the job lands exactly where the API lands, by construction**.
+
+There is consequently **no maintenance task definition to provision** and no second copy of the
+secret list to keep in step with the service's.
 
 ---
 
@@ -159,25 +183,32 @@ carries the time of the change, which is where that fact belongs.
 
 ### a. The schedule (how it actually runs)
 
-`.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the deployed
-image**, using the AWS credentials the deploy workflows already hold:
+`.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
+own task definition**, using the AWS credentials the deploy workflows already hold. Two calls: read
+the service to learn where it runs, then start the same task definition there with a different
+command.
 
 ```sh
+# where the API runs — subnets, security groups, assignPublicIp
+vpc=$(aws ecs describe-services --cluster "$CLUSTER" --services rfp-hub-<env>-service \
+        --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
+
 aws ecs run-task \
-  --cluster "$CLUSTER" --task-definition "$TASK_DEFINITION" --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[…],securityGroups=[…],assignPublicIp=DISABLED}" \
-  --overrides '{"containerOverrides":[{"name":"…","command":["node","packages/api/dist/jobs.js","staleness","--json"]}]}'
+  --cluster "$CLUSTER" --task-definition rfp-hub-<env> --launch-type FARGATE \
+  --network-configuration "$(jq -nc --argjson vpc "$vpc" '{awsvpcConfiguration: $vpc}')" \
+  --overrides '{"containerOverrides":[{"name":"rfp-hub-<env>","command":["node","packages/api/dist/jobs.js","staleness","--json"]}]}'
 ```
 
 **There is no public job endpoint and no shared job token.** A credential that can start a job has
 to live somewhere, and "a token in repository secrets that the internet-facing API accepts forever"
 is a worse somewhere than the deploy role that already exists.
 
-`.github/scripts/run-ecs-job.sh` is the twenty lines that do it, and it answers the *unprovisioned*
-case two ways on purpose: on the schedule a missing repository variable is a loud `::warning::` and
-a green job (the export is chained to this workflow, and failing over a resource that has never
-existed would stop the dataset publishing); on a `workflow_dispatch` it **fails**, because an
-operator dispatching the run is asking whether the wiring works.
+`.github/scripts/run-ecs-job.sh` is what does it, and it answers the *unprovisioned* case two ways
+on purpose. Two things can be absent — the cluster variable, and the service itself — and on the
+schedule either is a loud `::warning::` and a green job (the export is chained to this workflow, and
+failing over a resource that has never existed would stop the dataset publishing), while on a
+`workflow_dispatch` either **fails**, because an operator dispatching the run is asking whether the
+wiring works.
 
 ### b. The image, or a checkout (an operator, by hand)
 
@@ -217,15 +248,19 @@ Before the first M3 job run on any deployment, in order:
    [`deploy.md` §4](./deploy.md).
 2. Apply the migrations with the **DDL-capable** credential:
    `node packages/api/dist/migrate.js` — see [`deploy.md` §5](./deploy.md).
-3. Provision the maintenance task definition and set the repository variables the workflow reads,
-   **once per environment**: `<ENV>_MAINTENANCE_ECS_CLUSTER`,
-   `<ENV>_MAINTENANCE_ECS_TASK_DEFINITION`, `<ENV>_MAINTENANCE_ECS_CONTAINER`,
-   `<ENV>_MAINTENANCE_ECS_SUBNETS`, `<ENV>_MAINTENANCE_ECS_SECURITY_GROUPS`, where `<ENV>` is
-   `PRODUCTION` or `STAGING`. The task uses the **runtime** credential, not the migration one.
-4. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
-   loudly if any of that environment's variables is missing. A dispatch does **not** trigger the
-   export (only the scheduled chain does), so confirm the export separately — either wait for one
-   scheduled run or dispatch *Nightly open-data export* directly.
+3. Deploy the API to that environment at least once, so `rfp-hub-<env>` and
+   `rfp-hub-<env>-service` exist and `<ENV>_ECS_CLUSTER` is set. Both are prerequisites of the
+   deploy workflow itself, so this is nearly always already true; the runner reads the service for
+   its subnets and security groups, and says so plainly when the service is not there yet.
+4. Grant the deploy IAM user **`ecs:RunTask` on the task definition and `iam:PassRole` for the
+   task's execution and task roles**. This is the one permission that may be missing: registering a
+   task definition and updating a service — which the deploy workflow already does — does not imply
+   the right to start a task from it. Nothing else is needed; the maintenance chain uses the
+   **runtime** credential inside the container, not a DDL one.
+5. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
+   loudly if the cluster variable is unset or the service cannot be described. A dispatch does
+   **not** trigger the export (only the scheduled chain does), so confirm the export separately —
+   either wait for one scheduled run or dispatch *Nightly open-data export* directly.
 
 ---
 
