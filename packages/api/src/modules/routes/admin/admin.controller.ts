@@ -1,7 +1,10 @@
 import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
 import { AdminService } from "../../services/admin/admin.service.js";
+import { JOB_NAMES } from "../../services/jobs/registry.js";
+import { UnknownJobError, runJob } from "../../services/jobs/runner.js";
 import { VerificationService } from "../../services/verification/verification.service.js";
+import { notFound } from "../../shared/http-error.js";
 import { bodyOf, handled, idParam, paramsOf } from "../../shared/route-helpers.js";
 
 const admins = new AdminService();
@@ -30,5 +33,23 @@ export const adminController = {
       actorKind: "user",
       actorAccountId: principal.accountId,
     });
+  }),
+
+  /**
+   * ONE pass, deliberately. This is a button in a dashboard, not the schedule: a request that
+   * looped a cursor job to exhaustion would hold a connection and an HTTP socket for as long as the
+   * backlog took, and the thing that IS allowed to take that long is the container task.
+   */
+  runJob: handled(async (request: FastifyRequest) => {
+    const { job } = paramsOf<{ job: string }>(request);
+    const { limit } = bodyOf<{ limit?: number }>(request);
+    try {
+      return await runJob(job, { limit, maxPasses: 1 });
+    } catch (error) {
+      if (error instanceof UnknownJobError) {
+        throw notFound(`no job ${JSON.stringify(job)}. Known jobs: ${JOB_NAMES.join(", ")}.`);
+      }
+      throw error;
+    }
   }),
 };

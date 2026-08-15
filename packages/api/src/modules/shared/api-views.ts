@@ -337,3 +337,22 @@ export interface MembershipResultView {
   /** False when the membership was revoked rather than granted. */
   member: boolean;
 }
+
+/**
+ * One scheduled job's run, as `POST /v1/admin/jobs/{job}/run` reports it.
+ *
+ * `skipped` distinguishes the two ways a run correctly does nothing — another run held the
+ * advisory lock (`locked`), or the feature the job serves is not configured — from a run that did
+ * nothing because there was nothing to do (`processed: 0`, no `skipped`).
+ */
+export interface JobRunResultView {
+  job: string;
+  shape: "cursor" | "sweep";
+  processed: number;
+  /** What the job's predicate still matches. Always 0 for a sweep, by definition. */
+  remaining: number;
+  skipped?: string;
+  passes: number;
+  elapsedMs: number;
+  details?: Record<string, number>;
+}
