@@ -71,7 +71,8 @@ run("M3AUTH identity and credentials", () => {
       ["GET", "/v1/keys"],
       ["POST", "/v1/keys"],
       ["GET", "/v1/me/opportunities"],
-      ["GET", "/v1/me/duplicates"],
+      ["GET", "/v1/review/opportunities"],
+      ["POST", "/v1/opportunities"],
     ] as const) {
       const res = await app.inject({ method, url });
       expect(res.statusCode, `${method} ${url}`).toBe(401);
@@ -185,6 +186,9 @@ run("M3AUTH identity and credentials", () => {
       { method: "GET" as const, url: "/v1/keys" },
       { method: "POST" as const, url: "/v1/keys", payload: { scopes: ["read"] } },
       { method: "PATCH" as const, url: "/v1/me", payload: { displayName: "nope" } },
+      { method: "GET" as const, url: "/v1/review/opportunities" },
+      { method: "GET" as const, url: "/v1/review/accounts" },
+      { method: "POST" as const, url: "/v1/admin/accounts/1/role", payload: { role: "admin" } },
     ];
     for (const call of sessionOnly) {
       const res = await app.inject({ ...call, headers: bearer(ownerKey) });
@@ -193,17 +197,21 @@ run("M3AUTH identity and credentials", () => {
     }
   });
 
-  it("does not let a reviewer's API key manage credentials", async () => {
+  it("does not let a reviewer's API key reach the review surface", async () => {
     const reviewer = await seedAccount({ did: DIDS.reviewer });
     const key = await mintApiKeyFor(reviewer.id, ["read", "write", "publish"]);
-    const res = await app.inject({ method: "GET", url: "/v1/keys", headers: bearer(key) });
+    const res = await app.inject({
+      method: "GET",
+      url: "/v1/review/opportunities",
+      headers: bearer(key),
+    });
     // A global role never elevates an API key — the scope is irrelevant, the credential kind is not.
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toBe("session_required");
 
     const session = await app.inject({
       method: "GET",
-      url: "/v1/keys",
+      url: "/v1/review/opportunities",
       headers: bearer(reviewerToken),
     });
     expect(session.statusCode).toBe(200);

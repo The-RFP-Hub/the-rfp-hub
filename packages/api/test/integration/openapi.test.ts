@@ -112,6 +112,10 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "/v1/opportunities/schema",
       "/v1/stats",
       "/v1/health",
+      "/v1/publishers",
+      "/v1/opportunities/{id}/audit",
+      "/v1/opportunities/{id}/duplicates",
+      "/v1/opportunities/{id}/verification",
       // The spec's own documents, at the paths their identifiers name (adr/0007).
       ...canonicalDocuments.map((d) => d.path),
     ]) {
@@ -126,9 +130,40 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "JsonLdContext",
       "SpecVersionIndex",
       "Health",
+      // M3
+      "SubmissionResult",
+      "ValidationErrorResponse",
+      "AuditTrail",
+      "ClaimResult",
+      "Publisher",
+      "Me",
+      "ApiKey",
+      "ApiKeyCreated",
+      "ManagedOpportunityList",
     ]) {
       expect(doc.components?.schemas?.[name], `components has ${name}`).toBeTruthy();
     }
+
+    // The write, review and admin operations are published, and they declare the credential they
+    // need — an undocumented authenticated endpoint is worse than none.
+    for (const [path, method] of [
+      ["/v1/opportunities", "post"],
+      ["/v1/opportunities/{id}", "put"],
+      ["/v1/opportunities/{id}/claim", "post"],
+      ["/v1/me", "get"],
+      ["/v1/keys", "post"],
+      ["/v1/review/opportunities", "get"],
+      ["/v1/admin/accounts/{id}/role", "post"],
+    ] as const) {
+      const op = doc.paths?.[path]?.[method];
+      expect(op, `documents ${method.toUpperCase()} ${path}`).toBeTruthy();
+      expect(op.security, `${method.toUpperCase()} ${path} declares its credential`).toEqual([
+        { bearerAuth: [] },
+      ]);
+    }
+    expect(doc.components?.securitySchemes?.bearerAuth?.scheme).toBe("bearer");
+    // The public list of verified publishers carries no security requirement at all.
+    expect(doc.paths["/v1/publishers"].get.security).toBeUndefined();
     // the error contract is published, too
     expect(doc.paths["/v1/opportunities"].get.responses["400"]).toBeTruthy();
     expect(doc.paths["/v1/opportunities/{id}"].get.responses["404"]).toBeTruthy();
