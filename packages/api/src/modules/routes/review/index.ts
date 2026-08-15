@@ -2,9 +2,13 @@
  * `/v1/review` — the T3 surface. Every route is `requireRole("reviewer")`, which is session-only:
  * a global role never elevates an API key, so a leaked reviewer key cannot approve anything.
  *
- * Duplicate merge/confirm/dismiss and the manual source-verify trigger belong on this prefix and
- * are added by the waves that implement the machinery behind them — a review action with no
- * detector or verifier behind it would be a button that does nothing.
+ * Triggering a source verification is a REVIEWER capability, not an administrator one: the tier
+ * contract already gives T3 the power to override provenance, and a reviewer who can approve an
+ * entry but cannot ask whether its link resolves is being asked to decide with less evidence than
+ * the system has. The T4 route survives alongside it for bulk and scripted use.
+ *
+ * Duplicate merge/confirm/dismiss belongs on this prefix too and arrives with the detector behind
+ * it — a review action with nothing to review would be a button that does nothing.
  */
 import type { FastifyInstance } from "fastify";
 import { reviewController } from "./review.controller.js";
@@ -109,6 +113,31 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       },
     },
     reviewController.setListed,
+  );
+
+  router.post(
+    "/opportunities/:id/verify",
+    {
+      onRequest: guard,
+      // The one review action that reaches the network. Rate-limited so a reviewer holding the
+      // button down cannot turn this service into a request amplifier against somebody's site.
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+      schema: {
+        operationId: "verifyOpportunitySource",
+        tags: ["review"],
+        summary: "Fetch this entry's applicationUrl now and record what it says",
+        description:
+          "Records a run whatever happens — a refused address, a timeout and a soft 404 are all answers a reviewer needs. `matched` is a LOW-BAR anti-spam signal (the page exists and its title is about the same programme), not a fact-check: an administrator still approves. 400 when the entry carries no `applicationUrl`, because there is then nothing to check it against.",
+        security: [{ bearerAuth: [] }],
+        params: idParams,
+        response: {
+          200: { $ref: "VerificationRun#" },
+          400: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
+      },
+    },
+    reviewController.verifySource,
   );
 
   router.get(
