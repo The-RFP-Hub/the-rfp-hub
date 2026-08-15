@@ -184,6 +184,9 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         "/v1/review/organizations",
         "/v1/review/accounts",
         "/v1/admin/accounts/:id/role",
+        "/v1/admin/accounts/:id/direct-create",
+        "/v1/admin/opportunities/:id/verify",
+        "/v1/admin/jobs/:job/run",
         "/v1/organizations/:slug",
       ],
       // The spec's own documents, at the paths their identifiers name (adr/0007).

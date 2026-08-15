@@ -56,6 +56,7 @@ import type {
   InsightsSeriesView,
   InsightsSummaryView,
   InsightsTotalsView,
+  JobRunResultView,
   ManagedOpportunityListView,
   ManagedOpportunityView,
   MeMembershipView,
@@ -290,6 +291,7 @@ describe("closed response components vs their producers", () => {
       "InsightsSeries",
       "InsightsSummary",
       "InsightsTotals",
+      "JobRunResult",
       "ManagedOpportunity",
       "ManagedOpportunityList",
       "Me",
@@ -607,6 +609,19 @@ describe("M3 closed components vs their view types", () => {
       totals: insightsTotals,
       opportunities: [insightsEntry],
     } satisfies InsightsSummaryView,
+    // Every member present, including the two the runner omits when they do not apply: a closed
+    // component that never declared them would silently drop `skipped` from the one response a
+    // reader most needs it in.
+    JobRunResult: {
+      job: "staleness",
+      shape: "cursor",
+      processed: 3,
+      remaining: 0,
+      skipped: "locked",
+      passes: 1,
+      elapsedMs: 12,
+      details: { closedPastDue: 3 },
+    } satisfies JobRunResultView,
     ClaimResult: claimResult,
     ClaimSummary: claimSummary,
     ClaimList: { items: [claimSummary] } satisfies ClaimListView,

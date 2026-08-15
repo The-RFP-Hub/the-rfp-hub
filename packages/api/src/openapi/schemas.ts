@@ -823,6 +823,28 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "JobRunResult",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One scheduled maintenance run. `shape` is `cursor` when the run retires its own selection (so it may repeat while it is making progress) and `sweep` when it reprocesses a fixed window by design, in which case `remaining` is always 0. `skipped` says the run correctly did nothing: `locked` when another run of the same job held the database advisory lock, or a sentence naming the feature that is not configured.",
+    required: ["job", "shape", "processed", "remaining", "passes", "elapsedMs"],
+    properties: {
+      job: { type: "string" },
+      shape: { type: "string", enum: ["cursor", "sweep"] },
+      processed: { type: "integer", description: "Rows this invocation changed." },
+      remaining: { type: "integer" },
+      skipped: { type: "string" },
+      passes: { type: "integer" },
+      elapsedMs: { type: "integer" },
+      details: {
+        type: "object",
+        additionalProperties: { type: "integer" },
+        description: "Per-job counters. The members vary by job and are not part of the contract.",
+      },
+    },
+  },
+  {
     $id: "ErrorResponse",
     type: "object",
     additionalProperties: false,
