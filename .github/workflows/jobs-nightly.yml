@@ -29,10 +29,18 @@ name: Nightly maintenance jobs
 # staging credentials would either fail outright or quietly maintain the wrong database and publish
 # a snapshot whose staleness pass never touched it. So the environment is a first-class input:
 # blank (the schedule) means `production`, and an operator maintaining staging has to say so. The
-# credentials and the ECS resource names are then selected by that name — `PRODUCTION_AWS_*` /
-# `PRODUCTION_MAINTENANCE_ECS_*`, exactly the pairing production.yml uses — through an INDEX lookup
-# rather than an `&&`/`||` fallback, because a fallback would silently reach for the production
-# resources whenever a staging variable was unset.
+# credential and the cluster are then selected by that name — `PRODUCTION_AWS_*` with
+# `PRODUCTION_ECS_CLUSTER`, exactly the pairing production.yml uses — through an INDEX lookup rather
+# than an `&&`/`||` fallback, because a fallback would silently reach for the production cluster
+# whenever the staging variable was unset.
+#
+# THIS WORKFLOW PROVISIONS NOTHING. A job is the deployed image with a different command, so it runs
+# on the API SERVICE'S OWN task definition (`rfp-hub-<env>`) and inherits its image, its secrets and
+# its roles; `run-ecs-job.sh` reads the service (`rfp-hub-<env>-service`) at run time for the
+# subnets, security groups and launch type. The only repository variable it needs is the cluster —
+# `<ENV>_ECS_CLUSTER`, which the deploy workflows already require and an operator has therefore
+# already set. There is no separate maintenance task definition to keep in step with the service's
+# secret list, which is a copy that would eventually be stale in exactly the way that matters.
 
 on:
   schedule:
@@ -66,11 +74,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The environment this run maintains, and the prefix every credential and resource name is
-  # selected by. `inputs.environment` is empty on a schedule, so a scheduled chain is PRODUCTION —
-  # the deployment the open-data export reads. The two literals here are non-empty, so the
-  # `&&`/`||` idiom is safe in this one place; the lookups it drives are index lookups precisely so
-  # an unset variable stays unset instead of falling back to the other environment's.
+  # The environment this run maintains, and the prefix the credential and the cluster are selected
+  # by. `inputs.environment` is empty on a schedule, so a scheduled chain is PRODUCTION — the
+  # deployment the open-data export reads. The two literals here are non-empty, so the `&&`/`||`
+  # idiom is safe in this one place; the lookups it drives are index lookups precisely so an unset
+  # variable stays unset instead of falling back to the other environment's.
   TARGET_ENV: ${{ inputs.environment || 'production' }}
   ENV_PREFIX: ${{ inputs.environment == 'staging' && 'STAGING' || 'PRODUCTION' }}
   AWS_REGION: us-east-1
@@ -114,16 +122,14 @@ jobs:
       - name: Run ${{ matrix.job }}
         if: env.SELECTED == '' || env.SELECTED == matrix.job
         env:
-          # Each one is the hosting account's own resource name rather than a fact about this
-          # project, so they are repository VARIABLES, not literals in a public, source-neutral tree
-          # (see scripts/check-neutral.mjs). Settings -> Secrets and variables -> Actions ->
-          # Variables, one set per environment: PRODUCTION_MAINTENANCE_* and STAGING_MAINTENANCE_*.
-          ECS_CLUSTER: ${{ vars[format('{0}_MAINTENANCE_ECS_CLUSTER', env.ENV_PREFIX)] }}
-          ECS_TASK_DEFINITION: ${{ vars[format('{0}_MAINTENANCE_ECS_TASK_DEFINITION', env.ENV_PREFIX)] }}
-          ECS_CONTAINER: ${{ vars[format('{0}_MAINTENANCE_ECS_CONTAINER', env.ENV_PREFIX)] }}
-          ECS_SUBNETS: ${{ vars[format('{0}_MAINTENANCE_ECS_SUBNETS', env.ENV_PREFIX)] }}
-          ECS_SECURITY_GROUPS: ${{ vars[format('{0}_MAINTENANCE_ECS_SECURITY_GROUPS', env.ENV_PREFIX)] }}
-          VAR_PREFIX: ${{ env.ENV_PREFIX }}
+          # The cluster is the hosting account's own resource name rather than a fact about this
+          # project, so it is a repository VARIABLE, not a literal in a public, source-neutral tree
+          # (see scripts/check-neutral.mjs). It is the SAME variable the deploy workflow for this
+          # environment reads, under Settings -> Secrets and variables -> Actions -> Variables, so
+          # a deployment that exists has already set it. Everything else the task needs — the task
+          # definition, the container, the service, the subnets, the security groups — is derived or
+          # discovered by the runner (see .github/scripts/run-ecs-job.sh).
+          ECS_CLUSTER: ${{ vars[format('{0}_ECS_CLUSTER', env.ENV_PREFIX)] }}
           TARGET_ENV: ${{ env.TARGET_ENV }}
           JOB: ${{ matrix.job }}
           DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}
@@ -155,12 +161,7 @@ jobs:
       - name: Run staleness
         if: env.SELECTED == '' || env.SELECTED == 'staleness'
         env:
-          ECS_CLUSTER: ${{ vars[format('{0}_MAINTENANCE_ECS_CLUSTER', env.ENV_PREFIX)] }}
-          ECS_TASK_DEFINITION: ${{ vars[format('{0}_MAINTENANCE_ECS_TASK_DEFINITION', env.ENV_PREFIX)] }}
-          ECS_CONTAINER: ${{ vars[format('{0}_MAINTENANCE_ECS_CONTAINER', env.ENV_PREFIX)] }}
-          ECS_SUBNETS: ${{ vars[format('{0}_MAINTENANCE_ECS_SUBNETS', env.ENV_PREFIX)] }}
-          ECS_SECURITY_GROUPS: ${{ vars[format('{0}_MAINTENANCE_ECS_SECURITY_GROUPS', env.ENV_PREFIX)] }}
-          VAR_PREFIX: ${{ env.ENV_PREFIX }}
+          ECS_CLUSTER: ${{ vars[format('{0}_ECS_CLUSTER', env.ENV_PREFIX)] }}
           TARGET_ENV: ${{ env.TARGET_ENV }}
           JOB: staleness
           DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}

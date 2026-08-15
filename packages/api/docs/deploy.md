@@ -162,12 +162,20 @@ edge.
 
 ## 6. Running the maintenance jobs
 
-The nightly maintenance work runs as **one-off tasks on the same image**, started by
-`.github/workflows/jobs-nightly.yml` with the credentials the deploy workflows already hold:
+The nightly maintenance work runs as **one-off tasks on the API service's own task definition** —
+not a dedicated one — started by `.github/workflows/jobs-nightly.yml` with the credentials the
+deploy workflows already hold:
 
 ```sh
-node packages/api/dist/jobs.js <job> --json      # inside the image
+node packages/api/dist/jobs.js <job> --json      # inside the image, as a container override
 ```
+
+A job is the deployed image with a different command, so it inherits everything already assembled
+in the service's task definition — the image, the runtime `DATABASE_URL`, every secret in
+`secrets:` (§2), the execution and task roles — and the deploy workflows keep it current
+automatically; there is no second copy of that list to fall out of step. Subnets, security groups
+and launch type are not configured either: `run-ecs-job.sh` reads them off the running service with
+`aws ecs describe-services` at task-start time, so the job lands exactly where the API lands.
 
 There is **no public job endpoint and no shared job token**, deliberately: a credential that can
 start a job has to live somewhere, and a token in repository secrets that the internet-facing API
@@ -177,7 +185,7 @@ credential.
 
 ### Operator prerequisites
 
-One set **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks the set
+One variable **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
 from its `environment` input — which is empty on the schedule and therefore `production`, matching
 the deployment the open-data export reads. The credentials are picked the same way
 (`<ENV>_AWS_ACCESS_KEY_ID` / `<ENV>_AWS_SECRET_ACCESS_KEY`), so a scheduled maintenance chain
@@ -185,21 +193,38 @@ authenticates exactly as `production.yml` does.
 
 | Repository variable | What it names |
 |---|---|
-| `<ENV>_MAINTENANCE_ECS_CLUSTER` | The cluster the one-off task runs in |
-| `<ENV>_MAINTENANCE_ECS_TASK_DEFINITION` | A task definition on the deployed image, with the **runtime** `DATABASE_URL` — never the DDL role |
-| `<ENV>_MAINTENANCE_ECS_CONTAINER` | The container name inside it, for the command override |
-| `<ENV>_MAINTENANCE_ECS_SUBNETS` | Comma-separated subnet ids with egress (the verification job makes outbound requests) |
-| `<ENV>_MAINTENANCE_ECS_SECURITY_GROUPS` | Comma-separated security group ids |
+| `<ENV>_ECS_CLUSTER` | The cluster the one-off task runs in — the **same** variable `<env>.yml` already requires to deploy the service, so any deployed environment has already set it |
 
-Until all five of an environment's variables are set, the scheduled run announces a `::warning::`
-and stays green — the open-data export is chained to that workflow, and failing over a resource that
-has never existed would stop the dataset publishing. A **manual `workflow_dispatch` fails instead**,
-so an operator validating the wiring gets a real answer, and the message names the environment
-whose variables are missing. Prove it with one dispatch per environment before relying on the
-schedule.
+That is the only repository variable the chain needs. The task definition family
+(`rfp-hub-<env>`), the container name and the service (`rfp-hub-<env>-service`) are the names the
+deploy workflows already hardcode; `run-ecs-job.sh` derives them from `<env>` rather than reading a
+second copy of them from configuration.
 
-The task definition may reuse the service's `secrets` and `environment` verbatim. The full
-schedule, the idempotency and locking guarantees, and the per-job configuration are in
+The one thing that may still be missing is **IAM**, not a repository variable: the deploy user
+needs `ecs:RunTask` on the task definition and `iam:PassRole` for its execution and task roles.
+Registering a task definition and updating a service — which the deploy workflow already does —
+does not imply the right to start a task from it. This is likely already granted, since the same
+user is the one registering the task definition being started.
+
+Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, the
+scheduled run announces a `::warning::` and stays green — the open-data export is chained to that
+workflow, and failing over a resource that has never existed would stop the dataset publishing. A
+**manual `workflow_dispatch` fails instead**, so an operator validating the wiring gets a real
+answer, and the message names what is missing. Prove it with one dispatch per environment before
+relying on the schedule.
+
+### A dedicated task definition is optional
+
+Nothing here needs one: reusing the service's own task definition means there is no separate
+`secrets`/`environment` (§2) to keep in step by hand, which is the failure mode a dedicated
+definition would introduce for no benefit. The one case where a **separate** task definition earns
+its keep is a job that needs a credential the service must never hold — the gated migration job
+sketched in §5 ("Gating deploys on migrations") is exactly that: it needs the **migration role**,
+not the runtime one, and giving the service's task definition DDL access for one scheduled job would
+be a much larger blast radius than provisioning a second, migration-only definition for it. Nothing
+in the nightly maintenance chain needs that; it is noted here for when that job exists.
+
+The full schedule, the idempotency and locking guarantees, and the per-job configuration are in
 [`jobs.md`](./jobs.md).
 
 ---
