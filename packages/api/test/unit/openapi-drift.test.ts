@@ -48,11 +48,15 @@ import type {
   ClaimSummaryView,
   DuplicateListView,
   DuplicateMatchView,
+  DuplicatePairListView,
+  DuplicatePairView,
+  DuplicateSideView,
   ManagedOpportunityListView,
   ManagedOpportunityView,
   MeMembershipView,
   MeView,
   MembershipResultView,
+  MergeResultView,
   OrganizationListView,
   OrganizationSummaryView,
   PublisherListView,
@@ -271,6 +275,9 @@ describe("closed response components vs their producers", () => {
       "DatasetExport",
       "DuplicateList",
       "DuplicateMatch",
+      "DuplicatePair",
+      "DuplicatePairList",
+      "DuplicateSide",
       "ErrorResponse",
       "Health",
       "ManagedOpportunity",
@@ -278,6 +285,7 @@ describe("closed response components vs their producers", () => {
       "Me",
       "MeMembership",
       "MembershipResult",
+      "MergeResult",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
       "OrganizationList",
       "OrganizationSummary",
@@ -399,12 +407,21 @@ describe("closed response components vs their producers", () => {
  * declares it.
  */
 describe("M3 closed components vs their view types", () => {
+  const duplicateMatchSample: DuplicateMatchView = {
+    id: "example-org:other",
+    title: "Other",
+    similarity: 0.91,
+    status: "suspected",
+    detectedAt: "2026-08-14T00:00:00.000Z",
+  };
   const submissionResult: SubmissionResultView = {
     opportunity: fixtures[0]?.opp as Opportunity,
     created: true,
     reviewStatus: "pending",
     isListed: true,
     warnings: [],
+    duplicateCheck: "ok",
+    duplicates: [duplicateMatchSample],
   };
   const auditEntry: AuditEntryView = {
     action: "update",
@@ -414,12 +431,24 @@ describe("M3 closed components vs their view types", () => {
     changedFields: ["title"],
     patch: { title: { before: "a", after: "b" } },
   };
-  const duplicateMatch: DuplicateMatchView = {
-    id: "example-org:other",
-    title: "Other",
-    similarity: 0.91,
+  const duplicateMatch: DuplicateMatchView = duplicateMatchSample;
+  const duplicateSide: DuplicateSideView = {
+    id: "example-org:one",
+    title: "One",
+    reviewStatus: "approved",
+    isListed: true,
+    namespace: "example-org",
+    mergedInto: null,
+    updatedAt: "2026-08-14T00:00:00.000Z",
+  };
+  const duplicatePair: DuplicatePairView = {
+    id: 1,
     status: "suspected",
+    similarity: 0.91,
     detectedAt: "2026-08-14T00:00:00.000Z",
+    reviewedAt: null,
+    left: duplicateSide,
+    right: { ...duplicateSide, id: "example-org:two", title: "Two" },
   };
   const verificationRun: VerificationRunView = {
     runAt: "2026-08-14T00:00:00.000Z",
@@ -529,6 +558,15 @@ describe("M3 closed components vs their view types", () => {
     AuditTrail: { entries: [auditEntry] } satisfies AuditTrailView,
     DuplicateMatch: duplicateMatch,
     DuplicateList: { items: [duplicateMatch] } satisfies DuplicateListView,
+    DuplicateSide: duplicateSide,
+    DuplicatePair: duplicatePair,
+    DuplicatePairList: { items: [duplicatePair] } satisfies DuplicatePairListView,
+    MergeResult: {
+      pair: duplicatePair,
+      survivorId: "example-org:one",
+      mergedId: "example-org:two",
+      copiedFields: [],
+    } satisfies MergeResultView,
     VerificationRun: verificationRun,
     ClaimResult: claimResult,
     ClaimSummary: claimSummary,

@@ -1,23 +1,52 @@
+/**
+ * The write surface's controller — and the one place the post-commit work is wired in.
+ *
+ * The order inside the hook is deliberate. The verification enqueue is started FIRST and not
+ * awaited: it is genuinely fire-and-forget, and starting it after an awaited call would mean a
+ * duplicate-check failure took it down too (the whole hook is wrapped in one `try`). The duplicate
+ * check IS awaited, because `duplicateCheck` and the suspected matches belong in the 201 body — a
+ * result computed after the reply is a result nobody sees. It is bounded by `EMBEDDING_TIMEOUT_MS`
+ * inside the dedupe service, and it never throws for a provider failure.
+ */
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { config } from "../../../config.js";
 import { principalOf } from "../../../plugins/auth.js";
 import { ClaimService } from "../../services/claims/claim.service.js";
+import { DedupeService } from "../../services/dedupe/dedupe.service.js";
 import {
   OpportunityWriteService,
   type WriteResult,
 } from "../../services/opportunities/opportunity-write.service.js";
+import { VerificationService } from "../../services/verification/verification.service.js";
 import type { ClaimResultView, SubmissionResultView } from "../../shared/api-views.js";
 import { bodyOf, handled, paramsOf } from "../../shared/route-helpers.js";
 
-const writes = new OpportunityWriteService();
+const dedupe = new DedupeService();
+const verification = new VerificationService();
 const claims = new ClaimService();
 
+const writes = new OpportunityWriteService(undefined, {
+  async afterCommit(event) {
+    if (config.verification.onSubmit) verification.enqueue(event.opportunityId);
+    // Always the PUBLIC candidate scope, whoever submitted: a suspected-match response must never
+    // disclose another account's pending or unlisted title and id, and a reviewer submitting an
+    // entry is still submitting an entry.
+    return { duplicateCheck: await dedupe.check(event.opportunityId, "public") };
+  },
+});
+
 function toView(result: WriteResult): SubmissionResultView {
+  // Absent means the hook itself failed, which is exactly `unavailable`: nothing was checked, and
+  // the backfill job still owes this entry a pass.
+  const check = result.duplicateCheck ?? { status: "unavailable" as const, duplicates: [] };
   return {
     opportunity: result.opportunity,
     created: result.created,
     reviewStatus: result.reviewStatus,
     isListed: result.isListed,
     warnings: result.warnings,
+    duplicateCheck: check.status,
+    duplicates: check.duplicates,
   };
 }
 

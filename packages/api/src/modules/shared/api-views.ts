@@ -14,6 +14,16 @@ import type { Opportunity } from "@the-rfp-hub/standard";
 import type { AccountRole, ApiKeyScope } from "./capabilities.js";
 
 // ── writes ───────────────────────────────────────────────────────────────────────
+/**
+ * Whether duplicate detection RAN, which is a different question from whether it found anything.
+ *
+ * `ok` with an empty `duplicates` means "checked, nothing similar". `unavailable` means the
+ * embedding call failed or timed out and the backfill job still owes this entry a check.
+ * `disabled` means the deployment has no provider configured. Without this member a client cannot
+ * tell the three apart, and would read every one of them as "no duplicates".
+ */
+export type DuplicateCheckStatus = "ok" | "unavailable" | "disabled";
+
 export interface SubmissionResultView {
   opportunity: Opportunity;
   /** True for a create (including a recognised identical repeat), false for a replace. */
@@ -25,6 +35,14 @@ export interface SubmissionResultView {
    * publisher who cannot see them cannot act on them.
    */
   warnings: string[];
+  duplicateCheck: DuplicateCheckStatus;
+  /**
+   * Suspected matches, searched over PUBLICLY VISIBLE entries only.
+   *
+   * A submitter's duplicate check must never answer with somebody else's pending or unlisted title
+   * and id — that would make the endpoint a way to enumerate the review queue.
+   */
+  duplicates: DuplicateMatchView[];
 }
 
 // ── audit ────────────────────────────────────────────────────────────────────────
@@ -54,6 +72,49 @@ export interface DuplicateMatchView {
 
 export interface DuplicateListView {
   items: DuplicateMatchView[];
+}
+
+/**
+ * One side of a pair, as the REVIEW queue sees it.
+ *
+ * The submitter-facing `DuplicateMatchView` names only the other entry and only when it is public.
+ * A reviewer decides between two entries, so they get both sides and the editorial state that
+ * decides which one may survive a merge.
+ */
+export interface DuplicateSideView {
+  id: string;
+  title: string;
+  reviewStatus: "pending" | "approved" | "rejected";
+  isListed: boolean;
+  namespace: string | null;
+  /** The survivor of an earlier merge, when this entry has already lost one. */
+  mergedInto: string | null;
+  updatedAt: string;
+}
+
+export interface DuplicatePairView {
+  /** The PAIR's own id — what `/v1/review/duplicates/:id/…` names. Not an opportunity id. */
+  id: number;
+  status: "suspected" | "confirmed" | "dismissed" | "merged";
+  similarity: number | null;
+  detectedAt: string;
+  reviewedAt: string | null;
+  left: DuplicateSideView;
+  right: DuplicateSideView;
+}
+
+export interface DuplicatePairListView {
+  items: DuplicatePairView[];
+}
+
+export interface MergeResultView {
+  pair: DuplicatePairView;
+  /** The entry that remains public. */
+  survivorId: string;
+  /** The entry that was rejected, unlisted, archived and pointed at the survivor. */
+  mergedId: string;
+  /** Which whitelisted fields were carried over. Empty by default — a merge copies nothing. */
+  copiedFields: string[];
 }
 
 export interface VerificationRunView {

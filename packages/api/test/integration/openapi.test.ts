@@ -140,6 +140,8 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "ApiKey",
       "ApiKeyCreated",
       "ManagedOpportunityList",
+      "DuplicatePairList",
+      "MergeResult",
     ]) {
       expect(doc.components?.schemas?.[name], `components has ${name}`).toBeTruthy();
     }
@@ -153,6 +155,8 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/me", "get"],
       ["/v1/keys", "post"],
       ["/v1/review/opportunities", "get"],
+      ["/v1/review/duplicates", "get"],
+      ["/v1/review/duplicates/{id}/merge", "post"],
       ["/v1/review/opportunities/{id}/verify", "post"],
       ["/v1/admin/accounts/{id}/role", "post"],
     ] as const) {

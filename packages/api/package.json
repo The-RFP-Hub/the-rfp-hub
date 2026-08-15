@@ -21,7 +21,8 @@
     "export": "tsx scripts/export.ts",
     "export:api": "tsx scripts/export-from-api.ts",
     "corpus:fetch": "tsx tools/converter/fetch-corpus.ts",
-    "corpus:convert": "tsx tools/converter/convert.ts"
+    "corpus:convert": "tsx tools/converter/convert.ts",
+    "dedupe:threshold": "tsx scripts/dedupe-threshold-report.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
