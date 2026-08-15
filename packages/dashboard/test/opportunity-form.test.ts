@@ -101,12 +101,136 @@ describe("fromDocument", () => {
 
   it("round-trips: rebuilding from the form plus the carried fields loses nothing", () => {
     const { form, carried } = fromDocument(stored);
-    const rebuilt = { ...carried, ...toDocument(form).document };
+    const rebuilt = toDocument(form, carried).document;
 
     expect(rebuilt.milestones).toEqual([{ title: "Ship it" }]);
     expect(rebuilt.title).toBe("Round One");
     expect(rebuilt.ecosystems).toEqual(["ethereum", "optimism"]);
     // The form's own `source` wins, and it is empty: the server sets attribution on every write.
     expect(rebuilt.source).toEqual({});
+  });
+});
+
+/**
+ * The round trip against an entry that uses EVERY optional member the form does not render —
+ * including the ones INSIDE the two containers it half-models.
+ *
+ * A `PUT` replaces the stored record, so the question this answers is not "did the top level
+ * survive" but "did anything at all change that the publisher did not change". The assertion is
+ * therefore on the serialized bytes: an edit that touches one field must produce a payload
+ * identical to the stored record except that field (and `source`, which the server owns).
+ */
+describe("the maximal round trip", () => {
+  const maximal = {
+    specVersion: "1.0.0",
+    id: "acme:maximal",
+    fundingType: "grant",
+    title: "Round One",
+    summary: "A short summary.",
+    description: "A description.",
+    status: "open",
+    ecosystems: ["ethereum", "optimism"],
+    categories: ["infrastructure", "tooling"],
+    eligibility: "Teams shipping on a public network.",
+    applicationUrl: "https://example.org/apply",
+    website: "https://example.org",
+    logoUrl: "https://example.org/logo.png",
+    bannerUrl: "https://example.org/banner.png",
+    socialLinks: [{ platform: "farcaster", url: "https://example.com/acme" }],
+    operatingOrganizations: [
+      {
+        name: "Acme Foundation",
+        slug: "acme",
+        website: "https://acme.example",
+        logoUrl: "https://acme.example/logo.png",
+        contacts: [{ contactType: "email", value: "grants@acme.example" }],
+        ecosystems: ["ethereum"],
+      },
+      // A SECOND operating organisation. Rebuilding the array from the form's two inputs deleted
+      // this one outright.
+      { name: "Beta Collective", slug: "beta", website: "https://beta.example" },
+    ],
+    sponsoringOrganizations: [{ name: "Gamma DAO", slug: "gamma" }],
+    fundingInfo: {
+      currency: "USD",
+      budget: 500000,
+      minAward: 10000,
+      maxAward: 50000,
+      // …and the member the form has no input for, inside a container it partly rebuilds.
+      allocated: 125000,
+    },
+    fundingDetails: { fundingType: "grant", rounds: [{ name: "Spring", budget: 250000 }] },
+    deadlines: [{ deadlineType: "fixed", date: "2026-12-01T00:00:00.000Z", label: "application" }],
+    milestones: [{ title: "Ship it", description: "A working prototype." }],
+    prerequisites: ["A public repository."],
+    additionalReferences: [{ label: "Guidelines", url: "https://example.org/guidelines" }],
+    serviceAgreement: "https://example.org/terms",
+    opensAt: "2026-09-01T00:00:00.000Z",
+    postedAt: "2026-08-01T00:00:00.000Z",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-10T00:00:00.000Z",
+    source: { publisher: "acme", submittedBy: "acme", submittedAt: "2026-08-01T00:00:00.000Z" },
+  } as unknown as Opportunity;
+
+  /** What the server would receive, as the client would serialize it. */
+  const payload = (over: Partial<Record<string, unknown>> = {}) =>
+    JSON.stringify({ ...(maximal as unknown as Record<string, unknown>), ...over });
+
+  it("produces a byte-identical payload when nothing is edited", () => {
+    const { form, carried } = fromDocument(maximal);
+    const rebuilt = toDocument(form, carried);
+
+    expect(rebuilt.problems).toEqual([]);
+    // `source` is the ONE deliberate difference: the server owns attribution and the client sends
+    // an empty object rather than echoing what it was told.
+    expect(JSON.stringify(rebuilt.document)).toBe(payload({ source: {} }));
+  });
+
+  it("changes exactly the edited field and nothing else", () => {
+    const { form, carried } = fromDocument(maximal);
+    const rebuilt = toDocument({ ...form, title: "Round Two" }, carried);
+
+    expect(JSON.stringify(rebuilt.document)).toBe(payload({ title: "Round Two", source: {} }));
+  });
+
+  it("keeps every member of a container it only partly renders", () => {
+    const { form, carried } = fromDocument(maximal);
+    const rebuilt = toDocument({ ...form, budget: "600000", orgName: "Acme" }, carried);
+    const document = rebuilt.document as Record<string, unknown>;
+
+    // The first organisation's OTHER members survive an edit to its name…
+    expect(document.operatingOrganizations).toEqual([
+      {
+        name: "Acme",
+        slug: "acme",
+        website: "https://acme.example",
+        logoUrl: "https://acme.example/logo.png",
+        contacts: [{ contactType: "email", value: "grants@acme.example" }],
+        ecosystems: ["ethereum"],
+      },
+      { name: "Beta Collective", slug: "beta", website: "https://beta.example" },
+    ]);
+    // …and `allocated` survives an edit to the budget.
+    expect(document.fundingInfo).toEqual({
+      currency: "USD",
+      budget: 600000,
+      minAward: 10000,
+      maxAward: 50000,
+      allocated: 125000,
+    });
+  });
+
+  it("removes a field the publisher actually cleared", () => {
+    const { form, carried } = fromDocument(maximal);
+    const rebuilt = toDocument({ ...form, summary: "", maxAward: "" }, carried);
+    const document = rebuilt.document as Record<string, unknown>;
+
+    expect("summary" in document).toBe(false);
+    expect(document.fundingInfo).toEqual({
+      currency: "USD",
+      budget: 500000,
+      minAward: 10000,
+      allocated: 125000,
+    });
   });
 });

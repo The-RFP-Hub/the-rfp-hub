@@ -240,6 +240,9 @@ export function createApiClient(options: ApiClientOptions) {
     review: {
       opportunities: (query?: { reviewStatus?: ReviewStatus; page?: number; limit?: number }) =>
         request<ManagedOpportunityList>("GET", "/v1/review/opportunities", { query }),
+      /** One entry in full, entitled by ROLE rather than by ownership. See `loadOpportunity`. */
+      opportunity: (id: string) =>
+        request<Opportunity>("GET", `/v1/review/opportunities/${encodeURIComponent(id)}`),
       approve: (id: string, reason?: string | null) =>
         request<ReviewDecision>(
           "POST",
@@ -324,3 +327,30 @@ export function createApiClient(options: ApiClientOptions) {
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
+
+/**
+ * One entry in full, from whichever route this session is entitled to read it through.
+ *
+ * There are two, and neither one alone serves this page. `/v1/me/opportunities/{id}` is scoped to
+ * entries the caller submitted or publishes — right for an owner, and a 404 for a reviewer, who is
+ * sent here from the review queue, a claim or a duplicate pair, all of which are by definition
+ * somebody else's entry. `/v1/review/opportunities/{id}` is entitled by role and is a 403 for
+ * everybody else.
+ *
+ * OWNER FIRST, and the fallback is narrow on purpose: only a 404, and only for a session that
+ * reports `canReview`. A reviewer looking at their OWN entry still reads it as its owner, so the
+ * ordinary case does not depend on the role at all — and a 401 or a transport failure is passed
+ * straight through rather than being retried against a route that will answer the same way.
+ */
+export async function loadOpportunity(
+  api: ApiClient,
+  id: string,
+  canReview: boolean,
+): Promise<Opportunity> {
+  try {
+    return await api.me.opportunity(id);
+  } catch (error) {
+    if (!canReview || !(error instanceof ApiError) || !error.isNotFound) throw error;
+    return api.review.opportunity(id);
+  }
+}

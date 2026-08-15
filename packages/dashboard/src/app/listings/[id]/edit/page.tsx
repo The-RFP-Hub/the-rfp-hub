@@ -11,21 +11,26 @@
 import { RequireSession } from "@/components/Chrome";
 import { OpportunityForm } from "@/components/OpportunityForm";
 import { ResourceView } from "@/components/states";
+import { loadOpportunity } from "@/lib/api";
 import { fromDocument } from "@/lib/opportunity-form";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
+import type { Me } from "@/lib/types";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
 
 export default function EditListingPage() {
   const params = useParams<{ id: string }>();
   const id = decodeURIComponent(String(params.id ?? ""));
-  return <RequireSession>{() => <EditForm id={id} />}</RequireSession>;
+  return <RequireSession>{(me) => <EditForm id={id} me={me} />}</RequireSession>;
 }
 
-function EditForm({ id }: { id: string }) {
+function EditForm({ id, me }: { id: string; me: Me }) {
   const api = useApi();
-  const load = useCallback(() => api.me.opportunity(id), [api, id]);
+  // The same two-route read the detail page does, for the same reason: a reviewer may edit an
+  // entry (submitter, namespace member or T3+ may `PUT`), and the owner route 404s one that is
+  // not theirs.
+  const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
   const { state, reload } = useResource(load);
 
   return (

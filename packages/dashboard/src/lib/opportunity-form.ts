@@ -94,8 +94,24 @@ export interface BuildResult {
   problems: string[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /**
- * Form → Standard document.
+ * Write a member, or REMOVE it.
+ *
+ * `undefined` means the publisher cleared the field, which is not the same as leaving it alone —
+ * and it has to be an actual removal rather than an `undefined` assignment: `Object.keys()` counts
+ * a key whose value is `undefined`, which is what decides whether `fundingInfo` is sent at all.
+ */
+function put(target: Record<string, unknown>, key: string, value: unknown): void {
+  if (value === undefined) delete target[key];
+  else target[key] = value;
+}
+
+/**
+ * Form → Standard document, laid over the record it was loaded from.
  *
  * EMPTY MEANS ABSENT, not empty string: sending `"summary": ""` would store an empty summary rather
  * than no summary, and the two are different claims about the programme.
@@ -103,21 +119,45 @@ export interface BuildResult {
  * Nothing here sets a `source.*` attribution field. The server owns every one of them — publisher,
  * submittedBy, submittedAt, ingestedVia, originalId — and a client that sent them would either be
  * ignored or, worse, be believed.
+ *
+ * `base` IS WHAT MAKES A REPLACE SAFE, and it goes deeper than the top level. `PUT` replaces the
+ * stored record, so anything this form does not rebuild has to arrive unchanged — and the form
+ * only PARTIALLY models two containers. It renders the first operating organisation's name and
+ * slug, and four members of `fundingInfo`. Rebuilding those containers from the inputs alone
+ * deleted every additional organisation, every organisation contact and website, and
+ * `fundingInfo.allocated`, from an entry whose publisher only came to fix a typo in the title.
+ *
+ * So the document STARTS as the stored one and each edited field is written back over it, per
+ * container and per array entry. Untouched members keep their values and their positions, which is
+ * also what makes "the payload is byte-identical except the fields I changed" a testable claim
+ * rather than an aspiration.
  */
-export function toDocument(form: OpportunityFormState): BuildResult {
+export function toDocument(
+  form: OpportunityFormState,
+  base: Record<string, unknown> = {},
+): BuildResult {
   const problems: string[] = [];
-  const document: Record<string, unknown> = {
-    specVersion: "1.0.0",
-    id: form.id.trim(),
-    fundingType: form.fundingType,
-    title: form.title.trim(),
-    description: form.description,
-    status: form.status,
-    // The server fills this in; it is sent as an empty object because the Standard requires the
-    // member to be present.
-    source: {},
-    operatingOrganizations: [{ name: form.orgName.trim(), slug: form.orgSlug.trim() }],
-  };
+  const document: Record<string, unknown> = { ...base };
+
+  const set = (key: string, value: unknown): void => put(document, key, value);
+
+  set("specVersion", "1.0.0");
+  set("id", form.id.trim());
+  set("fundingType", form.fundingType);
+  set("title", form.title.trim());
+  set("description", form.description);
+  set("status", form.status);
+  // The server fills this in; it is sent as an empty object because the Standard requires the
+  // member to be present.
+  set("source", {});
+
+  // Only the FIRST organisation is rendered, and only its name and slug. Every other member of it,
+  // and every organisation after it, is carried through this spread untouched.
+  const baseOrgs = Array.isArray(base.operatingOrganizations) ? base.operatingOrganizations : [];
+  const first: Record<string, unknown> = isRecord(baseOrgs[0]) ? { ...baseOrgs[0] } : {};
+  first.name = form.orgName.trim();
+  first.slug = form.orgSlug.trim();
+  set("operatingOrganizations", [first, ...baseOrgs.slice(1)]);
 
   const optionalText: [keyof OpportunityFormState, string][] = [
     ["summary", "summary"],
@@ -127,39 +167,53 @@ export function toDocument(form: OpportunityFormState): BuildResult {
   ];
   for (const [field, key] of optionalText) {
     const value = String(form[field]).trim();
-    if (value !== "") document[key] = value;
+    set(key, value === "" ? undefined : value);
   }
 
   const ecosystems = splitList(form.ecosystems);
-  if (ecosystems.length > 0) document.ecosystems = ecosystems;
+  set("ecosystems", ecosystems.length > 0 ? ecosystems : undefined);
   const categories = splitList(form.categories);
-  if (categories.length > 0) document.categories = categories;
+  set("categories", categories.length > 0 ? categories : undefined);
 
-  const fundingInfo: Record<string, unknown> = {};
-  if (form.currency.trim() !== "") fundingInfo.currency = form.currency.trim();
+  // Same rule one level down: `allocated`, and anything else a publisher set through the API,
+  // survives an edit that only touched the budget.
+  const fundingInfo: Record<string, unknown> = isRecord(base.fundingInfo)
+    ? { ...base.fundingInfo }
+    : {};
+  const currency = form.currency.trim();
+  put(fundingInfo, "currency", currency === "" ? undefined : currency);
   for (const [field, key] of [
     ["budget", "budget"],
     ["minAward", "minAward"],
     ["maxAward", "maxAward"],
   ] as const) {
     const parsed = numberOrUndefined(form[field]);
-    if (parsed === undefined) continue;
     if (Number.isNaN(parsed)) {
+      // Left as it was: the submission is blocked on this problem anyway, and clearing a stored
+      // amount because somebody mistyped over it is the destructive reading of a typo.
       problems.push(`${key} is not a number.`);
       continue;
     }
-    fundingInfo[key] = parsed;
+    put(fundingInfo, key, parsed);
   }
-  if (Object.keys(fundingInfo).length > 0) document.fundingInfo = fundingInfo;
+  set("fundingInfo", Object.keys(fundingInfo).length > 0 ? fundingInfo : undefined);
 
   const details = parseJson(form.fundingDetails, "fundingDetails");
-  if (details.problem) problems.push(details.problem);
-  document.fundingDetails = details.value ?? {};
+  if (details.problem) {
+    problems.push(details.problem);
+    // The Standard requires the member, so a create still has to carry one; an edit keeps what was
+    // stored rather than blanking it over a half-typed brace.
+    if (document.fundingDetails === undefined) set("fundingDetails", {});
+  } else {
+    set("fundingDetails", details.value ?? {});
+  }
 
-  if (form.deadlines.trim() !== "") {
+  if (form.deadlines.trim() === "") {
+    set("deadlines", undefined);
+  } else {
     const deadlines = parseJson(form.deadlines, "deadlines");
     if (deadlines.problem) problems.push(deadlines.problem);
-    else document.deadlines = deadlines.value;
+    else set("deadlines", deadlines.value);
   }
 
   return { document, problems };
@@ -177,10 +231,15 @@ function parseJson(text: string, field: string): { value?: unknown; problem?: st
 /**
  * Document → form, for the edit screen.
  *
- * Anything this form does not model is preserved by `carriedFields`, not dropped: a `PUT` REPLACES
- * the stored record, so an edit screen that rebuilt the document from its own inputs alone would
- * delete every field it happens not to render. That is the single most damaging bug an edit form
- * of this shape can have.
+ * `carried` is THE WHOLE STORED RECORD, not the leftovers. A `PUT` replaces it, so the safe base
+ * for the next one is the last one — `toDocument(form, carried)` then writes the edited fields back
+ * over it and removes the ones the publisher cleared. An earlier version passed only the fields
+ * this form does not name and rebuilt the rest; that carried the top level and silently dropped
+ * everything INSIDE the two containers it half-models — additional operating organisations, their
+ * contacts and websites, `fundingInfo.allocated`.
+ *
+ * Carrying the whole record also keeps key order, which is what lets the round-trip test assert
+ * that an untouched edit produces a byte-identical payload rather than merely an equivalent one.
  */
 export function fromDocument(entry: Opportunity): {
   form: OpportunityFormState;
@@ -192,30 +251,9 @@ export function fromDocument(entry: Opportunity): {
     : undefined;
   const funding = (record.fundingInfo ?? {}) as Record<string, unknown>;
 
-  const modelled = new Set([
-    "specVersion",
-    "id",
-    "fundingType",
-    "title",
-    "summary",
-    "description",
-    "status",
-    "ecosystems",
-    "categories",
-    "eligibility",
-    "applicationUrl",
-    "website",
-    "operatingOrganizations",
-    "fundingInfo",
-    "fundingDetails",
-    "deadlines",
-    // Server-owned. Sent back untouched so a replace does not look like an attempt to rewrite it.
-    "source",
-  ]);
-  const carried: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(record)) {
-    if (!modelled.has(key)) carried[key] = value;
-  }
+  const carried: Record<string, unknown> = { ...record };
+  // Server-owned, and sent back empty rather than echoed: attribution is set on every write, and a
+  // client restating it is either ignored or, worse, believed.
   carried.source = record.source ?? {};
 
   return {
