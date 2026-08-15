@@ -150,6 +150,35 @@ export class VerificationService {
     const now = new Date();
 
     return this.db.transaction(async (tx) => {
+      // COMPARE-AND-SET AGAINST THE ROW THIS VERDICT IS ABOUT.
+      //
+      // The fetch above is a network round trip, and a `PUT` landing during it replaces the very
+      // content the verdict was computed from. Applying it anyway is worse than doing nothing: it
+      // stamps `verified_at` LATER than the edit's `updated_at`, and the backfill predicate is
+      // `verified_at < updated_at`, so the new content is marked current and never re-checked. The
+      // record would then claim, permanently, that a page corroborates text it never saw.
+      //
+      // So the row is re-read under a lock and the verdict is applied only if nothing moved:
+      // `updated_at` unchanged and the URL still the one that was fetched. Otherwise the RUN IS
+      // STILL RECORDED — a fetch happened and its result is evidence — flagged stale, and the
+      // opportunity is left exactly as it is, which leaves it in the predicate for the next pass.
+      const locked = await tx
+        .select()
+        .from(opportunities)
+        .where(eq(opportunities.id, row.id))
+        .for("update")
+        .limit(1);
+      const current = locked[0];
+      const stale =
+        current === undefined ||
+        current.updatedAt.getTime() !== row.updatedAt.getTime() ||
+        (current.applicationUrl?.trim() ?? null) !== url;
+
+      const failureText = failure ? `${failure.category}: ${failure.message}` : null;
+      const staleText = stale
+        ? "stale_result: the entry changed while its source was being fetched, so this verdict was recorded but not applied"
+        : null;
+
       const inserted = await tx
         .insert(verificationRuns)
         .values({
@@ -164,36 +193,46 @@ export class VerificationService {
           matched: assessed?.matched ?? false,
           snapshotText: assessed?.snapshotText ?? null,
           snapshotSha256: fetched?.sha256 ?? null,
-          error: failure ? `${failure.category}: ${failure.message}` : null,
+          error: [staleText, failureText].filter((part) => part !== null).join(" — ") || null,
         })
         .returning();
       const run = inserted[0];
       if (!run) throw new Error(`failed to record a verification run for ${row.publicId}`);
 
       const matched = assessed?.matched ?? false;
-      await tx
-        .update(opportunities)
-        .set({
-          verifiedAgainstSource: matched,
-          verifiedAt: now,
-          // A SUCCESSFUL check is a "still real" signal and resets the staleness clock. A failed one
-          // is the opposite of evidence, so it deliberately does not.
-          lastSeenAt: matched ? now : row.lastSeenAt,
-        })
-        .where(eq(opportunities.id, row.id));
+      if (!stale) {
+        await tx
+          .update(opportunities)
+          .set({
+            verifiedAgainstSource: matched,
+            verifiedAt: now,
+            // A SUCCESSFUL check is a "still real" signal and resets the staleness clock. A failed
+            // one is the opposite of evidence, so it deliberately does not.
+            lastSeenAt: matched ? now : row.lastSeenAt,
+          })
+          .where(eq(opportunities.id, row.id));
+      }
 
       await this.audit.record(tx, {
         ...actor,
         subjectKind: "opportunity",
         subjectId: row.id,
         action: "verify_source",
-        patch: {
-          verifiedAgainstSource: { before: row.verifiedAgainstSource, after: matched },
-          url,
-          finalUrl: fetched?.finalUrl ?? null,
-          httpStatus: fetched?.status ?? failure?.status ?? null,
-          ...(failure ? { error: failure.category } : {}),
-        },
+        patch: stale
+          ? {
+              // No before/after pair: nothing about the entry changed, and a trail that implied
+              // otherwise would be the same lie the update itself would have been.
+              discarded: "stale_result",
+              reason: "the entry changed while its source was being fetched",
+              url,
+            }
+          : {
+              verifiedAgainstSource: { before: row.verifiedAgainstSource, after: matched },
+              url,
+              finalUrl: fetched?.finalUrl ?? null,
+              httpStatus: fetched?.status ?? failure?.status ?? null,
+              ...(failure ? { error: failure.category } : {}),
+            },
       });
 
       return toRunView(run);

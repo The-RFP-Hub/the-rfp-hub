@@ -132,11 +132,32 @@ export class StalenessService {
     const reason = this.closureReason(row, next, now, inactiveBefore);
     if (reason === null) {
       if (!nextChanged) return "unchanged";
-      await this.db
-        .update(opportunities)
-        .set({ nextDeadlineAt: next })
-        .where(eq(opportunities.id, row.id));
-      return "recomputed";
+      // THE SAME LOCKED RE-READ THE CLOSURE BRANCH USES, for the same reason and against a key
+      // that is read far more often. `next_deadline_at` is derived from `deadlines`, and a
+      // publisher's `PUT` between the walk's SELECT and this UPDATE has already recomputed it from
+      // the NEW deadlines — writing the value derived from the stale ones would overwrite a correct
+      // derived key with an obsolete one, and every deadline filter and sort would read it until
+      // the row happened to become a candidate again. The lock makes the publisher's write the one
+      // that stands.
+      return this.db.transaction(async (tx) => {
+        const locked = await tx
+          .select()
+          .from(opportunities)
+          .where(eq(opportunities.id, row.id))
+          .for("update")
+          .limit(1);
+        const current = locked[0];
+        if (!current) return "unchanged";
+        const currentNext = nextDeadlineAt(current.deadlines, now);
+        if ((currentNext?.getTime() ?? null) === (current.nextDeadlineAt?.getTime() ?? null)) {
+          return "unchanged";
+        }
+        await tx
+          .update(opportunities)
+          .set({ nextDeadlineAt: currentNext })
+          .where(eq(opportunities.id, row.id));
+        return "recomputed";
+      });
     }
 
     await this.db.transaction(async (tx) => {

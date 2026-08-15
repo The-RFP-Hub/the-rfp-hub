@@ -1,5 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
+import { toStandard } from "../../mappers/opportunity.mapper.js";
 import { toAccountSummary } from "../../services/admin/admin.service.js";
 import { AccountService } from "../../services/auth/account.service.js";
 import { ClaimService } from "../../services/claims/claim.service.js";
@@ -14,6 +15,7 @@ import type {
   ManagedOpportunityListView,
   OrganizationListView,
 } from "../../shared/api-views.js";
+import { notFound } from "../../shared/http-error.js";
 import { bodyOf, handled, idParam, paramsOf, queryOf } from "../../shared/route-helpers.js";
 
 const reviews = new ReviewService();
@@ -33,6 +35,23 @@ export const reviewController = {
     // The queue's default is the only status a reviewer has to act on.
     const page = await managed.listForReview({ reviewStatus: "pending", ...query });
     return page satisfies ManagedOpportunityListView;
+  }),
+
+  /**
+   * One entry in full, for the reviewer deciding it.
+   *
+   * `/v1/me/opportunities/{id}` is scoped to entries the caller submitted or publishes, which is
+   * exactly right for an owner and useless to a reviewer: the queue, the claims list and the
+   * duplicate pairs all link to entries that by definition belong to somebody else, and a reviewer
+   * following one of those links got a 404 from the owner route. `findAny` carries no visibility
+   * clause at all — the T3 gate on this route IS the entitlement — so a pending, rejected or
+   * unlisted record is served here and nowhere else.
+   */
+  findOpportunity: handled(async (request: FastifyRequest) => {
+    const { id } = paramsOf<{ id: string }>(request);
+    const row = await managed.findAny(id);
+    if (!row) throw notFound(`no opportunity ${JSON.stringify(id)}.`);
+    return toStandard(row);
   }),
 
   approve: handled(async (request: FastifyRequest) => {

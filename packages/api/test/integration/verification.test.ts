@@ -233,6 +233,42 @@ run("M3VER verification", () => {
     });
   });
 
+  it("records but does not apply a verdict whose entry changed during the fetch", async () => {
+    const id = await seedEntry("raced", MATCH_URL);
+
+    // The publisher's PUT lands while the outbound fetch is in flight. The verdict below was
+    // computed from the OLD content, so applying it would stamp `verified_at` later than the
+    // edit's `updated_at` — and the backfill predicate is `verified_at < updated_at`, so the new
+    // content would be marked current and never re-checked.
+    const racing: SourceTransport = async (url, options) => {
+      await db
+        .update(opportunities)
+        .set({ title: "Renamed mid-flight", updatedAt: new Date(Date.now() + 1_000) })
+        .where(eq(opportunities.id, id));
+      return fixtureTransport(PAGES)(url, options);
+    };
+
+    const view = await serviceWith(racing).verify(id);
+    // The run is still recorded — a fetch happened and what it found is evidence — and flagged.
+    expect(view.error).toMatch(/stale_result/);
+    expect(await latestRun(id)).toBeTruthy();
+
+    const row = (await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1))[0];
+    expect(row?.verifiedAt, "a discarded verdict must not stamp the entry").toBeNull();
+    expect(row?.verifiedAgainstSource).toBeNull();
+
+    // …so the entry is still owed a check, which is the whole point of not stamping it.
+    expect(await serviceWith(fixtureTransport(PAGES)).pendingIds(10_000)).toContain(id);
+
+    // And the same check against an entry nobody touched applies normally.
+    const settled = await serviceWith(fixtureTransport(PAGES)).verify(id);
+    expect(settled.error).toBeNull();
+    const after = (
+      await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1)
+    )[0];
+    expect(after?.verifiedAt).toBeTruthy();
+  });
+
   it("records a failed run rather than staying silent", async () => {
     const id = await seedEntry("missing", "https://programmes.example.org/nowhere");
     const view = await serviceWith(fixtureTransport(PAGES)).verify(id);

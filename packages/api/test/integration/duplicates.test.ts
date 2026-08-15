@@ -29,6 +29,7 @@ const { auditLog, opportunities, opportunityDuplicates } = await import("../../s
 const { bearer, grantMembership, mintPrivyToken, seedAccount, seedOrganization, testPrivyConfig } =
   await import("../helpers/auth.js");
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
+const { DedupeService } = await import("../../src/modules/services/dedupe/dedupe.service.js");
 
 const NS = "m3dup";
 const OTHER_NS = "m3dup-other";
@@ -200,6 +201,67 @@ run("M3DUP duplicate detection", () => {
     expect(probe.statusCode, probe.body).toBe(201);
     expect(ours(probe)).toContain(`${NS}:alpha`);
     expect(ours(probe)).not.toContain(`${NS}:hidden`);
+  });
+
+  // ── the OTHER direction of the same rule ──────────────────────────────────────
+  it("never discloses a pending counterpart to the owner of the entry it was matched against", async () => {
+    // The pending submission above recorded a pair with `alpha`, which the PUBLISHER owns. Owning
+    // one side of a pair is not entitlement to the other side: `alpha`'s owner is not `hidden`'s
+    // owner, and both of the owner-facing routes would otherwise read back a stranger's
+    // review-queue title and id.
+    const pending = await pairBetween(`${NS}:alpha`, `${NS}:hidden`);
+    expect(pending, "the fixture only proves anything if the pair exists").toBeTruthy();
+
+    const queue = await app.inject({ url: "/v1/me/duplicates", headers: bearer(publisherToken) });
+    expect(queue.statusCode).toBe(200);
+    const queued = queue.json().items.map((item: { id: string }) => item.id);
+    expect(queued).not.toContain(`${NS}:hidden`);
+
+    const sub = await app.inject({
+      url: `/v1/opportunities/${NS}:alpha/duplicates`,
+      headers: bearer(publisherToken),
+    });
+    expect(sub.statusCode).toBe(200);
+    expect(sub.json().items.map((item: { id: string }) => item.id)).not.toContain(`${NS}:hidden`);
+
+    // A reviewer, and only a reviewer, sees it — deciding between two entries is what they are for.
+    const review = await app.inject({
+      url: "/v1/review/duplicates",
+      headers: bearer(reviewerToken),
+    });
+    expect(review.statusCode).toBe(200);
+    const sides = review
+      .json()
+      .items.flatMap((pair: { left: { id: string }; right: { id: string } }) => [
+        pair.left.id,
+        pair.right.id,
+      ]);
+    expect(sides).toContain(`${NS}:hidden`);
+  });
+
+  it("re-selects an entry whose stored vector no longer matches its content", async () => {
+    // THE FAILURE THIS REPAIRS. An edit lands, the submit-time check fails (a provider timeout, a
+    // 429, a missing key) and the entry keeps its OLD vector — same model, same provider. A
+    // predicate that only looked for a MISSING embedding row would consider that current forever,
+    // and the entry would be searched, matched and pruned against text it no longer has.
+    const dedupe = new DedupeService();
+    const created = await post(
+      publisherToken,
+      entry(`${NS}:stale-vector`, "Settlement Layer Bounty", UNRELATED_BODY),
+    );
+    expect(created.statusCode, created.body).toBe(201);
+    expect(created.json().duplicateCheck).toBe("ok");
+
+    const rowId = await rowIdOf(`${NS}:stale-vector`);
+    expect(await dedupe.pendingEmbeddingIds(10_000)).not.toContain(rowId);
+
+    // The edit, without the embedding update that should have accompanied it.
+    await db
+      .update(opportunities)
+      .set({ description: `${UNRELATED_BODY} — and an entirely rewritten second half.` })
+      .where(eq(opportunities.id, rowId));
+
+    expect(await dedupe.pendingEmbeddingIds(10_000)).toContain(rowId);
   });
 
   // ── T-DUP-6 ───────────────────────────────────────────────────────────────────

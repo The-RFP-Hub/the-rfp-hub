@@ -12,6 +12,13 @@
  * a request body — a wallet address that arrives in a request is self-asserted. This job is the
  * only writer of that column, which is what makes that sentence true.
  *
+ * AND IT APPLIES THAT INPUT, HERE, RATHER THAN LEAVING IT FOR SOMEBODY ELSE. Enrichment stamps
+ * `enriched_at`, which takes the account out of this job's cursor permanently, so a promotion
+ * deferred to "the next enrichment run" would never happen. The moment the verified wallet lands
+ * it is checked against the configured list, and a match is promoted through the SAME audited,
+ * idempotent path the DID bootstrap uses. `AccountService.applyBootstrapAdmin` re-checks on every
+ * login too, so adding a wallet to the list later still takes effect without touching the database.
+ *
  * WITHOUT `PRIVY_APP_SECRET` THE JOB IS INERT and says so: `{skipped}`, exit 0, no rows touched.
  * That is a configuration statement, not a failure, and it is deliberately distinguishable from
  * the runner's `{skipped: "locked"}`.
@@ -26,6 +33,7 @@ import { and, asc, isNull, sql } from "drizzle-orm";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type AccountRow, accounts } from "../../../db/schema.js";
+import { AccountService } from "../auth/account.service.js";
 import type { JobResult } from "./types.js";
 
 /** The provider's user record, reduced to the two members this job reads. */
@@ -54,13 +62,25 @@ export interface AccountEnrichmentOptions {
 export class AccountEnrichmentService {
   private readonly config: AppConfig;
   private readonly fetchUser: ProviderUserFetcher | undefined;
+  private readonly accountsService: AccountService;
 
   constructor(
     private readonly db: DB = defaultDb,
-    options: { config?: AppConfig; fetchUser?: ProviderUserFetcher } = {},
+    options: {
+      config?: AppConfig;
+      fetchUser?: ProviderUserFetcher;
+      accounts?: AccountService;
+    } = {},
   ) {
     this.config = options.config ?? defaultConfig;
     this.fetchUser = options.fetchUser ?? privyUserFetcher(this.config);
+    this.accountsService =
+      options.accounts ??
+      new AccountService(
+        db,
+        this.config.bootstrapAdminPrivyDids,
+        this.config.bootstrapAdminWallets,
+      );
   }
 
   async runBatch(options: AccountEnrichmentOptions = {}): Promise<JobResult> {
@@ -75,13 +95,14 @@ export class AccountEnrichmentService {
     let processed = 0;
     let unknown = 0;
     let failed = 0;
+    let promoted = 0;
 
     for (const row of pending) {
       const did = row.privyDid;
       if (did === null) continue;
       try {
         const user = await fetchUser(did);
-        await this.db
+        const updated = await this.db
           .update(accounts)
           .set({
             // A record the provider does not have leaves both columns as they were: absent is not
@@ -90,7 +111,15 @@ export class AccountEnrichmentService {
             ...(user ? { primaryWallet: user.primaryWallet, email: user.email } : {}),
             enrichedAt: now,
           })
-          .where(sql`${accounts.id} = ${row.id}`);
+          .where(sql`${accounts.id} = ${row.id}`)
+          .returning();
+        const stored = updated[0];
+        // The bootstrap check runs against the row AS STORED, so it sees the wallet this pass just
+        // wrote. A no-op for every account that matches nothing, which is nearly all of them.
+        if (stored) {
+          const after = await this.accountsService.applyBootstrapAdmin(stored);
+          if (after.globalRole !== stored.globalRole) promoted++;
+        }
         if (user === null) unknown++;
         processed++;
       } catch {
@@ -102,7 +131,12 @@ export class AccountEnrichmentService {
     return {
       processed,
       remaining: await this.pendingCount(),
-      details: { attempted: pending.length, unknownToProvider: unknown, failed },
+      details: {
+        attempted: pending.length,
+        unknownToProvider: unknown,
+        failed,
+        bootstrapAdminsPromoted: promoted,
+      },
     };
   }
 

@@ -54,6 +54,24 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     reviewController.listOpportunities,
   );
 
+  router.get(
+    "/opportunities/:id",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "getReviewOpportunity",
+        tags: ["review"],
+        summary: "One entry in full, whatever its review status",
+        description:
+          "The reviewer's counterpart to `GET /v1/me/opportunities/{id}`, which is scoped to entries the caller owns. Everything a reviewer is sent to — the queue, a claim, a duplicate pair — is by definition somebody else's entry, so deciding it needs a read that is entitled by ROLE rather than by ownership. Serves pending, rejected and unlisted records; the T3 gate is the entitlement.",
+        security: [{ bearerAuth: [] }],
+        params: idParams,
+        response: { 200: { $ref: "Opportunity#" }, ...errors },
+      },
+    },
+    reviewController.findOpportunity,
+  );
+
   router.post(
     "/opportunities/:id/approve",
     {

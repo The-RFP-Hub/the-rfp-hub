@@ -20,6 +20,12 @@
  *    UNVERIFIED organisation transfers ownership but does NOT unlock auto-approval, because that
  *    requires a verified organisation. The response says so; so do the docs. Implying otherwise is
  *    how a publisher discovers the difference by having their next write sit in the queue.
+ *
+ * 5. **Queueing is IDEMPOTENT, including under a race.** The partial unique index is the only
+ *    arbiter of "one pending claim per organisation", and a read that precedes the insert cannot
+ *    be. Two colleagues filing the same claim at once therefore both pass the read and one insert
+ *    raises 23505 — which is caught and answered with the winning claim, not with a 500. The
+ *    claim is the organisation's, so the loser of that race got what they asked for.
  */
 import { and, eq } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
@@ -36,6 +42,7 @@ import type { ClaimResultView, ClaimSummaryView } from "../../shared/api-views.j
 import { effectiveCaps } from "../../shared/capabilities.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
+import { isUniqueViolation } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
 
 const NOTE_MAX = 1_000;
@@ -133,6 +140,14 @@ export class ClaimService {
         .where(eq(organizations.id, organization.id))
         .limit(1);
       const currentOrg = org[0];
+      // FOR UPDATE on the MEMBERSHIP row, not merely a read of it.
+      //
+      // The opportunity's lock serialises this grant against another grant, and against the
+      // staleness job — but it shares nothing with the revoke path, which only ever touches
+      // `org_memberships`. So a revocation starting after this SELECT could commit before the
+      // update below and the grant would still land on a membership that no longer exists. Locking
+      // the row is what makes the two paths conflict: a concurrent DELETE waits here, and whichever
+      // commits first is the one the other observes.
       const membership = await tx
         .select({ id: orgMemberships.id })
         .from(orgMemberships)
@@ -142,6 +157,7 @@ export class ClaimService {
             eq(orgMemberships.organizationId, organization.id),
           ),
         )
+        .for("update")
         .limit(1);
 
       if (!currentOrg?.verified || membership.length === 0) {
@@ -253,23 +269,11 @@ export class ClaimService {
     organization: OrganizationRow,
     note: string | null,
   ): Promise<ClaimResultView> {
-    const existing = await this.db
-      .select()
-      .from(opportunityClaims)
-      .where(
-        and(
-          eq(opportunityClaims.opportunityId, entry.id),
-          eq(opportunityClaims.organizationId, organization.id),
-          eq(opportunityClaims.status, "pending"),
-        ),
-      )
-      .limit(1);
-
     const reason = organization.verified
       ? `\`${organization.slug}\` is not listed among this entry's operating organisations, so a reviewer will decide.`
       : `\`${organization.slug}\` is not a verified publisher yet, so a reviewer will decide.`;
 
-    const already = existing[0];
+    const already = await this.findPendingClaim(entry.id, organization.id);
     if (already) {
       // A colleague at the same organisation already filed it. The claim is the organisation's, so
       // this is the same claim, not a second one.
@@ -282,39 +286,74 @@ export class ClaimService {
       };
     }
 
-    return this.db.transaction(async (tx) => {
-      const inserted = await tx
-        .insert(opportunityClaims)
-        .values({
-          opportunityId: entry.id,
-          organizationId: organization.id,
-          accountId: principal.accountId,
-          note,
-        })
-        .returning();
-      const claim = inserted[0];
-      if (!claim) throw new Error("failed to file a claim");
-      await this.audit.record(tx, {
-        subjectKind: "claim",
-        subjectId: claim.id,
-        actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
-        actorAccountId: principal.accountId,
-        actorApiKeyId: principal.apiKeyId ?? null,
-        action: "claim",
-        patch: {
-          opportunity: entry.publicId,
+    return this.db
+      .transaction(async (tx) => {
+        const inserted = await tx
+          .insert(opportunityClaims)
+          .values({
+            opportunityId: entry.id,
+            organizationId: organization.id,
+            accountId: principal.accountId,
+            note,
+          })
+          .returning();
+        const claim = inserted[0];
+        if (!claim) throw new Error("failed to file a claim");
+        await this.audit.record(tx, {
+          subjectKind: "claim",
+          subjectId: claim.id,
+          actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
+          actorAccountId: principal.accountId,
+          actorApiKeyId: principal.apiKeyId ?? null,
+          action: "claim",
+          patch: {
+            opportunity: entry.publicId,
+            organizationSlug: organization.slug,
+            note,
+          },
+        });
+        return {
+          outcome: "queued" as const,
+          claimId: claim.id,
+          opportunityId: entry.publicId,
           organizationSlug: organization.slug,
-          note,
-        },
+          message: reason,
+        };
+      })
+      .catch(async (error: unknown) => {
+        // TWO COLLEAGUES, ONE CLAIM. The read above and this insert are not one atomic step, so
+        // both members of an organisation can see no pending row and both reach here; the partial
+        // unique index lets one in and raises 23505 at the other. The claim is the ORGANISATION's,
+        // so the loser of that race has not failed — the thing they asked for exists. Loading the
+        // winner turns a 500 into the same idempotent 202 a serialised pair of requests would have
+        // produced.
+        if (!isUniqueViolation(error)) throw error;
+        const winner = await this.findPendingClaim(entry.id, organization.id);
+        if (!winner) throw error;
+        return {
+          outcome: "queued" as const,
+          claimId: winner.id,
+          opportunityId: entry.publicId,
+          organizationSlug: organization.slug,
+          message: `a claim from \`${organization.slug}\` is already awaiting review. ${reason}`,
+        };
       });
-      return {
-        outcome: "queued" as const,
-        claimId: claim.id,
-        opportunityId: entry.publicId,
-        organizationSlug: organization.slug,
-        message: reason,
-      };
-    });
+  }
+
+  /** The organisation's outstanding claim on one entry, if it has one. */
+  private async findPendingClaim(opportunityId: number, organizationId: number) {
+    const rows = await this.db
+      .select()
+      .from(opportunityClaims)
+      .where(
+        and(
+          eq(opportunityClaims.opportunityId, opportunityId),
+          eq(opportunityClaims.organizationId, organizationId),
+          eq(opportunityClaims.status, "pending"),
+        ),
+      )
+      .limit(1);
+    return rows[0];
   }
 
   private async findOpportunity(publicId: string): Promise<OpportunityRow> {

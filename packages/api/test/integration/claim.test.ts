@@ -158,6 +158,67 @@ run("M3CLAIM ownership claims", () => {
     expect(row?.lastSeenAt).not.toBeNull();
   });
 
+  it("keeps a claimed entry writable under its immutable id, and auto-approves the write", async () => {
+    // THE WHOLE POINT OF A CLAIM: an aggregator filed `host:…`, the organisation that runs the
+    // programme claimed it, and the id did not move — ids are immutable. The namespace a write is
+    // authorized against is therefore the ROW's publisher, not the id's prefix; deriving it from
+    // the prefix would reject every update the claim promised.
+    const id = await seedEntry("writable");
+    expect((await claim(operatorToken, id, OPERATOR)).statusCode).toBe(200);
+
+    const replaced = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(operatorToken),
+      payload: submission(id, HOST, {
+        title: "Updated by its publisher",
+        operatingOrganizations: [
+          { name: HOST, slug: HOST },
+          { name: OPERATOR, slug: OPERATOR },
+        ],
+      } as Record<string, unknown>),
+    });
+    expect(replaced.statusCode, replaced.body).toBe(200);
+    expect(replaced.json().reviewStatus).toBe("approved");
+    expect(replaced.json().opportunity.title).toBe("Updated by its publisher");
+
+    const row = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    expect(row?.publicId).toBe(id);
+    expect(row?.sourcePublisher).toBe(OPERATOR);
+    // …and the cross-system key stays pinned to the id it was created under, so a claim cannot
+    // move one half of `ux_opp_source` out from under whoever resolves against it.
+    expect(row?.sourceSystem).toBe(HOST);
+  });
+
+  it("is idempotent when two colleagues file the same claim at the same instant", async () => {
+    // Both requests read "no pending claim" before either inserts, so the partial unique index is
+    // the only arbiter and one insert raises 23505. That is a race, not a failure: the claim is
+    // the ORGANISATION's, so the loser is answered with the winning claim rather than a 500.
+    const id = await seedEntry("concurrent", [HOST], [OPERATOR]);
+    const [first, second] = await Promise.all([
+      claim(operatorToken, id, OPERATOR, "ours"),
+      claim(colleagueToken, id, OPERATOR, "also ours"),
+    ]);
+    expect([first.statusCode, second.statusCode]).toEqual([202, 202]);
+    expect(second.json().claimId).toBe(first.json().claimId);
+
+    const entry = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    const rows = await db
+      .select()
+      .from(opportunityClaims)
+      .where(
+        and(
+          eq(opportunityClaims.opportunityId, entry?.id ?? 0),
+          eq(opportunityClaims.status, "pending"),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+  });
+
   it("QUEUES a verified SPONSORING organisation — sponsorship is not operation", async () => {
     const id = await seedEntry("sponsor");
     const res = await claim(sponsorToken, id, SPONSOR);
