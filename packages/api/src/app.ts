@@ -3,10 +3,13 @@ import rateLimit from "@fastify/rate-limit";
 import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { config } from "./config.js";
+import { pool } from "./db/client.js";
 import { registerRoutes } from "./modules/routes/index.js";
+import { analyticsEvents } from "./modules/services/insights/event-buffer.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { isHttpError } from "./modules/shared/http-error.js";
 import { responseSchemas } from "./openapi/schemas.js";
+import { registerAnalyticsContext } from "./plugins/analytics-context.js";
 import { registerApexHostRule } from "./plugins/apex-host.js";
 import { type AuthOptions, registerAuth } from "./plugins/auth.js";
 import { registerSwagger } from "./plugins/swagger.js";
@@ -19,6 +22,17 @@ export interface BuildOptions {
    * their own ES256 verification key so they can mint tokens without a live identity provider.
    */
   auth?: AuthOptions;
+  /**
+   * Close the shared pg pool when the app closes.
+   *
+   * THE SERVER SETS THIS; THE TESTS DO NOT, and the reason is ordering rather than tidiness. The
+   * analytics buffer drains in an `onClose` hook and needs a LIVE pool to drain into, and Fastify
+   * runs `onClose` hooks LIFO — so the pool hook has to be registered BEFORE the flush hook to run
+   * AFTER it. Registering the pool close out here, after `buildApp` returned, put it last and
+   * therefore first, and the shutdown flush wrote into a closed pool. Both hooks are registered
+   * below, in one place, so the order is a decision that can be read.
+   */
+  closePool?: boolean;
 }
 
 /** Build the Fastify app (no network bind) — used by both the server and the integration tests. */
@@ -108,9 +122,27 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // so it covers every route the service has or gains.
   registerApexHostRule(app);
 
+  // ── shutdown order, decided here because it cannot be decided anywhere else ─────
+  // Fastify runs `onClose` hooks LIFO, so these two read backwards: the pool hook is registered
+  // FIRST so it runs LAST, and the analytics flush registered SECOND runs FIRST — against a pool
+  // that is still open. A buffered event is lost on a crash by design, but losing one to our own
+  // orderly shutdown would be a bug.
+  if (opts.closePool) {
+    app.addHook("onClose", async () => {
+      await pool.end();
+    });
+  }
+  analyticsEvents.reopen();
+  app.addHook("onClose", async () => {
+    await analyticsEvents.close();
+  });
+
   // Decorated on the ROOT instance, before the routes, so every route module can read `app.auth`.
   // Fastify encapsulation would otherwise scope the decorators to whichever plugin declared them.
   registerAuth(app, opts.auth);
+  // Same reason, and it CAPTURES NOTHING — it only supplies the per-request context that the
+  // controllers' explicit capture calls read. See plugins/analytics-context.ts.
+  registerAnalyticsContext(app);
 
   await registerSwagger(app); // before routes so their schemas are captured
   await registerRoutes(app);
@@ -138,11 +170,16 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         "/v1/stats",
         "/v1/health",
         "/v1/publishers",
+        "/v1/r/:id/apply",
+        "/v1/r/:id/source",
         "/v1/me",
         "/v1/me/opportunities",
         "/v1/me/duplicates",
         "/v1/keys",
+        "/v1/insights/opportunities/:id",
+        "/v1/insights/me/summary",
         "/v1/review/opportunities",
+        "/v1/review/duplicates",
         "/v1/review/claims",
         "/v1/review/organizations",
         "/v1/review/accounts",

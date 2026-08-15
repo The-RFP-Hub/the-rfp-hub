@@ -51,6 +51,11 @@ import type {
   DuplicatePairListView,
   DuplicatePairView,
   DuplicateSideView,
+  InsightsEntryView,
+  InsightsPointView,
+  InsightsSeriesView,
+  InsightsSummaryView,
+  InsightsTotalsView,
   ManagedOpportunityListView,
   ManagedOpportunityView,
   MeMembershipView,
@@ -280,6 +285,11 @@ describe("closed response components vs their producers", () => {
       "DuplicateSide",
       "ErrorResponse",
       "Health",
+      "InsightsEntry",
+      "InsightsPoint",
+      "InsightsSeries",
+      "InsightsSummary",
+      "InsightsTotals",
       "ManagedOpportunity",
       "ManagedOpportunityList",
       "Me",
@@ -481,6 +491,18 @@ describe("M3 closed components vs their view types", () => {
     createdAt: "2026-08-14T00:00:00.000Z",
     decidedAt: null,
   };
+  const insightsTotals: InsightsTotalsView = {
+    listViews: 12,
+    detailViews: 3,
+    sourceClicks: 1,
+    applyClicks: 2,
+  };
+  const insightsPoint: InsightsPointView = { day: "2026-08-14", ...insightsTotals };
+  const insightsEntry: InsightsEntryView = {
+    opportunityId: "example-org:one",
+    title: "One",
+    ...insightsTotals,
+  };
   const publisher: PublisherView = {
     slug: "example-org",
     name: "Example",
@@ -568,6 +590,23 @@ describe("M3 closed components vs their view types", () => {
       copiedFields: [],
     } satisfies MergeResultView,
     VerificationRun: verificationRun,
+    InsightsTotals: insightsTotals,
+    InsightsPoint: insightsPoint,
+    InsightsEntry: insightsEntry,
+    InsightsSeries: {
+      opportunityId: "example-org:one",
+      title: "One",
+      from: "2026-07-16",
+      to: "2026-08-14",
+      totals: insightsTotals,
+      days: [insightsPoint],
+    } satisfies InsightsSeriesView,
+    InsightsSummary: {
+      from: "2026-07-16",
+      to: "2026-08-14",
+      totals: insightsTotals,
+      opportunities: [insightsEntry],
+    } satisfies InsightsSummaryView,
     ClaimResult: claimResult,
     ClaimSummary: claimSummary,
     ClaimList: { items: [claimSummary] } satisfies ClaimListView,

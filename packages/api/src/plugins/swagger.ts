@@ -56,6 +56,11 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         { name: "admin", description: "Administrator surface — roles and direct-create grants" },
         { name: "publishers", description: "Verified publishing organisations" },
         {
+          name: "insights",
+          description:
+            "A publisher's own traffic. API reads and link-outs rather than page views, best-effort by construction, and never public.",
+        },
+        {
           name: "spec",
           description:
             "The RFP Hub Standard's own documents, served at the canonical URLs their identifiers name. Unversioned by the API on purpose — an identifier must not carry an API version.",

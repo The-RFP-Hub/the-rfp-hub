@@ -116,6 +116,10 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "/v1/opportunities/{id}/audit",
       "/v1/opportunities/{id}/duplicates",
       "/v1/opportunities/{id}/verification",
+      // The link-out redirects are PUBLISHED, deliberately: an undocumented public endpoint is
+      // worse than a compliance checker that has to understand a 3xx (which it now does).
+      "/v1/r/{id}/apply",
+      "/v1/r/{id}/source",
       // The spec's own documents, at the paths their identifiers name (adr/0007).
       ...canonicalDocuments.map((d) => d.path),
     ]) {
@@ -142,6 +146,8 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "ManagedOpportunityList",
       "DuplicatePairList",
       "MergeResult",
+      "InsightsSeries",
+      "InsightsSummary",
     ]) {
       expect(doc.components?.schemas?.[name], `components has ${name}`).toBeTruthy();
     }
@@ -158,6 +164,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/review/duplicates", "get"],
       ["/v1/review/duplicates/{id}/merge", "post"],
       ["/v1/review/opportunities/{id}/verify", "post"],
+      ["/v1/insights/me/summary", "get"],
       ["/v1/admin/accounts/{id}/role", "post"],
     ] as const) {
       const op = doc.paths?.[path]?.[method];

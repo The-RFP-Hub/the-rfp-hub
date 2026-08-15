@@ -130,6 +130,57 @@ export interface VerificationRunView {
   error: string | null;
 }
 
+// ── insights (publisher analytics) ───────────────────────────────────────────────
+/**
+ * The four counts, kept apart rather than merged into one `views`.
+ *
+ * A publisher's question is not "how much traffic" — it is "did anyone actually click through to
+ * apply". A single merged number cannot answer that, and once merged it cannot be unmerged.
+ *
+ * WHAT THESE MEASURE: API reads and link-outs, not page views. Our own automation is excluded by
+ * name, crawlers and `DNT: 1` are dropped, capture is buffered in memory and therefore crash-lossy,
+ * and feeds and exports are never instrumented at all. Best-effort, and every surface says so.
+ */
+export interface InsightsTotalsView {
+  listViews: number;
+  detailViews: number;
+  sourceClicks: number;
+  applyClicks: number;
+}
+
+export interface InsightsPointView extends InsightsTotalsView {
+  /** `YYYY-MM-DD`, UTC. */
+  day: string;
+}
+
+export interface InsightsSeriesView {
+  opportunityId: string;
+  title: string;
+  from: string;
+  to: string;
+  totals: InsightsTotalsView;
+  /**
+   * One row per day in the window, zero-filled — a day with no traffic is a zero, not a gap, and a
+   * chart drawn from a sparse series draws the wrong shape.
+   *
+   * Every day before today is the rollup; today is a live aggregate over the raw events, so traffic
+   * from an hour ago is visible now rather than tomorrow.
+   */
+  days: InsightsPointView[];
+}
+
+export interface InsightsEntryView extends InsightsTotalsView {
+  opportunityId: string;
+  title: string;
+}
+
+export interface InsightsSummaryView {
+  from: string;
+  to: string;
+  totals: InsightsTotalsView;
+  opportunities: InsightsEntryView[];
+}
+
 // ── claims ───────────────────────────────────────────────────────────────────────
 export interface ClaimResultView {
   /** `granted` transferred publishing rights now; `queued` filed a claim for review. */
