@@ -5,6 +5,7 @@ import { AccountService } from "../../services/auth/account.service.js";
 import { ClaimService } from "../../services/claims/claim.service.js";
 import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
 import { type OrganizationMetadata, ReviewService } from "../../services/review/review.service.js";
+import { VerificationService } from "../../services/verification/verification.service.js";
 import type {
   AccountListView,
   ClaimListView,
@@ -17,6 +18,7 @@ const reviews = new ReviewService();
 const claims = new ClaimService();
 const managed = new ManagedOpportunityService();
 const accountsService = new AccountService();
+const verification = new VerificationService();
 
 export const reviewController = {
   listOpportunities: handled(async (request: FastifyRequest) => {
@@ -49,6 +51,16 @@ export const reviewController = {
     const { id } = paramsOf<{ id: string }>(request);
     const { isListed } = bodyOf<{ isListed: boolean }>(request);
     return reviews.setListed(principal.accountId, id, isListed);
+  }),
+
+  verifySource: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    const row = await verification.resolvePublicId(id);
+    return verification.verify(row.id, {
+      actorKind: "user",
+      actorAccountId: principal.accountId,
+    });
   }),
 
   listClaims: handled(async (request: FastifyRequest) => {

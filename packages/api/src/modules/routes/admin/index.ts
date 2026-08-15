@@ -70,4 +70,22 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
     },
     adminController.setDirectCreate,
   );
+
+  router.post(
+    "/opportunities/:id/verify",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "adminVerifyOpportunitySource",
+        tags: ["admin"],
+        summary: "Fetch this entry's applicationUrl now (administrative / bulk use)",
+        description:
+          "The same action `/v1/review/opportunities/{id}/verify` performs, on the administrator prefix — kept for bulk and scripted runs over many entries. Triggering a single verification is a REVIEWER capability, and the review route is where an interactive reviewer does it.",
+        security: [{ bearerAuth: [] }],
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        response: { 200: { $ref: "VerificationRun#" }, ...errors },
+      },
+    },
+    adminController.verifySource,
+  );
 };

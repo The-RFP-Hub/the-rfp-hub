@@ -153,6 +153,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/me", "get"],
       ["/v1/keys", "post"],
       ["/v1/review/opportunities", "get"],
+      ["/v1/review/opportunities/{id}/verify", "post"],
       ["/v1/admin/accounts/{id}/role", "post"],
     ] as const) {
       const op = doc.paths?.[path]?.[method];

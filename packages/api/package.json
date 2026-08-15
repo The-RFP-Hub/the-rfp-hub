@@ -34,7 +34,8 @@
     "fastify": "^5.8.5",
     "jose": "^6.2.8",
     "pg": "^8.13.1",
-    "rfphub-validate": "workspace:*"
+    "rfphub-validate": "workspace:*",
+    "undici": "^7.16.0"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",
