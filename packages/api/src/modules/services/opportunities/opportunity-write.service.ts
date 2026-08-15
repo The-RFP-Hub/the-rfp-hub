@@ -187,6 +187,10 @@ export class OpportunityWriteService {
     const existing = await this.findByPublicId(document.id);
     const namespace = this.authorizationNamespace(document, existing);
     const caps = effectiveCaps(principal, namespace);
+    // Decided once and carried: it changes what the provenance rules do, what the review status
+    // does, and what the audit row says. Re-deriving it at each of those three would eventually
+    // give three answers.
+    const editorial = isEditorialWrite(principal, caps, existing, namespace);
     const now = new Date();
     const attributed = this.applyProvenance(document, {
       principal,
@@ -194,6 +198,7 @@ export class OpportunityWriteService {
       namespace,
       now,
       existing,
+      editorial,
     });
 
     if (options.mode === "create" && existing) {
@@ -237,6 +242,7 @@ export class OpportunityWriteService {
       document: attributed,
       existing,
       now,
+      editorial,
       warnings: warnings.map((warning) => warning.message),
     });
   }
@@ -299,6 +305,15 @@ export class OpportunityWriteService {
    * `submittedBy` is the publishing organization's slug when the account holds a verified
    * membership on the namespace (the entry is the ORGANISATION's), else the account's public handle,
    * else `"community"` — never a string from the body.
+   *
+   * AN EDITORIAL REPLACEMENT ATTRIBUTES NOTHING TO THE EDITOR. A reviewer correcting a typo in
+   * somebody else's entry is not its submitter and did not ingest it, so re-deriving attribution
+   * from the acting principal would publicly reattribute the whole submission to whoever last
+   * touched it — and after approval that credit is what the public detail route serves. So on an
+   * editorial write every attribution member comes off the stored row instead. `publisher` needs no
+   * branch: on a replace `namespace` IS the row's `source_publisher` (`authorizationNamespace`),
+   * and `submittedAt` needs none either — it was already preserved for everybody, because when an
+   * entry first arrived is a fact about the entry rather than about the most recent edit.
    */
   private applyProvenance(
     document: Opportunity,
@@ -308,11 +323,16 @@ export class OpportunityWriteService {
       namespace: string;
       now: Date;
       existing: OpportunityRow | undefined;
+      editorial: boolean;
     },
   ): Opportunity {
-    const { principal, caps, namespace, now, existing } = ctx;
+    const { principal, caps, namespace, now, existing, editorial } = ctx;
     const publishingAsOrg = principal.memberships.some((m) => m.slug === namespace && m.verified);
-    const submittedBy = publishingAsOrg ? namespace : (principal.account.handle ?? "community");
+    const submittedBy = editorial
+      ? (existing?.sourceSubmittedBy ?? undefined)
+      : publishingAsOrg
+        ? namespace
+        : (principal.account.handle ?? "community");
 
     return {
       ...document,
@@ -323,7 +343,11 @@ export class OpportunityWriteService {
         // Preserved across an update: when the entry first arrived is a fact about the entry, not
         // about the most recent edit.
         submittedAt: (existing?.sourceSubmittedAt ?? now).toISOString(),
-        ingestedVia: principal.credentialKind === "api_key" ? "publisher_api" : "submission",
+        ingestedVia: editorial
+          ? (existing?.ingestedVia ?? undefined)
+          : principal.credentialKind === "api_key"
+            ? "publisher_api"
+            : "submission",
         // Half of `ux_opp_source`. An arbitrary submitter must not be able to write it, or they
         // could deliberately collide with a publisher's own cross-system key.
         originalId: caps.canPublishImmediately
@@ -375,21 +399,44 @@ export class OpportunityWriteService {
     document: Opportunity;
     existing: OpportunityRow | undefined;
     now: Date;
+    editorial: boolean;
     warnings: string[];
   }): Promise<WriteResult> {
-    const { principal, caps, namespace, document, existing, now } = ctx;
+    const { principal, caps, namespace, document, existing, now, editorial } = ctx;
     const { opp } = fromStandard(document, now);
     const autoApprove = caps.canPublishImmediately;
+
     /**
-     * An edit that cannot auto-publish RETURNS THE ENTRY TO THE QUEUE.
+     * Whether this replacement actually says anything different.
      *
-     * Preserving `approved` here was a hole with no floor to it: `PUT` replaces the whole record,
-     * so the original T1 submitter of an entry a reviewer had approved could rewrite its title,
-     * description, amounts and application URL and have every word of it stay public, unreviewed.
-     * The prior decision was about the prior content and does not carry over to content nobody has
-     * seen. Approved is kept only for a writer who could have published this content from scratch.
+     * The SAME normalized projection the identical-repeat rule uses — content only, no server-owned
+     * bookkeeping — so "changed" means changed AS STORED rather than changed as typed. A create is
+     * a change by definition.
      */
-    const requeued = !autoApprove && existing?.reviewStatus === "approved";
+    const contentChanged =
+      existing === undefined ||
+      Object.keys(
+        diffFields(
+          comparable(existing) as Record<string, unknown>,
+          comparable(opp) as Record<string, unknown>,
+        ),
+      ).length > 0;
+
+    /**
+     * A CONTENT-CHANGING edit that cannot auto-publish RETURNS THE ENTRY TO THE QUEUE.
+     *
+     * Preserving `approved` unconditionally was a hole with no floor to it: `PUT` replaces the
+     * whole record, so the original T1 submitter of an entry a reviewer had approved could rewrite
+     * its title, description, amounts and application URL and have every word of it stay public,
+     * unreviewed. The prior decision was about the prior content and does not carry over to content
+     * nobody has seen.
+     *
+     * REQUEUEING AN UNCHANGED ENTRY IS THE OPPOSITE MISTAKE, and just as user-visible: opening the
+     * dashboard's edit form and pressing Save without typing anything would unpublish a live entry
+     * and put a reviewer's queue to work on a decision they had already made. The approval is about
+     * the content, so it survives exactly as long as the content does.
+     */
+    const requeued = !autoApprove && existing?.reviewStatus === "approved" && contentChanged;
 
     const values: OpportunityInsert = {
       ...opp,
@@ -397,7 +444,11 @@ export class OpportunityWriteService {
       // reassigns. `ux_opp_source` is `(source_system, original_id)`, so letting a claim move the
       // system half would change a cross-system key that other systems resolve against.
       sourceSystem: existing?.sourceSystem ?? namespaceOfPublicId(document.id) ?? namespace,
-      reviewStatus: autoApprove ? "approved" : "pending",
+      reviewStatus: autoApprove
+        ? "approved"
+        : contentChanged
+          ? "pending"
+          : (existing?.reviewStatus ?? "pending"),
       isListed: existing?.isListed ?? true,
       submittedBy: existing?.submittedBy ?? principal.accountId,
       approvedBy: autoApprove
@@ -447,9 +498,7 @@ export class OpportunityWriteService {
           // `actorRole` in the public `changedFields` of every entry in the corpus, where it is
           // noise. Recorded at write time rather than read time because a role is revocable and
           // the trail must say what was true when the action was taken.
-          patch: isEditorialWrite(principal, caps, existing, namespace)
-            ? { ...patch, actorRole: principal.role }
-            : patch,
+          patch: editorial ? { ...patch, actorRole: principal.role } : patch,
         });
         // An auto-approval is a second, separate decision and gets its own row: "created" and
         // "published without review" are different facts and a reader must be able to see both.

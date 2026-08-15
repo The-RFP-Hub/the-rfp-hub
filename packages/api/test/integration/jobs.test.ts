@@ -15,7 +15,13 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
-import { type OpportunityRow, accounts, auditLog, opportunities } from "../../src/db/schema.js";
+import {
+  type AccountRow,
+  type OpportunityRow,
+  accounts,
+  auditLog,
+  opportunities,
+} from "../../src/db/schema.js";
 import { AccountService } from "../../src/modules/services/auth/account.service.js";
 import { AccountEnrichmentService } from "../../src/modules/services/jobs/account-enrichment.service.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
@@ -35,6 +41,7 @@ const DIDS = {
   admin: "did:privy:m3job-admin",
   reviewer: "did:privy:m3job-reviewer",
   bootstrap: "did:privy:m3job-bootstrap",
+  bootstrapFailed: "did:privy:m3job-bootstrap-failed",
 };
 
 /**
@@ -340,6 +347,62 @@ run("M3JOB scheduled jobs", () => {
       .from(auditLog)
       .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, promoted?.id ?? 0)));
     expect(again.filter((row) => row.action === "assign_role")).toHaveLength(1);
+  });
+
+  it("leaves an account in the cursor when its promotion fails, and finishes it next run", async () => {
+    // `enriched_at` is what takes an account OUT of this cursor, and the promotion is the last
+    // moment it can happen. So the two have to commit together: a promotion that throws while
+    // writing its audit row must not leave the stamp behind, or the batch reports the account as
+    // failed and nothing ever selects it again.
+    const seeded = await seedAccount({
+      did: DIDS.bootstrapFailed,
+      handle: "m3job-bootstrap-failed",
+    });
+    expect(seeded.enrichedAt).toBeNull();
+
+    /** A promotion that fails the way a real one would: after the wallet write, inside the same tx. */
+    class BrokenAccounts extends AccountService {
+      override async applyBootstrapAdminWithin(): Promise<AccountRow> {
+        throw new Error("the audit write failed");
+      }
+    }
+
+    const wallets = [BOOTSTRAP_WALLET.toLowerCase()];
+    // Only this suite's account is answered for; every other pending one throws, which leaves it
+    // exactly as another suite left it.
+    const fetchUser = async (did: string) => {
+      if (did !== DIDS.bootstrapFailed) throw new Error("not this suite's account");
+      return { primaryWallet: BOOTSTRAP_WALLET, email: null };
+    };
+    const jobConfig = { ...config, bootstrapAdminWallets: wallets };
+
+    const broken = await new AccountEnrichmentService(db, {
+      config: jobConfig,
+      accounts: new BrokenAccounts(db, [], wallets),
+      fetchUser,
+    }).runBatch({ limit: 1000, now: NOW });
+    expect(broken.processed).toBe(0);
+
+    const rolledBack = (
+      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.bootstrapFailed)).limit(1)
+    )[0];
+    // The whole transaction rolled back, so the stamp is not there and neither is the wallet.
+    expect(rolledBack?.enrichedAt).toBeNull();
+    expect(rolledBack?.primaryWallet).toBeNull();
+    expect(rolledBack?.globalRole).toBe("submitter");
+
+    // …which is the point: the account is still selected, and the next run completes the work.
+    const retried = await new AccountEnrichmentService(db, {
+      config: jobConfig,
+      fetchUser,
+    }).runBatch({ limit: 1000, now: NOW });
+    expect(retried.details?.bootstrapAdminsPromoted).toBe(1);
+
+    const settled = (
+      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.bootstrapFailed)).limit(1)
+    )[0];
+    expect(settled?.enrichedAt).not.toBeNull();
+    expect(settled?.globalRole).toBe("admin");
   });
 
   // ── the convenience route ────────────────────────────────────────────────────────

@@ -187,9 +187,14 @@ run("M3DUP duplicate detection", () => {
     // A stranger's submission into a namespace they do not publish for lands PENDING, so it is
     // invisible to the public reads — and must be invisible here too, or a submission becomes a
     // way to read the review queue's titles and ids.
+    //
+    // It is filed under OTHER_NS deliberately. A pending entry in the PUBLISHER's own namespace is
+    // the publisher's by namespace ownership, so hiding it from them would prove nothing about
+    // disclosure and would be wrong besides; the entry a stranger must not learn about is one
+    // nobody has given them any relationship to.
     const hidden = await post(
       strangerToken,
-      entry(`${NS}:hidden`, "Superchain Builders Fund (mirror)", ALPHA_BODY),
+      entry(`${OTHER_NS}:hidden`, "Superchain Builders Fund (mirror)", ALPHA_BODY, OTHER_NS),
     );
     expect(hidden.statusCode, hidden.body).toBe(201);
     expect(hidden.json().reviewStatus).toBe("pending");
@@ -200,7 +205,9 @@ run("M3DUP duplicate detection", () => {
     );
     expect(probe.statusCode, probe.body).toBe(201);
     expect(ours(probe)).toContain(`${NS}:alpha`);
-    expect(ours(probe)).not.toContain(`${NS}:hidden`);
+    expect(probe.json().duplicates.map((match: { id: string }) => match.id)).not.toContain(
+      `${OTHER_NS}:hidden`,
+    );
   });
 
   // ── the OTHER direction of the same rule ──────────────────────────────────────
@@ -209,20 +216,22 @@ run("M3DUP duplicate detection", () => {
     // one side of a pair is not entitlement to the other side: `alpha`'s owner is not `hidden`'s
     // owner, and both of the owner-facing routes would otherwise read back a stranger's
     // review-queue title and id.
-    const pending = await pairBetween(`${NS}:alpha`, `${NS}:hidden`);
+    const pending = await pairBetween(`${NS}:alpha`, `${OTHER_NS}:hidden`);
     expect(pending, "the fixture only proves anything if the pair exists").toBeTruthy();
 
     const queue = await app.inject({ url: "/v1/me/duplicates", headers: bearer(publisherToken) });
     expect(queue.statusCode).toBe(200);
     const queued = queue.json().items.map((item: { id: string }) => item.id);
-    expect(queued).not.toContain(`${NS}:hidden`);
+    expect(queued).not.toContain(`${OTHER_NS}:hidden`);
 
     const sub = await app.inject({
       url: `/v1/opportunities/${NS}:alpha/duplicates`,
       headers: bearer(publisherToken),
     });
     expect(sub.statusCode).toBe(200);
-    expect(sub.json().items.map((item: { id: string }) => item.id)).not.toContain(`${NS}:hidden`);
+    expect(sub.json().items.map((item: { id: string }) => item.id)).not.toContain(
+      `${OTHER_NS}:hidden`,
+    );
 
     // A reviewer, and only a reviewer, sees it — deciding between two entries is what they are for.
     const review = await app.inject({
@@ -236,7 +245,53 @@ run("M3DUP duplicate detection", () => {
         pair.left.id,
         pair.right.id,
       ]);
-    expect(sides).toContain(`${NS}:hidden`);
+    expect(sides).toContain(`${OTHER_NS}:hidden`);
+  });
+
+  it("still shows an owner a pair of their OWN entries when neither side is public", async () => {
+    // ENTITLEMENT, NOT PUBLICITY, is the question the filter above has to ask. A public-only rule
+    // closes the leak and then hides the caller's own work from them: the reviewer-scope pass pairs
+    // pending entries with each other, so two of one account's queued submissions are a pair
+    // neither side of which is public — and that is exactly the pair this queue exists to surface.
+    const twin = await post(
+      strangerToken,
+      entry(
+        `${OTHER_NS}:hidden-twin`,
+        "Superchain Builders Fund (mirror copy)",
+        reword(ALPHA_BODY),
+        OTHER_NS,
+      ),
+    );
+    expect(twin.statusCode, twin.body).toBe(201);
+    expect(twin.json().reviewStatus).toBe("pending");
+
+    // The submit-time check searches PUBLIC rows only, so the pair between the two pending entries
+    // is not one it can find. The all-scope pass — what the backfill job runs — is.
+    await new DedupeService().embedAndDetect(await rowIdOf(`${OTHER_NS}:hidden-twin`), "all");
+    expect(await pairBetween(`${OTHER_NS}:hidden`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();
+
+    const mine = await app.inject({ url: "/v1/me/duplicates", headers: bearer(strangerToken) });
+    expect(mine.statusCode).toBe(200);
+    const items = mine.json().items.map((item: { id: string }) => item.id);
+    expect(items).toContain(`${OTHER_NS}:hidden`);
+
+    // …and the sub-resource agrees, from either side of the same pair.
+    const sub = await app.inject({
+      url: `/v1/opportunities/${OTHER_NS}:hidden-twin/duplicates`,
+      headers: bearer(strangerToken),
+    });
+    expect(sub.statusCode).toBe(200);
+    expect(sub.json().items.map((item: { id: string }) => item.id)).toContain(`${OTHER_NS}:hidden`);
+
+    // The leak stays closed: neither pending entry has become visible to the publisher, who owns
+    // the public entry they were both matched against.
+    const theirs = await app.inject({
+      url: "/v1/me/duplicates",
+      headers: bearer(publisherToken),
+    });
+    const queued = theirs.json().items.map((item: { id: string }) => item.id);
+    expect(queued).not.toContain(`${OTHER_NS}:hidden`);
+    expect(queued).not.toContain(`${OTHER_NS}:hidden-twin`);
   });
 
   it("re-selects an entry whose stored vector no longer matches its content", async () => {

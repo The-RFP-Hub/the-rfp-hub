@@ -16,8 +16,10 @@
  * `enriched_at`, which takes the account out of this job's cursor permanently, so a promotion
  * deferred to "the next enrichment run" would never happen. The moment the verified wallet lands
  * it is checked against the configured list, and a match is promoted through the SAME audited,
- * idempotent path the DID bootstrap uses. `AccountService.applyBootstrapAdmin` re-checks on every
- * login too, so adding a wallet to the list later still takes effect without touching the database.
+ * idempotent path the DID bootstrap uses — IN THE SAME TRANSACTION as the stamp, because a stamp
+ * that outlived a failed promotion would be exactly the "never happens" this paragraph is about.
+ * `AccountService.applyBootstrapAdmin` re-checks on every login too, so adding a wallet to the list
+ * later still takes effect without touching the database.
  *
  * WITHOUT `PRIVY_APP_SECRET` THE JOB IS INERT and says so: `{skipped}`, exit 0, no rows touched.
  * That is a configuration statement, not a failure, and it is deliberately distinguishable from
@@ -101,29 +103,40 @@ export class AccountEnrichmentService {
       const did = row.privyDid;
       if (did === null) continue;
       try {
+        // The network call stays OUTSIDE the transaction: a provider round trip must never be what
+        // holds one open.
         const user = await fetchUser(did);
-        const updated = await this.db
-          .update(accounts)
-          .set({
-            // A record the provider does not have leaves both columns as they were: absent is not
-            // the same as "provider says none", and overwriting a known wallet with null on a
-            // transient 404 would remove an authorization input.
-            ...(user ? { primaryWallet: user.primaryWallet, email: user.email } : {}),
-            enrichedAt: now,
-          })
-          .where(sql`${accounts.id} = ${row.id}`)
-          .returning();
-        const stored = updated[0];
-        // The bootstrap check runs against the row AS STORED, so it sees the wallet this pass just
-        // wrote. A no-op for every account that matches nothing, which is nearly all of them.
-        if (stored) {
-          const after = await this.accountsService.applyBootstrapAdmin(stored);
-          if (after.globalRole !== stored.globalRole) promoted++;
-        }
+
+        // THE STAMP AND THE PROMOTION COMMIT TOGETHER OR NOT AT ALL, because `enriched_at` is what
+        // takes this account out of the cursor and the promotion is the last chance to make it. Two
+        // transactions would mean a promotion that failed while writing its audit row left the
+        // stamp behind: the batch reports the account as failed, and nothing ever selects it again.
+        const outcome = await this.db.transaction(async (tx) => {
+          const updated = await tx
+            .update(accounts)
+            .set({
+              // A record the provider does not have leaves both columns as they were: absent is not
+              // the same as "provider says none", and overwriting a known wallet with null on a
+              // transient 404 would remove an authorization input.
+              ...(user ? { primaryWallet: user.primaryWallet, email: user.email } : {}),
+              enrichedAt: now,
+            })
+            .where(sql`${accounts.id} = ${row.id}`)
+            .returning();
+          const stored = updated[0];
+          if (!stored) return { promoted: false };
+          // The bootstrap check runs against the row AS STORED, so it sees the wallet this pass
+          // just wrote. A no-op for every account that matches nothing, which is nearly all of them.
+          const after = await this.accountsService.applyBootstrapAdminWithin(tx, stored);
+          return { promoted: after.globalRole !== stored.globalRole };
+        });
+
+        if (outcome.promoted) promoted++;
         if (user === null) unknown++;
         processed++;
       } catch {
-        // Left in the cursor on purpose — `enriched_at` stays NULL, so the next run retries.
+        // Left in the cursor on purpose — the whole transaction rolled back, so `enriched_at` is
+        // still NULL and the next run tries this account again.
         failed++;
       }
     }

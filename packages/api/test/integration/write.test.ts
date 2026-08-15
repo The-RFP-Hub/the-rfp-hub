@@ -381,6 +381,22 @@ run("M3WRITE submissions", () => {
       200,
     );
 
+    // FIRST, the edit that is not one. Opening the dashboard's edit form and pressing Save without
+    // typing anything sends the stored document back verbatim; unpublishing a live entry over that
+    // is the opposite mistake from letting a rewrite stay public, and just as visible to a reader.
+    const unchanged = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(submitterToken),
+      payload: submission(id, OTHER_NS),
+    });
+    expect(unchanged.statusCode, unchanged.body).toBe(200);
+    expect(unchanged.json().reviewStatus).toBe("approved");
+    expect(unchanged.json().isListed).toBe(true);
+    expect((await app.inject({ method: "GET", url: `/v1/opportunities/${id}` })).statusCode).toBe(
+      200,
+    );
+
     const edited = await app.inject({
       method: "PUT",
       url: `/v1/opportunities/${id}`,
@@ -409,6 +425,51 @@ run("M3WRITE submissions", () => {
       );
     expect(requeue).toBeTruthy();
     expect(requeue.patch.reviewStatus).toEqual({ before: "approved", after: "pending" });
+  });
+
+  it("credits an editorial replacement to nobody: the stored attribution survives it", async () => {
+    // A reviewer may `PUT` an entry they neither submitted nor publish — correcting a typo is not
+    // an action for which the only available tool should be the approval button. What must NOT
+    // follow is the entry being reattributed: after the next approval, `source.submittedBy` is what
+    // the PUBLIC detail route serves as the credit for the whole submission.
+    const id = `${NS}:live`;
+    const before = await app.inject({
+      url: `/v1/me/opportunities/${id}`,
+      headers: bearer(publisherToken),
+    });
+    expect(before.statusCode, before.body).toBe(200);
+    const storedSource = before.json().source;
+    expect(storedSource.submittedBy).toBe(NS);
+
+    const edited = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(reviewerToken),
+      payload: submission(id, NS, { title: "Corrected by a reviewer" }),
+    });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().opportunity.title).toBe("Corrected by a reviewer");
+    // Every attribution member, byte for byte: publisher, submittedBy, submittedAt, ingestedVia,
+    // originalId. None of them is a fact about who last touched the record.
+    expect(edited.json().opportunity.source).toEqual(storedSource);
+    // A reviewer cannot publish into this namespace, so the corrected content still goes back for
+    // review — the two rules are independent and both apply here.
+    expect(edited.json().reviewStatus).toBe("pending");
+
+    // The trail is where the editor IS named, which is the point: the entry's credit is unchanged
+    // and the history says an editorial role acted.
+    const trail = await app.inject({
+      url: `/v1/opportunities/${id}/audit`,
+      headers: bearer(reviewerToken),
+    });
+    expect(trail.statusCode).toBe(200);
+    const editorial = trail
+      .json()
+      .entries.find(
+        (row: { patch?: { actorRole?: string } }) => row.patch?.actorRole !== undefined,
+      );
+    expect(editorial?.action).toBe("update");
+    expect(editorial?.patch.actorRole).toBe("reviewer");
   });
 
   it("404s a PUT against an entry that does not exist and 403s one owned by somebody else", async () => {
