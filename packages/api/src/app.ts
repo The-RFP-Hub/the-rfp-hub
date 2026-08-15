@@ -5,13 +5,20 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { config } from "./config.js";
 import { registerRoutes } from "./modules/routes/index.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
+import { isHttpError } from "./modules/shared/http-error.js";
 import { responseSchemas } from "./openapi/schemas.js";
 import { registerApexHostRule } from "./plugins/apex-host.js";
+import { type AuthOptions, registerAuth } from "./plugins/auth.js";
 import { registerSwagger } from "./plugins/swagger.js";
 
 export interface BuildOptions {
   /** Pass a Fastify logger config; defaults to off (tests) / on (server). */
   logger?: boolean;
+  /**
+   * Identity overrides. A deployment reads them from the environment; the integration suites inject
+   * their own ES256 verification key so they can mint tokens without a live identity provider.
+   */
+  auth?: AuthOptions;
 }
 
 /** Build the Fastify app (no network bind) — used by both the server and the integration tests. */
@@ -67,6 +74,13 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   for (const schema of responseSchemas) app.addSchema(schema);
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
+    // A service-layer failure already knows its status, its stable code and its extra members. The
+    // routes wrap their handlers so this is normally unreachable; it is the backstop for a throw
+    // from a hook or a serializer, where no wrapper is in the way.
+    if (isHttpError(error)) {
+      reply.code(error.status).send(error.toBody());
+      return;
+    }
     // Schema/validation failures stay 400 with a safe message.
     if (error.validation) {
       reply.code(400).send({ error: "bad_request", message: error.message });
@@ -94,6 +108,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // so it covers every route the service has or gains.
   registerApexHostRule(app);
 
+  // Decorated on the ROOT instance, before the routes, so every route module can read `app.auth`.
+  // Fastify encapsulation would otherwise scope the decorators to whichever plugin declared them.
+  registerAuth(app, opts.auth);
+
   await registerSwagger(app); // before routes so their schemas are captured
   await registerRoutes(app);
 
@@ -115,6 +133,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         "/v1/export/opportunities.csv",
         "/v1/stats",
         "/v1/health",
+        "/v1/me",
+        "/v1/me/opportunities",
+        "/v1/me/duplicates",
+        "/v1/keys",
       ],
       // The spec's own documents, at the paths their identifiers name (adr/0007).
       spec: canonicalDocuments.map((doc) => doc.path),

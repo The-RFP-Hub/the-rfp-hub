@@ -35,6 +35,32 @@ import {
 import { listQuerySchema } from "../../src/modules/routes/opportunities/types.js";
 import type { Page } from "../../src/modules/services/opportunities/opportunity.service.js";
 import type { StatsSummary } from "../../src/modules/services/stats/stats.service.js";
+import type {
+  AccountListView,
+  AccountSummaryView,
+  ApiKeyCreatedView,
+  ApiKeyListView,
+  ApiKeyView,
+  AuditEntryView,
+  AuditTrailView,
+  ClaimListView,
+  ClaimResultView,
+  ClaimSummaryView,
+  DuplicateListView,
+  DuplicateMatchView,
+  ManagedOpportunityListView,
+  ManagedOpportunityView,
+  MeMembershipView,
+  MeView,
+  MembershipResultView,
+  OrganizationListView,
+  OrganizationSummaryView,
+  PublisherListView,
+  PublisherView,
+  ReviewDecisionView,
+  SubmissionResultView,
+  VerificationRunView,
+} from "../../src/modules/shared/api-views.js";
 import { canonicalDocuments } from "../../src/modules/shared/canonical-documents.js";
 import { type ExportEnvelope, toExportJson } from "../../src/modules/shared/export-format.js";
 import { responseSchemas } from "../../src/openapi/schemas.js";
@@ -232,12 +258,37 @@ describe("closed response components vs their producers", () => {
 
   it("guards every component that closes its shape", () => {
     expect(closed).toEqual([
+      "AccountList",
+      "AccountSummary",
+      "ApiKey",
+      "ApiKeyCreated",
+      "ApiKeyList",
+      "AuditEntry",
+      "AuditTrail",
+      "ClaimList",
+      "ClaimResult",
+      "ClaimSummary",
       "DatasetExport",
+      "DuplicateList",
+      "DuplicateMatch",
       "ErrorResponse",
       "Health",
+      "ManagedOpportunity",
+      "ManagedOpportunityList",
+      "Me",
+      "MeMembership",
+      "MembershipResult",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
+      "OrganizationList",
+      "OrganizationSummary",
       "PaginatedOpportunities",
+      "Publisher",
+      "PublisherList",
+      "ReviewDecision",
       "Stats",
+      "SubmissionResult",
+      "ValidationErrorResponse",
+      "VerificationRun",
     ]);
   });
 
@@ -334,5 +385,210 @@ describe("closed response components vs their producers", () => {
     expect(declaredKeys("ErrorResponse")).toEqual(
       Object.keys({ error: "bad_request", message: "…" }).sort(),
     );
+  });
+});
+
+/**
+ * The M3 components, each pinned to the type its producer actually returns.
+ *
+ * Every one of these closes its shape, so fast-json-stringify DROPS an undeclared member without a
+ * word — and the live-spec integration test cannot see that, because it validates a body the
+ * serializer has already coerced to the very schema under test. The samples below are typed as the
+ * view interfaces the controllers return (`modules/shared/api-views.ts`), so adding a field there
+ * is a TYPECHECK error until the sample is updated, and then a TEST failure until the component
+ * declares it.
+ */
+describe("M3 closed components vs their view types", () => {
+  const submissionResult: SubmissionResultView = {
+    opportunity: fixtures[0]?.opp as Opportunity,
+    created: true,
+    reviewStatus: "pending",
+    isListed: true,
+    warnings: [],
+  };
+  const auditEntry: AuditEntryView = {
+    action: "update",
+    at: "2026-08-14T00:00:00.000Z",
+    actorKind: "api_key",
+    actor: "example-org",
+    changedFields: ["title"],
+    patch: { title: { before: "a", after: "b" } },
+  };
+  const duplicateMatch: DuplicateMatchView = {
+    id: "example-org:other",
+    title: "Other",
+    similarity: 0.91,
+    status: "suspected",
+    detectedAt: "2026-08-14T00:00:00.000Z",
+  };
+  const verificationRun: VerificationRunView = {
+    runAt: "2026-08-14T00:00:00.000Z",
+    requestedUrl: "https://example.org/apply",
+    finalUrl: "https://example.org/apply",
+    httpStatus: 200,
+    existsAtSource: true,
+    matched: true,
+    fieldDiff: {},
+    extracted: {},
+    snapshotSha256: "0".repeat(64),
+    error: null,
+  };
+  const claimResult: ClaimResultView = {
+    outcome: "granted",
+    claimId: 1,
+    opportunityId: "example-org:one",
+    organizationSlug: "example-org",
+    message: "…",
+  };
+  const claimSummary: ClaimSummaryView = {
+    id: 1,
+    opportunityId: "example-org:one",
+    opportunityTitle: "One",
+    organizationSlug: "example-org",
+    organizationVerified: true,
+    claimedBy: "someone",
+    status: "pending",
+    note: null,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    decidedAt: null,
+  };
+  const publisher: PublisherView = {
+    slug: "example-org",
+    name: "Example",
+    description: null,
+    website: null,
+    logoUrl: null,
+    ecosystems: [],
+    verifiedAt: null,
+  };
+  const meMembership: MeMembershipView = {
+    slug: "example-org",
+    name: "Example",
+    role: "owner",
+    verified: true,
+  };
+  const me: MeView = {
+    accountId: 1,
+    handle: null,
+    displayName: null,
+    email: null,
+    primaryWallet: null,
+    role: "submitter",
+    directCreate: false,
+    credentialKind: "session",
+    scopes: [],
+    memberships: [meMembership],
+    canManageKeys: true,
+    canReview: false,
+    canAdmin: false,
+    createdAt: "2026-08-14T00:00:00.000Z",
+  };
+  const apiKey: ApiKeyView = {
+    id: 1,
+    name: null,
+    keyPrefix: "abcdefgh",
+    scopes: ["read"],
+    createdAt: "2026-08-14T00:00:00.000Z",
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+  };
+  const managed: ManagedOpportunityView = {
+    id: "example-org:one",
+    title: "One",
+    fundingType: "grant",
+    status: "open",
+    reviewStatus: "pending",
+    isListed: true,
+    namespace: "example-org",
+    submittedBy: null,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    updatedAt: "2026-08-14T00:00:00.000Z",
+  };
+  const accountSummary: AccountSummaryView = {
+    id: 1,
+    handle: null,
+    displayName: null,
+    globalRole: "submitter",
+    directCreate: false,
+    createdAt: "2026-08-14T00:00:00.000Z",
+  };
+  const organizationSummary: OrganizationSummaryView = {
+    slug: "example-org",
+    name: "Example",
+    verified: true,
+    verifiedAt: null,
+    website: null,
+    ecosystems: [],
+    memberCount: 1,
+  };
+
+  const samples: Record<string, object> = {
+    SubmissionResult: submissionResult,
+    AuditEntry: auditEntry,
+    AuditTrail: { entries: [auditEntry] } satisfies AuditTrailView,
+    DuplicateMatch: duplicateMatch,
+    DuplicateList: { items: [duplicateMatch] } satisfies DuplicateListView,
+    VerificationRun: verificationRun,
+    ClaimResult: claimResult,
+    ClaimSummary: claimSummary,
+    ClaimList: { items: [claimSummary] } satisfies ClaimListView,
+    Publisher: publisher,
+    PublisherList: { items: [publisher], total: 1 } satisfies PublisherListView,
+    MeMembership: meMembership,
+    Me: me,
+    ApiKey: apiKey,
+    ApiKeyList: { items: [apiKey] } satisfies ApiKeyListView,
+    ApiKeyCreated: { key: apiKey, token: "rfph_abcdefgh_secret" } satisfies ApiKeyCreatedView,
+    ManagedOpportunity: managed,
+    ManagedOpportunityList: {
+      items: [managed],
+      page: 1,
+      limit: 20,
+      total: 1,
+      totalPages: 1,
+    } satisfies ManagedOpportunityListView,
+    ReviewDecision: {
+      id: "example-org:one",
+      reviewStatus: "approved",
+      isListed: true,
+    } satisfies ReviewDecisionView,
+    AccountSummary: accountSummary,
+    AccountList: { items: [accountSummary] } satisfies AccountListView,
+    OrganizationSummary: organizationSummary,
+    OrganizationList: { items: [organizationSummary] } satisfies OrganizationListView,
+    MembershipResult: {
+      organizationSlug: "example-org",
+      accountId: 1,
+      role: "publisher",
+      member: true,
+    } satisfies MembershipResultView,
+    // Not a view type: the error body is assembled by `HttpError.toBody()`.
+    ValidationErrorResponse: { error: "validation_failed", message: "…", errors: ["…"] },
+  };
+
+  for (const [id, sample] of Object.entries(samples)) {
+    it(`${id} declares exactly what its producer returns`, () => {
+      expect(declaredKeys(id)).toEqual(Object.keys(sample).sort());
+    });
+  }
+
+  it("covers every closed M3 component with a typed sample", () => {
+    const m3 = responseSchemas
+      .filter((schema) => schema.additionalProperties === false)
+      .map((schema) => schema.$id)
+      .filter(
+        (id) =>
+          ![
+            "DatasetExport",
+            "ErrorResponse",
+            "Health",
+            "OpportunitySummary",
+            "PaginatedOpportunities",
+            "Stats",
+          ].includes(id),
+      )
+      .sort();
+    expect(Object.keys(samples).sort()).toEqual(m3);
   });
 });

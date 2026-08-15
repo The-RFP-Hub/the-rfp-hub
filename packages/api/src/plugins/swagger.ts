@@ -21,12 +21,40 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
       // Driven by PUBLIC_BASE_URL (default "/" — relative, correct wherever the server is hosted).
       // A deployed environment sets it to the API's OWN https:// origin; see config.ts.
       servers: [{ url: config.publicBaseUrl }],
+      // ONE scheme for both credential kinds, because one header carries both: a bearer value
+      // starting `rfph_` is an API key and anything else is a session token. The distinction is
+      // made on the token itself rather than on a header the caller chooses, which is what keeps
+      // the session-only routes session-only. See modules/shared/api-key-token.ts.
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            description:
+              "`Authorization: Bearer <token>` — either a signed-in session access token or an API key (`rfph_<prefix>_<secret>`). Key management, identity changes, review and administration accept a session only.",
+          },
+        },
+      },
       tags: [
         { name: "opportunities", description: "Funding opportunities" },
         { name: "feeds", description: "Syndication feeds (Atom 1.0, RSS 2.0)" },
         { name: "export", description: "Full-dataset downloads (JSON, CSV)" },
         { name: "stats", description: "Dataset statistics" },
         { name: "meta", description: "Service metadata" },
+        {
+          name: "auth",
+          description:
+            "API-key lifecycle. Session-only: a key may never mint or revoke a key, because a key that could would mint a stronger one.",
+        },
+        { name: "account", description: "The authenticated account and its own entries" },
+        {
+          name: "submissions",
+          description:
+            "Creating, replacing and claiming entries. The server sets every provenance attribution field itself.",
+        },
+        { name: "review", description: "Reviewer surface — the queue, claims and organisations" },
+        { name: "admin", description: "Administrator surface — roles and direct-create grants" },
+        { name: "publishers", description: "Verified publishing organisations" },
         {
           name: "spec",
           description:
