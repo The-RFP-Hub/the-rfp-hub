@@ -1,0 +1,379 @@
+/*
+ * One stylesheet, plain CSS, no framework.
+ *
+ * The dashboard is a dozen data-dense screens for a handful of operators. A utility framework or a
+ * component library would be more bytes and another supply-chain surface than the whole of the rest
+ * of this package, for layout a stylesheet does in a couple of hundred lines.
+ *
+ * System fonts only — no font is fetched from a third party, which keeps `font-src` at `'self'` and
+ * keeps every reader's IP off somebody else's CDN.
+ */
+
+:root {
+  --ink: #16181d;
+  --ink-soft: #5b6270;
+  --line: #dfe3ea;
+  --bg: #ffffff;
+  --bg-soft: #f6f7f9;
+  --accent: #1f4fd8;
+  --ok: #10693c;
+  --warn: #8a5a00;
+  --bad: #a11b1b;
+  --radius: 6px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--bg-soft);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #eef2fe;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  width: 100%;
+}
+
+textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-height: 8rem;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+caption {
+  text-align: left;
+  color: var(--ink-soft);
+  padding-bottom: 0.4rem;
+}
+
+.shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+}
+
+.shell-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.shell-header nav {
+  display: flex;
+  gap: 0.9rem;
+  flex: 1;
+}
+
+.shell-header nav a[aria-current="page"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.shell-session {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.shell-main {
+  padding: 1.5rem 0;
+}
+
+.shell-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+.footnote {
+  font-size: 0.9em;
+  max-width: 60ch;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 0.3rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/*
+ * Present to a screen reader, absent to the eye. Used for the legends that name a group of
+ * buttons: the grouping is real and has to be announced, but repeating "Window" above three
+ * buttons that already read "7 days / 30 days / 90 days" would be noise on screen.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.state {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+}
+
+.state.error {
+  border-color: #f0c4c4;
+  background: #fdf5f5;
+}
+
+.empty-title {
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.note {
+  margin: 0.4rem 0;
+}
+
+.note.ok {
+  color: var(--ok);
+}
+
+.note.error {
+  color: var(--bad);
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 0.55rem;
+  font-size: 0.82em;
+  background: var(--bg-soft);
+  white-space: nowrap;
+}
+
+.badge-approved,
+.badge-listed,
+.badge-verified,
+.badge-matched {
+  color: var(--ok);
+  border-color: #bfe3cd;
+  background: #f2fbf6;
+}
+
+.badge-pending,
+.badge-unverified,
+.badge-unknown {
+  color: var(--warn);
+  border-color: #ecd9ab;
+  background: #fdf9f0;
+}
+
+.badge-rejected,
+.badge-unlisted,
+.badge-unmatched {
+  color: var(--bad);
+  border-color: #f0c4c4;
+  background: #fdf5f5;
+}
+
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 9rem;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+
+.tile-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tile-label {
+  color: var(--ink-soft);
+  font-size: 0.9em;
+}
+
+.chart {
+  margin: 1rem 0;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 180px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.bar {
+  fill: var(--accent);
+}
+
+.bar-zero {
+  fill: var(--line);
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85em;
+  padding-top: 0.3rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--line);
+  margin: 1rem 0;
+  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.field {
+  margin: 0.75rem 0;
+  max-width: 46rem;
+}
+
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.field .hint {
+  color: var(--ink-soft);
+  font-size: 0.88em;
+  margin: 0.2rem 0 0.35rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0 1rem;
+}
+
+.untrusted-block {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 70ch;
+}
+
+.secret {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  background: #fdf9f0;
+  border: 1px solid #ecd9ab;
+  border-radius: var(--radius);
+  padding: 0.6rem;
+}
