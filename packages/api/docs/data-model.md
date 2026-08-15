@@ -776,6 +776,16 @@ keeps `ux_opp_source` meaningful. See `src/modules/shared/namespace.ts`.
   clause is load-bearing for the opposite reason — an entry with a known future deadline is never
   closed for inactivity. The predicate lives in `src/modules/shared/deadlines.ts`.
 
+  **`updated_at` is deliberately not touched by either pass.** The inactivity clock reads it, so
+  bumping it would reset the very timer that selected the row; and the verification predicate is
+  `verified_at < updated_at`, so bumping it would re-queue every closed entry for an outbound fetch
+  every night, forever. The `audit_log` row carries the time of the change.
+
+  Both passes are one **cursor** job, run nightly and ordered **before** the open-data export by a
+  workflow dependency rather than by two cron expressions. The schedule, the cursor-vs-sweep
+  contract, the `pg_try_advisory_lock` semantics and the operator runbook are in
+  [`jobs.md`](./jobs.md).
+
 ## Open questions / deferred
 
 - **Cross-system dedup** (Hub ETH ↔ an external aggregator's non-ETH registry) — deferred. The

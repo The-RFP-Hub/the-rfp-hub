@@ -159,25 +159,50 @@ an existence oracle over other people's credentials.
 
 ## 5. Route matrix
 
+Every write route in this table is authorized by `effectiveCaps(principal, namespace)` and audited.
+"optional" means the route accepts a credential and answers differently with one, but does not
+require it; a **presented-but-invalid** credential is a 401 there too, because silently serving the
+anonymous view to somebody whose token expired tells them nothing and shows them less.
+
+### Public and optional
+
 | Route | Credential | Notes |
 |---|---|---|
 | `GET /v1/opportunities`, `/:id`, `/schema` | none | public read surface, unchanged |
+| `GET /v1/stats`, `/v1/health`, `/v1/feeds/*`, `/v1/export/*` | none | unchanged |
+| `GET /v1/publishers` | none | verified organisations only |
+| `GET /v1/r/:id/apply`, `/v1/r/:id/source` | none | `302` for approved **and** listed entries only; `404` otherwise |
 | `GET /v1/opportunities/:id/audit` | optional | redacted for the public; full patch for the owner and T3+ |
 | `GET /v1/opportunities/:id/duplicates` | optional | an unprivileged caller never sees a non-public other side |
 | `GET /v1/opportunities/:id/verification` | optional | 404 when never checked — a real state |
+
+### Authenticated (either credential kind)
+
+| Route | Credential | Notes |
+|---|---|---|
 | `POST /v1/opportunities` | T1 + `write` | auto-approves only via `canPublishImmediately` |
-| `PUT /v1/opportunities/:id` | owner or T2 of the namespace | `body.id` must equal the path id |
-| `POST /v1/opportunities/:id/claim` | membership on the claiming org | grant needs `publish` on a key |
-| `GET /v1/me`, `/v1/me/opportunities[/:id]`, `/v1/me/duplicates` | T1 | either credential kind |
+| `PUT /v1/opportunities/:id` | owner or T2 of the namespace, + `write` | `body.id` must equal the path id |
+| `POST /v1/opportunities/:id/claim` | membership on the claiming org | an **immediate grant** needs `publish` on a key — its absence is a 403 naming the scope, never a silent queue |
+| `GET /v1/me`, `/v1/me/opportunities`, `/v1/me/opportunities/:id`, `/v1/me/duplicates` | T1 | `/me/opportunities/:id` is the owner-visible full detail for a pending or rejected entry the public route 404s |
+| `GET /v1/insights/opportunities/:id` | owner or T3+ | 403 for anyone else — a publisher's numbers are not public |
+| `GET /v1/insights/me/summary` | T1 | every entry the caller may see the numbers for |
+
+### Session-only
+
+| Route | Credential | Notes |
+|---|---|---|
 | `PATCH /v1/me` | T1, **session** | |
-| `GET|POST /v1/keys`, `DELETE /v1/keys/:id` | T1, **session** | account-scoped; 404 on a foreign id |
-| `GET /v1/review/opportunities`, `POST …/:id/approve|reject`, `PATCH …/:id` | T3, **session** | |
-| `GET /v1/review/claims`, `POST …/:id/approve|reject` | T3, **session** | approval carries `verifyOrganization` |
-| `POST /v1/review/organizations/:slug/verify|unverify`, `PATCH …/:slug`, `POST|DELETE …/:slug/members` | T3, **session** | |
+| `GET\|POST /v1/keys`, `DELETE /v1/keys/:id` | T1, **session** | account-scoped; 404 on a foreign id |
+| `PATCH /v1/organizations/:slug` | org `owner`/`admin`, **session** | never the verified flag |
+| `GET /v1/review/opportunities`, `POST …/:id/approve\|reject`, `PATCH …/:id` | T3, **session** | |
+| `POST /v1/review/opportunities/:id/verify` | T3, **session** | triggering a source check is a reviewer capability |
+| `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval carries `verifyOrganization` |
+| `GET /v1/review/duplicates`, `POST …/:id/confirm\|dismiss\|merge` | T3, **session** | |
+| `POST /v1/review/organizations/:slug/verify\|unverify`, `PATCH …/:slug`, `POST\|DELETE …/:slug/members` | T3, **session** | |
 | `GET /v1/review/accounts`, `GET /v1/review/organizations` | T3, **session** | discovery for the review screens |
 | `POST /v1/admin/accounts/:id/role`, `…/direct-create` | T4, **session** | |
-| `PATCH /v1/organizations/:slug` | org `owner`/`admin`, **session** | never the verified flag |
-| `GET /v1/publishers` | none | verified organisations only |
+| `POST /v1/admin/opportunities/:id/verify` | T4, **session** | the same action as the review route, kept for bulk/scripted runs |
+| `POST /v1/admin/jobs/:job/run` | T4, **session** | a convenience only — the schedule starts jobs as container tasks ([`jobs.md`](./jobs.md)) |
 
 ---
 
@@ -259,6 +284,60 @@ An invalid document comes back as:
 …rather than a generic schema message, because the route installs a pass-through Fastify validator
 and the service is the sole validator. The published OpenAPI document still `$ref`s `Opportunity` as
 the request schema: it is the accurate contract, it is simply not the enforcement point.
+
+### Claiming an entry somebody else published
+
+An entry ingested into your namespace before you had an account is claimed rather than
+re-submitted, so its id, its history and anything already pointing at it survive.
+
+```sh
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"organizationSlug":"my-org","note":"we run this programme"}' \
+  $API/v1/opportunities/some-namespace:1459/claim
+```
+
+Two outcomes, and the status code is the whole answer:
+
+* **`200 {"outcome":"granted"}`** — your organisation is **verified** *and* its slug appears in the
+  entry's `operatingOrganizations`. Publisher ownership transfers immediately.
+  *Sponsorship is not operation:* appearing only in `sponsoringOrganizations` does not grant, or a
+  sponsor could seize an entry it merely funds.
+* **`202 {"outcome":"queued","claimId":…}`** — anything else. A reviewer decides.
+
+`409` when the entry is already owned by a **different** verified organisation;
+`200 {"outcome":"unchanged"}` when your organisation already owns it. On an API key, a claim that
+*would* be granted immediately needs
+the `publish` scope, and its absence is a 403 rather than a quiet downgrade to a queued claim.
+
+### Reviewing, as T3
+
+```sh
+REVIEWER=<reviewer's access token>       # a session. An API key is 403 on every route below.
+
+curl -H "Authorization: Bearer $REVIEWER" "$API/v1/review/opportunities?reviewStatus=pending"
+curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/my-org:42/approve
+
+# Check the entry against its own applicationUrl before deciding.
+curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/opportunities/my-org:42/verify
+
+# Claims. `verifyOrganization` is an explicit decision, not a side effect:
+curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
+  -d '{"verifyOrganization":true}' $API/v1/review/claims/7/approve
+```
+
+> **`verifyOrganization: false` transfers ownership but does *not* unlock auto-approval.**
+> Auto-approval requires a **verified** organisation, so that publisher's later writes keep landing
+> `pending`. The response says so, and this paragraph exists because "the claim was approved, why is
+> my next submission still in review" is otherwise a support ticket rather than a documented rule.
+
+Verifying an organisation is what actually flips a namespace to T2, and revoking a membership takes
+it back on the very next request:
+
+```sh
+curl -X POST -H "Authorization: Bearer $REVIEWER" $API/v1/review/organizations/my-org/verify
+curl -X POST -H "Authorization: Bearer $REVIEWER" -H 'content-type: application/json' \
+  -d '{"accountId":123,"role":"publisher"}' $API/v1/review/organizations/my-org/members
+```
 
 ---
 
