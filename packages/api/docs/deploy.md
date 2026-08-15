@@ -177,18 +177,26 @@ credential.
 
 ### Operator prerequisites
 
+One set **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks the set
+from its `environment` input — which is empty on the schedule and therefore `production`, matching
+the deployment the open-data export reads. The credentials are picked the same way
+(`<ENV>_AWS_ACCESS_KEY_ID` / `<ENV>_AWS_SECRET_ACCESS_KEY`), so a scheduled maintenance chain
+authenticates exactly as `production.yml` does.
+
 | Repository variable | What it names |
 |---|---|
-| `MAINTENANCE_ECS_CLUSTER` | The cluster the one-off task runs in |
-| `MAINTENANCE_ECS_TASK_DEFINITION` | A task definition on the deployed image, with the **runtime** `DATABASE_URL` — never the DDL role |
-| `MAINTENANCE_ECS_CONTAINER` | The container name inside it, for the command override |
-| `MAINTENANCE_ECS_SUBNETS` | Comma-separated subnet ids with egress (the verification job makes outbound requests) |
-| `MAINTENANCE_ECS_SECURITY_GROUPS` | Comma-separated security group ids |
+| `<ENV>_MAINTENANCE_ECS_CLUSTER` | The cluster the one-off task runs in |
+| `<ENV>_MAINTENANCE_ECS_TASK_DEFINITION` | A task definition on the deployed image, with the **runtime** `DATABASE_URL` — never the DDL role |
+| `<ENV>_MAINTENANCE_ECS_CONTAINER` | The container name inside it, for the command override |
+| `<ENV>_MAINTENANCE_ECS_SUBNETS` | Comma-separated subnet ids with egress (the verification job makes outbound requests) |
+| `<ENV>_MAINTENANCE_ECS_SECURITY_GROUPS` | Comma-separated security group ids |
 
-Until all five are set, the scheduled run announces a `::warning::` and stays green — the open-data
-export is chained to that workflow, and failing over a resource that has never existed would stop
-the dataset publishing. A **manual `workflow_dispatch` fails instead**, so an operator validating
-the wiring gets a real answer. Prove it with one dispatch before relying on the schedule.
+Until all five of an environment's variables are set, the scheduled run announces a `::warning::`
+and stays green — the open-data export is chained to that workflow, and failing over a resource that
+has never existed would stop the dataset publishing. A **manual `workflow_dispatch` fails instead**,
+so an operator validating the wiring gets a real answer, and the message names the environment
+whose variables are missing. Prove it with one dispatch per environment before relying on the
+schedule.
 
 The task definition may reuse the service's `secrets` and `environment` verbatim. The full
 schedule, the idempotency and locking guarantees, and the per-job configuration are in
