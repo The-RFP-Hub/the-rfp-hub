@@ -4,7 +4,7 @@
  * behaviour a page depends on: the token is attached, a failure is an `ApiError` carrying the API's
  * own code, and a body that is not JSON is not silently treated as one.
  */
-import { ApiError, createApiClient, linkOutUrl } from "@/lib/api";
+import { ApiError, createApiClient, linkOutUrl, loadOpportunity } from "@/lib/api";
 import { describe, expect, it } from "vitest";
 
 interface Call {
@@ -195,5 +195,64 @@ describe("linkOutUrl", () => {
     expect(linkOutUrl("https://api.example.com", "acme:1", "source")).toBe(
       "https://api.example.com/v1/r/acme%3A1/source",
     );
+  });
+});
+
+/**
+ * The two-route read behind every link into `/listings/[id]`.
+ *
+ * The review queue, the claims list and the duplicate pairs all link a reviewer to entries they do
+ * not own, and the owner route answers those with a 404. What must NOT happen is the fallback
+ * firing for anything else: a submitter must not probe a reviewer route, and a 401 must not be
+ * retried against a route that will answer the same way.
+ */
+describe("loadOpportunity", () => {
+  const client = (responder: (call: Call) => Response) => {
+    const { fetchImpl, calls } = stubFetch(responder);
+    return {
+      api: createApiClient({
+        baseUrl: "https://api.example.com",
+        getToken: async () => "token",
+        fetchImpl,
+      }),
+      calls,
+    };
+  };
+
+  it("reads an owned entry through the owner route and stops there", async () => {
+    const { api, calls } = client(() => json({ id: "acme:1", title: "Mine" }));
+
+    await expect(loadOpportunity(api, "acme:1", true)).resolves.toMatchObject({ id: "acme:1" });
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.com/v1/me/opportunities/acme%3A1",
+    ]);
+  });
+
+  it("falls back to the reviewer route for an entry a reviewer does not own", async () => {
+    const { api, calls } = client((call) =>
+      call.url.includes("/v1/me/")
+        ? json({ error: "not_found", message: "no opportunity of yours." }, 404)
+        : json({ id: "other:1", title: "Somebody else's" }),
+    );
+
+    await expect(loadOpportunity(api, "other:1", true)).resolves.toMatchObject({ id: "other:1" });
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.com/v1/me/opportunities/other%3A1",
+      "https://api.example.com/v1/review/opportunities/other%3A1",
+    ]);
+  });
+
+  it("does not reach for the reviewer route without the role", async () => {
+    const { api, calls } = client(() => json({ error: "not_found", message: "no." }, 404));
+
+    await expect(loadOpportunity(api, "other:1", false)).rejects.toBeInstanceOf(ApiError);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("passes a non-404 failure straight through, whatever the role", async () => {
+    const { api, calls } = client(() => json({ error: "unauthorized", message: "no." }, 401));
+
+    await expect(loadOpportunity(api, "other:1", true)).rejects.toMatchObject({ status: 401 });
+    expect(calls).toHaveLength(1);
   });
 });

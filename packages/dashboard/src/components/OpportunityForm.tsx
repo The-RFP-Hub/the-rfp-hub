@@ -28,7 +28,7 @@ import { useMemo, useState } from "react";
 export function OpportunityForm({
   initial,
   mode,
-  /** Fields the form does not model, carried through a replace untouched. Empty on a create. */
+  /** The stored record a replace is layered over. Empty on a create. */
   carried = {},
 }: {
   initial: OpportunityFormState;
@@ -42,8 +42,11 @@ export function OpportunityForm({
   const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [result, setResult] = useState<SubmissionResult | null>(null);
 
-  const built = useMemo(() => toDocument(form), [form]);
-  const document = useMemo(() => ({ ...carried, ...built.document }), [carried, built.document]);
+  // The stored record is the BASE the edited fields are written over, not a set of leftovers
+  // merged after the fact: a shallow merge cannot preserve the members of a container this form
+  // only half models (see `toDocument`).
+  const built = useMemo(() => toDocument(form, carried), [form, carried]);
+  const document = built.document;
   const validation = useMemo(() => validateDocument(document), [document]);
   const idIssue = mode === "create" ? idProblem(form.id) : null;
 

@@ -3,9 +3,11 @@
 /**
  * One entry: what it says, and the four things the API can tell you about it.
  *
- * The record itself comes from `GET /v1/me/opportunities/{id}`, not from the public detail route —
- * the public one 404s a pending or rejected entry, and the owner of a pending entry is exactly who
- * needs to look at it.
+ * The record never comes from the public detail route: that one 404s a pending or rejected entry,
+ * and a pending entry is exactly the thing the two audiences for this page need to look at. Those
+ * audiences read it through different routes — the owner through `/v1/me/opportunities/{id}`, a
+ * reviewer who owns nothing here through `/v1/review/opportunities/{id}` — and `loadOpportunity`
+ * is the one place that picks between them.
  *
  * Every outbound link goes through the API's redirect routes. Linking straight to the stored URL
  * would leave the apply and source counters at zero and make the Analytics tab quietly wrong.
@@ -15,7 +17,7 @@ import { RequireSession } from "@/components/Chrome";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge } from "@/components/badges";
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError, linkOutUrl } from "@/lib/api";
+import { ApiError, linkOutUrl, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
@@ -43,7 +45,9 @@ export default function ListingPage() {
 function Listing({ id, me }: { id: string; me: Me }) {
   const api = useApi();
   const [tab, setTab] = useState<Tab>("analytics");
-  const load = useCallback(() => api.me.opportunity(id), [api, id]);
+  // Owner route first, reviewer route as the fallback — the entry a reviewer was linked to from
+  // the queue, a claim or a duplicate pair is by definition not theirs. See `loadOpportunity`.
+  const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
   const { state, reload } = useResource(load);
 
   return (
