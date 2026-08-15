@@ -79,9 +79,41 @@ guarantees nothing, and a late maintenance run published a dataset still adverti
 API had already closed. `workflow_run` is the only form of "after" that is actually after.
 
 **What that costs, stated plainly:** a failing job holds tonight's dataset publication, because the
-export is gated on `conclusion == 'success'`. That is the deliberate trade — publishing a snapshot
-whose staleness pass did not run is worse than publishing a day late; the export is idempotent and
-the next night republishes; and `workflow_dispatch` on the export recovers it immediately.
+export is gated on the maintenance run succeeding. That is the deliberate trade — publishing a
+snapshot whose staleness pass did not run is worse than publishing a day late; the export is
+idempotent and the next night republishes; and `workflow_dispatch` on the export recovers it
+immediately.
+
+**The export gate is "the SCHEDULED chain succeeded", not "a maintenance run went green".** A
+conclusion check alone would be satisfied by two runs that never touched the thing the export
+depends on:
+
+* a single-job dispatch — `job=analytics-rollup` skips every staleness step and still concludes
+  successfully;
+* a `environment=staging` dispatch, which maintains a database the production export never reads.
+
+So `nightly-export.yml` additionally requires `github.event.workflow_run.event == 'schedule'`. The
+schedule is the one trigger that always runs the whole chain against production — it leaves `job`
+blank and takes the `production` default for `environment`. A partial or staging dispatch therefore
+publishes nothing, and `workflow_dispatch` on the export remains the operator's way to say "the
+prerequisite is met, publish now".
+
+### Which deployment a run maintains
+
+`environment` is a required `workflow_dispatch` input (`production` | `staging`) and is **empty on
+the schedule, which means `production`** — the deployment the open-data export reads. Both the AWS
+credentials and the ECS resource names are selected from that name:
+
+| Environment | Credentials | Resource variables |
+|---|---|---|
+| `production` (and every scheduled run) | `PRODUCTION_AWS_ACCESS_KEY_ID` / `PRODUCTION_AWS_SECRET_ACCESS_KEY` — the same pair `production.yml` deploys with | `PRODUCTION_MAINTENANCE_ECS_*` |
+| `staging` (dispatch only) | `STAGING_AWS_ACCESS_KEY_ID` / `STAGING_AWS_SECRET_ACCESS_KEY` | `STAGING_MAINTENANCE_ECS_*` |
+
+The lookups are `secrets[format(...)]` / `vars[format(...)]` **index** expressions rather than the
+`&&`/`||` fallback idiom: a fallback treats an unset staging variable as false and silently reaches
+for the production resource, which is the exact accident this parameterisation exists to prevent.
+An unset variable stays unset and `run-ecs-job.sh` names it — prefixed with the environment, so the
+message says which set is missing.
 
 ---
 
@@ -185,12 +217,15 @@ Before the first M3 job run on any deployment, in order:
    [`deploy.md` §4](./deploy.md).
 2. Apply the migrations with the **DDL-capable** credential:
    `node packages/api/dist/migrate.js` — see [`deploy.md` §5](./deploy.md).
-3. Provision the maintenance task definition and set the repository variables the workflow reads
-   (`MAINTENANCE_ECS_CLUSTER`, `MAINTENANCE_ECS_TASK_DEFINITION`, `MAINTENANCE_ECS_CONTAINER`,
-   `MAINTENANCE_ECS_SUBNETS`, `MAINTENANCE_ECS_SECURITY_GROUPS`). The task uses the **runtime**
-   credential, not the migration one.
-4. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs*, which fails loudly if any
-   of those is missing, and confirm *Nightly open-data export* starts on its success.
+3. Provision the maintenance task definition and set the repository variables the workflow reads,
+   **once per environment**: `<ENV>_MAINTENANCE_ECS_CLUSTER`,
+   `<ENV>_MAINTENANCE_ECS_TASK_DEFINITION`, `<ENV>_MAINTENANCE_ECS_CONTAINER`,
+   `<ENV>_MAINTENANCE_ECS_SUBNETS`, `<ENV>_MAINTENANCE_ECS_SECURITY_GROUPS`, where `<ENV>` is
+   `PRODUCTION` or `STAGING`. The task uses the **runtime** credential, not the migration one.
+4. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
+   loudly if any of that environment's variables is missing. A dispatch does **not** trigger the
+   export (only the scheduled chain does), so confirm the export separately — either wait for one
+   scheduled run or dispatch *Nightly open-data export* directly.
 
 ---
 

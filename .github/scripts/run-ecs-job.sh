@@ -23,14 +23,18 @@
 set -euo pipefail
 
 : "${JOB:?JOB is required}"
+# Which deployment this run maintains, and the prefix its repository variables carry. Named in the
+# messages below because "a variable is unset" is not actionable without saying WHICH environment's.
+: "${VAR_PREFIX:?VAR_PREFIX is required (PRODUCTION or STAGING)}"
+target_env="${TARGET_ENV:-unknown}"
 
 missing=()
 for name in ECS_CLUSTER ECS_TASK_DEFINITION ECS_CONTAINER ECS_SUBNETS ECS_SECURITY_GROUPS; do
-  if [ -z "${!name:-}" ]; then missing+=("MAINTENANCE_${name}"); fi
+  if [ -z "${!name:-}" ]; then missing+=("${VAR_PREFIX}_MAINTENANCE_${name}"); fi
 done
 
 if [ "${#missing[@]}" -gt 0 ]; then
-  detail="the maintenance task runner is not provisioned: repository variable(s) ${missing[*]} are unset, so '${JOB}' did not run"
+  detail="the ${target_env} maintenance task runner is not provisioned: repository variable(s) ${missing[*]} are unset, so '${JOB}' did not run"
   if [ "${DISPATCHED:-false}" = "true" ]; then
     echo "::error::${detail}"
     exit 1
@@ -50,7 +54,7 @@ overrides=$(
 
 network="awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}"
 
-echo "starting ${JOB} on ${ECS_TASK_DEFINITION}"
+echo "starting ${JOB} on ${ECS_TASK_DEFINITION} (${target_env})"
 task_arn=$(
   aws ecs run-task \
     --cluster "$ECS_CLUSTER" \

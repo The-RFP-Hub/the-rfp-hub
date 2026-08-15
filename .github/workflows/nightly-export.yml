@@ -66,12 +66,25 @@ jobs:
     name: Publish and verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # A `completed` maintenance run includes the ones that failed and the ones that were cancelled.
-    # Only a successful one means the dataset about to be published reflects tonight's staleness
-    # pass. A manual dispatch has no triggering run and is always allowed — it is the recovery path.
+    # THE PREREQUISITE IS THE WHOLE CHAIN, NOT MERELY A GREEN RUN, and `conclusion == 'success'`
+    # alone does not say that. `Nightly maintenance jobs` also accepts a dispatch that runs ONE job
+    # — `job=analytics-rollup` skips every staleness step and still concludes successfully — and a
+    # dispatch that maintains STAGING, whose database this workflow's production export never
+    # reads. Either would satisfy a conclusion check while leaving the stated staleness prerequisite
+    # unmet.
+    #
+    # `github.event.workflow_run.event` is the trigger of the run that completed, and the SCHEDULE
+    # is the one trigger that always runs the whole chain against production (jobs-nightly.yml
+    # defaults `environment` to production and leaves `job` blank). So the chain is expressed as
+    # "the scheduled maintenance run succeeded", and a partial or staging dispatch publishes
+    # nothing.
+    #
+    # A manual dispatch OF THIS workflow has no triggering run and is always allowed — it is the
+    # recovery path, and the operator using it is the one asserting the prerequisite.
     if: >-
       github.event_name == 'workflow_dispatch'
-      || github.event.workflow_run.conclusion == 'success'
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'schedule')
 
     steps:
       # Full history: the push below rebases onto whatever main has become, which a shallow clone
