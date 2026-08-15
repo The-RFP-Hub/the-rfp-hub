@@ -1,0 +1,32 @@
+{
+  "name": "@the-rfp-hub/dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Publisher dashboard for the RFP Hub — submit and manage entries, read their traffic, and run the review and administration queues.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3005",
+    "build": "next build",
+    "start": "next start --port 3005",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "^3.37.1",
+    "@the-rfp-hub/standard": "workspace:*",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "rfphub-validate": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.9",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}
