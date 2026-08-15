@@ -30,14 +30,14 @@ export interface ViewerScope {
   /** Owner (submitter or namespace publisher) or T3+. Unlocks THIS entry's full audit patch. */
   privileged: boolean;
   /**
-   * T3+ on a session, and nobody else.
+   * Who is asking, carried so the sub-resources can ask the entitlement question about a DIFFERENT
+   * entry.
    *
-   * Kept apart from `privileged` because the two answer different questions. `privileged` is
-   * "may this caller see the private half of THIS entry" — an owner may. Whether the caller may
-   * see the private half of a DIFFERENT entry, which is what the other side of a duplicate pair
-   * is, is a separate question, and the owner's answer to it is no.
+   * `privileged` cannot answer that. It is settled against `row`, and the other side of a duplicate
+   * pair is a different row with a different owner — so the pair filter re-asks `isPrivileged`
+   * against the counterpart rather than reusing the answer for this one.
    */
-  reviewer: boolean;
+  principal: Principal | null;
 }
 
 export class OpportunityMetaService {
@@ -61,18 +61,22 @@ export class OpportunityMetaService {
     const privileged = isPrivileged(row, principal);
     const isPublic = row.reviewStatus === "approved" && row.isListed;
     if (!isPublic && !privileged) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
-    return { row, privileged, reviewer: isReviewer(principal) };
+    return { row, privileged, principal };
   }
 
   /**
    * The duplicate pairs naming this entry, from either side.
    *
-   * A pair is unordered, so both columns are searched and the OTHER entry is what gets reported.
-   * Only a REVIEWER is shown a pair whose other side is not publicly visible — a suspected match
-   * must never disclose somebody else's pending title and id, and owning one side of a pair does
-   * not entitle anybody to the other side. That is the whole of the leak this filter closes: a
-   * pending submission that resembles a public entry records a pair with it, and the public
-   * entry's owner is not the pending entry's owner.
+   * A pair is unordered, so both columns are searched and the OTHER entry is what gets reported —
+   * and reporting it is disclosure of THAT entry, so it is held to that entry's own visibility.
+   * `maySee` asks the question again against the counterpart: public, or the caller's own by
+   * submission or namespace, or the caller is a reviewer.
+   *
+   * Owning one side is not, by itself, entitlement to the other. That is the leak this closes: a
+   * pending submission that resembles a public entry records a pair with it, and the public entry's
+   * owner is not the pending entry's owner. It is also why the check cannot simply be "is the
+   * caller a reviewer" — two of the caller's OWN pending entries can be paired with each other, and
+   * hiding those hides nothing from anybody.
    */
   async duplicates(scope: ViewerScope): Promise<DuplicateMatchView[]> {
     const other = opportunities;
@@ -95,7 +99,7 @@ export class OpportunityMetaService {
       .orderBy(desc(opportunityDuplicates.detectedAt));
 
     return rows
-      .filter(({ other: match }) => scope.reviewer || isPubliclyVisible(match))
+      .filter(({ other: match }) => maySee(match, scope.principal))
       .map(({ pair, other: match }) => ({
         id: match.publicId,
         title: match.title,
@@ -108,14 +112,20 @@ export class OpportunityMetaService {
   /**
    * Every suspected/decided pair touching an entry this account owns, for the dashboard's queue.
    *
-   * The OWNED entry is the one whose side is filtered on; the OTHER side is what gets reported —
-   * and reporting it is disclosure of an entry this caller does not own. So the other side is held
-   * to the same bar as everywhere else: publicly visible, unless the caller is a reviewer.
+   * The OWNED entry is the one whose side is filtered on; the OTHER side is what gets reported, and
+   * reporting it is disclosure of THAT entry. So the counterpart is held to its own visibility
+   * through `maySee`, which is the same ownership predicate this query selects by — public, or the
+   * caller's own by submission or namespace, or the caller is a reviewer.
    *
-   * WITHOUT THAT FILTER THIS ROUTE IS A WINDOW INTO THE REVIEW QUEUE. Detection runs a pending
+   * WITHOUT ANY FILTER THIS ROUTE IS A WINDOW INTO THE REVIEW QUEUE. Detection runs a pending
    * submission against the PUBLIC corpus, so a pair between somebody's pending entry and an
    * unrelated publisher's live one is the ordinary case, not the exotic one — and the live entry's
    * owner reaching `/v1/me/duplicates` would read back the pending entry's id and title.
+   *
+   * WITH A PUBLIC-ONLY FILTER it hides the caller's own work from them. The all-scope backfill
+   * pairs pending entries with each other, so two of one publisher's queued submissions are a pair
+   * neither side of which is public — and that is precisely the pair this queue exists to show.
+   * Entitlement, not publicity, is the question.
    */
   async duplicatesForOwner(principal: Principal): Promise<DuplicateMatchView[]> {
     const namespaces = principal.memberships.map((m) => m.slug);
@@ -147,9 +157,8 @@ export class OpportunityMetaService {
       .orderBy(desc(opportunityDuplicates.detectedAt))
       .limit(100);
 
-    const reviewer = isReviewer(principal);
     return rows
-      .filter(({ other: match }) => reviewer || isPubliclyVisible(match))
+      .filter(({ other: match }) => maySee(match, principal))
       .map(({ pair, other: match }) => ({
         id: match.publicId,
         title: match.title,
@@ -213,4 +222,17 @@ export function isPrivileged(row: OpportunityRow, principal: Principal | null): 
     row.sourcePublisher !== null &&
     principal.memberships.some((m) => m.slug === row.sourcePublisher)
   );
+}
+
+/**
+ * Whether this caller may be TOLD ABOUT this row — the question every duplicate counterpart is put
+ * to, and the only one that is right for it.
+ *
+ * It is deliberately the union of the two rules rather than either alone: publicity answers for a
+ * stranger, entitlement answers for the owner of a queued entry, and a counterpart can need either.
+ * Held in one function because both duplicate surfaces ask it and two copies of a disclosure rule
+ * is one copy too many.
+ */
+export function maySee(row: OpportunityRow, principal: Principal | null): boolean {
+  return isPubliclyVisible(row) || isPrivileged(row, principal);
 }

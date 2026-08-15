@@ -26,7 +26,7 @@
  * `config.ts` says so at boot.
  */
 import { and, eq, ilike, or } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../../db/client.js";
+import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
 import { type AccountRow, accounts, orgMemberships, organizations } from "../../../db/schema.js";
 import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict } from "../../shared/http-error.js";
@@ -84,33 +84,51 @@ export class AccountService {
    * Public because enrichment calls it the moment it writes a wallet — an account already stamped
    * `enriched_at` is out of that job's cursor forever, so waiting for the next enrichment pass
    * would mean the promotion never happened.
+   *
+   * This is the standalone form, on its own transaction — the login path, where there is nothing
+   * else to be atomic with. A caller that IS writing something else takes `within` instead.
    */
   async applyBootstrapAdmin(account: AccountRow): Promise<AccountRow> {
     if (account.globalRole === "admin") return account;
+    if (this.bootstrapReason(account) === undefined) return account;
+    return this.db.transaction((tx) => this.applyBootstrapAdminWithin(tx, account));
+  }
+
+  /**
+   * The same promotion, on a handle the caller supplies — so it commits with whatever else that
+   * handle is writing, or with nothing at all.
+   *
+   * ENRICHMENT NEEDS THIS, and a nested `db.transaction()` would not have given it: called on the
+   * pool it opens a SECOND connection, which is not atomic with anything. The stamp that takes an
+   * account out of the enrichment cursor and the promotion the stamp is the last chance to make
+   * have to land together — otherwise a promotion that throws while writing its audit row leaves
+   * `enriched_at` committed, the job reports the account as failed, and it is never selected again.
+   */
+  async applyBootstrapAdminWithin(tx: DbLike, account: AccountRow): Promise<AccountRow> {
+    if (account.globalRole === "admin") return account;
     const reason = this.bootstrapReason(account);
     if (reason === undefined) return account;
-    return this.db.transaction(async (tx) => {
-      const updated = await tx
-        .update(accounts)
-        .set({ globalRole: "admin", updatedAt: new Date() })
-        .where(and(eq(accounts.id, account.id), eq(accounts.globalRole, account.globalRole)))
-        .returning();
-      const row = updated[0];
-      // Lost the compare-and-set: something else changed the role between the read and here, and
-      // its decision is the newer one.
-      if (!row) return account;
-      await this.audit.record(tx, {
-        ...SYSTEM_ACTOR,
-        subjectKind: "account",
-        subjectId: row.id,
-        action: "assign_role",
-        patch: {
-          globalRole: { before: account.globalRole, after: "admin" },
-          reason,
-        },
-      });
-      return row;
+
+    const updated = await tx
+      .update(accounts)
+      .set({ globalRole: "admin", updatedAt: new Date() })
+      .where(and(eq(accounts.id, account.id), eq(accounts.globalRole, account.globalRole)))
+      .returning();
+    const row = updated[0];
+    // Lost the compare-and-set: something else changed the role between the read and here, and
+    // its decision is the newer one.
+    if (!row) return account;
+    await this.audit.record(tx, {
+      ...SYSTEM_ACTOR,
+      subjectKind: "account",
+      subjectId: row.id,
+      action: "assign_role",
+      patch: {
+        globalRole: { before: account.globalRole, after: "admin" },
+        reason,
+      },
     });
+    return row;
   }
 
   /** Which configured list this account matches, or `undefined` for neither. */
