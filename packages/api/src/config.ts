@@ -301,12 +301,17 @@ export function readEmbeddingProvider(
  * universal constant: the same number means different things to a 1536-dimension model and to a
  * hashed token bag, so one shared default would be wrong for at least one of them.
  *
- * Both are PROVISIONAL operating points, to be settled against the committed corpus by the
- * threshold sweep (`scripts/dedupe-threshold-report.ts`) and recorded in docs/data-model.md.
+ * `deterministic` is SETTLED at 0.74 — the midpoint of the separating band measured by
+ * `scripts/dedupe-threshold-report.ts` over the committed corpus (worst positive 0.911, best
+ * negative 0.571). `test/unit/dedupe-threshold.test.ts` asserts that band in CI, so a corpus change
+ * that closes it fails the build rather than silently degrading detection.
+ *
+ * `openai` remains PROVISIONAL: settling it needs a key, which CI does not have and must not have,
+ * so the number is a documented starting point rather than a measured one. See docs/data-model.md.
  */
 export const DEFAULT_SIMILARITY_THRESHOLD: Record<EmbeddingProvider, number> = {
   openai: 0.86,
-  deterministic: 0.72,
+  deterministic: 0.74,
   disabled: 1,
 };
 

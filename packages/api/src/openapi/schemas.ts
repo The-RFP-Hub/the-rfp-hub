@@ -235,7 +235,15 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     description:
       "The outcome of a create or replace. `reviewStatus` is `approved` only when the credential could publish into the resolved namespace — a submission that lands `pending` is stored and invisible to the public reads until a reviewer approves it.",
-    required: ["opportunity", "created", "reviewStatus", "isListed", "warnings"],
+    required: [
+      "opportunity",
+      "created",
+      "reviewStatus",
+      "isListed",
+      "warnings",
+      "duplicateCheck",
+      "duplicates",
+    ],
     properties: {
       opportunity: { $ref: "Opportunity" },
       created: {
@@ -250,6 +258,18 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         items: { type: "string" },
         description:
           "Advisory check-tier findings. Never fatal — a conformant document may carry them.",
+      },
+      duplicateCheck: {
+        type: "string",
+        enum: ["ok", "unavailable", "disabled"],
+        description:
+          "Whether duplicate detection RAN. `ok` with an empty `duplicates` means checked and nothing similar; `unavailable` means the embedding call failed or timed out and a backfill still owes this entry a check; `disabled` means no provider is configured. Without this a client cannot tell the three apart. Detection never blocks a write — a failure is reported here, not as an error.",
+      },
+      duplicates: {
+        type: "array",
+        items: { $ref: "DuplicateMatch" },
+        description:
+          "Suspected matches, searched over PUBLICLY VISIBLE entries only — a duplicate check must never disclose another account's pending or unlisted title and id.",
       },
     },
   },
@@ -304,6 +324,70 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     required: ["items"],
     properties: { items: { type: "array", items: { $ref: "DuplicateMatch" } } },
+  },
+  {
+    $id: "DuplicateSide",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One entry of a pair, as the REVIEW queue sees it — including the editorial state that decides which of the two may survive a merge.",
+    required: ["id", "title", "reviewStatus", "isListed", "namespace", "mergedInto", "updatedAt"],
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+      isListed: { type: "boolean" },
+      namespace: { type: ["string", "null"] },
+      mergedInto: {
+        type: ["string", "null"],
+        description:
+          "The survivor of an earlier merge. A merge target that carries this is refused — that is what prevents chains and, transitively, cycles.",
+      },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "DuplicatePair",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A suspected or decided pair, both sides shown. `id` is the PAIR's own id — what /v1/review/duplicates/{id}/… names, never an opportunity id.",
+    required: ["id", "status", "similarity", "detectedAt", "reviewedAt", "left", "right"],
+    properties: {
+      id: { type: "integer" },
+      status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
+      similarity: { type: ["number", "null"] },
+      detectedAt: { type: "string", format: "date-time" },
+      reviewedAt: { type: ["string", "null"], format: "date-time" },
+      left: { $ref: "DuplicateSide" },
+      right: { $ref: "DuplicateSide" },
+    },
+  },
+  {
+    $id: "DuplicatePairList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "DuplicatePair" } } },
+  },
+  {
+    $id: "MergeResult",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The outcome of a merge. The loser is rejected, unlisted, archived and pointed at the survivor — its row is KEPT, because its public id may already be in an export, a feed or somebody's bookmarks.",
+    required: ["pair", "survivorId", "mergedId", "copiedFields"],
+    properties: {
+      pair: { $ref: "DuplicatePair" },
+      survivorId: { type: "string" },
+      mergedId: { type: "string" },
+      copiedFields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Which whitelisted fields were carried over. Empty by default — a merge copies nothing unless asked, and a copy that would leave the survivor invalid against the Standard rolls the whole merge back.",
+      },
+    },
   },
   {
     $id: "VerificationRun",

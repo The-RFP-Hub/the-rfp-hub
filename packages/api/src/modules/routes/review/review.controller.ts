@@ -3,12 +3,14 @@ import { principalOf } from "../../../plugins/auth.js";
 import { toAccountSummary } from "../../services/admin/admin.service.js";
 import { AccountService } from "../../services/auth/account.service.js";
 import { ClaimService } from "../../services/claims/claim.service.js";
+import { DedupeService } from "../../services/dedupe/dedupe.service.js";
 import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
 import { type OrganizationMetadata, ReviewService } from "../../services/review/review.service.js";
 import { VerificationService } from "../../services/verification/verification.service.js";
 import type {
   AccountListView,
   ClaimListView,
+  DuplicatePairListView,
   ManagedOpportunityListView,
   OrganizationListView,
 } from "../../shared/api-views.js";
@@ -18,6 +20,7 @@ const reviews = new ReviewService();
 const claims = new ClaimService();
 const managed = new ManagedOpportunityService();
 const accountsService = new AccountService();
+const dedupe = new DedupeService();
 const verification = new VerificationService();
 
 export const reviewController = {
@@ -60,6 +63,37 @@ export const reviewController = {
     return verification.verify(row.id, {
       actorKind: "user",
       actorAccountId: principal.accountId,
+    });
+  }),
+
+  listDuplicates: handled(async (request: FastifyRequest) => {
+    const { status, limit } = queryOf<{
+      status?: "suspected" | "confirmed" | "dismissed" | "merged";
+      limit?: number;
+    }>(request);
+    const items = await dedupe.listForReview(status, limit);
+    return { items } satisfies DuplicatePairListView;
+  }),
+
+  confirmDuplicate: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    return dedupe.decide(principal.accountId, idParam(id, "duplicate pair"), "confirm");
+  }),
+
+  dismissDuplicate: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    return dedupe.decide(principal.accountId, idParam(id, "duplicate pair"), "dismiss");
+  }),
+
+  mergeDuplicate: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    const { survivorId, fields } = bodyOf<{ survivorId: string; fields?: string[] }>(request);
+    return dedupe.merge(principal.accountId, idParam(id, "duplicate pair"), {
+      survivorId,
+      fields,
     });
   }),
 

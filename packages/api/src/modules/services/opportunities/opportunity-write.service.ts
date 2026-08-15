@@ -49,6 +49,7 @@ import { diffFields } from "../../shared/patch.js";
 import { AuditService } from "../audit/audit.service.js";
 import { violatedConstraint } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
+import type { DuplicateCheckResult } from "../dedupe/dedupe.service.js";
 
 /** Per-field caps, enforced before anything is persisted. The body cap is on the route. */
 export const FIELD_CAPS = {
@@ -60,16 +61,30 @@ export const FIELD_CAPS = {
 } as const;
 
 /**
- * The seam Wave 3 fills.
+ * The post-commit seam: work that must happen after the row exists and outside its transaction.
  *
- * Duplicate detection and source verification both want to run AFTER the row is committed and
- * OUTSIDE the transaction — an embedding call that fails must not roll back a legitimate
- * submission, and a source fetch must never hold a database transaction open across the network.
- * So the write path commits, then calls this, and a hook that throws is logged and swallowed by the
- * caller rather than turning a stored entry into a 500.
+ * Duplicate detection and source verification both belong here — an embedding call that fails must
+ * not roll back a legitimate submission, and a source fetch must never hold a database transaction
+ * open across the network.
+ *
+ * THE HOOK RETURNS, AND THE CALLER WAITS. Detection was originally fire-and-forget, which cannot
+ * work: `duplicateCheck` and the suspected matches are part of the 201 body, and a result computed
+ * after the response was sent is a result nobody receives. So `afterCommit` resolves to what the
+ * response needs, the write awaits it, and the whole of it stays bounded by
+ * `EMBEDDING_TIMEOUT_MS`. Anything genuinely fire-and-forget (queueing a source verification) is
+ * started inside the hook and not awaited.
+ *
+ * A HOOK THAT THROWS IS SWALLOWED. The row is committed; public behaviour must never depend on a
+ * post-commit enrichment succeeding, and the caller reports the honest `unavailable` instead.
  */
 export interface WriteHooks {
-  afterCommit?(event: AfterCommitEvent): Promise<void> | void;
+  /**
+   * A hook with nothing to contribute returns `undefined` rather than nothing at all: `void` in a
+   * union is ambiguous about whether the value may be inspected, and this one is inspected.
+   */
+  afterCommit?(
+    event: AfterCommitEvent,
+  ): Promise<AfterCommitOutcome | undefined> | AfterCommitOutcome | undefined;
 }
 
 export interface AfterCommitEvent {
@@ -78,6 +93,11 @@ export interface AfterCommitEvent {
   namespace: string;
   created: boolean;
   principal: Principal;
+}
+
+/** What the post-commit work hands back to the response. */
+export interface AfterCommitOutcome {
+  duplicateCheck?: DuplicateCheckResult;
 }
 
 export interface WriteResult {
@@ -90,6 +110,11 @@ export interface WriteResult {
   warnings: string[];
   /** True when an identical repeat of an earlier create was recognised and no row changed. */
   repeated: boolean;
+  /**
+   * Whether duplicate detection ran, and what it found. Absent when the hook itself failed, which
+   * the caller reports as `unavailable` — the honest answer, and the one the backfill job acts on.
+   */
+  duplicateCheck?: DuplicateCheckResult;
   row: OpportunityRow;
 }
 
@@ -171,7 +196,19 @@ export class OpportunityWriteService {
       // different account reaching for an id that is taken — is one undifferentiated 409. A 403
       // here would confirm to a stranger that the id exists and who it belongs to.
       const repeat = this.identicalRepeat(principal, attributed, existing);
-      if (repeat) return repeat;
+      if (repeat) {
+        // The post-commit work runs for a repeat too. Nothing changed, so the embedding is skipped
+        // on its content hash — but the caller gets the SAME answer the original create gave, which
+        // is what makes a retry idempotent rather than merely non-destructive.
+        const outcome = await this.runAfterCommit({
+          opportunityId: existing.id,
+          publicId: existing.publicId,
+          namespace,
+          created: false,
+          principal,
+        });
+        return { ...repeat, duplicateCheck: outcome?.duplicateCheck };
+      }
       throw conflict(
         "id_conflict",
         `an opportunity with id ${JSON.stringify(document.id)} already exists and differs from this submission. Use PUT to replace it.`,
@@ -363,7 +400,7 @@ export class OpportunityWriteService {
         throw translateWriteFailure(error, document);
       });
 
-    await this.runAfterCommit({
+    const outcome = await this.runAfterCommit({
       opportunityId: row.id,
       publicId: row.publicId,
       namespace,
@@ -378,18 +415,20 @@ export class OpportunityWriteService {
       isListed: row.isListed,
       warnings: ctx.warnings,
       repeated: false,
+      duplicateCheck: outcome?.duplicateCheck,
       row,
     };
   }
 
-  /** Wave 3's seam. A hook failure is never allowed to un-store a stored entry. */
-  private async runAfterCommit(event: AfterCommitEvent): Promise<void> {
-    if (!this.hooks.afterCommit) return;
+  /** The post-commit seam. A hook failure is never allowed to un-store a stored entry. */
+  private async runAfterCommit(event: AfterCommitEvent): Promise<AfterCommitOutcome | undefined> {
+    if (!this.hooks.afterCommit) return undefined;
     try {
-      await this.hooks.afterCommit(event);
+      return (await this.hooks.afterCommit(event)) ?? undefined;
     } catch {
       // Deliberately swallowed: the row is committed and public behaviour must not depend on a
       // post-commit enrichment succeeding. The hook owns its own logging and retry (a backfill job).
+      return undefined;
     }
   }
 }

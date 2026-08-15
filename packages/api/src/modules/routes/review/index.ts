@@ -6,9 +6,6 @@
  * contract already gives T3 the power to override provenance, and a reviewer who can approve an
  * entry but cannot ask whether its link resolves is being asked to decide with less evidence than
  * the system has. The T4 route survives alongside it for bulk and scripted use.
- *
- * Duplicate merge/confirm/dismiss belongs on this prefix too and arrives with the detector behind
- * it — a review action with nothing to review would be a button that does nothing.
  */
 import type { FastifyInstance } from "fastify";
 import { reviewController } from "./review.controller.js";
@@ -21,6 +18,12 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     properties: { slug: { type: "string" } },
   };
   const idParams = { type: "object", required: ["id"], properties: { id: { type: "string" } } };
+  /** A duplicate PAIR's own numeric id — not an opportunity's public id. */
+  const pairParams = {
+    type: "object",
+    required: ["id"],
+    properties: { id: { type: "string", pattern: "^[0-9]+$" } },
+  };
   const errors = {
     401: { $ref: "ErrorResponse#" },
     403: { $ref: "ErrorResponse#" },
@@ -138,6 +141,101 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       },
     },
     reviewController.verifySource,
+  );
+
+  // ── duplicates ────────────────────────────────────────────────────────────────
+  router.get(
+    "/duplicates",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "listDuplicatePairs",
+        tags: ["review"],
+        summary: "The duplicate queue — both sides of every pair",
+        description:
+          "Unlike the submitter-facing `/v1/opportunities/{id}/duplicates`, this shows pairs whose other side is pending or unlisted: deciding between two entries is what a reviewer is for.",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            status: {
+              type: "string",
+              enum: ["suspected", "confirmed", "dismissed", "merged"],
+            },
+            limit: { type: "integer", minimum: 1, maximum: 200 },
+          },
+        },
+        response: { 200: { $ref: "DuplicatePairList#" }, ...errors },
+      },
+    },
+    reviewController.listDuplicates,
+  );
+
+  router.post(
+    "/duplicates/:id/confirm",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "confirmDuplicate",
+        tags: ["review"],
+        summary: "Record that two entries really are the same programme",
+        description:
+          "Changes the pair's status only. Neither entry is touched — deciding which one survives is a separate, destructive action.",
+        security: [{ bearerAuth: [] }],
+        params: pairParams,
+        response: { 200: { $ref: "DuplicatePair#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+      },
+    },
+    reviewController.confirmDuplicate,
+  );
+
+  router.post(
+    "/duplicates/:id/dismiss",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "dismissDuplicate",
+        tags: ["review"],
+        summary: "Record that two similar entries are different programmes",
+        description:
+          "A dismissal is permanent as far as the detector is concerned: re-running detection never resurrects a dismissed pair, because a re-run has no new information about a judgement somebody already made.",
+        security: [{ bearerAuth: [] }],
+        params: pairParams,
+        response: { 200: { $ref: "DuplicatePair#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+      },
+    },
+    reviewController.dismissDuplicate,
+  );
+
+  router.post(
+    "/duplicates/:id/merge",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "mergeDuplicate",
+        tags: ["review"],
+        summary: "Keep one entry of a pair and retire the other into it",
+        description:
+          "The loser is rejected, unlisted, archived and pointed at the survivor; its row is kept so a future read can redirect rather than 404. The survivor must be approved AND listed, and must not itself have been merged — that check is what prevents chains and cycles (409 naming the real survivor). `fields` copies a whitelist from the loser; the result is re-validated against the Standard inside the transaction and the whole merge rolls back if it would no longer conform.",
+        security: [{ bearerAuth: [] }],
+        params: pairParams,
+        body: {
+          type: "object",
+          required: ["survivorId"],
+          additionalProperties: false,
+          properties: {
+            survivorId: {
+              type: "string",
+              description: "The public id of whichever side of the pair is to remain public.",
+            },
+            fields: { type: "array", items: { type: "string" } },
+          },
+        },
+        response: { 200: { $ref: "MergeResult#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+      },
+    },
+    reviewController.mergeDuplicate,
   );
 
   router.get(
