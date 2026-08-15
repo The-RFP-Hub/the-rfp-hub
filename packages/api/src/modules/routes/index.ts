@@ -3,6 +3,8 @@ import { canonical } from "./canonical/index.js";
 import { datasetExport } from "./export/index.js";
 import { feeds } from "./feeds/index.js";
 import { health } from "./health/index.js";
+import { keys } from "./keys/index.js";
+import { me } from "./me/index.js";
 import { opportunities } from "./opportunities/index.js";
 import { specArtifactMirror } from "./spec-artifacts/index.js";
 import { stats } from "./stats/index.js";
@@ -16,6 +18,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(datasetExport, { prefix: "/v1/export" });
   await app.register(stats, { prefix: "/v1/stats" });
   await app.register(health, { prefix: "/v1/health" });
+  await app.register(me, { prefix: "/v1/me" });
+  await app.register(keys, { prefix: "/v1/keys" });
   // No prefix, deliberately: these routes ARE the spec's identifiers, and an identifier must
   // not carry an API version. See modules/shared/canonical-documents.ts and adr/0007.
   await app.register(canonical);
