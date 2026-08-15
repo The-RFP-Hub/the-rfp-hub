@@ -15,7 +15,9 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
-import { type OpportunityRow, auditLog, opportunities } from "../../src/db/schema.js";
+import { type OpportunityRow, accounts, auditLog, opportunities } from "../../src/db/schema.js";
+import { AccountService } from "../../src/modules/services/auth/account.service.js";
+import { AccountEnrichmentService } from "../../src/modules/services/jobs/account-enrichment.service.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
 import { runJob } from "../../src/modules/services/jobs/runner.js";
 import {
@@ -32,7 +34,16 @@ const NS = "m3job";
 const DIDS = {
   admin: "did:privy:m3job-admin",
   reviewer: "did:privy:m3job-reviewer",
+  bootstrap: "did:privy:m3job-bootstrap",
 };
+
+/**
+ * The address the fixture's identity provider reports for the bootstrap account.
+ *
+ * Deliberately written here in MIXED case and configured in lower: an address is case-insensitive
+ * in every form that matters, and a checksummed paste must not silently fail to match.
+ */
+const BOOTSTRAP_WALLET = "0xA11CE0000000000000000000000000000000B0B5";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-08-14T12:00:00.000Z");
@@ -283,6 +294,52 @@ run("M3JOB scheduled jobs", () => {
 
   it("refuses an unknown job name", async () => {
     await expect(runJob("delete-everything")).rejects.toThrow(/unknown job/);
+  });
+
+  // ── the bootstrap-wallet grant ───────────────────────────────────────────────────
+  it("promotes a configured bootstrap wallet the moment enrichment stores it", async () => {
+    // `BOOTSTRAP_ADMIN_WALLETS` is only usable as an authorization input because the wallet came
+    // from the provider's record rather than from a request — and enrichment is the one writer of
+    // that column. It is also the LAST time this account is in the job's cursor (the run stamps
+    // `enriched_at`), so the promotion has to happen here rather than being left for a later pass.
+    const seeded = await seedAccount({ did: DIDS.bootstrap, handle: "m3job-bootstrap" });
+    expect(seeded.globalRole).toBe("submitter");
+
+    const enrichment = new AccountEnrichmentService(db, {
+      config: { ...config, bootstrapAdminWallets: [BOOTSTRAP_WALLET.toLowerCase()] },
+      // Only this suite's account is answered for. Every other pending account THROWS, which
+      // leaves `enriched_at` NULL and the account exactly as another suite left it — a fixture
+      // must not enrich the whole table as a side effect.
+      fetchUser: async (did: string) => {
+        if (did !== DIDS.bootstrap) throw new Error("not this suite's account");
+        return { primaryWallet: BOOTSTRAP_WALLET, email: null };
+      },
+    });
+    const result = await enrichment.runBatch({ limit: 1000, now: NOW });
+    expect(result.details?.bootstrapAdminsPromoted).toBe(1);
+
+    const promoted = (
+      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.bootstrap)).limit(1)
+    )[0];
+    expect(promoted?.globalRole).toBe("admin");
+    expect(promoted?.primaryWallet).toBe(BOOTSTRAP_WALLET);
+
+    const trail = await db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, promoted?.id ?? 0)));
+    const grants = trail.filter((row) => row.action === "assign_role");
+    expect(grants).toHaveLength(1);
+    expect((grants[0]?.patch as { reason?: string })?.reason).toBe("bootstrap_admin_wallet");
+
+    // Idempotent: re-checking an account that is already an admin writes no second row.
+    const service = new AccountService(db, [], [BOOTSTRAP_WALLET.toLowerCase()]);
+    if (promoted) await service.applyBootstrapAdmin(promoted);
+    const again = await db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, promoted?.id ?? 0)));
+    expect(again.filter((row) => row.action === "assign_role")).toHaveLength(1);
   });
 
   // ── the convenience route ────────────────────────────────────────────────────────

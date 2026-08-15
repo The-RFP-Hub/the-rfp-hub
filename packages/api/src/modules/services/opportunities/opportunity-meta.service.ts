@@ -27,8 +27,17 @@ import { notFound } from "../../shared/http-error.js";
 /** What a caller may see of one entry. */
 export interface ViewerScope {
   row: OpportunityRow;
-  /** Owner (submitter or namespace publisher) or T3+. Unlocks the full audit patch and all pairs. */
+  /** Owner (submitter or namespace publisher) or T3+. Unlocks THIS entry's full audit patch. */
   privileged: boolean;
+  /**
+   * T3+ on a session, and nobody else.
+   *
+   * Kept apart from `privileged` because the two answer different questions. `privileged` is
+   * "may this caller see the private half of THIS entry" — an owner may. Whether the caller may
+   * see the private half of a DIFFERENT entry, which is what the other side of a duplicate pair
+   * is, is a separate question, and the owner's answer to it is no.
+   */
+  reviewer: boolean;
 }
 
 export class OpportunityMetaService {
@@ -52,15 +61,18 @@ export class OpportunityMetaService {
     const privileged = isPrivileged(row, principal);
     const isPublic = row.reviewStatus === "approved" && row.isListed;
     if (!isPublic && !privileged) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
-    return { row, privileged };
+    return { row, privileged, reviewer: isReviewer(principal) };
   }
 
   /**
    * The duplicate pairs naming this entry, from either side.
    *
    * A pair is unordered, so both columns are searched and the OTHER entry is what gets reported.
-   * An unprivileged viewer is shown only pairs whose other side is publicly visible — a suspected
-   * match must never disclose somebody else's pending title and id.
+   * Only a REVIEWER is shown a pair whose other side is not publicly visible — a suspected match
+   * must never disclose somebody else's pending title and id, and owning one side of a pair does
+   * not entitle anybody to the other side. That is the whole of the leak this filter closes: a
+   * pending submission that resembles a public entry records a pair with it, and the public
+   * entry's owner is not the pending entry's owner.
    */
   async duplicates(scope: ViewerScope): Promise<DuplicateMatchView[]> {
     const other = opportunities;
@@ -83,10 +95,7 @@ export class OpportunityMetaService {
       .orderBy(desc(opportunityDuplicates.detectedAt));
 
     return rows
-      .filter(
-        ({ other: match }) =>
-          scope.privileged || (match.reviewStatus === "approved" && match.isListed),
-      )
+      .filter(({ other: match }) => scope.reviewer || isPubliclyVisible(match))
       .map(({ pair, other: match }) => ({
         id: match.publicId,
         title: match.title,
@@ -99,10 +108,14 @@ export class OpportunityMetaService {
   /**
    * Every suspected/decided pair touching an entry this account owns, for the dashboard's queue.
    *
-   * The OWNED entry is the one whose side is filtered on; the other side is reported. A pair whose
-   * other side is not public is included only because the owner is entitled to know their own entry
-   * was flagged — the other entry's title and id are what a stranger must not see, and a stranger
-   * does not reach this route.
+   * The OWNED entry is the one whose side is filtered on; the OTHER side is what gets reported —
+   * and reporting it is disclosure of an entry this caller does not own. So the other side is held
+   * to the same bar as everywhere else: publicly visible, unless the caller is a reviewer.
+   *
+   * WITHOUT THAT FILTER THIS ROUTE IS A WINDOW INTO THE REVIEW QUEUE. Detection runs a pending
+   * submission against the PUBLIC corpus, so a pair between somebody's pending entry and an
+   * unrelated publisher's live one is the ordinary case, not the exotic one — and the live entry's
+   * owner reaching `/v1/me/duplicates` would read back the pending entry's id and title.
    */
   async duplicatesForOwner(principal: Principal): Promise<DuplicateMatchView[]> {
     const namespaces = principal.memberships.map((m) => m.slug);
@@ -134,13 +147,16 @@ export class OpportunityMetaService {
       .orderBy(desc(opportunityDuplicates.detectedAt))
       .limit(100);
 
-    return rows.map(({ pair, other: match }) => ({
-      id: match.publicId,
-      title: match.title,
-      similarity: pair.similarity === null ? null : Number(pair.similarity),
-      status: pair.status,
-      detectedAt: pair.detectedAt.toISOString(),
-    }));
+    const reviewer = isReviewer(principal);
+    return rows
+      .filter(({ other: match }) => reviewer || isPubliclyVisible(match))
+      .map(({ pair, other: match }) => ({
+        id: match.publicId,
+        title: match.title,
+        similarity: pair.similarity === null ? null : Number(pair.similarity),
+        status: pair.status,
+        detectedAt: pair.detectedAt.toISOString(),
+      }));
   }
 
   /** The most recent run, or undefined when the entry has never been checked. */
@@ -168,17 +184,30 @@ export class OpportunityMetaService {
   }
 }
 
+/**
+ * T3+, on a session.
+ *
+ * The editorial role is session-only, here as everywhere else: a leaked key must not read the full
+ * patch of every entry in the corpus, or the non-public side of every duplicate pair, just because
+ * its owner is a reviewer.
+ */
+export function isReviewer(principal: Principal | null): boolean {
+  if (!principal) return false;
+  return (
+    principal.credentialKind === "session" &&
+    (principal.role === "reviewer" || principal.role === "admin")
+  );
+}
+
+/** The public read invariant, applied to one already-loaded row. */
+function isPubliclyVisible(row: OpportunityRow): boolean {
+  return row.reviewStatus === "approved" && row.isListed;
+}
+
 /** Owner — by submission or by namespace — or a reviewer. The one definition of "privileged". */
 export function isPrivileged(row: OpportunityRow, principal: Principal | null): boolean {
   if (!principal) return false;
-  // The editorial role is session-only, here as everywhere else: a leaked key must not read the
-  // full patch of every entry in the corpus just because its owner is a reviewer.
-  if (
-    principal.credentialKind === "session" &&
-    (principal.role === "reviewer" || principal.role === "admin")
-  ) {
-    return true;
-  }
+  if (isReviewer(principal)) return true;
   if (row.submittedBy === principal.accountId) return true;
   return (
     row.sourcePublisher !== null &&

@@ -49,7 +49,7 @@ export const opportunityMeta = async (router: FastifyInstance): Promise<void> =>
         tags: ["opportunities"],
         summary: "Duplicate pairs naming this entry",
         description:
-          "An unprivileged caller is only ever shown pairs whose other side is publicly visible. An entry that has not been through duplicate detection has none, and an empty list is that answer.",
+          "Only a reviewer is shown a pair whose other side is not publicly visible: owning one side of a pair does not entitle the caller to the other side, which is somebody else's entry. An entry that has not been through duplicate detection has no pairs, and an empty list is that answer.",
         params: idParams,
         response: {
           200: { $ref: "DuplicateList#" },

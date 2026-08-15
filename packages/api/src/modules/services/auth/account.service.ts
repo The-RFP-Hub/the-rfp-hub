@@ -15,12 +15,22 @@
  * BOOTSTRAP ADMINS ARE RE-EVALUATED ON EVERY LOGIN, not only at provisioning: adding a DID to
  * `BOOTSTRAP_ADMIN_PRIVY_DIDS` has to take effect without anybody touching the database, which is
  * the entire point of having the variable. The promotion is audited like any other role change.
+ *
+ * `BOOTSTRAP_ADMIN_WALLETS` IS THE SAME RULE AGAINST A DIFFERENT COLUMN, and the difference is
+ * where the value came from. `accounts.primary_wallet` is written by ONE thing — the enrichment
+ * job, from the provider's own record — so matching against it is matching against something the
+ * provider verified, not against a string a request asserted. It is therefore re-checked in the
+ * two places the pair (account, wallet) can become true: on every login, like the DID list, and
+ * immediately after enrichment writes the wallet, so the first admin does not have to log in twice.
+ * Without `PRIVY_APP_SECRET` nothing ever writes that column, the list matches nothing, and
+ * `config.ts` says so at boot.
  */
 import { and, eq, ilike, or } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type AccountRow, accounts, orgMemberships, organizations } from "../../../db/schema.js";
 import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict } from "../../shared/http-error.js";
+import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { AuditService, SYSTEM_ACTOR } from "../audit/audit.service.js";
 
 /** A handle is public and appears in `source.submittedBy`, so it is held to slug shape. */
@@ -46,6 +56,8 @@ export class AccountService {
   constructor(
     private readonly db: DB = defaultDb,
     private readonly bootstrapAdminDids: string[] = [],
+    /** Lowercased by `config.ts`; compared against the provider-verified `primary_wallet`. */
+    private readonly bootstrapAdminWallets: string[] = [],
   ) {
     this.audit = new AuditService(db);
   }
@@ -64,12 +76,19 @@ export class AccountService {
     return this.applyBootstrapAdmin(account);
   }
 
-  /** Promote a configured bootstrap DID to admin. Idempotent, and audited the first time only. */
-  private async applyBootstrapAdmin(account: AccountRow): Promise<AccountRow> {
+  /**
+   * Promote a configured bootstrap identity to admin. Idempotent, and audited the first time only.
+   *
+   * Two matchers, one rule. The DID is what the token itself carried; the wallet is what the
+   * provider's own record said, stored by the enrichment job. Neither is a value a request supplied.
+   * Public because enrichment calls it the moment it writes a wallet — an account already stamped
+   * `enriched_at` is out of that job's cursor forever, so waiting for the next enrichment pass
+   * would mean the promotion never happened.
+   */
+  async applyBootstrapAdmin(account: AccountRow): Promise<AccountRow> {
     if (account.globalRole === "admin") return account;
-    if (account.privyDid === null || !this.bootstrapAdminDids.includes(account.privyDid)) {
-      return account;
-    }
+    const reason = this.bootstrapReason(account);
+    if (reason === undefined) return account;
     return this.db.transaction(async (tx) => {
       const updated = await tx
         .update(accounts)
@@ -77,6 +96,8 @@ export class AccountService {
         .where(and(eq(accounts.id, account.id), eq(accounts.globalRole, account.globalRole)))
         .returning();
       const row = updated[0];
+      // Lost the compare-and-set: something else changed the role between the read and here, and
+      // its decision is the newer one.
       if (!row) return account;
       await this.audit.record(tx, {
         ...SYSTEM_ACTOR,
@@ -85,11 +106,23 @@ export class AccountService {
         action: "assign_role",
         patch: {
           globalRole: { before: account.globalRole, after: "admin" },
-          reason: "bootstrap_admin_privy_did",
+          reason,
         },
       });
       return row;
     });
+  }
+
+  /** Which configured list this account matches, or `undefined` for neither. */
+  private bootstrapReason(account: AccountRow): string | undefined {
+    if (account.privyDid !== null && this.bootstrapAdminDids.includes(account.privyDid)) {
+      return "bootstrap_admin_privy_did";
+    }
+    const wallet = account.primaryWallet?.trim().toLowerCase();
+    if (wallet && this.bootstrapAdminWallets.includes(wallet)) {
+      return "bootstrap_admin_wallet";
+    }
+    return undefined;
   }
 
   async findById(id: number): Promise<AccountRow | undefined> {
@@ -131,7 +164,16 @@ export class AccountService {
       .orderBy(organizations.slug);
   }
 
-  /** `PATCH /v1/me`. Session-only at the route; the shape rules live here. */
+  /**
+   * `PATCH /v1/me`. Session-only at the route; the shape rules live here.
+   *
+   * AUDITED, IN THE SAME TRANSACTION AS THE WRITE. The handle is not a cosmetic preference: it is
+   * the public attribution `source.submittedBy` carries on everything this account has published,
+   * so "who was this entry credited to last month" is only answerable if a rename is a recorded
+   * event. `subject_kind='account'` is what the generalized audit table exists for — the old
+   * opportunity-keyed table could not hold this row at all — and the actor is the account itself,
+   * because the route admits no other credential.
+   */
   async updateProfile(accountId: number, update: ProfileUpdate): Promise<AccountRow> {
     const set: Partial<AccountRow> = { updatedAt: new Date() };
 
@@ -167,14 +209,41 @@ export class AccountService {
     }
 
     try {
-      const rows = await this.db
-        .update(accounts)
-        .set(set)
-        .where(eq(accounts.id, accountId))
-        .returning();
-      const row = rows[0];
-      if (!row) throw new Error(`account ${accountId} vanished during a profile update`);
-      return row;
+      return await this.db.transaction(async (tx) => {
+        const before = await tx
+          .select()
+          .from(accounts)
+          .where(eq(accounts.id, accountId))
+          .for("update")
+          .limit(1);
+        const previous = before[0];
+        if (!previous) throw new Error(`account ${accountId} vanished during a profile update`);
+
+        const rows = await tx
+          .update(accounts)
+          .set(set)
+          .where(eq(accounts.id, accountId))
+          .returning();
+        const row = rows[0];
+        if (!row) throw new Error(`account ${accountId} vanished during a profile update`);
+
+        const patch = diffFields(
+          { handle: previous.handle, displayName: previous.displayName },
+          { handle: row.handle, displayName: row.displayName },
+        );
+        // A PATCH that changed nothing writes no history row, the same rule the write path uses.
+        if (!isEmptyPatch(patch)) {
+          await this.audit.record(tx, {
+            subjectKind: "account",
+            subjectId: row.id,
+            actorKind: "user",
+            actorAccountId: row.id,
+            action: "update",
+            patch,
+          });
+        }
+        return row;
+      });
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw conflict("handle_taken", "that handle is already in use.");

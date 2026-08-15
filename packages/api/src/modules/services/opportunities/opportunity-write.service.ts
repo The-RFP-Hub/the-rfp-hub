@@ -10,9 +10,13 @@
  *      installs a pass-through Fastify validator (D-7) precisely so this runs instead of ajv
  *      rejecting the body first with its own generic message; the humanized errors are the whole
  *      point of the endpoint being usable. Advisory `warnings` are returned with a 201, never fatal.
- *   3. **Namespace, then id.** `namespace = source.publisher ?? operatingOrganizations[0].slug`, and
- *      the public id must be `<namespace>:<local>` — the same derivation `source_system` uses, so an
- *      entry cannot be filed under a system it was not authorized for.
+ *   3. **Namespace, then id — and the two questions differ by mode.** On a CREATE the namespace is
+ *      `source.publisher ?? operatingOrganizations[0].slug` and the public id must be
+ *      `<namespace>:<local>`, the same derivation `source_system` uses, so an entry cannot be filed
+ *      under a system it was not authorized for. On a REPLACE the row's stored `source_publisher`
+ *      IS the namespace: the id is immutable and a granted claim reassigns the publisher without
+ *      touching it, so re-deriving from the prefix would lock a claimed entry out of the very
+ *      updates the claim promised. See `authorizationNamespace`.
  *   4. **Capabilities against that namespace**, from `effectiveCaps`. Never re-derived here.
  *   5. **Provenance is overwritten, wholesale.** The mapper persists `submittedBy`, `submittedAt`
  *      and `originalId` straight from the body, so leaving any of them client-controlled permits
@@ -42,9 +46,15 @@ import {
   organizations,
 } from "../../../db/schema.js";
 import { fromStandard, organizationInserts, toStandard } from "../../mappers/opportunity.mapper.js";
-import { type Capabilities, type Principal, effectiveCaps } from "../../shared/capabilities.js";
+import {
+  type Capabilities,
+  type Principal,
+  canWriteWith,
+  effectiveCaps,
+  hasVerifiedMembership,
+} from "../../shared/capabilities.js";
 import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
-import { checkPublicId, resolveNamespace } from "../../shared/namespace.js";
+import { checkPublicId, namespaceOfPublicId, resolveNamespace } from "../../shared/namespace.js";
 import { diffFields } from "../../shared/patch.js";
 import { AuditService } from "../audit/audit.service.js";
 import { violatedConstraint } from "../auth/account.service.js";
@@ -154,16 +164,8 @@ export class OpportunityWriteService {
     }
     const document = record as unknown as Opportunity;
 
-    const namespace = resolveNamespace(document);
-    if (namespace === undefined) {
-      throw badRequest(
-        "namespace_required",
-        "a submission must name the namespace it is published under: set `source.publisher` to an organisation slug, or give `operatingOrganizations[0].slug`.",
-      );
-    }
-    const idProblem = checkPublicId(document.id, namespace);
-    if (idProblem) throw badRequest("invalid_id", idProblem);
-
+    // The id may not change, whatever else does. Checked before anything is looked up, because a
+    // mismatch means the request is about two different entries and no answer to it is right.
     if (options.mode === "replace" && options.pathId !== undefined) {
       if (document.id !== options.pathId) {
         throw badRequest(
@@ -173,8 +175,9 @@ export class OpportunityWriteService {
       }
     }
 
-    const caps = effectiveCaps(principal, namespace);
-    if (!caps.canSubmit) {
+    // The credential half of "may you write at all" does not depend on any namespace, and asking it
+    // first keeps a caller who cannot write from learning whether an id exists.
+    if (!canWriteWith(principal)) {
       throw forbidden(
         "missing_scope",
         "writing requires the `write` scope (or the stronger `publish`) on an API key.",
@@ -182,6 +185,8 @@ export class OpportunityWriteService {
     }
 
     const existing = await this.findByPublicId(document.id);
+    const namespace = this.authorizationNamespace(document, existing);
+    const caps = effectiveCaps(principal, namespace);
     const now = new Date();
     const attributed = this.applyProvenance(document, {
       principal,
@@ -234,6 +239,49 @@ export class OpportunityWriteService {
       now,
       warnings: warnings.map((warning) => warning.message),
     });
+  }
+
+  /**
+   * The namespace authorization is decided against — and it is a different question on a create
+   * than on a replace.
+   *
+   * ON A CREATE it comes from the document (`source.publisher`, else the primary operating
+   * organisation) and the id MUST carry it as a prefix. That rule is what keeps `source_system`
+   * derivable from the id and `ux_opp_source` meaningful, and it is enforced here, once, at the
+   * only moment an id is chosen.
+   *
+   * ON A REPLACE the row already exists and its namespace is a STORED FACT — `source_publisher`,
+   * which a granted claim reassigns. Re-deriving it from the id prefix would strand every claimed
+   * entry: an aggregator's `host:123` claimed by `operator` keeps its immutable id, so a rule that
+   * required the prefix to match the current publisher would reject the very updates the claim
+   * promised. The id-prefix rule is therefore a CREATE-time rule plus an immutability rule, not a
+   * per-write invariant — and reading the namespace from the row rather than the body is also what
+   * stops a submitter from restating `source.publisher` to move an entry into a namespace they do
+   * hold a membership on.
+   */
+  private authorizationNamespace(
+    document: Opportunity,
+    existing: OpportunityRow | undefined,
+  ): string {
+    if (existing) {
+      // The `??` chain is ordered by authority: the stored publisher, then the id it was created
+      // under. The last fallback is unreachable for anything this service created (a create
+      // enforces the prefix) and exists so a hand-loaded row cannot produce an empty namespace,
+      // which would match a membership on `""`.
+      return (
+        existing.sourcePublisher ?? namespaceOfPublicId(existing.publicId) ?? existing.publicId
+      );
+    }
+    const namespace = resolveNamespace(document);
+    if (namespace === undefined) {
+      throw badRequest(
+        "namespace_required",
+        "a submission must name the namespace it is published under: set `source.publisher` to an organisation slug, or give `operatingOrganizations[0].slug`.",
+      );
+    }
+    const idProblem = checkPublicId(document.id, namespace);
+    if (idProblem) throw badRequest("invalid_id", idProblem);
+    return namespace;
   }
 
   private async findByPublicId(publicId: string): Promise<OpportunityRow | undefined> {
@@ -332,11 +380,24 @@ export class OpportunityWriteService {
     const { principal, caps, namespace, document, existing, now } = ctx;
     const { opp } = fromStandard(document, now);
     const autoApprove = caps.canPublishImmediately;
+    /**
+     * An edit that cannot auto-publish RETURNS THE ENTRY TO THE QUEUE.
+     *
+     * Preserving `approved` here was a hole with no floor to it: `PUT` replaces the whole record,
+     * so the original T1 submitter of an entry a reviewer had approved could rewrite its title,
+     * description, amounts and application URL and have every word of it stay public, unreviewed.
+     * The prior decision was about the prior content and does not carry over to content nobody has
+     * seen. Approved is kept only for a writer who could have published this content from scratch.
+     */
+    const requeued = !autoApprove && existing?.reviewStatus === "approved";
 
     const values: OpportunityInsert = {
       ...opp,
-      sourceSystem: namespace,
-      reviewStatus: autoApprove ? "approved" : (existing?.reviewStatus ?? "pending"),
+      // Pinned to the id, which is immutable — NOT to the current publisher, which a granted claim
+      // reassigns. `ux_opp_source` is `(source_system, original_id)`, so letting a claim move the
+      // system half would change a cross-system key that other systems resolve against.
+      sourceSystem: existing?.sourceSystem ?? namespaceOfPublicId(document.id) ?? namespace,
+      reviewStatus: autoApprove ? "approved" : "pending",
       isListed: existing?.isListed ?? true,
       submittedBy: existing?.submittedBy ?? principal.accountId,
       approvedBy: autoApprove
@@ -369,28 +430,53 @@ export class OpportunityWriteService {
           existing ? (comparable(existing) as Record<string, unknown>) : {},
           comparable(stored) as Record<string, unknown>,
         );
-        await this.audit.record(tx, {
-          subjectKind: "opportunity",
-          subjectId: stored.id,
-          actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
+        const actor = {
+          actorKind:
+            principal.credentialKind === "api_key" ? ("api_key" as const) : ("user" as const),
           actorAccountId: principal.accountId,
           actorApiKeyId: principal.apiKeyId ?? null,
+        };
+        await this.audit.record(tx, {
+          ...actor,
+          subjectKind: "opportunity",
+          subjectId: stored.id,
           action: created ? "create" : "update",
-          patch,
+          // Recorded ONLY when the writer is acting editorially — a reviewer editing somebody
+          // else's entry, which is the one case where "who wrote this" is not answered by the
+          // entry's own ownership. Stamping the role on every ordinary publisher write would put
+          // `actorRole` in the public `changedFields` of every entry in the corpus, where it is
+          // noise. Recorded at write time rather than read time because a role is revocable and
+          // the trail must say what was true when the action was taken.
+          patch: isEditorialWrite(principal, caps, existing, namespace)
+            ? { ...patch, actorRole: principal.role }
+            : patch,
         });
         // An auto-approval is a second, separate decision and gets its own row: "created" and
         // "published without review" are different facts and a reader must be able to see both.
         if (autoApprove && existing?.reviewStatus !== "approved") {
           await this.audit.record(tx, {
+            ...actor,
             subjectKind: "opportunity",
             subjectId: stored.id,
-            actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
-            actorAccountId: principal.accountId,
-            actorApiKeyId: principal.apiKeyId ?? null,
             action: "approve",
             patch: {
               reviewStatus: { before: existing?.reviewStatus ?? null, after: "approved" },
               reason: "verified_publisher_namespace",
+            },
+          });
+        }
+        // …and so is the reverse. The audit action enum is closed and gains nothing here: `update`
+        // with a patch naming the transition and its reason says exactly what happened, and the
+        // alternative is an `ALTER TYPE` migration for a verb the trail can already express.
+        if (requeued) {
+          await this.audit.record(tx, {
+            ...actor,
+            subjectKind: "opportunity",
+            subjectId: stored.id,
+            action: "update",
+            patch: {
+              reviewStatus: { before: "approved", after: "pending" },
+              reason: "replaced_without_auto_approval",
             },
           });
         }
@@ -484,11 +570,18 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
 }
 
 /**
- * Whether this principal may write over an entry that already exists.
+ * Whether this principal may write over an entry that already exists: the submitter, a verified
+ * publisher of the namespace the row is filed under, or T3+.
  *
- * Either they submitted it, or they are a verified publisher of the namespace it is filed under —
- * which is what a granted claim transfers. A reviewer role deliberately does not appear: editing an
- * entry is a review action with its own audited route.
+ * `namespace` is the ROW's namespace (see `authorizationNamespace`), so the membership arm is a
+ * question about the entry rather than about what the body claimed.
+ *
+ * T3+ IS DELIBERATE, and the earlier comment here saying the opposite was simply wrong: the
+ * approved design grants `PUT` to the submitter, a namespace member, or T3+, and a reviewer who
+ * can approve an entry outright but cannot correct a typo in it would reach for the approval
+ * button as the only tool they have. `caps.canReview` is session-only and covers admins, so a
+ * leaked reviewer key still cannot write over anything — and an editorial write is stamped with
+ * the actor's role in the audit trail, so it is distinguishable from the publisher's own.
  */
 function mayWriteExisting(
   principal: Principal,
@@ -497,8 +590,20 @@ function mayWriteExisting(
   namespace: string,
 ): boolean {
   if (existing.submittedBy === principal.accountId) return true;
-  if (existing.sourcePublisher !== null && existing.sourcePublisher !== namespace) return false;
-  return principal.memberships.some((m) => m.slug === namespace && m.verified) || caps.canAdmin;
+  if (hasVerifiedMembership(principal, namespace)) return true;
+  return caps.canReview;
+}
+
+/** A write over somebody else's entry, permitted only by the editorial role. */
+function isEditorialWrite(
+  principal: Principal,
+  caps: Capabilities,
+  existing: OpportunityRow | undefined,
+  namespace: string,
+): boolean {
+  if (!existing || !caps.canReview) return false;
+  if (existing.submittedBy === principal.accountId) return false;
+  return !hasVerifiedMembership(principal, namespace);
 }
 
 /** The comparable projection of a row or an insert: content only, no server-owned bookkeeping. */

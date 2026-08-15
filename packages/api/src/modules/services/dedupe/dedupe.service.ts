@@ -23,7 +23,7 @@
  *    predicate the backfill job selects on. A submission that was accepted stays accepted.
  */
 
-import { type SQL, and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { type SQL, and, asc, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { validateOpportunity } from "rfphub-validate";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
@@ -54,6 +54,9 @@ import {
 
 /** How many neighbours the ANN index returns before the threshold is applied. */
 const ANN_CANDIDATES = 20;
+
+/** Rows read per pass while walking the corpus for entries whose embedding is not current. */
+const SCAN_PAGE = 500;
 
 /**
  * The fields a merge may carry from the loser to the survivor.
@@ -187,15 +190,7 @@ export class DedupeService {
     row: OpportunityRow,
     provider: EmbeddingProvider,
   ): Promise<number[]> {
-    const text = embeddingText({
-      title: row.title,
-      summary: row.summary,
-      description: row.description,
-      fundingType: row.fundingType,
-      ecosystems: row.ecosystems,
-      categories: row.categories,
-      operatingOrganizations: row.operatingOrganizations,
-    });
+    const text = embeddingTextFor(row);
     const hash = contentHash(text, provider.model, provider.id);
 
     const stored = await this.db
@@ -358,9 +353,9 @@ export class DedupeService {
    * Embed every entry whose vector is missing or stale, up to `limit`.
    *
    * A CURSOR job in the sense of docs/jobs.md: the run retires the rows it selects, so `remaining`
-   * decreases and the runner may loop to zero. The predicate is "no embedding row for the
-   * configured model and provider" — which is exactly what a failed submit-time check leaves behind,
-   * and also what a provider switch leaves behind for the whole table.
+   * decreases and the runner may loop to zero. The predicate is "this entry has no CURRENT
+   * embedding" — see `pendingEmbeddingIds` for what current means and why the missing-row test
+   * alone was not enough.
    */
   async runBatch(options: { limit?: number } = {}): Promise<{
     processed: number;
@@ -385,24 +380,62 @@ export class DedupeService {
     return { processed, remaining };
   }
 
-  private async pendingEmbeddingIds(limit: number): Promise<number[]> {
+  /**
+   * Entries with no CURRENT embedding: no row at all, a row from another model or provider, **or a
+   * row whose `content_hash` no longer matches the entry's text**.
+   *
+   * THE HASH ARM IS THE ONE THAT WAS MISSING, and without it the backfill could never repair the
+   * exact failure it exists to repair. An edit changes the text; if the submit-time check then
+   * fails (a provider timeout, a missing key, a 429), the row keeps its OLD vector — same model,
+   * same provider, so a missing-row test considers it current and never selects it again. The
+   * entry is then searched, and matched against, using a vector of text that no longer exists,
+   * and its stale `suspected` pairs never get pruned. "Has an embedding" is not the question;
+   * "has an embedding OF THIS CONTENT" is, and `content_hash` is what answers it.
+   *
+   * The hash cannot be computed in SQL — `embeddingText` is a pure TypeScript composition and
+   * having a second, SQL-shaped copy of it is precisely how the two derivations drift apart — so
+   * the scan is a paged walk that stops as soon as `limit` candidates are found.
+   *
+   * Public, like `VerificationService.pendingIds`: the cursor IS the queue, so being able to ask
+   * "what does this predicate select" without running the job is how it stays testable.
+   */
+  async pendingEmbeddingIds(limit: number): Promise<number[]> {
     const provider = this.provider;
     if (!provider) return [];
-    const rows = await this.db
-      .select({ id: opportunities.id })
-      .from(opportunities)
-      .leftJoin(
-        opportunityEmbeddings,
-        and(
-          eq(opportunityEmbeddings.opportunityId, opportunities.id),
-          eq(opportunityEmbeddings.model, provider.model),
-          eq(opportunityEmbeddings.providerId, provider.id),
-        ),
-      )
-      .where(and(isNull(opportunityEmbeddings.opportunityId), isNull(opportunities.mergedIntoId)))
-      .orderBy(asc(opportunities.id))
-      .limit(limit);
-    return rows.map((row) => row.id);
+    const picked: number[] = [];
+    let afterId = 0;
+
+    while (picked.length < limit) {
+      const page = await this.db
+        .select({
+          row: opportunities,
+          model: opportunityEmbeddings.model,
+          providerId: opportunityEmbeddings.providerId,
+          contentHash: opportunityEmbeddings.contentHash,
+        })
+        .from(opportunities)
+        .leftJoin(opportunityEmbeddings, eq(opportunityEmbeddings.opportunityId, opportunities.id))
+        .where(and(isNull(opportunities.mergedIntoId), gt(opportunities.id, afterId)))
+        .orderBy(asc(opportunities.id))
+        .limit(SCAN_PAGE);
+      if (page.length === 0) break;
+
+      for (const entry of page) {
+        afterId = entry.row.id;
+        if (
+          entry.contentHash === null ||
+          entry.model !== provider.model ||
+          entry.providerId !== provider.id ||
+          entry.contentHash !==
+            contentHash(embeddingTextFor(entry.row), provider.model, provider.id)
+        ) {
+          picked.push(entry.row.id);
+          if (picked.length >= limit) break;
+        }
+      }
+      if (page.length < SCAN_PAGE) break;
+    }
+    return picked;
   }
 
   // ── the reviewer surface ───────────────────────────────────────────────────────
@@ -660,6 +693,25 @@ function cosineDistanceTo(vector: number[]): SQL<number> {
 }
 
 /** Three decimals. A similarity is read by a human and compared to a threshold, not accumulated. */
+/**
+ * The text one entry embeds as, in ONE place.
+ *
+ * Both callers need it — `ensureEmbedding` to decide whether to re-embed, and the backfill cursor
+ * to decide whether a stored hash is still the entry's — and two copies of this projection is two
+ * derivations that eventually disagree about what an entry's content hash should be.
+ */
+function embeddingTextFor(row: OpportunityRow): string {
+  return embeddingText({
+    title: row.title,
+    summary: row.summary,
+    description: row.description,
+    fundingType: row.fundingType,
+    ecosystems: row.ecosystems,
+    categories: row.categories,
+    operatingOrganizations: row.operatingOrganizations,
+  });
+}
+
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }

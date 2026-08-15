@@ -161,6 +161,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/me", "get"],
       ["/v1/keys", "post"],
       ["/v1/review/opportunities", "get"],
+      ["/v1/review/opportunities/{id}", "get"],
       ["/v1/review/duplicates", "get"],
       ["/v1/review/duplicates/{id}/merge", "post"],
       ["/v1/review/opportunities/{id}/verify", "post"],

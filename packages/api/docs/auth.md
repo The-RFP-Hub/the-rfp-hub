@@ -195,6 +195,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `GET\|POST /v1/keys`, `DELETE /v1/keys/:id` | T1, **session** | account-scoped; 404 on a foreign id |
 | `PATCH /v1/organizations/:slug` | org `owner`/`admin`, **session** | never the verified flag |
 | `GET /v1/review/opportunities`, `POST …/:id/approve\|reject`, `PATCH …/:id` | T3, **session** | |
+| `GET /v1/review/opportunities/:id` | T3, **session** | one entry in full, whatever its review status. The owner route `GET /v1/me/opportunities/:id` is scoped to entries the caller owns, and everything a reviewer is sent to is by definition somebody else's |
 | `POST /v1/review/opportunities/:id/verify` | T3, **session** | triggering a source check is a reviewer capability |
 | `GET /v1/review/claims`, `POST …/:id/approve\|reject` | T3, **session** | approval carries `verifyOrganization` |
 | `GET /v1/review/duplicates`, `POST …/:id/confirm\|dismiss\|merge` | T3, **session** | |

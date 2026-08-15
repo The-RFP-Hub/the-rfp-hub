@@ -29,6 +29,7 @@ const DIDS = {
   submitter: "did:privy:m3write-submitter",
   publisher: "did:privy:m3write-publisher",
   stranger: "did:privy:m3write-stranger",
+  reviewer: "did:privy:m3write-reviewer",
 };
 
 const run = describeWithDb;
@@ -38,6 +39,7 @@ run("M3WRITE submissions", () => {
   let submitterToken: string;
   let publisherToken: string;
   let strangerToken: string;
+  let reviewerToken: string;
   let publishKey: string;
 
   beforeAll(async () => {
@@ -47,6 +49,7 @@ run("M3WRITE submissions", () => {
     const submitter = await seedAccount({ did: DIDS.submitter, handle: "m3write-submitter" });
     const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3write-publisher" });
     await seedAccount({ did: DIDS.stranger, handle: "m3write-stranger" });
+    await seedAccount({ did: DIDS.reviewer, handle: "m3write-reviewer", role: "reviewer" });
 
     // A VERIFIED organisation carrying real directory metadata — the row a submission must not be
     // able to rewrite.
@@ -61,6 +64,7 @@ run("M3WRITE submissions", () => {
     submitterToken = await mintPrivyToken(DIDS.submitter);
     publisherToken = await mintPrivyToken(DIDS.publisher);
     strangerToken = await mintPrivyToken(DIDS.stranger);
+    reviewerToken = await mintPrivyToken(DIDS.reviewer);
     publishKey = await mintApiKeyFor(publisher.id, ["read", "write", "publish"]);
     void submitter;
   });
@@ -340,6 +344,9 @@ run("M3WRITE submissions", () => {
     expect(replaced.statusCode).toBe(200);
     expect(replaced.json().opportunity.title).toBe("Replaced");
     expect(replaced.json().created).toBe(false);
+    // The OTHER half of the requeue rule: a writer who could have published this content from
+    // scratch keeps it published, so this edit does not bounce back into the queue.
+    expect(replaced.json().reviewStatus).toBe("approved");
 
     const row = (
       await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
@@ -347,6 +354,61 @@ run("M3WRITE submissions", () => {
     // A publisher write is the "still real" signal the staleness clock reads.
     expect(row?.lastSeenAt).not.toBeNull();
     expect(row?.sourceSystem).toBe(NS);
+  });
+
+  it("returns an approved entry to the queue when the writer cannot auto-publish", async () => {
+    // The shape that matters: a T1 submitter's entry, approved by a reviewer, then edited by that
+    // same submitter. They own it — so the write is allowed — and they cannot publish, so the
+    // replacement content has never been reviewed and must not inherit the earlier decision.
+    const id = `${OTHER_NS}:requeue`;
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(submitterToken),
+      payload: submission(id, OTHER_NS),
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    expect(created.json().reviewStatus).toBe("pending");
+
+    const approved = await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${id}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { reason: "looks real" },
+    });
+    expect(approved.statusCode, approved.body).toBe(200);
+    expect((await app.inject({ method: "GET", url: `/v1/opportunities/${id}` })).statusCode).toBe(
+      200,
+    );
+
+    const edited = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(submitterToken),
+      payload: submission(id, OTHER_NS, { title: "Rewritten after approval" }),
+    });
+    expect(edited.statusCode, edited.body).toBe(200);
+    expect(edited.json().reviewStatus).toBe("pending");
+
+    // …and the rewritten content is out of the public read set until somebody looks at it again.
+    const publicAgain = await app.inject({ method: "GET", url: `/v1/opportunities/${id}` });
+    expect(publicAgain.statusCode).toBe(404);
+
+    // The transition is in the trail, as an `update` naming it — the audit action enum is closed
+    // and `update` with a reason says exactly what happened.
+    const trail = await app.inject({
+      url: `/v1/opportunities/${id}/audit`,
+      headers: bearer(submitterToken),
+    });
+    expect(trail.statusCode).toBe(200);
+    const requeue = trail
+      .json()
+      .entries.find(
+        (row: { patch?: { reason?: string } }) =>
+          row.patch?.reason === "replaced_without_auto_approval",
+      );
+    expect(requeue).toBeTruthy();
+    expect(requeue.patch.reviewStatus).toEqual({ before: "approved", after: "pending" });
   });
 
   it("404s a PUT against an entry that does not exist and 403s one owned by somebody else", async () => {

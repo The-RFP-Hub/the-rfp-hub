@@ -94,6 +94,11 @@ export class AnalyticsEventBuffer {
     }
     if (this.pending.length >= this.flushSize) {
       void this.flush();
+      // `flush()` empties `pending` synchronously when it STARTS one — so anything still here
+      // joined a flush that was already in flight and will not be written by it. Arming the timer
+      // as well means this burst has a scheduled writer even if the in-flight flush's follow-up
+      // (see `scheduleFollowUp`) has not run yet.
+      if (this.pending.length > 0) this.arm();
       return;
     }
     this.arm();
@@ -146,9 +151,32 @@ export class AnalyticsEventBuffer {
         return 0;
       } finally {
         this.flushing = undefined;
+        this.scheduleFollowUp();
       }
     })();
     return this.flushing;
+  }
+
+  /**
+   * Whatever arrived DURING a flush gets its own writer.
+   *
+   * `record()` and `close()` both answer a flush that is already running by joining its promise —
+   * which is right, they must not start a second concurrent write — but joining does nothing for
+   * the events that arrived after the batch was taken. Without this, a burst of `flushSize` events
+   * landing while a flush is in flight schedules no timer and no follow-up, and those events sit
+   * in memory until the next unrelated request happens to arm one. If traffic stops, that is never.
+   *
+   * So the end of every flush asks the question again: a full batch goes immediately, a partial one
+   * waits for the ordinary interval. `close()` drains the rest itself, which is why this stops at
+   * the closed flag rather than racing it.
+   */
+  private scheduleFollowUp(): void {
+    if (this.closed || this.pending.length === 0) return;
+    if (this.pending.length >= this.flushSize) {
+      void this.flush();
+      return;
+    }
+    this.arm();
   }
 
   private async resolveIds(publicIds: string[]): Promise<Map<string, number>> {
@@ -161,14 +189,25 @@ export class AnalyticsEventBuffer {
     return new Map(rows.map((row) => [row.publicId, row.id]));
   }
 
-  /** Stop accepting, cancel the timer, drain once. Registered as the app's `onClose` flush. */
+  /**
+   * Stop accepting, cancel the timer, and drain EVERYTHING. Registered as the app's `onClose`
+   * flush, before the pool-closing hook so it runs against a live pool.
+   *
+   * A single `flush()` is not a drain when one is already in flight: the call joins it and returns
+   * while the events that arrived after that batch was taken are still buffered. `record()` refuses
+   * once `closed` is set, so the queue is finite and this loop terminates — the bound is belt and
+   * braces against a caller that somehow keeps appending, not the mechanism.
+   */
   async close(): Promise<void> {
     this.closed = true;
     if (this.timer !== undefined) {
       clearTimeout(this.timer);
       this.timer = undefined;
     }
-    await this.flush();
+    for (let pass = 0; pass < 100; pass++) {
+      await this.flush();
+      if (this.pending.length === 0) return;
+    }
   }
 
   /** Reopen after a close — the integration suites build several apps in one process. */

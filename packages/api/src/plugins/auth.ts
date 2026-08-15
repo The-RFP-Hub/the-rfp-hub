@@ -36,6 +36,7 @@ export interface AuthOptions {
   /** Overrides the deployment's identity-provider settings — the integration tests inject a key. */
   privy?: typeof config.privy;
   bootstrapAdminPrivyDids?: string[];
+  bootstrapAdminWallets?: string[];
   db?: DB;
 }
 
@@ -77,6 +78,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   const accounts = new AccountService(
     db,
     options.bootstrapAdminPrivyDids ?? config.bootstrapAdminPrivyDids,
+    options.bootstrapAdminWallets ?? config.bootstrapAdminWallets,
   );
   const principals = new PrincipalService(db, {
     accounts,
