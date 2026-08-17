@@ -38,8 +38,9 @@ You are eligible if **all** of these are true.
    recorded — `sponsoringOrganizations` — but it is not publisher ownership, and it does not
    qualify you to publish or to claim.
 2. **It is a genuine funding opportunity.** A grant, hackathon, bounty, accelerator, RFP, or a
-   fund that invests — in any ecosystem. The Hub is ecosystem-neutral: scope is about the work
-   being funded, not about which ecosystem or chain the money moves on.
+   fund that invests. The Hub's focus is the Ethereum ecosystem, but that is not an exclusion rule —
+   other ecosystems are indexed too, not turned away. Scope is about the work being funded, not
+   about which ecosystem or chain the money moves on.
 3. **Your entries carry a public `applicationUrl`.** The link is the whole point of the index: the
    Hub is where an opportunity is found, never where it is applied to. A programme whose only
    channel is a forum thread or a shared form is fine — that thread or form *is* the link.
@@ -196,7 +197,7 @@ If you believe a decision is wrong, say so on the original application issue.
 
 ## Not applying?
 
-Nothing here is required to be listed. The Hub indexes public funding
+Nothing here is required to be listed. The Hub indexes public Ethereum-ecosystem funding
 opportunities either way, and anyone can submit one — it just goes through review first. Verification
 is for organisations that want to own their own listings and keep them current themselves.
 

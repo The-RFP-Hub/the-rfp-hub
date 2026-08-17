@@ -7,7 +7,7 @@
 > [`CHANGELOG.md`](../../CHANGELOG.md), and the reasoning in the [ADRs](../../../../adr).
 
 The **RFP Hub Standard** is a canonical, ecosystem-neutral representation of a funding
-opportunity. The normative artifact is
+opportunity in the Ethereum ecosystem. The normative artifact is
 [`opportunity.schema.json`](./opportunity.schema.json) (JSON Schema, draft 2020-12).
 
 **This document is informative.** It explains the fields, the conventions the schema cannot
@@ -38,10 +38,11 @@ Schema. Where that is the case, this document says so at the point of the rule.
 
 ## Scope
 
-The Hub is **ecosystem-neutral** — a multi-ecosystem aggregation layer, not a single-chain index.
-`ecosystems` is an **open, extensible list — not a closed enum** — so every ecosystem is
-first-class: Ethereum and its L2s (Optimism, Base, Arbitrum, Polygon, Scroll, zkSync, Linea, OP
-Stack, Celo, …) alongside Solana, Cosmos and any newly launched chain. `ecosystems` is
+The Hub is **ETH-scoped** in focus — the Ethereum ecosystem is its center of gravity — but this is
+not an exclusion rule. `ecosystems` is an **open, extensible list — not a closed enum** — so it
+never turns an ecosystem away: Ethereum and its L2s (Optimism, Base, Arbitrum, Polygon, Scroll,
+zkSync, Linea, OP Stack, Celo, …) are first-class, and Solana, Cosmos, or a newly launched chain are
+equally valid values. `ecosystems` is
 deliberately **not** registry-governed: a registry over a list of chain names reads as an
 allowed-values list however carefully the normative document words it, and it would put a review
 step in front of a newly launched chain for no interoperability gain. Write the ecosystem's usual

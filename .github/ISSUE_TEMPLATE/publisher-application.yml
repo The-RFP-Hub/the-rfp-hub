@@ -146,8 +146,7 @@ body:
       label: Before submitting
       options:
         - label: >-
-            Every programme listed above is a genuine funding opportunity (in any ecosystem — the
-            Hub is ecosystem-neutral).
+            Every programme listed above is a genuine funding opportunity.
           required: true
         - label: >-
             We will publish only programmes we operate, and keep our entries accurate.
