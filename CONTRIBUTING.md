@@ -1,6 +1,6 @@
 # Contributing to the RFP Hub
 
-Thanks for helping build an open, neutral standard and aggregation layer for Ethereum-ecosystem
+Thanks for helping build an open, neutral, multi-ecosystem standard and aggregation layer for
 funding opportunities. Contributions of all kinds are welcome — schema proposals, validation
 tooling, bug reports, docs, and data.
 

@@ -4,7 +4,7 @@
 [![code: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](./LICENSE)
 [![standard: CC0-1.0](https://img.shields.io/badge/standard-CC0--1.0-lightgrey.svg)](./packages/standard/LICENSE)
 
-An open, neutral aggregation layer and **standard** for **Ethereum-ecosystem funding
+An open, neutral, multi-ecosystem aggregation layer and **standard** for **funding
 opportunities** — grants, hackathons, bounties, accelerators, VC funds, and RFPs. It indexes,
 verifies, and distributes opportunities through a standard format, a public API, open data
 exports, and agent-friendly tooling (M2 ships these as running, tested code) — and where an entry
