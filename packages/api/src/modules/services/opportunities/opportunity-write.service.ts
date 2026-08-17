@@ -18,10 +18,12 @@
  *      authorized for. On a REPLACE the row's stored `source_publisher` IS the namespace: the id is
  *      immutable and a granted claim reassigns the publisher without touching it, so re-deriving
  *      from the prefix would lock a claimed entry out of the very updates the claim promised — and
- *      the same containment rule holds for entries that already conform, so a conforming
- *      replacement may not strip the stored publisher out of `operatingOrganizations` (a legacy row
- *      whose publisher was never one of its operating orgs is grandfathered and stays editable).
- *      See `authorizationNamespace` and the replace branch of `write`.
+ *      the same containment rule holds on replace, so a replacement may not strip the stored
+ *      publisher out of `operatingOrganizations`. The one exemption is import-provenance-scoped: a
+ *      row that entered through a legacy ingest route (`ingestedVia ∈ {import, scrape, outbox}`) AND
+ *      never conformed is grandfathered and stays editable; a `publisher_api`/`submission` row went
+ *      through the create-time gate and is held to containment on replace. See
+ *      `authorizationNamespace` and the replace branch of `write`.
  *   4. **Capabilities against that namespace**, from `effectiveCaps`. Never re-derived here.
  *   5. **Provenance is overwritten, wholesale.** The mapper persists `submittedBy`, `submittedAt`
  *      and `originalId` straight from the body, so leaving any of them client-controlled permits
@@ -238,29 +240,37 @@ export class OpportunityWriteService {
           "that entry was submitted by another account and you are not a verified publisher of its namespace.",
         );
       }
-      // The CREATE-time containment rule, applied to the STORED publisher — but ONLY to entries
-      // that already conform to it. For a conforming entry a replacement may not strip out the
-      // operating organisation that authorises it (so `acme:x` cannot be edited to drop `acme` from
-      // `operatingOrganizations` while staying published under `acme`); rejected as the SAME 400 the
-      // create-time gate uses, not a silent requeue.
+      // The CREATE-time containment rule, applied to the STORED publisher on replace — with a
+      // narrow, PROVENANCE-SCOPED exemption for legacy imports.
       //
-      // "Conforms" is read off the EXISTING row: the stored `source_publisher` is one of the row's
-      // own operating-org slugs. Legacy import/seed rows whose publisher was NEVER one of their
-      // operating orgs (14 in the seed corpus — e.g. `fundingmap:1042`, publisher `optimism`,
-      // operator `optimism-foundation`) are GRANDFATHERED: the containment rule did not hold when
-      // they were loaded, so enforcing it on edit would lock them out of ordinary content
-      // corrections. Claimed entries are unaffected — a granted claim already requires the claimant
-      // to be an operating org, so their stored publisher IS one. The `!== null` narrows the
-      // publisher to a string for both membership checks below.
-      if (
-        existing.sourcePublisher !== null &&
-        operatingSlugsOf(existing.operatingOrganizations).includes(existing.sourcePublisher) &&
-        !operatingSlugs(document).includes(existing.sourcePublisher)
-      ) {
-        throw badRequest(
-          "publisher_not_operating",
-          `this entry is published under ${JSON.stringify(existing.sourcePublisher)}; a replacement must keep that organisation in \`operatingOrganizations\`.`,
+      // A replacement may not strip out the operating organisation that authorises the entry: for a
+      // row whose stored `source_publisher` is one of its OWN operating-org slugs, dropping that org
+      // from `operatingOrganizations` is a 400 (the same code the create gate uses), so `acme:x`
+      // cannot be edited to remove `acme` while staying published under `acme`.
+      //
+      // The exemption is import-provenance-scoped, NOT merely "non-conforming". A row is
+      // grandfathered only when it BOTH (a) entered through a legacy ingest route
+      // (`ingestedVia ∈ {import, scrape, outbox}`) AND (b) never conformed — its stored publisher was
+      // never one of its operating orgs (the 14 seed-corpus rows: e.g. `fundingmap:1042`, published
+      // under `optimism`, operated by `optimism-foundation`). Those never passed the create-time
+      // gate, so enforcing containment on edit would only lock them out of ordinary corrections. A
+      // row created through the AUTHENTICATED write path (`publisher_api`/`submission`) went through
+      // that gate and must stay conforming: a foreign-operated one of those is still rejected on
+      // replace, never grandfathered. Claimed entries are unaffected — a granted claim already
+      // requires the claimant to be an operating org, so their publisher conforms.
+      const storedPublisher = existing.sourcePublisher;
+      if (storedPublisher !== null && !operatingSlugs(document).includes(storedPublisher)) {
+        const neverConformed = !operatingSlugsOf(existing.operatingOrganizations).includes(
+          storedPublisher,
         );
+        const legacyIngest = LEGACY_INGEST_ORIGINS.has(existing.ingestedVia ?? "");
+        const grandfathered = legacyIngest && neverConformed;
+        if (!grandfathered) {
+          throw badRequest(
+            "publisher_not_operating",
+            `this entry is published under ${JSON.stringify(storedPublisher)}; a replacement must keep that organisation in \`operatingOrganizations\`.`,
+          );
+        }
       }
     }
 
@@ -658,6 +668,14 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
     });
   }
 }
+
+/**
+ * The ingest routes that predate — or bypass — the create-time operating-org gate. A row that
+ * entered through one of these and never conformed is grandfathered on replace (see `write`); a row
+ * created through the authenticated write path (`publisher_api`/`submission`) went through the gate
+ * and is not. A null `ingestedVia` is treated as non-legacy (fail closed toward enforcement).
+ */
+const LEGACY_INGEST_ORIGINS: ReadonlySet<string> = new Set(["import", "scrape", "outbox"]);
 
 /** The slugs of a list of operating organisations — a stored row's array, or a document's. */
 function operatingSlugsOf(orgs: readonly { slug: string }[]): string[] {
