@@ -18,8 +18,10 @@
  *      authorized for. On a REPLACE the row's stored `source_publisher` IS the namespace: the id is
  *      immutable and a granted claim reassigns the publisher without touching it, so re-deriving
  *      from the prefix would lock a claimed entry out of the very updates the claim promised — and
- *      the same containment rule holds, so a replacement may not strip the stored publisher out of
- *      `operatingOrganizations`. See `authorizationNamespace` and the replace branch of `write`.
+ *      the same containment rule holds for entries that already conform, so a conforming
+ *      replacement may not strip the stored publisher out of `operatingOrganizations` (a legacy row
+ *      whose publisher was never one of its operating orgs is grandfathered and stays editable).
+ *      See `authorizationNamespace` and the replace branch of `write`.
  *   4. **Capabilities against that namespace**, from `effectiveCaps`. Never re-derived here.
  *   5. **Provenance is overwritten, wholesale.** The mapper persists `submittedBy`, `submittedAt`
  *      and `originalId` straight from the body, so leaving any of them client-controlled permits
@@ -236,16 +238,23 @@ export class OpportunityWriteService {
           "that entry was submitted by another account and you are not a verified publisher of its namespace.",
         );
       }
-      // The CREATE-time containment rule, applied to the STORED publisher: a replacement may not
-      // strip the operating organisation that authorises the entry. On a replace `namespace` is the
-      // row's stored `source_publisher`, so an edit dropping it from `operatingOrganizations` would
-      // leave the entry published under an org it no longer names as an operator. Rejected as a 400
-      // — the SAME code and status as the create-time gate, for consistency — rather than silently
-      // requeued: a missing authorising operator is a malformed edit, not a lower-privilege change
-      // awaiting review. Guarded on a stored publisher actually existing, so a legacy or hand-loaded
-      // row that never carried one is unaffected.
+      // The CREATE-time containment rule, applied to the STORED publisher — but ONLY to entries
+      // that already conform to it. For a conforming entry a replacement may not strip out the
+      // operating organisation that authorises it (so `acme:x` cannot be edited to drop `acme` from
+      // `operatingOrganizations` while staying published under `acme`); rejected as the SAME 400 the
+      // create-time gate uses, not a silent requeue.
+      //
+      // "Conforms" is read off the EXISTING row: the stored `source_publisher` is one of the row's
+      // own operating-org slugs. Legacy import/seed rows whose publisher was NEVER one of their
+      // operating orgs (14 in the seed corpus — e.g. `fundingmap:1042`, publisher `optimism`,
+      // operator `optimism-foundation`) are GRANDFATHERED: the containment rule did not hold when
+      // they were loaded, so enforcing it on edit would lock them out of ordinary content
+      // corrections. Claimed entries are unaffected — a granted claim already requires the claimant
+      // to be an operating org, so their stored publisher IS one. The `!== null` narrows the
+      // publisher to a string for both membership checks below.
       if (
-        existing.sourcePublisher &&
+        existing.sourcePublisher !== null &&
+        operatingSlugsOf(existing.operatingOrganizations).includes(existing.sourcePublisher) &&
         !operatingSlugs(document).includes(existing.sourcePublisher)
       ) {
         throw badRequest(
@@ -650,6 +659,11 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
   }
 }
 
+/** The slugs of a list of operating organisations — a stored row's array, or a document's. */
+function operatingSlugsOf(orgs: readonly { slug: string }[]): string[] {
+  return orgs.map((org) => org.slug);
+}
+
 /**
  * The slugs of the organisations that OPERATE this programme — who runs intake and the process,
  * never a sponsor. This is the set the publishing namespace must belong to (the write-side twin of
@@ -657,7 +671,7 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
  * authorise publishing.
  */
 function operatingSlugs(document: Opportunity): string[] {
-  return (document.operatingOrganizations ?? []).map((org) => org.slug);
+  return operatingSlugsOf(document.operatingOrganizations ?? []);
 }
 
 /**
