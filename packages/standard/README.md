@@ -1,7 +1,7 @@
 # @the-rfp-hub/standard
 
-The **canonical RFP Hub Standard** — a JSON Schema (draft 2020-12) describing a
-funding opportunity, plus the TypeScript types **generated from it**.
+The **canonical RFP Hub Standard** — a JSON Schema (draft 2020-12) describing an
+Ethereum-ecosystem funding opportunity, plus the TypeScript types **generated from it**.
 
 CC0-1.0. Zero runtime dependencies. This package is the single source of truth that the
 validator, API, client, and agent libraries all build on.
