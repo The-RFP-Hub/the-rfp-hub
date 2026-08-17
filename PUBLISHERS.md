@@ -37,9 +37,9 @@ You are eligible if **all** of these are true.
    Sponsoring or funding a programme somebody else operates is a real relationship and it is
    recorded — `sponsoringOrganizations` — but it is not publisher ownership, and it does not
    qualify you to publish or to claim.
-2. **The programme is in scope.** Funding for work in the **Ethereum ecosystem** — grants,
-   hackathons, bounties, accelerators, RFPs, or a fund that invests in it. Scope is about the work
-   being funded, not about which chain the money moves on.
+2. **It is a genuine funding opportunity.** A grant, hackathon, bounty, accelerator, RFP, or a
+   fund that invests — in any ecosystem. The Hub is ecosystem-neutral: scope is about the work
+   being funded, not about which ecosystem or chain the money moves on.
 3. **Your entries carry a public `applicationUrl`.** The link is the whole point of the index: the
    Hub is where an opportunity is found, never where it is applied to. A programme whose only
    channel is a forum thread or a shared form is fine — that thread or form *is* the link.
@@ -51,8 +51,7 @@ You are eligible if **all** of these are true.
 
 **What does not qualify:** aggregators re-publishing other people's programmes under their own
 namespace (claim the individual entries instead — see below); an organisation asking to publish for
-a programme it merely sponsors; a listing with no public way to apply; anything outside the
-Ethereum ecosystem.
+a programme it merely sponsors; a listing with no public way to apply.
 
 ---
 
@@ -104,13 +103,21 @@ silence — reopening it later is fine and costs nothing.
 
 ## What approval does
 
-The reviewer:
+**The organisation is inferred from the programme — nobody creates it by hand.** The sequence is:
 
-* creates or verifies the **organisation** in the directory, and
-* grants your account a **membership** on it.
+1. **Sign in.** A first visit provisions your account from your identity alone (a just-in-time
+   account, with no membership yet). Set the public handle your submissions are attributed to with
+   `PATCH /v1/me`.
+2. **Submit the programme, naming your organisation in `operatingOrganizations`.** That first
+   submission **registers your organisation as an unverified directory stub** — its slug is the
+   `operatingOrganizations[].slug` you named — and files the entry `pending`, since you hold no
+   membership yet. The stub is created inside the submission's own transaction, whether or not the
+   entry is ever approved. There is no separate "create organisation" step, for you or for a
+   reviewer.
+3. **A reviewer verifies that existing stub** and grants your account a **membership** on it.
 
-Both are audited, and both are visible: verified organisations are listed publicly at
-`GET /v1/publishers`.
+Both the verification and the membership are audited, and both are visible: verified organisations
+are listed publicly at `GET /v1/publishers`.
 
 Then, as the maintainer:
 
@@ -189,7 +196,7 @@ If you believe a decision is wrong, say so on the original application issue.
 
 ## Not applying?
 
-Nothing here is required to be listed. The Hub indexes public Ethereum-ecosystem funding
+Nothing here is required to be listed. The Hub indexes public funding
 opportunities either way, and anyone can submit one — it just goes through review first. Verification
 is for organisations that want to own their own listings and keep them current themselves.
 

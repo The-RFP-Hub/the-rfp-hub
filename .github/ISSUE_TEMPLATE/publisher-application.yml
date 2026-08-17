@@ -10,6 +10,11 @@ body:
         first — it describes what qualifies, what is checked, what approval grants, and how
         verification is revoked.
 
+        **Your organisation does not need to be pre-registered.** Submitting a programme that names
+        it in `operatingOrganizations` registers it as an unverified directory stub — its slug taken
+        from that operating organisation. Approving this application is a reviewer **verifying that
+        stub** and granting you a membership; there is no separate create-organisation step.
+
         **This issue is public.** Who may publish as whom should be a visible, arguable decision.
         Do not paste credentials, private contact details, or anything you would not put on a
         website; a public channel is what the review needs.
@@ -141,7 +146,8 @@ body:
       label: Before submitting
       options:
         - label: >-
-            Every programme listed above is in scope — funding for work in the Ethereum ecosystem.
+            Every programme listed above is a genuine funding opportunity (in any ecosystem — the
+            Hub is ecosystem-neutral).
           required: true
         - label: >-
             We will publish only programmes we operate, and keep our entries accurate.
