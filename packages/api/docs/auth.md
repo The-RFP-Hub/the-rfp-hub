@@ -224,7 +224,12 @@ cross-system unique key.
 
 The namespace is `source.publisher ?? operatingOrganizations[0].slug`, and the public id **must** be
 `<namespace>:<local>` — the same derivation `source_system` uses, so an entry cannot be filed under a
-system it was not authorized for.
+system it was not authorized for. The namespace **must also appear in `operatingOrganizations[].slug`**:
+you may only publish under an organisation that operates the programme, so a stated `source.publisher`
+that names an org which does not run the programme is a `400` `publisher_not_operating`. When
+`source.publisher` is absent the namespace *is* `operatingOrganizations[0].slug`, so the rule holds
+trivially. A `PUT` is held to the same containment against the entry's **stored** publisher — a
+replacement may not strip out the operating org that authorises the entry.
 
 ---
 

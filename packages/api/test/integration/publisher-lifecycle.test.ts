@@ -10,7 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
-import { auditLog, opportunities } from "../../src/db/schema.js";
+import { auditLog, opportunities, organizations } from "../../src/db/schema.js";
 import {
   bearer,
   mintPrivyToken,
@@ -23,6 +23,8 @@ import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3life";
+const JIT_NS = "m3life-jit";
+const JIT_DID = "did:privy:m3life-jit";
 const DIDS = {
   publisher: "did:privy:m3life-publisher",
   reviewer: "did:privy:m3life-reviewer",
@@ -49,8 +51,8 @@ run("M3LIFE publisher lifecycle", () => {
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
-      organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      organizationSlugs: [NS, JIT_NS],
+      privyDids: [...Object.values(DIDS), JIT_DID],
     });
     await app.close();
     await pool.end();
@@ -199,5 +201,68 @@ run("M3LIFE publisher lifecycle", () => {
     expect(stillThere.map((t) => t.action)).toEqual(
       expect.arrayContaining(["create_api_key", "revoke_api_key"]),
     );
+  });
+
+  it("infers the organisation from the programme: submit registers the stub, a reviewer verifies it", async () => {
+    // The P2 flow, with NO organisation pre-registered. There is no reviewer "create org" step —
+    // the org is inferred from the programme, and its slug is the operating org the programme names.
+    const account = await seedAccount({ did: JIT_DID, handle: "m3life-jit" });
+    const jitToken = await mintPrivyToken(JIT_DID);
+
+    // The directory has never heard of this slug.
+    expect(
+      await db.select().from(organizations).where(eq(organizations.slug, JIT_NS)),
+    ).toHaveLength(0);
+
+    // 1. A first-time publisher (JIT account) submits a programme naming its organisation as the
+    //    operator. No membership yet, so it queues — but the submission still runs its write
+    //    transaction, and the org stub is created inside it.
+    const submitted = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(jitToken),
+      payload: submission(`${JIT_NS}:round-1`, JIT_NS),
+    });
+    expect(submitted.statusCode, submitted.body).toBe(201);
+    expect(submitted.json().reviewStatus).toBe("pending");
+
+    // 2. The submission registered the organisation as an UNVERIFIED directory stub, its slug taken
+    //    from the operating org the programme named — regardless of the pending approval status.
+    const stub = (
+      await db.select().from(organizations).where(eq(organizations.slug, JIT_NS)).limit(1)
+    )[0];
+    expect(stub?.slug).toBe(JIT_NS);
+    expect(stub?.verified).toBe(false);
+
+    // 3. The reviewer VERIFIES that existing stub and grants the membership — verify, not create.
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/review/organizations/${JIT_NS}/verify`,
+          headers: bearer(reviewerToken),
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: `/v1/review/organizations/${JIT_NS}/members`,
+          headers: bearer(reviewerToken),
+          payload: { accountId: account.id, role: "owner" },
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    // 4. A subsequent publish under that namespace now auto-approves.
+    const published = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(jitToken),
+      payload: submission(`${JIT_NS}:round-2`, JIT_NS),
+    });
+    expect(published.statusCode, published.body).toBe(201);
+    expect(published.json().reviewStatus).toBe("approved");
   });
 });
