@@ -150,4 +150,71 @@ run("M3NS namespace and auto-approval", () => {
     // before the namespace rule is reached — which is the right order.
     expect(res.statusCode).toBe(400);
   });
+
+  it("400s a publisher who does not OPERATE the programme, whatever ecosystem it names", async () => {
+    // The closed exploit: a verified member of `mine` names `mine` as the publisher but lists only
+    // `theirs` as the operator — a foreign-operated programme they would otherwise push straight to
+    // public. The ecosystem (Solana) and the absent applicationUrl are deliberately present to prove
+    // the rejection is about OPERATION, not about either of those.
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(publisherToken),
+      payload: submission(`${MINE}:foreign-operated`, MINE, {
+        operatingOrganizations: [{ name: THEIRS, slug: THEIRS }],
+        source: { publisher: MINE },
+        ecosystems: ["Solana"],
+      }),
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe("publisher_not_operating");
+  });
+
+  it("publishes a verified publisher's own programme in a NON-Ethereum ecosystem", async () => {
+    // The other half of the same point: when the namespace IS an operating org, a Solana programme
+    // auto-approves exactly as any other would. There is no Ethereum-only rule anywhere in the path.
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(publisherToken),
+      payload: submission(`${MINE}:solana`, MINE, { ecosystems: ["Solana"] }),
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().reviewStatus).toBe("approved");
+    expect(res.json().opportunity.ecosystems).toEqual(["Solana"]);
+  });
+
+  it("publishes when the namespace is ONE OF several operating orgs, and rejects a PUT that strips it", async () => {
+    // Multiple operating orgs are supported: the rule is containment. `mine` (the publisher's
+    // verified org) is the second operator here, and that is enough to auto-approve.
+    const id = `${MINE}:multi`;
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(publisherToken),
+      payload: submission(id, MINE, {
+        operatingOrganizations: [
+          { name: THEIRS, slug: THEIRS },
+          { name: MINE, slug: MINE },
+        ],
+        source: { publisher: MINE },
+      }),
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    expect(created.json().reviewStatus).toBe("approved");
+
+    // An edit may not strip the operating org that authorises the entry: the stored publisher
+    // (`mine`) must remain among `operatingOrganizations`. Rejected as the same 400 the create gate
+    // uses, rather than silently requeued.
+    const stripped = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(publisherToken),
+      payload: submission(id, MINE, {
+        operatingOrganizations: [{ name: THEIRS, slug: THEIRS }],
+      }),
+    });
+    expect(stripped.statusCode).toBe(400);
+    expect(stripped.json().error).toBe("publisher_not_operating");
+  });
 });

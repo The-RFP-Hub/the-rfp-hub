@@ -11,12 +11,15 @@
  *      rejecting the body first with its own generic message; the humanized errors are the whole
  *      point of the endpoint being usable. Advisory `warnings` are returned with a 201, never fatal.
  *   3. **Namespace, then id — and the two questions differ by mode.** On a CREATE the namespace is
- *      `source.publisher ?? operatingOrganizations[0].slug` and the public id must be
- *      `<namespace>:<local>`, the same derivation `source_system` uses, so an entry cannot be filed
- *      under a system it was not authorized for. On a REPLACE the row's stored `source_publisher`
- *      IS the namespace: the id is immutable and a granted claim reassigns the publisher without
- *      touching it, so re-deriving from the prefix would lock a claimed entry out of the very
- *      updates the claim promised. See `authorizationNamespace`.
+ *      `source.publisher ?? operatingOrganizations[0].slug`, it MUST appear among
+ *      `operatingOrganizations` (you may only publish under an org that operates the programme —
+ *      sponsorship does not authorise it), and the public id must be `<namespace>:<local>`, the
+ *      same derivation `source_system` uses, so an entry cannot be filed under a system it was not
+ *      authorized for. On a REPLACE the row's stored `source_publisher` IS the namespace: the id is
+ *      immutable and a granted claim reassigns the publisher without touching it, so re-deriving
+ *      from the prefix would lock a claimed entry out of the very updates the claim promised — and
+ *      the same containment rule holds, so a replacement may not strip the stored publisher out of
+ *      `operatingOrganizations`. See `authorizationNamespace` and the replace branch of `write`.
  *   4. **Capabilities against that namespace**, from `effectiveCaps`. Never re-derived here.
  *   5. **Provenance is overwritten, wholesale.** The mapper persists `submittedBy`, `submittedAt`
  *      and `originalId` straight from the body, so leaving any of them client-controlled permits
@@ -233,6 +236,23 @@ export class OpportunityWriteService {
           "that entry was submitted by another account and you are not a verified publisher of its namespace.",
         );
       }
+      // The CREATE-time containment rule, applied to the STORED publisher: a replacement may not
+      // strip the operating organisation that authorises the entry. On a replace `namespace` is the
+      // row's stored `source_publisher`, so an edit dropping it from `operatingOrganizations` would
+      // leave the entry published under an org it no longer names as an operator. Rejected as a 400
+      // — the SAME code and status as the create-time gate, for consistency — rather than silently
+      // requeued: a missing authorising operator is a malformed edit, not a lower-privilege change
+      // awaiting review. Guarded on a stored publisher actually existing, so a legacy or hand-loaded
+      // row that never carried one is unaffected.
+      if (
+        existing.sourcePublisher &&
+        !operatingSlugs(document).includes(existing.sourcePublisher)
+      ) {
+        throw badRequest(
+          "publisher_not_operating",
+          `this entry is published under ${JSON.stringify(existing.sourcePublisher)}; a replacement must keep that organisation in \`operatingOrganizations\`.`,
+        );
+      }
     }
 
     return this.persist({
@@ -283,6 +303,18 @@ export class OpportunityWriteService {
       throw badRequest(
         "namespace_required",
         "a submission must name the namespace it is published under: set `source.publisher` to an organisation slug, or give `operatingOrganizations[0].slug`.",
+      );
+    }
+    // You may only publish under an organisation that OPERATES the programme. The namespace is the
+    // publishing org — `source.publisher`, else `operatingOrganizations[0].slug` — and requiring it
+    // to appear among `operatingOrganizations` closes the hole where a verified member of `acme`
+    // publishes a programme operated solely by `globex` straight to public. When `source.publisher`
+    // is absent the namespace IS `operatingOrganizations[0].slug`, so this holds trivially; the
+    // check only bites when a stated publisher names an org that does not run the programme.
+    if (!operatingSlugs(document).includes(namespace)) {
+      throw badRequest(
+        "publisher_not_operating",
+        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this programme. You may only publish under an organisation named in \`operatingOrganizations\`.`,
       );
     }
     const idProblem = checkPublicId(document.id, namespace);
@@ -616,6 +648,16 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
       errors: problems,
     });
   }
+}
+
+/**
+ * The slugs of the organisations that OPERATE this programme — who runs intake and the process,
+ * never a sponsor. This is the set the publishing namespace must belong to (the write-side twin of
+ * the claim service's operating-vs-sponsoring rule): sponsorship is recorded, but it does not
+ * authorise publishing.
+ */
+function operatingSlugs(document: Opportunity): string[] {
+  return (document.operatingOrganizations ?? []).map((org) => org.slug);
 }
 
 /**

@@ -196,7 +196,7 @@ CREATE TABLE opportunities (
   banner_url         TEXT,
   social_links       JSONB NOT NULL DEFAULT '[]',     -- [{platform, url}] entries; not filtered
 
-  -- classification (open lists per the ETH-scoped standard) — filtered via GIN
+  -- classification (open lists per the standard) — filtered via GIN
   ecosystems         TEXT[] NOT NULL DEFAULT '{}',
   categories         TEXT[] NOT NULL DEFAULT '{}',
 
@@ -695,6 +695,13 @@ The namespace is `source.publisher ?? operatingOrganizations[0].slug`, and the p
 be `<namespace>:<local>` — an id with no `:`, or with a different prefix, is a `400` naming the
 required form. That keeps `source_system` derivable exactly as `scripts/seed.ts` derives it, and
 keeps `ux_opp_source` meaningful. See `src/modules/shared/namespace.ts`.
+
+The namespace **must also be one of the entry's operating organisations** —
+`namespace ∈ operatingOrganizations[].slug`, the write-side twin of the claim rule below: you may
+only publish under an org that operates the programme, never one it merely sponsors. A `source.publisher`
+naming a non-operating org is a `400` `publisher_not_operating`; on a `PUT` the same containment is
+checked against the **stored** `source_publisher`, so an edit cannot strip the operating org that
+authorises the entry.
 
 ## Key flows
 
