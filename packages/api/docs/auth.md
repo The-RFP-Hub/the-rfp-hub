@@ -228,11 +228,13 @@ system it was not authorized for. The namespace **must also appear in `operating
 you may only publish under an organisation that operates the programme, so a stated `source.publisher`
 that names an org which does not run the programme is a `400` `publisher_not_operating`. When
 `source.publisher` is absent the namespace *is* `operatingOrganizations[0].slug`, so the rule holds
-trivially. A `PUT` is held to the same containment against the entry's **stored** publisher, but
-only for entries that already conform (the stored publisher is one of the row's own operating
-orgs): a conforming replacement may not strip out the operating org that authorises the entry, while
-a legacy import whose stored publisher was never one of its operating orgs is grandfathered and
-stays editable.
+trivially. A `PUT` is held to the same containment against the entry's **stored** publisher — a
+replacement may not strip out the operating org that authorises the entry. The one exemption is
+**import-provenance-scoped**: a row that both entered through a legacy ingest route
+(`ingestedVia ∈ {import, scrape, outbox}`) **and** never conformed (its stored publisher was never
+one of its operating orgs) is grandfathered and stays editable. A row created through the
+authenticated write path (`publisher_api`/`submission`) went through the create-time gate, so it is
+held to containment on replace — a foreign-operated one of those is still a `400`.
 
 ---
 
