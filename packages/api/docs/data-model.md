@@ -700,8 +700,10 @@ The namespace **must also be one of the entry's operating organisations** —
 `namespace ∈ operatingOrganizations[].slug`, the write-side twin of the claim rule below: you may
 only publish under an org that operates the programme, never one it merely sponsors. A `source.publisher`
 naming a non-operating org is a `400` `publisher_not_operating`; on a `PUT` the same containment is
-checked against the **stored** `source_publisher`, so an edit cannot strip the operating org that
-authorises the entry.
+checked against the **stored** `source_publisher` for entries that already conform (the stored
+publisher is one of the row's own operating orgs), so a conforming edit cannot strip the operating
+org that authorises the entry. Legacy import rows whose stored publisher was never an operating org
+are grandfathered and stay editable under their stored namespace.
 
 ## Key flows
 
