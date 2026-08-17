@@ -15,7 +15,7 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         title: "RFP Hub API",
         version: "1.0.0",
         description:
-          "Public, unauthenticated read API serving the RFP Hub Standard v1.0.0 — Ethereum-ecosystem funding opportunities.",
+          "Public, unauthenticated read API serving the RFP Hub Standard v1.0.0 — funding opportunities across ecosystems.",
         license: { name: "MIT", identifier: "MIT" },
       },
       // Driven by PUBLIC_BASE_URL (default "/" — relative, correct wherever the server is hosted).

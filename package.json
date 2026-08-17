@@ -2,7 +2,7 @@
   "name": "@the-rfp-hub/monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "RFP Hub — open standard, validation tooling, API, client, and agent libraries for Ethereum-ecosystem funding opportunities.",
+  "description": "RFP Hub — open standard, validation tooling, API, client, and agent libraries for funding opportunities across ecosystems.",
   "packageManager": "pnpm@10.17.1",
   "engines": {
     "node": ">=18"
