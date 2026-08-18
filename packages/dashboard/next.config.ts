@@ -17,7 +17,7 @@ const packageDir = dirname(fileURLToPath(import.meta.url));
  * the API, so a build never needs it to be running.
  *
  * SECURITY HEADERS. The Content-Security-Policy is NOT here: it carries a per-request nonce and is
- * therefore set in `src/middleware.ts`, which is the only place that can mint one. The headers
+ * therefore set in `src/proxy.ts`, which is the only place that can mint one. The headers
  * below are the request-independent half, kept next to the build so a deployment that forgets to
  * configure its host still gets them.
  */

@@ -129,7 +129,7 @@ rendering it safely means an allowlisting renderer with raw HTML disabled, and a
 reviewed as the change it is.
 
 **Content-Security-Policy.** Built in `src/lib/csp.ts`, unit-tested, and applied by
-`src/middleware.ts` with a fresh per-request nonce. Scripts carry that nonce and inline scripts are
+`src/proxy.ts` with a fresh per-request nonce. Scripts carry that nonce and inline scripts are
 refused; framing and object embedding are refused outright; `connect-src` is an allowlist naming the
 configured API origin and the auth SDK's own origins; no remote images are loaded, so a
 publisher-supplied `logoUrl` cannot phone home from a reader's browser.
