@@ -3,11 +3,16 @@
 /**
  * The application shell: navigation, session state, and the one place a page's access is gated.
  *
- * NAVIGATION IS RENDERED FROM `GET /v1/me`, not from anything this client decided. `canReview` and
- * `canAdmin` come back with the account, so the review and administration links appear for the
- * people who hold those capabilities and for nobody else. Hiding a link is presentation, never
- * protection — every one of those routes is enforced on the API, and a hand-typed URL reaches a
- * page that renders the API's own 403.
+ * TWO NAVIGATIONS, because there are two audiences. The public one names the directory and is
+ * rendered for everybody, signed in or not — the reads behind it are unauthenticated, so gating the
+ * link would be theatre. The Sections one is the publisher's workbench and appears only once the API
+ * has said who this is.
+ *
+ * THE SECTIONS NAVIGATION IS RENDERED FROM `GET /v1/me`, not from anything this client decided.
+ * `canReview` and `canAdmin` come back with the account, so the review and administration links
+ * appear for the people who hold those capabilities and for nobody else. Hiding a link is
+ * presentation, never protection — every one of those routes is enforced on the API, and a
+ * hand-typed URL reaches a page that renders the API's own 403.
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { useSession } from "@/lib/session";
@@ -24,6 +29,8 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  // The signed-in overview, which used to be `/` before the public directory took that route.
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/listings", label: "Listings" },
   { href: "/duplicates", label: "Duplicates" },
   { href: "/keys", label: "API keys", requires: (me) => me.canManageKeys },
@@ -41,8 +48,13 @@ export function Chrome({ children }: { children: ReactNode }) {
     <div className="shell">
       <header className="shell-header">
         <Link href="/" className="brand">
-          RFP Hub <span className="muted">publisher dashboard</span>
+          RFP Hub <span className="muted">the directory and the workbench</span>
         </Link>
+        <nav aria-label="Public">
+          <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
+            Directory
+          </Link>
+        </nav>
         <nav aria-label="Sections">
           {me
             ? NAV.filter((item) => !item.requires || item.requires(me)).map((item) => (
@@ -78,8 +90,9 @@ export function Chrome({ children }: { children: ReactNode }) {
       <main className="shell-main">{children}</main>
       <footer className="shell-footer">
         <p className="muted">
-          Analytics on this dashboard are best-effort — server-side API reads and link-outs, not
-          page views. Nothing here is a second authorization system: the API decides.
+          The directory republishes what publishers and submitters stated, under one open standard.
+          Analytics here are best-effort — server-side API reads and link-outs, not page views.
+          Nothing on this site is a second authorization system: the API decides.
         </p>
       </footer>
     </div>

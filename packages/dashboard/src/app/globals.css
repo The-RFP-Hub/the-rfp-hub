@@ -123,9 +123,18 @@ caption {
   border-bottom: 1px solid var(--line);
 }
 
+/*
+ * Two navigations share the header: the public one (the directory, shown to everybody) and the
+ * role-gated Sections one. Only the LAST takes the free space, so the public link sits next to the
+ * brand it belongs with rather than drifting to the middle of an empty header when nobody is
+ * signed in.
+ */
 .shell-header nav {
   display: flex;
   gap: 0.9rem;
+}
+
+.shell-header nav:last-of-type {
   flex: 1;
 }
 
@@ -361,6 +370,51 @@ caption {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: 0 1rem;
+}
+
+/* Definition lists are how every fact table in this package is marked up; give them a shape. */
+.grid-2 dt {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--ink-soft);
+  margin-top: 0.6rem;
+}
+
+.grid-2 dd {
+  margin: 0;
+}
+
+/* A list that is a list semantically and a stack of lines visually. */
+ul.plain {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/*
+ * The directory's filter bar. Every control is a `.field`, so it inherits the label and input
+ * styling every form in this package uses; the row only decides how they sit next to each other.
+ */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 1rem;
+  margin: 1rem 0;
+  padding: 0.2rem 1rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+}
+
+.filters .field {
+  flex: 1 1 11rem;
+  max-width: 20rem;
+}
+
+/* The submit button sizes to its text rather than stretching across a column of its own. */
+.filters .field:last-child {
+  flex: 0 0 auto;
 }
 
 .untrusted-block {

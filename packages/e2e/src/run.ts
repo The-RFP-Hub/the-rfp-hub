@@ -480,7 +480,19 @@ async function bringUp(ctx: Context): Promise<RunState> {
   // there for the analytics buffer, not for webpack, so the compile happens here instead.
   abortIfInterrupted(ctx);
   process.stdout.write("• warming dashboard routes…\n");
-  for (const route of ["/", "/listings", "/keys", "/review", "/admin", "/duplicates", "/account"]) {
+  for (const route of [
+    "/",
+    "/dashboard",
+    "/listings",
+    "/keys",
+    "/review",
+    "/admin",
+    "/duplicates",
+    "/account",
+    // A dynamic segment compiles once, per route rather than per id, so any id warms it. This one
+    // cannot exist, which is the point: the compile is what is wanted, not the data.
+    "/opportunities/warm-up",
+  ]) {
     await fetch(`${dashboardUrl}${route}`, { redirect: "manual" }).catch(() => undefined);
   }
 

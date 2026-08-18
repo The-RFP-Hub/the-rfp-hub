@@ -4,10 +4,19 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RFP Hub publisher dashboard",
+  title: "RFP Hub — funding opportunities",
   description:
-    "Submit and manage funding opportunities, read their traffic, and run the review queues.",
-  // Nothing here is public, and none of it should be indexed even if a preview host is reachable.
+    "Browse published funding opportunities under one open standard, and — for publishers — submit and maintain them, read their traffic, and run the review queues.",
+  /*
+   * INDEXING STAYS OFF, even though half of this app is now public.
+   *
+   * It is not a statement about the directory's audience; it is a statement about this deployment.
+   * Nothing here is served from a canonical public host yet — there is no pipeline and no registered
+   * domain for it (see the deployment section of the README) — and a preview URL that indexes is a
+   * preview URL competing with the real one for every listing it carries. Turning this on is an
+   * operator decision to take once the directory has an address worth indexing, not a default to
+   * inherit from a build.
+   */
   robots: { index: false, follow: false },
 };
 

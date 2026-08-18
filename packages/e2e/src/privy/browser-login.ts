@@ -136,8 +136,10 @@ export async function login(input: BrowserLoginInput): Promise<BrowserLoginResul
     await page.getByRole("button", { name: "Log out" }).waitFor({ state: "visible", timeout });
 
     if (input.awaitApiSession !== false) {
-      // The navigation renders only after `/v1/me` resolves, so waiting for a nav link is what
-      // proves the API accepted the browser's token — not merely that the provider accepted the OTP.
+      // `Listings`, deliberately, and not the `Directory` link beside it: the sections navigation
+      // renders only after `/v1/me` resolves, whereas `Directory` is public and is on the page for a
+      // signed-out stranger too. Waiting for the gated link is what proves the API accepted this
+      // browser's token, rather than merely that the provider accepted the code.
       await page.getByRole("link", { name: "Listings" }).waitFor({ state: "visible", timeout });
     } else {
       // No API to answer yet. The request still LEAVES the page, which is all this call needs; give

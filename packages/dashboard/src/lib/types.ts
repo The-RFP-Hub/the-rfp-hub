@@ -12,9 +12,29 @@
  * handles and organisation names are publisher-supplied; they are rendered as text nodes and never
  * as markup. See `components/UntrustedText.tsx`.
  */
-import type { Opportunity } from "@the-rfp-hub/standard";
+import type {
+  Deadline,
+  Funding,
+  FundingType,
+  Milestone,
+  Opportunity,
+  OpportunityStatus,
+  Organization,
+  Provenance,
+  SocialLink,
+} from "@the-rfp-hub/standard";
 
-export type { Opportunity };
+export type {
+  Deadline,
+  Funding,
+  FundingType,
+  Milestone,
+  Opportunity,
+  OpportunityStatus,
+  Organization,
+  Provenance,
+  SocialLink,
+};
 
 /** Review state. Editorial, server-owned, and not part of the Standard document. */
 export type ReviewStatus = "pending" | "approved" | "rejected";
@@ -32,6 +52,35 @@ export interface ApiErrorBody {
   errors?: string[];
   /** Present on `survivor_already_merged`: the entry that really survived. */
   survivorId?: string;
+}
+
+// ── the public directory ────────────────────────────────────────────────────────
+/**
+ * Strip the generated Standard type's `[k: string]: unknown` index signature, so `Omit` can drop a
+ * named key from it. The same helper, for the same reason, as the API's own list mapper: without it
+ * `Omit` sees `keyof` as bare `string` and produces an object with no named members at all.
+ */
+type RemoveIndex<T> = {
+  [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
+};
+
+/**
+ * `OpportunitySummary` — one row of `GET /v1/opportunities`.
+ *
+ * A full Standard opportunity MINUS `fundingDetails`, which the list projection omits as a delivery
+ * concern (the detail route carries it). Derived from the Standard type rather than re-typed, so a
+ * field the spec adds is a field this list can read without a second edit here.
+ */
+export type OpportunitySummary = Omit<RemoveIndex<Opportunity>, "fundingDetails">;
+
+/** `PaginatedOpportunities` — the envelope `GET /v1/opportunities` serves the summaries in. */
+export interface PaginatedOpportunities {
+  items: OpportunitySummary[];
+  page: number;
+  limit: number;
+  total: number;
+  /** Always ≥ 1: an empty result is page 1 of 1, not page 1 of 0. */
+  totalPages: number;
 }
 
 // ── writes ──────────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
  * Pure presentation helpers. No React, no network, no `Date.now()` where it can be avoided — so
  * they are unit-testable, and so a chart's geometry can be asserted without a DOM.
  */
-import type { DuplicateCheckStatus, InsightsPoint } from "./types";
+import type { Deadline, DuplicateCheckStatus, Funding, InsightsPoint } from "./types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -38,6 +38,101 @@ export function formatCount(value: number): string {
 export function formatSimilarity(similarity: number | null): string {
   if (similarity === null) return "similarity unknown";
   return `${Math.round(similarity * 100)}% similar`;
+}
+
+/**
+ * A monetary amount in the document's own currency, or null when there is nothing to show.
+ *
+ * Grouped with the same locale-free separator as `formatCount`, and NEVER converted or rounded: the
+ * Standard's amounts are major units in a currency the publisher named, and a directory that turned
+ * "1000 OP" into "$1,000" would be inventing an exchange rate. The currency is publisher-supplied
+ * text and is rendered as text, like every other string that arrives from a record.
+ */
+export function formatAmount(
+  value: number | null | undefined,
+  currency?: string | null,
+): string | null {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  const [whole = "0", fraction] = String(value).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const rendered = fraction ? `${grouped}.${fraction}` : grouped;
+  const unit = currency?.trim();
+  return unit ? `${rendered} ${unit}` : rendered;
+}
+
+/**
+ * The funding envelope as one line, or null when the publisher stated nothing.
+ *
+ * The per-award range is preferred over the programme budget because it is the number an applicant
+ * is deciding on. Absent both, null — an empty envelope is shown as nothing rather than as a zero.
+ */
+export function describeAward(funding: Funding | null | undefined): string | null {
+  if (!funding) return null;
+  const min = formatAmount(funding.minAward);
+  const max = formatAmount(funding.maxAward);
+  const unit = funding.currency?.trim();
+  const suffix = unit ? ` ${unit}` : "";
+  if (min && max) return `${min}–${max}${suffix} per award`;
+  if (max) return `Up to ${max}${suffix} per award`;
+  if (min) return `From ${min}${suffix} per award`;
+  const budget = formatAmount(funding.budget);
+  if (budget) return `${budget}${suffix} programme budget`;
+  return null;
+}
+
+/** Every parseable `fixed` date on a record, ascending. Mirrors the API's own derivation. */
+function fixedDeadlines(deadlines: readonly Deadline[] | null | undefined): Deadline[] {
+  if (!Array.isArray(deadlines)) return [];
+  return deadlines
+    .filter(
+      (entry) => entry?.deadlineType === "fixed" && !Number.isNaN(Date.parse(entry.date ?? "")),
+    )
+    .sort((a, b) => Date.parse(a.date ?? "") - Date.parse(b.date ?? ""));
+}
+
+/** Whether the record accepts applications on a rolling basis. */
+export function hasRollingDeadline(deadlines: readonly Deadline[] | null | undefined): boolean {
+  return Array.isArray(deadlines) && deadlines.some((entry) => entry?.deadlineType === "rolling");
+}
+
+/**
+ * The earliest `fixed` deadline strictly after `now`, or null.
+ *
+ * The same derivation the API sorts and filters on (`nextDeadlineAt`), repeated here rather than
+ * taken from the payload because the payload does not carry it: the list serves `deadlines[]`, and
+ * the derived key is a database column the Standard object never names. Deliberately not
+ * label-aware — this answers "what is the next date on this record", which is the question a
+ * deadline column asks; selecting "the application deadline" specifically means selecting by label.
+ */
+export function nextFixedDeadline(
+  deadlines: readonly Deadline[] | null | undefined,
+  now: Date = new Date(),
+): Deadline | null {
+  return (
+    fixedDeadlines(deadlines).find((entry) => Date.parse(entry.date ?? "") > now.getTime()) ?? null
+  );
+}
+
+/**
+ * The deadline column, as a phrase.
+ *
+ * Four distinct answers, because collapsing them loses the one a reader needs: a date, an open
+ * rolling window, a record whose dates have all passed, and a record that states no deadline at all.
+ */
+export function describeDeadline(
+  deadlines: readonly Deadline[] | null | undefined,
+  now: Date = new Date(),
+): string {
+  const next = nextFixedDeadline(deadlines, now);
+  if (next) return formatInstant(next.date);
+  if (hasRollingDeadline(deadlines)) return "Rolling";
+  if (fixedDeadlines(deadlines).length > 0) return "No upcoming deadline";
+  return "—";
+}
+
+/** `fixed` / `rolling` and the publisher's label, as one phrase for a deadlines table row. */
+export function describeDeadlineEntry(entry: Deadline): string {
+  return entry.deadlineType === "rolling" ? "Rolling" : formatInstant(entry.date);
 }
 
 export interface Bar {
