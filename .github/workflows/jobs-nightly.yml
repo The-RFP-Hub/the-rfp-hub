@@ -57,9 +57,23 @@ on:
           - production
           - staging
       job:
-        description: "Run a single job instead of the whole chain (blank = all)."
+        description: "Run a single job instead of the whole chain."
         required: false
-        default: ""
+        type: choice
+        default: all
+        # The exact names in `packages/api/src/modules/services/jobs/registry.ts` (`JOB_NAMES`),
+        # the one place a job name is spelled — plus `all` for "the whole chain" (`choice` options
+        # cannot be an empty string). A free-form string here meant a typo silently matched neither
+        # `matrix.job` nor `'staleness'` in every step's `if:` below, skipping every guarded step
+        # and leaving a green run that did nothing.
+        options:
+          - all
+          - analytics-rollup
+          - retention
+          - embedding-backfill
+          - verification-backfill
+          - account-enrichment
+          - staleness
 
 # This workflow writes nothing to the repository; it reads the runner script out of a checkout and
 # starts container tasks with AWS credentials supplied as secrets.
@@ -82,7 +96,8 @@ env:
   TARGET_ENV: ${{ inputs.environment || 'production' }}
   ENV_PREFIX: ${{ inputs.environment == 'staging' && 'STAGING' || 'PRODUCTION' }}
   AWS_REGION: us-east-1
-  # Blank on a schedule, a job name when an operator dispatched one deliberately.
+  # Blank on a schedule (no `inputs` at all); `all` or a job name when an operator dispatched one
+  # deliberately. Every `if:` below treats blank and `all` the same — "run the whole chain".
   SELECTED: ${{ github.event.inputs.job }}
 
 jobs:
@@ -106,13 +121,13 @@ jobs:
       # `persist-credentials: false`: nothing here pushes, and a credential left in `.git/config`
       # is inherited by every later step for no reason. Same rule as nightly-export.yml.
       - name: Checkout
-        if: env.SELECTED == '' || env.SELECTED == matrix.job
+        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == matrix.job
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Configure AWS credentials
-        if: env.SELECTED == '' || env.SELECTED == matrix.job
+        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == matrix.job
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets[format('{0}_AWS_ACCESS_KEY_ID', env.ENV_PREFIX)] }}
@@ -120,7 +135,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run ${{ matrix.job }}
-        if: env.SELECTED == '' || env.SELECTED == matrix.job
+        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == matrix.job
         env:
           # The cluster is the hosting account's own resource name rather than a fact about this
           # project, so it is a repository VARIABLE, not a literal in a public, source-neutral tree
@@ -145,13 +160,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        if: env.SELECTED == '' || env.SELECTED == 'staleness'
+        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == 'staleness'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Configure AWS credentials
-        if: env.SELECTED == '' || env.SELECTED == 'staleness'
+        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == 'staleness'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets[format('{0}_AWS_ACCESS_KEY_ID', env.ENV_PREFIX)] }}
@@ -159,7 +174,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run staleness
-        if: env.SELECTED == '' || env.SELECTED == 'staleness'
+        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == 'staleness'
         env:
           ECS_CLUSTER: ${{ vars[format('{0}_ECS_CLUSTER', env.ENV_PREFIX)] }}
           TARGET_ENV: ${{ env.TARGET_ENV }}
