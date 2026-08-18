@@ -16,16 +16,24 @@ process.env.EMBEDDING_PROVIDER = "deterministic";
 import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import type { EmbeddingProvider } from "../../src/modules/services/dedupe/embedding-provider.js";
 import { ALPHA_BODY, UNRELATED_BODY, reword } from "../helpers/dedupe-text.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 // EVERY import that can reach `config.ts` is dynamic, and that includes the test helpers: they
 // import the db client, which imports the config, which reads the environment exactly once. A
-// static import of any of them would be evaluated before the assignment above.
+// static import of any of them would be evaluated before the assignment above. (`EmbeddingProvider`
+// above is `import type` only, erased before any of this ever runs.)
 const { buildApp } = await import("../../src/app.js");
 const { db, pool } = await import("../../src/db/client.js");
-const { auditLog, opportunities, opportunityDuplicates } = await import("../../src/db/schema.js");
+const { auditLog, opportunities, opportunityDuplicates, opportunityEmbeddings } = await import(
+  "../../src/db/schema.js"
+);
+const { contentHash, embeddingText } = await import("../../src/modules/shared/embedding-text.js");
+const { DeterministicEmbeddingProvider } = await import(
+  "../../src/modules/services/dedupe/embedding-provider.js"
+);
 const { bearer, grantMembership, mintPrivyToken, seedAccount, seedOrganization, testPrivyConfig } =
   await import("../helpers/auth.js");
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
@@ -319,6 +327,93 @@ run("M3DUP duplicate detection", () => {
     expect(await dedupe.pendingEmbeddingIds(10_000)).toContain(rowId);
   });
 
+  it("does not let an OLDER embedding call overwrite a NEWER edit's vector and content hash", async () => {
+    // THE RACE. `provider.embed()` is a network round trip taken OUTSIDE any transaction. If the
+    // entry is edited — and independently re-embedded — WHILE an earlier request's own `embed()`
+    // call is still in flight, and that earlier request's write then lands AFTER the newer one's,
+    // an unconditional upsert would silently revert the fresh vector and content hash to the
+    // stale ones. Modelled here without real concurrency: the fake provider's embed() call, which
+    // stands in for the OLDER request's in-flight network round trip, performs the newer edit AND
+    // its own already-finished embedding as a side effect before returning the older, now-stale
+    // vector.
+    const created = await post(
+      publisherToken,
+      entry(`${NS}:racing-embed`, "Superchain Builders Fund (racing)", UNRELATED_BODY),
+    );
+    expect(created.statusCode, created.body).toBe(201);
+    const rowId = await rowIdOf(`${NS}:racing-embed`);
+
+    const real = new DeterministicEmbeddingProvider();
+    const project = (row: {
+      title: string;
+      summary: string | null;
+      description: string;
+      fundingType: string;
+      ecosystems: string[];
+      categories: string[];
+      operatingOrganizations: unknown;
+      // biome-ignore lint/suspicious/noExplicitAny: mirrors `embeddingTextFor`'s own field set
+    }) => embeddingText(row as any);
+
+    let calls = 0;
+    const racing: EmbeddingProvider = {
+      id: real.id,
+      model: real.model,
+      dimensions: real.dimensions,
+      async embed(text: string) {
+        calls++;
+        if (calls === 1) {
+          await db
+            .update(opportunities)
+            .set({ description: `${UNRELATED_BODY} — and a second, later edit's content.` })
+            .where(eq(opportunities.id, rowId));
+          const newer = (
+            await db.select().from(opportunities).where(eq(opportunities.id, rowId)).limit(1)
+          )[0];
+          if (!newer) throw new Error("row vanished mid-race");
+          const newerHash = contentHash(project(newer), real.model, real.id);
+          await db
+            .insert(opportunityEmbeddings)
+            .values({
+              opportunityId: rowId,
+              model: real.model,
+              providerId: real.id,
+              embedding: real.embedSync(project(newer)),
+              contentHash: newerHash,
+            })
+            .onConflictDoUpdate({
+              target: opportunityEmbeddings.opportunityId,
+              set: {
+                model: real.model,
+                providerId: real.id,
+                embedding: real.embedSync(project(newer)),
+                contentHash: newerHash,
+              },
+            });
+        }
+        return real.embed(text);
+      },
+    };
+
+    await new DedupeService(db, { provider: racing }).embedAndDetect(rowId, "all");
+
+    const stored = (
+      await db
+        .select()
+        .from(opportunityEmbeddings)
+        .where(eq(opportunityEmbeddings.opportunityId, rowId))
+        .limit(1)
+    )[0];
+    const finalRow = (
+      await db.select().from(opportunities).where(eq(opportunities.id, rowId)).limit(1)
+    )[0];
+    if (!finalRow) throw new Error("row vanished");
+    const expectedHash = contentHash(project(finalRow), real.model, real.id);
+
+    // The NEWER edit's hash survives — the older, in-flight call's stale result never landed.
+    expect(stored?.contentHash).toBe(expectedHash);
+  });
+
   // ── T-DUP-6 ───────────────────────────────────────────────────────────────────
   it("deletes a suspected pair when an update removes the similarity", async () => {
     const before = await pairBetween(`${NS}:alpha`, `${NS}:alpha-copy`);
@@ -433,6 +528,72 @@ run("M3DUP duplicate detection", () => {
       expect(refused.statusCode, refused.body).toBe(409);
       expect(["survivor_already_merged", "survivor_not_public"]).toContain(refused.json().error);
     }
+  });
+
+  it("refuses to merge a LOSER that is already the survivor of an earlier merge — the other chain", async () => {
+    // The check above (`survivor_already_merged`) refuses a SURVIVOR that already points elsewhere.
+    // That alone does not stop A → B → C: nothing stopped B, having already absorbed A, from being
+    // chosen as the LOSER of a later B/C pair — B still shows `mergedIntoId: null` right up until
+    // that second merge would set it. Three mutually similar entries reproduce it: A merges into B
+    // (B now has a dependent), then a genuinely pre-existing B/C pair attempts C as survivor and B
+    // as loser.
+    const a = await post(
+      publisherToken,
+      entry(`${NS}:chain-a`, "Superchain Chain Fund", ALPHA_BODY),
+    );
+    expect(a.statusCode, a.body).toBe(201);
+    const b = await post(
+      publisherToken,
+      entry(`${NS}:chain-b`, "Superchain Chain Fund | Mirror", reword(ALPHA_BODY)),
+    );
+    expect(b.statusCode, b.body).toBe(201);
+    const c = await post(
+      publisherToken,
+      entry(`${NS}:chain-c`, "Superchain Chain Fund | Directory", ALPHA_BODY),
+    );
+    expect(c.statusCode, c.body).toBe(201);
+
+    const abPair = await pairBetween(`${NS}:chain-a`, `${NS}:chain-b`);
+    expect(abPair, "chain-a and chain-b should be suspected duplicates").toBeTruthy();
+    const bcPair = await pairBetween(`${NS}:chain-b`, `${NS}:chain-c`);
+    expect(bcPair, "chain-b and chain-c should be suspected duplicates").toBeTruthy();
+
+    // A → B. B now has a dependent.
+    const firstMerge = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${abPair?.id}/merge`,
+      headers: bearer(reviewerToken),
+      payload: { survivorId: `${NS}:chain-b` },
+    });
+    expect(firstMerge.statusCode, firstMerge.body).toBe(200);
+
+    // B → C would chain A through B. Refused, even though B itself carries no `mergedIntoId` yet.
+    const secondMerge = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${bcPair?.id}/merge`,
+      headers: bearer(reviewerToken),
+      payload: { survivorId: `${NS}:chain-c` },
+    });
+    expect(secondMerge.statusCode, secondMerge.body).toBe(409);
+    expect(secondMerge.json().error).toBe("loser_has_dependents");
+
+    // No chain: B is untouched by the refused attempt, and A still names B directly.
+    const bRow = (
+      await db
+        .select()
+        .from(opportunities)
+        .where(eq(opportunities.publicId, `${NS}:chain-b`))
+        .limit(1)
+    )[0];
+    expect(bRow?.mergedIntoId).toBeNull();
+    const aRow = (
+      await db
+        .select()
+        .from(opportunities)
+        .where(eq(opportunities.publicId, `${NS}:chain-a`))
+        .limit(1)
+    )[0];
+    expect(aRow?.mergedIntoId).toBe(bRow?.id);
   });
 
   it("shows a reviewer both sides of a pair, including one that is not public", async () => {

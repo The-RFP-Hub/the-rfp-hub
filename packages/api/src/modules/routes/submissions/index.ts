@@ -10,10 +10,16 @@
  *
  * WHY A PASS-THROUGH VALIDATOR. Fastify's ajv would reject a malformed body before the service ever
  * saw it and emit its own generic message, so the humanized, field-by-field report — the thing that
- * makes this endpoint usable — would never be produced. `setValidatorCompiler` here is scoped to
- * this plugin by the same encapsulation, and the route still DECLARES `body: {$ref: "Opportunity#"}`
- * so the published document describes the request accurately. The schema is the contract; the
- * service is the enforcement point.
+ * makes this endpoint usable — would never be produced. The pass-through is applied per-ROUTE
+ * (`validatorCompiler` in each write route's options), scoped to `POST /` and `PUT /:id` only —
+ * NOT plugin-wide — and each route still DECLARES `body: {$ref: "Opportunity#"}` so the published
+ * document describes the request accurately. The schema is the contract; the service is the
+ * enforcement point.
+ *
+ * `POST /:id/claim` is a different shape of request (`organizationSlug`, `note`) with nothing to
+ * humanize, so it keeps Fastify's ordinary ajv validation against its own small schema below — a
+ * malformed or missing claim body is a plain 400 before `ClaimService` ever sees it, rather than a
+ * `.trim()` call on whatever the caller sent.
  */
 import type { FastifyInstance } from "fastify";
 import { submissionsController } from "./submissions.controller.js";
@@ -22,9 +28,10 @@ import { submissionsController } from "./submissions.controller.js";
 export const SUBMISSION_BODY_LIMIT = 256 * 1024;
 
 export const submissions = async (router: FastifyInstance): Promise<void> => {
-  // Scoped to this plugin. Nothing else in the app is affected: the list endpoint's querystring
-  // strictness, the canonical documents and every other route keep Fastify's own validation.
-  router.setValidatorCompiler(() => (data) => ({ value: data }));
+  // Applied only to the two opportunity-write routes below (`validatorCompiler` in their own
+  // route options), never plugin-wide: `POST /:id/claim` needs and keeps Fastify's own validation
+  // against its declared schema.
+  const passThroughValidator = () => (data: unknown) => ({ value: data });
 
   const writeSchema = {
     body: { $ref: "Opportunity#" },
@@ -46,6 +53,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
       bodyLimit: SUBMISSION_BODY_LIMIT,
       onRequest: router.auth.requireAuth,
       config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      validatorCompiler: passThroughValidator,
       schema: {
         operationId: "createOpportunity",
         tags: ["submissions"],
@@ -65,6 +73,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
       bodyLimit: SUBMISSION_BODY_LIMIT,
       onRequest: router.auth.requireAuth,
       config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      validatorCompiler: passThroughValidator,
       schema: {
         operationId: "replaceOpportunity",
         tags: ["submissions"],

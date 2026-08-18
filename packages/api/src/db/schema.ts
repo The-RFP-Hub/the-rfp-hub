@@ -490,6 +490,22 @@ export const auditLog = pgTable(
      */
     actorApiKeyId: bigint({ mode: "number" }),
     actorKind: actorKind().notNull(),
+    /**
+     * The role the actor held WHEN THEY ACTED — and the reason the public trail can promise a
+     * reviewer anonymity.
+     *
+     * The public actor label coarsens an editorial action to `"reviewer"` and credits everyone else
+     * by handle. Deriving that from `accounts.global_role` at READ time makes the promise expire:
+     * demote a reviewer and their handle appears retroactively on every entry they ever rejected,
+     * and promote a submitter and their own past submissions stop being theirs. A role is
+     * revocable; what it was at the moment of the action is not.
+     *
+     * NULL for a job, an outbox delivery and for every row written before this column existed.
+     * Those older rows are NOT backfilled: `audit_log` refuses `UPDATE` (migration 0004), and
+     * defeating the trigger that makes the history trustworthy in order to rewrite the history is a
+     * worse trade than the read-time fallback, which is what those rows keep.
+     */
+    actorRole: accountRole(),
     action: auditAction().notNull(),
     /** `{field: {before, after}}` — see `modules/shared/patch.ts`. Field names only, publicly. */
     patch: jsonb().$type<Record<string, unknown>>(),

@@ -160,7 +160,12 @@ export class StalenessService {
       });
     }
 
-    await this.db.transaction(async (tx) => {
+    // The locked re-read's OWN decision is what `runBatch` must count against, not the pre-lock
+    // `reason` above: if a publisher's write between the walk's SELECT and this lock already took
+    // the row out of contention (closed it themselves, or resolved the condition), the transaction
+    // correctly does nothing — and the caller has to be told that, or it reports an entry as
+    // processed and closed for a mutation that never happened.
+    return this.db.transaction(async (tx): Promise<"unchanged" | StalenessReason> => {
       // Re-read under a row lock: a publisher editing this entry between the walk's SELECT and this
       // UPDATE must win, because their edit is the newer statement of fact.
       const locked = await tx
@@ -170,10 +175,10 @@ export class StalenessService {
         .for("update")
         .limit(1);
       const current = locked[0];
-      if (!current || current.status !== "open") return;
+      if (!current || current.status !== "open") return "unchanged";
       const currentNext = nextDeadlineAt(current.deadlines, now);
       const currentReason = this.closureReason(current, currentNext, now, inactiveBefore);
-      if (currentReason === null) return;
+      if (currentReason === null) return "unchanged";
 
       await tx
         .update(opportunities)
@@ -191,8 +196,8 @@ export class StalenessService {
           status: { before: current.status, after: "closed" },
         },
       });
+      return currentReason;
     });
-    return reason;
   }
 
   /** The two rules, in the order they are applied. `null` when the entry stays open. */

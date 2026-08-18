@@ -29,6 +29,8 @@ const DIDS = {
   publisher: "did:privy:m3audit-publisher",
   admin: "did:privy:m3audit-admin",
   stranger: "did:privy:m3audit-stranger",
+  // Demoted mid-suite, on purpose: the trail must not follow.
+  reviewer: "did:privy:m3audit-reviewer",
   // A separate subject for the admin grants: promoting the stranger would change what the
   // redaction and visibility cases below are testing.
   target: "did:privy:m3audit-target",
@@ -49,6 +51,8 @@ run("M3AUDIT the append-only trail", () => {
   let publisherToken: string;
   let adminToken: string;
   let strangerToken: string;
+  let reviewerToken: string;
+  let reviewerId: number;
   let publishKey: string;
   let publishKeyId: number;
   let publisherId: number;
@@ -64,6 +68,12 @@ run("M3AUDIT the append-only trail", () => {
     publisherId = publisher.id;
     await seedAccount({ did: DIDS.admin, handle: "m3audit-admin", role: "admin" });
     await seedAccount({ did: DIDS.stranger, handle: "m3audit-stranger" });
+    const reviewer = await seedAccount({
+      did: DIDS.reviewer,
+      handle: "m3audit-reviewer",
+      role: "reviewer",
+    });
+    reviewerId = reviewer.id;
     await seedAccount({ did: DIDS.target, handle: "m3audit-target" });
     const org = await seedOrganization({ slug: NS, verified: true });
     await grantMembership(publisher.id, org.id, "owner");
@@ -71,6 +81,7 @@ run("M3AUDIT the append-only trail", () => {
     publisherToken = await mintPrivyToken(DIDS.publisher);
     adminToken = await mintPrivyToken(DIDS.admin);
     strangerToken = await mintPrivyToken(DIDS.stranger);
+    reviewerToken = await mintPrivyToken(DIDS.reviewer);
 
     const minted = await app.inject({
       method: "POST",
@@ -207,6 +218,46 @@ run("M3AUDIT the append-only trail", () => {
       headers: bearer(adminToken),
     });
     expect(admin.statusCode).toBe(200);
+  });
+
+  it("keeps a reviewer coarse in the public trail after they are demoted", async () => {
+    // The promise the coarse actor label makes is that the public trail says an EDITOR acted, never
+    // which one. Deriving that from the account's role at READ time makes the promise expire the
+    // moment the role does: demote the reviewer and their handle appears on everything they ever
+    // approved or rejected. The capacity is recorded with the row instead.
+    const reviewed = `${NS}:reviewed`;
+    const submitted = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(strangerToken),
+      payload: submission(reviewed, NS),
+    });
+    expect(submitted.statusCode, submitted.body).toBe(201);
+
+    const approved = await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${reviewed}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { reason: "looks real" },
+    });
+    expect(approved.statusCode, approved.body).toBe(200);
+
+    const actorOfApproval = async () => {
+      const trail = await app.inject({ method: "GET", url: `/v1/opportunities/${reviewed}/audit` });
+      expect(trail.statusCode).toBe(200);
+      return trail.json().entries.find((e: { action: string }) => e.action === "approve")?.actor;
+    };
+    expect(await actorOfApproval()).toBe("reviewer");
+
+    const demoted = await app.inject({
+      method: "POST",
+      url: `/v1/admin/accounts/${reviewerId}/role`,
+      headers: bearer(adminToken),
+      payload: { role: "submitter" },
+    });
+    expect(demoted.statusCode, demoted.body).toBe(200);
+
+    expect(await actorOfApproval()).toBe("reviewer");
   });
 
   it("refuses a direct UPDATE or DELETE at the DATABASE, not merely in the code", async () => {

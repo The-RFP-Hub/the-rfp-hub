@@ -32,6 +32,7 @@ import type {
 } from "../../shared/api-views.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
+import { isUniqueViolation } from "../auth/account.service.js";
 
 export type OrgRole = "owner" | "admin" | "publisher";
 
@@ -227,52 +228,65 @@ export class ReviewService {
     slug: string,
     accountId: number,
     role: string | undefined,
+    /** Internal: caps the one-time retry below at one, so a genuine bug cannot recurse forever. */
+    retried = false,
   ): Promise<MembershipResultView> {
     const orgRole = normalizeOrgRole(role);
-    return this.db.transaction(async (tx) => {
-      const org = await findOrganization(tx, slug);
-      const account = await tx
-        .select({ id: accounts.id })
-        .from(accounts)
-        .where(eq(accounts.id, accountId))
-        .limit(1);
-      if (!account[0]) throw notFound(`no account ${accountId}.`);
+    try {
+      return await this.db.transaction(async (tx) => {
+        const org = await findOrganization(tx, slug);
+        const account = await tx
+          .select({ id: accounts.id })
+          .from(accounts)
+          .where(eq(accounts.id, accountId))
+          .limit(1);
+        if (!account[0]) throw notFound(`no account ${accountId}.`);
 
-      const existing = await tx
-        .select()
-        .from(orgMemberships)
-        .where(
-          and(eq(orgMemberships.accountId, accountId), eq(orgMemberships.organizationId, org.id)),
-        )
-        .limit(1);
+        const existing = await tx
+          .select()
+          .from(orgMemberships)
+          .where(
+            and(eq(orgMemberships.accountId, accountId), eq(orgMemberships.organizationId, org.id)),
+          )
+          .limit(1);
 
-      if (existing[0]) {
-        if (existing[0].role === orgRole) {
-          return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
+        if (existing[0]) {
+          if (existing[0].role === orgRole) {
+            return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
+          }
+          await tx
+            .update(orgMemberships)
+            .set({ role: orgRole })
+            .where(eq(orgMemberships.id, existing[0].id));
+        } else {
+          await tx
+            .insert(orgMemberships)
+            .values({ accountId, organizationId: org.id, role: orgRole });
         }
-        await tx
-          .update(orgMemberships)
-          .set({ role: orgRole })
-          .where(eq(orgMemberships.id, existing[0].id));
-      } else {
-        await tx
-          .insert(orgMemberships)
-          .values({ accountId, organizationId: org.id, role: orgRole });
-      }
 
-      await this.audit.record(tx, {
-        subjectKind: "organization",
-        subjectId: org.id,
-        actorKind: "user",
-        actorAccountId: actorAccountId,
-        action: "grant_publisher",
-        patch: {
-          accountId,
-          role: { before: existing[0]?.role ?? null, after: orgRole },
-        },
+        await this.audit.record(tx, {
+          subjectKind: "organization",
+          subjectId: org.id,
+          actorKind: "user",
+          actorAccountId: actorAccountId,
+          action: "grant_publisher",
+          patch: {
+            accountId,
+            role: { before: existing[0]?.role ?? null, after: orgRole },
+          },
+        });
+        return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
       });
-      return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
-    });
+    } catch (error) {
+      // TWO REVIEWERS, ONE GRANT. The read above and the insert are not one atomic step, so two
+      // concurrent grants of the same previously-absent membership can both see no row and both
+      // reach the insert; the unique index (`ux_org_membership`) lets one in and raises 23505 at
+      // the other. The grant is documented as idempotent, so the loser of that race has not
+      // failed — retrying finds the row the winner just committed and takes the ordinary
+      // "already a member" path above (updating the role if this call asked for a different one).
+      if (retried || !isUniqueViolation(error)) throw error;
+      return this.grantMembership(actorAccountId, slug, accountId, role, true);
+    }
   }
 
   async revokeMembership(

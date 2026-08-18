@@ -10,7 +10,10 @@
  * 2. **Membership, verification and the operating match are re-checked INSIDE the granting
  *    transaction, against a `SELECT … FOR UPDATE` on the entry.** A decision computed before the
  *    transaction can be won by a revocation racing it: the check passes, the membership is revoked,
- *    the grant lands anyway. Locking the row is what serialises the two.
+ *    the grant lands anyway. Locking the rows is what serialises the two — every row the answer is
+ *    derived from, the organisation's `verified` flag included, and always in the same order:
+ *    ENTRY, then organisation, then membership. Both paths here and the write path take the entry
+ *    first, so a member retrying a claim and a reviewer deciding it cannot close a deadlock cycle.
  *
  * 3. **A grant is held to the publication bar.** On an API-key credential that means the `publish`
  *    scope, and its absence is a 403 naming the missing scope rather than a silent queue — a claim
@@ -134,10 +137,22 @@ export class ClaimService {
       const row = locked[0];
       if (!row) throw notFound(`no opportunity ${JSON.stringify(entry.publicId)}.`);
 
+      // FOR SHARE on the ORGANISATION row as well, for the same reason as the membership below:
+      // `verified` is half of what makes this claim grantable, and a plain read of it is beaten by
+      // a reviewer un-verifying the organisation between here and the commit. Shared rather than
+      // exclusive because two grants on the same organisation are not in conflict with each other,
+      // only with whoever is withdrawing its verification.
+      //
+      // The CURRENT PUBLISHER's organisation, read further down, is deliberately NOT locked: the
+      // dangerous direction there is unverified → verified, and a lock cannot help with that — a
+      // verification committing after this transaction's snapshot is invisible whether the row is
+      // locked or not, and locking a second row of the same table would introduce an ordering
+      // hazard between two grants that name each other's organisations.
       const org = await tx
         .select()
         .from(organizations)
         .where(eq(organizations.id, organization.id))
+        .for("share")
         .limit(1);
       const currentOrg = org[0];
       // FOR UPDATE on the MEMBERSHIP row, not merely a read of it.
@@ -427,6 +442,34 @@ export class ClaimService {
     decision: { approve: boolean; verifyOrganization?: boolean },
   ): Promise<ClaimResultView> {
     return this.db.transaction(async (tx) => {
+      // THE ENTRY IS LOCKED FIRST, before the claim and the organisation.
+      //
+      // `grant()` takes the opportunity, then the organisation, then the membership, and settles
+      // the claim row last. A decision that took the claim first and then waited for the same
+      // opportunity would close a cycle — member retries the claim while a reviewer decides it —
+      // and PostgreSQL would answer one of them with a deadlock rather than a decision. Every path
+      // that touches an entry and its claim therefore acquires the ENTRY first: this one, `grant()`
+      // and the write path (see `services/auth/publish-authority.ts` for the whole order).
+      //
+      // Learning which entry that is costs one unlocked read, which is safe because a claim's
+      // `opportunity_id` is immutable: whatever else changes about the claim before the lock below,
+      // it is still a claim about this entry.
+      const target = await tx
+        .select({ opportunityId: opportunityClaims.opportunityId })
+        .from(opportunityClaims)
+        .where(eq(opportunityClaims.id, claimId))
+        .limit(1);
+      if (!target[0]) throw notFound(`no claim ${claimId}.`);
+
+      const entryRows = await tx
+        .select()
+        .from(opportunities)
+        .where(eq(opportunities.id, target[0].opportunityId))
+        .for("update")
+        .limit(1);
+      const entry = entryRows[0];
+      if (!entry) throw notFound(`no opportunity for claim ${claimId}.`);
+
       const rows = await tx
         .select({ claim: opportunityClaims, organization: organizations })
         .from(opportunityClaims)
@@ -449,15 +492,6 @@ export class ClaimService {
           decidedAt: now,
         })
         .where(eq(opportunityClaims.id, claimId));
-
-      const entryRows = await tx
-        .select()
-        .from(opportunities)
-        .where(eq(opportunities.id, found.claim.opportunityId))
-        .for("update")
-        .limit(1);
-      const entry = entryRows[0];
-      if (!entry) throw notFound(`no opportunity for claim ${claimId}.`);
 
       const reviewerActor = { actorKind: "user" as const, actorAccountId: reviewerId };
 
