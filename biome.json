@@ -7,6 +7,8 @@
       "**/dist/**",
       "**/node_modules/**",
       "**/.next/**",
+      "**/test-results/**",
+      "**/playwright-report/**",
       "**/generated/**",
       "**/migrations/**",
       "**/examples/**",

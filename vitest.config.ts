@@ -19,6 +19,8 @@ import { configDefaults, defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
-    exclude: [...configDefaults.exclude, "**/.next/**", "packages/dashboard/**"],
+    // `packages/e2e` is Playwright, run only through `pnpm e2e`: its `*.spec.ts` files match
+    // vitest's default include and would otherwise be collected and run here too.
+    exclude: [...configDefaults.exclude, "**/.next/**", "packages/dashboard/**", "packages/e2e/**"],
   },
 });

@@ -57,7 +57,25 @@ export function requiresProductionOptIn(baseUrl) {
 
 const NUMERIC = new Set(["--views", "--timeout", "--concurrency"]);
 
-export function parseArgs(argv) {
+/**
+ * The three credentials, and the environment variable each falls back to.
+ *
+ * WHY A FALLBACK EXISTS AT ALL. Credentials passed as argv are visible to every process on the
+ * machine: `ps` shows a full command line, and these are a live session token and a live API key.
+ * A harness that boots a stack and then runs this checker against it (see the E2E runner) can
+ * hand them over in the child's environment instead, which `ps` does not print.
+ *
+ * The flags still WIN. A run that passes `--privy-token` gets that token, whatever the environment
+ * says — otherwise an exported variable left over from an earlier session could silently redirect
+ * a deliberate run, which is exactly the class of surprise this tool refuses elsewhere.
+ */
+const CREDENTIAL_ENV = {
+  privyToken: "M3_PRIVY_TOKEN",
+  adminToken: "M3_ADMIN_TOKEN",
+  apiKey: "M3_API_KEY",
+};
+
+export function parseArgs(argv, env = process.env) {
   const opts = {
     json: "m3-compliance-report.json",
     views: 5,
@@ -134,6 +152,11 @@ export function parseArgs(argv) {
         );
     }
   }
+
+  for (const [key, variable] of Object.entries(CREDENTIAL_ENV)) {
+    if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
+  }
+
   return opts;
 }
 
