@@ -1,0 +1,32 @@
+{
+  "name": "@the-rfp-hub/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end suite for the RFP Hub: an external runner that boots a disposable Postgres, the API on a restricted role, the dashboard and a fixture web server, then drives Playwright against real HTTP and a real browser.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "e2e": "tsx src/run.ts",
+    "e2e:openai": "E2E_EMBEDDING_PROVIDER=openai tsx src/run.ts --grep @dedupe",
+    "e2e:check-m3": "tsx src/run.ts --check-m3",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@privy-io/node": "^0.29.0",
+    "@types/pg": "^8.11.10",
+    "dotenv": "^17.4.2",
+    "jose": "^6.2.8",
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
+    "directory": "packages/e2e"
+  }
+}

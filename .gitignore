@@ -30,3 +30,23 @@ packages/dashboard/.next/
 # packages/api/tools/converter/README.md. The CURATED dataset it feeds is
 # packages/api/data/seed-corpus.json, which IS committed.
 packages/api/tools/converter/out/
+
+# Playwright run output for packages/e2e — machine-written per run, and potentially carries
+# short-lived session material in a failure trace (see that package's README).
+packages/e2e/test-results/
+packages/e2e/playwright-report/
+
+# The E2E runner's exclusive lock on the dashboard dev server. It sits BESIDE `.next/` rather than
+# inside it because `next dev` rewrites that directory on start and would delete a lock kept there.
+packages/dashboard/.e2e-next-lock
+
+# the E2E suite's local report. Specifically this filename, not every `*.local.md` — see
+# packages/e2e/README.md and the M3 E2E plan for why the rule must exist before the file is ever
+# written.
+/M3-E2E-REPORT.local.md
+
+# Next 16's postinstall writes agent-rules files into the dashboard package pointing at its own
+# docs under node_modules. This repository deliberately carries no agent-rules files, so these are
+# ignored rather than reviewed on every install.
+packages/dashboard/AGENTS.md
+packages/dashboard/CLAUDE.md

@@ -109,6 +109,25 @@ describe("parseArgs", () => {
     });
   });
 
+  it("falls back to the credential environment variables, but never over a flag", () => {
+    const env = {
+      M3_PRIVY_TOKEN: "from-env",
+      M3_ADMIN_TOKEN: "admin-from-env",
+      M3_API_KEY: "rfph_from_env",
+    };
+    const fromEnv = parseArgs(["--base-url", "http://127.0.0.1:3001"], env);
+    expect(fromEnv).toMatchObject({
+      privyToken: "from-env",
+      adminToken: "admin-from-env",
+      apiKey: "rfph_from_env",
+    });
+
+    const flagWins = parseArgs(["--privy-token", "from-flag"], env);
+    expect(flagWins.privyToken).toBe("from-flag");
+    // The other two still fall back — one explicit flag does not disable the mechanism.
+    expect(flagWins.adminToken).toBe("admin-from-env");
+  });
+
   it("rejects an unknown flag and a flag with no value", () => {
     expect(() => parseArgs(["--nope"])).toThrow(/unknown argument/);
     expect(() => parseArgs(["--base-url"])).toThrow(/needs a value/);

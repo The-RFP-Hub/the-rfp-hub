@@ -83,6 +83,9 @@ Options
   --timeout <ms>          Per-request timeout. Default 20000.
   --no-color              Plain output.
   -h, --help              This text.
+
+Credentials may also arrive as M3_PRIVY_TOKEN / M3_ADMIN_TOKEN / M3_API_KEY, which keeps them off
+the command line \`ps\` prints. The flags win wherever both are present.
 `;
 
 async function main() {

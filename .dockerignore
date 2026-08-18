@@ -29,3 +29,10 @@ exports
 # of the API's lockfile importers (its own lockfile / not a `packages/*` workspace member), or with
 # copying it in and building only the API package. Validate with a local `docker build` at that point.
 packages/dashboard
+
+# packages/e2e is the same story as packages/dashboard above, for the same reason: it is not an
+# input to the API image (it orchestrates the API from OUTSIDE the container — Docker, a disposable
+# Postgres, a browser — it is not something that runs inside one), and the builder's
+# `pnpm install --frozen-lockfile` has to keep tolerating a workspace member present in
+# pnpm-lock.yaml but absent from the build context. Validated by the same local `docker build` step.
+packages/e2e

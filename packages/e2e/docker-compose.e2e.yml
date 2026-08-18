@@ -1,0 +1,50 @@
+# Disposable Postgres for one E2E run. Modeled on packages/api/docker-compose.test.yml — same
+# image, same tmpfs-only data, same "safe to `down -v` at will" property — but RUN-SCOPED rather
+# than fixed, because two of these can legitimately be up at once (two runs on one machine, or a
+# leftover from an interrupted run alongside a fresh one) and must never share or `down -v` each
+# other's container.
+#
+# This file therefore does NOT declare `name:` or a fixed `container_name`. The caller (the
+# runner, packages/e2e/src/run.ts) supplies both, per run, on the command line / environment:
+#
+#   docker compose -p rfphub-e2e-<runId> -f docker-compose.e2e.yml up -d --wait
+#   docker compose -p rfphub-e2e-<runId> -f docker-compose.e2e.yml port postgres 5432
+#   docker compose -p rfphub-e2e-<runId> -f docker-compose.e2e.yml down -v
+#
+# where E2E_PG_CONTAINER=rfphub-e2e-pg-<runId> is exported before `up` so `container_name` below
+# picks it up.
+#
+# ── PROJECT NAME IS LOAD-BEARING, EVEN THOUGH IT IS NOT DECLARED HERE. DO NOT ADD A `name:` ──────
+# Compose derives a project name from the DIRECTORY when `-p` is not passed, and keys containers on
+# (project, service). Every run in this directory calls its service `postgres`, same as
+# packages/api/docker-compose.test.yml calls ITS service `postgres` in ITS directory — different
+# directories, so no collision there. The collision this file guards against is between E2E runs
+# of ITSELF: without a run-scoped `-p`, two concurrent `docker compose -f docker-compose.e2e.yml up`
+# invocations would resolve to the SAME (project, service) and the second `up` would recreate the
+# first run's container out from under it. The runner passing `-p rfphub-e2e-<runId>` on every
+# invocation is what keeps each run in its own project, where `down -v` reaches nothing but that
+# run's own container. A hard-coded `name:` here would defeat exactly that.
+services:
+  postgres:
+    # Same image as the dev database, the API's test compose, and CI: the migrations create the
+    # `vector` extension, so a database without it cannot run them, and one on a different image is
+    # not testing what runs anywhere else.
+    image: pgvector/pgvector:pg15
+    container_name: ${E2E_PG_CONTAINER}
+    environment:
+      POSTGRES_USER: rfphub
+      POSTGRES_PASSWORD: rfphub
+      POSTGRES_DB: rfphub
+    ports:
+      # Dynamic host port: never a fixed number. The runner reads the actual mapping back with
+      # `docker compose port postgres 5432` after `up --wait` succeeds — no bind-then-hope, no
+      # TOCTOU window between choosing a port and the container claiming it. Bound to 127.0.0.1
+      # only: this database is never meant to be reachable from outside the host running the suite.
+      - "127.0.0.1::5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rfphub -d rfphub"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
