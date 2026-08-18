@@ -104,16 +104,6 @@ export interface AppConfig {
   dedupe: DedupeConfig;
   verification: VerificationConfig;
   analytics: AnalyticsConfig;
-  /**
-   * Accounts that become admins on login, matched by DID. Re-evaluated on EVERY login, so adding
-   * one takes effect without touching the database.
-   */
-  bootstrapAdminPrivyDids: string[];
-  /**
-   * The same, matched against a wallet the identity provider has VERIFIED — never a wallet the
-   * request asserts. Inert without `privy.appSecret`, since nothing fills the verified wallet in.
-   */
-  bootstrapAdminWallets: string[];
   /** Days of no publisher touch after which a deadline-less open entry is closed as inactive. */
   stalenessInactiveDays: number;
 }
@@ -449,10 +439,6 @@ export const config: AppConfig = {
     retentionDays: readPositiveInt(process.env.ANALYTICS_RETENTION_DAYS, 180),
   },
 
-  bootstrapAdminPrivyDids: readList(process.env.BOOTSTRAP_ADMIN_PRIVY_DIDS),
-  // Lowercased because an address is case-insensitive in every form that matters here, and a
-  // checksummed paste must not silently fail to match the same address written flat.
-  bootstrapAdminWallets: readList(process.env.BOOTSTRAP_ADMIN_WALLETS).map((w) => w.toLowerCase()),
   stalenessInactiveDays: readPositiveInt(process.env.STALENESS_INACTIVE_DAYS, 90),
 };
 
@@ -462,12 +448,5 @@ export const config: AppConfig = {
 if (config.analytics.enabled && analyticsHmac.generated && process.env.NODE_ENV !== "test") {
   console.error(
     "ANALYTICS_HMAC_KEY unset — using a random per-boot key. The hashes stay unlinkable to an address either way; what is lost is continuity, so session de-duplication resets on every restart. Supply the key through the task definition's secrets (packages/api/docs/deploy.md).",
-  );
-}
-
-// Said once, at boot, because the alternative is a variable that looks set and does nothing.
-if (config.bootstrapAdminWallets.length > 0 && config.privy.appSecret === undefined) {
-  console.error(
-    "BOOTSTRAP_ADMIN_WALLETS is set but PRIVY_APP_SECRET is not, so no wallet is ever verified and the list matches nothing. Use BOOTSTRAP_ADMIN_PRIVY_DIDS, which needs no enrichment.",
   );
 }

@@ -85,8 +85,6 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `ANALYTICS_ENABLED` | `true` | |
 | `ANALYTICS_RETENTION_DAYS` | `180` | Enforced by the retention sweep, not by the schema |
 | `STALENESS_INACTIVE_DAYS` | `90` | |
-| `BOOTSTRAP_ADMIN_PRIVY_DIDS` | comma-separated DIDs | Re-evaluated on **every** login, so adding one later takes effect without a redeploy |
-| `BOOTSTRAP_ADMIN_WALLETS` | comma-separated addresses | Matched only against a **verified** wallet from enrichment. Inert without `PRIVY_APP_SECRET`, and the API says so at boot |
 | `PRIVY_APP_ID` | the app id | Not secret — it is the token audience, and it is published to the browser by the dashboard |
 | `PRIVY_JWKS_URL` | unset | An **unverified** override. The documented mechanism for app access tokens is the PEM above |
 
@@ -144,6 +142,21 @@ Locally, against a database you own:
 ```sh
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api migrate
 ```
+
+### The first administrator
+
+A one-time step in the same ceremony, with the same credential, because it is the one grant the
+product cannot make itself — every route that grants `admin` requires an admin:
+
+```sh
+DATABASE_URL=… pnpm --filter @the-rfp-hub/api grant-admin -- --did did:privy:… --create --yes
+```
+
+It echoes the `host:port/database` it resolved (never the URL — that carries a password), refuses a
+non-loopback target without `--allow-remote`, refuses to write without `--yes`, exits non-zero on
+any refusal, and is idempotent. **No environment variable grants a role**; after this, admins are
+granted and revoked in the product, and the same command is how a lockout is recovered. See
+[auth.md](auth.md#administrators).
 
 ### Gating deploys on migrations
 

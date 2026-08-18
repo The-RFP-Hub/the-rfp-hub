@@ -7,19 +7,11 @@
  * completes with the DID alone and leaves `accounts.enriched_at` NULL — which IS the queue. There
  * is no queue table, no retry column and nothing to drain: the cursor is the absence of a value.
  *
- * WHAT IT IS FOR. `accounts.primary_wallet` is usable as an authorization input
- * (`BOOTSTRAP_ADMIN_WALLETS`) only because it came from the provider's own record rather than from
- * a request body — a wallet address that arrives in a request is self-asserted. This job is the
- * only writer of that column, which is what makes that sentence true.
- *
- * AND IT APPLIES THAT INPUT, HERE, RATHER THAN LEAVING IT FOR SOMEBODY ELSE. Enrichment stamps
- * `enriched_at`, which takes the account out of this job's cursor permanently, so a promotion
- * deferred to "the next enrichment run" would never happen. The moment the verified wallet lands
- * it is checked against the configured list, and a match is promoted through the SAME audited,
- * idempotent path the DID bootstrap uses — IN THE SAME TRANSACTION as the stamp, because a stamp
- * that outlived a failed promotion would be exactly the "never happens" this paragraph is about.
- * `AccountService.applyBootstrapAdmin` re-checks on every login too, so adding a wallet to the list
- * later still takes effect without touching the database.
+ * WHAT IT IS FOR. `accounts.primary_wallet` and `accounts.email` are the provider's own record of
+ * this subject, and this job is the ONLY writer of either — a wallet address that arrives in a
+ * request is self-asserted, and the difference is the whole reason the column is trustworthy. It
+ * grants nothing by itself: roles are granted by an admin over the audited route, or by an operator
+ * running the admin ceremony (`scripts/grant-admin.ts`), never by a value landing in a column.
  *
  * WITHOUT `PRIVY_APP_SECRET` THE JOB IS INERT and says so: `{skipped}`, exit 0, no rows touched.
  * That is a configuration statement, not a failure, and it is deliberately distinguishable from
@@ -35,7 +27,6 @@ import { and, asc, isNull, sql } from "drizzle-orm";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type AccountRow, accounts } from "../../../db/schema.js";
-import { AccountService } from "../auth/account.service.js";
 import type { JobResult } from "./types.js";
 
 /** The provider's user record, reduced to the two members this job reads. */
@@ -64,25 +55,16 @@ export interface AccountEnrichmentOptions {
 export class AccountEnrichmentService {
   private readonly config: AppConfig;
   private readonly fetchUser: ProviderUserFetcher | undefined;
-  private readonly accountsService: AccountService;
 
   constructor(
     private readonly db: DB = defaultDb,
     options: {
       config?: AppConfig;
       fetchUser?: ProviderUserFetcher;
-      accounts?: AccountService;
     } = {},
   ) {
     this.config = options.config ?? defaultConfig;
     this.fetchUser = options.fetchUser ?? privyUserFetcher(this.config);
-    this.accountsService =
-      options.accounts ??
-      new AccountService(
-        db,
-        this.config.bootstrapAdminPrivyDids,
-        this.config.bootstrapAdminWallets,
-      );
   }
 
   async runBatch(options: AccountEnrichmentOptions = {}): Promise<JobResult> {
@@ -97,7 +79,6 @@ export class AccountEnrichmentService {
     let processed = 0;
     let unknown = 0;
     let failed = 0;
-    let promoted = 0;
 
     for (const row of pending) {
       const did = row.privyDid;
@@ -107,11 +88,10 @@ export class AccountEnrichmentService {
         // holds one open.
         const user = await fetchUser(did);
 
-        // THE STAMP AND THE PROMOTION COMMIT TOGETHER OR NOT AT ALL, because `enriched_at` is what
-        // takes this account out of the cursor and the promotion is the last chance to make it. Two
-        // transactions would mean a promotion that failed while writing its audit row left the
-        // stamp behind: the batch reports the account as failed, and nothing ever selects it again.
-        const outcome = await this.db.transaction(async (tx) => {
+        // The stamp is what takes this account out of the cursor, so it is written only once the
+        // provider has answered: a failure anywhere in here rolls the whole thing back and the next
+        // run selects the account again.
+        await this.db.transaction(async (tx) => {
           const updated = await tx
             .update(accounts)
             .set({
@@ -123,15 +103,9 @@ export class AccountEnrichmentService {
             })
             .where(sql`${accounts.id} = ${row.id}`)
             .returning();
-          const stored = updated[0];
-          if (!stored) return { promoted: false };
-          // The bootstrap check runs against the row AS STORED, so it sees the wallet this pass
-          // just wrote. A no-op for every account that matches nothing, which is nearly all of them.
-          const after = await this.accountsService.applyBootstrapAdminWithin(tx, stored);
-          return { promoted: after.globalRole !== stored.globalRole };
+          if (!updated[0]) throw new Error(`account ${row.id} vanished during enrichment`);
         });
 
-        if (outcome.promoted) promoted++;
         if (user === null) unknown++;
         processed++;
       } catch {
@@ -148,7 +122,6 @@ export class AccountEnrichmentService {
         attempted: pending.length,
         unknownToProvider: unknown,
         failed,
-        bootstrapAdminsPromoted: promoted,
       },
     };
   }

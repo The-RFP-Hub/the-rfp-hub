@@ -1,6 +1,6 @@
 /**
  * Identity and credentials, end to end: token verification, just-in-time provisioning, the admin
- * bootstrap, and the session-only boundary that keeps a leaked API key from becoming a stronger one.
+ * grant, and the session-only boundary that keeps a leaked API key from becoming a stronger one.
  *
  * Isolation tag: `M3AUTH` / `m3auth:`.
  */
@@ -24,7 +24,8 @@ const DIDS = {
   fresh: "did:privy:m3auth-fresh",
   owner: "did:privy:m3auth-owner",
   other: "did:privy:m3auth-other",
-  bootstrap: "did:privy:m3auth-bootstrap",
+  admin: "did:privy:m3auth-admin",
+  promoted: "did:privy:m3auth-promoted",
   reviewer: "did:privy:m3auth-reviewer",
 };
 
@@ -36,27 +37,29 @@ run("M3AUTH identity and credentials", () => {
   let otherKey: string;
   let ownerToken: string;
   let reviewerToken: string;
+  let adminToken: string;
+  let adminId: number;
+  let promotedId: number;
 
   const account = async (input: SeedAccountInput) => seedAccount(input);
 
   beforeAll(async () => {
-    app = await buildApp({
-      auth: {
-        privy: await testPrivyConfig(),
-        // Re-evaluated on EVERY login, which is the behaviour under test below.
-        bootstrapAdminPrivyDids: [DIDS.bootstrap],
-      },
-    });
+    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
     await app.ready();
 
     const owner = await account({ did: DIDS.owner, handle: "m3auth-owner" });
     const other = await account({ did: DIDS.other, handle: "m3auth-other" });
     await account({ did: DIDS.reviewer, handle: "m3auth-reviewer", role: "reviewer" });
+    const admin = await account({ did: DIDS.admin, handle: "m3auth-admin", role: "admin" });
+    const promoted = await account({ did: DIDS.promoted, handle: "m3auth-promoted" });
+    promotedId = promoted.id;
+    adminId = admin.id;
 
     ownerKey = await mintApiKeyFor(owner.id, ["read", "write"]);
     otherKey = await mintApiKeyFor(other.id, ["read"]);
     ownerToken = await mintPrivyToken(DIDS.owner);
     reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    adminToken = await mintPrivyToken(DIDS.admin);
   });
 
   afterAll(async () => {
@@ -95,6 +98,13 @@ run("M3AUTH identity and credentials", () => {
     }
   });
 
+  it("refuses a correctly signed token that simply omits `exp`", async () => {
+    const token = await mintPrivyToken(DIDS.owner, { omitExpiry: true });
+    const res = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().message).toBe("the access token could not be verified.");
+  });
+
   it("provisions an account on first login, keyed on the DID alone", async () => {
     const token = await mintPrivyToken(DIDS.fresh);
     const first = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
@@ -111,17 +121,60 @@ run("M3AUTH identity and credentials", () => {
     expect(second.json().accountId).toBe(body.accountId);
   });
 
-  it("applies the admin bootstrap on login, not only at provisioning", async () => {
-    // First login provisions as an ordinary submitter would be, then the bootstrap list promotes.
-    const token = await mintPrivyToken(DIDS.bootstrap);
-    const res = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
-    expect(res.statusCode).toBe(200);
-    expect(res.json().role).toBe("admin");
-    expect(res.json().canAdmin).toBe(true);
+  it("makes an admin in the product, effective on the target's very next request", async () => {
+    // Nothing in the environment grants a role: a session resolves to whatever the database holds.
+    // So the promotion is an ACTION by an admin, and the only thing worth asserting about it is
+    // that the next request the target makes is already the request of an admin — a role that took
+    // a re-login to become real would be a role nobody could rely on having revoked either.
+    const token = await mintPrivyToken(DIDS.promoted);
+    const before = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
+    expect(before.json().role).toBe("submitter");
+    expect(before.json().canAdmin).toBe(false);
 
-    // And again on a later login — the promotion is idempotent, not a one-shot.
-    const again = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
-    expect(again.json().role).toBe("admin");
+    const granted = await app.inject({
+      method: "POST",
+      url: `/v1/admin/accounts/${promotedId}/role`,
+      headers: bearer(adminToken),
+      payload: { role: "admin" },
+    });
+    expect(granted.statusCode, granted.body).toBe(200);
+    expect(granted.json().globalRole).toBe("admin");
+
+    const after = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
+    expect(after.json().role).toBe("admin");
+    expect(after.json().canAdmin).toBe(true);
+
+    // …and the new admin can administer, which is the half a role field alone does not prove.
+    const byNewAdmin = await app.inject({
+      method: "POST",
+      url: `/v1/admin/accounts/${adminId}/role`,
+      headers: bearer(token),
+      payload: { role: "admin" },
+    });
+    expect(byNewAdmin.statusCode, byNewAdmin.body).toBe(200);
+
+    // Revocation is the same route, and takes effect just as immediately.
+    const revoked = await app.inject({
+      method: "POST",
+      url: `/v1/admin/accounts/${promotedId}/role`,
+      headers: bearer(adminToken),
+      payload: { role: "submitter" },
+    });
+    expect(revoked.statusCode, revoked.body).toBe(200);
+    const demoted = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
+    expect(demoted.json().canAdmin).toBe(false);
+  });
+
+  it("refuses the admin surface to everyone who is not an admin", async () => {
+    for (const token of [ownerToken, reviewerToken]) {
+      const res = await app.inject({
+        method: "POST",
+        url: `/v1/admin/accounts/${promotedId}/role`,
+        headers: bearer(token),
+        payload: { role: "admin" },
+      });
+      expect(res.statusCode).toBe(403);
+    }
   });
 
   it("shows an API key's secret exactly once and never again", async () => {

@@ -56,9 +56,32 @@ credential and is heavily rate-limited, so a login completes with the DID alone 
 stays `NULL` — which is the cursor the enrichment job selects on. A request never waits on the
 provider, and a provider outage never locks anyone out.
 
-**Bootstrap admins are re-evaluated on every login**, not only at provisioning:
-`BOOTSTRAP_ADMIN_PRIVY_DIDS` takes effect without anybody touching the database, which is the entire
-point of having the variable. The promotion is audited like any other role change.
+**Logging in grants nothing.** A session resolves to whatever role the database already holds. No
+environment variable promotes anybody, and that is the point: a role re-derived from configuration
+on every request is granted to whoever holds the deployment configuration and cannot be revoked in
+the product.
+
+### Administrators
+
+| Which admin | How | Credential |
+|---|---|---|
+| the first one | `pnpm --filter @the-rfp-hub/api grant-admin -- --did <privy-did> [--create] --yes` | the **migration** `DATABASE_URL` |
+| every later one | `POST /v1/admin/accounts/:id/role` with `{"role": "admin"}` | an admin's session |
+| a lockout | the same script | the migration `DATABASE_URL` |
+
+The ceremony is a one-time install step, run with the same credential that creates the tables. It
+resolves the account by subject (`--create` provisions one that has never logged in), prints what it
+resolved and which `host:port/database` it is pointed at — never the URL, which carries a password —
+refuses a non-loopback target without `--allow-remote`, refuses to write at all without `--yes`, and
+exits non-zero on every refusal. It is idempotent: an account that is already an admin is a reported
+no-op with no second audit row. The grant is audited as an ordinary `assign_role` with
+`reason: "operator_grant_admin"` and no acting account, because no account acted — an operator did.
+
+**The product manages administrators after that.** An admin grants and revokes `admin` over the
+normal route, self-demotion included, with one floor: the **last remaining admin cannot be demoted**
+(`409 last_admin`). Zeroing the admins is not a state the product can undo — every route that could
+restore one requires an admin — so the dashboard must not be able to reach it by accident. It stays
+recoverable, by an operator, with the script.
 
 ### API keys
 
