@@ -28,7 +28,7 @@ export { useApi, ApiClientProvider } from "./api-context";
  */
 const PrivyRoot = dynamic(() => import("./privy-root"), {
   ssr: false,
-  loading: () => <p className="state">Loading the dashboard…</p>,
+  loading: () => <p className="state">Loading the RFP Hub…</p>,
 });
 
 export interface SessionState {

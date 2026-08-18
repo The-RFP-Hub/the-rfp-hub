@@ -43,9 +43,21 @@ test.describe("M3-5 the signed-in dashboard", () => {
     // for the thing the criterion is about, rather than for a timeout to expire.
     await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
 
-    // Every session may manage its own keys, so `API keys` is present for a plain submitter too.
-    for (const label of ["Listings", "Duplicates", "API keys", "Account"]) {
-      await expect(page.getByRole("link", { name: label })).toBeVisible();
+    // `Directory` is public and always present; `Dashboard` is where the signed-in overview moved
+    // when `/` became the public directory. The rest is the capability-gated set — and every session
+    // may manage its own keys, so `API keys` is there for a plain submitter too.
+    for (const label of [
+      "Directory",
+      "Dashboard",
+      "Listings",
+      "Duplicates",
+      "API keys",
+      "Account",
+    ]) {
+      // `exact` matters: the brand link's accessible name ("RFP Hub — the directory and the…")
+      // contains "Directory" as a substring, so a loose match resolves to two elements and fails
+      // strict mode. The nav labels are exact strings; pinning them is the tighter assertion anyway.
+      await expect(page.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
   });
 

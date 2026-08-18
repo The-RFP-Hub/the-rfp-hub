@@ -41,6 +41,7 @@ import type {
   Opportunity,
   OrganizationList,
   OrganizationSummary,
+  PaginatedOpportunities,
   PublisherList,
   ReviewDecision,
   ReviewStatus,
@@ -99,6 +100,38 @@ export interface ApiClientOptions {
 }
 
 type Query = Record<string, string | number | boolean | undefined>;
+
+/**
+ * The querystring of `GET /v1/opportunities`, as far as the public browse surface uses it.
+ *
+ * A `type` rather than an `interface` on purpose: only a type alias is assignable to `Query`'s index
+ * signature, and being assignable to it is what stops a page inventing a parameter. That matters
+ * more here than anywhere else in this client — the list endpoint validates its querystring with
+ * `additionalProperties: false` and answers a misspelled filter with a 400, never with a silently
+ * ignored one. Every member below is a parameter the endpoint actually declares.
+ *
+ * The list filters accept a comma-separated list as well as a single value; the browse UI sends one
+ * value at a time, and the wire form is the same either way.
+ */
+export type DirectoryQuery = {
+  /** Free text over title, summary and description. */
+  q?: string;
+  fundingType?: string;
+  status?: string;
+  ecosystem?: string;
+  category?: string;
+  /** Organisation slug — matches any operating OR sponsoring organisation. */
+  organization?: string;
+  minAward?: number;
+  maxAward?: number;
+  /** RFC 3339 instants, compared against the derived `nextDeadlineAt`. */
+  deadlineAfter?: string;
+  deadlineBefore?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+};
 
 /**
  * The measurable link-out for an entry.
@@ -319,6 +352,27 @@ export function createApiClient(options: ApiClientOptions) {
     },
 
     // ── public ──────────────────────────────────────────────────────────────────
+    /**
+     * The unauthenticated browse surface: the published directory, as a visitor with no account
+     * reads it.
+     *
+     * Deliberately NOT folded into `opportunities` above, which is the publisher's write and
+     * sub-resource group. These two routes are the ones a visitor hits, and they are the ones the
+     * API counts: `GET /v1/opportunities` records a list view for every row it serves, and
+     * `GET /v1/opportunities/{id}` records the detail view. A browse page that read an entry through
+     * any other route would leave a publisher's `detailViews` at zero while people were reading it.
+     *
+     * Both 404 anything that is not `approved AND is_listed`, which is why the workbench keeps its
+     * own owner and reviewer routes: a pending entry is invisible here by design.
+     */
+    directory: {
+      list: (query?: DirectoryQuery) =>
+        request<PaginatedOpportunities>("GET", "/v1/opportunities", { query }),
+      /** The full Standard object, and the read the API counts as a detail view. */
+      find: (id: string) =>
+        request<Opportunity>("GET", `/v1/opportunities/${encodeURIComponent(id)}`),
+    },
+
     publishers: {
       /** Takes no parameters: the verified set is small and the route returns all of it. */
       list: () => request<PublisherList>("GET", "/v1/publishers"),

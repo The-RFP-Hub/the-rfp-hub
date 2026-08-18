@@ -1,14 +1,25 @@
-# RFP Hub publisher dashboard
+# RFP Hub — the directory and the workbench
 
-A browser client for the RFP Hub `/v1/` API: submit and maintain funding opportunities, read what
-they get read for, manage API keys, and — for the people who hold those capabilities — run the
-review and administration queues.
+A browser client for the RFP Hub `/v1/` API, and two surfaces rather than one:
+
+* **The directory** — every published opportunity, browsable, searchable and readable by anybody,
+  with **no account and no sign-in**. It is the front door (`/`), because the people the data is for
+  are applicants and an applicant has no reason to hold an account here.
+* **The workbench** — submit and maintain funding opportunities, read what they get read for, manage
+  API keys, and, for the people who hold those capabilities, run the review and administration
+  queues. It starts at `/dashboard` and needs a session.
 
 **It is a client and nothing else.** There are no route handlers, no server actions that talk to the
 API, and no server-side session. Every authenticated request is made from the browser with the
 signed-in user's own access token, so the API remains the single authority on what an account may
-do. Nothing this dashboard renders is a permission decision it made itself; the capability flags on
-the navigation come from `GET /v1/me`.
+do. Nothing this client renders is a permission decision it made itself; the capability flags on the
+navigation come from `GET /v1/me`.
+
+**The public half is public all the way down.** `GET /v1/opportunities`, `GET /v1/opportunities/{id}`
+and its audit sub-resource are unauthenticated on the API; the client attaches an `Authorization`
+header only when there is a token to attach, and the directory never asks for one. A signed-in
+reader sees exactly what a stranger sees there — the routes serve `approved AND is_listed` entries
+and nothing else, whoever asks.
 
 ---
 
@@ -72,9 +83,18 @@ change the environment every other suite executes in.
 
 ## The pages
 
+### Public — no session
+
 | Route | What it does |
 |---|---|
-| `/` | Signed out: what an account is for, and the login button. Signed in: this account's traffic across everything it publishes, most-read first. |
+| `/` | The directory. Every published opportunity, from `GET /v1/opportunities`: title, organisation, next deadline and award, with search, funding-type / status / ecosystem filters, ordering and pagination. Every filter is a parameter that endpoint declares — it validates its querystring with `additionalProperties: false`, so an invented one is a 400 rather than a control that quietly does nothing. Below the listing, the demoted sign-in card for publishers. |
+| `/opportunities/[id]` | One published opportunity in full, from `GET /v1/opportunities/{id}` — **the read the API counts as a detail view**. Dates, money, organisations, milestones, eligibility, links, the type-specific `fundingDetails` block verbatim, the provenance and source-check state the payload exposes, and the public, redacted change history from the audit route. The "open the application page" action goes through `/v1/r/{id}/apply`. |
+
+### Signed in — the workbench
+
+| Route | What it does |
+|---|---|
+| `/dashboard` | Signed out: what an account is for, and the login button. Signed in: this account's traffic across everything it publishes, most-read first. (This was `/` until the directory took that route.) |
 | `/listings` | Everything this account submitted or publishes, **whatever its review status** — the public reads 404 a pending entry, and its owner still needs to see it. Review status, listing state, and the last source-check verdict per row. |
 | `/listings/[id]` | One entry, with four tabs: **Analytics** (daily reads and link-outs), **Audit** (every mutation, with the full patch for the owner), **Verification** (the last source check, and a reviewer's button to run one), **Duplicates** (suspected matches against published entries). Also where an entry is claimed for an organisation. |
 | `/listings/new`, `/listings/[id]/edit` | Submit or replace, validated in the browser against the Standard before it is sent. |
@@ -92,6 +112,11 @@ own machine-readable code so a report can quote it.
 Every "open the application page" control points at `GET /v1/r/{id}/apply` or `…/source`, not at the
 stored URL. The click counters only move for hops the API sees; linking directly would leave
 `applyClicks` at zero forever and make the Analytics tab quietly wrong.
+
+This is why the public detail page reads the **public** route rather than any other: `detailViews`
+is counted by `GET /v1/opportunities/{id}` and `applyClicks` by the redirect. A browse surface built
+on a different read would leave a publisher's numbers at zero while people were reading and applying
+— and the traffic it was hiding would be the traffic it had itself generated.
 
 ### Analytics are best-effort, and every surface says so
 
@@ -145,7 +170,14 @@ Two relaxations are deliberate and named rather than buried:
 
 Because the nonce is per request, **every page is rendered per request** (`export const dynamic` in
 the root layout). A prerendered page cannot carry a nonce a later request's header will match. There
-is no server-side content to cache anyway.
+is no server-side content to cache anyway — the public directory is fetched in the browser like
+every other screen here.
+
+**Indexing stays off** (`robots: { index: false }` in the root layout), even though half the app is
+now public. That is a statement about this deployment, not about the directory's audience: nothing
+here is served from a canonical public host yet, and a preview URL that indexes competes with the
+real one for every listing it carries. Turning it on is an operator decision to take once the
+directory has an address worth indexing.
 
 ---
 
@@ -186,32 +218,44 @@ unattended in CI. That gap is covered here, by hand, once per release.
 Run against a staging deployment with a real publisher account, after generating traffic with
 `packages/api/scripts/demo-traffic.ts`. Capture a screenshot for each numbered item.
 
-1. **Login.** `/` signed out shows the explanation and the login button. After signing in, the
-   header shows the account handle and the navigation matches the account's capabilities (no Review
-   link for a submitter, no Administration link for a reviewer).
-2. **Listings.** `/listings` lists the account's entries including a **pending** one, with its review
+1. **The directory, signed out.** In a private window, `/` lists published opportunities with no
+   sign-in of any kind. Search, filter by funding type and ecosystem, change the ordering and page
+   forward and back. Confirm a **pending** entry is absent, and that the network tab shows no
+   `Authorization` header on `/v1/opportunities`.
+2. **A public entry, signed out.** Open one from the directory. `/opportunities/{id}` shows the
+   dates, money, organisations, provenance and change history. Click "Open the application page";
+   confirm it lands on the programme's own site via `/v1/r/{id}/apply`. Then, as that entry's
+   publisher, confirm `detailViews` and `applyClicks` both moved — this is the whole point of the
+   public page reading the public route.
+3. **Login.** `/` signed out shows the directory *and* the publisher card with its login button.
+   After signing in, the header shows the account handle and the navigation matches the account's
+   capabilities (no Review link for a submitter, no Administration link for a reviewer), with the
+   Directory link present in both states.
+4. **Listings.** `/listings` lists the account's entries including a **pending** one, with its review
    status, listing state and source-check verdict.
-3. **Analytics.** `/listings/{id}` → Analytics shows non-zero totals and a bar chart with one bar per
+5. **Analytics.** `/listings/{id}` → Analytics shows non-zero totals and a bar chart with one bar per
    day of the window, and the day-by-day table matches the tiles. Switch the window to 7 days and
    confirm the chart redraws. **This is the screenshot the milestone asks for.**
-4. **Link-out counting.** Click "Open the application page", return, reload the Analytics tab, and
+6. **Link-out counting.** Click "Open the application page", return, reload the Analytics tab, and
    confirm `applyClicks` has increased — proving the redirect route is the counted path.
-5. **Audit.** The Audit tab shows one row per mutation, with the patch visible to the owner.
-6. **Verification.** The Verification tab shows the last run, or the honest "not checked yet" state.
-7. **Submit.** `/listings/new` with a deliberately invalid document shows the in-browser errors and
+7. **Audit.** The Audit tab shows one row per mutation, with the patch visible to the owner — and
+   the public `/opportunities/{id}` history shows the same actions with field names only.
+8. **Verification.** The Verification tab shows the last run, or the honest "not checked yet" state.
+9. **Submit.** `/listings/new` with a deliberately invalid document shows the in-browser errors and
    keeps the submit button disabled; correcting them submits, and the result panel states the review
    status **and** the duplicate-check state.
-8. **Duplicate check states.** Submit a near-copy of an existing published entry and confirm the
-   result panel names the match. On a deployment with detection disabled, confirm the panel says the
-   check did not run rather than "nothing similar found".
-9. **Keys.** `/keys` mints a key, shows the secret once, and the secret is gone after a reload.
-   Revoking it moves the row to revoked.
-10. **Review.** As a reviewer, `/review` approves a pending entry (it becomes visible in the public
-    read), approves a claim **without** verifying the organisation and shows the API's sentence about
-    future writes staying pending, and merges a duplicate pair with the survivor chosen explicitly.
-11. **Administration.** As an administrator, `/admin` changes an account's role and toggles
+10. **Duplicate check states.** Submit a near-copy of an existing published entry and confirm the
+    result panel names the match. On a deployment with detection disabled, confirm the panel says the
+    check did not run rather than "nothing similar found".
+11. **Keys.** `/keys` mints a key, shows the secret once, and the secret is gone after a reload.
+    Revoking it moves the row to revoked.
+12. **Review.** As a reviewer, `/review` approves a pending entry (it appears in the public directory
+    within a reload), approves a claim **without** verifying the organisation and shows the API's
+    sentence about future writes staying pending, and merges a duplicate pair with the survivor
+    chosen explicitly.
+13. **Administration.** As an administrator, `/admin` changes an account's role and toggles
     direct-create.
-12. **Refusals.** As a submitter, open `/review` directly by URL and confirm the page reports the
+14. **Refusals.** As a submitter, open `/review` directly by URL and confirm the page reports the
     missing capability rather than showing a queue.
 
 ---
@@ -224,3 +268,15 @@ Run against a staging deployment with a real publisher account, after generating
 * Organisation directory editing (`PATCH /v1/review/organizations/{slug}`) has no screen yet;
   verification and membership are the parts a reviewer needs day to day.
 * No dark theme, and no per-funding-type submission form (see above).
+* **The directory is client-fetched, so it is invisible to anything that does not run JavaScript.**
+  That is the same trade every other screen here makes, and it is fine while indexing is off; the day
+  the directory gets a canonical host it wants server rendering and metadata per entry, which is a
+  larger change than this cut (the CSP nonce is why every page is `force-dynamic` today).
+* The directory's filters are one value at a time. The endpoint accepts a comma-separated list on
+  every list filter and the client passes the string straight through, so multi-select is a UI change
+  and not an API one.
+* `/opportunities/{id}` renders `fundingDetails` as the record's own JSON. A typed layout per funding
+  type is the same six-shapes problem the submission form has, and the same answer: showing it
+  verbatim cannot drop a field a publisher entered.
+* The public change history is fetched on mount rather than when its `<details>` is opened — one
+  small extra public GET per detail view.

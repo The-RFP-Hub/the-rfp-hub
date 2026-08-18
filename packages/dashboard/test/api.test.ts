@@ -187,6 +187,40 @@ describe("createApiClient", () => {
   });
 });
 
+/**
+ * The two routes the public browse pages read. They are unauthenticated, and the point of testing
+ * them here is that they stay that way: a directory that only worked for a signed-in reader would
+ * look perfectly fine to whoever built it.
+ */
+describe("the public directory", () => {
+  it("lists through the public route with no credential at all", async () => {
+    const { fetchImpl, calls } = stubFetch(() =>
+      json({ items: [], page: 1, limit: 20, total: 0, totalPages: 1 }),
+    );
+    const api = createApiClient({
+      baseUrl: "https://api.example.com",
+      getToken: async () => null,
+      fetchImpl,
+    });
+
+    await api.directory.list({ q: "zk", fundingType: "grant", sort: "postedAt", order: "desc" });
+
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/opportunities?q=zk&fundingType=grant&sort=postedAt&order=desc",
+    );
+    expect((calls[0]?.init.headers as Record<string, string>).authorization).toBeUndefined();
+  });
+
+  it("reads one entry through the route the API counts as a detail view", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ id: "acme:round-1" }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.directory.find("acme:round-1");
+
+    expect(calls[0]?.url).toBe("https://api.example.com/v1/opportunities/acme%3Around-1");
+  });
+});
+
 describe("linkOutUrl", () => {
   it("points at the API's redirect route, which is what makes a click countable", () => {
     expect(linkOutUrl("https://api.example.com", "acme:round-1", "apply")).toBe(
