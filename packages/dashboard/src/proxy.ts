@@ -2,6 +2,13 @@
  * The ONLY server-side code in this package, and it exists for exactly one reason: a
  * Content-Security-Policy with a per-request nonce cannot be a static header.
  *
+ * NAMED `proxy`, NOT `middleware`. Next 16 renamed the convention: the file is `proxy.ts` and the
+ * exported function must be `proxy` (or a default export) — a file still called `middleware.ts`
+ * builds with a deprecation warning, and one that exports the old name under the new filename fails
+ * outright. The behaviour this file depends on is unchanged: `config.matcher` is still honoured, and
+ * `NextResponse.next({ request: { headers } })` still rewrites the REQUEST headers the render sees,
+ * which is the whole mechanism below.
+ *
  * It authenticates nothing, reads no cookie and calls no API. Authorization lives in the API and
  * the browser holds the only credential — see `next.config.ts`.
  *
@@ -14,7 +21,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { contentSecurityPolicy } from "./lib/csp";
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const nonce = Buffer.from(crypto.randomUUID().replaceAll("-", ""), "hex").toString("base64");
   const csp = contentSecurityPolicy(nonce, process.env.NEXT_PUBLIC_API_URL);
 

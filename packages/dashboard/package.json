@@ -6,8 +6,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 3005",
-    "build": "next build",
+    "dev": "next dev --webpack --port 3005",
+    "build": "next build --webpack",
     "start": "next start --port 3005",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -15,7 +15,7 @@
   "dependencies": {
     "@privy-io/react-auth": "^3.37.1",
     "@the-rfp-hub/standard": "workspace:*",
-    "next": "^15.5.4",
+    "next": "^16.3.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "rfphub-validate": "workspace:*"
@@ -28,5 +28,8 @@
     "jsdom": "^25.0.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }

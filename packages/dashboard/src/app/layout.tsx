@@ -15,7 +15,7 @@ export const metadata: Metadata = {
  * EVERY PAGE IS RENDERED PER REQUEST, and it is the Content-Security-Policy that requires it.
  *
  * The framework emits inline bootstrap scripts and stamps them with the nonce it finds on the
- * incoming request — a nonce that `src/middleware.ts` mints fresh each time. A prerendered page has
+ * incoming request — a nonce that `src/proxy.ts` mints fresh each time. A prerendered page has
  * no way to carry a nonce that a later request's header will match, so its inline scripts would be
  * blocked and the page would arrive inert. The alternatives were `'unsafe-inline'` for scripts,
  * which gives up the protection entirely, or no CSP at all.

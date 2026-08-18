@@ -1,5 +1,5 @@
 /**
- * The Content-Security-Policy, built here rather than written as a string in the middleware so it
+ * The Content-Security-Policy, built here rather than written as a string in the proxy so it
  * can be unit-tested without a running server.
  *
  * WHAT THIS IS DEFENDING. Every listing this dashboard renders is publisher-supplied, and the
