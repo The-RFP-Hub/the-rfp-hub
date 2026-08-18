@@ -9,13 +9,18 @@
  * Neither grant elevates an API key. `direct_create` widens which NAMESPACES an account may publish
  * into; whether the credential in hand may cause publication at all is still `canPublishWith`, so
  * a `write`-only key belonging to a direct-create admin still lands its submissions `pending`.
+ *
+ * ADMIN IS GRANTED AND REVOKED HERE like any other role — the product manages its own administrators
+ * rather than deferring to a list in the environment. The one exception is the first one, which no
+ * admin exists to make: that is an operator ceremony (`scripts/grant-admin.ts`, run with the
+ * migration credential), and it is also how a lockout is undone.
  */
 import { eq } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type AccountRow, accounts } from "../../../db/schema.js";
 import type { AccountSummaryView } from "../../shared/api-views.js";
 import type { AccountRole } from "../../shared/capabilities.js";
-import { badRequest, notFound } from "../../shared/http-error.js";
+import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
 
 const ROLES: AccountRole[] = ["submitter", "reviewer", "admin"];
@@ -27,11 +32,40 @@ export class AdminService {
     this.audit = new AuditService(db);
   }
 
+  /**
+   * Grant or revoke any global role, including `admin` — with one floor under it.
+   *
+   * THE LAST ADMIN CANNOT BE DEMOTED FROM HERE. Zeroing the admins is not a state the product can
+   * undo: every route that could restore one requires an admin. It stays RECOVERABLE — an operator
+   * runs `scripts/grant-admin.ts` against the database — but a dashboard should not be able to
+   * reach it by accident, and "I demoted myself" is exactly the accident. Demoting an admin while
+   * another remains is ordinary, self-demotion included.
+   */
   async assignRole(adminId: number, accountId: number, role: string): Promise<AccountSummaryView> {
     const target = normalizeRole(role);
     return this.db.transaction(async (tx) => {
+      // Every transaction that could REMOVE an admin locks the admin set first, in id order — the
+      // same order in all of them, so two demotions racing serialise instead of deadlocking, and
+      // neither can count the other's admin as still there. Taken before the target's own lock
+      // because a demotion's target is itself in this set.
+      const admins =
+        target === "admin"
+          ? []
+          : await tx
+              .select({ id: accounts.id })
+              .from(accounts)
+              .where(eq(accounts.globalRole, "admin"))
+              .orderBy(accounts.id)
+              .for("update");
+
       const row = await lockAccount(tx, accountId);
       if (row.globalRole === target) return toAccountSummary(row);
+      if (row.globalRole === "admin" && admins.length <= 1) {
+        throw conflict(
+          "last_admin",
+          "this is the only admin account; promote another admin first. A lockout is recoverable only by an operator with the database credential.",
+        );
+      }
       const updated = await tx
         .update(accounts)
         .set({ globalRole: target, updatedAt: new Date() })

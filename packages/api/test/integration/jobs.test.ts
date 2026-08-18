@@ -15,17 +15,11 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
-import {
-  type AccountRow,
-  type OpportunityRow,
-  accounts,
-  auditLog,
-  opportunities,
-} from "../../src/db/schema.js";
-import { AccountService } from "../../src/modules/services/auth/account.service.js";
+import { type OpportunityRow, accounts, auditLog, opportunities } from "../../src/db/schema.js";
 import { AccountEnrichmentService } from "../../src/modules/services/jobs/account-enrichment.service.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
 import { runJob } from "../../src/modules/services/jobs/runner.js";
+import { StalenessService } from "../../src/modules/services/jobs/staleness.service.js";
 import {
   bearer,
   mintApiKeyFor,
@@ -40,17 +34,12 @@ const NS = "m3job";
 const DIDS = {
   admin: "did:privy:m3job-admin",
   reviewer: "did:privy:m3job-reviewer",
-  bootstrap: "did:privy:m3job-bootstrap",
-  bootstrapFailed: "did:privy:m3job-bootstrap-failed",
+  enriched: "did:privy:m3job-enriched",
+  enrichFailed: "did:privy:m3job-enrich-failed",
 };
 
-/**
- * The address the fixture's identity provider reports for the bootstrap account.
- *
- * Deliberately written here in MIXED case and configured in lower: an address is case-insensitive
- * in every form that matters, and a checksummed paste must not silently fail to match.
- */
-const BOOTSTRAP_WALLET = "0xA11CE0000000000000000000000000000000B0B5";
+/** The address the fixture's identity provider reports for the enriched account. */
+const PROVIDER_WALLET = "0xa11ce0000000000000000000000000000000b0b5";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-08-14T12:00:00.000Z");
@@ -248,6 +237,61 @@ run("M3JOB scheduled jobs", () => {
     }
   });
 
+  it("does not count a candidate the LOCKED re-read finds already resolved", async () => {
+    // THE BUG. `settle()`'s closing branch re-reads the row under `FOR UPDATE` — deliberately, so a
+    // publisher's write between the walk's SELECT and this lock wins — and its transaction
+    // correctly returns early (no update, no audit row) when that re-read no longer agrees the
+    // entry should close. But the METHOD used to fall back to the PRE-LOCK `reason` regardless of
+    // what the transaction decided, so `runBatch` counted an untouched, still-open entry as
+    // processed and closed.
+    //
+    // A fresh, private fixture (not one of `FIXTURES`, which other cases in this file already
+    // drive to `closed`): seeded past due, so the walk's SELECT would capture `reason: "past_due"`,
+    // then edited — simulating the concurrent publisher write — to no longer be past due AND to
+    // reset the inactivity clock, before the (here, directly invoked) locked re-read runs.
+    const localId = "race-resolved";
+    const inserted = await db
+      .insert(opportunities)
+      .values({
+        publicId: publicId(localId),
+        fundingType: "grant" as const,
+        status: "open" as const,
+        title: `Job fixture ${localId}`,
+        description: "A staleness race fixture.",
+        operatingOrganizations: [{ name: NS, slug: NS }],
+        orgSlugs: [NS],
+        deadlines: [fixed(ago(10))],
+        lastSeenAt: ago(1),
+        reviewStatus: "approved" as const,
+        sourcePublisher: NS,
+      })
+      .returning();
+    const staleSnapshot = inserted[0];
+    if (!staleSnapshot) throw new Error("could not seed the race fixture");
+
+    await db
+      .update(opportunities)
+      .set({ deadlines: [fixed(ahead(30))], lastSeenAt: NOW })
+      .where(eq(opportunities.id, staleSnapshot.id));
+
+    const before = await closures(staleSnapshot.id);
+
+    // `settle` is private; this drives it directly rather than orchestrating real overlapping
+    // `runBatch` calls, because the property under test — the transaction's OWN outcome must be
+    // what is returned — is a property of `settle` itself, not of the page-walking loop around it.
+    const service = new StalenessService(db) as unknown as {
+      settle(row: OpportunityRow, now: Date, inactiveBefore: Date): Promise<string>;
+    };
+    const outcome = await service.settle(staleSnapshot, NOW, new Date(NOW.getTime() - 90 * DAY));
+
+    expect(outcome, "the locked re-read's own decision, not the stale pre-lock snapshot's").toBe(
+      "unchanged",
+    );
+    const after = await load(localId);
+    expect(after.status).toBe("open");
+    expect(await closures(staleSnapshot.id)).toEqual(before);
+  });
+
   it("returns `skipped: locked` — without blocking — while another run holds the lock", async () => {
     const holder = new pg.Client({ connectionString: config.databaseUrl });
     await holder.connect();
@@ -303,106 +347,84 @@ run("M3JOB scheduled jobs", () => {
     await expect(runJob("delete-everything")).rejects.toThrow(/unknown job/);
   });
 
-  // ── the bootstrap-wallet grant ───────────────────────────────────────────────────
-  it("promotes a configured bootstrap wallet the moment enrichment stores it", async () => {
-    // `BOOTSTRAP_ADMIN_WALLETS` is only usable as an authorization input because the wallet came
-    // from the provider's record rather than from a request — and enrichment is the one writer of
-    // that column. It is also the LAST time this account is in the job's cursor (the run stamps
-    // `enriched_at`), so the promotion has to happen here rather than being left for a later pass.
-    const seeded = await seedAccount({ did: DIDS.bootstrap, handle: "m3job-bootstrap" });
+  // ── enrichment ───────────────────────────────────────────────────────────────────
+  it("stores the wallet and email the provider holds, and grants nothing by doing so", async () => {
+    // `accounts.primary_wallet` is trustworthy precisely because this job is its only writer — a
+    // wallet that arrives in a request is self-asserted. What it is NOT is an authorization input
+    // in its own right: nothing here promotes anybody, because a role that a column can confer is
+    // a role nobody granted. Admins are made by the ceremony or by an admin, never by enrichment.
+    const seeded = await seedAccount({ did: DIDS.enriched, handle: "m3job-enriched" });
     expect(seeded.globalRole).toBe("submitter");
 
     const enrichment = new AccountEnrichmentService(db, {
-      config: { ...config, bootstrapAdminWallets: [BOOTSTRAP_WALLET.toLowerCase()] },
+      config,
       // Only this suite's account is answered for. Every other pending account THROWS, which
       // leaves `enriched_at` NULL and the account exactly as another suite left it — a fixture
       // must not enrich the whole table as a side effect.
       fetchUser: async (did: string) => {
-        if (did !== DIDS.bootstrap) throw new Error("not this suite's account");
-        return { primaryWallet: BOOTSTRAP_WALLET, email: null };
+        if (did !== DIDS.enriched) throw new Error("not this suite's account");
+        return { primaryWallet: PROVIDER_WALLET, email: null };
       },
     });
-    const result = await enrichment.runBatch({ limit: 1000, now: NOW });
-    expect(result.details?.bootstrapAdminsPromoted).toBe(1);
+    expect((await enrichment.runBatch({ limit: 1000, now: NOW })).processed).toBe(1);
 
-    const promoted = (
-      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.bootstrap)).limit(1)
+    const enriched = (
+      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.enriched)).limit(1)
     )[0];
-    expect(promoted?.globalRole).toBe("admin");
-    expect(promoted?.primaryWallet).toBe(BOOTSTRAP_WALLET);
+    expect(enriched?.primaryWallet).toBe(PROVIDER_WALLET);
+    expect(enriched?.enrichedAt).not.toBeNull();
+    expect(enriched?.globalRole).toBe("submitter");
 
     const trail = await db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, promoted?.id ?? 0)));
-    const grants = trail.filter((row) => row.action === "assign_role");
-    expect(grants).toHaveLength(1);
-    expect((grants[0]?.patch as { reason?: string })?.reason).toBe("bootstrap_admin_wallet");
-
-    // Idempotent: re-checking an account that is already an admin writes no second row.
-    const service = new AccountService(db, [], [BOOTSTRAP_WALLET.toLowerCase()]);
-    if (promoted) await service.applyBootstrapAdmin(promoted);
-    const again = await db
-      .select()
-      .from(auditLog)
-      .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, promoted?.id ?? 0)));
-    expect(again.filter((row) => row.action === "assign_role")).toHaveLength(1);
+      .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, enriched?.id ?? 0)));
+    expect(trail.filter((row) => row.action === "assign_role")).toHaveLength(0);
   });
 
-  it("leaves an account in the cursor when its promotion fails, and finishes it next run", async () => {
-    // `enriched_at` is what takes an account OUT of this cursor, and the promotion is the last
-    // moment it can happen. So the two have to commit together: a promotion that throws while
-    // writing its audit row must not leave the stamp behind, or the batch reports the account as
-    // failed and nothing ever selects it again.
-    const seeded = await seedAccount({
-      did: DIDS.bootstrapFailed,
-      handle: "m3job-bootstrap-failed",
-    });
+  it("leaves an account in the cursor when its enrichment fails, and finishes it next run", async () => {
+    // `enriched_at` is what takes an account OUT of this cursor, so it must not be written by a
+    // pass that did not complete: a stamp that outlived a failure means the batch reports the
+    // account as failed and nothing ever selects it again.
+    const seeded = await seedAccount({ did: DIDS.enrichFailed, handle: "m3job-enrich-failed" });
     expect(seeded.enrichedAt).toBeNull();
 
-    /** A promotion that fails the way a real one would: after the wallet write, inside the same tx. */
-    class BrokenAccounts extends AccountService {
-      override async applyBootstrapAdminWithin(): Promise<AccountRow> {
-        throw new Error("the audit write failed");
-      }
-    }
-
-    const wallets = [BOOTSTRAP_WALLET.toLowerCase()];
+    let attempt = 0;
     // Only this suite's account is answered for; every other pending one throws, which leaves it
     // exactly as another suite left it.
     const fetchUser = async (did: string) => {
-      if (did !== DIDS.bootstrapFailed) throw new Error("not this suite's account");
-      return { primaryWallet: BOOTSTRAP_WALLET, email: null };
+      if (did !== DIDS.enrichFailed) throw new Error("not this suite's account");
+      if (++attempt === 1) throw new Error("the provider call failed");
+      return { primaryWallet: PROVIDER_WALLET, email: null };
     };
-    const jobConfig = { ...config, bootstrapAdminWallets: wallets };
 
-    const broken = await new AccountEnrichmentService(db, {
-      config: jobConfig,
-      accounts: new BrokenAccounts(db, [], wallets),
-      fetchUser,
-    }).runBatch({ limit: 1000, now: NOW });
+    const broken = await new AccountEnrichmentService(db, { config, fetchUser }).runBatch({
+      limit: 1000,
+      now: NOW,
+    });
     expect(broken.processed).toBe(0);
+    // At least this suite's: the fixture refuses to answer for any other suite's pending account,
+    // so in a full run the failure count is however many of those the batch also swept up.
+    expect(broken.details?.failed).toBeGreaterThanOrEqual(1);
 
     const rolledBack = (
-      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.bootstrapFailed)).limit(1)
+      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.enrichFailed)).limit(1)
     )[0];
-    // The whole transaction rolled back, so the stamp is not there and neither is the wallet.
     expect(rolledBack?.enrichedAt).toBeNull();
     expect(rolledBack?.primaryWallet).toBeNull();
-    expect(rolledBack?.globalRole).toBe("submitter");
 
     // …which is the point: the account is still selected, and the next run completes the work.
-    const retried = await new AccountEnrichmentService(db, {
-      config: jobConfig,
-      fetchUser,
-    }).runBatch({ limit: 1000, now: NOW });
-    expect(retried.details?.bootstrapAdminsPromoted).toBe(1);
+    const retried = await new AccountEnrichmentService(db, { config, fetchUser }).runBatch({
+      limit: 1000,
+      now: NOW,
+    });
+    expect(retried.processed).toBe(1);
 
     const settled = (
-      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.bootstrapFailed)).limit(1)
+      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.enrichFailed)).limit(1)
     )[0];
     expect(settled?.enrichedAt).not.toBeNull();
-    expect(settled?.globalRole).toBe("admin");
+    expect(settled?.primaryWallet).toBe(PROVIDER_WALLET);
   });
 
   // ── the convenience route ────────────────────────────────────────────────────────

@@ -35,8 +35,6 @@ import { isHttpError } from "../modules/shared/http-error.js";
 export interface AuthOptions {
   /** Overrides the deployment's identity-provider settings — the integration tests inject a key. */
   privy?: typeof config.privy;
-  bootstrapAdminPrivyDids?: string[];
-  bootstrapAdminWallets?: string[];
   db?: DB;
 }
 
@@ -75,11 +73,7 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
   const db = options.db ?? defaultDb;
   const privy = new PrivyTokenService(options.privy ?? config.privy);
-  const accounts = new AccountService(
-    db,
-    options.bootstrapAdminPrivyDids ?? config.bootstrapAdminPrivyDids,
-    options.bootstrapAdminWallets ?? config.bootstrapAdminWallets,
-  );
+  const accounts = new AccountService(db);
   const principals = new PrincipalService(db, {
     accounts,
     keys: new ApiKeyService(db),

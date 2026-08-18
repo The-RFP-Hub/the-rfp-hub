@@ -86,8 +86,8 @@ describe("reading the identity provider's user record", () => {
         ],
       }),
     ).toEqual({
-      // Lower-cased: an address is case-insensitive in every form that matters, and
-      // BOOTSTRAP_ADMIN_WALLETS is compared against it flat.
+      // Lower-cased: an address is case-insensitive in every form that matters, and a checksummed
+      // paste must not read as a different address from the same one written flat.
       primaryWallet: "0xabc0000000000000000000000000000000000001",
       email: "someone@example.org",
     });

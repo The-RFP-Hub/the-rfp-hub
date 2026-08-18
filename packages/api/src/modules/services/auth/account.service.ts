@@ -12,24 +12,18 @@
  * NULL is the cursor the enrichment job selects on; nothing else is needed to "queue" the work, and
  * a request never waits on the provider.
  *
- * BOOTSTRAP ADMINS ARE RE-EVALUATED ON EVERY LOGIN, not only at provisioning: adding a DID to
- * `BOOTSTRAP_ADMIN_PRIVY_DIDS` has to take effect without anybody touching the database, which is
- * the entire point of having the variable. The promotion is audited like any other role change.
- *
- * `BOOTSTRAP_ADMIN_WALLETS` IS THE SAME RULE AGAINST A DIFFERENT COLUMN, and the difference is
- * where the value came from. `accounts.primary_wallet` is written by ONE thing — the enrichment
- * job, from the provider's own record — so matching against it is matching against something the
- * provider verified, not against a string a request asserted. It is therefore re-checked in the
- * two places the pair (account, wallet) can become true: on every login, like the DID list, and
- * immediately after enrichment writes the wallet, so the first admin does not have to log in twice.
- * Without `PRIVY_APP_SECRET` nothing ever writes that column, the list matches nothing, and
- * `config.ts` says so at boot.
+ * LOGIN GRANTS NOTHING. A session resolves to whatever role the database already holds — there is
+ * no list of privileged identities in the environment for a login to consult, because a role that
+ * is re-derived from configuration on every request is a role nobody can revoke in the product.
+ * The FIRST admin is made by an operator running `scripts/grant-admin.ts` with the migration
+ * credential (`grantAdmin` below); every admin after that is made by an admin, over
+ * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
-import { and, eq, ilike, or } from "drizzle-orm";
-import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
+import { eq, ilike, or } from "drizzle-orm";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type AccountRow, accounts, orgMemberships, organizations } from "../../../db/schema.js";
 import type { Membership } from "../../shared/capabilities.js";
-import { badRequest, conflict } from "../../shared/http-error.js";
+import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { AuditService, SYSTEM_ACTOR } from "../audit/audit.service.js";
 
@@ -50,15 +44,19 @@ export interface ProfileUpdate {
   displayName?: string | null;
 }
 
+/** What the admin ceremony did, so an operator's console can say which of the three happened. */
+export interface AdminGrant {
+  account: AccountRow;
+  /** The account did not exist and `create` provisioned it. */
+  created: boolean;
+  /** False when the account was already an admin — a no-op, and no second audit row. */
+  promoted: boolean;
+}
+
 export class AccountService {
   private readonly audit: AuditService;
 
-  constructor(
-    private readonly db: DB = defaultDb,
-    private readonly bootstrapAdminDids: string[] = [],
-    /** Lowercased by `config.ts`; compared against the provider-verified `primary_wallet`. */
-    private readonly bootstrapAdminWallets: string[] = [],
-  ) {
+  constructor(private readonly db: DB = defaultDb) {
     this.audit = new AuditService(db);
   }
 
@@ -73,74 +71,73 @@ export class AccountService {
     const rows = await this.db.select().from(accounts).where(eq(accounts.privyDid, did)).limit(1);
     const account = rows[0];
     if (!account) throw new Error(`account for '${did}' vanished between insert and read`);
-    return this.applyBootstrapAdmin(account);
+    return account;
+  }
+
+  /** The account a subject names, or `undefined`. The read half of the admin ceremony. */
+  async findByPrivyDid(did: string): Promise<AccountRow | undefined> {
+    const rows = await this.db.select().from(accounts).where(eq(accounts.privyDid, did)).limit(1);
+    return rows[0];
   }
 
   /**
-   * Promote a configured bootstrap identity to admin. Idempotent, and audited the first time only.
+   * THE FIRST ADMIN — the one grant the product cannot make, because making it needs an admin.
    *
-   * Two matchers, one rule. The DID is what the token itself carried; the wallet is what the
-   * provider's own record said, stored by the enrichment job. Neither is a value a request supplied.
-   * Public because enrichment calls it the moment it writes a wallet — an account already stamped
-   * `enriched_at` is out of that job's cursor forever, so waiting for the next enrichment pass
-   * would mean the promotion never happened.
+   * Reached only from `scripts/grant-admin.ts`, run by an operator against the database with the
+   * migration credential. That is deliberately the same authority that can create the table: an
+   * identity list in the service's environment would grant a role on every login, to whoever holds
+   * the deployment configuration, with nothing in the product able to revoke it. Holding the
+   * ceremony at the database instead means the grant is an EVENT, recorded once, and every later
+   * admin is made by an admin over the audited route.
    *
-   * This is the standalone form, on its own transaction — the login path, where there is nothing
-   * else to be atomic with. A caller that IS writing something else takes `within` instead.
+   * `create` provisions the row for a subject that has never logged in, with the same
+   * `ON CONFLICT DO NOTHING` idiom as `resolveByPrivyDid` — an operator should not have to
+   * choreograph "log in first, then be granted".
+   *
+   * Idempotent: an account that is already an admin is returned unchanged and writes no second
+   * audit row. The lock is what makes the read-then-write safe against a concurrent role change.
    */
-  async applyBootstrapAdmin(account: AccountRow): Promise<AccountRow> {
-    if (account.globalRole === "admin") return account;
-    if (this.bootstrapReason(account) === undefined) return account;
-    return this.db.transaction((tx) => this.applyBootstrapAdminWithin(tx, account));
-  }
+  async grantAdmin(did: string, options: { create?: boolean } = {}): Promise<AdminGrant> {
+    return this.db.transaction(async (tx) => {
+      const locked = async () =>
+        (
+          await tx.select().from(accounts).where(eq(accounts.privyDid, did)).for("update").limit(1)
+        )[0];
 
-  /**
-   * The same promotion, on a handle the caller supplies — so it commits with whatever else that
-   * handle is writing, or with nothing at all.
-   *
-   * ENRICHMENT NEEDS THIS, and a nested `db.transaction()` would not have given it: called on the
-   * pool it opens a SECOND connection, which is not atomic with anything. The stamp that takes an
-   * account out of the enrichment cursor and the promotion the stamp is the last chance to make
-   * have to land together — otherwise a promotion that throws while writing its audit row leaves
-   * `enriched_at` committed, the job reports the account as failed, and it is never selected again.
-   */
-  async applyBootstrapAdminWithin(tx: DbLike, account: AccountRow): Promise<AccountRow> {
-    if (account.globalRole === "admin") return account;
-    const reason = this.bootstrapReason(account);
-    if (reason === undefined) return account;
+      let account = await locked();
+      let created = false;
+      if (!account) {
+        if (options.create !== true) {
+          throw notFound(`no account for ${JSON.stringify(did)}.`);
+        }
+        await tx.insert(accounts).values({ privyDid: did }).onConflictDoNothing();
+        account = await locked();
+        created = account !== undefined;
+      }
+      if (!account) throw new Error(`account for '${did}' vanished between insert and read`);
+      if (account.globalRole === "admin") return { account, created, promoted: false };
 
-    const updated = await tx
-      .update(accounts)
-      .set({ globalRole: "admin", updatedAt: new Date() })
-      .where(and(eq(accounts.id, account.id), eq(accounts.globalRole, account.globalRole)))
-      .returning();
-    const row = updated[0];
-    // Lost the compare-and-set: something else changed the role between the read and here, and
-    // its decision is the newer one.
-    if (!row) return account;
-    await this.audit.record(tx, {
-      ...SYSTEM_ACTOR,
-      subjectKind: "account",
-      subjectId: row.id,
-      action: "assign_role",
-      patch: {
-        globalRole: { before: account.globalRole, after: "admin" },
-        reason,
-      },
+      const updated = await tx
+        .update(accounts)
+        .set({ globalRole: "admin", updatedAt: new Date() })
+        .where(eq(accounts.id, account.id))
+        .returning();
+      const row = updated[0];
+      if (!row) throw new Error(`account ${account.id} vanished during the admin grant`);
+      await this.audit.record(tx, {
+        // Nobody's account did this: an operator holding the migration credential did, and the
+        // trail says so rather than naming an account that was not acting.
+        ...SYSTEM_ACTOR,
+        subjectKind: "account",
+        subjectId: row.id,
+        action: "assign_role",
+        patch: {
+          globalRole: { before: account.globalRole, after: "admin" },
+          reason: "operator_grant_admin",
+        },
+      });
+      return { account: row, created, promoted: true };
     });
-    return row;
-  }
-
-  /** Which configured list this account matches, or `undefined` for neither. */
-  private bootstrapReason(account: AccountRow): string | undefined {
-    if (account.privyDid !== null && this.bootstrapAdminDids.includes(account.privyDid)) {
-      return "bootstrap_admin_privy_did";
-    }
-    const wallet = account.primaryWallet?.trim().toLowerCase();
-    if (wallet && this.bootstrapAdminWallets.includes(wallet)) {
-      return "bootstrap_admin_wallet";
-    }
-    return undefined;
   }
 
   async findById(id: number): Promise<AccountRow | undefined> {
@@ -286,16 +283,33 @@ export class AccountService {
   }
 }
 
+/**
+ * The DRIVER's error, which is not necessarily the error that was thrown.
+ *
+ * Drizzle wraps a failed query in a `DrizzleQueryError` and hangs the driver's own error off
+ * `cause`, so reading `code`/`constraint` from the thrown object answers `undefined` — and every
+ * unique-violation rule downstream then reports a 500 where the contract promises a 409 or an
+ * idempotent success. Walking the chain reads those fields wherever the wrapper happens to put
+ * them, which is also what keeps this working if a future version stops wrapping. Bounded, because
+ * a `cause` chain is not guaranteed to be acyclic.
+ */
+function driverError(error: unknown): { code?: string; constraint?: string } | undefined {
+  let current = error;
+  for (let hop = 0; hop < 5; hop++) {
+    if (typeof current !== "object" || current === null) return undefined;
+    const named = current as { code?: string; constraint?: string; cause?: unknown };
+    if (named.code !== undefined || named.constraint !== undefined) return named;
+    current = named.cause;
+  }
+  return undefined;
+}
+
 /** Postgres unique-violation SQLSTATE. */
 export function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" && error !== null && (error as { code?: string }).code === "23505"
-  );
+  return driverError(error)?.code === "23505";
 }
 
 /** The constraint a unique violation names, when the driver reports one. */
 export function violatedConstraint(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null) return undefined;
-  const named = error as { constraint?: string };
-  return named.constraint;
+  return driverError(error)?.constraint;
 }

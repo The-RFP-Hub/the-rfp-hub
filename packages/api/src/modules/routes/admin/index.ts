@@ -34,6 +34,8 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
         operationId: "assignAccountRole",
         tags: ["admin"],
         summary: "Set an account's global role",
+        description:
+          "Includes `admin`: administrators are granted and revoked in the product. The LAST remaining admin cannot be demoted here (409 `last_admin`) — that state is recoverable only by an operator running the grant-admin script against the database.",
         security: [{ bearerAuth: [] }],
         params: accountParams,
         body: {
@@ -42,7 +44,11 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { role: { type: "string", enum: ["submitter", "reviewer", "admin"] } },
         },
-        response: { 200: { $ref: "AccountSummary#" }, ...errors },
+        response: {
+          200: { $ref: "AccountSummary#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     adminController.assignRole,
