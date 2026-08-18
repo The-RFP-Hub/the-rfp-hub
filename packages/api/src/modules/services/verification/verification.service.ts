@@ -207,8 +207,13 @@ export class VerificationService {
             verifiedAgainstSource: matched,
             verifiedAt: now,
             // A SUCCESSFUL check is a "still real" signal and resets the staleness clock. A failed
-            // one is the opposite of evidence, so it deliberately does not.
-            lastSeenAt: matched ? now : row.lastSeenAt,
+            // one is the opposite of evidence, so it deliberately does not — but it must not
+            // regress the clock either: this update does not touch `updatedAt`, so a second
+            // overlapping run's staleness check (above) cannot detect a `lastSeenAt` some OTHER
+            // run committed in between. Write back the LOCKED row's value, never the pre-fetch
+            // snapshot, or a failed run finishing after a concurrent successful one silently
+            // reverts it. (`current` is always defined here: `stale` is true whenever it is not.)
+            lastSeenAt: matched ? now : (current?.lastSeenAt ?? row.lastSeenAt),
           })
           .where(eq(opportunities.id, row.id));
       }

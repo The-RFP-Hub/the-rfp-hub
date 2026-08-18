@@ -1,0 +1,1 @@
+ALTER TABLE "audit_log" ADD COLUMN "actor_role" "account_role";

@@ -107,6 +107,10 @@ export class PrivyTokenService {
         issuer: PRIVY_ISSUER,
         audience: this.privy.appId,
         algorithms: [PRIVY_ALGORITHM],
+        // `jose` enforces `exp` only when the claim is present — a correctly signed token that
+        // simply omits it would otherwise verify and never expire. `requiredClaims` makes its
+        // absence a verification failure, matching the class comment's stated guarantee.
+        requiredClaims: ["exp"],
       });
       payload = verified.payload;
     } catch {

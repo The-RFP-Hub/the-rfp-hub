@@ -246,6 +246,38 @@ run("M3CLAIM ownership claims", () => {
     expect(res.json().error).toBe("not_a_member");
   });
 
+  it("400s a malformed claim body instead of 500ing on a non-string field", async () => {
+    const id = await seedEntry("malformed-body");
+
+    // A non-string `organizationSlug` used to reach `ClaimService`'s `.trim()` unvalidated: the
+    // plugin's pass-through validator (installed for the opportunity-write routes' humanized
+    // reports) used to apply to this route too. It is now scoped to those two routes only, so
+    // this route gets Fastify's ordinary schema validation.
+    const badType = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(operatorToken),
+      payload: { organizationSlug: {} },
+    });
+    expect(badType.statusCode).toBe(400);
+    expect(badType.json().error).toBe("bad_request");
+
+    const missingBody = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(operatorToken),
+    });
+    expect(missingBody.statusCode).toBe(400);
+
+    const extraProperty = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(operatorToken),
+      payload: { organizationSlug: OPERATOR, unexpected: "nope" },
+    });
+    expect(extraProperty.statusCode).toBe(400);
+  });
+
   it("collapses two colleagues' claims into one pending row, per ORGANISATION", async () => {
     // OPERATOR only SPONSORS here, so both claims queue rather than granting.
     const id = await seedEntry("collapse", [HOST], [OPERATOR]);

@@ -5,12 +5,12 @@
  *
  * Isolation tag: `M3REV` / `m3rev:`.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
-import { opportunities } from "../../src/db/schema.js";
+import { opportunities, orgMemberships } from "../../src/db/schema.js";
 import {
   bearer,
   grantMembership,
@@ -30,6 +30,7 @@ const DIDS = {
   member: "did:privy:m3rev-member",
   reviewer: "did:privy:m3rev-reviewer",
   admin: "did:privy:m3rev-admin",
+  raceMember: "did:privy:m3rev-race-member",
 };
 
 const run = describeWithDb;
@@ -239,6 +240,42 @@ run("M3REV review and administration", () => {
       payload: submission(`${CANDIDATE}:member-again`, CANDIDATE),
     });
     expect(again.json().reviewStatus).toBe("approved");
+  });
+
+  it("serializes two concurrent grants of the same previously-absent membership", async () => {
+    // The read (is there already a membership row?) and the insert are not one atomic step, so two
+    // concurrent grants for the SAME, previously ungranted (account, organisation) pair can both
+    // see no row and both attempt the insert. The unique index lets one in and raises a conflict at
+    // the other; the grant is documented as idempotent, so BOTH requests must come back 200 with
+    // `member: true`, and exactly one row must exist — never a 500 for an otherwise ordinary grant.
+    const fresh = await seedAccount({ did: DIDS.raceMember, handle: "m3rev-race-member" });
+
+    const grant = () =>
+      app.inject({
+        method: "POST",
+        url: `/v1/review/organizations/${CANDIDATE}/members`,
+        headers: bearer(reviewerToken),
+        payload: { accountId: fresh.id, role: "publisher" },
+      });
+    const [first, second] = await Promise.all([grant(), grant()]);
+
+    for (const res of [first, second]) {
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().member).toBe(true);
+      expect(res.json().role).toBe("publisher");
+    }
+
+    const rows = await db
+      .select()
+      .from(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.accountId, fresh.id),
+          eq(orgMemberships.organizationId, candidateOrgId),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.role).toBe("publisher");
   });
 
   it("edits organisation metadata through the reviewer route, audited, without touching verified", async () => {

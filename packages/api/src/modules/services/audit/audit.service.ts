@@ -16,7 +16,9 @@
  *   owner and T3+   → the same, plus the full `patch`.
  *
  * The actor is coarsened for the public view for the same reason: a trail that names which reviewer
- * rejected which entry is an invitation to go and argue with them personally.
+ * rejected which entry is an invitation to go and argue with them personally — and the capacity it
+ * is coarsened by is RECORDED WITH THE ROW rather than looked up when it is read, because a role is
+ * revocable and the trail must say what was true when the action was taken.
  */
 import { and, desc, eq } from "drizzle-orm";
 import { type DbLike, db as defaultDb } from "../../../db/client.js";
@@ -73,6 +75,7 @@ export class AuditService {
       actorKind: entry.actorKind,
       actorAccountId: entry.actorAccountId ?? null,
       actorApiKeyId: entry.actorApiKeyId ?? null,
+      actorRole: await actingRole(tx, entry.actorAccountId),
       action: entry.action,
       patch: (entry.patch ?? null) as Record<string, unknown> | null,
     });
@@ -92,7 +95,12 @@ export class AuditService {
         actorKind: auditLog.actorKind,
         patch: auditLog.patch,
         actorHandle: accounts.handle,
-        actorRole: accounts.globalRole,
+        actorRole: auditLog.actorRole,
+        // ONLY the fallback for rows written before `audit_log.actor_role` existed, which cannot be
+        // backfilled (see the column's comment in `db/schema.ts`). For every row written since, the
+        // stored capacity wins and this is not consulted — which is the whole point: a role change
+        // must not reach backwards through the trail.
+        currentRole: accounts.globalRole,
       })
       .from(auditLog)
       .leftJoin(accounts, eq(accounts.id, auditLog.actorAccountId))
@@ -106,7 +114,7 @@ export class AuditService {
         action: row.action,
         at: row.createdAt.toISOString(),
         actorKind: row.actorKind,
-        actor: publicActor(row.actorKind, row.actorHandle, row.actorRole),
+        actor: publicActor(row.actorKind, row.actorHandle, row.actorRole ?? row.currentRole),
         changedFields: changedFields(patch),
       };
       if (viewer.full) view.patch = patch;
@@ -116,11 +124,41 @@ export class AuditService {
 }
 
 /**
+ * The role the actor holds AS THIS MUTATION COMMITS, read with the writing handle.
+ *
+ * Read here rather than taken from the caller for two reasons. It needs no change at any of the
+ * ~30 places that append a row — a signature that has to be threaded through a dozen services is a
+ * signature somebody will forget, and a forgotten one silently degrades to the old leak. And it is
+ * strictly MORE faithful than the caller's `principal.role`, which was resolved when the bearer was
+ * exchanged and may already be stale: this read sits inside the same transaction as the mutation,
+ * so it answers with the role that was true when the action landed.
+ *
+ * One primary-key lookup per audit row, on a row the writing transaction has usually already
+ * touched.
+ */
+async function actingRole(
+  tx: DbLike,
+  actorAccountId: number | null | undefined,
+): Promise<"submitter" | "reviewer" | "admin" | null> {
+  if (actorAccountId === null || actorAccountId === undefined) return null;
+  const rows = await tx
+    .select({ role: accounts.globalRole })
+    .from(accounts)
+    .where(eq(accounts.id, actorAccountId))
+    .limit(1);
+  return rows[0]?.role ?? null;
+}
+
+/**
  * The coarse actor label.
  *
  * A reviewer or admin is `"reviewer"` whatever their handle: their action was taken in an editorial
  * capacity, and the trail's job is to say that an editor acted, not which one. A submitter is their
  * own public handle, because attribution is the point of a public handle.
+ *
+ * The role passed here is the one STORED with the row (`audit_log.actor_role`), not the one the
+ * account holds today — see the column's comment. Demoting a reviewer must not retroactively put
+ * their handle on everything they ever rejected.
  */
 export function publicActor(
   actorKind: ActorKind,

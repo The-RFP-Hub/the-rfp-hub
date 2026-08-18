@@ -36,6 +36,13 @@
       "when": 1786749706047,
       "tag": "0004_audit_immutability",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787013289854,
+      "tag": "0005_audit_actor_role",
+      "breakpoints": true
     }
   ]
 }

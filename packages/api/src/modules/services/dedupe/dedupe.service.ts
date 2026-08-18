@@ -189,6 +189,7 @@ export class DedupeService {
   private async ensureEmbedding(
     row: OpportunityRow,
     provider: EmbeddingProvider,
+    depth = 0,
   ): Promise<number[]> {
     const text = embeddingTextFor(row);
     const hash = contentHash(text, provider.model, provider.id);
@@ -210,6 +211,19 @@ export class DedupeService {
       vector = await provider.embed(text, controller.signal);
     } finally {
       clearTimeout(timer);
+    }
+
+    // COMPARE-AND-SET AGAINST THE ENTRY'S CURRENT CONTENT, not the snapshot this vector was
+    // computed from. `provider.embed` is a network round trip; if the entry was edited while it was
+    // in flight, an OLDER request finishing after a NEWER one would otherwise overwrite the fresh
+    // vector and content hash with the stale ones, and duplicate search / pair pruning would then
+    // run against content the entry no longer has, until the next backfill pass repairs it. The
+    // depth cap keeps a pathological edit-storm from recursing forever; past it the row is written
+    // anyway — the next `check()` or the backfill cursor corrects it.
+    if (depth < 3) {
+      const fresh = await this.loadRow(row.id);
+      const freshHash = contentHash(embeddingTextFor(fresh), provider.model, provider.id);
+      if (freshHash !== hash) return this.ensureEmbedding(fresh, provider, depth + 1);
     }
 
     await this.db
@@ -538,6 +552,26 @@ export class DedupeService {
       }
       const loser = [...locked.values()].find((row) => row.id !== survivor.id);
       if (!loser) throw conflict("invalid_pair", "a pair must name two distinct entries.");
+
+      // THE OTHER HALF OF THE NO-CHAIN INVARIANT. The check below this one refuses a SURVIVOR that
+      // already points elsewhere; this refuses a LOSER that something else already points AT. Without
+      // it, merging an existing B/C pair with C as survivor and B (already the survivor of an earlier
+      // A/B merge) as loser would create A → B → C: A's `mergedIntoId` still names B, and B is no
+      // longer the immediate — or even the eventual, from a single hop — survivor. `loser` is already
+      // locked above (it is one of `ids`), so nothing else can be mid-way through attaching a NEW
+      // dependent to it: doing that requires locking THIS SAME ROW first, which blocks until this
+      // transaction commits or rolls back.
+      const dependents = await tx
+        .select({ id: opportunities.id })
+        .from(opportunities)
+        .where(eq(opportunities.mergedIntoId, loser.id))
+        .limit(1);
+      if (dependents.length > 0) {
+        throw conflict(
+          "loser_has_dependents",
+          `${JSON.stringify(loser.publicId)} is itself the survivor of an earlier merge; merging it away would chain that earlier loser through it. Merge the earlier loser directly into ${JSON.stringify(survivor.publicId)} instead.`,
+        );
+      }
 
       if (survivor.mergedIntoId !== null) {
         const real = await loadRowById(tx, survivor.mergedIntoId);

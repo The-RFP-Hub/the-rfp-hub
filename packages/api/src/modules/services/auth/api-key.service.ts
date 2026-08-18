@@ -72,19 +72,29 @@ export class ApiKeyService {
     const name = normalizeName(input.name);
     const expiresAt = normalizeExpiry(input.expiresAt);
 
-    const live = await this.db
-      .select({ id: apiKeys.id })
-      .from(apiKeys)
-      .where(and(eq(apiKeys.accountId, accountId), isNull(apiKeys.revokedAt)));
-    if (live.length >= MAX_KEYS_PER_ACCOUNT) {
-      throw badRequest(
-        "too_many_keys",
-        `an account may hold at most ${MAX_KEYS_PER_ACCOUNT} live keys; revoke one before minting another.`,
-      );
-    }
-
     const minted = mintApiKey();
     return this.db.transaction(async (tx) => {
+      // Locks the account row so two concurrent mints for the same account serialize here — the
+      // count-then-insert below is otherwise a check-then-act race that lets both sides observe
+      // 24 live keys and both insert a 25th. The account row is the natural per-account
+      // serialization point; it needs no new advisory-lock namespace.
+      await tx
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(eq(accounts.id, accountId))
+        .for("update");
+
+      const live = await tx
+        .select({ id: apiKeys.id })
+        .from(apiKeys)
+        .where(and(eq(apiKeys.accountId, accountId), isNull(apiKeys.revokedAt)));
+      if (live.length >= MAX_KEYS_PER_ACCOUNT) {
+        throw badRequest(
+          "too_many_keys",
+          `an account may hold at most ${MAX_KEYS_PER_ACCOUNT} live keys; revoke one before minting another.`,
+        );
+      }
+
       const rows = await tx
         .insert(apiKeys)
         .values({
@@ -130,12 +140,31 @@ export class ApiKeyService {
       if (!key) throw notFound(`no api key ${keyId}.`);
       if (key.revokedAt !== null) return key;
 
+      // `revoked_at IS NULL` in the WHERE, not merely in the read above: two concurrent
+      // revocations of the SAME key both read `null` there, and an unconditional UPDATE would let
+      // the second one overwrite the first's timestamp AND write a second audit row claiming
+      // `before: null` — two revocations of one key in an append-only history that is supposed to
+      // record one. The predicate is the compare-and-set (same idiom as `touchLastUsed` below):
+      // only the WINNER's UPDATE matches a row; the loser's affects zero and falls through to the
+      // documented re-revocation no-op.
       const updated = await tx
         .update(apiKeys)
         .set({ revokedAt: new Date() })
-        .where(and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId)))
+        .where(
+          and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId), isNull(apiKeys.revokedAt)),
+        )
         .returning();
-      const row = updated[0] ?? key;
+      const row = updated[0];
+      if (!row) {
+        const current = await tx
+          .select()
+          .from(apiKeys)
+          .where(and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId)))
+          .limit(1);
+        const winner = current[0];
+        if (!winner) throw notFound(`no api key ${keyId}.`);
+        return winner;
+      }
       await this.audit.record(tx, {
         subjectKind: "api_key",
         subjectId: row.id,

@@ -37,6 +37,17 @@
  *   7. **The mutation and its audit row share one transaction**, so history and state commit
  *      together or not at all.
  *
+ * THE DECISION IS MADE UNDER THE ROW LOCK, NOT BEFORE IT. Every step above runs twice: once
+ * unlocked, as a fail-fast that answers the cheap 400/403/404 without opening a transaction, and
+ * once inside `persist`'s transaction against `SELECT … FOR UPDATE` on the row plus a re-proved
+ * membership (`resolvePublishAuthority`). Nothing the unlocked pass derives reaches the write.
+ * Recomputing only the content diff would not be enough: between the two passes a granted claim can
+ * move the namespace, a revocation can remove the authority that was about to auto-publish, and
+ * another writer can replace the whole document — so the namespace, the capabilities, the
+ * ownership and containment checks, the provenance, the requeue decision and the audit patch are
+ * all re-derived from what the lock actually holds. A row that vanished between the two is a 409,
+ * never a silent create.
+ *
  * IDEMPOTENCY WITHOUT A KEY TABLE. A `POST` whose id already exists is compared field by field
  * against the stored row through the same normalized projection that produced it. Byte-identical and
  * from the original submitter → the original result, as a 200: a retried create succeeds instead of
@@ -66,6 +77,10 @@ import { diffFields } from "../../shared/patch.js";
 import { AuditService } from "../audit/audit.service.js";
 import { violatedConstraint } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
+import {
+  type PublishAuthorityResolver,
+  resolvePublishAuthority,
+} from "../auth/publish-authority.js";
 import type { DuplicateCheckResult } from "../dedupe/dedupe.service.js";
 
 /** Per-field caps, enforced before anything is persisted. The body cap is on the route. */
@@ -142,12 +157,21 @@ export interface WriteOptions {
   mode: "create" | "replace";
 }
 
+/** What the decision block derives, from one row and one principal. The namespace is its input. */
+interface WriteDecision {
+  caps: Capabilities;
+  editorial: boolean;
+  /** The document with every attribution field set by the server. */
+  attributed: Opportunity;
+}
+
 export class OpportunityWriteService {
   private readonly audit: AuditService;
 
   constructor(
     private readonly db: DB = defaultDb,
     private readonly hooks: WriteHooks = {},
+    private readonly publishAuthority: PublishAuthorityResolver = resolvePublishAuthority,
   ) {
     this.audit = new AuditService(db);
   }
@@ -191,35 +215,38 @@ export class OpportunityWriteService {
       );
     }
 
-    const existing = await this.findByPublicId(document.id);
-    const namespace = this.authorizationNamespace(document, existing);
-    const caps = effectiveCaps(principal, namespace);
-    // Decided once and carried: it changes what the provenance rules do, what the review status
-    // does, and what the audit row says. Re-deriving it at each of those three would eventually
-    // give three answers.
-    const editorial = isEditorialWrite(principal, caps, existing, namespace);
-    const now = new Date();
-    const attributed = this.applyProvenance(document, {
+    // FAIL-FAST ONLY, and deliberately unlocked: it exists so a malformed, unauthorized or unknown
+    // write is refused without opening a transaction. Everything it derives is ADVISORY and none of
+    // it reaches the write — `persist` derives the same answers again from the locked row.
+    const preview = await this.findByPublicId(document.id);
+    if (options.mode === "replace" && !preview) {
+      throw notFound(`no opportunity ${JSON.stringify(document.id)}.`);
+    }
+    const namespace = this.authorizationNamespace(document, preview);
+    const advisory = this.decide({
       principal,
-      caps,
+      document,
+      existing: preview,
       namespace,
-      now,
-      existing,
-      editorial,
+      mode: options.mode,
+      now: new Date(),
     });
 
-    if (options.mode === "create" && existing) {
+    if (options.mode === "create" && preview) {
       // An identical repeat by the ORIGINAL submitter succeeds; anything else — including a
       // different account reaching for an id that is taken — is one undifferentiated 409. A 403
       // here would confirm to a stranger that the id exists and who it belongs to.
-      const repeat = this.identicalRepeat(principal, attributed, existing);
+      //
+      // Decided on the unlocked read on purpose: neither branch writes anything, and the losing
+      // half of a create/create race is answered by the unique constraint under the lock instead.
+      const repeat = this.identicalRepeat(principal, advisory.attributed, preview);
       if (repeat) {
         // The post-commit work runs for a repeat too. Nothing changed, so the embedding is skipped
         // on its content hash — but the caller gets the SAME answer the original create gave, which
         // is what makes a retry idempotent rather than merely non-destructive.
         const outcome = await this.runAfterCommit({
-          opportunityId: existing.id,
-          publicId: existing.publicId,
+          opportunityId: preview.id,
+          publicId: preview.publicId,
           namespace,
           created: false,
           principal,
@@ -232,8 +259,40 @@ export class OpportunityWriteService {
       );
     }
 
-    if (options.mode === "replace") {
-      if (!existing) throw notFound(`no opportunity ${JSON.stringify(document.id)}.`);
+    return this.persist({
+      principal,
+      document,
+      mode: options.mode,
+      warnings: warnings.map((warning) => warning.message),
+    });
+  }
+
+  /**
+   * The whole write decision, from ONE row and ONE principal: what the caller may do here, whether
+   * this is an editorial write, and the document as the server will store it.
+   *
+   * Pure with respect to the database — it is called once unlocked as a fail-fast and once inside
+   * the writing transaction, and the second answer is the one that lands. The rules that can refuse
+   * a replacement (ownership, and the operating-org containment rule) live here rather than in
+   * `write` for exactly that reason: a caller who lost their authority between the two passes must
+   * be refused by the second one, not carried by the first.
+   */
+  private decide(ctx: {
+    principal: RequestPrincipal;
+    document: Opportunity;
+    existing: OpportunityRow | undefined;
+    namespace: string;
+    mode: "create" | "replace";
+    now: Date;
+  }): WriteDecision {
+    const { principal, document, existing, namespace, mode, now } = ctx;
+    const caps = effectiveCaps(principal, namespace);
+    // Decided once and carried: it changes what the provenance rules do, what the review status
+    // does, and what the audit row says. Re-deriving it at each of those three would eventually
+    // give three answers.
+    const editorial = isEditorialWrite(principal, caps, existing, namespace);
+
+    if (mode === "replace" && existing) {
       if (!mayWriteExisting(principal, caps, existing, namespace)) {
         throw forbidden(
           "not_your_entry",
@@ -274,16 +333,39 @@ export class OpportunityWriteService {
       }
     }
 
-    return this.persist({
-      principal,
+    return {
       caps,
-      namespace,
-      document: attributed,
-      existing,
-      now,
       editorial,
-      warnings: warnings.map((warning) => warning.message),
-    });
+      attributed: this.applyProvenance(document, {
+        principal,
+        caps,
+        namespace,
+        now,
+        existing,
+        editorial,
+      }),
+    };
+  }
+
+  /**
+   * The principal, with the two facts that decide auto-publication re-read inside this transaction.
+   *
+   * `memberships` is narrowed to the ONE namespace being written, deliberately: every consumer
+   * downstream asks about this namespace and nothing else, so keeping the auth-time list for the
+   * account's other organisations would only leave a stale answer lying around where a later change
+   * could consult it.
+   */
+  private async reproveAuthority(
+    tx: Tx,
+    principal: RequestPrincipal,
+    namespace: string,
+  ): Promise<RequestPrincipal> {
+    const authority = await this.publishAuthority(tx, principal.accountId, namespace);
+    return {
+      ...principal,
+      directCreate: authority.directCreate,
+      memberships: authority.member ? [{ slug: namespace, verified: authority.verified }] : [],
+    };
   }
 
   /**
@@ -443,17 +525,93 @@ export class OpportunityWriteService {
     };
   }
 
+  /**
+   * The write itself — and the ONLY place the decision that lands is made.
+   *
+   * The transaction opens with `SELECT … FOR UPDATE` on the row and re-proves the account's
+   * authority over the namespace (`reproveAuthority`), then re-derives everything from those two:
+   * a concurrent replacement, a granted claim that moved the publisher, and a revoked membership
+   * are all visible here and none of them are visible to the unlocked read in `write`.
+   */
   private async persist(ctx: {
     principal: RequestPrincipal;
-    caps: Capabilities;
-    namespace: string;
     document: Opportunity;
-    existing: OpportunityRow | undefined;
-    now: Date;
-    editorial: boolean;
+    mode: "create" | "replace";
     warnings: string[];
   }): Promise<WriteResult> {
-    const { principal, caps, namespace, document, existing, now, editorial } = ctx;
+    const committed = await this.db.transaction(async (tx) => {
+      const locked = await tx
+        .select()
+        .from(opportunities)
+        .where(eq(opportunities.publicId, ctx.document.id))
+        .for("update")
+        .limit(1);
+      const existing = locked[0];
+
+      if (ctx.mode === "create" && existing) {
+        // Created by somebody else between the fail-fast read and this lock. The same answer the
+        // unique constraint would give a statement later, given here so the create path can never
+        // fall into the update branch.
+        throw conflict(
+          "id_conflict",
+          `an opportunity with id ${JSON.stringify(ctx.document.id)} already exists.`,
+        );
+      }
+      if (ctx.mode === "replace" && !existing) {
+        // The row was there when the request was validated and is gone now. A replacement is not a
+        // create, so the only honest answer is that the request lost a race.
+        throw conflict(
+          "write_conflict",
+          `opportunity ${JSON.stringify(ctx.document.id)} was removed while this replacement was being applied.`,
+        );
+      }
+
+      return this.applyWrite(tx, { ...ctx, existing });
+    });
+
+    const outcome = await this.runAfterCommit({
+      opportunityId: committed.row.id,
+      publicId: committed.row.publicId,
+      namespace: committed.namespace,
+      created: committed.created,
+      principal: ctx.principal,
+    });
+
+    return {
+      opportunity: toStandard(committed.row),
+      created: committed.created,
+      reviewStatus: committed.row.reviewStatus,
+      isListed: committed.row.isListed,
+      warnings: ctx.warnings,
+      repeated: false,
+      duplicateCheck: outcome?.duplicateCheck,
+      row: committed.row,
+    };
+  }
+
+  /** Everything inside the lock: re-decide, write the row, write the history. */
+  private async applyWrite(
+    tx: Tx,
+    ctx: {
+      principal: RequestPrincipal;
+      document: Opportunity;
+      mode: "create" | "replace";
+      existing: OpportunityRow | undefined;
+    },
+  ): Promise<{ row: OpportunityRow; namespace: string; created: boolean }> {
+    const { existing } = ctx;
+    const now = new Date();
+    const namespace = this.authorizationNamespace(ctx.document, existing);
+    const principal = await this.reproveAuthority(tx, ctx.principal, namespace);
+    const { caps, editorial, attributed } = this.decide({
+      principal,
+      document: ctx.document,
+      existing,
+      namespace,
+      mode: ctx.mode,
+      now,
+    });
+    const document = attributed;
     const { opp } = fromStandard(document, now);
     const autoApprove = caps.canPublishImmediately;
 
@@ -513,97 +671,72 @@ export class OpportunityWriteService {
 
     const created = existing === undefined;
 
-    const row = await this.db
-      .transaction(async (tx) => {
-        await insertOrganizationStubs(tx, document);
+    await insertOrganizationStubs(tx, document);
 
-        const written =
-          existing === undefined
-            ? await tx.insert(opportunities).values(values).returning()
-            : await tx
-                .update(opportunities)
-                .set(values)
-                .where(eq(opportunities.id, existing.id))
-                .returning();
-        const stored = written[0];
-        if (!stored) throw new Error(`failed to persist ${document.id}`);
-
-        const patch = diffFields(
-          existing ? (comparable(existing) as Record<string, unknown>) : {},
-          comparable(stored) as Record<string, unknown>,
-        );
-        const actor = {
-          actorKind:
-            principal.credentialKind === "api_key" ? ("api_key" as const) : ("user" as const),
-          actorAccountId: principal.accountId,
-          actorApiKeyId: principal.apiKeyId ?? null,
-        };
-        await this.audit.record(tx, {
-          ...actor,
-          subjectKind: "opportunity",
-          subjectId: stored.id,
-          action: created ? "create" : "update",
-          // Recorded ONLY when the writer is acting editorially — a reviewer editing somebody
-          // else's entry, which is the one case where "who wrote this" is not answered by the
-          // entry's own ownership. Stamping the role on every ordinary publisher write would put
-          // `actorRole` in the public `changedFields` of every entry in the corpus, where it is
-          // noise. Recorded at write time rather than read time because a role is revocable and
-          // the trail must say what was true when the action was taken.
-          patch: editorial ? { ...patch, actorRole: principal.role } : patch,
-        });
-        // An auto-approval is a second, separate decision and gets its own row: "created" and
-        // "published without review" are different facts and a reader must be able to see both.
-        if (autoApprove && existing?.reviewStatus !== "approved") {
-          await this.audit.record(tx, {
-            ...actor,
-            subjectKind: "opportunity",
-            subjectId: stored.id,
-            action: "approve",
-            patch: {
-              reviewStatus: { before: existing?.reviewStatus ?? null, after: "approved" },
-              reason: "verified_publisher_namespace",
-            },
-          });
-        }
-        // …and so is the reverse. The audit action enum is closed and gains nothing here: `update`
-        // with a patch naming the transition and its reason says exactly what happened, and the
-        // alternative is an `ALTER TYPE` migration for a verb the trail can already express.
-        if (requeued) {
-          await this.audit.record(tx, {
-            ...actor,
-            subjectKind: "opportunity",
-            subjectId: stored.id,
-            action: "update",
-            patch: {
-              reviewStatus: { before: "approved", after: "pending" },
-              reason: "replaced_without_auto_approval",
-            },
-          });
-        }
-        return stored;
-      })
-      .catch((error: unknown) => {
-        throw translateWriteFailure(error, document);
-      });
-
-    const outcome = await this.runAfterCommit({
-      opportunityId: row.id,
-      publicId: row.publicId,
-      namespace,
-      created,
-      principal,
+    const written = await (existing === undefined
+      ? tx.insert(opportunities).values(values).returning()
+      : tx.update(opportunities).set(values).where(eq(opportunities.id, existing.id)).returning()
+    ).catch((error: unknown) => {
+      // Translated here rather than around the whole transaction so the message is built from the
+      // document as the SERVER attributed it — the only unique keys a client can collide with are
+      // the ones the server chose to accept.
+      throw translateWriteFailure(error, document);
     });
+    const stored = written[0];
+    if (!stored) throw new Error(`failed to persist ${document.id}`);
 
-    return {
-      opportunity: toStandard(row),
-      created,
-      reviewStatus: row.reviewStatus,
-      isListed: row.isListed,
-      warnings: ctx.warnings,
-      repeated: false,
-      duplicateCheck: outcome?.duplicateCheck,
-      row,
+    const patch = diffFields(
+      existing ? (comparable(existing) as Record<string, unknown>) : {},
+      comparable(stored) as Record<string, unknown>,
+    );
+    const actor = {
+      actorKind: principal.credentialKind === "api_key" ? ("api_key" as const) : ("user" as const),
+      actorAccountId: principal.accountId,
+      actorApiKeyId: principal.apiKeyId ?? null,
     };
+    await this.audit.record(tx, {
+      ...actor,
+      subjectKind: "opportunity",
+      subjectId: stored.id,
+      action: created ? "create" : "update",
+      // Recorded ONLY when the writer is acting editorially — a reviewer editing somebody else's
+      // entry, which is the one case where "who wrote this" is not answered by the entry's own
+      // ownership. Stamping the role on every ordinary publisher write would put `actorRole` in the
+      // public `changedFields` of every entry in the corpus, where it is noise. Recorded at write
+      // time rather than read time because a role is revocable and the trail must say what was true
+      // when the action was taken.
+      patch: editorial ? { ...patch, actorRole: principal.role } : patch,
+    });
+    // An auto-approval is a second, separate decision and gets its own row: "created" and
+    // "published without review" are different facts and a reader must be able to see both.
+    if (autoApprove && existing?.reviewStatus !== "approved") {
+      await this.audit.record(tx, {
+        ...actor,
+        subjectKind: "opportunity",
+        subjectId: stored.id,
+        action: "approve",
+        patch: {
+          reviewStatus: { before: existing?.reviewStatus ?? null, after: "approved" },
+          reason: "verified_publisher_namespace",
+        },
+      });
+    }
+    // …and so is the reverse. The audit action enum is closed and gains nothing here: `update`
+    // with a patch naming the transition and its reason says exactly what happened, and the
+    // alternative is an `ALTER TYPE` migration for a verb the trail can already express.
+    if (requeued) {
+      await this.audit.record(tx, {
+        ...actor,
+        subjectKind: "opportunity",
+        subjectId: stored.id,
+        action: "update",
+        patch: {
+          reviewStatus: { before: "approved", after: "pending" },
+          reason: "replaced_without_auto_approval",
+        },
+      });
+    }
+    return { row: stored, namespace, created };
   }
 
   /** The post-commit seam. A hook failure is never allowed to un-store a stored entry. */
@@ -764,8 +897,23 @@ function comparable(row: Record<string, unknown>): Record<string, unknown> {
  * `ux_opp_source` is the cross-system key `(source_system, original_id)`; colliding on it is a
  * different problem from colliding on the public id, and answering "id conflict" for it sends the
  * caller to change the wrong field.
+ *
+ * THE PUBLIC-ID ARM IS THE ONLY ANSWER THE CREATE/CREATE RACE HAS. Two creates of the same absent
+ * id both pass the `FOR UPDATE` lookup — PostgreSQL does not lock a row that is not there — and the
+ * loser's INSERT raises 23505. It is named `opportunities_publicId_unique` (migration 0000), a
+ * drizzle-generated name that carries the COLUMN in camelCase while the column itself is
+ * `public_id`, so matching on the snake_case spelling missed it and turned a 409 into a 500.
+ * Matching a case- and separator-insensitive form covers both spellings and survives a regenerated
+ * constraint name; `test/integration/write-concurrency.test.ts` pins it against the real database.
  */
-function translateWriteFailure(error: unknown, document: Opportunity): unknown {
+function namesPublicId(constraint: string): boolean {
+  return constraint
+    .toLowerCase()
+    .replace(/[^a-z]/g, "")
+    .includes("publicid");
+}
+
+export function translateWriteFailure(error: unknown, document: Opportunity): unknown {
   const constraint = violatedConstraint(error);
   if (constraint === "ux_opp_source") {
     return conflict(
@@ -779,7 +927,7 @@ function translateWriteFailure(error: unknown, document: Opportunity): unknown {
       },
     );
   }
-  if (constraint?.includes("public_id")) {
+  if (constraint !== undefined && namesPublicId(constraint)) {
     return conflict(
       "id_conflict",
       `an opportunity with id ${JSON.stringify(document.id)} already exists.`,

@@ -219,6 +219,46 @@ run("M3VER verification", () => {
     expect(row?.verifiedAgainstSource).toBe(false);
   });
 
+  it("does not let a failed run revert a newer `lastSeenAt` a concurrent successful run committed", async () => {
+    // This run's own successful-write path does not touch `updatedAt` (see the source comment at
+    // verification.service.ts), so a second, overlapping run's compare-and-set against
+    // `updated_at` cannot see that `lastSeenAt` moved. The transport below fires exactly where a
+    // concurrent successful run's commit would land — after this run's OWN pre-fetch snapshot is
+    // taken, before its locked re-read — and this run resolves as a non-match (a soft-404 page),
+    // so it must write back the LOCKED row's `lastSeenAt`, not its own stale snapshot.
+    const id = await seedEntry("no-clock-regression", SOFT_404_URL);
+    const stale = new Date(Date.now() - 60 * 60 * 1000);
+    await db.update(opportunities).set({ lastSeenAt: stale }).where(eq(opportunities.id, id));
+
+    const concurrentlyCommitted = new Date(Date.now() - 30 * 1000);
+    const transport: SourceTransport = async () => {
+      // The "concurrent successful run", modelled as a direct write landing mid-fetch: newer
+      // `lastSeenAt`, `updatedAt` untouched — exactly what the real success path does.
+      await db
+        .update(opportunities)
+        .set({ lastSeenAt: concurrentlyCommitted })
+        .where(eq(opportunities.id, id));
+      return {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+        bytes: Buffer.from(PAGES[SOFT_404_URL].body ?? ""),
+        truncated: false,
+      };
+    };
+
+    const view = await serviceWith(transport).verify(id);
+    expect(
+      view.matched,
+      "the soft-404 page must not match, or this is testing the wrong branch",
+    ).toBe(false);
+
+    const row = (await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1))[0];
+    // Proves the non-stale write branch actually ran (the entry's own content and URL never
+    // changed, so the compare-and-set correctly saw it as current).
+    expect(row?.verifiedAt).toBeTruthy();
+    expect(row?.lastSeenAt?.getTime()).toBe(concurrentlyCommitted.getTime());
+  });
+
   it("flags a redirect that leaves the requested site, without refusing it", async () => {
     const id = await seedEntry("offsite", OFFSITE_URL);
     const view = await serviceWith(fixtureTransport(PAGES)).verify(id);
@@ -333,6 +373,59 @@ run("M3VER verification", () => {
     const scheme = await seedEntry("ssrf-scheme", "file:///etc/passwd");
     const schemeRun = await service.verify(scheme);
     expect(schemeRun.error).toMatch(/scheme_not_allowed/);
+  });
+
+  /**
+   * The rebinding shape: a NAME, not a literal, whose resolution is what decides the destination —
+   * and which is resolved at the hop it is used on rather than inherited from an earlier one.
+   *
+   * This is the case the literal-address tests above cannot reach. `127.0.0.1` in a URL is refused
+   * by looking at the URL; `localhost` is only refused by resolving it, which is the step an
+   * attacker controls the answer to. Doing that resolution ONCE, up front, and then letting the
+   * connection re-resolve is the classic time-of-check/time-of-use hole this fetcher is built to
+   * close — so both hops are checked here, with the same hostname on each, and the second one is
+   * answered by the REAL transport.
+   *
+   * No DNS is mocked. This repository validates through injected seams rather than module mocks,
+   * and `localhost` gives a genuinely-resolved name that lands on a private address, which is
+   * exactly what is needed.
+   */
+  it("resolves a hostname at every hop, so a name that lands on a private address is refused", async () => {
+    const service = serviceWith(undefined, { allowPrivateHosts: false });
+
+    // Hop one: the name is resolved and refused before any connection is attempted.
+    const direct = await seedEntry("ssrf-name-hop1", `http://localhost:${loopbackPort}/`);
+    const directRun = await service.verify(direct);
+    expect(directRun.error, "a hostname that resolves to loopback is refused").toMatch(
+      /address_refused/,
+    );
+    expect(directRun.httpStatus, "no request may have been made").toBeNull();
+
+    // Hop two: a public first hop redirects to that same name. The first hop is injected because a
+    // test cannot make a real public name redirect anywhere; hop two goes through the real
+    // transport, which must resolve and classify the name AGAIN rather than trusting hop one.
+    const { undiciTransport } = await import(
+      "../../src/modules/services/verification/fetcher.service.js"
+    );
+    const hopOne = "https://rebinding.example.org/out";
+    const hybrid: SourceTransport = async (url, options) => {
+      if (url === hopOne) {
+        return {
+          status: 302,
+          headers: { location: `http://localhost:${loopbackPort}/` },
+          bytes: Buffer.alloc(0),
+          truncated: false,
+        };
+      }
+      return undiciTransport(url, options);
+    };
+
+    const rebound = await seedEntry("ssrf-name-hop2", hopOne);
+    const reboundRun = await serviceWith(hybrid, { allowPrivateHosts: false }).verify(rebound);
+    expect(reboundRun.error, "hop two's hostname must be resolved and classified too").toMatch(
+      /address_refused/,
+    );
+    expect(reboundRun.existsAtSource).toBe(false);
   });
 
   // ── the real fetcher, end to end, behind the escape hatch ──────────────────────

@@ -59,20 +59,24 @@ export interface TokenOptions {
   expiresIn?: number;
   issuer?: string;
   audience?: string;
+  /** Omits `exp` entirely — the shape a non-expiring forgery would have. */
+  omitExpiry?: boolean;
 }
 
 /** A signed access token for a DID. */
 export async function mintPrivyToken(did: string, options: TokenOptions = {}): Promise<string> {
   const { privateKey } = await keys();
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({})
+  const builder = new SignJWT({})
     .setProtectedHeader({ alg: "ES256" })
     .setSubject(did)
     .setIssuer(options.issuer ?? "privy.io")
     .setAudience(options.audience ?? TEST_APP_ID)
-    .setIssuedAt(now)
-    .setExpirationTime(now + (options.expiresIn ?? 600))
-    .sign(privateKey);
+    .setIssuedAt(now);
+  if (!options.omitExpiry) {
+    builder.setExpirationTime(now + (options.expiresIn ?? 600));
+  }
+  return builder.sign(privateKey);
 }
 
 /** A token signed by a DIFFERENT key — the forgery case. */
