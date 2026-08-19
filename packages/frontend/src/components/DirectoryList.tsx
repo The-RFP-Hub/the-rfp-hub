@@ -7,7 +7,7 @@
  * client attaches an `Authorization` header only when there is a token to attach, and this component
  * never asks for one — so it renders identically for a signed-in publisher and for somebody who has
  * never seen this deployment before. A signed-in reader is not shown more here: the route serves
- * `approved AND is_listed` entries and nothing else, whoever asks.
+ * `approved AND is_listed` listings and nothing else, whoever asks.
  *
  * EVERY FILTER IS A PARAMETER THE ENDPOINT DECLARES. The list route validates its querystring with
  * `additionalProperties: false`, so an invented filter is a 400 rather than a control that quietly
@@ -15,12 +15,21 @@
  * values themselves are read out of the Standard's schema, so the six funding types and four
  * statuses offered here cannot drift from the ones the API accepts.
  *
- * The list payload is the thin projection — a Standard opportunity minus `fundingDetails` — so the
- * columns below are all fields it actually carries. `deadlines[]` is an array of fixed and rolling
- * entries rather than a single date, and the next-deadline phrase is derived from it exactly as the
- * API derives the key it sorts on.
+ * THE SELECTION LIVES IN THE ADDRESS BAR, not in this component. `searchParams` is the single
+ * source of truth for what is being shown; the local state below is only the DRAFT the reader is
+ * editing. Three bugs died with that change and they were all the same bug:
+ *
+ *   1. A DRAFT WAS SILENTLY DISCARDED. The two free-text boxes were applied on submit while the
+ *      three selects applied on change — so typing "zk" and then choosing a funding type ran a
+ *      search for the funding type alone, with "zk" still sitting on screen looking as though it
+ *      had been used. Every control now commits the WHOLE draft, so what is on screen is what was
+ *      asked for.
+ *   2. BACK WENT NOWHERE USEFUL. Filter, open a listing, press Back — and the reader landed on an
+ *      unfiltered first page having lost the search they came for.
+ *   3. A FILTERED VIEW COULD NOT BE SHARED OR RELOADED.
  */
 import { UntrustedText } from "@/components/UntrustedText";
+import { StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import {
   DEFAULT_SELECTION,
@@ -29,169 +38,304 @@ import {
   ORDERINGS,
   type Ordering,
   STATUSES,
+  SUGGESTED_ECOSYSTEMS,
   directoryQuery,
   isFiltered,
+  selectionFromParams,
+  selectionToHref,
 } from "@/lib/directory";
-import { describeAward, describeDeadline, formatCount } from "@/lib/format";
+import { describeDeadline, formatCount } from "@/lib/format";
+import { HOW_IT_WORKS } from "@/lib/links";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { OpportunitySummary } from "@/lib/types";
 import Link from "next/link";
-import { type FormEvent, useCallback, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 export function DirectoryList() {
   const api = useApi();
-  const [selection, setSelection] = useState<DirectorySelection>(DEFAULT_SELECTION);
-  // The two free-text filters are applied on submit rather than per keystroke: there is no
-  // debounce in this package, and a request per character would be one per character.
-  const [q, setQ] = useState("");
-  const [ecosystem, setEcosystem] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const load = useCallback(() => api.directory.list(directoryQuery(selection)), [api, selection]);
+  // WHAT IS BEING SHOWN — parsed from the URL on every render, so a back button, a reload and a
+  // pasted link all arrive at the same place by the same path.
+  const applied = useMemo(
+    () => selectionFromParams(new URLSearchParams(searchParams?.toString() ?? "")),
+    [searchParams],
+  );
+
+  // WHAT THE READER IS EDITING. Seeded from the URL and re-seeded whenever it changes underneath —
+  // which is what makes the controls follow a back button instead of contradicting it.
+  const [draft, setDraft] = useState<DirectorySelection>(applied);
+  useEffect(() => setDraft(applied), [applied]);
+
+  const load = useCallback(() => api.directory.list(directoryQuery(applied)), [api, applied]);
   const { state, reload } = useResource(load);
 
-  /** Any change to a filter returns to page 1 — page 4 of the previous result is not page 4 of this one. */
-  const apply = (patch: Partial<DirectorySelection>) =>
-    setSelection((current) => ({ ...current, ...patch, page: 1 }));
+  /**
+   * Commit a change. Every commit carries the ENTIRE draft, which is the fix for the discarded-text
+   * bug: there is no path through this component that sends one control's value and drops another's.
+   *
+   * `push`, not `replace`, so each filtering step is a history entry a reader can walk back out of.
+   */
+  const commit = useCallback(
+    (patch: Partial<DirectorySelection>) => {
+      // Any change to a filter returns to page 1 — page 4 of the previous result is not page 4 of
+      // this one. A page change passes `page` explicitly and overrides this.
+      const next = { ...draft, ...patch, page: patch.page ?? 1 };
+      setDraft(next);
+      router.push(selectionToHref(next));
+    },
+    [draft, router],
+  );
 
   const search = (event: FormEvent) => {
     event.preventDefault();
-    apply({ q, ecosystem });
+    commit({});
   };
 
   return (
     <>
-      <form className="filters" onSubmit={search}>
-        <div className="field">
-          <label htmlFor="directory-q">Search</label>
-          <input
-            id="directory-q"
-            type="search"
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            placeholder="Words in the title, summary or description"
-          />
-        </div>
+      {/*
+       * A <search> LANDMARK around the filter bar. Screen-reader users navigate a page by landmark
+       * before they navigate it by control, and "the thing that narrows this list" is one of the two
+       * places anybody arrives on this page wanting to be. The element carries the role natively,
+       * which is why it is an element rather than `role="search"` on the form.
+       */}
+      <search>
+        <form className="filters" onSubmit={search}>
+          <div className={`field${draft.q.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-q">Search</label>
+            <input
+              id="directory-q"
+              type="search"
+              value={draft.q}
+              onChange={(event) => setDraft({ ...draft, q: event.target.value })}
+              placeholder="storage, zk, retrieval…"
+            />
+          </div>
 
-        <div className="field">
-          <label htmlFor="directory-ecosystem">Ecosystem</label>
-          <input
-            id="directory-ecosystem"
-            value={ecosystem}
-            onChange={(event) => setEcosystem(event.target.value)}
-            placeholder="Exactly as the publisher named it"
-          />
-        </div>
+          {/*
+           * A DATALIST, NOT A SELECT. `ecosystems[]` is free text in the Standard — it is whatever a
+           * publisher called their own ecosystem — so a closed list would hide real listings whose
+           * spelling is not in it. This offers the common ones and still accepts anything typed.
+           *
+           * Written assuming the API matches case-insensitively: the live corpus carries both
+           * `Ethereum` and `ethereum`, and `Filecoin` and `filecoin`, so an exact-match filter answers
+           * a reader who typed the wrong case with an empty page about a well-populated ecosystem.
+           */}
+          <div className={`field${draft.ecosystem.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-ecosystem">Ecosystem</label>
+            <input
+              id="directory-ecosystem"
+              list="directory-ecosystems"
+              value={draft.ecosystem}
+              onChange={(event) => setDraft({ ...draft, ecosystem: event.target.value })}
+              placeholder="Any ecosystem"
+            />
+            <datalist id="directory-ecosystems">
+              {SUGGESTED_ECOSYSTEMS.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </div>
 
-        <div className="field">
-          <label htmlFor="directory-type">Funding type</label>
-          <select
-            id="directory-type"
-            value={selection.fundingType}
-            onChange={(event) => apply({ fundingType: event.target.value })}
-          >
-            <option value="">Any</option>
-            {FUNDING_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className={`field${draft.fundingType ? " is-set" : ""}`}>
+            <label htmlFor="directory-type">Funding type</label>
+            <select
+              id="directory-type"
+              value={draft.fundingType}
+              onChange={(event) => commit({ fundingType: event.target.value })}
+            >
+              <option value="">Any type</option>
+              {FUNDING_TYPES.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="field">
-          <label htmlFor="directory-status">Status</label>
-          <select
-            id="directory-status"
-            value={selection.status}
-            onChange={(event) => apply({ status: event.target.value })}
-          >
-            <option value="">Any</option>
-            {STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </div>
+          {/*
+           * THE DEFAULT IS VISIBLE. This control opens holding `open` rather than blank, because the
+           * list it is describing is already narrowed to open opportunities — a filter the reader
+           * cannot see is a filter they cannot undo.
+           */}
+          <div className={`field${draft.status ? " is-set" : ""}`}>
+            <label htmlFor="directory-status">Status</label>
+            <select
+              id="directory-status"
+              value={draft.status}
+              onChange={(event) => commit({ status: event.target.value })}
+            >
+              <option value="">Any status</option>
+              {STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="field">
-          <label htmlFor="directory-order">Order</label>
-          <select
-            id="directory-order"
-            value={selection.ordering}
-            onChange={(event) => apply({ ordering: event.target.value as Ordering })}
-          >
-            {ORDERINGS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="field">
+            <label htmlFor="directory-order">Order by</label>
+            <select
+              id="directory-order"
+              value={draft.ordering}
+              onChange={(event) => commit({ ordering: event.target.value as Ordering })}
+            >
+              {ORDERINGS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="field">
-          <button type="submit">Search</button>
-        </div>
-      </form>
+          <div className="field field-action">
+            <button type="submit" className="button-primary">
+              Search
+            </button>
+          </div>
+        </form>
+      </search>
 
       <ResourceView resource={state} what="the directory" onRetry={reload}>
-        {(list) =>
-          list.items.length === 0 ? (
-            <EmptyState
-              title={
-                isFiltered(selection) ? "Nothing matches those filters." : "Nothing published yet."
-              }
-              detail={
-                isFiltered(selection)
-                  ? "Ecosystem and funding type match exactly; the search box matches words in the title, summary and description."
-                  : "This directory lists entries a reviewer has approved and listed. There are none yet."
-              }
+        {(list) => (
+          <>
+            <ResultLine
+              applied={applied}
+              total={list.total}
+              page={list.page}
+              totalPages={list.totalPages}
+              stale={state.status === "ready" && state.stale}
             />
-          ) : (
-            <>
-              <table>
-                <caption>
-                  {formatCount(list.total)} published{" "}
-                  {list.total === 1 ? "opportunity" : "opportunities"} · page {list.page} of{" "}
-                  {list.totalPages}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Opportunity</th>
-                    <th scope="col">Organisation</th>
-                    <th scope="col">Next deadline</th>
-                    <th scope="col">Award</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => (
-                    <DirectoryRow key={item.id} item={item} />
-                  ))}
-                </tbody>
-              </table>
 
-              <div className="row">
-                <button
-                  type="button"
-                  disabled={list.page <= 1}
-                  onClick={() => setSelection((current) => ({ ...current, page: list.page - 1 }))}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={list.page >= list.totalPages}
-                  onClick={() => setSelection((current) => ({ ...current, page: list.page + 1 }))}
-                >
-                  Next
-                </button>
-              </div>
-            </>
-          )
-        }
+            {list.items.length === 0 ? (
+              <EmptyState
+                title={
+                  isFiltered(applied) ? "Nothing matches those filters." : "Nothing published yet."
+                }
+                detail={
+                  isFiltered(applied)
+                    ? "Funding type and status match exactly; the search box matches words in the title, summary and description."
+                    : "This directory lists opportunities a reviewer has approved and listed. There are none yet."
+                }
+                action={
+                  isFiltered(applied) ? (
+                    <>
+                      <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
+                      <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
+                    </>
+                  ) : (
+                    <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
+                  )
+                }
+              />
+            ) : (
+              <>
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Opportunity</th>
+                        <th scope="col">Organisation</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" className="numeric">
+                          Next deadline
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.items.map((item) => (
+                        <DirectoryRow key={item.id} item={item} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <nav className="pagination" aria-label="Directory pages">
+                  <button
+                    type="button"
+                    disabled={list.page <= 1}
+                    onClick={() => commit({ page: list.page - 1 })}
+                  >
+                    Previous
+                  </button>
+                  <span className="muted">
+                    Page {list.page} of {list.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={list.page >= list.totalPages}
+                    onClick={() => commit({ page: list.page + 1 })}
+                  >
+                    Next
+                  </button>
+                </nav>
+              </>
+            )}
+          </>
+        )}
       </ResourceView>
     </>
+  );
+}
+
+/**
+ * What is on screen, in words, plus the one-click way out of the default narrowing.
+ *
+ * The toggle is a LINK rather than a button so that the state it leads to is an address: it can be
+ * middle-clicked, bookmarked and sent to somebody. That it also happens to make the back button
+ * work is a consequence of the same decision, not a second mechanism.
+ */
+function ResultLine({
+  applied,
+  total,
+  page,
+  totalPages,
+  stale,
+}: {
+  applied: DirectorySelection;
+  total: number;
+  page: number;
+  totalPages: number;
+  stale: boolean;
+}) {
+  const noun = total === 1 ? "opportunity" : "opportunities";
+  const status = applied.status ? `${applied.status} ` : "";
+  const narrowed = applied.status === DEFAULT_SELECTION.status;
+
+  return (
+    <div className="result-line">
+      <p>
+        <strong>
+          {formatCount(total)} {status}
+          {noun}
+        </strong>
+        {applied.ecosystem.trim() ? (
+          <>
+            {" "}
+            on <UntrustedText value={applied.ecosystem.trim()} />
+          </>
+        ) : null}{" "}
+        · page {page} of {totalPages}
+        {stale ? <span className="faint"> · refreshing…</span> : null}
+      </p>
+      {narrowed ? (
+        <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>
+          Include closed and upcoming
+        </Link>
+      ) : applied.status === "" ? (
+        <Link href={selectionToHref({ ...applied, status: DEFAULT_SELECTION.status, page: 1 })}>
+          Show only what is open
+        </Link>
+      ) : (
+        <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>Show every status</Link>
+      )}
+    </div>
   );
 }
 
@@ -202,30 +346,35 @@ export function DirectoryList() {
  * to display — the party that actually runs the intake. Sponsors are a different array and are left
  * to the detail page: naming a backer in a column headed "Organisation" would misattribute who a
  * reader is applying to.
+ *
+ * THE RAW ID IS GONE FROM THE ROW and the publisher's own summary took its place. `acme:round-4`
+ * is a join key: it tells a reader nothing about whether to click, it is the widest thing in the
+ * cell, and it was sitting directly under the title in the position a scanning eye reads second.
+ * The summary is the sentence the publisher wrote to answer exactly that question. The id is still
+ * a click away, in mono, on the listing's own page — where somebody who wants it is looking.
  */
 export function DirectoryRow({ item }: { item: OpportunitySummary }) {
   const operator = item.operatingOrganizations[0];
-  const award = describeAward(item.fundingInfo);
   return (
     <tr>
       <th scope="row">
-        <Link href={`/opportunities/${encodeURIComponent(item.id)}`}>
+        <Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">
           <UntrustedText value={item.title} />
         </Link>
-        <div className="muted">
-          <code>{item.id}</code> · {item.fundingType} · {item.status}
-        </div>
-        {item.ecosystems && item.ecosystems.length > 0 ? (
-          <div className="muted">
-            <UntrustedText value={item.ecosystems.join(", ")} />
+        {item.summary?.trim() ? (
+          <div className="row-summary">
+            <UntrustedText value={item.summary} />
           </div>
         ) : null}
       </th>
-      <td>
+      <td className="muted">
         <UntrustedText value={operator?.name} />
       </td>
-      <td>{describeDeadline(item.deadlines)}</td>
-      <td>{award ? <UntrustedText value={award} /> : <span className="muted">—</span>}</td>
+      <td>{item.fundingType}</td>
+      <td>
+        <StatusBadge status={item.status} />
+      </td>
+      <td className="numeric">{describeDeadline(item.deadlines)}</td>
     </tr>
   );
 }

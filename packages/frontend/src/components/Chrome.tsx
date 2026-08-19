@@ -3,19 +3,23 @@
 /**
  * The application shell: navigation, session state, and the one place a page's access is gated.
  *
- * TWO NAVIGATIONS, because there are two audiences. The public one names the directory and is
- * rendered for everybody, signed in or not — the reads behind it are unauthenticated, so gating the
- * link would be theatre. The Sections one is the publisher's workbench and appears only once the API
- * has said who this is.
+ * THE NAVIGATION IS GROUPED, NOT LISTED. There are three kinds of destination here and a flat row
+ * of seven links says they are peers: what anybody may read (the directory, and the page explaining
+ * who does what), what THIS ACCOUNT owns (its listings, its traffic, its keys), and what a HUB
+ * STAFF ROLE may do (the review queues, accounts and roles). The last group grants power — a click
+ * in it publishes somebody's listing or changes what an account may do — so it is separated by a
+ * rule rather than by a comma. Duplicates left the top level with the same reasoning: it is a view
+ * of your own listings, reached from `/listings`, not a seventh destination competing with them.
  *
- * THE SECTIONS NAVIGATION IS RENDERED FROM `GET /v1/me`, not from anything this client decided.
- * `canReview` and `canAdmin` come back with the account, so the review and administration links
- * appear for the people who hold those capabilities and for nobody else. Hiding a link is
- * presentation, never protection — every one of those routes is enforced on the API, and a
- * hand-typed URL reaches a page that renders the API's own 403.
+ * THE ACCOUNT GROUP IS RENDERED FROM `GET /v1/me`, not from anything this client decided.
+ * `canReview` and `canAdmin` come back with the account, so the staff links appear for the people
+ * who hold those capabilities and for nobody else. Hiding a link is presentation, never protection —
+ * every one of those routes is enforced on the API, and a hand-typed URL reaches a page that
+ * renders the API's own 403.
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
-import { useSession } from "@/lib/session";
+import { HOW_IT_WORKS, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,46 +32,112 @@ interface NavItem {
   requires?: (me: Me) => boolean;
 }
 
-const NAV: NavItem[] = [
-  // The signed-in overview, which used to be `/` before the public directory took that route.
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/listings", label: "Listings" },
-  { href: "/duplicates", label: "Duplicates" },
-  { href: "/keys", label: "API keys", requires: (me) => me.canManageKeys },
-  { href: "/review", label: "Review", requires: (me) => me.canReview },
-  { href: "/admin", label: "Administration", requires: (me) => me.canAdmin },
-  { href: "/account", label: "Account" },
+/** Readable to everybody, session or not. */
+const PUBLIC_NAV: NavItem[] = [
+  { href: "/", label: "Directory" },
+  { href: HOW_IT_WORKS, label: "How it works" },
 ];
+
+/**
+ * This account's own things. `API keys` sits directly under `Account` because that is what it is —
+ * a credential belonging to the account — even though it keeps its own route.
+ *
+ * A FUNCTION RATHER THAN A CONSTANT, because one of these items is derived from the account: an
+ * organisation is a place this account can act, and it belongs beside its listings rather than
+ * behind two clicks on the account page.
+ */
+function accountNav(me: Me): NavItem[] {
+  const organisation = organisationNav(me);
+  return [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/listings", label: "Your listings" },
+    ...(organisation ? [organisation] : []),
+    { href: "/account", label: "Account" },
+    { href: "/keys", label: "API keys", requires: (item) => item.canManageKeys },
+  ];
+}
+
+/**
+ * The organisation link, or none.
+ *
+ * ONE MEMBERSHIP GETS ITS OWN NAME AND ITS OWN ADDRESS. A landing page listing exactly one row is a
+ * click that answers nothing, and "Organisations" as a label for a single named thing is vaguer than
+ * the thing itself. Several memberships need somewhere to choose between them, and none gets no
+ * link at all — an empty destination in a header is a promise the account cannot keep.
+ *
+ * The label for the single case is publisher-supplied text. It is rendered as a text child like
+ * every other untrusted string in this package, never as markup.
+ */
+export function organisationNav(me: Me): NavItem | null {
+  const [only] = me.memberships;
+  if (!only) return null;
+  if (me.memberships.length === 1) {
+    return { href: `/organisations/${encodeURIComponent(only.slug)}`, label: only.name };
+  }
+  return { href: "/organisations", label: "Organisations" };
+}
+
+/**
+ * Hub staff. Both labels say what the destination IS rather than what it is called internally:
+ * "Review" was a verb with no object, and "Administration" named a department rather than the two
+ * things the page actually does.
+ */
+const STAFF_NAV: NavItem[] = [
+  { href: "/review", label: "Review queues", requires: (me) => me.canReview },
+  { href: "/admin", label: "Accounts & roles", requires: (me) => me.canAdmin },
+];
+
+/**
+ * Whether a nav item is the section the reader is in.
+ *
+ * BY PREFIX, not by equality. `/listings/acme:round-4/edit` is inside Listings, and an exact match
+ * left the whole navigation unmarked on every page except a section's index — so the one moment a
+ * reader most needs to know where they are (three levels into a form) was the one moment nothing
+ * said. `/` is exact by necessity: it prefixes everything.
+ */
+export function isCurrent(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string; me: Me | null }) {
+  const visible = items.filter((item) => !item.requires || (me !== null && item.requires(me)));
+  if (visible.length === 0) return null;
+  return (
+    <span className="shell-nav-group">
+      {visible.map((item) => (
+        <Link
+          key={item.href}
+          href={item.href}
+          aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </span>
+  );
+}
 
 export function Chrome({ children }: { children: ReactNode }) {
   const session = useSession();
-  const pathname = usePathname();
+  const api = useApi();
+  const pathname = usePathname() ?? "/";
   const me = session.me.status === "ready" ? session.me.data : null;
 
   return (
     <div className="shell">
       <header className="shell-header">
         <Link href="/" className="brand">
-          RFP Hub <span className="muted">the directory and the workbench</span>
+          RFP Hub
+          <span className="brand-tagline">an open index of funding opportunities</span>
         </Link>
-        <nav aria-label="Public">
-          <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
-            Directory
-          </Link>
+
+        <nav className="shell-nav" aria-label="Sections">
+          <NavGroup items={PUBLIC_NAV} pathname={pathname} me={me} />
+          {me ? <NavGroup items={accountNav(me)} pathname={pathname} me={me} /> : null}
+          {me ? <NavGroup items={STAFF_NAV} pathname={pathname} me={me} /> : null}
         </nav>
-        <nav aria-label="Sections">
-          {me
-            ? NAV.filter((item) => !item.requires || item.requires(me)).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={pathname === item.href ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              ))
-            : null}
-        </nav>
+
         <div className="shell-session">
           {session.error ? (
             <span className="muted">sign-in unavailable</span>
@@ -87,13 +157,26 @@ export function Chrome({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
+
       <main className="shell-main">{children}</main>
+
       <footer className="shell-footer">
-        <p className="muted">
-          The directory republishes what publishers and submitters stated, under one open standard.
-          Analytics here are best-effort — server-side API reads and link-outs, not page views.
-          Nothing on this site is a second authorization system: the API decides.
-        </p>
+        <Link href={HOW_IT_WORKS}>About</Link>
+        <a href={STANDARD} target="_blank" rel="noopener noreferrer">
+          The Standard
+        </a>
+        {/*
+         * The API this build talks to, not a hard-coded one. A preview deployment linking at
+         * production's documentation would be documenting a different API than the one its own
+         * pages are reading.
+         */}
+        <a href={apiDocsUrl(api.baseUrl)} target="_blank" rel="noopener noreferrer">
+          API &amp; data
+        </a>
+        <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
+          GitHub
+        </a>
+        <span className="shell-footer-note">Open data · CC0 exports · MIT code</span>
       </footer>
     </div>
   );
@@ -123,11 +206,14 @@ export function RequireSession({
       <div className="state empty">
         <p className="empty-title">You are not signed in.</p>
         <p className="muted">
-          This page shows one account&rsquo;s own entries and traffic, so it needs a session.
+          This page shows one account&rsquo;s own listings and traffic, so it needs a session.
         </p>
-        <button type="button" onClick={session.login}>
-          Log in
-        </button>
+        <p className="row">
+          <button type="button" className="button-primary" onClick={session.login}>
+            Log in
+          </button>
+          <Link href={HOW_IT_WORKS}>What an account is for</Link>
+        </p>
       </div>
     );
   }
@@ -135,7 +221,14 @@ export function RequireSession({
     return <Loading what="your account" />;
   }
   if (session.me.status === "error") {
-    return <ErrorState error={session.me.error} what="your account" onRetry={session.reloadMe} />;
+    return (
+      <ErrorState
+        error={session.me.error}
+        what="your account"
+        onRetry={session.reloadMe}
+        onLogin={session.login}
+      />
+    );
   }
 
   const me = session.me.data;
@@ -145,7 +238,8 @@ export function RequireSession({
         <p className="empty-title">This account does not have {capability.label}.</p>
         <p className="muted">
           The API is the authority on that — this page is only reporting what it answered for your
-          account. Ask an administrator if you believe it should.
+          account. <Link href={HOW_IT_WORKS}>Who can do what</Link> explains which role holds it;
+          ask an administrator if you believe yours should.
         </p>
       </div>
     );

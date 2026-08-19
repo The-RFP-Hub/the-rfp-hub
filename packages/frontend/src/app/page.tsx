@@ -9,26 +9,43 @@
  * to hold an account here at all. The reads behind this page are unauthenticated, so there was never
  * a technical reason for the wall either.
  *
+ * THE LEDE IS TWO SENTENCES AND THE SECOND ONE IS A DISCLAIMER, deliberately, above the fold and in
+ * the same type size as the promise. What this site is gets one line; what it is NOT — an
+ * application portal — gets the next, because the misunderstanding it prevents is the expensive
+ * one. A reader who thinks they applied here has not applied anywhere.
+ *
  * The sign-in card has not been removed, only demoted: it sits below the directory, and "Log in"
  * stays in the header where it has always been. `/dashboard` is the publisher's own surface and is
  * where the signed-in overview moved to.
  */
 import { DirectoryList } from "@/components/DirectoryList";
-import { AuthUnavailable } from "@/components/states";
+import { AuthUnavailable, Loading } from "@/components/states";
+import { HOW_IT_WORKS } from "@/lib/links";
 import { useSession } from "@/lib/session";
 import Link from "next/link";
+import { Suspense } from "react";
 
 export default function DirectoryPage() {
   return (
     <section>
       <h1>Funding opportunities</h1>
-      <p className="footnote">
-        Every entry a reviewer has approved and listed, republished in one place under a single open
-        standard. Reading it needs no account: search, open an entry and follow it through to the
-        programme&rsquo;s own application page.
+      <p className="lede">
+        An open, neutral index of funding in the Ethereum ecosystem — grants, hackathons, bounties,
+        RFPs. <strong>Free to read, no account.</strong>
+        <br />
+        We link you to each programme&rsquo;s own application page;{" "}
+        <strong>we never take applications ourselves</strong>.
       </p>
 
-      <DirectoryList />
+      {/*
+       * The filter state lives in `searchParams`, which a client component may only read inside a
+       * Suspense boundary — the framework needs somewhere to put the fallback while it resolves
+       * them. The fallback is the same loading state the directory would show anyway, so the
+       * boundary costs a reader nothing.
+       */}
+      <Suspense fallback={<Loading what="the directory" />}>
+        <DirectoryList />
+      </Suspense>
 
       <PublisherInvitation />
     </section>
@@ -51,10 +68,10 @@ function PublisherInvitation() {
     <section className="card" aria-labelledby="publish-heading">
       <h2 id="publish-heading">Do you run one of these programmes?</h2>
       <p className="footnote">
-        The workbench is the other half of this site: submit opportunities, keep them current, and
-        see what they get read and applied for. Signing in creates an account the first time;
-        publishing without review additionally requires membership of a verified organisation, which
-        a reviewer grants.
+        Submit your opportunities, keep them current, and see what they get read and applied for.
+        Signing in creates an account the first time; publishing without review additionally
+        requires membership of a verified organisation, which a reviewer grants.{" "}
+        <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it.
       </p>
       {!session.ready ? (
         <p className="muted">Restoring your session…</p>
@@ -65,7 +82,7 @@ function PublisherInvitation() {
       ) : (
         <>
           <p>
-            <button type="button" onClick={session.login}>
+            <button type="button" className="button-primary" onClick={session.login}>
               Log in
             </button>
           </p>

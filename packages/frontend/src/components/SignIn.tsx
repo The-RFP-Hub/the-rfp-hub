@@ -19,7 +19,11 @@
  */
 import { ActionNote } from "@/components/states";
 import { authClient, describeOtpFailure, describeTransportFailure } from "@/lib/auth-client";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { HOW_IT_WORKS } from "@/lib/links";
+import { useResource } from "@/lib/resource";
+import { useApi } from "@/lib/session";
+import Link from "next/link";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 /** Six digits, as the API mints them (`otpLength: 6`). Used to size and validate the input. */
 const OTP_LENGTH = 6;
@@ -41,23 +45,26 @@ export function SignIn({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   /**
-   * Whether the API turned out to have no Google provider registered.
+   * Whether this deployment offers Google at all — ASKED, not guessed.
    *
-   * ATTEMPT-BASED DETECTION, and the reasoning is worth stating because the alternative looks
-   * cheaper than it is. Nothing the API serves advertises which social providers are configured:
-   * the Better-Auth routes are hidden from the OpenAPI document, `/api/auth/ok` reports liveness
-   * only, and `GET /v1/health` reports the database. The only side-effect-free probe available is
-   * the sign-in call itself, which answers `404 PROVIDER_NOT_FOUND` from its first statement —
-   * before any state row is written — when the provider is absent. So the button is offered, and
-   * removes itself the once if the deployment does not have Google.
+   * `GET /v1/health` now reports `auth.google`, which is a configuration read of the same predicate
+   * the auth instance uses to decide whether to register the provider. So the button is offered only
+   * when the deployment actually has it, rather than rendered hopefully and withdrawn after somebody
+   * presses it — which is what attempt-based detection looks like to the person using it.
    *
-   * The honest cost is one dead click on an email-only deployment. The alternative — probing on
-   * mount — cannot be done without side effects, because the SUCCESS path of that same call writes
-   * an OAuth state row; and a build-time flag would add back the second environment variable this
-   * migration exists to remove. A one-field advertisement on a public endpoint would beat both, and
-   * is the follow-up worth taking.
+   * THE ATTEMPT-BASED WITHDRAWAL IS KEPT AS A FALLBACK, and it is not dead code: an older API answers
+   * `/v1/health` without an `auth` member, and a database outage makes that route 503 so the answer
+   * cannot be read at all. In both cases "the API did not say" is treated as "offer it and find out",
+   * which is strictly better than hiding a working method because a health check was unavailable. A
+   * 404 `PROVIDER_NOT_FOUND` from the sign-in call then withdraws it, exactly as before.
    */
-  const [googleAbsent, setGoogleAbsent] = useState(false);
+  const api = useApi();
+  const loadHealth = useCallback(() => api.health(), [api]);
+  const health = useResource(loadHealth);
+  const advertised = health.state.status === "ready" ? health.state.data.auth?.google : undefined;
+  const [googleWithdrawn, setGoogleWithdrawn] = useState(false);
+  /* Hidden when the API said no; otherwise shown until an attempt proves otherwise. */
+  const showGoogle = advertised !== false && !googleWithdrawn;
 
   const codeInput = useRef<HTMLInputElement>(null);
   // Move to the code box as soon as it exists: the reader's next action is in their mail client and
@@ -168,7 +175,7 @@ export function SignIn({
       });
       // Reached only if the redirect did NOT happen — i.e. the call failed.
       if (error?.status === 404) {
-        setGoogleAbsent(true);
+        setGoogleWithdrawn(true);
         setNote({
           kind: "error",
           message:
@@ -197,7 +204,9 @@ export function SignIn({
       <p className="muted footnote">
         We email you a {OTP_LENGTH}-digit code. There is no password. The first time you sign in,
         this creates your account; publishing without review additionally requires membership of a
-        verified organisation, which a reviewer grants.
+        verified organisation, which a reviewer grants.{" "}
+        <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it — including
+        everything you can already do here without an account.
       </p>
 
       {step === "address" ? (
@@ -253,14 +262,14 @@ export function SignIn({
 
       <ActionNote note={note} />
 
-      {googleAbsent ? null : (
+      {showGoogle ? (
         <>
           <p className="muted signin-or">or</p>
           <button type="button" onClick={() => void continueWithGoogle()} disabled={busy}>
             Continue with Google
           </button>
         </>
-      )}
+      ) : null}
 
       <p className="muted footnote">
         Signing in stores a session token in this browser and sends it to the API, which is the only

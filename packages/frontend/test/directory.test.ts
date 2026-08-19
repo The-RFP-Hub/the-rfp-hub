@@ -8,12 +8,17 @@
  * checked without a running API is here.
  */
 import {
+  ANY_STATUS,
   DEFAULT_SELECTION,
   FUNDING_TYPES,
   ORDERINGS,
   STATUSES,
+  SUGGESTED_ECOSYSTEMS,
   directoryQuery,
   isFiltered,
+  selectionFromParams,
+  selectionToHref,
+  selectionToParams,
 } from "@/lib/directory";
 import { describeAward, describeDeadline, formatAmount, nextFixedDeadline } from "@/lib/format";
 import type { Deadline } from "@/lib/types";
@@ -56,13 +61,33 @@ describe("the directory querystring", () => {
 
     expect(query.q).toBeUndefined();
     expect(query.fundingType).toBeUndefined();
-    expect(query.status).toBeUndefined();
     expect(query.ecosystem).toBeUndefined();
     // The ones that always have a value still do.
     expect(query.sort).toBe("nextDeadlineAt");
     expect(query.order).toBe("asc");
     expect(query.page).toBe(1);
     expect(query.limit).toBe(20);
+  });
+
+  it("OPENS ON OPEN OPPORTUNITIES, and sends that as a real filter", () => {
+    // The default narrows. That is a product decision — most of a public funding register's
+    // readers are looking for something they can still apply to — and it is only defensible
+    // because the control shows the value and the count line offers the way out. This assertion
+    // is the machine-readable half of that decision: if the default ever changes, it changes here
+    // first, deliberately, rather than by somebody editing an initial-state literal.
+    expect(DEFAULT_SELECTION.status).toBe("open");
+    expect(directoryQuery(DEFAULT_SELECTION).status).toBe("open");
+  });
+
+  it("offers ecosystem suggestions that are suggestions, not a permitted set", () => {
+    // The control is a datalist over these, plus anything the reader types: `ecosystems[]` is free
+    // text in the Standard, and a closed list would hide real listings whose spelling is not here.
+    expect(SUGGESTED_ECOSYSTEMS.length).toBeGreaterThan(5);
+    expect(SUGGESTED_ECOSYSTEMS).toContain("Ethereum");
+    // Nothing filters against it — a typed value that is not on the list is passed through whole.
+    expect(directoryQuery({ ...DEFAULT_SELECTION, ecosystem: "Nowhere Chain" }).ecosystem).toBe(
+      "Nowhere Chain",
+    );
   });
 
   it("trims what the reader typed", () => {
@@ -103,9 +128,73 @@ describe("the directory querystring", () => {
   });
 
   it("knows whether an empty result means 'none' or 'none match'", () => {
-    expect(isFiltered(DEFAULT_SELECTION)).toBe(false);
-    expect(isFiltered({ ...DEFAULT_SELECTION, q: "  " })).toBe(false);
-    expect(isFiltered({ ...DEFAULT_SELECTION, ecosystem: "Base" })).toBe(true);
+    // The DEFAULT view is now a filtered one, so an empty result on it reads as "nothing matches"
+    // and offers the way out — not as "nothing has ever been published here", which would be a
+    // lie told to somebody who had merely picked a quiet status.
+    expect(isFiltered(DEFAULT_SELECTION)).toBe(true);
+    const unfiltered = { ...DEFAULT_SELECTION, status: "" };
+    expect(isFiltered(unfiltered)).toBe(false);
+    expect(isFiltered({ ...unfiltered, q: "  " })).toBe(false);
+    expect(isFiltered({ ...unfiltered, ecosystem: "Base" })).toBe(true);
+  });
+});
+
+/**
+ * THE ADDRESS BAR IS THE FILTER STATE.
+ *
+ * Three user-visible failures were the same missing round trip: Back landed on an unfiltered page,
+ * a filtered view could not be shared, and a reload lost the search. These assertions are what stop
+ * that regressing, and the awkward case — `status` — is the one worth reading. The selection's
+ * empty string means "every status" while the DEFAULT is "open", so an absent parameter cannot mean
+ * "empty" or the "Include closed and upcoming" link would have no address to point at.
+ */
+describe("the directory's URL state", () => {
+  const roundTrip = (selection: Parameters<typeof selectionToParams>[0]) =>
+    selectionFromParams(selectionToParams(selection));
+
+  it("survives a round trip through the address bar", () => {
+    const selection = {
+      ...DEFAULT_SELECTION,
+      q: "zk proofs",
+      ecosystem: "Optimism",
+      fundingType: "grant",
+      status: "closed",
+      ordering: "updatedAt:desc" as const,
+      page: 4,
+    };
+    expect(roundTrip(selection)).toEqual(selection);
+  });
+
+  it("writes nothing that is at its default, so the front page keeps a clean URL", () => {
+    expect(selectionToParams(DEFAULT_SELECTION).toString()).toBe("");
+    expect(selectionToHref(DEFAULT_SELECTION)).toBe("/");
+  });
+
+  it("distinguishes 'the reader turned the status filter off' from 'the reader chose nothing'", () => {
+    const everything = { ...DEFAULT_SELECTION, status: "" };
+    // Turning it off is an explicit, linkable value...
+    expect(selectionToParams(everything).get("status")).toBe(ANY_STATUS);
+    expect(selectionFromParams(new URLSearchParams("status=any")).status).toBe("");
+    // ...and an ABSENT parameter is the default, not "everything".
+    expect(selectionFromParams(new URLSearchParams("")).status).toBe("open");
+  });
+
+  it("ignores a hand-edited value the API would answer with a 400", () => {
+    // A bad URL lands the reader on the directory, not on an error panel: every one of these is a
+    // parameter the list endpoint validates, so forwarding it would turn a typo into a 400.
+    const parsed = selectionFromParams(
+      new URLSearchParams("type=not-a-type&status=nonsense&sort=title:asc&page=-3"),
+    );
+    expect(parsed.fundingType).toBe("");
+    expect(parsed.status).toBe(DEFAULT_SELECTION.status);
+    expect(parsed.ordering).toBe(DEFAULT_SELECTION.ordering);
+    expect(parsed.page).toBe(1);
+  });
+
+  it("keeps free text verbatim, including the characters a querystring has to escape", () => {
+    const selection = { ...DEFAULT_SELECTION, q: "zk & rollups", ecosystem: "ZKsync Era" };
+    expect(roundTrip(selection)).toEqual(selection);
+    expect(selectionToHref(selection)).toContain("?");
   });
 });
 

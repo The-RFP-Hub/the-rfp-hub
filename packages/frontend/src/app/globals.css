@@ -1,26 +1,40 @@
 /*
  * One stylesheet, plain CSS, no framework.
  *
- * The frontend is a dozen data-dense screens for a handful of operators. A utility framework or a
+ * The frontend is a public register plus a dozen data-dense work screens. A utility framework or a
  * component library would be more bytes and another supply-chain surface than the whole of the rest
- * of this package, for layout a stylesheet does in a couple of hundred lines.
+ * of this package, for layout a stylesheet does in a few hundred lines.
  *
- * System fonts only — no font is fetched from a third party, which keeps `font-src` at `'self'` and
- * keeps every reader's IP off somebody else's CDN.
+ * FONTS ARE SELF-HOSTED, not linked. The three families arrive as `--font-display`, `--font-body`
+ * and `--font-mono` from `lib/fonts.ts`, which downloads them at BUILD time and serves them from
+ * this origin — so `font-src` stays `'self'` and no reader's address reaches a font CDN. See that
+ * module for the whole argument.
+ *
+ * THE PALETTE IS DELIBERATELY COLOURLESS: near-black ink on warm near-white paper, warm grays, no
+ * brand accent and no hue that carries meaning. Status, emphasis and hierarchy are typographic —
+ * weight, size, case, border style — which is also what makes every state on this site legible to a
+ * colourblind reader by construction rather than by audit. `--ok`, `--warn` and `--bad` do not
+ * exist here any more; if a state matters, it is said in words.
  */
 
 :root {
-  --ink: #16181d;
-  --ink-soft: #5b6270;
-  --line: #dfe3ea;
-  --bg: #ffffff;
-  --bg-soft: #f6f7f9;
-  --accent: #1f4fd8;
-  --ok: #10693c;
-  --warn: #8a5a00;
-  --bad: #a11b1b;
+  /* Paper and ink. */
+  --paper: #fcfcfa;
+  --ink: #1a1917;
+  /* Warm grays, light to dark: hairline, rule, panel fill, secondary ink. */
+  --line-faint: #e8e6e1;
+  --line: #d6d3ce;
+  --panel: #f4f3f0;
+  --ink-soft: #57534e;
+  --ink-faint: #a8a29e;
+
   --radius: 6px;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Kept as aliases so a rule written against the old names still resolves while pages migrate. */
+  --bg: var(--paper);
+  --bg-soft: var(--panel);
+
+  font-family: var(--font-body), -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -30,45 +44,107 @@
 body {
   margin: 0;
   color: var(--ink);
-  background: var(--bg);
+  background: var(--paper);
   font-size: 15px;
   line-height: 1.5;
 }
 
+/*
+ * Headings are the display face, and they are the only place it appears. Tight tracking at size is
+ * what makes an 800 weight read as institutional rather than as shouting.
+ */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+h1 {
+  font-weight: 800;
+  font-size: 1.95rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin: 1.6rem 0 0.5rem;
+}
+
+h3 {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/*
+ * Links are ink, not paint — underlined, because the underline is what marks them once the colour
+ * does not. The hover thickens the rule rather than changing the hue.
+ */
 a {
-  color: var(--accent);
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
 }
 
 code {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  font-size: 0.9em;
-  background: var(--bg-soft);
-  padding: 0.1em 0.3em;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  font-size: 0.88em;
+  background: var(--panel);
+  padding: 0.1em 0.4em;
   border-radius: 3px;
 }
 
 button {
   font: inherit;
   color: inherit;
-  background: var(--bg);
+  background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 0.35rem 0.7rem;
+  padding: 0.35rem 0.8rem;
   cursor: pointer;
 }
 
 button:hover {
-  border-color: var(--accent);
+  border-color: var(--ink);
 }
 
-button[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: #eef2fe;
+button[aria-pressed="true"],
+button[aria-selected="true"] {
+  border-color: var(--ink);
+  background: var(--panel);
+  font-weight: 600;
 }
 
 button:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
+}
+
+/*
+ * THE ONE CONSEQUENTIAL BUTTON SHAPE. Filled ink, on the action a page exists for — applying,
+ * submitting, publishing. It is deliberately the only filled thing on any screen, so that "this
+ * one does the thing" needs no colour to say it.
+ */
+.button-primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  font-weight: 700;
+  padding: 0.55rem 1.15rem;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.button-primary:hover {
+  background: #000;
+  text-decoration: none;
 }
 
 input,
@@ -76,15 +152,24 @@ select,
 textarea {
   font: inherit;
   color: inherit;
-  background: var(--bg);
+  background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.35rem 0.5rem;
   width: 100%;
 }
 
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
 textarea {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   min-height: 8rem;
 }
 
@@ -94,12 +179,58 @@ table {
   margin: 0.75rem 0;
 }
 
+/*
+ * Column headers are labels, not content: small, upper, tracked, secondary ink, over a heavy rule.
+ * The heavy rule under the head and the hairline between rows is the whole table idiom here.
+ */
+thead th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 0.5rem;
+}
+
 th,
 td {
   text-align: left;
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid var(--line);
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--line-faint);
   vertical-align: top;
+}
+
+/*
+ * A ROW HEADER IS A HEADER SEMANTICALLY, NOT VISUALLY. `<th scope="row">` on the first cell is what
+ * tells a screen reader which column labels the rest of the row, and the user agent renders it
+ * bold — which put the summary line, the id and every other secondary thing inside that cell in the
+ * same weight as the title. Emphasis is applied deliberately in this package (`.row-title`), so the
+ * cell itself is reset to the reading weight and the bold goes back to meaning something.
+ */
+tbody th[scope="row"] {
+  font-weight: 400;
+}
+
+th:first-child,
+td:first-child {
+  padding-left: 0;
+}
+
+th:last-child,
+td:last-child {
+  padding-right: 0;
+}
+
+/*
+ * Numbers align on their digits, and they align on each other. `nowrap` because the things in this
+ * column are dates and counts: "23 Aug 18:30 UTC" broken over two lines reads as two facts, and a
+ * column of two-line dates loses the vertical rhythm that made it scannable in the first place.
+ */
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 caption {
@@ -108,74 +239,165 @@ caption {
   padding-bottom: 0.4rem;
 }
 
+/*
+ * EVERY TABLE GETS ONE. A table wider than its column scrolls inside this rather than pushing the
+ * page sideways — on a phone the alternative is a horizontal scrollbar on the document and a
+ * header that has drifted off the left edge.
+ */
+.table-scroll {
+  overflow-x: auto;
+  /* Keeps a focus ring on a cell from being clipped by the scroll container. */
+  padding: 2px;
+  margin: 0 -2px;
+}
+
+/* ------------------------------------------------------------------ the shell --- */
+
 .shell {
-  max-width: 1080px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 0 1.25rem 4rem;
+  padding: 0 2rem 3rem;
 }
 
 .shell-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--line);
+  align-items: baseline;
+  gap: 1rem 1.75rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--ink);
+}
+
+.brand {
+  font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand-tagline {
+  display: block;
+  font-family: var(--font-body), sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-soft);
 }
 
 /*
- * Two navigations share the header: the public one (the directory, shown to everybody) and the
- * role-gated Sections one. Only the LAST takes the free space, so the public link sits next to the
- * brand it belongs with rather than drifting to the middle of an empty header when nobody is
- * signed in.
+ * THREE NAVIGATIONS, GROUPED AND VISIBLY SEPARATED: what anybody may read, what this account owns,
+ * and what a staff role may do. They are one row with rules between the groups rather than one
+ * undifferentiated list, because "Directory" and "Accounts & roles" are not peers and a flat list
+ * says they are.
  */
-.shell-header nav {
+.shell-nav {
   display: flex;
-  gap: 0.9rem;
-}
-
-.shell-header nav:last-of-type {
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 1.1rem;
+  font-size: 14px;
   flex: 1;
 }
 
-.shell-header nav a[aria-current="page"] {
-  font-weight: 600;
-  text-decoration: underline;
+.shell-nav-group {
+  display: flex;
+  align-items: baseline;
+  gap: 1.1rem;
+  padding-right: 1.1rem;
+  border-right: 1px solid var(--line);
+}
+
+.shell-nav-group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.shell-nav a {
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.shell-nav a:hover {
+  border-bottom-color: var(--line);
+}
+
+.shell-nav a[aria-current="page"] {
+  font-weight: 700;
+  border-bottom-color: var(--ink);
 }
 
 .shell-session {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-}
-
-.brand {
-  font-weight: 700;
-  text-decoration: none;
-  color: var(--ink);
+  font-size: 14px;
+  margin-left: auto;
 }
 
 .shell-main {
-  padding: 1.5rem 0;
+  padding: 2rem 0 0;
 }
 
 .shell-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
   border-top: 1px solid var(--line);
-  padding-top: 1rem;
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.shell-footer a {
+  color: var(--ink-soft);
+}
+
+.shell-footer-note {
+  margin-left: auto;
+}
+
+/* ------------------------------------------------------------------- reading --- */
+
+.lede {
+  max-width: 68ch;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+  margin: 0 0 1.75rem;
+}
+
+.lede strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .muted {
   color: var(--ink-soft);
 }
 
+.faint {
+  color: var(--ink-faint);
+}
+
 .footnote {
   font-size: 0.9em;
-  max-width: 60ch;
+  max-width: 68ch;
+}
+
+.prose {
+  max-width: 70ch;
 }
 
 .row-between {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
@@ -186,6 +408,13 @@ caption {
   gap: 0.6rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: flex-start;
 }
 
 .segmented {
@@ -213,69 +442,133 @@ caption {
   border: 0;
 }
 
+/* -------------------------------------------------------------------- states --- */
+
 .state {
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--bg-soft);
+  background: var(--panel);
+  display: block;
 }
 
+/*
+ * AN ERROR IS A HEAVIER RULE, NOT A RED ONE. It has to read as consequential without hue: two solid
+ * ink pixels down the leading edge is louder than a pink panel and survives greyscale, print and a
+ * colourblind reader.
+ */
 .state.error {
-  border-color: #f0c4c4;
-  background: #fdf5f5;
+  background: var(--paper);
+  border-color: var(--line);
+  border-left: 3px solid var(--ink);
+}
+
+/*
+ * LOADING RESERVES ITS HEIGHT. Without this the skeleton is one line tall, the content that
+ * arrives is twenty, and everything below jumps — including whatever the reader was reaching for.
+ */
+.state.loading {
+  min-height: 8rem;
+  color: var(--ink-soft);
 }
 
 .empty-title {
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 0.25rem;
+}
+
+.state p:last-child {
+  margin-bottom: 0;
 }
 
 .note {
   margin: 0.4rem 0;
+  display: block;
 }
 
 .note.ok {
-  color: var(--ok);
+  font-weight: 600;
 }
 
 .note.error {
-  color: var(--bad);
+  font-weight: 600;
+  border-left: 3px solid var(--ink);
+  padding-left: 0.6rem;
 }
 
+/* -------------------------------------------------------------------- badges --- */
+
+/*
+ * STATUS IS TYPOGRAPHIC. Four shapes, no hue, each one legible as a word before it is legible as a
+ * shape: a bordered box is live, a filled box is finished, a dashed box is provisional, and struck
+ * muted text is refused. Printed in black and white, or read by somebody who sees no colour at
+ * all, every one of them still says what it says.
+ */
 .badge {
   display: inline-block;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0 0.55rem;
-  font-size: 0.82em;
-  background: var(--bg-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  padding: 2px 8px;
   white-space: nowrap;
+  background: transparent;
+  color: var(--ink);
 }
 
+/* Live, current, included: an outline. */
+.badge-open,
 .badge-approved,
 .badge-listed,
 .badge-verified,
 .badge-matched {
-  color: var(--ok);
-  border-color: #bfe3cd;
-  background: #f2fbf6;
+  border-style: solid;
 }
 
+/* Finished, decided, closed: filled ink. The heaviest thing in the row, because it is terminal. */
+.badge-closed,
+.badge-archived {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Provisional — waiting on somebody: a dashed outline in secondary ink. */
 .badge-pending,
+.badge-upcoming,
 .badge-unverified,
 .badge-unknown {
-  color: var(--warn);
-  border-color: #ecd9ab;
-  background: #fdf9f0;
+  border-style: dashed;
+  border-color: var(--ink-soft);
+  color: var(--ink-soft);
 }
 
+/* Refused: struck through and quiet. Nothing is going to happen to it. */
 .badge-rejected,
 .badge-unlisted,
 .badge-unmatched {
-  color: var(--bad);
-  border-color: #f0c4c4;
-  background: #fdf5f5;
+  border-color: var(--line);
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
 }
+
+/* A badge that carries its explanation beside it rather than only in a tooltip. */
+.badge-labelled {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.badge-labelled .badge-gloss {
+  font-size: 0.85em;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* --------------------------------------------------------------------- tiles --- */
 
 .tiles {
   display: flex;
@@ -296,9 +589,11 @@ caption {
 }
 
 .tile-value {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .tile-label {
@@ -313,13 +608,13 @@ caption {
 .chart-svg {
   width: 100%;
   height: 180px;
-  background: var(--bg-soft);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
 
 .bar {
-  fill: var(--accent);
+  fill: var(--ink);
 }
 
 .bar-zero {
@@ -342,11 +637,54 @@ caption {
   flex-wrap: wrap;
 }
 
+/*
+ * A SECTION RULE, not a heading that happens to be bold.
+ *
+ * The same small/upper/tracked label as a table's column head, over the same two-pixel rule — so a
+ * section title and the header of the table beneath it read as one object rather than two competing
+ * headings. `-quiet` is the same shape at lower contrast, for a section that is subordinate to the
+ * one above it (search results under the curated lists) rather than its peer.
+ */
+.section-head {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 1.75rem 0 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.section-head-quiet {
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.9rem 1rem;
   margin: 0.75rem 0;
+}
+
+/* The one card that is an instruction rather than a container: two solid pixels, per the mock. */
+.card-strong {
+  border: 2px solid var(--ink);
+}
+
+/*
+ * A confirmation is a `<fieldset>`, which arrives with user-agent padding and an inline-ish
+ * intrinsic width that fights the card. `min-inline-size: 0` is the one that matters: without it a
+ * fieldset refuses to shrink below its content and pushes a table sideways.
+ */
+.confirm {
+  min-inline-size: 0;
+  max-width: 46rem;
+}
+
+.confirm > legend {
+  padding: 0 0.35rem;
+  margin-left: -0.35rem;
 }
 
 .field {
@@ -391,36 +729,129 @@ ul.plain {
   margin: 0;
 }
 
+/* ------------------------------------------------------------ the directory --- */
+
 /*
- * The directory's filter bar. Every control is a `.field`, so it inherits the label and input
- * styling every form in this package uses; the row only decides how they sit next to each other.
+ * The filter bar. Every control is a `.field`, so it inherits the label and input styling every
+ * form in this package uses; the row only decides how they sit next to each other.
  */
 .filters {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0 1rem;
-  margin: 1rem 0;
-  padding: 0.2rem 1rem 0.9rem;
-  border: 1px solid var(--line);
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.5rem;
+  padding: 1rem;
   border-radius: var(--radius);
-  background: var(--bg-soft);
+  background: var(--panel);
 }
 
 .filters .field {
+  margin: 0;
   flex: 1 1 11rem;
   max-width: 20rem;
 }
 
+/*
+ * Filter labels are the same small-caps as a column header, because they name the same thing: the
+ * axis, not the value.
+ */
+.filters label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
 /* The submit button sizes to its text rather than stretching across a column of its own. */
-.filters .field:last-child {
+.filters .field-action {
   flex: 0 0 auto;
+}
+
+/*
+ * A FILTER THAT IS NARROWING THE RESULT LOOKS DIFFERENT FROM ONE THAT IS NOT. The directory opens
+ * on `status: open`, which is a real filter with a real effect, so the control that holds it is
+ * inked and weighted rather than sitting silently at a default the reader cannot see.
+ */
+.filters .is-set select,
+.filters .is-set input {
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.result-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0 0.6rem;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.result-line strong {
+  color: var(--ink);
+}
+
+/* The title cell: a bold link, and the publisher's own summary line under it. */
+.row-title {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.row-title:hover {
+  text-decoration: underline;
+}
+
+.row-summary {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  /* Two lines at most: the summary is orientation, and a six-line cell stops the table scanning. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * The same secondary line WITHOUT the clamp, for a table that is being read rather than scanned.
+ * The role matrix on /how-it-works is reference material: truncating "The Hub never takes
+ * applications" to "The Hub never takes…" on the one page that exists to answer that question is
+ * the clamp doing exactly the wrong thing.
+ */
+.cell-note {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  max-width: 46ch;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
 }
 
 .untrusted-block {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-width: 70ch;
+}
+
+pre.untrusted-block {
+  font-family: var(--font-mono), ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  overflow-x: auto;
 }
 
 /*
@@ -436,7 +867,7 @@ ul.plain {
   justify-content: center;
   padding: 2rem 1rem;
   overflow-y: auto;
-  background: rgba(22, 24, 29, 0.45);
+  background: rgba(26, 25, 23, 0.45);
   z-index: 10;
 }
 
@@ -449,7 +880,7 @@ ul.plain {
   position: static;
   width: 100%;
   max-width: 26rem;
-  background: var(--bg);
+  background: var(--paper);
   color: inherit;
   margin: 0;
 }
@@ -464,10 +895,27 @@ ul.plain {
 }
 
 .secret {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono), ui-monospace, Menlo, monospace;
   word-break: break-all;
-  background: #fdf9f0;
-  border: 1px solid #ecd9ab;
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.6rem;
+}
+
+/* ---------------------------------------------------------------- narrow --- */
+
+@media (max-width: 40rem) {
+  .shell {
+    padding: 0 1rem 3rem;
+  }
+
+  .shell-nav-group {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
 }

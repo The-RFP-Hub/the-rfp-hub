@@ -1,4 +1,5 @@
 import { Chrome } from "@/components/Chrome";
+import { fontVariables } from "@/lib/fonts";
 import { AppProviders } from "@/lib/session";
 import type { Metadata } from "next";
 import "./globals.css";
@@ -6,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RFP Hub — funding opportunities",
   description:
-    "Browse published funding opportunities under one open standard, and — for publishers — submit and maintain them, read their traffic, and run the review queues.",
+    "An open index of funding opportunities under one standard: read it without an account, and — for publishers — submit and maintain listings, read their traffic, and run the review queues.",
   /*
    * INDEXING STAYS OFF, even though half of this app is now public.
    *
@@ -34,9 +35,19 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * The font variables go on `<html>`, once.
+ *
+ * `next/font` emits the `@font-face` rules and a class that declares `--font-display`,
+ * `--font-body` and `--font-mono`; the stylesheet consumes those variables and nothing else knows
+ * a family name. Putting the class on the root element is what puts them in scope for the whole
+ * tree, including the sign-in dialog, which renders in a portal-free overlay but still inherits
+ * from here. NOTHING IS FETCHED AT RUNTIME — see `lib/fonts.ts` for why `font-src 'self'` is
+ * untouched by this.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={fontVariables}>
       <body>
         <AppProviders>
           <Chrome>{children}</Chrome>
