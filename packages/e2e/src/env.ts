@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 /**
  * The environment every child process gets — built from `{}`, never inherited.
  *
@@ -26,11 +27,9 @@
  * `packages/api/.env`. That file is read once, read-only, for the Privy credentials, and never
  * written.
  */
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parse as parseDotenv } from "dotenv";
-import { presence, register } from "./redact.js";
+import { register } from "./redact.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(here, "..", "..", "..");
@@ -56,59 +55,23 @@ function baseEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-// ── tenant credentials ────────────────────────────────────────────────────────────────────────
-
-export interface TenantCredentials {
-  appId: string | undefined;
-  /** Stays in the runner. Never reaches an API process — see `apiEnv`. */
-  appSecret: string | undefined;
-  verificationKey: string | undefined;
-  /** Where each value came from, for the preflight report. Presence only, never a value. */
-  report: Record<
-    string,
-    { source: "environment" | "packages/api/.env" | "none"; presence: string }
-  >;
-}
+// ── the identity secret ─────────────────────────────────────────────────────────────────────────
 
 /**
- * Reads the Privy app credentials, preferring real environment variables and falling back to
- * `packages/api/.env`.
+ * The signing secret for this run's sessions.
  *
- * The file is parsed with `dotenv.parse` on a string this function read itself — NOT
- * `dotenv.config()`, which would mutate `process.env` of the runner and, through it, of anything
- * that later built an environment less carefully than this module does. Reading is the whole
- * contract: nothing here writes to that file, and `scripts/check-deploy.mjs` independently
- * guarantees it never enters a build context.
+ * Generated per run and thrown away with it. There is no tenant to borrow one from any more, and
+ * nothing outside this process needs to verify a token it did not issue — so a fresh random secret
+ * is strictly better than a configured one: two concurrent runs cannot accept each other's sessions
+ * even by accident.
+ *
+ * It IS a long-lived secret for the length of the run (it signs every token), so it is registered
+ * with the redactor and the end-of-run artifact scan searches for it.
  */
-export function readTenantCredentials(): TenantCredentials {
-  let fromFile: Record<string, string> = {};
-  try {
-    fromFile = parseDotenv(readFileSync(join(apiDir, ".env"), "utf8"));
-  } catch {
-    // Absent or unreadable is a normal state — the preflight reports it and the ladder degrades.
-  }
-
-  const report: TenantCredentials["report"] = {};
-  const pick = (key: string): string | undefined => {
-    const fromEnv = process.env[key];
-    const value = fromEnv ?? fromFile[key];
-    report[key] = {
-      source: fromEnv ? "environment" : fromFile[key] ? "packages/api/.env" : "none",
-      presence: presence(value),
-    };
-    return value || undefined;
-  };
-
-  const appId = pick("PRIVY_APP_ID");
-  const appSecret = pick("PRIVY_APP_SECRET");
-  const verificationKey = pick("PRIVY_VERIFICATION_KEY");
-
-  // The app secret is the run's most consequential long-lived secret: it is a standing credential
-  // for a real tenant. Registering it here means the end-of-run artifact scan is looking for it
-  // whether or not any code path ever printed it.
-  register(appSecret, { label: "privy-app-secret", longLived: true });
-
-  return { appId, appSecret, verificationKey, report };
+export function newAuthSecret(): string {
+  const secret = randomBytes(32).toString("base64url");
+  register(secret, { label: "better-auth-secret", longLived: true });
+  return secret;
 }
 
 // ── the API child ─────────────────────────────────────────────────────────────────────────────
@@ -117,8 +80,17 @@ export interface ApiEnvInput {
   /** The RESTRICTED runtime role's URL. Least privilege is the point; see `postgres.ts`. */
   databaseUrl: string;
   port: number;
-  appId: string | undefined;
-  verificationKey: string | undefined;
+  /** Signs this run's session tokens. Per run; see `newAuthSecret`. */
+  authSecret: string;
+  /** Where the API writes sign-in codes, inside the run's own 0700 directory. */
+  outboxDir: string;
+  /** The dashboard's origin, so sign-in and the handoff are permitted to come from it. */
+  dashboardOrigin: string;
+  /**
+   * `null` for the one instance `ssrf.spec.ts` boots to prove an unconfigured deployment refuses to
+   * sign anybody in. Every other instance uses the file transport.
+   */
+  emailTransport?: "file" | "null";
   /** Per-run, so analytics hashes cannot be correlated across runs. */
   analyticsHmacKey: string;
   /**
@@ -143,11 +115,25 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   // stack reachable from the network, so it is set explicitly rather than left to the default.
   env.HOST = "127.0.0.1";
 
-  if (input.appId) env.PRIVY_APP_ID = input.appId;
-  if (input.verificationKey) env.PRIVY_VERIFICATION_KEY = input.verificationKey;
-  // PRIVY_APP_SECRET is deliberately NOT set. `config.ts` reads it optionally and no path this suite
-  // exercises needs it.
-  // Withholding it means an API process cannot leak a credential it never had.
+  // ── identity ────────────────────────────────────────────────────────────────────────────────
+  //
+  // ONE SECRET, GENERATED PER RUN, AND NOTHING ELSE. There is no app id, no verification key and no
+  // tenant: the API is the identity provider now, and the only thing it needs is something to sign
+  // sessions with.
+  env.BETTER_AUTH_SECRET = input.authSecret;
+  // The callback base — the API's own origin. Deliberately not `PUBLIC_BASE_URL`, which is the
+  // OpenAPI `servers[0].url` and may legitimately differ.
+  env.BETTER_AUTH_URL = `http://127.0.0.1:${input.port}`;
+  // Exact origins, never a wildcard: this list is the CSRF check, the `callbackURL` allowlist, the
+  // handoff redirect allowlist and the `/api/auth/*` CORS allowlist all at once.
+  env.TRUSTED_ORIGINS = [input.dashboardOrigin, `http://127.0.0.1:${input.port}`].join(",");
+
+  // Codes are written to a file inside the run's own directory rather than sent anywhere. This is
+  // the whole reason the suite needs no external configuration — and `config.ts` refuses to boot a
+  // production process with any transport that reveals the code instead of delivering it.
+  env.EMAIL_TRANSPORT = input.emailTransport ?? "file";
+  env.EMAIL_FROM = "no-reply@rfphub.invalid";
+  if ((input.emailTransport ?? "file") === "file") env.EMAIL_OUTBOX_DIR = input.outboxDir;
 
   // NO BOOTSTRAP LIST. The API no longer promotes anyone from its environment: administrators are
   // made by an operator ceremony against the database credential (`pnpm --filter @the-rfp-hub/api
@@ -189,7 +175,6 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
 
 export interface DashboardEnvInput {
   apiPort: number;
-  appId: string | undefined;
 }
 
 /**
@@ -204,7 +189,8 @@ export function dashboardEnv(input: DashboardEnvInput): NodeJS.ProcessEnv {
   const env = baseEnv();
   env.NODE_ENV = "development";
   env.NEXT_PUBLIC_API_URL = `http://127.0.0.1:${input.apiPort}`;
-  if (input.appId) env.NEXT_PUBLIC_PRIVY_APP_ID = input.appId;
+  // No identity-provider app id: the dashboard talks to our own `/api/auth/*`, whose origin it
+  // already knows from `NEXT_PUBLIC_API_URL`.
   // Next's telemetry pings a remote endpoint on first run; a test harness should not.
   env.NEXT_TELEMETRY_DISABLED = "1";
   return env;
@@ -223,7 +209,7 @@ export function migrateEnv(adminDatabaseUrl: string): NodeJS.ProcessEnv {
 // ── the check-m3 child ────────────────────────────────────────────────────────────────────────
 
 export interface CheckM3EnvInput {
-  privyToken?: string;
+  sessionToken?: string;
   adminToken?: string;
   apiKey?: string;
 }
@@ -232,12 +218,12 @@ export interface CheckM3EnvInput {
  * Credentials for `scripts/check-m3.mjs` go through the ENVIRONMENT, not argv.
  *
  * argv is world-readable through `ps`, and these are a live session token and a live API key.
- * `scripts/m3-compliance/options.mjs` accepts `M3_PRIVY_TOKEN` / `M3_ADMIN_TOKEN` / `M3_API_KEY`
+ * `scripts/m3-compliance/options.mjs` accepts `M3_SESSION_TOKEN` / `M3_ADMIN_TOKEN` / `M3_API_KEY`
  * for exactly this reason; the flags still win where both are given.
  */
 export function checkM3Env(input: CheckM3EnvInput): NodeJS.ProcessEnv {
   const env = baseEnv();
-  if (input.privyToken) env.M3_PRIVY_TOKEN = input.privyToken;
+  if (input.sessionToken) env.M3_SESSION_TOKEN = input.sessionToken;
   if (input.adminToken) env.M3_ADMIN_TOKEN = input.adminToken;
   if (input.apiKey) env.M3_API_KEY = input.apiKey;
   env.NO_COLOR = "1";

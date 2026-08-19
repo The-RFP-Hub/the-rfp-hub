@@ -19,11 +19,10 @@
 import { test as base, expect } from "@playwright/test";
 import pg from "pg";
 import { ApiClient } from "./http.js";
-import { seedDocument } from "./privy/identities.js";
-import { UNBLOCKED_BY } from "./privy/preflight.js";
+import { seedDocument } from "./identity/actors.js";
+import { sessionFor } from "./identity/sessions.js";
 import { register } from "./redact.js";
 import { type ActorName, type RunState, readState } from "./state.js";
-import { tokenForDid } from "./tokens.js";
 
 export { expect };
 
@@ -99,8 +98,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   api: async ({ stack }, use) => {
     await use(async (actor: ActorName) => {
       const state = requireActor(stack, actor);
-      const token = await tokenForDid(state.did);
-      register(token, { label: "privy-access-token", longLived: false });
+      const { token } = await sessionFor(state.email);
       return new ApiClient({ baseUrl: stack.urls.api, token, userAgent: DESKTOP_UA });
     });
   },
@@ -164,88 +162,78 @@ export function requireActor(stack: RunState, actor: ActorName) {
   const state = stack.actors[actor];
   if (!state) {
     throw new Error(
-      `no "${actor}" identity at ladder level ${stack.level}. ` +
-        `Set ${UNBLOCKED_BY[stack.level].join(" and ") || "more distinct test accounts"} to provide one.`,
+      `no "${actor}" identity in this run. The runner signs in as one address per part before Playwright starts, and identities need no external provisioning — so this is a bring-up bug rather than a configuration one.`,
     );
   }
   return state;
 }
 
 /**
- * Declares a spec BLOCKED by missing external configuration.
+ * Declares a spec unable to run, and says why.
  *
- * The reason string always names the environment variable that would unblock it, because a skipped
- * test whose reason is "not available" tells a reader nothing they can act on. These strings are
- * what the reporter turns into the report's BLOCKED column.
+ * THIS USED TO BE THE MOST-CALLED FUNCTION IN THE SUITE. Identities came from a third-party tenant
+ * in whatever quantity somebody had provisioned, so every spec had to ask permission first, and a
+ * routine run reported dozens of criteria BLOCKED with a list of environment variables that would
+ * unblock them. Identities are now created by using them, offline, so the answer is always yes.
+ *
+ * The function survives as a backstop rather than a gate: if a part is genuinely missing, or two
+ * parts collapse onto one identity, a spec must skip loudly instead of quietly asserting something
+ * other than what it claims — a "plain submitter" that is really the verified publisher would
+ * auto-publish, and the test would report the OPPOSITE of the rule as satisfied. That failure mode
+ * is worth keeping a guard for even when it should be unreachable.
  */
 export function skipUnlessActor(stack: RunState, ...actors: ActorName[]): void {
-  const unblock = UNBLOCKED_BY[stack.level].join(", ") || "further distinct Privy test accounts";
-
   const missing = actors.filter((actor) => !stack.actors[actor]);
   if (missing.length > 0) {
     test.skip(
       true,
-      `BLOCKED-by-missing-external-config: no ${missing.join(", ")} identity at ladder level ${stack.level}. ` +
-        `Unblocked by: ${unblock}.`,
+      `BLOCKED: no ${missing.join(", ")} identity was established for this run. Identities need no external configuration, so this indicates a bring-up failure — see the runner's output.`,
     );
     return;
   }
 
-  // A spec that asked for two parts must GET two parts.
-  //
-  // `assignActors` no longer aliases anything except reviewer↔admin, which is sanctioned because the
-  // two are capability-equivalent. This is the backstop for everything else: if a future assignment
-  // ever points two requested names at one DID, the spec is silently testing a different situation
-  // than it says it is — a "plain submitter" that is really the verified publisher will auto-publish,
-  // and the test will assert, and report, the opposite of the rule. Skipping loudly is the only safe
-  // response; passing is the dangerous one.
   const seen = new Map<string, ActorName>();
   for (const name of actors) {
-    const did = stack.actors[name]?.did;
-    if (!did) continue;
-    const other = seen.get(did);
-    // A collision is sanctioned only when BOTH actors declare the same alias group — the runner's
-    // explicit statement that the sharing is deliberate and harmless. See `ActorState.aliasGroup`.
+    const userId = stack.actors[name]?.userId;
+    if (!userId) continue;
+    const other = seen.get(userId);
+    // Sanctioned only when BOTH declare the same alias group — the runner's explicit statement that
+    // the sharing is deliberate. Only reviewer↔admin ever does, because the two are
+    // capability-equivalent: `requireRole("reviewer")` admits administrators.
     const group = stack.actors[name]?.aliasGroup;
     const otherGroup = other ? stack.actors[other]?.aliasGroup : undefined;
     if (other && !(group !== undefined && group === otherGroup)) {
       test.skip(
         true,
-        `BLOCKED-by-missing-external-config: "${name}" and "${other}" resolve to the same identity at ` +
-          `ladder level ${stack.level}, so this criterion cannot distinguish them. Unblocked by: ${unblock}.`,
+        `BLOCKED: "${name}" and "${other}" resolve to the same identity, so this criterion cannot distinguish them.`,
       );
       return;
     }
-    seen.set(did, name);
+    seen.set(userId, name);
   }
 }
 
 /**
  * For a spec that needs a signed-in browser, and needs it to be a PARTICULAR actor's session.
  *
- * The second half is what stops a whole class of quiet nonsense. `storageState` belongs to exactly
- * one identity, and every owner-only dashboard assertion reads entries created over HTTP by
- * `api("publisher")`. If the browser signed in as some other identity — easy to arrange by adding
- * extra test emails — those specs would load a signed-in dashboard that owns none of the data they
- * are about, and would fail for a reason that has nothing to do with the product. `assignActors`
- * makes the browser identity the publisher precisely so this holds; this is the assertion that it
- * did, checked where a spec can report it rather than where it would surface as a mystery.
+ * `storageState` belongs to exactly one identity, and every owner-only dashboard assertion reads
+ * entries created over HTTP by `api("publisher")`. If the browser signed in as a different identity
+ * those specs would load a signed-in dashboard that owns none of the data they are about, and would
+ * fail for a reason that has nothing to do with the product. `assignActors` makes the browser
+ * identity the publisher precisely so this holds; this is the assertion that it did, checked where a
+ * spec can report it rather than where it would surface as a mystery.
  */
 export function skipUnlessBrowserSession(stack: RunState, owner: ActorName = "publisher"): void {
   if (!stack.storageStatePath) {
-    test.skip(
-      true,
-      "BLOCKED-by-missing-external-config: no browser session was established. " +
-        "Unblocked by: E2E_PRIVY_TENANT_ACK, E2E_PRIVY_TEST_EMAIL, E2E_PRIVY_TEST_OTP.",
-    );
+    test.skip(true, "BLOCKED: no browser session was established during bring-up.");
     return;
   }
 
   const actor = stack.actors[owner];
-  if (!actor || (stack.browserDid && actor.did !== stack.browserDid)) {
+  if (!actor || (stack.browserUserId && actor.userId !== stack.browserUserId)) {
     test.skip(
       true,
-      `BLOCKED-by-missing-external-config: the browser session does not belong to the "${owner}" actor, so an owner-only assertion would be driven by a session that owns nothing here. Unblocked by: E2E_PRIVY_TEST_EMAIL naming the identity that should hold the browser session.`,
+      `BLOCKED: the browser session does not belong to the "${owner}" actor, so an owner-only assertion would be driven by a session that owns nothing here.`,
     );
   }
 }

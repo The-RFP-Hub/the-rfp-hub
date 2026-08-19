@@ -67,8 +67,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
   }) => {
     test.skip(
       !stack.actors.submitter || stack.actors.submitter.shared === true,
-      "BLOCKED-by-missing-external-config: this needs a browser session on an UNPRIVILEGED account. " +
-        "Unblocked by: E2E_PRIVY_TEST_EMAILS (a distinct non-administrator test account).",
+      "BLOCKED: this needs a browser session on an UNPRIVILEGED account.",
     );
 
     for (const path of ["/review", "/admin"]) {
@@ -333,9 +332,8 @@ test.describe("M3-5 analytics count what a visitor does", () => {
       // full statement needs a SECOND VERIFIED PUBLISHER, and this run has none.
       test.skip(
         true,
-        "BLOCKED-by-missing-external-config: proving that another VERIFIED PUBLISHER is refused " +
-          "needs a second independent publisher identity. The unauthenticated case above did run. " +
-          "Unblocked by: E2E_PRIVY_TEST_EMAILS (further distinct test accounts).",
+        "BLOCKED: proving that another VERIFIED PUBLISHER is refused needs a second independent " +
+          "publisher identity. The unauthenticated case above did run.",
       );
       return;
     }

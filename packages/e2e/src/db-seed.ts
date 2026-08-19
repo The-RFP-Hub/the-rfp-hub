@@ -9,13 +9,13 @@
  *   - **ageing a fixture backwards.** The staleness criteria need `last_seen_at`/`updated_at` in the
  *     past, and there is no endpoint that moves them there — correctly, because one would be a
  *     route for falsifying history.
- *   - **an API-key credential when no session exists.** At the degraded level there is no real
- *     identity, so no session can mint a key — and the "an API key is refused on a session-only
- *     route" criterion would go untested for want of a key, even though it has nothing to do with
- *     identity. The key material below is minted in the product's own documented format, and every
- *     use of it is preceded by a POSITIVE CONTROL: the key must first be accepted on a route that
- *     takes either credential. If this file's format ever drifts from the API's, that control fails
- *     loudly rather than turning the negative assertion into a vacuous one.
+ *   - **an API-key credential whose account is fixed and known.** The negative-authentication specs
+ *     need a key on an account whose role they chose, without spending a sign-in on it — the
+ *     assertions are about the CREDENTIAL KIND, not about identity. The key material below is minted
+ *     in the product's own documented format, and every use of it is preceded by a POSITIVE CONTROL:
+ *     the key must first be accepted on a route that takes either credential. If this file's format
+ *     ever drifts from the API's, that control fails loudly rather than turning the negative
+ *     assertion into a vacuous one.
  */
 import { createHash, randomBytes } from "node:crypto";
 import type pg from "pg";
@@ -46,20 +46,45 @@ function base32(length: number): string {
   return out;
 }
 
-/** An account row, created directly. Returns its id. Idempotent on the DID. */
-export async function seedAccount(
+/**
+ * An identity and its account, created directly. Returns the account id.
+ *
+ * TWO ROWS, IN THIS ORDER, and the order is the whole subtlety. `auth_user` is the identity the
+ * session library owns; `accounts` is the product's own row and joins to it by `auth_user_id`. There
+ * is no foreign key between them — deliberately, because an `accounts` row must outlive a deleted
+ * identity, since `audit_log` points at the account and a cascade over there must never be able to
+ * erase history over here — so nothing in the database would stop this from creating an orphan. The
+ * ordering is what keeps the pair coherent.
+ *
+ * DIRECT SQL, FOR DETERMINISM. Signing in would produce a real identity, but with an id the library
+ * chooses; these rows need an id the caller already knows so a later assertion can name it. It
+ * bypasses no hooks, because there are none — the account row is created just-in-time by the API on
+ * first `/v1/me`, which is a documented M3 criterion and is precisely why no `databaseHooks` were
+ * added on the API side.
+ *
+ * Idempotent on the identity id.
+ */
+export async function seedIdentity(
   pool: pg.Pool,
-  did: string,
+  userId: string,
+  email: string,
   role: "submitter" | "reviewer" | "admin" = "submitter",
 ): Promise<number> {
+  await pool.query(
+    `INSERT INTO auth_user (id, name, email, email_verified)
+       VALUES ($1, $2, $3, true)
+       ON CONFLICT (id) DO NOTHING`,
+    [userId, email, email.toLowerCase()],
+  );
+
   const inserted = await pool.query<{ id: number }>(
-    `INSERT INTO accounts (privy_did, global_role) VALUES ($1, $2)
-       ON CONFLICT (privy_did) DO UPDATE SET global_role = EXCLUDED.global_role
+    `INSERT INTO accounts (auth_user_id, global_role) VALUES ($1, $2)
+       ON CONFLICT (auth_user_id) DO UPDATE SET global_role = EXCLUDED.global_role
        RETURNING id`,
-    [did, role],
+    [userId, role],
   );
   const id = inserted.rows[0]?.id;
-  if (id === undefined) throw new Error(`db-seed: could not seed an account for ${did}`);
+  if (id === undefined) throw new Error(`db-seed: could not seed an account for ${userId}`);
   return Number(id);
 }
 

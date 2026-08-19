@@ -10,7 +10,7 @@
  */
 import { expect, skipUnlessActor, test } from "../src/fixtures.js";
 import type { ApiClient } from "../src/http.js";
-import { me } from "../src/privy/identities.js";
+import { me } from "../src/identity/actors.js";
 import type { ActorName } from "../src/state.js";
 
 test.describe.configure({ mode: "serial" });

@@ -15,14 +15,21 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { LadderLevel } from "./privy/preflight.js";
 
 /** The named parts a spec asks for. See `identities.ts` for how each is filled at each level. */
 export type ActorName = "admin" | "reviewer" | "publisher" | "otherPublisher" | "submitter";
 
 export interface ActorState {
   name: ActorName;
-  did: string;
+  /**
+   * `auth_user.id` — the subject the account row joins on (`accounts.auth_user_id`).
+   *
+   * Named `userId` rather than the old `did`: it is no longer a decentralised identifier issued by
+   * anybody, it is a row id in this run's own disposable database.
+   */
+  userId: string;
+  /** The address this identity signs in with, and the outbox is keyed on. */
+  email: string;
   /** Filled by the setup project, after the actor's first `/v1/me`. */
   accountId?: number;
   handle?: string | null;
@@ -65,8 +72,15 @@ export interface ActorState {
 export interface RunState {
   runId: string;
   startedAt: string;
-  level: LadderLevel;
-  /** Every criterion this level cannot execute, with the variable that would unblock it. */
+  /**
+   * Criteria this run could not execute, with what would unblock each.
+   *
+   * KEPT DELIBERATELY, AND EXPECTED TO BE EMPTY. The ladder that used to fill it is gone: there is
+   * no external configuration left to be missing, so a run either does everything or has a bug. The
+   * field survives so that a future genuine limitation has somewhere to be recorded rather than
+   * being discovered as a silently-passing test — and so the reporter prints "0 blocked" instead of
+   * losing the distinction between "nothing blocked" and "nobody looked".
+   */
   blocked: Array<{ area: string; reason: string; unblockedBy: string[] }>;
   /** Criteria that execute but prove less than the full statement, with what is missing. */
   conditional: Array<{ area: string; reason: string }>;
@@ -114,40 +128,21 @@ export interface RunState {
   /** actor name → DID, flattened for the report and for the cross-run comparison. */
   permutation: Record<string, string>;
   /**
-   * The DID that was the bootstrap administrator in the PREVIOUS run, when one was recorded.
+   * The address that was the administrator in the PREVIOUS run, when one was recorded.
    *
-   * Present only when a previous run wrote an assignment record AND this run rotated away from it.
-   * The acceptance setup uses it for the cross-run privilege non-leakage assertion.
+   * Present only when an earlier run wrote an assignment record and this run rotated away from it.
+   * See the cross-run assertion in `tests/00-acceptance.setup.ts` for what it can and cannot prove
+   * now that the identity store is this run's own database rather than an external tenant.
    */
-  previousAdminDid?: string;
-  /** Presence-only report from the preflight. Never a credential value. */
-  preflight: {
-    tenantAcknowledged: boolean;
-    appIdMasked: string;
-    identities: number;
-    browserLogin: boolean;
-    notes: string[];
-    failures: Array<{ kind: string; credential: string; detail: string }>;
-  };
+  previousAdminEmail?: string;
   /** `storageState` for the signed-in browser context, when one was established. */
   storageStatePath?: string;
-  /** The DID that browser session belongs to. Undefined when no browser session was established. */
-  browserDid?: string;
-  /**
-   * True when the API was booted with a locally-generated verification key because the deployment
-   * supplied none.
-   *
-   * The key's private half is discarded, so NO token can ever be valid against it — which is
-   * exactly what the negative-authentication assertions need, and is why they can run on a machine
-   * with no credentials at all. Nothing positive may ever be claimed from a run in this state.
-   */
-  inertVerificationKey?: boolean;
+  /** The user id that browser session belongs to. */
+  browserUserId?: string;
+  /** Where the API writes sign-in codes: inside this run's own 0700 directory, removed with it. */
+  outboxDir: string;
   /** Where the API and dashboard child logs are, for a failure report. */
   logs: Record<string, string>;
-  /** The Privy app id, needed by `auth-negative.spec.ts` to forge a token with the real audience. */
-  privyAppId?: string;
-  /** Set when the API was booted WITHOUT a verification key — the degraded, no-real-auth boot. */
-  degradedNoPrivy: boolean;
 }
 
 export const STATE_ENV = "E2E_STATE_FILE";

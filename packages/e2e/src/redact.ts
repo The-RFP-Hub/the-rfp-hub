@@ -44,7 +44,23 @@ export interface RegisteredSecret {
   longLived: boolean;
 }
 
-/** Minimum length for a value worth registering: shorter strings redact half the world. */
+/**
+ * Minimum length for a value worth registering: shorter strings redact half the world.
+ *
+ * ONE-TIME CODES ARE THEREFORE NOT REGISTERED, and that is a deliberate, stated position rather than
+ * an oversight. A sign-in code is six digits — below this floor, and a catastrophic thing to grep
+ * for: `\b\d{6}\b` matches timestamps, byte counts, ids and half the numbers in any log, so
+ * registering one would either redact the artifacts into uselessness or, worse, train a reader to
+ * ignore the redaction markers.
+ *
+ * It is classified with the short-lived material the README already admits to, not with the
+ * long-lived secrets this scan exists to catch: a code is single-use, lives 300 seconds, belongs to
+ * one address, and is DELETED FROM THE OUTBOX WHEN IT IS READ (`identity/outbox.ts`). By the time
+ * any artifact is scanned it has already stopped being a credential.
+ *
+ * Registered long-lived: `BETTER_AUTH_SECRET`, every `rfph_…` API key. Session tokens are
+ * registered short-lived.
+ */
 const MIN_SECRET_LENGTH = 8;
 
 let inMemory: RegisteredSecret[] = [];
@@ -157,7 +173,8 @@ export function longLived(): RegisteredSecret[] {
  */
 const STRUCTURAL: Array<[RegExp, string]> = [
   [/rfph_[A-Za-z0-9_-]{16,}/g, "[redacted:api-key]"],
-  // Three base64url segments: a signed JWT. Privy access tokens and this suite's forged ones both.
+  // Three base64url segments: a signed JWT. Not the session format — those are opaque — but the
+  // OIDC stub lane issues real ones, and a forged token in the negative specs is shaped like one.
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, "[redacted:jwt]"],
 ];
 
