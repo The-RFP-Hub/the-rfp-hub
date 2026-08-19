@@ -183,7 +183,7 @@ test.describe("the sign-in surface answers only its own origins", () => {
     // 11 — `/v1` is deliberately `origin:"*"` because every credential there is header-borne. The
     //      sign-in surface does NOT inherit that: it mints credentials and exposes `set-auth-token`,
     //      so `origin:"*"` would turn any page on the web into a readable login client. The
-    //      allowlist is `TRUSTED_ORIGINS`, which this run sets to the dashboard and the API.
+    //      allowlist is `TRUSTED_ORIGINS`, which this run sets to the frontend and the API.
     const evil = "https://evil.example";
     const preflight = await anonApi.request({
       method: "OPTIONS",
@@ -199,21 +199,21 @@ test.describe("the sign-in surface answers only its own origins", () => {
       "a disallowed origin must not be granted access",
     ).not.toBe(evil);
 
-    // The control: the dashboard's own origin IS allowed, so the absence above is a decision rather
+    // The control: the frontend's own origin IS allowed, so the absence above is a decision rather
     // than CORS being switched off altogether.
     const allowed = await anonApi.request({
       method: "OPTIONS",
       path: "/api/auth/sign-in/email-otp",
       headers: {
-        origin: stack.urls.dashboard,
+        origin: stack.urls.frontend,
         "access-control-request-method": "POST",
         "access-control-request-headers": "content-type",
       },
     });
     expect(
       allowed.headers.get("access-control-allow-origin"),
-      "the dashboard's own origin is allowed, so the refusal above is a policy and not an outage",
-    ).toBe(stack.urls.dashboard);
+      "the frontend's own origin is allowed, so the refusal above is a policy and not an outage",
+    ).toBe(stack.urls.frontend);
   });
 });
 

@@ -35,7 +35,7 @@ test.describe("M3-1 roles and their effects", () => {
     expect(promoted.status).toBe(200);
     expect(promoted.body.globalRole).toBe("reviewer");
 
-    // The promotion is only real if the account SEES it. `/v1/me` is what the dashboard renders its
+    // The promotion is only real if the account SEES it. `/v1/me` is what the frontend renders its
     // navigation from and what every later capability decision reads.
     const promotedSelf = await (await api("submitter")).get<{ role: string; canReview: boolean }>(
       "/v1/me",

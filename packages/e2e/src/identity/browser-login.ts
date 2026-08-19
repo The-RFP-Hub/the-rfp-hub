@@ -1,5 +1,5 @@
 /**
- * A real browser sign-in, through the dashboard's own form.
+ * A real browser sign-in, through the frontend's own form.
  *
  * WHAT GOT SIMPLER, AND WHY IT MATTERS. This used to drive a third party's modal: a dialog whose
  * DOM we did not own, rendered by a script we did not ship, reached through selectors that had to be
@@ -24,7 +24,7 @@ import { waitForOtp } from "./outbox.js";
 
 export interface BrowserLoginInput {
   browser: Browser;
-  dashboardUrl: string;
+  frontendUrl: string;
   apiUrl: string;
   /** The address to sign in as. Created on first use; no prior provisioning. */
   email: string;
@@ -47,7 +47,7 @@ export interface BrowserLoginResult {
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-/** Where the dashboard keeps the session token. `SESSION_STORAGE_KEY` in `lib/auth-client.ts`. */
+/** Where the frontend keeps the session token. `SESSION_STORAGE_KEY` in `lib/auth-client.ts`. */
 const SESSION_STORAGE_KEY = "rfphub.session-token";
 
 export async function login(input: BrowserLoginInput): Promise<BrowserLoginResult> {
@@ -78,7 +78,7 @@ export async function login(input: BrowserLoginInput): Promise<BrowserLoginResul
   });
 
   try {
-    await page.goto(input.dashboardUrl, { waitUntil: "domcontentloaded", timeout });
+    await page.goto(input.frontendUrl, { waitUntil: "domcontentloaded", timeout });
 
     // WAIT FOR THE SESSION TO RESOLVE FIRST. The front page is the public directory now, and the
     // header shows "restoring session…" until the client has decided whether anybody is signed in.

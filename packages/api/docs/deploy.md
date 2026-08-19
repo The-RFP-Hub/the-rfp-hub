@@ -66,7 +66,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 |---|---|---|
 | `NODE_ENV` | `production` | Also what makes `VERIFY_ALLOW_PRIVATE_HOSTS` and the non-delivering email transports refuse to boot |
 | `BETTER_AUTH_URL` | the API's own origin | The base every auth route and OAuth callback is built from. **Not** `PUBLIC_BASE_URL`, which is the OpenAPI document's `servers[0].url` and may legitimately differ |
-| `TRUSTED_ORIGINS` | the dashboard's origin(s) | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart |
+| `TRUSTED_ORIGINS` | the frontend's origin(s) | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart |
 | `PREVIEW_ORIGIN_PATTERN` | staging only | An **anchored** regular expression for preview origins, tied to our project *and* team slug. Never `*.vercel.app`. Unanchored → refuses to boot |
 | `EMAIL_TRANSPORT` | `ses` | How sign-in codes are delivered. `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
 | `EMAIL_FROM` | `no-reply@ethrfps.app` | The envelope sender. Its domain needs SPF/DKIM/DMARC, or the codes land in spam |
@@ -102,7 +102,7 @@ deployments run the same schema.
 #### Google sign-in, per environment
 
 Ships dark until the two variables above are set: with no `GOOGLE_CLIENT_ID` the provider is not
-registered, the route does not exist and the dashboard renders no button. When enabling it, create
+registered, the route does not exist and the frontend renders no button. When enabling it, create
 **one Web client per environment** (consent screen `openid email profile`, no offline access — we
 never call a Google API on a user's behalf) with the redirect URI:
 
@@ -110,9 +110,9 @@ never call a Google API on a user's behalf) with the redirect URI:
 {BETTER_AUTH_URL}/api/auth/callback/google
 ```
 
-The callback lands a host-only `HttpOnly` cookie on the API's own origin, which the dashboard — a
+The callback lands a host-only `HttpOnly` cookie on the API's own origin, which the frontend — a
 different origin — cannot read. `GET /api/auth-handoff` converts it to a one-time token and
-redirects to the dashboard carrying it in the **fragment**, which is not sent to servers and does
+redirects to the frontend carrying it in the **fragment**, which is not sent to servers and does
 not appear in access logs or `Referer`. That is a narrowing, not a guarantee: the receiving page
 scrubs the URL before its first `await`, the token is single-use with a three-minute life, and only
 the server-side handoff can mint one (`disableClientRequest`). `returnTo` is validated against
@@ -252,7 +252,7 @@ identity tables.
 | 3 | **Run `0006`** as the migration role, on the image being deployed. It drops the legacy columns **and** applies the orphan policy. **Record the revoked-key count it reports.** | Running it after the deploy: the new image queries `auth_user_id` against a table that has no such column. |
 | 4 | **Apply `grant-auth.sql`** as the admin/owner connection. | Every login 500s while every test stays green. See above. |
 | 5 | **Deploy the new API image** with `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`, `AWS_SES_REGION`. Scale back up. | — |
-| 6 | **Rebuild and redeploy the dashboard.** Its public variables are inlined at build time, so redeploying the old build keeps it pointing at the old identity provider. | The dashboard sends credentials the new verifier cannot read: 401 on everything. |
+| 6 | **Rebuild and redeploy the frontend.** Its public variables are inlined at build time, so redeploying the old build keeps it pointing at the old identity provider. | The frontend sends credentials the new verifier cannot read: 401 on everything. |
 | 7 | **Smoke:** sign in by email, confirm the code arrives from SES, `GET /v1/me` returns your address and role. | — |
 | 8 | **The first admin signs in, then the operator runs `grant-admin --email`.** | **Every account is a `submitter` until this is done** — by design, see below. |
 
@@ -390,7 +390,7 @@ correct choice for a library that must not version-lock its host's test runner o
 But this project's own root `vitest` devDependency satisfies that peer, and pnpm's peer resolution
 wires it into the graph under `better-auth`'s node. `pnpm audit --prod` walks that graph from a
 production dependency (`better-auth` itself, a real `dependencies` entry in both `packages/api` and
-`packages/dashboard`) and counts everything reachable from it — including the peer-satisfied
+`packages/frontend`) and counts everything reachable from it — including the peer-satisfied
 `vitest` and everything transitively beneath it (`vite`, `postcss`, `esbuild`) — as production
 exposure. None of it is runtime-reachable; the audit gate cannot tell the difference.
 
@@ -399,9 +399,9 @@ exposure. None of it is runtime-reachable; the audit gate cannot tell the differ
 `pnpm -r why --prod vitest` before and after) — pnpm's override rewriting targets real dependency
 edges, and a peer satisfied by the workspace's own hoisted devDependency has no such edge for the
 scoped path to rewrite. The only fix that actually moves the installed version is bumping the real
-devDependency: **root `vitest` and `packages/dashboard`'s `vitest` both went from `^2.1.8` to
+devDependency: **root `vitest` and `packages/frontend`'s `vitest` both went from `^2.1.8` to
 `^3.2.7`**, which is a real (if incidental) test-runner upgrade, not a pin. It was regression-verified
-against every suite that uses `testAuth`/`testUtils` plus the full root and dashboard runs before
+against every suite that uses `testAuth`/`testUtils` plus the full root and frontend runs before
 being treated as safe — see the validation trail in this change's report.
 
 **`vite` still needed a global override.** Bumping `vitest` alone left its own `vite` peer resolving
@@ -410,7 +410,7 @@ to the newest 5.x patch available (`5.4.21`), which the advisory covers (fixed o
 and `@vitejs/plugin-react@4.7.0`'s (`^4.2 || ^5 || ^6 || ^7`). The override alone was **not
 sufficient for `@vitejs/plugin-react`'s own peer slot** — it kept resolving to whatever the latest
 published `vite` was (`8.x`, itself unaffected but outside both accepted ranges) until `vite` was
-also added as an explicit `packages/dashboard` devDependency pinned to the same `7.3.6`, giving that
+also added as an explicit `packages/frontend` devDependency pinned to the same `7.3.6`, giving that
 peer a real edge to anchor on. Confirmed stable across three consecutive `rm -rf node_modules &&
 pnpm install` cycles before being treated as deterministic.
 

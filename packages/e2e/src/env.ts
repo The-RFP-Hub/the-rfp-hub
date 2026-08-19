@@ -34,7 +34,7 @@ import { register } from "./redact.js";
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(here, "..", "..", "..");
 export const apiDir = join(repoRoot, "packages", "api");
-export const dashboardDir = join(repoRoot, "packages", "dashboard");
+export const frontendDir = join(repoRoot, "packages", "frontend");
 
 /**
  * The only variables inherited from the ambient environment, and why each one has to be.
@@ -84,8 +84,8 @@ export interface ApiEnvInput {
   authSecret: string;
   /** Where the API writes sign-in codes, inside the run's own 0700 directory. */
   outboxDir: string;
-  /** The dashboard's origin, so sign-in and the handoff are permitted to come from it. */
-  dashboardOrigin: string;
+  /** The frontend's origin, so sign-in and the handoff are permitted to come from it. */
+  frontendOrigin: string;
   /**
    * `null` for the one instance `ssrf.spec.ts` boots to prove an unconfigured deployment refuses to
    * sign anybody in. Every other instance uses the file transport.
@@ -126,7 +126,7 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   env.BETTER_AUTH_URL = `http://127.0.0.1:${input.port}`;
   // Exact origins, never a wildcard: this list is the CSRF check, the `callbackURL` allowlist, the
   // handoff redirect allowlist and the `/api/auth/*` CORS allowlist all at once.
-  env.TRUSTED_ORIGINS = [input.dashboardOrigin, `http://127.0.0.1:${input.port}`].join(",");
+  env.TRUSTED_ORIGINS = [input.frontendOrigin, `http://127.0.0.1:${input.port}`].join(",");
 
   // Codes are written to a file inside the run's own directory rather than sent anywhere. This is
   // the whole reason the suite needs no external configuration — and `config.ts` refuses to boot a
@@ -171,9 +171,9 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   return env;
 }
 
-// ── the dashboard child ───────────────────────────────────────────────────────────────────────
+// ── the frontend child ────────────────────────────────────────────────────────────────────────
 
-export interface DashboardEnvInput {
+export interface FrontendEnvInput {
   apiPort: number;
 }
 
@@ -185,11 +185,11 @@ export interface DashboardEnvInput {
  * production build would bake the values in and cost minutes on every run. `proxy.ts` reads
  * `process.env.NEXT_PUBLIC_API_URL` per request for the CSP `connect-src`, which works either way.
  */
-export function dashboardEnv(input: DashboardEnvInput): NodeJS.ProcessEnv {
+export function frontendEnv(input: FrontendEnvInput): NodeJS.ProcessEnv {
   const env = baseEnv();
   env.NODE_ENV = "development";
   env.NEXT_PUBLIC_API_URL = `http://127.0.0.1:${input.apiPort}`;
-  // No identity-provider app id: the dashboard talks to our own `/api/auth/*`, whose origin it
+  // No identity-provider app id: the frontend talks to our own `/api/auth/*`, whose origin it
   // already knows from `NEXT_PUBLIC_API_URL`.
   // Next's telemetry pings a remote endpoint on first run; a test harness should not.
   env.NEXT_TELEMETRY_DISABLED = "1";

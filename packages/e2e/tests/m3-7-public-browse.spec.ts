@@ -70,7 +70,7 @@ test.describe("M3-7 the public directory", () => {
 
     const { context, page } = await anonymous(browser);
     try {
-      await page.goto(stack.urls.dashboard);
+      await page.goto(stack.urls.frontend);
       await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
 
       // The filter is a parameter the endpoint declares — the list route validates its querystring
@@ -136,7 +136,7 @@ test.describe("M3-7 the public entry page", () => {
 
     const { context, page } = await anonymous(browser);
     try {
-      await page.goto(`${stack.urls.dashboard}/opportunities/${encodeURIComponent(id)}`);
+      await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
 
       await expect(page.getByRole("heading", { name: new RegExp(replacedTitle) })).toBeVisible();
       // The id and the description reach the page as text.
@@ -217,7 +217,7 @@ test.describe("M3-7 what an anonymous visitor's traffic counts", () => {
       // The public detail page performs the read the API counts: `GET /v1/opportunities/:id`. The
       // publisher's own dashboard pages deliberately do NOT count, which is why this has to be the
       // public page in a real browser.
-      await page.goto(`${stack.urls.dashboard}/opportunities/${encodeURIComponent(id)}`);
+      await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
       await expect(page.getByRole("link", { name: "Open the application page" })).toBeVisible();
 
       const afterRead = await pollUntil(

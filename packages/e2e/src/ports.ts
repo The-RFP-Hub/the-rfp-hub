@@ -5,7 +5,7 @@
  * back with `docker compose port` (see `postgres.ts`), which has no TOCTOU window at all. That is
  * the better mechanism and it is used wherever it is available.
  *
- * It is not available for the API or the dashboard, because neither can be told "bind port 0 and
+ * It is not available for the API or the frontend, because neither can be told "bind port 0 and
  * tell me what you got": `packages/api/src/config.ts` reads `PORT` and silently falls back to 3001
  * for anything it cannot parse as a usable port — handing it `0` would quietly put the API on the
  * developer's own dev port — and `next dev --port 0` picks a port this process would then have to
