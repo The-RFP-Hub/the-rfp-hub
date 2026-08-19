@@ -17,7 +17,7 @@
  *   4. the identity preflight — talks to the identity provider, and to nothing of ours: the very
  *      first `/v1/me` a fresh identity sends is itself an M3 criterion, and a preflight that
  *      "checked the token works" would consume the only chance to observe it
- *   5. the dashboard, which does not need the API to boot
+ *   5. the frontend, which does not need the API to boot
  *   6. at the browser-only level ONLY: a throwaway browser login, to learn the identity's DID
  *      BEFORE the API starts — otherwise bootstrapping an administrator would be circular
  *   7. the API, on the restricted role
@@ -47,8 +47,8 @@ import { type GrantAdminResult, ceremonyLogFile, grantAdmin } from "./admin-cere
 import {
   apiDir,
   apiEnv,
-  dashboardDir,
-  dashboardEnv,
+  frontendDir,
+  frontendEnv,
   migrateEnv,
   newAuthSecret,
   playwrightEnv,
@@ -118,7 +118,7 @@ const OWNERSHIP_MARKER = ".rfphub-e2e-owned";
  * The repository as a whole supports Node 18 and that is not changed here — the API and the
  * libraries genuinely run there. Playwright 1.62 does not: it refuses to start on anything below
  * Node 20. Without this check that shows up as a confusing failure from deep inside a child process
- * AFTER a Postgres container, an API and a dashboard have already been started, and the operator has
+ * AFTER a Postgres container, an API and a frontend have already been started, and the operator has
  * to work backwards to a version requirement nothing stated. `packages/e2e/package.json` declares
  * `engines.node >= 20` for the same reason; this is the part that produces a readable message.
  */
@@ -237,7 +237,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
   //
   // `E2E_RUN_ID` can be reused deliberately (it is the documented way to re-run against a
   // part-provisioned stack), and two invocations reusing it used to accept the same directory and
-  // the same marker. The second would then typically fail on the dashboard lock — and delete the
+  // the same marker. The second would then typically fail on the frontend lock — and delete the
   // FIRST one's live workspace on its way out, taking that run's session state with it. Creating
   // non-recursively makes the collision an immediate, explicit refusal instead.
   mkdirSync(dirname(ctx.tmp), { recursive: true, mode: 0o700 });
@@ -314,15 +314,15 @@ async function bringUp(ctx: Context): Promise<RunState> {
   // Signs this run's sessions and nothing else's. Generated here, thrown away with the run.
   const authSecret = newAuthSecret();
 
-  // ── 5. the dashboard ─────────────────────────────────────────────────────────────────────────
+  // ── 5. the frontend ──────────────────────────────────────────────────────────────────────────
   const taken = new Set<number>([ctx.pg.port]);
   const apiPort = await ports.reserve(taken);
-  const dashboardPort = await ports.reserve(taken);
+  const frontendPort = await ports.reserve(taken);
 
-  const dashboard = processes.start({
-    name: "dashboard",
+  const frontend = processes.start({
+    name: "frontend",
     command: "pnpm",
-    // `--webpack` is NOT optional here. Turbopack is Next 16's default, and the dashboard's
+    // `--webpack` is NOT optional here. Turbopack is Next 16's default, and the frontend's
     // `next.config.ts` carries a `webpack()` hook — the `@farcaster/mini-app-solana: false` alias
     // that keeps an uninstalled optional peer from failing resolution. Under Turbopack that hook is
     // ignored (and a build refuses outright), so the dev server this suite drives has to be the same
@@ -333,25 +333,25 @@ async function bringUp(ctx: Context): Promise<RunState> {
       "dev",
       "--webpack",
       "--port",
-      String(dashboardPort),
+      String(frontendPort),
       "--hostname",
       "127.0.0.1",
     ],
-    cwd: dashboardDir,
-    env: dashboardEnv({ apiPort }),
-    logFile: join(ctx.logDir, "dashboard.log"),
+    cwd: frontendDir,
+    env: frontendEnv({ apiPort }),
+    logFile: join(ctx.logDir, "frontend.log"),
   });
-  ctx.children.push(dashboard);
-  const dashboardUrl = `http://127.0.0.1:${dashboardPort}`;
-  process.stdout.write(`• dashboard starting on ${dashboardUrl}…\n`);
+  ctx.children.push(frontend);
+  const frontendUrl = `http://127.0.0.1:${frontendPort}`;
+  process.stdout.write(`• frontend starting on ${frontendUrl}…\n`);
   abortIfInterrupted(ctx);
   await processes.waitFor({
-    what: "dashboard",
+    what: "frontend",
     abort: () => ctx.interrupted,
-    watch: dashboard,
+    watch: frontend,
     timeoutMs: 120_000,
     probe: async () =>
-      (await fetch(dashboardUrl, { redirect: "manual" }).catch(() => undefined))?.status !==
+      (await fetch(frontendUrl, { redirect: "manual" }).catch(() => undefined))?.status !==
       undefined,
   });
 
@@ -369,7 +369,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
       port: apiPort,
       authSecret,
       outboxDir: ctx.outboxDir,
-      dashboardOrigin: dashboardUrl,
+      frontendOrigin: frontendUrl,
       analyticsHmacKey,
       allowPrivateHosts: true,
       embeddingProvider:
@@ -421,11 +421,11 @@ async function bringUp(ctx: Context): Promise<RunState> {
   });
   process.stdout.write(`• admin ceremony: ${adminCeremony.outcome} for the run's administrator\n`);
 
-  // The browser signs in as the PUBLISHER, through the dashboard's own form. `storageState` belongs
+  // The browser signs in as the PUBLISHER, through the frontend's own form. `storageState` belongs
   // to exactly one identity, and the owner-only dashboard specs read entries that actor created.
   const publisherActor = assignment.actors.publisher;
   if (!publisherActor) throw new Error("run: no publisher identity was established");
-  process.stdout.write("• signing in through the dashboard…\n");
+  process.stdout.write("• signing in through the frontend…\n");
   abortIfInterrupted(ctx);
   const { chromium } = await import("@playwright/test");
   const browser = await chromium.launch();
@@ -433,7 +433,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
   try {
     browserSession = await login({
       browser,
-      dashboardUrl,
+      frontendUrl,
       apiUrl,
       email: publisherActor.email,
       outboxDir: ctx.outboxDir,
@@ -446,11 +446,11 @@ async function bringUp(ctx: Context): Promise<RunState> {
   }
   process.stdout.write("  signed in; session state captured\n");
 
-  // ── 8. warm the dashboard routes ─────────────────────────────────────────────────────────────
+  // ── 8. warm the frontend routes ──────────────────────────────────────────────────────────────
   // `next dev` compiles per route on first request. A 20-second expect timeout inside a spec is
   // there for the analytics buffer, not for webpack, so the compile happens here instead.
   abortIfInterrupted(ctx);
-  process.stdout.write("• warming dashboard routes…\n");
+  process.stdout.write("• warming frontend routes…\n");
   for (const route of [
     "/",
     "/dashboard",
@@ -464,7 +464,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
     // cannot exist, which is the point: the compile is what is wanted, not the data.
     "/opportunities/warm-up",
   ]) {
-    await fetch(`${dashboardUrl}${route}`, { redirect: "manual" }).catch(() => undefined);
+    await fetch(`${frontendUrl}${route}`, { redirect: "manual" }).catch(() => undefined);
   }
 
   // ── 9. the state file ────────────────────────────────────────────────────────────────────────
@@ -475,13 +475,13 @@ async function bringUp(ctx: Context): Promise<RunState> {
     conditional: assignment.conditional,
     ports: {
       api: apiPort,
-      dashboard: dashboardPort,
+      frontend: frontendPort,
       fixture: ctx.fixture.port,
       postgres: ctx.pg.port,
     },
     urls: {
       api: apiUrl,
-      dashboard: dashboardUrl,
+      frontend: frontendUrl,
       fixture: fixtureUrl,
       programme: `${fixtureUrl}/programme/${ctx.runId}`,
     },
@@ -499,7 +499,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
     ),
     previousAdminEmail: previousAdmin(assignment.actors.admin?.userId),
     outboxDir: ctx.outboxDir,
-    logs: { api: api.logFile, dashboard: dashboard.logFile },
+    logs: { api: api.logFile, frontend: frontend.logFile },
     storageStatePath: browserSession.storageStatePath,
     browserUserId: browserSession.userId,
   };
@@ -572,7 +572,7 @@ function writeIdentities(ctx: Context, identities: Identity[]): void {
 }
 
 /**
- * An exclusive lock on the dashboard's dev cache.
+ * An exclusive lock on the frontend's dev cache.
  *
  * `next dev` keeps a per-directory build cache and its own lock inside `.next/`. Two concurrent E2E
  * runs would share it and corrupt each other's compile state in ways that surface as unrelated,
@@ -582,9 +582,9 @@ function writeIdentities(ctx: Context, identities: Identity[]): void {
 function acquireNextLock(ctx: Context): void {
   // BESIDE `.next/`, not inside it. `next dev` clears and recreates parts of that directory on
   // start, which silently deleted a lock file kept there — and a lock that a lock-protected process
-  // deletes on its way up is not a lock at all. This location is the dashboard package directory,
+  // deletes on its way up is not a lock at all. This location is the frontend package directory,
   // which nothing else rewrites.
-  const lockPath = join(dashboardDir, ".e2e-next-lock");
+  const lockPath = join(frontendDir, ".e2e-next-lock");
   try {
     // "wx" — create exclusively. The failure mode IS the feature.
     ctx.lockFd = openSync(lockPath, "wx");
@@ -725,7 +725,7 @@ async function tearDown(ctx: Context): Promise<string[]> {
     try {
       unlinkSync(ctx.lockPath);
     } catch (err) {
-      problems.push(`releasing the dashboard lock: ${(err as Error).message}`);
+      problems.push(`releasing the frontend lock: ${(err as Error).message}`);
     }
   }
 

@@ -2,7 +2,7 @@
  * Playwright's configuration for the M3 end-to-end suite.
  *
  * THE STACK IS NOT STARTED HERE. There is no `webServer` block: a disposable Postgres, a restricted
- * database role, an API, a dashboard, a fixture web server and an identity preflight are more than
+ * database role, an API, a frontend, a fixture web server and an identity preflight are more than
  * `webServer` can express, and — decisively — Playwright cannot guarantee teardown of resources it
  * did not create. `packages/e2e/src/run.ts` owns all of it in a `try/finally` and runs Playwright as
  * its child. So this file reads the state that runner wrote, and refuses to run without it.
@@ -52,7 +52,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: state.urls.dashboard,
+    baseURL: state.urls.frontend,
     // Kept on failure only. Traces record request headers and Playwright offers no redaction hook,
     // so a failure trace CAN contain a short-lived access token — stated as known residue in the
     // README and the report, and the reason the end-of-run scan is scoped to long-lived secrets.

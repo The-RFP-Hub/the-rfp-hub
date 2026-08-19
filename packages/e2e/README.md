@@ -2,7 +2,7 @@
 
 End-to-end suite for the RFP Hub. This package is an external **runner**, not a bare Playwright
 config: `src/run.ts` owns every out-of-process resource for the run — a disposable Postgres, the
-API (running on a restricted database role), the dashboard, a fixture web server and a temporary
+API (running on a restricted database role), the frontend, a fixture web server and a temporary
 identity provider session — brings them up, drives Playwright as a child process, and tears
 everything down in a `finally`, including on `SIGINT`/`SIGTERM`. Nothing here is meant to be run
 as `vitest`; the root test run excludes this package (see `vitest.config.ts`).
@@ -33,7 +33,7 @@ OPENAI_API_KEY=... pnpm --filter @the-rfp-hub/e2e e2e:openai
 Every resource the runner creates is scoped to one run (`E2E_RUN_ID`, or 8 random hex if unset):
 the Postgres compose project, its container, and the temp directory holding session state. Two
 runs can execute concurrently without sharing or tearing down each other's database — the one
-exception is `packages/dashboard/.next/`, a shared dev cache; a concurrent run is refused by a
+exception is `packages/frontend/.next/`, a shared dev cache; a concurrent run is refused by a
 lock file rather than silently corrupting it.
 
 Nothing this suite creates needs to be cleaned up by hand: `docker compose down -v` happens in the
@@ -158,5 +158,5 @@ Two further residues, stated rather than papered over:
 - **nothing persists outside the run at all.** The identity store is this run's own database,
   destroyed with its container — the previous provider left user records in a tenant that teardown
   could not remove, and that residue is simply gone;
-- `packages/dashboard/.next/` is a shared dev cache, so concurrent runs are refused by
-  `packages/dashboard/.e2e-next-lock` rather than supported.
+- `packages/frontend/.next/` is a shared dev cache, so concurrent runs are refused by
+  `packages/frontend/.e2e-next-lock` rather than supported.

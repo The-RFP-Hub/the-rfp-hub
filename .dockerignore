@@ -19,18 +19,18 @@ exports
 **/.env
 **/.env.*
 
-# The dashboard is not an input to the API image. It is deployed on its own (see its README) and
+# The frontend is not an input to the API image. It is deployed on its own (see its README) and
 # the API image must not be able to fail — and so block an ECS deploy — on a package the service
 # never runs, which `pnpm -r build` / `pnpm -r typecheck` in the builder stage would otherwise do.
 #
-# NOTE for whoever adds packages/dashboard: the builder runs `pnpm install --frozen-lockfile`, and
+# NOTE for whoever adds packages/frontend: the builder runs `pnpm install --frozen-lockfile`, and
 # a workspace member present in pnpm-lock.yaml but missing from the context makes that command
-# refuse the lockfile. Excluding the directory therefore has to come with keeping the dashboard out
+# refuse the lockfile. Excluding the directory therefore has to come with keeping the frontend out
 # of the API's lockfile importers (its own lockfile / not a `packages/*` workspace member), or with
 # copying it in and building only the API package. Validate with a local `docker build` at that point.
-packages/dashboard
+packages/frontend
 
-# packages/e2e is the same story as packages/dashboard above, for the same reason: it is not an
+# packages/e2e is the same story as packages/frontend above, for the same reason: it is not an
 # input to the API image (it orchestrates the API from OUTSIDE the container — Docker, a disposable
 # Postgres, a browser — it is not something that runs inside one), and the builder's
 # `pnpm install --frozen-lockfile` has to keep tolerating a workspace member present in

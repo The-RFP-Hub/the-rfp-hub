@@ -73,7 +73,7 @@ test.describe("SSRF: direct private targets are refused", () => {
         // failure rather than the address check it claims to be.
         authSecret: process.env[AUTH_SECRET_ENV] ?? "",
         outboxDir: stack.outboxDir,
-        dashboardOrigin: stack.urls.dashboard,
+        frontendOrigin: stack.urls.frontend,
         analyticsHmacKey: randomBytes(32).toString("hex"),
         // The whole point of this instance: the address checks are ON.
         allowPrivateHosts: false,
@@ -177,7 +177,7 @@ test.describe("an API that cannot deliver a code refuses to start a sign-in", ()
         port,
         authSecret: process.env[AUTH_SECRET_ENV] ?? "",
         outboxDir: stack.outboxDir,
-        dashboardOrigin: stack.urls.dashboard,
+        frontendOrigin: stack.urls.frontend,
         analyticsHmacKey: randomBytes(32).toString("hex"),
         allowPrivateHosts: true,
         // The whole point of this instance.

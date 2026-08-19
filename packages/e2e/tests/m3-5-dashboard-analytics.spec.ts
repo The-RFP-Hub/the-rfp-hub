@@ -37,7 +37,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     page,
     stack,
   }) => {
-    await page.goto(stack.urls.dashboard);
+    await page.goto(stack.urls.frontend);
 
     // `Log out` is the product's own signal that a session was restored — waiting for it is waiting
     // for the thing the criterion is about, rather than for a timeout to expire.
@@ -71,7 +71,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     );
 
     for (const path of ["/review", "/admin"]) {
-      await page.goto(`${stack.urls.dashboard}${path}`);
+      await page.goto(`${stack.urls.frontend}${path}`);
       // Hiding a link is presentation; the page still renders, and what it renders is the API's
       // answer about this account — not a second, client-side authorization system.
       await expect(page.getByText(/does not have/i)).toBeVisible();
@@ -83,7 +83,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     stack,
     api,
   }) => {
-    await page.goto(`${stack.urls.dashboard}/listings/new`);
+    await page.goto(`${stack.urls.frontend}/listings/new`);
     await expect(page.getByRole("heading", { name: "Submit an opportunity" })).toBeVisible();
 
     // An empty form cannot be submitted: the button stays disabled and the non-conformance is shown
@@ -91,7 +91,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     await expect(page.getByRole("button", { name: "Submit" })).toBeDisabled();
 
     // …and then the form is actually FILLED AND SUBMITTED. Stopping at the disabled button proves
-    // only that the form renders: a broken submit handler, or a dashboard pointed at the wrong API,
+    // only that the form renders: a broken submit handler, or a frontend pointed at the wrong API,
     // passes that test unchanged. The assertion that matters is that a person typing into this form
     // ends up with a row the API will serve back.
     const localId = `form-${Date.now()}`;
@@ -115,7 +115,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     await expect(submit, "a conformant form enables its submit button").toBeEnabled();
     await submit.click();
 
-    // The dashboard reports the outcome in its own words; the API is the authority on whether the
+    // The frontend reports the outcome in its own words; the API is the authority on whether the
     // row exists, so both are checked and the API's answer is the one that decides.
     await expect(page.getByText(/Submitted\./i)).toBeVisible();
 
@@ -128,7 +128,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
   });
 
   test("a key's secret is shown once and is gone after a reload", async ({ page, stack }) => {
-    await page.goto(`${stack.urls.dashboard}/keys`);
+    await page.goto(`${stack.urls.frontend}/keys`);
     await page.getByRole("button", { name: "Mint" }).click();
 
     const shown = page.getByRole("heading", { name: "Copy this now" });
@@ -157,9 +157,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     });
     expect((await publisher.post("/v1/opportunities", document)).status).toBe(201);
 
-    await page.goto(
-      `${stack.urls.dashboard}/listings/${encodeURIComponent(document.id as string)}`,
-    );
+    await page.goto(`${stack.urls.frontend}/listings/${encodeURIComponent(document.id as string)}`);
     // `.first()` because the title legitimately appears more than once on this page (the heading and
     // the traffic panel's label). The assertion is that the payload is rendered as TEXT — the node
     // holds the literal `<script>…` characters — not that it appears exactly once.

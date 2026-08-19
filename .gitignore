@@ -23,8 +23,8 @@ m3-compliance-report.json
 # image. It is a copy of one developer's local data — not a repo artifact, and potentially large.
 packages/api/.local-backup-*.sql
 
-# Next.js build output (the dashboard, M3). Machine-written, and big.
-packages/dashboard/.next/
+# Next.js build output (the frontend, M3). Machine-written, and big.
+packages/frontend/.next/
 
 # offline converter working files (raw upstream snapshot + draft corpus) — see
 # packages/api/tools/converter/README.md. The CURATED dataset it feeds is
@@ -36,17 +36,17 @@ packages/api/tools/converter/out/
 packages/e2e/test-results/
 packages/e2e/playwright-report/
 
-# The E2E runner's exclusive lock on the dashboard dev server. It sits BESIDE `.next/` rather than
+# The E2E runner's exclusive lock on the frontend dev server. It sits BESIDE `.next/` rather than
 # inside it because `next dev` rewrites that directory on start and would delete a lock kept there.
-packages/dashboard/.e2e-next-lock
+packages/frontend/.e2e-next-lock
 
 # the E2E suite's local report. Specifically this filename, not every `*.local.md` — see
 # packages/e2e/README.md and the M3 E2E plan for why the rule must exist before the file is ever
 # written.
 /M3-E2E-REPORT.local.md
 
-# Next 16's postinstall writes agent-rules files into the dashboard package pointing at its own
+# Next 16's postinstall writes agent-rules files into the frontend package pointing at its own
 # docs under node_modules. This repository deliberately carries no agent-rules files, so these are
 # ignored rather than reviewed on every install.
-packages/dashboard/AGENTS.md
-packages/dashboard/CLAUDE.md
+packages/frontend/AGENTS.md
+packages/frontend/CLAUDE.md

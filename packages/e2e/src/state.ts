@@ -86,13 +86,13 @@ export interface RunState {
   conditional: Array<{ area: string; reason: string }>;
   ports: {
     api: number;
-    dashboard: number;
+    frontend: number;
     fixture: number;
     postgres: number;
   };
   urls: {
     api: string;
-    dashboard: string;
+    frontend: string;
     fixture: string;
     /** The fixture page a verification run is expected to fetch. */
     programme: string;
@@ -141,7 +141,7 @@ export interface RunState {
   browserUserId?: string;
   /** Where the API writes sign-in codes: inside this run's own 0700 directory, removed with it. */
   outboxDir: string;
-  /** Where the API and dashboard child logs are, for a failure report. */
+  /** Where the API and frontend child logs are, for a failure report. */
   logs: Record<string, string>;
 }
 

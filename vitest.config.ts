@@ -6,7 +6,7 @@ import { configDefaults, defineConfig } from "vitest/config";
  * no config, which is the same thing — this file exists to keep it that way as the workspace
  * grows a package that must NOT be in it.
  *
- * `packages/dashboard` runs its own vitest with a jsdom environment. Pulling a jsdom suite into
+ * `packages/frontend` runs its own vitest with a jsdom environment. Pulling a jsdom suite into
  * this node-environment run would either fail on a missing DOM or, worse, quietly change the
  * environment for every other suite here. It gets its own config and its own CI step; the root run
  * stays exactly what it was.
@@ -21,6 +21,6 @@ export default defineConfig({
   test: {
     // `packages/e2e` is Playwright, run only through `pnpm e2e`: its `*.spec.ts` files match
     // vitest's default include and would otherwise be collected and run here too.
-    exclude: [...configDefaults.exclude, "**/.next/**", "packages/dashboard/**", "packages/e2e/**"],
+    exclude: [...configDefaults.exclude, "**/.next/**", "packages/frontend/**", "packages/e2e/**"],
   },
 });

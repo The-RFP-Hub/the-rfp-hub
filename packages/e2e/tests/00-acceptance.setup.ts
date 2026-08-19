@@ -84,7 +84,7 @@ test("M3-1 just-in-time provisioning: a fresh identity's first request creates a
 }) => {
   // The candidate must be an identity NOTHING has spoken to yet.
   //
-  // The browser identity is disqualified by construction: bring-up signs it in, and the dashboard
+  // The browser identity is disqualified by construction: bring-up signs it in, and the frontend
   // issues `/v1/me` as soon as the session restores — so by the time this test runs, its account
   // already exists and the "did not exist beforehand" assertion could only ever fail. That is not a
   // product defect, it is this criterion being unobservable for that identity, and the honest
@@ -117,7 +117,7 @@ test("M3-1 just-in-time provisioning: a fresh identity's first request creates a
   expect(view.canAdmin).toBe(false);
   expect(view.canReview).toBe(false);
   // Any session can manage its own keys — a submitter included. This is the API's own answer and
-  // the dashboard renders its navigation from it.
+  // the frontend renders its navigation from it.
   expect(view.canManageKeys).toBe(true);
   expect(view.memberships).toEqual([]);
 

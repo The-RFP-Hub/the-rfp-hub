@@ -25,7 +25,7 @@ import { setTimeout as delay } from "node:timers/promises";
  * Thrown when a wait is abandoned because the run was interrupted.
  *
  * A distinct type, not a plain Error: the runner has to tell "the user pressed Ctrl-C" apart from
- * "the dashboard never came up", because the first is not a failure and must not be reported as
+ * "the frontend never came up", because the first is not a failure and must not be reported as
  * one — while both take exactly the same teardown path.
  */
 export class InterruptedError extends Error {
