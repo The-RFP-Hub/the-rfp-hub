@@ -36,6 +36,11 @@ import {
   vector,
 } from "drizzle-orm/pg-core";
 
+// Better-Auth's own tables (`auth_user`/`auth_session`/`auth_account`/`auth_verification`) live in
+// their own file — see auth-schema.ts's header for why — and are re-exported here so this remains
+// the single module drizzle-kit and the runtime client point at.
+export * from "./auth-schema.js";
+
 // ── jsonb payload types ────────────────────────────────────────────────────────
 // The jsonb columns below store Standard sub-objects verbatim, so their types come FROM the
 // Standard and are never redefined here. They are re-declared as locally-named interfaces purely
@@ -207,23 +212,20 @@ export const organizations = pgTable("organizations", {
 export const accounts = pgTable("accounts", {
   id: bigint({ mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
   /**
-   * The identity provider's subject. THE join key, and the only one: a wallet address that reaches
-   * the API is self-asserted and would be a forgeable authorization input, so provisioning,
-   * lookup and admin bootstrap all key on this.
+   * The identity provider's subject — `auth_user.id`. THE join key, and the only one. Drop-in
+   * replacement for the former `privy_did`: still an opaque provider-issued string, so
+   * `resolveBy…`, `grant-admin`, `db-seed` and `accounts.search` keep their shapes.
+   *
+   * NO FOREIGN KEY, deliberately. An `accounts` row must outlive a deleted `auth_user` row —
+   * `audit_log` points at THIS table's id, never at Better-Auth's, and a cascaded delete over
+   * there must never be able to silently orphan or erase history over here.
    */
-  privyDid: text().unique(),
-  /**
-   * Filled by the enrichment job from the provider's own record — never from a request body. A
-   * wallet is only usable as an authorization input once it has been VERIFIED by the provider.
-   */
-  primaryWallet: text(),
-  /** PII, and it lives only here — the identity app is separate from any other product's users. */
-  email: text(),
+  authUserId: text().unique(),
   displayName: text(),
   /**
    * The public identifier used for attribution: `source.submittedBy` becomes this handle, the
    * publishing organization's slug, or `"community"`. Public, so it is deliberately not the email
-   * or the DID.
+   * or the auth subject.
    */
   handle: text().unique(),
   globalRole: accountRole().notNull().default("submitter"),
@@ -233,14 +235,6 @@ export const accounts = pgTable("accounts", {
    * without the other.
    */
   directCreate: boolean().notNull().default(false),
-  /**
-   * When the provider record was last read into `primaryWallet`/`email`.
-   *
-   * NULL is the enrichment job's cursor. Enrichment is deliberately off the authentication path —
-   * the provider's user endpoint needs a second credential and is heavily rate-limited — so a
-   * login completes with the DID alone and this column is what says the rest is still owed.
-   */
-  enrichedAt: timestamp({ withTimezone: true }),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

@@ -8,7 +8,7 @@
  * The gates, and what each one closes:
  *
  *   `requireAuth`     a credential of either kind. 401 without one.
- *   `requireSession`  a Privy SESSION, API keys refused with 403. This is what keeps a leaked key
+ *   `requireSession`  a real SESSION, API keys refused with 403. This is what keeps a leaked key
  *                     from minting a stronger key, changing the account's identity, approving
  *                     anything or granting itself a role — see `capabilities.canManageKeys`.
  *   `requireScope`    an explicit scope on an API-key credential (a session always passes: a
@@ -20,7 +20,7 @@
  * they asked for, and never learns why.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
-import { config } from "../config.js";
+import { type Auth, type AuthConfig, defaultAuth } from "../auth/better-auth.js";
 import { type DB, db as defaultDb } from "../db/client.js";
 import { AccountService } from "../modules/services/auth/account.service.js";
 import { ApiKeyService } from "../modules/services/auth/api-key.service.js";
@@ -28,17 +28,33 @@ import {
   PrincipalService,
   type RequestPrincipal,
 } from "../modules/services/auth/principal.service.js";
-import { PrivyTokenService } from "../modules/services/auth/privy-token.service.js";
+import { SessionService } from "../modules/services/auth/session.service.js";
 import type { AccountRole, ApiKeyScope } from "../modules/shared/capabilities.js";
 import { isHttpError } from "../modules/shared/http-error.js";
 
 export interface AuthOptions {
-  /** Overrides the deployment's identity-provider settings — the integration tests inject a key. */
-  privy?: typeof config.privy;
+  /**
+   * Overrides the deployment's session authority — the integration suites inject their own
+   * instance, over the test database, so they can sign identities in without a network or a
+   * third party. ONE optional constructor override is the whole seam.
+   */
+  auth?: Auth;
+  /**
+   * The auth-side configuration the MOUNT reads — allowed origins, the API's own URL. Separate
+   * from `auth` because it answers a different question: `auth` is what verifies a token, this is
+   * who may ask it to mint one. A test that exercises the CORS split supplies both.
+   */
+  config?: AuthConfig;
   db?: DB;
 }
 
 export interface AuthDecorators {
+  /**
+   * The instance the verifier resolved against — handed back so the HTTP mount uses the SAME one.
+   * Two instances over one database would verify each other's tokens only by accident of sharing a
+   * secret, and would diverge the moment one was injected by a test.
+   */
+  auth: Auth;
   principals: PrincipalService;
   requireAuth: preHandlerHookHandler;
   requireSession: preHandlerHookHandler;
@@ -72,12 +88,13 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
 
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
   const db = options.db ?? defaultDb;
-  const privy = new PrivyTokenService(options.privy ?? config.privy);
+  const auth = options.auth ?? defaultAuth();
+  const sessions = new SessionService(auth);
   const accounts = new AccountService(db);
   const principals = new PrincipalService(db, {
     accounts,
     keys: new ApiKeyService(db),
-    privy,
+    sessions,
   });
 
   // Declared so `request.principal` exists on every request object rather than being added as a
@@ -171,6 +188,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   };
 
   const decorators: AuthDecorators = {
+    auth,
     principals,
     requireAuth,
     requireSession,

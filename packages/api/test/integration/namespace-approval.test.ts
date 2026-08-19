@@ -17,10 +17,11 @@ import {
   bearer,
   grantMembership,
   mintApiKeyFor,
-  mintPrivyToken,
   seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  signIn,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
@@ -29,9 +30,9 @@ import { describeWithDb } from "./db-gate.js";
 const MINE = "m3ns-mine";
 const THEIRS = "m3ns-theirs";
 const UNVERIFIED = "m3ns-unverified";
-const DIDS = {
-  publisher: "did:privy:m3ns-publisher",
-  direct: "did:privy:m3ns-direct",
+const EMAILS = {
+  publisher: "m3ns-publisher@rfphub.invalid",
+  direct: "m3ns-direct@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -43,36 +44,38 @@ run("M3NS namespace and auto-approval", () => {
   let directWriteKey: string;
   let directPublishKey: string;
   let publisherWriteKey: string;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3ns-publisher" });
-    const direct = await seedAccount({
-      did: DIDS.direct,
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3ns-publisher" });
+    const direct = await seedIdentity(EMAILS.direct, {
       handle: "m3ns-direct",
       directCreate: true,
     });
+    userIds.push(publisher.userId, direct.userId);
 
     const mine = await seedOrganization({ slug: MINE, verified: true });
     await seedOrganization({ slug: THEIRS, verified: true });
     const unverified = await seedOrganization({ slug: UNVERIFIED, verified: false });
-    await grantMembership(publisher.id, mine.id);
-    await grantMembership(publisher.id, unverified.id);
+    await grantMembership(publisher.account.id, mine.id);
+    await grantMembership(publisher.account.id, unverified.id);
 
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    directToken = await mintPrivyToken(DIDS.direct);
-    directWriteKey = await mintApiKeyFor(direct.id, ["read", "write"]);
-    directPublishKey = await mintApiKeyFor(direct.id, ["read", "write", "publish"]);
-    publisherWriteKey = await mintApiKeyFor(publisher.id, ["read", "write"]);
+    publisherToken = publisher.token;
+    directToken = direct.token;
+    directWriteKey = await mintApiKeyFor(direct.account.id, ["read", "write"]);
+    directPublishKey = await mintApiKeyFor(direct.account.id, ["read", "write", "publish"]);
+    publisherWriteKey = await mintApiKeyFor(publisher.account.id, ["read", "write"]);
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3ns-",
       organizationSlugs: [MINE, THEIRS, UNVERIFIED],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();
@@ -132,7 +135,10 @@ run("M3NS namespace and auto-approval", () => {
   });
 
   it("refuses a key that carries neither `write` nor `publish`", async () => {
-    const readOnly = await mintApiKeyFor((await seedAccount({ did: DIDS.direct })).id, ["read"]);
+    const readOnly = await mintApiKeyFor(
+      (await seedAccount({ userId: (await signIn(EMAILS.direct)).userId })).id,
+      ["read"],
+    );
     const res = await post(readOnly, `${THEIRS}:read-only`, THEIRS);
     expect(res.statusCode).toBe(403);
     expect(res.json().error).toBe("missing_scope");

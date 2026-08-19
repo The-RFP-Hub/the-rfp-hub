@@ -15,25 +15,26 @@ import {
   bearer,
   grantMembership,
   mintApiKeyFor,
-  mintPrivyToken,
   seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  signIn,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3audit";
-const DIDS = {
-  publisher: "did:privy:m3audit-publisher",
-  admin: "did:privy:m3audit-admin",
-  stranger: "did:privy:m3audit-stranger",
+const EMAILS = {
+  publisher: "m3audit-publisher@rfphub.invalid",
+  admin: "m3audit-admin@rfphub.invalid",
+  stranger: "m3audit-stranger@rfphub.invalid",
   // Demoted mid-suite, on purpose: the trail must not follow.
-  reviewer: "did:privy:m3audit-reviewer",
+  reviewer: "m3audit-reviewer@rfphub.invalid",
   // A separate subject for the admin grants: promoting the stranger would change what the
   // redaction and visibility cases below are testing.
-  target: "did:privy:m3audit-target",
+  target: "m3audit-target@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -59,29 +60,30 @@ run("M3AUDIT the append-only trail", () => {
   let opportunityId: number;
 
   const PUBLIC_ID = `${NS}:tracked`;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3audit-publisher" });
-    publisherId = publisher.id;
-    await seedAccount({ did: DIDS.admin, handle: "m3audit-admin", role: "admin" });
-    await seedAccount({ did: DIDS.stranger, handle: "m3audit-stranger" });
-    const reviewer = await seedAccount({
-      did: DIDS.reviewer,
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3audit-publisher" });
+    publisherId = publisher.account.id;
+    const admin = await seedIdentity(EMAILS.admin, { handle: "m3audit-admin", role: "admin" });
+    const stranger = await seedIdentity(EMAILS.stranger, { handle: "m3audit-stranger" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
       handle: "m3audit-reviewer",
       role: "reviewer",
     });
-    reviewerId = reviewer.id;
-    await seedAccount({ did: DIDS.target, handle: "m3audit-target" });
+    reviewerId = reviewer.account.id;
+    const target = await seedIdentity(EMAILS.target, { handle: "m3audit-target" });
+    userIds.push(publisher.userId, admin.userId, stranger.userId, reviewer.userId, target.userId);
     const org = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, org.id, "owner");
+    await grantMembership(publisher.account.id, org.id, "owner");
 
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    adminToken = await mintPrivyToken(DIDS.admin);
-    strangerToken = await mintPrivyToken(DIDS.stranger);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    publisherToken = publisher.token;
+    adminToken = admin.token;
+    strangerToken = stranger.token;
+    reviewerToken = reviewer.token;
 
     const minted = await app.inject({
       method: "POST",
@@ -114,7 +116,8 @@ run("M3AUDIT the append-only trail", () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();
@@ -138,7 +141,7 @@ run("M3AUDIT the append-only trail", () => {
     const keyRows = await rowsFor("api_key", publishKeyId);
     expect(keyRows.map((r) => r.action)).toContain("create_api_key");
 
-    const target = await seedAccount({ did: DIDS.target });
+    const target = await seedAccount({ userId: (await signIn(EMAILS.target)).userId });
     const granted = await app.inject({
       method: "POST",
       url: `/v1/admin/accounts/${target.id}/role`,

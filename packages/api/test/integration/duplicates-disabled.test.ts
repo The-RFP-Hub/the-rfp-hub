@@ -30,12 +30,13 @@ import { describeWithDb } from "./db-gate.js";
 const { buildApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/client.js");
 const { config } = await import("../../src/config.js");
-const { bearer, grantMembership, mintPrivyToken, seedAccount, seedOrganization, testPrivyConfig } =
-  await import("../helpers/auth.js");
+const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = await import(
+  "../helpers/auth.js"
+);
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
 
 const NS = "m3dupoff";
-const DIDS = { publisher: "did:privy:m3dupoff-publisher" };
+const EMAIL = "m3dupoff-publisher@rfphub.invalid";
 
 const run = describeWithDb;
 
@@ -54,20 +55,24 @@ run("M3DUP duplicate detection, provider disabled", () => {
   let app: FastifyInstance;
   let token: string;
 
+  let userId: string;
+
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3dupoff-publisher" });
+    const publisher = await seedIdentity(EMAIL, { handle: "m3dupoff-publisher" });
     const org = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, org.id, "owner");
-    token = await mintPrivyToken(DIDS.publisher);
+    await grantMembership(publisher.account.id, org.id, "owner");
+    token = publisher.token;
+    userId = publisher.userId;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds: [userId],
+      emails: [EMAIL],
     });
     await app.close();
     await pool.end();

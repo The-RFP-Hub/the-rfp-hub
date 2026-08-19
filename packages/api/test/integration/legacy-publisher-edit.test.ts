@@ -23,7 +23,7 @@ import { sourceSystemOf } from "../../scripts/seed.js";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
-import { bearer, mintPrivyToken, seedAccount, testPrivyConfig } from "../helpers/auth.js";
+import { bearer, seedIdentity, testAuth } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
@@ -36,7 +36,7 @@ const API_ID = "m3legacy:api-1";
 const API_NS = "m3legacy-api-ns";
 const API_OP = "m3legacy-api-op";
 
-const DID = "did:privy:m3legacy-reviewer";
+const EMAIL = "m3legacy-reviewer@rfphub.invalid";
 
 /**
  * A legacy-shaped, NON-conforming document: published under `ns`, operated by `operator` (so the
@@ -61,13 +61,15 @@ const run = describeWithDb;
 run("M3LEGACY replace-time containment and the import-provenance exemption", () => {
   let app: FastifyInstance;
   let reviewerToken: string;
+  let userId: string;
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    await seedAccount({ did: DID, handle: "m3legacy-reviewer", role: "reviewer" });
-    reviewerToken = await mintPrivyToken(DID);
+    const reviewer = await seedIdentity(EMAIL, { handle: "m3legacy-reviewer", role: "reviewer" });
+    reviewerToken = reviewer.token;
+    userId = reviewer.userId;
 
     // Seeded through the service, NOT the write path — the create-time gate would reject both, which
     // is the whole point: these are rows that reached the DB without passing it.
@@ -88,7 +90,8 @@ run("M3LEGACY replace-time containment and the import-provenance exemption", () 
     await cleanupFixtures({
       opportunityPrefix: "m3legacy:",
       organizationSlugs: [IMPORT_OP, API_OP],
-      privyDids: [DID],
+      userIds: [userId],
+      emails: [EMAIL],
     });
     await app.close();
     await pool.end();

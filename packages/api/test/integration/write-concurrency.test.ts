@@ -21,10 +21,9 @@ import {
   bearer,
   grantMembership,
   mintApiKeyFor,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { openLockBarrier } from "../helpers/lock-barrier.js";
@@ -32,10 +31,10 @@ import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3conc";
-const DIDS = {
-  publisher: "did:privy:m3conc-publisher",
+const EMAILS = {
+  publisher: "m3conc-publisher@rfphub.invalid",
   /** Publishes here through an admin grant rather than a membership — the other route to T2. */
-  direct: "did:privy:m3conc-direct",
+  direct: "m3conc-direct@rfphub.invalid",
 };
 
 /** One `{before, after}` entry of an audit patch. */
@@ -53,31 +52,33 @@ run("M3CONC concurrent writes", () => {
   let accountId: number;
   let directAccountId: number;
   let organizationId: number;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3conc-publisher" });
-    const direct = await seedAccount({
-      did: DIDS.direct,
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3conc-publisher" });
+    const direct = await seedIdentity(EMAILS.direct, {
       handle: "m3conc-direct",
       directCreate: true,
     });
+    userIds.push(publisher.userId, direct.userId);
     const organization = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, organization.id);
-    accountId = publisher.id;
-    directAccountId = direct.id;
+    await grantMembership(publisher.account.id, organization.id);
+    accountId = publisher.account.id;
+    directAccountId = direct.account.id;
     organizationId = organization.id;
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    directKey = await mintApiKeyFor(direct.id, ["read", "write", "publish"]);
+    publisherToken = publisher.token;
+    directKey = await mintApiKeyFor(direct.account.id, ["read", "write", "publish"]);
   }, 30_000);
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

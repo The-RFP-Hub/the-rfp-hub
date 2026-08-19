@@ -33,19 +33,18 @@ import { VerificationService } from "../../src/modules/services/verification/ver
 import {
   bearer,
   grantMembership,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { fixtureTransport, sourcePage } from "../helpers/verify-transport.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3ver";
-const DIDS = {
-  publisher: "did:privy:m3ver-publisher",
-  reviewer: "did:privy:m3ver-reviewer",
+const EMAILS = {
+  publisher: "m3ver-publisher@rfphub.invalid",
+  reviewer: "m3ver-reviewer@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -137,16 +136,22 @@ run("M3VER verification", () => {
   let loopbackPort: number;
   let server: ReturnType<typeof createServer>;
 
+  const userIds: string[] = [];
+
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3ver-publisher" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3ver-reviewer", role: "reviewer" });
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3ver-publisher" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3ver-reviewer",
+      role: "reviewer",
+    });
+    userIds.push(publisher.userId, reviewer.userId);
     const org = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, org.id, "owner");
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    await grantMembership(publisher.account.id, org.id, "owner");
+    publisherToken = publisher.token;
+    reviewerToken = reviewer.token;
 
     server = createServer((_req, res) => {
       const page = sourcePage({
@@ -165,7 +170,8 @@ run("M3VER verification", () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

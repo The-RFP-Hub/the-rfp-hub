@@ -14,10 +14,11 @@ import { opportunities, orgMemberships } from "../../src/db/schema.js";
 import {
   bearer,
   grantMembership,
-  mintPrivyToken,
   seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  signIn,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
@@ -25,12 +26,12 @@ import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3rev";
 const CANDIDATE = "m3rev-candidate";
-const DIDS = {
-  submitter: "did:privy:m3rev-submitter",
-  member: "did:privy:m3rev-member",
-  reviewer: "did:privy:m3rev-reviewer",
-  admin: "did:privy:m3rev-admin",
-  raceMember: "did:privy:m3rev-race-member",
+const EMAILS = {
+  submitter: "m3rev-submitter@rfphub.invalid",
+  member: "m3rev-member@rfphub.invalid",
+  reviewer: "m3rev-reviewer@rfphub.invalid",
+  admin: "m3rev-admin@rfphub.invalid",
+  raceMember: "m3rev-race-member@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -43,33 +44,39 @@ run("M3REV review and administration", () => {
   let adminToken: string;
   let memberId: number;
   let candidateOrgId: number;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    await seedAccount({ did: DIDS.submitter, handle: "m3rev-submitter" });
-    const member = await seedAccount({ did: DIDS.member, handle: "m3rev-member" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3rev-reviewer", role: "reviewer" });
-    await seedAccount({ did: DIDS.admin, handle: "m3rev-admin", role: "admin" });
-    memberId = member.id;
+    const submitter = await seedIdentity(EMAILS.submitter, { handle: "m3rev-submitter" });
+    const member = await seedIdentity(EMAILS.member, { handle: "m3rev-member" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3rev-reviewer",
+      role: "reviewer",
+    });
+    const admin = await seedIdentity(EMAILS.admin, { handle: "m3rev-admin", role: "admin" });
+    memberId = member.account.id;
+    userIds.push(submitter.userId, member.userId, reviewer.userId, admin.userId);
 
     await seedOrganization({ slug: NS, verified: false });
     const candidate = await seedOrganization({ slug: CANDIDATE, verified: false });
     candidateOrgId = candidate.id;
-    await grantMembership(member.id, candidate.id, "owner");
+    await grantMembership(member.account.id, candidate.id, "owner");
 
-    submitterToken = await mintPrivyToken(DIDS.submitter);
-    memberToken = await mintPrivyToken(DIDS.member);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
-    adminToken = await mintPrivyToken(DIDS.admin);
+    submitterToken = submitter.token;
+    memberToken = member.token;
+    reviewerToken = reviewer.token;
+    adminToken = admin.token;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3rev",
       organizationSlugs: [NS, CANDIDATE],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();
@@ -248,14 +255,15 @@ run("M3REV review and administration", () => {
     // see no row and both attempt the insert. The unique index lets one in and raises a conflict at
     // the other; the grant is documented as idempotent, so BOTH requests must come back 200 with
     // `member: true`, and exactly one row must exist — never a 500 for an otherwise ordinary grant.
-    const fresh = await seedAccount({ did: DIDS.raceMember, handle: "m3rev-race-member" });
+    const fresh = await seedIdentity(EMAILS.raceMember, { handle: "m3rev-race-member" });
+    userIds.push(fresh.userId);
 
     const grant = () =>
       app.inject({
         method: "POST",
         url: `/v1/review/organizations/${CANDIDATE}/members`,
         headers: bearer(reviewerToken),
-        payload: { accountId: fresh.id, role: "publisher" },
+        payload: { accountId: fresh.account.id, role: "publisher" },
       });
     const [first, second] = await Promise.all([grant(), grant()]);
 
@@ -270,7 +278,7 @@ run("M3REV review and administration", () => {
       .from(orgMemberships)
       .where(
         and(
-          eq(orgMemberships.accountId, fresh.id),
+          eq(orgMemberships.accountId, fresh.account.id),
           eq(orgMemberships.organizationId, candidateOrgId),
         ),
       );
@@ -311,7 +319,10 @@ run("M3REV review and administration", () => {
   });
 
   it("keeps role assignment to T4 and account/organisation discovery to T3", async () => {
-    const target = await seedAccount({ did: DIDS.submitter });
+    // Re-resolves the SAME account `beforeAll` already seeded — `signIn` caches per address, so
+    // this reuses the submitter's identity to promote its existing account, rather than minting a
+    // second one.
+    const target = await seedAccount({ userId: (await signIn(EMAILS.submitter)).userId });
     const byReviewer = await app.inject({
       method: "POST",
       url: `/v1/admin/accounts/${target.id}/role`,

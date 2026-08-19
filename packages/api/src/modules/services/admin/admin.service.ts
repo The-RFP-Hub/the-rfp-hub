@@ -60,6 +60,15 @@ export class AdminService {
 
       const row = await lockAccount(tx, accountId);
       if (row.globalRole === target) return toAccountSummary(row);
+      // A privilege on an account nobody can sign in as is a ghost: it can never be exercised by
+      // its owner, and it counts toward the last-admin guard, so a mistyped grant can convince the
+      // product it has an administrator it does not have. Migration 0006 cleared the ones the
+      // identity swap created; this is what stops the route from making new ones.
+      //
+      // DEMOTION IS STILL ALLOWED, deliberately: landing on `submitter` is the cleanup direction,
+      // and refusing it would strand any such row as a permanent phantom admin that the guard keeps
+      // counting.
+      assertReachable(row, target !== "submitter");
       if (row.globalRole === "admin" && admins.length <= 1) {
         throw conflict(
           "last_admin",
@@ -92,6 +101,9 @@ export class AdminService {
     return this.db.transaction(async (tx) => {
       const row = await lockAccount(tx, accountId);
       if (row.directCreate === directCreate) return toAccountSummary(row);
+      // The same rule as the role: granting to an unreachable account creates a privilege nobody can
+      // hold, revoking one is cleanup.
+      assertReachable(row, directCreate);
       const updated = await tx
         .update(accounts)
         .set({ directCreate, updatedAt: new Date() })
@@ -112,6 +124,21 @@ export class AdminService {
 }
 
 type TxLike = Parameters<Parameters<DB["transaction"]>[0]>[0];
+
+/**
+ * Refuse to hand a privilege to an account that has no identity behind it.
+ *
+ * `accounts.auth_user_id` is NULL for a row that has lost — or never had — an identity, and there is
+ * no foreign key to make that impossible (an accounts row must outlive its identity, because
+ * `audit_log` points at it). So the check lives here, on the two routes that grant.
+ */
+function assertReachable(row: AccountRow, granting: boolean): void {
+  if (!granting || row.authUserId !== null) return;
+  throw conflict(
+    "unreachable_account",
+    "that account has no identity behind it — nobody can sign in as it — so granting it anything would create a privilege no person holds. It can still be demoted.",
+  );
+}
 
 async function lockAccount(tx: TxLike, accountId: number): Promise<AccountRow> {
   const rows = await tx

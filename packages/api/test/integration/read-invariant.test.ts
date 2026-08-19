@@ -18,20 +18,19 @@ import { pool } from "../../src/db/client.js";
 import {
   bearer,
   grantMembership,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3inv";
-const DIDS = {
-  publisher: "did:privy:m3inv-publisher",
-  submitter: "did:privy:m3inv-submitter",
-  reviewer: "did:privy:m3inv-reviewer",
+const EMAILS = {
+  publisher: "m3inv-publisher@rfphub.invalid",
+  submitter: "m3inv-submitter@rfphub.invalid",
+  reviewer: "m3inv-reviewer@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -41,25 +40,31 @@ run("M3INV the public read invariant", () => {
   let publisherToken: string;
   let submitterToken: string;
   let reviewerToken: string;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3inv-publisher" });
-    await seedAccount({ did: DIDS.submitter, handle: "m3inv-submitter" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3inv-reviewer", role: "reviewer" });
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3inv-publisher" });
+    const submitter = await seedIdentity(EMAILS.submitter, { handle: "m3inv-submitter" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3inv-reviewer",
+      role: "reviewer",
+    });
+    userIds.push(publisher.userId, submitter.userId, reviewer.userId);
     const org = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, org.id, "owner");
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    submitterToken = await mintPrivyToken(DIDS.submitter);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    await grantMembership(publisher.account.id, org.id, "owner");
+    publisherToken = publisher.token;
+    submitterToken = submitter.token;
+    reviewerToken = reviewer.token;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

@@ -11,23 +11,17 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { auditLog, opportunities, organizations } from "../../src/db/schema.js";
-import {
-  bearer,
-  mintPrivyToken,
-  seedAccount,
-  seedOrganization,
-  testPrivyConfig,
-} from "../helpers/auth.js";
+import { bearer, seedIdentity, seedOrganization, signIn, testAuth } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3life";
 const JIT_NS = "m3life-jit";
-const JIT_DID = "did:privy:m3life-jit";
-const DIDS = {
-  publisher: "did:privy:m3life-publisher",
-  reviewer: "did:privy:m3life-reviewer",
+const JIT_EMAIL = "m3life-jit@rfphub.invalid";
+const EMAILS = {
+  publisher: "m3life-publisher@rfphub.invalid",
+  reviewer: "m3life-reviewer@rfphub.invalid",
 };
 const PUBLIC_ID = `${NS}:programme`;
 
@@ -38,21 +32,30 @@ run("M3LIFE publisher lifecycle", () => {
   let publisherToken: string;
   let reviewerToken: string;
   let accountId: number;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
-    await seedAccount({ did: DIDS.reviewer, handle: "m3life-reviewer", role: "reviewer" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3life-reviewer",
+      role: "reviewer",
+    });
     await seedOrganization({ slug: NS, name: "Lifecycle Foundation", verified: false });
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    // NOT seeded: the first case's whole point is that first login is what provisions this
+    // account, from nothing but the identity.
+    const publisher = await signIn(EMAILS.publisher);
+    publisherToken = publisher.token;
+    reviewerToken = reviewer.token;
+    userIds.push(publisher.userId, reviewer.userId);
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS, JIT_NS],
-      privyDids: [...Object.values(DIDS), JIT_DID],
+      userIds,
+      emails: [...Object.values(EMAILS), JIT_EMAIL],
     });
     await app.close();
     await pool.end();
@@ -206,8 +209,9 @@ run("M3LIFE publisher lifecycle", () => {
   it("infers the organisation from the programme: submit registers the stub, a reviewer verifies it", async () => {
     // The P2 flow, with NO organisation pre-registered. There is no reviewer "create org" step —
     // the org is inferred from the programme, and its slug is the operating org the programme names.
-    const account = await seedAccount({ did: JIT_DID, handle: "m3life-jit" });
-    const jitToken = await mintPrivyToken(JIT_DID);
+    const account = await seedIdentity(JIT_EMAIL, { handle: "m3life-jit" });
+    userIds.push(account.userId);
+    const jitToken = account.token;
 
     // The directory has never heard of this slug.
     expect(
@@ -250,7 +254,7 @@ run("M3LIFE publisher lifecycle", () => {
           method: "POST",
           url: `/v1/review/organizations/${JIT_NS}/members`,
           headers: bearer(reviewerToken),
-          payload: { accountId: account.id, role: "owner" },
+          payload: { accountId: account.account.id, role: "owner" },
         })
       ).statusCode,
     ).toBe(200);

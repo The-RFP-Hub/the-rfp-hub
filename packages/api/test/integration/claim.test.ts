@@ -16,10 +16,9 @@ import {
   bearer,
   grantMembership,
   mintApiKeyFor,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
@@ -35,14 +34,14 @@ const OPERATOR = "m3claim-operator";
 const SPONSOR = "m3claim-sponsor";
 const RIVAL = "m3claim-rival";
 const UNVERIFIED = "m3claim-unverified";
-const DIDS = {
-  host: "did:privy:m3claim-host",
-  rival: "did:privy:m3claim-rival",
-  operator: "did:privy:m3claim-operator",
-  colleague: "did:privy:m3claim-colleague",
-  sponsor: "did:privy:m3claim-sponsor",
-  unverified: "did:privy:m3claim-unverified",
-  reviewer: "did:privy:m3claim-reviewer",
+const EMAILS = {
+  host: "m3claim-host@rfphub.invalid",
+  rival: "m3claim-rival@rfphub.invalid",
+  operator: "m3claim-operator@rfphub.invalid",
+  colleague: "m3claim-colleague@rfphub.invalid",
+  sponsor: "m3claim-sponsor@rfphub.invalid",
+  unverified: "m3claim-unverified@rfphub.invalid",
+  reviewer: "m3claim-reviewer@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -58,6 +57,7 @@ run("M3CLAIM ownership claims", () => {
   let reviewerToken: string;
   let operatorId: number;
   let operatorOrgId: number;
+  const userIds: string[] = [];
 
   /**
    * One approved, listed entry published under the unverified `HOST` namespace.
@@ -94,16 +94,27 @@ run("M3CLAIM ownership claims", () => {
   }
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const rival = await seedAccount({ did: DIDS.rival, handle: "m3claim-rival" });
-    const operator = await seedAccount({ did: DIDS.operator, handle: "m3claim-operator" });
-    const colleague = await seedAccount({ did: DIDS.colleague, handle: "m3claim-colleague" });
-    const sponsor = await seedAccount({ did: DIDS.sponsor, handle: "m3claim-sponsor" });
-    const unverified = await seedAccount({ did: DIDS.unverified, handle: "m3claim-unverified" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3claim-reviewer", role: "reviewer" });
-    operatorId = operator.id;
+    const rival = await seedIdentity(EMAILS.rival, { handle: "m3claim-rival" });
+    const operator = await seedIdentity(EMAILS.operator, { handle: "m3claim-operator" });
+    const colleague = await seedIdentity(EMAILS.colleague, { handle: "m3claim-colleague" });
+    const sponsor = await seedIdentity(EMAILS.sponsor, { handle: "m3claim-sponsor" });
+    const unverified = await seedIdentity(EMAILS.unverified, { handle: "m3claim-unverified" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3claim-reviewer",
+      role: "reviewer",
+    });
+    operatorId = operator.account.id;
+    userIds.push(
+      rival.userId,
+      operator.userId,
+      colleague.userId,
+      sponsor.userId,
+      unverified.userId,
+      reviewer.userId,
+    );
 
     await seedOrganization({ slug: HOST, verified: false });
     const rivalOrg = await seedOrganization({ slug: RIVAL, verified: true });
@@ -112,25 +123,26 @@ run("M3CLAIM ownership claims", () => {
     const unverifiedOrg = await seedOrganization({ slug: UNVERIFIED, verified: false });
     operatorOrgId = operatorOrg.id;
 
-    await grantMembership(rival.id, rivalOrg.id, "owner");
-    await grantMembership(operator.id, operatorOrg.id, "owner");
-    await grantMembership(colleague.id, operatorOrg.id, "publisher");
-    await grantMembership(sponsor.id, sponsorOrg.id, "owner");
-    await grantMembership(unverified.id, unverifiedOrg.id, "owner");
+    await grantMembership(rival.account.id, rivalOrg.id, "owner");
+    await grantMembership(operator.account.id, operatorOrg.id, "owner");
+    await grantMembership(colleague.account.id, operatorOrg.id, "publisher");
+    await grantMembership(sponsor.account.id, sponsorOrg.id, "owner");
+    await grantMembership(unverified.account.id, unverifiedOrg.id, "owner");
 
-    rivalToken = await mintPrivyToken(DIDS.rival);
-    operatorToken = await mintPrivyToken(DIDS.operator);
-    colleagueToken = await mintPrivyToken(DIDS.colleague);
-    sponsorToken = await mintPrivyToken(DIDS.sponsor);
-    unverifiedToken = await mintPrivyToken(DIDS.unverified);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    rivalToken = rival.token;
+    operatorToken = operator.token;
+    colleagueToken = colleague.token;
+    sponsorToken = sponsor.token;
+    unverifiedToken = unverified.token;
+    reviewerToken = reviewer.token;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3claim-",
       organizationSlugs: [HOST, OPERATOR, SPONSOR, RIVAL, UNVERIFIED],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

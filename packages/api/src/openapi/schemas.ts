@@ -618,7 +618,6 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "handle",
       "displayName",
       "email",
-      "primaryWallet",
       "role",
       "directCreate",
       "credentialKind",
@@ -636,11 +635,10 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         description: "The public identifier attribution uses. Null until it is chosen.",
       },
       displayName: { type: ["string", "null"] },
-      email: { type: ["string", "null"] },
-      primaryWallet: {
+      email: {
         type: ["string", "null"],
         description:
-          "Filled by enrichment from the identity provider's own record — never asserted by a request.",
+          "The verified address this account signs in with. Null when the request presented an API key, which identifies an account without identifying a session.",
       },
       role: { type: "string", enum: ["submitter", "reviewer", "admin"] },
       directCreate: { type: "boolean" },

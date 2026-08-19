@@ -27,8 +27,9 @@ async function view(request: FastifyRequest): Promise<MeView> {
     accountId: principal.accountId,
     handle: principal.account.handle,
     displayName: principal.account.displayName,
-    email: principal.account.email,
-    primaryWallet: principal.account.primaryWallet,
+    // From the SESSION, not from `accounts`: the address lives in the identity tables and this API
+    // deliberately keeps one copy of it. An API-key request has no session and therefore no address.
+    email: principal.email ?? null,
     role: principal.role,
     directCreate: principal.directCreate,
     credentialKind: principal.credentialKind,

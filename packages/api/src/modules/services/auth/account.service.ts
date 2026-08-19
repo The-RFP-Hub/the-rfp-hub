@@ -1,16 +1,16 @@
 /**
- * Accounts: provisioned on first login, keyed on the identity provider's DID, and nothing else.
+ * Accounts: provisioned on first login, keyed on the session's SUBJECT, and nothing else.
  *
- * WHY THE DID AND NOT A WALLET. A wallet address that reaches this API arrived in a request, which
- * makes it self-asserted, which makes it a forgeable authorization input. The DID comes out of a
- * signature this process verified. `accounts.primary_wallet` exists, but it is filled by the
- * enrichment job from the provider's own record and is usable as an authorization input only
- * because of where it came from.
+ * WHAT THE SUBJECT IS. The opaque user id the identity tables mint — never an email address. An
+ * address is a routable, transferable, re-assignable thing a person can change; the subject is the
+ * one value that is stable for the life of the identity, which is why it and not the address is
+ * what `audit_log` ends up pointing at through `accounts.id`. `grant-admin --email` looks an
+ * address UP to find a subject; it never stores one.
  *
- * ENRICHMENT IS NOT ON THIS PATH. The provider's user endpoint needs a second credential and is
- * heavily rate-limited, so a login completes with the DID alone and `enriched_at` stays NULL. That
- * NULL is the cursor the enrichment job selects on; nothing else is needed to "queue" the work, and
- * a request never waits on the provider.
+ * NO PROFILE IS COPIED HERE. The address, the display name the provider knows and the verification
+ * state all live in the identity tables, and `/v1/me` joins for the address rather than keeping a
+ * second copy that would drift. This table holds what the APPLICATION decides about an account:
+ * its role, its direct-create grant, its public handle.
  *
  * LOGIN GRANTS NOTHING. A session resolves to whatever role the database already holds — there is
  * no list of privileged identities in the environment for a login to consult, because a role that
@@ -66,17 +66,25 @@ export class AccountService {
    * `ON CONFLICT DO NOTHING` followed by a read rather than a read-then-insert: two tabs logging in
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
    */
-  async resolveByPrivyDid(did: string): Promise<AccountRow> {
-    await this.db.insert(accounts).values({ privyDid: did }).onConflictDoNothing();
-    const rows = await this.db.select().from(accounts).where(eq(accounts.privyDid, did)).limit(1);
+  async resolveBySubject(subject: string): Promise<AccountRow> {
+    await this.db.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
+    const rows = await this.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.authUserId, subject))
+      .limit(1);
     const account = rows[0];
-    if (!account) throw new Error(`account for '${did}' vanished between insert and read`);
+    if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
     return account;
   }
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */
-  async findByPrivyDid(did: string): Promise<AccountRow | undefined> {
-    const rows = await this.db.select().from(accounts).where(eq(accounts.privyDid, did)).limit(1);
+  async findBySubject(subject: string): Promise<AccountRow | undefined> {
+    const rows = await this.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.authUserId, subject))
+      .limit(1);
     return rows[0];
   }
 
@@ -90,31 +98,36 @@ export class AccountService {
    * ceremony at the database instead means the grant is an EVENT, recorded once, and every later
    * admin is made by an admin over the audited route.
    *
-   * `create` provisions the row for a subject that has never logged in, with the same
-   * `ON CONFLICT DO NOTHING` idiom as `resolveByPrivyDid` — an operator should not have to
-   * choreograph "log in first, then be granted".
+   * `create` provisions the `accounts` row for an identity that has signed in but never made a
+   * `/v1` request, with the same `ON CONFLICT DO NOTHING` idiom as `resolveBySubject` — an operator
+   * should not have to choreograph "now go and call an endpoint, then be granted".
    *
    * Idempotent: an account that is already an admin is returned unchanged and writes no second
    * audit row. The lock is what makes the read-then-write safe against a concurrent role change.
    */
-  async grantAdmin(did: string, options: { create?: boolean } = {}): Promise<AdminGrant> {
+  async grantAdmin(subject: string, options: { create?: boolean } = {}): Promise<AdminGrant> {
     return this.db.transaction(async (tx) => {
       const locked = async () =>
         (
-          await tx.select().from(accounts).where(eq(accounts.privyDid, did)).for("update").limit(1)
+          await tx
+            .select()
+            .from(accounts)
+            .where(eq(accounts.authUserId, subject))
+            .for("update")
+            .limit(1)
         )[0];
 
       let account = await locked();
       let created = false;
       if (!account) {
         if (options.create !== true) {
-          throw notFound(`no account for ${JSON.stringify(did)}.`);
+          throw notFound(`no account for ${JSON.stringify(subject)}.`);
         }
-        await tx.insert(accounts).values({ privyDid: did }).onConflictDoNothing();
+        await tx.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
         account = await locked();
         created = account !== undefined;
       }
-      if (!account) throw new Error(`account for '${did}' vanished between insert and read`);
+      if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
       if (account.globalRole === "admin") return { account, created, promoted: false };
 
       const updated = await tx
@@ -267,7 +280,7 @@ export class AccountService {
     }
   }
 
-  /** T3 account discovery for the review screens. Matches handle, display name or DID exactly. */
+  /** T3 account discovery for the review screens. Matches handle, display name or subject. */
   async search(q: string | undefined, limit = 25): Promise<AccountRow[]> {
     const query = (q ?? "").trim();
     if (query === "") {
@@ -277,7 +290,7 @@ export class AccountService {
     const match = or(
       ilike(accounts.handle, like),
       ilike(accounts.displayName, like),
-      eq(accounts.privyDid, query),
+      eq(accounts.authUserId, query),
     );
     return this.db.select().from(accounts).where(match).orderBy(accounts.id).limit(limit);
   }

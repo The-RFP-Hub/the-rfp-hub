@@ -34,17 +34,18 @@ const { contentHash, embeddingText } = await import("../../src/modules/shared/em
 const { DeterministicEmbeddingProvider } = await import(
   "../../src/modules/services/dedupe/embedding-provider.js"
 );
-const { bearer, grantMembership, mintPrivyToken, seedAccount, seedOrganization, testPrivyConfig } =
-  await import("../helpers/auth.js");
+const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = await import(
+  "../helpers/auth.js"
+);
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
 const { DedupeService } = await import("../../src/modules/services/dedupe/dedupe.service.js");
 
 const NS = "m3dup";
 const OTHER_NS = "m3dup-other";
-const DIDS = {
-  publisher: "did:privy:m3dup-publisher",
-  stranger: "did:privy:m3dup-stranger",
-  reviewer: "did:privy:m3dup-reviewer",
+const EMAILS = {
+  publisher: "m3dup-publisher@rfphub.invalid",
+  stranger: "m3dup-stranger@rfphub.invalid",
+  reviewer: "m3dup-reviewer@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -116,28 +117,34 @@ run("M3DUP duplicate detection", () => {
     return rows[0];
   };
 
+  const userIds: string[] = [];
+
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3dup-publisher" });
-    const stranger = await seedAccount({ did: DIDS.stranger, handle: "m3dup-stranger" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3dup-reviewer", role: "reviewer" });
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3dup-publisher" });
+    const stranger = await seedIdentity(EMAILS.stranger, { handle: "m3dup-stranger" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3dup-reviewer",
+      role: "reviewer",
+    });
     const org = await seedOrganization({ slug: NS, verified: true });
     await seedOrganization({ slug: OTHER_NS, verified: false });
-    await grantMembership(publisher.id, org.id, "owner");
-    void stranger;
+    await grantMembership(publisher.account.id, org.id, "owner");
+    userIds.push(publisher.userId, stranger.userId, reviewer.userId);
 
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    strangerToken = await mintPrivyToken(DIDS.stranger);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    publisherToken = publisher.token;
+    strangerToken = stranger.token;
+    reviewerToken = reviewer.token;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS, OTHER_NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

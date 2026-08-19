@@ -24,7 +24,10 @@ import { mintApiKeyFor, seedAccount } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
 
-const DID = "did:privy:m3keylimit-account";
+// An opaque subject, not an address: this suite drives `ApiKeyService` directly, never through a
+// session, so there is no identity to sign in as — `accounts.auth_user_id` carries no foreign key
+// to `auth_user`, and a plain unique string is exactly what `seedAccount` needs.
+const USER_ID = "m3keylimit-account";
 const LIVE_BEFORE_THE_RACE = 24;
 const MAX_LIVE_KEYS = 25;
 
@@ -34,7 +37,7 @@ run("M3KEYLIMIT the 25-live-key ceiling holds under a concurrent mint", () => {
   let accountId: number;
 
   beforeAll(async () => {
-    const account = await seedAccount({ did: DID, handle: "m3keylimit-account" });
+    const account = await seedAccount({ userId: USER_ID, handle: "m3keylimit-account" });
     accountId = account.id;
 
     // Seeded directly through the fixture helper (a plain INSERT), not through the service under
@@ -45,7 +48,7 @@ run("M3KEYLIMIT the 25-live-key ceiling holds under a concurrent mint", () => {
   });
 
   afterAll(async () => {
-    await cleanupFixtures({ privyDids: [DID] });
+    await cleanupFixtures({ userIds: [USER_ID] });
   });
 
   it("lets exactly one of two concurrent mints through the 25th slot", async () => {
@@ -89,14 +92,14 @@ run("M3KEYLIMIT the 25-live-key ceiling holds under a concurrent mint", () => {
  *
  * Isolation tag: `M3KEYREVOKE` / `m3keyrevoke:`.
  */
-const REVOKE_DID = "did:privy:m3keyrevoke-account";
+const REVOKE_USER_ID = "m3keyrevoke-account";
 
 run("M3KEYREVOKE a key's revocation is a single, once-only event under concurrency", () => {
   let accountId: number;
   let keyId: number;
 
   beforeAll(async () => {
-    const account = await seedAccount({ did: REVOKE_DID, handle: "m3keyrevoke-account" });
+    const account = await seedAccount({ userId: REVOKE_USER_ID, handle: "m3keyrevoke-account" });
     accountId = account.id;
     await mintApiKeyFor(accountId);
     const rows = await db
@@ -109,7 +112,7 @@ run("M3KEYREVOKE a key's revocation is a single, once-only event under concurren
   });
 
   afterAll(async () => {
-    await cleanupFixtures({ privyDids: [REVOKE_DID] });
+    await cleanupFixtures({ userIds: [REVOKE_USER_ID] });
   });
 
   it("writes exactly one audit row and one stable `revokedAt` for two concurrent revokes", async () => {

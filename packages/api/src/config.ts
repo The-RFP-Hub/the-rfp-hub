@@ -17,16 +17,50 @@ import { isLoopbackHost } from "./shared/loopback.js";
 // exported shell vars and a deployment's injected environment always win over the file.
 loadDotenv({ quiet: true });
 
-/** Access-token verification and the optional server-side enrichment credential. */
-export interface PrivyConfig {
-  /** The app id. Also the token `aud`, so a token minted for another app is rejected. */
-  appId: string | undefined;
-  /** The app's PEM verification key — the documented mechanism for app access tokens. */
-  verificationKey: string | undefined;
-  /** An UNVERIFIED override: no JWKS endpoint is documented for app access tokens. */
-  jwksUrl: string | undefined;
-  /** Server-side secret. Enrichment only, never the auth path. Absent → enrichment is inert. */
-  appSecret: string | undefined;
+/** The session authority: what signs session tokens, where it lives, and who may talk to it. */
+export interface BetterAuthConfig {
+  /**
+   * Signs and verifies session tokens (HMAC-SHA256, checked before any database access).
+   *
+   * ROTATING IT LOGS EVERYONE OUT. There is no dual-secret verification on the bearer path — the
+   * library HMACs against exactly one value — so this is a deliberate global sign-out, not a
+   * seamless roll. Said here because a reader will otherwise assume the opposite.
+   */
+  secret: string;
+  /** True when the secret came from the environment rather than from a per-boot fallback. */
+  secretConfigured: boolean;
+  /**
+   * The API's OWN origin — the base every auth route and OAuth callback is built from.
+   *
+   * Deliberately not `publicBaseUrl`, which is the OpenAPI document's `servers[0].url` and may
+   * legitimately differ (a docs host, a path prefix behind a gateway).
+   */
+  url: string;
+  /** Exact origins allowed to drive sign-in: CSRF, `callbackURL`, the handoff, and CORS. */
+  trustedOrigins: string[];
+  /** Staging only: an anchored preview-origin predicate. Never a bare `*.vercel.app`. */
+  previewOriginPattern: RegExp | undefined;
+}
+
+/** Optional social sign-in. Absent client id → the provider is not registered at all. */
+export interface GoogleConfig {
+  clientId: string | undefined;
+  clientSecret: string | undefined;
+}
+
+/** How a one-time code reaches a person. */
+export type EmailTransportKind = "ses" | "resend" | "file" | "stdout" | "memory" | "null";
+
+export interface EmailConfig {
+  transport: EmailTransportKind;
+  /** The envelope sender. Required for any transport that actually sends. */
+  from: string;
+  /** `file` transport only: where the outbox lives. */
+  outboxDir: string | undefined;
+  /** `ses` transport only. No credential — the task role carries it. */
+  sesRegion: string | undefined;
+  /** `resend` only. Kept as an interface-level alternative; unused by any deployment today. */
+  resendApiKey: string | undefined;
 }
 
 export type EmbeddingProvider = "openai" | "deterministic" | "disabled";
@@ -99,7 +133,9 @@ export interface AppConfig {
    * this process. `undefined` (the default) trusts nothing.
    */
   trustProxy: number | string[] | undefined;
-  privy: PrivyConfig;
+  betterAuth: BetterAuthConfig;
+  google: GoogleConfig;
+  email: EmailConfig;
   embedding: EmbeddingConfig;
   dedupe: DedupeConfig;
   verification: VerificationConfig;
@@ -386,9 +422,109 @@ export function readAnalyticsHmacKey(raw: string | undefined): {
   return { key: randomBytes(32).toString("hex"), generated: true };
 }
 
+/** A secret this short is not a secret. Long enough that a guess is not a strategy. */
+const SECRET_MIN_LENGTH = 32;
+
+/**
+ * The session-signing secret.
+ *
+ * PRODUCTION THROWS; everything else generates one per boot and says what that costs. The two
+ * halves are different failures: a deployment without a secret would sign sessions with a value
+ * that changes on every restart, so every deploy — and every scale event — would log every user
+ * out, and nobody would connect the two. A developer's laptop doing the same is merely mildly
+ * annoying, and demanding a secret to run the test suite would be friction for nothing.
+ *
+ * The length floor is checked with the same severity as absence: a two-character secret is the
+ * failure that looks configured.
+ */
+export function readBetterAuthSecret(
+  raw: string | undefined,
+  production: boolean,
+): { secret: string; configured: boolean } {
+  const value = readOptional(raw);
+  if (value !== undefined && value.length >= SECRET_MIN_LENGTH) {
+    return { secret: value, configured: true };
+  }
+  if (production) {
+    throw new Error(
+      value === undefined
+        ? `BETTER_AUTH_SECRET is required when NODE_ENV=production. It signs every session token; without it each restart would silently sign everyone out. Supply at least ${SECRET_MIN_LENGTH} random characters through the task definition's secrets.`
+        : `BETTER_AUTH_SECRET must be at least ${SECRET_MIN_LENGTH} characters (got ${value.length}). It is the only thing standing between a forged token and a session.`,
+    );
+  }
+  return { secret: randomBytes(32).toString("hex"), configured: false };
+}
+
+/**
+ * The preview-origin predicate, as a source pattern.
+ *
+ * ANCHORED TO OUR PROJECT AND OUR TEAM, never a bare `*.vercel.app` — that would accept any tenant
+ * on the platform, which is every attacker who can sign up. The residual trust is stated rather
+ * than hidden: this assumes the preview host will not hand our team slug to somebody else.
+ *
+ * Supplied as a full regular expression by the deployment (staging only) so the exact shape stays a
+ * deployment property; anchors are enforced here rather than trusted, because an unanchored pattern
+ * matches in the middle of an attacker-chosen origin.
+ */
+export function readPreviewOriginPattern(raw: string | undefined): RegExp | undefined {
+  const value = readOptional(raw);
+  if (value === undefined) return undefined;
+  if (!value.startsWith("^") || !value.endsWith("$")) {
+    throw new Error(
+      `PREVIEW_ORIGIN_PATTERN must be anchored with ^ and $ — an unanchored pattern matches inside an origin an attacker chooses (e.g. "https://evil.example/?x=${value}"). Got ${JSON.stringify(raw)}.`,
+    );
+  }
+  try {
+    return new RegExp(value);
+  } catch (error) {
+    throw new Error(
+      `PREVIEW_ORIGIN_PATTERN is not a valid regular expression: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/** Transports that only make sense on a developer's machine or in a test run. */
+const LOCAL_ONLY_TRANSPORTS: ReadonlySet<string> = new Set(["file", "stdout", "memory", "null"]);
+const EMAIL_TRANSPORTS: ReadonlySet<string> = new Set([
+  "ses",
+  "resend",
+  "file",
+  "stdout",
+  "memory",
+  "null",
+]);
+
+/**
+ * How one-time codes are delivered.
+ *
+ * Refuses to boot in production on any transport that does not actually send an email, in the shape
+ * `readAllowPrivateHosts` uses: a deployment whose sign-in codes go to a file nobody reads is not a
+ * degraded deployment, it is a locked door, and it would present as "the code never arrived" for
+ * every user at once.
+ */
+export function readEmailTransport(
+  raw: string | undefined,
+  production: boolean,
+): EmailTransportKind {
+  const value = (readOptional(raw) ?? (production ? "ses" : "stdout")).toLowerCase();
+  if (!EMAIL_TRANSPORTS.has(value)) {
+    throw new Error(
+      `EMAIL_TRANSPORT must be one of ${[...EMAIL_TRANSPORTS].join(", ")}. Got ${JSON.stringify(raw)}.`,
+    );
+  }
+  if (production && LOCAL_ONLY_TRANSPORTS.has(value)) {
+    throw new Error(
+      `EMAIL_TRANSPORT=${value} under NODE_ENV=production. Nothing would be delivered, so every sign-in would fail at the "enter the code" step with no error anywhere. Use ses.`,
+    );
+  }
+  return value as EmailTransportKind;
+}
+
 const embeddingApiKey = readOptional(process.env.OPENAI_API_KEY);
 const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER, embeddingApiKey);
 const analyticsHmac = readAnalyticsHmacKey(process.env.ANALYTICS_HMAC_KEY);
+const betterAuthSecret = readBetterAuthSecret(process.env.BETTER_AUTH_SECRET, isProduction);
+const emailTransport = readEmailTransport(process.env.EMAIL_TRANSPORT, isProduction);
 
 export const config: AppConfig = {
   databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
@@ -398,11 +534,28 @@ export const config: AppConfig = {
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
   trustProxy: readTrustProxy(process.env.TRUST_PROXY),
 
-  privy: {
-    appId: readOptional(process.env.PRIVY_APP_ID),
-    verificationKey: readPem(process.env.PRIVY_VERIFICATION_KEY),
-    jwksUrl: readOptional(process.env.PRIVY_JWKS_URL),
-    appSecret: readOptional(process.env.PRIVY_APP_SECRET),
+  betterAuth: {
+    secret: betterAuthSecret.secret,
+    secretConfigured: betterAuthSecret.configured,
+    // Falls back to this process's own address so a local run needs no configuration; a deployment
+    // sets it to the API's public origin, which is what the OAuth callback is built from.
+    url:
+      readOptional(process.env.BETTER_AUTH_URL) ?? `http://127.0.0.1:${readPort(process.env.PORT)}`,
+    trustedOrigins: readList(process.env.TRUSTED_ORIGINS),
+    previewOriginPattern: readPreviewOriginPattern(process.env.PREVIEW_ORIGIN_PATTERN),
+  },
+
+  google: {
+    clientId: readOptional(process.env.GOOGLE_CLIENT_ID),
+    clientSecret: readOptional(process.env.GOOGLE_CLIENT_SECRET),
+  },
+
+  email: {
+    transport: emailTransport,
+    from: readOptional(process.env.EMAIL_FROM) ?? "no-reply@ethrfps.app",
+    outboxDir: readOptional(process.env.EMAIL_OUTBOX_DIR),
+    sesRegion: readOptional(process.env.AWS_SES_REGION) ?? readOptional(process.env.AWS_REGION),
+    resendApiKey: readOptional(process.env.RESEND_API_KEY),
   },
 
   embedding: {
@@ -445,6 +598,15 @@ export const config: AppConfig = {
 // Announced only where it costs something: a run with analytics off never touches the key, and a
 // test run generates one on purpose. Both cases are noise, and noise is how a real warning gets
 // missed.
+// Said once, at boot, because the consequence is invisible until it bites: a per-boot secret means
+// every restart invalidates every session, which presents to users as "it logged me out again" and
+// to an operator as nothing at all.
+if (!config.betterAuth.secretConfigured && process.env.NODE_ENV !== "test") {
+  console.error(
+    "BETTER_AUTH_SECRET unset (or shorter than 32 characters) — using a random per-boot secret. Sessions are signed with it, so EVERY RESTART SIGNS EVERYONE OUT. Set it in the environment; see packages/api/docs/deploy.md.",
+  );
+}
+
 if (config.analytics.enabled && analyticsHmac.generated && process.env.NODE_ENV !== "test") {
   console.error(
     "ANALYTICS_HMAC_KEY unset — using a random per-boot key. The hashes stay unlinkable to an address either way; what is lost is continuity, so session de-duplication resets on every restart. Supply the key through the task definition's secrets (packages/api/docs/deploy.md).",

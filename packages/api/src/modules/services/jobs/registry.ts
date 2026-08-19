@@ -21,7 +21,6 @@ import { type DB, db as defaultDb } from "../../../db/client.js";
 import { DedupeService } from "../dedupe/dedupe.service.js";
 import { AnalyticsRollupService } from "../insights/rollup.service.js";
 import { VerificationService } from "../verification/verification.service.js";
-import { AccountEnrichmentService } from "./account-enrichment.service.js";
 import { StalenessService } from "./staleness.service.js";
 import type { JobResult } from "./types.js";
 
@@ -78,13 +77,6 @@ export const JOBS: JobDefinition[] = [
     describes:
       "Fetch the applicationUrl of entries never checked or edited since their last check.",
     run: (options) => new VerificationService(dbOf(options)).runBatch({ limit: options.limit }),
-  },
-  {
-    name: "account-enrichment",
-    shape: "cursor",
-    describes: "Read the identity provider's record for accounts that have never been enriched.",
-    run: (options) =>
-      new AccountEnrichmentService(dbOf(options)).runBatch({ limit: options.limit }),
   },
   {
     name: "staleness",
