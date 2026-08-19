@@ -70,9 +70,10 @@ function PublisherInvitation() {
             </button>
           </p>
           <p className="muted footnote">
-            Authentication is handled by an external provider. This site never sees a password or a
-            private key: it exchanges the session for a short-lived access token and sends that to
-            the API, which is the only thing that decides what an account may do.
+            Signing in is a one-time code emailed to you by this service. There is no password to
+            choose or lose and no key to hand over; the code is exchanged for a token kept in this
+            browser and sent to the API, which is the only thing that decides what an account may
+            do.
           </p>
         </>
       )}

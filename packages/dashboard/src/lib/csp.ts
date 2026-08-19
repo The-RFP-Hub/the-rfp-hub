@@ -8,42 +8,38 @@
  * scans the source for it). This header is the second: even if some future component reintroduced
  * an injection, an injected inline `<script>` carries no nonce and does not run.
  *
- * THE TWO DELIBERATE RELAXATIONS, both named rather than buried:
+ * IT MATTERS MORE THAN IT USED TO. The session token in `localStorage` is now a 90-day credential
+ * rather than an access token of about an hour (`lib/auth-client.ts` states that trade in full), so
+ * the value of keeping arbitrary script off this origin went up at the same moment this policy got
+ * strong enough to do it.
  *
- *   `'unsafe-eval'` — `rfphub-validate` validates a submission in the browser with ajv, and ajv
- *   compiles a JSON Schema into a function with `new Function`. Without this the form loses its
- *   live validation and falls back to the server's 400 (the form handles that path, but it is a
- *   worse experience). The exposure this buys an attacker is narrow: nothing here ever evaluates a
- *   string it did not author, so there is no gadget to reach. Removing it means precompiling the
- *   Standard's schema with ajv's standalone code generator at build time, which is the right fix
- *   and is recorded in the README as follow-up work rather than pretended away.
+ * WHAT THIS POLICY NO LONGER CONTAINS, and why each removal is real rather than tidying:
  *
- *   `style-src 'unsafe-inline'` — the framework and the auth SDK both emit inline style
- *   attributes. Inline styles are not script execution; the prohibition that matters is on
- *   `script-src`, and that one is kept.
+ *   `'unsafe-eval'` / `'wasm-unsafe-eval'` — these were here for ajv, which compiled the Standard's
+ *   JSON Schema into a function with `new Function` so the submit form could validate in the
+ *   browser. They are gone, and the production build is green without them: `rfphub-validate` is
+ *   consumed as a prebuilt ESM module and Next's production bundle evaluates no schema at runtime.
+ *   (Next's DEV server does use eval for its own tooling; that is a dev-server property and not a
+ *   reason to widen the header a deployment ships.) This is the largest single change here — with
+ *   them present, an attacker who could get a string into the page could execute it.
+ *
+ *   Every third-party origin. `connect-src` named three of the previous auth vendor's hosts and
+ *   five WalletConnect ones; `frame-src` named those plus a bot-check origin. All are gone because
+ *   the browser now talks to exactly one host — the API — and embeds nothing. Google sign-in does
+ *   not reappear here: it is a top-level navigation out and a top-level redirect back, not an
+ *   embedded widget, so it needs no CSP allowance at all.
+ *
+ *   `frame-src 'self'` → `'none'` and `worker-src 'self' blob:` → `'self'`. Neither capability is
+ *   used any more, and `blob:` in `worker-src` is a script-execution channel.
+ *
+ * The one remaining relaxation is named rather than buried: `style-src 'unsafe-inline'`, because the
+ * framework emits inline style attributes. Inline styles are not script execution; the prohibition
+ * that matters is on `script-src`, and that one is now absolute.
  *
  * `connect-src` is an ALLOWLIST that has to name the API's origin, so a deployment pointing at a
- * different API must rebuild — which is correct: a browser that may call any origin with the
- * user's bearer token is one exfiltration bug away from handing it over.
+ * different API must rebuild — which is correct: a browser that may call any origin with the user's
+ * session token is one exfiltration bug away from handing it over.
  */
-
-/** Where the SDK's own iframe, popup and API live. Hard-coded because it is the vendor's, not ours. */
-const PRIVY_ORIGINS = [
-  "https://auth.privy.io",
-  "https://*.privy.io",
-  "https://*.rpc.privy.systems",
-] as const;
-
-/** The wallet-connection and bot-check origins the auth SDK reaches for during a login. */
-const WALLET_ORIGINS = [
-  "https://explorer-api.walletconnect.com",
-  "https://*.walletconnect.com",
-  "https://*.walletconnect.org",
-  "wss://*.walletconnect.com",
-  "wss://*.walletconnect.org",
-] as const;
-
-const CHALLENGE_ORIGIN = "https://challenges.cloudflare.com";
 
 /**
  * The origin of `url`, or `null` when it is absent or unparseable.
@@ -62,25 +58,39 @@ export function originOf(url: string | undefined): string | null {
 }
 
 /** The whole header value, for one request's nonce and one deployment's API origin. */
-export function contentSecurityPolicy(nonce: string, apiUrl: string | undefined): string {
+export function contentSecurityPolicy(
+  nonce: string,
+  apiUrl: string | undefined,
+  /**
+   * The DEV SERVER's one allowance, and the reason it is a parameter rather than a constant.
+   *
+   * `next dev` compiles modules with an eval-based devtool: the client bundle evaluates strings as
+   * JavaScript, and under the policy above the browser refuses, the bundle never initialises and the
+   * page hangs at "restoring session…". That is not a hypothetical — it is what `pnpm dev` did until
+   * this parameter existed, and what the end-to-end suite hit on its first run against the tightened
+   * policy.
+   *
+   * The deployed header is UNCHANGED. `script-src` stays absolute in production: this widens the
+   * policy only when the process is not a production build, so a deployment can never ship it. The
+   * alternative — dropping `'unsafe-eval'` back into the shipped policy — would have handed an
+   * attacker who can get a string into the page the ability to execute it, to fix a dev-server
+   * problem.
+   */
+  development = process.env.NODE_ENV !== "production",
+): string {
   const api = originOf(apiUrl);
   const directives: [string, string[]][] = [
     ["default-src", ["'self'"]],
-    [
-      "script-src",
-      ["'self'", `'nonce-${nonce}'`, "'unsafe-eval'", "'wasm-unsafe-eval'", CHALLENGE_ORIGIN],
-    ],
+    ["script-src", ["'self'", `'nonce-${nonce}'`, ...(development ? ["'unsafe-eval'"] : [])]],
     ["style-src", ["'self'", "'unsafe-inline'"]],
     // No remote images. A publisher-supplied `logoUrl` is rendered as a link, never as an <img>:
     // loading it would leak every dashboard reader's IP to whatever host a submitter names.
     ["img-src", ["'self'", "data:"]],
     ["font-src", ["'self'", "data:"]],
-    ["connect-src", ["'self'", ...(api ? [api] : []), ...PRIVY_ORIGINS, ...WALLET_ORIGINS]],
-    [
-      "frame-src",
-      ["'self'", ...PRIVY_ORIGINS, CHALLENGE_ORIGIN, "https://verify.walletconnect.com"],
-    ],
-    ["worker-src", ["'self'", "blob:"]],
+    // The API, and nothing else. Both halves of this app talk to exactly one host.
+    ["connect-src", ["'self'", ...(api ? [api] : [])]],
+    ["frame-src", ["'none'"]],
+    ["worker-src", ["'self'"]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],

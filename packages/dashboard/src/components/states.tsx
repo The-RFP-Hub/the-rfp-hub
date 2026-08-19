@@ -88,9 +88,9 @@ export function ResourceView<T>({
 }
 
 /**
- * Sign-in itself is unavailable — the auth service could not be reached, or it does not recognise
- * this deployment's application. Distinct from "you are logged out", because there is nothing a
- * visitor can do about it and a login button would just fail silently.
+ * Sign-in itself is unavailable — the API could not be reached to find out who is signed in.
+ * Distinct from "you are logged out", because there is nothing a visitor can do about it and a
+ * login button would just fail silently.
  */
 export function AuthUnavailable({ error }: { error: Error }) {
   return (
@@ -98,10 +98,9 @@ export function AuthUnavailable({ error }: { error: Error }) {
       <p className="empty-title">Sign-in is unavailable.</p>
       <p>{error.message}</p>
       <p className="muted">
-        The authentication provider could not start. That is usually its service being unreachable,
-        or <code>NEXT_PUBLIC_PRIVY_APP_ID</code> naming an application that does not exist for this
-        environment. Nothing here is broken on your side and retrying will not help until it is
-        fixed.
+        Sessions are issued by the API itself, so this means the API could not be reached — it is
+        down, or <code>NEXT_PUBLIC_API_URL</code> names an origin this browser cannot talk to.
+        Nothing here is broken on your side and retrying will not help until it is fixed.
       </p>
     </div>
   );

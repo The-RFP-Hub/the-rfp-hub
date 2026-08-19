@@ -3,9 +3,9 @@
 /**
  * The API client's React context, alone in its own module.
  *
- * It is separate from `privy-root.tsx` so that a test — and the analytics render test in particular
- * — can provide a stub client to a subtree without pulling in the auth SDK, and separate from
- * `session.tsx` so importing the context does not drag the provider tree with it.
+ * It is separate from `auth-root.tsx` so that a test — and the analytics and directory render tests
+ * in particular — can provide a stub client to a subtree without pulling in the auth client, and
+ * separate from `session.tsx` so importing the context does not drag the provider tree with it.
  */
 import { createContext, useContext } from "react";
 import type { ApiClient } from "./api";

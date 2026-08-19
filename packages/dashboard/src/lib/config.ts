@@ -1,17 +1,21 @@
 /**
- * The two variables this dashboard cannot run without, read in one place and validated honestly.
+ * The one variable this dashboard cannot run without, read in one place and validated honestly.
  *
- * Both are `NEXT_PUBLIC_`, which means they are INLINED AT BUILD TIME. Setting them on a running
- * host changes nothing until the next build, and that trips people up often enough that the error
- * text says so rather than reporting a generic "not configured".
+ * It is `NEXT_PUBLIC_`, which means it is INLINED AT BUILD TIME. Setting it on a running host
+ * changes nothing until the next build, and that trips people up often enough that the error text
+ * says so rather than reporting a generic "not configured".
+ *
+ * ONE, not two. Authentication used to need its own application id here, naming a third-party
+ * identity pool that had to be kept distinct per environment or two environments' users ended up in
+ * one directory. Sessions are now issued by the API itself, so the API's origin is the only thing
+ * this client needs to be told — and there is no longer a second identifier that can be right,
+ * wrong, or right for the wrong environment.
  *
  * A missing value is reported, never defaulted. A dashboard that quietly falls back to somebody
- * else's API sends a user's bearer token there, and a dashboard that falls back to a shared auth
- * application puts two environments' users in one identity pool.
+ * else's API sends a user's session token there.
  */
 export interface ClientConfig {
   apiBaseUrl: string;
-  privyAppId: string;
 }
 
 export type ConfigResult =
@@ -21,21 +25,18 @@ export type ConfigResult =
 /**
  * Validate the build-time environment.
  *
- * Takes the values rather than reading `process.env` itself so the rules are testable. The caller
- * passes the inlined literals — they have to be written out as `process.env.NEXT_PUBLIC_…` at the
- * call site for the bundler to replace them, which is why this is not a loop over names.
+ * Takes the value rather than reading `process.env` itself so the rules are testable. The caller
+ * passes the inlined literal — it has to be written out as `process.env.NEXT_PUBLIC_…` at the call
+ * site for the bundler to replace it, which is why this is not a loop over names.
  */
-export function readConfig(env: {
-  apiUrl: string | undefined;
-  privyAppId: string | undefined;
-}): ConfigResult {
+export function readConfig(env: { apiUrl: string | undefined }): ConfigResult {
   const problems: { variable: string; problem: string }[] = [];
 
   const apiUrl = env.apiUrl?.trim();
   if (!apiUrl) {
     problems.push({
       variable: "NEXT_PUBLIC_API_URL",
-      problem: "not set — the dashboard has no API to talk to.",
+      problem: "not set — the dashboard has no API to talk to, and no way to sign anybody in.",
     });
   } else {
     try {
@@ -51,15 +52,6 @@ export function readConfig(env: {
     }
   }
 
-  const privyAppId = env.privyAppId?.trim();
-  if (!privyAppId) {
-    problems.push({
-      variable: "NEXT_PUBLIC_PRIVY_APP_ID",
-      problem:
-        "not set — there is no auth application to log in against. Use a SEPARATE application per environment.",
-    });
-  }
-
-  if (problems.length > 0 || !apiUrl || !privyAppId) return { ok: false, problems };
-  return { ok: true, config: { apiBaseUrl: apiUrl.replace(/\/+$/, ""), privyAppId } };
+  if (problems.length > 0 || !apiUrl) return { ok: false, problems };
+  return { ok: true, config: { apiBaseUrl: apiUrl.replace(/\/+$/, "") } };
 }

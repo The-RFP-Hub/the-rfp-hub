@@ -6,12 +6,31 @@
  * and the disagreement would always land the same way round: a form that says "looks fine" and a
  * server that says 400.
  *
- * WHY IT CAN FAIL, AND WHAT HAPPENS THEN. ajv compiles a JSON Schema into a function with
- * `new Function`, which a Content-Security-Policy without `'unsafe-eval'` refuses. This deployment
- * allows it (see `lib/csp.ts`), but a host that tightens the header, or a browser extension that
- * does, would make compilation throw. That is caught here and reported as "unavailable" rather than
- * as "valid": the form then submits and renders the API's own humanized 400. Degraded, honest, and
- * never a false all-clear.
+ * WHY IT WORKS UNDER A STRICT CSP, WHICH IS NOT OBVIOUS AND WAS ONCE UNTRUE.
+ *
+ * ajv normally turns a JSON Schema into a function with `new Function`, and this page's
+ * Content-Security-Policy has no `'unsafe-eval'` (`lib/csp.ts`), so that call throws `EvalError` in
+ * the browser. For a window between the auth migration and the fix, that is exactly what happened
+ * here and the form ran with no in-browser validation at all.
+ *
+ * It is fixed at the source rather than by relaxing the header: `rfphub-validate` now ships the
+ * Standard's validator PRECOMPILED with ajv's standalone code generator, and `validateOpportunity`
+ * resolves straight to it — no schema is compiled at runtime, so nothing on this path evaluates a
+ * string. Verified by making `Function` throw and watching validation still return both a pass and a
+ * humanized failure.
+ *
+ * ajv's compiler is nevertheless still PRESENT in the bundle: `ajv-formats` requires `ajv`
+ * unconditionally and declares no `sideEffects: false`, so a bundler keeps the machinery even
+ * though the only call site (`createValidator` with a caller-supplied schema) is unreachable from
+ * here. Present but never executed is the accurate description; "the bundle contains no
+ * `new Function`" is not, and a grep for it will find one.
+ *
+ * THE `try` STAYS, AS DEFENCE IN DEPTH RATHER THAN AS THE EXPECTED PATH. It costs nothing and it
+ * still catches the cases that remain real — a future schema change that reintroduces runtime
+ * compilation, a browser extension imposing a stricter policy than ours, a malformed document that
+ * makes a check throw. When it fires, the form reports validation "unavailable" rather than "valid":
+ * it says so on screen and submits anyway, and the API's own humanized 400 lands in the same place.
+ * Degraded, honest, and never a false all-clear.
  */
 import { humanizeErrors, validateOpportunity } from "rfphub-validate";
 
