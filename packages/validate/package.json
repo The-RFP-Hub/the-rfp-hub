@@ -23,10 +23,13 @@
     }
   },
   "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
   "engines": {
     "node": ">=18"
   },
   "scripts": {
+    "codegen": "node scripts/codegen.mjs",
+    "codegen:check": "node scripts/codegen.mjs --check",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -36,6 +39,9 @@
     "@the-rfp-hub/standard": "workspace:*",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.7"
   },
   "keywords": ["rfp-hub", "funding", "grants", "json-schema", "validation", "ethereum", "cli"],
   "repository": {

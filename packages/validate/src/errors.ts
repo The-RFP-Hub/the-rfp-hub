@@ -1,11 +1,9 @@
 import { opportunitySchema } from "@the-rfp-hub/standard";
 import type { ErrorObject, ValidateFunction } from "ajv";
-import { createValidator } from "./validator.js";
+import { branches as generatedBranchValidators } from "./generated/validators.js";
 
 const schema = opportunitySchema as {
-  $schema?: string;
   properties?: Record<string, { enum?: unknown }>;
-  $defs?: Record<string, { properties?: Record<string, { const?: unknown }> }>;
 };
 
 /**
@@ -17,14 +15,6 @@ const FUNDING_TYPES: readonly string[] = (() => {
   const values = schema.properties?.fundingType?.enum;
   return Array.isArray(values) ? (values as string[]) : [];
 })();
-
-/** Tag value → `$defs` name (e.g. 'vc_fund' → 'vcFund'), read from each def's `const` tag. */
-const DEF_BY_TAG: ReadonlyMap<string, string> = new Map(
-  Object.entries(schema.$defs ?? {}).flatMap(([name, def]) => {
-    const tag = def.properties?.fundingType?.const;
-    return typeof tag === "string" ? ([[tag, name]] as const) : [];
-  }),
-);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -44,25 +34,14 @@ function isFundingDetailsError(e: ErrorObject): boolean {
 }
 
 /**
- * Per-shape validators, compiled lazily against the schema's own `$defs`. ajv's error spray for
- * a failed `fundingDetails` mixes every `oneOf` branch, and its schemaPaths do not reliably name
- * the branch they came from — re-validating against the tagged shape alone is what lets the
- * report carry only the errors that were meant.
+ * Per-shape validators, precompiled at build time (scripts/codegen.mjs) against the schema's own
+ * `$defs`, keyed by the standard's `fundingType` tag values. ajv's error spray for a failed
+ * `fundingDetails` mixes every `oneOf` branch, and its schemaPaths do not reliably name the
+ * branch they came from — re-validating against the tagged shape alone is what lets the report
+ * carry only the errors that were meant.
  */
-const branchValidators = new Map<string, ValidateFunction>();
 function branchValidator(tag: string): ValidateFunction | undefined {
-  const def = DEF_BY_TAG.get(tag);
-  if (!def) return undefined;
-  let validate = branchValidators.get(tag);
-  if (!validate) {
-    validate = createValidator({
-      $schema: schema.$schema,
-      $defs: schema.$defs,
-      $ref: `#/$defs/${def}`,
-    });
-    branchValidators.set(tag, validate);
-  }
-  return validate;
+  return generatedBranchValidators[tag];
 }
 
 /**
