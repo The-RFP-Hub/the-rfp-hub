@@ -35,16 +35,28 @@ function EditForm({ id, me }: { id: string; me: Me }) {
 
   return (
     <section>
-      <h1>Edit entry</h1>
+      <h1>Edit this listing</h1>
       <p className="muted footnote">
-        A replace re-runs Standard validation and the duplicate check. An edit to an approved entry
-        by a publisher who may publish stays approved; otherwise it returns to the review queue —
-        the result panel below the form says which happened.
+        A replace re-runs Standard validation and the duplicate check. An edit to a published
+        listing by a publisher who may publish stays approved; otherwise it returns to the review
+        queue — the result panel below the form says which happened.
       </p>
-      <ResourceView resource={state} what="this entry" onRetry={reload}>
+      <ResourceView resource={state} what="this listing" onRetry={reload}>
         {(entry) => {
           const { form, carried } = fromDocument(entry);
-          return <OpportunityForm mode="edit" initial={form} carried={carried} />;
+          return (
+            <OpportunityForm
+              mode="edit"
+              initial={form}
+              carried={carried}
+              authority={{
+                verifiedNamespaces: me.memberships
+                  .filter((membership) => membership.verified)
+                  .map((membership) => membership.slug),
+                directCreate: me.directCreate,
+              }}
+            />
+          );
         }}
       </ResourceView>
     </section>
