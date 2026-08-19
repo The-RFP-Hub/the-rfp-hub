@@ -255,8 +255,11 @@ export interface Me {
   accountId: number;
   handle: string | null;
   displayName: string | null;
+  /**
+   * The address the account signs in with. Still served — the API joins it from the auth user
+   * record — even though the identity provider that used to supply it is gone.
+   */
   email: string | null;
-  primaryWallet: string | null;
   role: AccountRole;
   directCreate: boolean;
   /** Which credential this request presented. The dashboard always presents a session. */

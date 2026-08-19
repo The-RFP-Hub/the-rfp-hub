@@ -423,6 +423,46 @@ ul.plain {
   max-width: 70ch;
 }
 
+/*
+ * The sign-in panel. Positioned in the stylesheet rather than with inline styles, because
+ * `style-src 'unsafe-inline'` is the one relaxation left in the policy and nothing new should lean
+ * on it.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+  background: rgba(22, 24, 29, 0.45);
+  z-index: 10;
+}
+
+/*
+ * A non-modal `<dialog open>` is `position: absolute` with its own border and margins in the user
+ * agent stylesheet, which would take it straight out of the flex centring above. These four
+ * declarations are undoing that, not decorating — the `.card` rules supply the actual look.
+ */
+.overlay-panel {
+  position: static;
+  width: 100%;
+  max-width: 26rem;
+  background: var(--bg);
+  color: inherit;
+  margin: 0;
+}
+
+.signin h2 {
+  margin-top: 0;
+}
+
+.signin-or {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.9em;
+}
+
 .secret {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;

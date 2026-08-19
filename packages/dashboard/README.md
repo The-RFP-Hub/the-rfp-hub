@@ -11,7 +11,7 @@ A browser client for the RFP Hub `/v1/` API, and two surfaces rather than one:
 
 **It is a client and nothing else.** There are no route handlers, no server actions that talk to the
 API, and no server-side session. Every authenticated request is made from the browser with the
-signed-in user's own access token, so the API remains the single authority on what an account may
+signed-in user's own session token, so the API remains the single authority on what an account may
 do. Nothing this client renders is a permission decision it made itself; the capability flags on the
 navigation come from `GET /v1/me`.
 
@@ -25,33 +25,29 @@ and nothing else, whoever asks.
 
 ## Environment
 
-Two variables, both `NEXT_PUBLIC_`, both **inlined at build time**. Setting them on a running host
-changes nothing until the next build — the dashboard says so on screen when one is missing, because
-it is the most common way to lose an afternoon here. Copy `.env-example` to `.env.local` to start.
+**One** variable, `NEXT_PUBLIC_`, **inlined at build time**. Setting it on a running host changes
+nothing until the next build — the dashboard says so on screen when it is missing, because it is the
+most common way to lose an afternoon here. Copy `.env-example` to `.env.local` to start.
 
 | Variable | What it is |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Origin of the API, e.g. `http://localhost:3004`. Also written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
-| `NEXT_PUBLIC_PRIVY_APP_ID` | The auth application this environment logs in against. |
+| `NEXT_PUBLIC_API_URL` | Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
 
-Neither is a secret — an API origin and an application id are identifiers, readable by anyone who
-loads the page. **Nothing secret may ever be added with this prefix.** The dashboard holds no
-server-side credential at all.
+It is not a secret — an API origin is an identifier, readable by anyone who loads the page.
+**Nothing secret may ever be added with this prefix.** This package holds no server-side credential
+at all.
 
-### One auth application per environment
+### There used to be a second one
 
-Development, staging and production each get **their own** application, and all of them are separate
-from any other product's. This is not tidiness:
+A third-party auth application id, which had to name a **different** application per environment or
+a throwaway login in development became a real account in production's directory. Sessions are now
+issued by the API itself, from its own database, so the environments are separated by the same thing
+that separates everything else about them — which API you are pointed at. That whole class of
+misconfiguration is gone with the variable.
 
-* The application **is** the user pool. Sharing one means a throwaway login in development is a real
-  account in production's directory, and it means one environment's data-subject requests reach
-  across all of them.
-* The API verifies an access token by checking that its `aud` equals its own configured application
-  id. One application across environments makes that check unable to tell them apart: a token minted
-  against development would be accepted by production.
-
-The API's `PRIVY_APP_ID` must name the **same** application this dashboard does, per environment. A
-mismatch is a 401 on every authenticated call with a perfectly valid-looking session.
+What replaces it, on the API side, is `TRUSTED_ORIGINS`: the API must list this dashboard's origin,
+or the browser's preflight for the sign-in calls is refused. `/v1` is unaffected — it stays
+`origin: "*"` with `credentials: false`, because every `/v1` credential is header-borne.
 
 ---
 
@@ -61,9 +57,12 @@ mismatch is a 401 on every authenticated call with a perfectly valid-looking ses
 pnpm install
 pnpm --filter rfphub-validate build      # the dashboard imports it for in-browser validation
 cp packages/dashboard/.env-example packages/dashboard/.env.local
-# fill in NEXT_PUBLIC_PRIVY_APP_ID, then:
 pnpm --filter @the-rfp-hub/dashboard dev # http://localhost:3005
 ```
+
+Signing in locally needs the API running with a mail transport that does not send mail: set
+`EMAIL_TRANSPORT=stdout` and the six-digit code is printed to the API's console. Nothing else about
+sign-in differs from production.
 
 The API has to be running for anything past the login screen to have data — see
 `packages/api/README.md`. `pnpm --filter @the-rfp-hub/dashboard... build` (note the `...`) builds the
@@ -145,6 +144,28 @@ the same place — degraded, and never a false all-clear.
 
 ## Security
 
+**Sessions.** Sign-in is ours now, not an embedded third-party modal: an email address, a six-digit
+code, and — where the deployment configures it — Google.
+
+* **The code flow** is two steps on one panel (`src/components/SignIn.tsx`). The API mints the code,
+  counts the attempts and issues the session; this package renders the three failures apart, because
+  "wrong code", "expired code" and "too many attempts" have three different next steps.
+* **Google** is a top-level navigation. Google returns to the **API**, which is where the session
+  cookie belongs; the API exchanges that cookie for a one-time token and bounces the browser to
+  `/auth/complete`, which trades it for the bearer session this client uses. The dashboard never
+  sees the cookie, and the API is never handed a redirect target it did not choose. The token
+  arrives in the URL **fragment** — never sent to a server — and `/auth/complete` rewrites the URL
+  before its first `await`, navigates on with `replace`, and relies on the token being single-use.
+* **The Google button is offered, not advertised.** Nothing the API serves says which social
+  providers are configured, so the button renders optimistically and removes itself the once if the
+  API answers `404 PROVIDER_NOT_FOUND` — which that call does from its first statement, before
+  writing anything. The honest cost is one dead click on an email-only deployment; see "Known gaps".
+* **The token lives in `localStorage`**, and it is a **90-day** session rather than the roughly
+  one-hour access token that preceded it. Both are XSS-reachable; the window and the blast radius
+  are not comparable, and `src/lib/auth-client.ts` states that trade in full rather than implying
+  they are. The compensating controls are the CSP above, the no-raw-HTML test, and the fact that
+  sessions are now revocable server-side — a compromise is remediable, which it previously was not.
+
 **Untrusted content.** Titles, descriptions, organisation names and URLs are publisher-supplied; the
 Standard says a `description` must be treated as untrusted. They are rendered as **text**, never as
 markup — no HTML injection API is used anywhere in `src/`, and `test/no-raw-html.test.ts` scans the
@@ -153,20 +174,39 @@ has crept into `package.json`. Markdown is therefore shown as the characters the
 rendering it safely means an allowlisting renderer with raw HTML disabled, and adding one should be
 reviewed as the change it is.
 
-**Content-Security-Policy.** Built in `src/lib/csp.ts`, unit-tested, and applied by
-`src/proxy.ts` with a fresh per-request nonce. Scripts carry that nonce and inline scripts are
-refused; framing and object embedding are refused outright; `connect-src` is an allowlist naming the
-configured API origin and the auth SDK's own origins; no remote images are loaded, so a
-publisher-supplied `logoUrl` cannot phone home from a reader's browser.
+**Content-Security-Policy.** Built in `src/lib/csp.ts`, unit-tested, and applied by `src/proxy.ts`
+with a fresh per-request nonce. The auth migration made this materially stronger, because removing
+the third-party SDK removed everything that was forcing it to be weak:
 
-Two relaxations are deliberate and named rather than buried:
+| Directive | Before | Now |
+|---|---|---|
+| `script-src` | `'self' 'nonce-…' 'unsafe-eval' 'wasm-unsafe-eval'` + a bot-check origin | **`'self' 'nonce-…'`** |
+| `connect-src` | `'self' <api>` + 3 auth-vendor + 5 wallet origins | **`'self' <api>`** |
+| `frame-src` | `'self'` + 5 third-party origins | **`'none'`** |
+| `worker-src` | `'self' blob:` | **`'self'`** |
 
-* `'unsafe-eval'` — ajv compiles the Standard's JSON Schema with `new Function`, and without it the
-  submit form loses its live validation. Nothing here evaluates a string it did not author, so there
-  is no gadget to reach. Removing it means precompiling the schema with ajv's standalone code
-  generator at build time; that is the right fix and is not in this cut.
-* `style-src 'unsafe-inline'` — the framework and the auth SDK emit inline style attributes. Inline
-  styles are not script execution; the prohibition that matters is on `script-src`, and it is kept.
+Dropping `'unsafe-eval'` and `'wasm-unsafe-eval'` is the largest single security change in this
+package's history: with them present, anything that could get a string onto this origin could
+execute it — and the session token in `localStorage` is now a 90-day credential rather than an
+hour-long one. No third-party origin is named anywhere any more. Google sign-in does not reappear
+here, because it is a top-level navigation out and back rather than an embedded widget.
+
+The table above is the **deployed** header. `next dev` compiles with an eval-based devtool, so
+`contentSecurityPolicy` widens `script-src` for the dev server alone, behind an explicit parameter
+rather than an ambient `NODE_ENV` read — and `test/csp.test.ts` asserts both sides, so the dev
+allowance cannot quietly become a shipped one.
+
+**This briefly cost the submit form its in-browser validation**, and the fix went the right way.
+ajv normally compiles the Standard's schema with `new Function`, which `script-src` no longer
+permits; rather than restore the relaxation, `rfphub-validate` now ships that validator
+**precompiled** with ajv's standalone code generator, so nothing evaluates a string at runtime and
+live validation works under the strict header. (ajv's compiler is still *present* in the bundle —
+`ajv-formats` requires it unconditionally — but it is unreachable from this package's code paths.)
+
+One relaxation remains, named rather than buried:
+
+* `style-src 'unsafe-inline'` — the framework emits inline style attributes. Inline styles are not
+  script execution; the prohibition that matters is on `script-src`, and that one is now absolute.
 
 Because the nonce is per request, **every page is rendered per request** (`export const dynamic` in
 the root layout). A prerendered page cannot carry a nonce a later request's header will match. There
@@ -196,24 +236,28 @@ Node runtime):
    this workspace, so a build that cannot see the repository root will fail.
 2. Build command `pnpm --filter @the-rfp-hub/dashboard... build` (the `...` builds workspace
    dependencies first). Install command `pnpm install --frozen-lockfile`.
-3. Set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_PRIVY_APP_ID` **for that environment** as build-time
-   variables, and add the deployment's own origin to the auth application's allowed origins.
+3. Set `NEXT_PUBLIC_API_URL` **for that environment** as a build-time variable, and add this
+   deployment's own origin to the API's `TRUSTED_ORIGINS` — without it the browser's preflight for
+   the sign-in calls is refused and nobody can log in, while the public directory keeps working
+   (`/v1` is `origin: "*"`). That asymmetry is the symptom to recognise.
 4. `output: "standalone"` is set, so a self-hosted deployment runs `node .next/standalone/server.js`
    with `.next/static` and `public/` copied alongside it.
 
-Redeploy on every configuration change: both variables are baked into the bundle.
+Redeploy on every configuration change: the variable is baked into the bundle.
 
 If a pipeline is added later, it needs exactly two things this repository does not yet have — a
-build step with per-environment variables, and a preview URL registered with the auth application.
+build step with a per-environment API origin, and a way to register each preview URL with the API's
+trusted origins.
 
 ---
 
 ## Manual acceptance checklist
 
 The render test proves the analytics tab turns a series into bars and numbers. It does not prove the
-whole path from a real login through real traffic, and no automated test in this cut does: a full
-end-to-end run needs an interactive login against a real auth application, which cannot run
-unattended in CI. That gap is covered here, by hand, once per release.
+whole path from a real login through real traffic. **The login half of that gap has closed**: sign-in
+is now this project's own code against this project's own API, and the E2E suite drives a real code
+through a deterministic mail transport — it no longer depends on an interactive third-party login
+that could not run unattended. What is still checked by hand is everything downstream of it.
 
 Run against a staging deployment with a real publisher account, after generating traffic with
 `packages/api/scripts/demo-traffic.ts`. Capture a screenshot for each numbered item.
@@ -228,40 +272,59 @@ Run against a staging deployment with a real publisher account, after generating
    publisher, confirm `detailViews` and `applyClicks` both moved — this is the whole point of the
    public page reading the public route.
 3. **Login.** `/` signed out shows the directory *and* the publisher card with its login button.
-   After signing in, the header shows the account handle and the navigation matches the account's
-   capabilities (no Review link for a submitter, no Administration link for a reviewer), with the
-   Directory link present in both states.
-4. **Listings.** `/listings` lists the account's entries including a **pending** one, with its review
-   status, listing state and source-check verdict.
-5. **Analytics.** `/listings/{id}` → Analytics shows non-zero totals and a bar chart with one bar per
-   day of the window, and the day-by-day table matches the tiles. Switch the window to 7 days and
-   confirm the chart redraws. **This is the screenshot the milestone asks for.**
-6. **Link-out counting.** Click "Open the application page", return, reload the Analytics tab, and
-   confirm `applyClicks` has increased — proving the redirect route is the counted path.
-7. **Audit.** The Audit tab shows one row per mutation, with the patch visible to the owner — and
-   the public `/opportunities/{id}` history shows the same actions with field names only.
-8. **Verification.** The Verification tab shows the last run, or the honest "not checked yet" state.
-9. **Submit.** `/listings/new` with a deliberately invalid document shows the in-browser errors and
-   keeps the submit button disabled; correcting them submits, and the result panel states the review
-   status **and** the duplicate-check state.
-10. **Duplicate check states.** Submit a near-copy of an existing published entry and confirm the
+   Click it, enter an address, receive the code, and sign in. Check the three failures on the way:
+   a wrong code, an expired one (wait five minutes), and a fourth attempt on the same code — each
+   must say something different and specific. After signing in, the header shows the account handle
+   and the navigation matches the account's capabilities (no Review link for a submitter, no
+   Administration link for a reviewer), with the Directory link present in both states.
+4. **Google, where configured.** "Continue with Google" leaves for Google, returns via the API, and
+   lands on `/dashboard` signed in. Confirm the address bar shows **no** `#ott=` fragment when it
+   settles, and that pressing Back does not sign you in again or re-expose the token. On a
+   deployment without Google configured, the button withdraws with a plain sentence and email still
+   works.
+5. **Sign out.** The header's Log out clears the session; a reload does not restore it, and
+   `/dashboard` offers a login rather than data.
+6. **Listings.** `/listings` lists the account's entries including a **pending** one, with its review
+    status, listing state and source-check verdict.
+7. **Analytics.** `/listings/{id}` → Analytics shows non-zero totals and a bar chart with one bar per
+    day of the window, and the day-by-day table matches the tiles. Switch the window to 7 days and
+    confirm the chart redraws. **This is the screenshot the milestone asks for.**
+8. **Link-out counting.** Click "Open the application page", return, reload the Analytics tab, and
+    confirm `applyClicks` has increased — proving the redirect route is the counted path.
+9. **Audit.** The Audit tab shows one row per mutation, with the patch visible to the owner — and
+    the public `/opportunities/{id}` history shows the same actions with field names only.
+10. **Verification.** The Verification tab shows the last run, or the honest "not checked yet" state.
+11. **Submit.** `/listings/new` with a deliberately invalid document shows the in-browser errors and
+    keeps the submit button disabled; correcting them submits, and the result panel states the review
+    status **and** the duplicate-check state. This works under the strict CSP because
+    `rfphub-validate` ships the Standard's validator **precompiled**; if the form instead reports
+    validation "unavailable", something has reintroduced runtime schema compilation — treat that as
+    the finding, and do not fix it by restoring `'unsafe-eval'`.
+12. **Duplicate check states.** Submit a near-copy of an existing published entry and confirm the
     result panel names the match. On a deployment with detection disabled, confirm the panel says the
     check did not run rather than "nothing similar found".
-11. **Keys.** `/keys` mints a key, shows the secret once, and the secret is gone after a reload.
+13. **Keys.** `/keys` mints a key, shows the secret once, and the secret is gone after a reload.
     Revoking it moves the row to revoked.
-12. **Review.** As a reviewer, `/review` approves a pending entry (it appears in the public directory
+14. **Review.** As a reviewer, `/review` approves a pending entry (it appears in the public directory
     within a reload), approves a claim **without** verifying the organisation and shows the API's
     sentence about future writes staying pending, and merges a duplicate pair with the survivor
     chosen explicitly.
-13. **Administration.** As an administrator, `/admin` changes an account's role and toggles
+15. **Administration.** As an administrator, `/admin` changes an account's role and toggles
     direct-create.
-14. **Refusals.** As a submitter, open `/review` directly by URL and confirm the page reports the
+16. **Refusals.** As a submitter, open `/review` directly by URL and confirm the page reports the
     missing capability rather than showing a queue.
 
 ---
 
 ## Known gaps
 
+* **The Google button is offered rather than advertised.** Nothing the API serves says which social
+  providers are configured, so the button renders and withdraws on `404 PROVIDER_NOT_FOUND`. One
+  field on a public endpoint — `GET /v1/health` gaining `auth: { google: boolean }`, say — would
+  make it conditional on load and cost the API one line. Worth taking when the API is next touched.
+* **`/auth/complete` is not exercised by a unit test.** Its correctness is an ordering property
+  (`history.replaceState` before the first `await`) and a navigation property, both of which need a
+  real history stack to mean anything; they are covered by the E2E back-button case instead.
 * The verification badge on `/listings` is fetched **per row** — the list payload does not carry the
   last run. At most 20 rows, each failing soft, but the right fix is a field on the list row.
 * No pagination controls on the review queues; they take the API's first 50–100 rows.

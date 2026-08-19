@@ -4,7 +4,7 @@
  * Every network call in this package goes through `createApiClient`. That is not tidiness: it is
  * what makes three properties checkable in one place instead of on every page.
  *
- *   1. The bearer token is attached HERE, from the caller's own Privy session, and nowhere else. No
+ *   1. The bearer token is attached HERE, from the caller's own stored session, and nowhere else. No
  *      page composes an `Authorization` header, so none can leak one into a third-party request.
  *   2. A failure is an `ApiError` with the API's own machine-readable `error` code, whatever went
  *      wrong — a 400 with a humanized field report, a 401, a 409 naming another entry, a body that
@@ -93,7 +93,7 @@ export type TokenSource = () => Promise<string | null>;
 
 export interface ApiClientOptions {
   baseUrl: string;
-  /** Returns the caller's access token, or null when they are not logged in. */
+  /** Returns the caller's stored session token, or null when they are not logged in. */
   getToken?: TokenSource;
   /** Injected in tests. Production passes nothing and gets the browser's `fetch`. */
   fetchImpl?: typeof fetch;

@@ -8,7 +8,7 @@ const packageDir = dirname(fileURLToPath(import.meta.url));
  * The dashboard is a BROWSER CLIENT of the API and nothing else.
  *
  * There are no Next route handlers, no server actions that talk to the API and no server-side
- * session: every authenticated request is made from the browser with the caller's own Privy access
+ * session: every authenticated request is made from the browser with the caller's own session
  * token, so the API stays the single authorization authority. A server session here would be a
  * second one, and the two would disagree the first time a role changed.
  *
@@ -42,18 +42,11 @@ const nextConfig: NextConfig = {
   // worktree, where a second lockfile sits one directory up — the inference is ambiguous and the
   // build says so; a wrong guess would trace the wrong node_modules into the standalone output.
   outputFileTracingRoot: join(packageDir, "../.."),
-  webpack: (config) => {
-    // The auth SDK carries optional integrations for chains and mini-app hosts this dashboard does
-    // not use, and their packages are optional peers we deliberately do not install. Resolving them
-    // to `false` turns a "module not found" warning on every build into an explicit statement that
-    // the integration is absent. It is unreachable at runtime: those code paths are behind login
-    // methods this app does not enable.
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "@farcaster/mini-app-solana": false,
-    };
-    return config;
-  },
+  // NO `webpack` OVERRIDE. There used to be one, aliasing an optional wallet integration to `false`
+  // to silence a "module not found" warning the previous auth SDK produced on every build. The SDK
+  // is gone and so is the warning: the auth client this package now uses pulls in no chain or
+  // mini-app peers at all, so there is nothing left to stub out.
+  //
   // `rfphub-validate` and `@the-rfp-hub/standard` are workspace packages consumed from source-built
   // ESM `dist`. They are pure (JSON Schema + ajv, no Node built-ins), so they bundle for the
   // browser; this tells Next to transpile them rather than treat them as opaque externals.
