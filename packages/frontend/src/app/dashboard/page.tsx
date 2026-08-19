@@ -14,6 +14,7 @@
 import { UntrustedText } from "@/components/UntrustedText";
 import { AuthUnavailable, ResourceView } from "@/components/states";
 import { METRIC_LABELS, formatCount, formatDay } from "@/lib/format";
+import { HOW_IT_WORKS } from "@/lib/links";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import Link from "next/link";
@@ -30,11 +31,12 @@ export default function DashboardPage() {
   if (!session.authenticated) {
     return (
       <section>
-        <h1>Publisher workbench</h1>
+        <h1>Your listings&rsquo; traffic</h1>
         <p className="footnote">
           Submit funding opportunities to the RFP Hub, keep them current, and see what they get read
-          for. Signing in creates an account the first time; publishing without review additionally
-          requires membership of a verified organisation, which a reviewer grants.
+          and applied for. Signing in creates an account the first time; publishing without review
+          additionally requires membership of a verified organisation, which a reviewer grants —{" "}
+          <Link href={HOW_IT_WORKS}>who can do what</Link> sets out the whole of it.
         </p>
         <p>
           <button type="button" onClick={session.login}>
@@ -63,7 +65,7 @@ function Overview() {
 
   return (
     <section>
-      <h1>Your entries</h1>
+      <h1>Your listings&rsquo; traffic</h1>
       <ResourceView resource={state} what="your traffic summary" onRetry={reload}>
         {(summary) => (
           <>
@@ -83,37 +85,46 @@ function Overview() {
               <div className="state empty">
                 <p className="empty-title">Nothing published under this account yet.</p>
                 <p className="muted">
-                  <Link href="/listings/new">Submit an opportunity</Link> — it will land pending
-                  unless your account publishes into a verified namespace.
+                  There is no traffic to report until something of yours is in the directory.
+                </p>
+                <p className="row">
+                  <Link className="button-primary" href="/listings/new">
+                    Submit an opportunity
+                  </Link>
+                  <span className="muted">
+                    It lands pending unless your account publishes into a verified namespace.
+                  </span>
                 </p>
               </div>
             ) : (
-              <table>
-                <caption>Most-read entries first</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Entry</th>
-                    <th scope="col">Detail views</th>
-                    <th scope="col">Apply clicks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.opportunities.map((entry) => (
-                    <tr key={entry.opportunityId}>
-                      <th scope="row">
-                        <Link href={`/listings/${encodeURIComponent(entry.opportunityId)}`}>
-                          <UntrustedText value={entry.title} />
-                        </Link>
-                        <div className="muted">
-                          <code>{entry.opportunityId}</code>
-                        </div>
-                      </th>
-                      <td>{formatCount(entry.detailViews)}</td>
-                      <td>{formatCount(entry.applyClicks)}</td>
+              <div className="table-scroll">
+                <table>
+                  <caption>Most-read entries first</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Listing</th>
+                      <th scope="col">Detail views</th>
+                      <th scope="col">Apply clicks</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {summary.opportunities.map((entry) => (
+                      <tr key={entry.opportunityId}>
+                        <th scope="row">
+                          <Link href={`/listings/${encodeURIComponent(entry.opportunityId)}`}>
+                            <UntrustedText value={entry.title} />
+                          </Link>
+                          <div className="muted">
+                            <code>{entry.opportunityId}</code>
+                          </div>
+                        </th>
+                        <td>{formatCount(entry.detailViews)}</td>
+                        <td>{formatCount(entry.applyClicks)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </>
         )}

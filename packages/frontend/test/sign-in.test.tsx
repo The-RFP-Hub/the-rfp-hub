@@ -11,6 +11,8 @@
  * person sees and what the API is asked for.
  */
 import { SignIn } from "@/components/SignIn";
+import { type ApiClient, ApiError } from "@/lib/api";
+import { ApiClientProvider } from "@/lib/api-context";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -45,8 +47,25 @@ vi.mock("@/lib/auth-client", async () => {
 
 const API = "https://api.example.com";
 
-const mount = (onSignedIn?: () => void) =>
-  render(<SignIn apiBaseUrl={API} onSignedIn={onSignedIn} />);
+/**
+ * The panel now asks `/v1/health` which sign-in methods this deployment has, so it needs a client.
+ * `health` is overridable per test: the three interesting answers are "google: true", "google:
+ * false" and "the API did not say".
+ */
+const client = (
+  health: () => Promise<unknown> = async () => ({
+    status: "ok",
+    db: "up",
+    auth: { google: true },
+  }),
+): ApiClient => ({ baseUrl: API, health }) as unknown as ApiClient;
+
+const mount = (onSignedIn?: () => void, health?: () => Promise<unknown>) =>
+  render(
+    <ApiClientProvider value={client(health)}>
+      <SignIn apiBaseUrl={API} onSignedIn={onSignedIn} />
+    </ApiClientProvider>,
+  );
 
 /** Fill the address and ask for a code — the shared first half of every case below. */
 async function reachCodeStep(email = "programs@acme.example.org") {
@@ -301,5 +320,65 @@ describe("when the sign-in service cannot be reached", () => {
     // Unlike the 404, which DOES tell us the deployment has no Google provider.
     const google = screen.getByRole("button", { name: "Continue with Google" });
     expect(google).toHaveProperty("disabled", false);
+  });
+});
+
+/**
+ * WHICH SIGN-IN METHODS THIS DEPLOYMENT ACTUALLY HAS.
+ *
+ * The panel used to render the Google button hopefully and withdraw it after somebody pressed it
+ * and got a 404 — which, to the person using it, is a button that does not work. `/v1/health` now
+ * reports `auth.google`, so the button is offered only when the deployment has it.
+ *
+ * The fallback is not dead code: an older API omits `auth`, and a database outage makes the route
+ * 503 so nothing can be read off it. "The API did not say" has to mean "offer it and find out",
+ * because hiding a working method because a health check was unavailable is the worse failure.
+ */
+describe("advertised sign-in methods", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sendVerificationOtp.mockResolvedValue({ error: null });
+    signInSocial.mockResolvedValue({ error: null });
+  });
+
+  it("offers Google when the API says the deployment has it", async () => {
+    mount(undefined, async () => ({ status: "ok", db: "up", auth: { google: true } }));
+
+    expect(await screen.findByRole("button", { name: "Continue with Google" })).toBeTruthy();
+  });
+
+  it("hides Google when the API says it does not, without anybody having to press it", async () => {
+    mount(undefined, async () => ({ status: "ok", db: "up", auth: { google: false } }));
+
+    // Email is present, so the panel has rendered and this is a real absence rather than a race.
+    expect(await screen.findByRole("button", { name: "Send code" })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Continue with Google" })).toBeNull(),
+    );
+    expect(signInSocial).not.toHaveBeenCalled();
+  });
+
+  it("falls back to trying when an older API omits the field", async () => {
+    mount(undefined, async () => ({ status: "ok", db: "up" }));
+
+    const google = await screen.findByRole("button", { name: "Continue with Google" });
+    // And the attempt-based withdrawal still works from there.
+    signInSocial.mockResolvedValueOnce({
+      error: { status: 404, code: "PROVIDER_NOT_FOUND", message: "Provider not found" },
+    });
+    fireEvent.click(google);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Continue with Google" })).toBeNull(),
+    );
+  });
+
+  it("falls back to trying when health itself cannot be read", async () => {
+    mount(undefined, async () => {
+      throw new ApiError(503, "degraded", "the database is down");
+    });
+
+    // A health check that failed is not evidence about Google.
+    expect(await screen.findByRole("button", { name: "Continue with Google" })).toBeTruthy();
   });
 });

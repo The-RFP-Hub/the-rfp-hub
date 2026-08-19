@@ -24,7 +24,7 @@ import { useCallback, useState } from "react";
 
 const SCOPES: { value: ApiKeyScope; label: string; detail: string }[] = [
   { value: "read", label: "read", detail: "Read the same data an anonymous caller can." },
-  { value: "write", label: "write", detail: "Submit and replace entries." },
+  { value: "write", label: "write", detail: "Submit and replace listings." },
   {
     value: "publish",
     label: "publish",
@@ -132,7 +132,7 @@ function Keys() {
         </div>
       ) : null}
 
-      <div className="card">
+      <div className="card" id="mint-key">
         <h2>Mint a key</h2>
         <div className="field">
           <label htmlFor="key-name">Label</label>
@@ -167,50 +167,60 @@ function Keys() {
           list.items.length === 0 ? (
             <EmptyState
               title="No keys yet."
-              detail="Nothing is broken — an account that only uses this frontend never needs one."
+              detail="Nothing is broken — an account that only uses this frontend never needs one. A key is for scripts and integrations that submit on your behalf."
+              action={
+                <a href="#mint-key" className="button-primary">
+                  Mint your first key
+                </a>
+              }
             />
           ) : (
-            <table>
-              <caption>
-                To rotate: mint the replacement, deploy it, then revoke the old one — in that order.
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Key</th>
-                  <th scope="col">Scopes</th>
-                  <th scope="col">Last used</th>
-                  <th scope="col">State</th>
-                  <th scope="col" />
-                </tr>
-              </thead>
-              <tbody>
-                {list.items.map((key) => (
-                  <tr key={key.id}>
-                    <th scope="row">
-                      <UntrustedText value={key.name} fallback="(unlabelled)" />
-                      <div className="muted">
-                        <code>{key.keyPrefix}…</code> · created {formatInstant(key.createdAt)}
-                      </div>
-                    </th>
-                    <td>
-                      <code>{key.scopes.join(", ") || "none"}</code>
-                    </td>
-                    <td className="muted">
-                      {key.lastUsedAt ? formatInstant(key.lastUsedAt) : "never"}
-                      <div className="muted">recorded at most once every few minutes</div>
-                    </td>
-                    <td>{key.revokedAt ? `revoked ${formatInstant(key.revokedAt)}` : "active"}</td>
-                    <td>
-                      {key.revokedAt ? null : (
-                        <button type="button" onClick={() => void revoke(key.id)}>
-                          Revoke
-                        </button>
-                      )}
-                    </td>
+            <div className="table-scroll">
+              <table>
+                <caption>
+                  To rotate: mint the replacement, deploy it, then revoke the old one — in that
+                  order.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Scopes</th>
+                    <th scope="col">Last used</th>
+                    <th scope="col">State</th>
+                    <th scope="col" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {list.items.map((key) => (
+                    <tr key={key.id}>
+                      <th scope="row">
+                        <UntrustedText value={key.name} fallback="(unlabelled)" />
+                        <div className="muted">
+                          <code>{key.keyPrefix}…</code> · created {formatInstant(key.createdAt)}
+                        </div>
+                      </th>
+                      <td>
+                        <code>{key.scopes.join(", ") || "none"}</code>
+                      </td>
+                      <td className="muted">
+                        {key.lastUsedAt ? formatInstant(key.lastUsedAt) : "never"}
+                        <div className="muted">recorded at most once every few minutes</div>
+                      </td>
+                      <td>
+                        {key.revokedAt ? `revoked ${formatInstant(key.revokedAt)}` : "active"}
+                      </td>
+                      <td>
+                        {key.revokedAt ? null : (
+                          <button type="button" onClick={() => void revoke(key.id)}>
+                            Revoke
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )
         }
       </ResourceView>

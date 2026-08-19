@@ -18,6 +18,7 @@ import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function AccountPage() {
@@ -84,48 +85,50 @@ function Account({ me }: { me: Me }) {
 
       <div className="card">
         <h2>What the API says this account may do</h2>
-        <table>
-          <tbody>
-            <tr>
-              <th scope="row">Account id</th>
-              <td>
-                <code>{me.accountId}</code>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Global role</th>
-              <td>{me.role}</td>
-            </tr>
-            <tr>
-              <th scope="row">Credential in use</th>
-              <td>{me.credentialKind === "session" ? "browser session" : "API key"}</td>
-            </tr>
-            <tr>
-              <th scope="row">Direct create</th>
-              <td>
-                {me.directCreate
-                  ? "yes — may publish into any namespace without a membership"
-                  : "no"}
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Manage keys</th>
-              <td>{me.canManageKeys ? "yes" : "no"}</td>
-            </tr>
-            <tr>
-              <th scope="row">Review</th>
-              <td>{me.canReview ? "yes" : "no"}</td>
-            </tr>
-            <tr>
-              <th scope="row">Administer</th>
-              <td>{me.canAdmin ? "yes" : "no"}</td>
-            </tr>
-            <tr>
-              <th scope="row">Account created</th>
-              <td className="muted">{formatInstant(me.createdAt)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table>
+            <tbody>
+              <tr>
+                <th scope="row">Account id</th>
+                <td>
+                  <code>{me.accountId}</code>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Global role</th>
+                <td>{me.role}</td>
+              </tr>
+              <tr>
+                <th scope="row">Credential in use</th>
+                <td>{me.credentialKind === "session" ? "browser session" : "API key"}</td>
+              </tr>
+              <tr>
+                <th scope="row">Direct create</th>
+                <td>
+                  {me.directCreate
+                    ? "yes — may publish into any namespace without a membership"
+                    : "no"}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Manage keys</th>
+                <td>{me.canManageKeys ? "yes" : "no"}</td>
+              </tr>
+              <tr>
+                <th scope="row">Review</th>
+                <td>{me.canReview ? "yes" : "no"}</td>
+              </tr>
+              <tr>
+                <th scope="row">Administer</th>
+                <td>{me.canAdmin ? "yes" : "no"}</td>
+              </tr>
+              <tr>
+                <th scope="row">Account created</th>
+                <td className="muted">{formatInstant(me.createdAt)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="card">
@@ -137,31 +140,43 @@ function Account({ me }: { me: Me }) {
             changes.
           </p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Organisation</th>
-                <th scope="col">Your role</th>
-                <th scope="col">Publishing</th>
-              </tr>
-            </thead>
-            <tbody>
-              {me.memberships.map((membership) => (
-                <tr key={membership.slug}>
-                  <th scope="row">
-                    <UntrustedText value={membership.name} />
-                    <div className="muted">
-                      <code>{membership.slug}</code>
-                    </div>
-                  </th>
-                  <td>{membership.role}</td>
-                  <td>
-                    <VerifiedBadge verified={membership.verified} />
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Organisation</th>
+                  <th scope="col">Your role</th>
+                  <th scope="col">Publishing</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {me.memberships.map((membership) => (
+                  <tr key={membership.slug}>
+                    <th scope="row">
+                      {/*
+                       * The membership is the entry point to the organisation's own page — what it
+                       * has published, and what is waiting in its name. Naming it here without
+                       * linking made this table a dead end listing places the reader could not go.
+                       */}
+                      <Link
+                        className="row-title"
+                        href={`/organisations/${encodeURIComponent(membership.slug)}`}
+                      >
+                        <UntrustedText value={membership.name} />
+                      </Link>
+                      <div className="muted">
+                        <code>{membership.slug}</code>
+                      </div>
+                    </th>
+                    <td>{membership.role}</td>
+                    <td>
+                      <VerifiedBadge verified={membership.verified} gloss />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </section>

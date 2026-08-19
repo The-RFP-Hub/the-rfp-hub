@@ -17,7 +17,7 @@
  * without ever having decided to trust anyone.
  */
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
-import { MatchBadge } from "@/components/badges";
+import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { linkOutUrl } from "@/lib/api";
 import {
@@ -30,7 +30,7 @@ import {
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 export function PublicOpportunity({ id }: { id: string }) {
   const api = useApi();
@@ -68,45 +68,19 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
         <UntrustedText value={entry.title} />
       </h1>
       <p className="muted">
-        <code>{entry.id}</code> · {entry.fundingType} · {entry.status}
+        {entry.fundingType} · <StatusBadge status={entry.status} />
         {operator ? (
           <>
             {" "}
             · run by <UntrustedText value={operator.name} />
           </>
-        ) : null}
+        ) : null}{" "}
+        · <code>{entry.id}</code>
       </p>
 
-      <div className="row">
-        {entry.applicationUrl ? (
-          <a
-            href={linkOutUrl(baseUrl, entry.id, "apply")}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open the application page
-          </a>
-        ) : null}
-        {entry.website ? (
-          <a
-            href={linkOutUrl(baseUrl, entry.id, "source")}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open the programme site
-          </a>
-        ) : null}
-        {entry.applicationUrl || entry.website ? (
-          <span className="muted footnote">
-            Both hops go through the Hub, which is how the publisher sees that their listing was
-            acted on. You land on the programme&rsquo;s own page.
-          </span>
-        ) : (
-          <span className="muted">This entry states no application link.</span>
-        )}
-      </div>
-
       {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
+
+      <ApplyAction entry={entry} baseUrl={baseUrl} />
 
       <dl className="grid-2 card">
         <div>
@@ -151,18 +125,25 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
       <Tags entry={entry} />
       <Links entry={entry} />
 
+      {/*
+       * NAMED FOR WHO IT IS FOR. This block is raw JSON in a page otherwise written for applicants,
+       * and "Type-specific details (grant)" read like a section of the listing they were skipping
+       * by mistake. Saying "for developers" out loud costs nothing and stops a reader opening a
+       * pretty-printed object looking for the deadline.
+       */}
       <details className="card">
-        <summary>Type-specific details ({entry.fundingType})</summary>
+        <summary>Machine-readable details (for developers)</summary>
         <p className="muted footnote">
-          The Standard&rsquo;s <code>fundingDetails</code> block, verbatim. It is a different shape
-          for each of the six funding types, so it is shown as the record itself carries it rather
-          than through a per-type layout that could drop a field a publisher entered.
+          The Standard&rsquo;s <code>fundingDetails</code> block for a{" "}
+          <strong>{entry.fundingType}</strong>, verbatim. It is a different shape for each of the
+          six funding types, so it is shown as the listing itself carries it rather than through a
+          per-type layout that could drop a field a publisher entered.
         </p>
         <pre className="untrusted-block">{JSON.stringify(entry.fundingDetails, null, 2)}</pre>
       </details>
 
       <section aria-labelledby="provenance-heading" className="card">
-        <h2 id="provenance-heading">Where this record came from</h2>
+        <h2 id="provenance-heading">Where this listing came from</h2>
         <p className="muted footnote">
           The Hub republishes what a publisher or a submitter stated. The check below is a{" "}
           <strong>low-bar anti-spam signal</strong> — the linked page exists and its title is about
@@ -218,6 +199,127 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
   );
 }
 
+/**
+ * THE ONE THING A READER CAME HERE TO DO, above the fold and shaped like it matters.
+ *
+ * The action this page exists for is leaving it — the Hub takes no applications and never will, so
+ * the honest primary action is the programme's own intake, named as such. "Apply on the
+ * programme's own site" says where the click goes before it is clicked; "Open the application
+ * page" said neither whose page nor that it leaves.
+ *
+ * THE HOP GOES THROUGH THE API, and that is not decoration: `GET /v1/r/{id}/apply` is where the
+ * apply click is counted. A page that linked straight to the stored `applicationUrl` would leave a
+ * publisher's numbers at zero while people were applying through it.
+ *
+ * NO APPLICATION LINK IS A REAL STATE AND IT IS NOT A DEAD END. Roughly one listing in eight
+ * carries no `applicationUrl` — an ongoing bounty programme, a record imported from a feed that
+ * never had one. The old page said "This entry states no application link." and stopped, which
+ * left the reader holding a description and nowhere to go. It now says the same true thing and
+ * then hands over the two things it does have: the programme's own site, and the organisation
+ * running it.
+ */
+function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
+  const operator = entry.operatingOrganizations[0];
+
+  if (entry.applicationUrl) {
+    return (
+      <div className="card">
+        <p className="row">
+          <a
+            className="button-primary"
+            href={linkOutUrl(baseUrl, entry.id, "apply")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Apply on the programme&rsquo;s own site ↗
+          </a>
+          {entry.website ? (
+            <a
+              href={linkOutUrl(baseUrl, entry.id, "source")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Programme site
+            </a>
+          ) : null}
+          <ShareLink />
+        </p>
+        <p className="muted footnote">
+          The Hub does not take applications and never sees yours — you land on the
+          programme&rsquo;s own page. The hop goes through the Hub so the publisher can see their
+          listing was acted on.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <p>
+        <strong>This listing states no application link.</strong>
+      </p>
+      <p className="muted footnote">
+        That is what the publisher filed, not something missing from this page. Applications for
+        this programme are arranged wherever {operator ? "the organisation below" : "its organiser"}{" "}
+        says — start from the programme&rsquo;s own site.
+      </p>
+      <p className="row">
+        {entry.website ? (
+          <a
+            className="button-primary"
+            href={linkOutUrl(baseUrl, entry.id, "source")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open the programme site ↗
+          </a>
+        ) : operator?.website ? (
+          <UntrustedLink href={operator.website} label="Open the organisation’s site ↗" />
+        ) : (
+          <span className="muted">
+            No site was stated either. Everything the listing does carry is below.
+          </span>
+        )}
+        <ShareLink />
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Copy this page's address.
+ *
+ * A listing is the unit people pass around — "look at this one" in a group chat is how most readers
+ * arrive — and the address bar of a mobile browser is a poor place to do that from. The button
+ * reports what happened rather than assuming: `navigator.clipboard` needs a secure context and a
+ * permission, and a control that silently does nothing is worse than one that says it could not.
+ */
+function ShareLink() {
+  const [note, setNote] = useState<string | null>(null);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setNote("Link copied");
+    } catch {
+      setNote("Could not copy — use the address bar");
+    }
+  };
+
+  return (
+    <>
+      <button type="button" onClick={() => void copy()}>
+        Copy link
+      </button>
+      {note ? (
+        <output className="muted" aria-live="polite">
+          {note}
+        </output>
+      ) : null}
+    </>
+  );
+}
+
 /** One free-text block, rendered only when the publisher filled it in. Never an empty heading. */
 function Prose({ title, value }: { title: string; value: string | null | undefined }) {
   if (!value || value.trim() === "") return null;
@@ -242,24 +344,26 @@ function Deadlines({ entry }: { entry: Opportunity }) {
   return (
     <section aria-labelledby="deadlines-heading">
       <h2 id="deadlines-heading">Dates</h2>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">What</th>
-            <th scope="col">When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {deadlines.map((deadline, index) => (
-            <tr key={`${deadline.deadlineType}-${deadline.date ?? index}`}>
-              <th scope="row">
-                <UntrustedText value={deadline.label} fallback="unlabelled" />
-              </th>
-              <td>{describeDeadlineEntry(deadline)}</td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">What</th>
+              <th scope="col">When</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {deadlines.map((deadline, index) => (
+              <tr key={`${deadline.deadlineType}-${deadline.date ?? index}`}>
+                <th scope="row">
+                  <UntrustedText value={deadline.label} fallback="unlabelled" />
+                </th>
+                <td>{describeDeadlineEntry(deadline)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -272,31 +376,33 @@ function Milestones({ entry }: { entry: Opportunity }) {
   return (
     <section aria-labelledby="milestones-heading">
       <h2 id="milestones-heading">Milestones</h2>
-      <table>
-        <caption>In the order the publisher listed them</caption>
-        <thead>
-          <tr>
-            <th scope="col">Milestone</th>
-            <th scope="col">Amount</th>
-            <th scope="col">Criteria</th>
-          </tr>
-        </thead>
-        <tbody>
-          {milestones.map((milestone, index) => (
-            <tr key={`${milestone.title ?? "milestone"}-${index}`}>
-              <th scope="row">
-                <UntrustedText value={milestone.title} fallback="unnamed" />
-              </th>
-              <td>
-                <UntrustedText value={formatAmount(milestone.amount, currency)} />
-              </td>
-              <td>
-                <UntrustedText value={milestone.criteria} />
-              </td>
+      <div className="table-scroll">
+        <table>
+          <caption>In the order the publisher listed them</caption>
+          <thead>
+            <tr>
+              <th scope="col">Milestone</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Criteria</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {milestones.map((milestone, index) => (
+              <tr key={`${milestone.title ?? "milestone"}-${index}`}>
+                <th scope="row">
+                  <UntrustedText value={milestone.title} fallback="unnamed" />
+                </th>
+                <td>
+                  <UntrustedText value={formatAmount(milestone.amount, currency)} />
+                </td>
+                <td>
+                  <UntrustedText value={milestone.criteria} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -394,7 +500,7 @@ function Links({ entry }: { entry: Opportunity }) {
       <h2 id="links-heading">Links</h2>
       <p className="muted footnote">
         Shown as addresses rather than fetched. The two buttons at the top of this page are the
-        counted hops; these are the raw values the record carries.
+        counted hops; these are the raw values the listing carries.
       </p>
       <dl className="grid-2">
         <div>
@@ -457,35 +563,37 @@ export function PublicHistory({ id }: { id: string }) {
           trail.entries.length === 0 ? (
             <EmptyState title="No recorded changes." />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">When</th>
-                  <th scope="col">Action</th>
-                  <th scope="col">Actor</th>
-                  <th scope="col">Fields</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trail.entries.map((audited) => (
-                  <tr key={`${audited.at}-${audited.action}`}>
-                    <td className="muted">{formatInstant(audited.at)}</td>
-                    <td>{audited.action}</td>
-                    <td>
-                      <UntrustedText value={audited.actor} />{" "}
-                      <span className="muted">({audited.actorKind})</span>
-                    </td>
-                    <td>
-                      {audited.changedFields.length === 0 ? (
-                        <span className="muted">—</span>
-                      ) : (
-                        <code>{audited.changedFields.join(", ")}</code>
-                      )}
-                    </td>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Fields</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {trail.entries.map((audited) => (
+                    <tr key={`${audited.at}-${audited.action}`}>
+                      <td className="muted">{formatInstant(audited.at)}</td>
+                      <td>{audited.action}</td>
+                      <td>
+                        <UntrustedText value={audited.actor} />{" "}
+                        <span className="muted">({audited.actorKind})</span>
+                      </td>
+                      <td>
+                        {audited.changedFields.length === 0 ? (
+                          <span className="muted">—</span>
+                        ) : (
+                          <code>{audited.changedFields.join(", ")}</code>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )
         }
       </ResourceView>
