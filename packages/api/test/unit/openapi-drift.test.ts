@@ -401,7 +401,9 @@ describe("closed response components vs their producers", () => {
   // health.controller.ts and app.ts's error handler emit object literals rather than a named type,
   // so these two are pinned to the literals they send.
   it("Health and ErrorResponse declare exactly what their controllers send", () => {
-    expect(declaredKeys("Health")).toEqual(Object.keys({ status: "ok", db: "up" }).sort());
+    expect(declaredKeys("Health")).toEqual(
+      Object.keys({ status: "ok", db: "up", auth: { google: false } }).sort(),
+    );
     expect(declaredKeys("ErrorResponse")).toEqual(
       Object.keys({ error: "bad_request", message: "…" }).sort(),
     );
@@ -554,6 +556,9 @@ describe("M3 closed components vs their view types", () => {
     isListed: true,
     namespace: "example-org",
     submittedBy: null,
+    // Null is the state most entries are in — nobody has decided anything yet. The populated shape
+    // is asserted end to end in review.test.ts, where a real decision produces it.
+    lastDecision: null,
     createdAt: "2026-08-14T00:00:00.000Z",
     updatedAt: "2026-08-14T00:00:00.000Z",
   };

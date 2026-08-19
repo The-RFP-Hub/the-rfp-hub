@@ -205,7 +205,23 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     required: ["status"],
-    properties: { status: { type: "string" }, db: { type: "string" } },
+    properties: {
+      status: { type: "string" },
+      db: { type: "string" },
+      auth: {
+        type: "object",
+        additionalProperties: false,
+        required: ["google"],
+        description:
+          "Which optional sign-in methods this deployment has configured, so a client can advertise only what exists. Email one-time codes are always available and are therefore not reported.",
+        properties: {
+          google: {
+            type: "boolean",
+            description: "True when the Google provider is registered (client id AND secret).",
+          },
+        },
+      },
+    },
   },
   // ── M3 components ──────────────────────────────────────────────────────────────
   // Every one of these closes its shape, so the serializer drops anything a controller returns
@@ -723,6 +739,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "isListed",
       "namespace",
       "submittedBy",
+      "lastDecision",
       "createdAt",
       "updatedAt",
     ],
@@ -735,6 +752,18 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       isListed: { type: "boolean" },
       namespace: { type: ["string", "null"] },
       submittedBy: { type: ["string", "null"] },
+      lastDecision: {
+        type: ["object", "null"],
+        additionalProperties: false,
+        description:
+          "The newest approve/reject recorded against this entry, read from the audit trail. Null until somebody decides. `reason` is whatever the decider wrote — including the server's own reason for an automatic approval — and is null when none was given.",
+        required: ["action", "reason", "at"],
+        properties: {
+          action: { type: "string", enum: ["approve", "reject"] },
+          reason: { type: ["string", "null"] },
+          at: { type: "string", format: "date-time" },
+        },
+      },
       createdAt: { type: "string", format: "date-time" },
       updatedAt: { type: "string", format: "date-time" },
     },

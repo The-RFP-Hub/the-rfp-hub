@@ -18,11 +18,39 @@
  * nothing about the resulting figure looks wrong. Assignment makes a second run a no-op, which is
  * what makes the job safe to re-run at all.
  */
-import { and, gte, lt, sql } from "drizzle-orm";
+import { and, gte, inArray, lt, sql } from "drizzle-orm";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { opportunityEvents, opportunityStatsDaily } from "../../../db/schema.js";
+import { opportunities, opportunityEvents, opportunityStatsDaily } from "../../../db/schema.js";
 import { COLUMN_OF, utcDay } from "./insights.service.js";
+
+/** One day's counters for one entry — the shape the upsert writes. */
+interface StatsRow {
+  opportunityId: number;
+  day: string;
+  listViews: number;
+  detailViews: number;
+  sourceClicks: number;
+  applyClicks: number;
+  updatedAt: Date;
+}
+
+/**
+ * Postgres foreign-key violation, read through the driver error the ORM wraps.
+ *
+ * Here it means exactly one thing: the entry these statistics are about was deleted while they were
+ * being computed.
+ */
+function isForeignKeyViolation(error: unknown): boolean {
+  let current: unknown = error;
+  for (let hop = 0; hop < 5; hop++) {
+    if (typeof current !== "object" || current === null) return false;
+    const named = current as { code?: string; cause?: unknown };
+    if (named.code !== undefined) return named.code === "23503";
+    current = named.cause;
+  }
+  return false;
+}
 
 /** How many days back a sweep recomputes, including today. */
 export const ROLLUP_WINDOW_DAYS = 3;
@@ -76,7 +104,16 @@ export class AnalyticsRollupService {
         total: sql<number>`count(*)::int`,
       })
       .from(opportunityEvents)
-      .where(and(gte(opportunityEvents.occurredAt, start), lt(opportunityEvents.occurredAt, end)))
+      .where(
+        and(
+          gte(opportunityEvents.occurredAt, start),
+          lt(opportunityEvents.occurredAt, end),
+          // Only entries that still exist. Redundant while `opportunity_events` cascades from
+          // `opportunities` (it does, and `0003` says so) — kept because this sweep should not
+          // depend on that cascade to avoid computing statistics for a row nobody can look at.
+          sql`exists (select 1 from ${opportunities} where ${opportunities.id} = ${opportunityEvents.opportunityId})`,
+        ),
+      )
       .groupBy(opportunityEvents.opportunityId, opportunityEvents.eventType);
 
     const byOpportunity = new Map<
@@ -103,6 +140,41 @@ export class AnalyticsRollupService {
       updatedAt: now,
     }));
 
+    return this.upsert(values, now);
+  }
+
+  /**
+   * Write one day's rows — and survive an entry that disappears WHILE the sweep is running.
+   *
+   * The aggregate above and this write are two statements, so an opportunity deleted between them
+   * is invisible to the first and gone by the second: the foreign key then rejects the whole batch
+   * with `23503` and the nightly job fails, having written nothing for the hundreds of entries that
+   * were perfectly fine. Filtering the aggregate cannot prevent this — at read time the row was
+   * still there — so the honest answer is to tolerate it: an entry that no longer exists has no
+   * statistics worth keeping, so it is dropped and the rest of the day is written.
+   *
+   * ONE retry, deliberately. A second failure means something other than a racing delete, and a
+   * sweep that retried indefinitely would hide it.
+   */
+  private async upsert(values: StatsRow[], now: Date, retrying = false): Promise<number> {
+    try {
+      await this.write(values, now);
+      return values.length;
+    } catch (error) {
+      if (retrying || !isForeignKeyViolation(error)) throw error;
+      const ids = values.map((row) => row.opportunityId);
+      const alive = await this.db
+        .select({ id: opportunities.id })
+        .from(opportunities)
+        .where(inArray(opportunities.id, ids));
+      const surviving = new Set(alive.map((row) => row.id));
+      const remaining = values.filter((row) => surviving.has(row.opportunityId));
+      if (remaining.length === 0) return 0;
+      return this.upsert(remaining, now, true);
+    }
+  }
+
+  private async write(values: StatsRow[], now: Date): Promise<void> {
     await this.db
       .insert(opportunityStatsDaily)
       .values(values)
@@ -117,7 +189,6 @@ export class AnalyticsRollupService {
           updatedAt: now,
         },
       });
-    return values.length;
   }
 
   /**

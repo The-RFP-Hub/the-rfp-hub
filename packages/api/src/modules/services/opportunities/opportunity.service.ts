@@ -14,6 +14,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityInsert,
@@ -81,6 +82,27 @@ export function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, "\\$&");
 }
 
+/**
+ * "Does this text[] column contain any of these values, ignoring case?"
+ *
+ * THE INDEX TRADEOFF, stated rather than discovered later. `&&` (`arrayOverlaps`) is served by the
+ * GIN index on these columns; `lower(x)` cannot be, because the index holds the values as written.
+ * So this predicate is a scan over the row's own array — a few elements per row — and the planner
+ * falls back to a sequential scan on the table where `&&` would have used the index.
+ *
+ * Accepted deliberately: the corpus is small (hundreds of rows, bounded by what a review queue can
+ * pass), the arrays are short, and the alternative is a filter that quietly answers with a subset of
+ * the matching rows. If this table ever grows enough for it to matter, the fix is an expression
+ * index on `lower()` over the unnested values — a functional GIN index — not re-narrowing the query.
+ */
+function arrayMatchesInsensitive(column: PgColumn, values: string[]): SQL {
+  const lowered = sql.join(
+    values.map((value) => sql`${value.trim().toLowerCase()}`),
+    sql`, `,
+  );
+  return sql`exists (select 1 from unnest(${column}) as candidate where lower(candidate) in (${lowered}))`;
+}
+
 /** Data + business logic for opportunities. Public reads are always approved + listed. */
 export class OpportunityService {
   constructor(private readonly db: DB = defaultDb) {}
@@ -93,11 +115,21 @@ export class OpportunityService {
     ];
     if (q.fundingType?.length) where.push(inArray(opportunities.fundingType, q.fundingType));
     if (q.status?.length) where.push(inArray(opportunities.status, q.status));
-    if (q.ecosystem?.length) where.push(arrayOverlaps(opportunities.ecosystems, q.ecosystem));
+    // CASE-INSENSITIVE, unlike the two filters around it, and the difference is not stylistic: an
+    // ecosystem name is free text a publisher types, so the corpus really does hold `Ethereum`,
+    // `ethereum` and `EVM`/`evm` side by side, and a case-sensitive `&&` answered a query for one of
+    // them with a fraction of the rows and no indication that it had. A filter that silently returns
+    // a subset is worse than one that returns nothing.
+    if (q.ecosystem?.length)
+      where.push(arrayMatchesInsensitive(opportunities.ecosystems, q.ecosystem));
+    // `category` stays case-SENSITIVE on purpose: it is a closed vocabulary defined by the Standard
+    // and validated on the way in, so its values are already canonical. Loosening it would only
+    // widen what an exact, checked value matches.
     if (q.category?.length) where.push(arrayOverlaps(opportunities.categories, q.category));
-    // ANY operating OR sponsoring organization, via the denormalized GIN-indexed slug array.
+    // ANY operating OR sponsoring organization, via the denormalized slug array — also
+    // case-insensitively, because a slug arrives in a URL a human typed as often as from a link.
     if (q.organization) {
-      where.push(arrayOverlaps(opportunities.orgSlugs, [q.organization]));
+      where.push(arrayMatchesInsensitive(opportunities.orgSlugs, [q.organization]));
     }
     // Include the same-side bound so a row that sets only one of min/max/budget still matches.
     if (q.minAward !== undefined) {

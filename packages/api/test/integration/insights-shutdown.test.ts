@@ -1,7 +1,7 @@
 /**
  * THE SHUTDOWN FLUSH DRAINS AGAINST A LIVE POOL — proved, not asserted by inspection.
  *
- * Isolation tag: `M3ANA` / `m3anashut:`.
+ * Isolation tag: `M3ANA` / `m3shut:`.
  *
  * Fastify runs `onClose` hooks LIFO, so registration order is the INVERSE of execution order. When
  * the pool-closing hook was added in `server.ts` after `buildApp` returned, it was registered last
@@ -28,7 +28,10 @@ import { analyticsEvents } from "../../src/modules/services/insights/event-buffe
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import { describeWithDb } from "./db-gate.js";
 
-const NS = "m3anashut";
+// NOT `m3shut`: `insights.test.ts` sweeps `m3ana%`, which matched every id here and deleted them
+// — with their analytics events — while this suite was asserting on them. No namespace may be a
+// prefix of another; see helpers/cleanup.ts.
+const NS = "m3shut";
 const PUBLIC_ID = `${NS}:one`;
 const READER = { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) TestReader/1.0" };
 
@@ -76,15 +79,23 @@ run("M3ANA shutdown flush", () => {
     const app = await buildApp({ closePool: true });
     await app.ready();
 
+    // MEASURED AS A DELTA, not as an absolute. `analyticsEvents` is a module-level singleton shared
+    // by every app in this worker PROCESS, and vitest runs test files in the same process — so any
+    // other suite making a public detail read is also in that buffer. Asserting its total depth
+    // made this file fail for what its neighbours did, which is the opposite of what it is about.
+    const before = analyticsEvents.depth;
+
     // Fewer than the flush size and well inside the flush interval, so nothing has been written yet
     // — the shutdown hook is the only thing that can save these.
     for (let i = 0; i < 3; i++) {
       const res = await app.inject({ url: `/v1/opportunities/${PUBLIC_ID}`, headers: READER });
       expect(res.statusCode).toBe(200);
     }
-    expect(analyticsEvents.depth, "still buffered, not yet written").toBe(3);
+    expect(analyticsEvents.depth - before, "still buffered, not yet written").toBe(3);
 
     await app.close();
+    // The flush empties the buffer for everyone, which is a fact about the shutdown hook and is
+    // safe to assert absolutely: whatever else was in there, it was written too.
     expect(analyticsEvents.depth).toBe(0);
 
     // A connection this app never had, so the answer cannot come from the pool under test.

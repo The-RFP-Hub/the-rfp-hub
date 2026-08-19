@@ -1,7 +1,7 @@
 /**
  * The DEGRADED half of duplicate detection: a deployment with no embedding provider.
  *
- * Isolation tag: `M3DUP` / `m3dupoff:`.
+ * Isolation tag: `M3DUP` / `m3nodup:`.
  *
  * A SEPARATE FILE, not a separate test. `config.ts` reads the environment once at module load and
  * the submissions controller builds its `DedupeService` from it at module scope, so "provider on"
@@ -35,8 +35,10 @@ const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = aw
 );
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
 
-const NS = "m3dupoff";
-const EMAIL = "m3dupoff-publisher@rfphub.invalid";
+// NOT `m3nodup`: `duplicates.test.ts` sweeps `m3dup%`, which would have matched every id here and
+// hard-deleted them mid-run. No namespace may be a prefix of another — see helpers/cleanup.ts.
+const NS = "m3nodup";
+const EMAIL = "m3nodup-publisher@rfphub.invalid";
 
 const run = describeWithDb;
 
@@ -60,7 +62,7 @@ run("M3DUP duplicate detection, provider disabled", () => {
   beforeAll(async () => {
     app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
-    const publisher = await seedIdentity(EMAIL, { handle: "m3dupoff-publisher" });
+    const publisher = await seedIdentity(EMAIL, { handle: "m3nodup-publisher" });
     const org = await seedOrganization({ slug: NS, verified: true });
     await grantMembership(publisher.account.id, org.id, "owner");
     token = publisher.token;

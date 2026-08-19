@@ -173,6 +173,48 @@ one answer, and whichever it picked would be wrong somewhere.
 
 `direct_create` is independent of the global role, deliberately: reviewing is not publishing.
 
+### What a T2 verified publisher may do
+
+Within **their own namespace** (`source.publisher` — never merely an organisation they co-operate
+or sponsor):
+
+* **write and auto-publish**, when the credential also permits it (`publish` on a key, any session);
+* **see everything filed under it**, whatever its review status — `GET /v1/organizations/:slug/opportunities`.
+  This one admits **any** membership, verified or not: looking is not publishing;
+* **decide** what somebody else filed under it —
+  `POST /v1/organizations/:slug/opportunities/:id/{approve,reject}`. **Verified membership, session
+  only.** Approving publishes to the world, so it rides the same trust event auto-publish does, and
+  a leaked key must not hold it.
+
+**Verified members decide within their own namespace; Hub reviewers (T3) decide anywhere.** A
+rejection here **requires a written reason**, and that is the counterweight to the obvious conflict
+of interest: anyone may submit an entry *about* an organisation, so the organisation refusing a
+third party's account of its own programme is the decision that most needs a name against it. The
+trail attributes both verbs to the deciding member **by handle** — never coarsened to `reviewer`,
+which is the anonymity a neutral reviewer gets and a self-interested party should not — carries
+`via: "operating_org"` so a reader can tell the two apart, and the reason is shown to the submitter
+on their own listing (`lastDecision`).
+
+The scope is the **namespace**, not "any organisation named in `operatingOrganizations`". Widening it
+was considered and rejected: an entry may name several operators, approving publishes it in the
+namespace's name, and a co-operator could then publish under somebody else's banner — the same
+cross-org hazard the write path's containment rule exists to close. An entry filed under a namespace
+you do not publish for answers `404`, not `403`, so these routes cannot enumerate another
+organisation's pending queue.
+
+### What limits an account with no verified membership
+
+At most **`SUBMISSION_PENDING_LIMIT` (default 5) entries awaiting review at once**, counted as rows
+currently `pending` and owned by the account. The review queue is a shared resource and reviewing is
+human work; without a ceiling one account can deny that work to everybody else at no cost to itself.
+
+It is a ceiling on the **queue**, not a quota on a lifetime: every decision frees a slot, replacing
+an entry that is already pending is not a new submission, and anybody holding a verified membership
+**anywhere** is exempt entirely — their own writes auto-approve and never reach the queue, and
+metering their proposals into other namespaces would meter exactly the people the Hub has already
+vouched for. Over the cap, `POST /v1/opportunities` answers `409 pending_limit_reached` naming the
+count, the limit, and the fact that slots free as reviews happen.
+
 ---
 
 ## 3. The rule that closes the escalation hole

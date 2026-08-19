@@ -114,7 +114,12 @@ export class AuditService {
         action: row.action,
         at: row.createdAt.toISOString(),
         actorKind: row.actorKind,
-        actor: publicActor(row.actorKind, row.actorHandle, row.actorRole ?? row.currentRole),
+        actor: publicActor(
+          row.actorKind,
+          row.actorHandle,
+          row.actorRole ?? row.currentRole,
+          (patch as { via?: unknown }).via,
+        ),
         changedFields: changedFields(patch),
       };
       if (viewer.full) view.patch = patch;
@@ -122,6 +127,15 @@ export class AuditService {
     });
   }
 }
+
+/**
+ * The `patch.via` value that says a decision was taken in a PUBLISHER capacity.
+ *
+ * Written by the organisation-scoped decision routes and read by `publicActor`. It is a fact about
+ * WHICH HAT the actor wore, which is a different question from what roles they hold — and the only
+ * one the public label is trying to answer.
+ */
+export const OPERATING_ORG_CAPACITY = "operating_org";
 
 /**
  * The role the actor holds AS THIS MUTATION COMMITS, read with the writing handle.
@@ -159,14 +173,25 @@ async function actingRole(
  * The role passed here is the one STORED with the row (`audit_log.actor_role`), not the one the
  * account holds today — see the column's comment. Demoting a reviewer must not retroactively put
  * their handle on everything they ever rejected.
+ *
+ * CAPACITY OVERRIDES ROLE, and only in this direction. A decision taken through an organisation's
+ * own routes is made as that organisation's publisher, and it is NAMED: anyone may submit an entry
+ * about an organisation, so the organisation deciding about it is the case that most needs somebody
+ * answerable attached to it. Without this, a member who also happens to be Hub staff would be
+ * anonymised as "reviewer" by a global role that had nothing to do with the decision — the
+ * anonymity exists to protect a NEUTRAL reviewer from being argued with personally, and a
+ * self-interested party is not that. The same person deciding through the STAFF route is coarsened
+ * exactly as before, because there they really are acting as a reviewer.
  */
 export function publicActor(
   actorKind: ActorKind,
   handle: string | null,
   role: "submitter" | "reviewer" | "admin" | null,
+  capacity?: unknown,
 ): string {
   if (actorKind === "job") return "job";
   if (actorKind === "outbox") return "outbox";
+  if (capacity === OPERATING_ORG_CAPACITY) return handle ?? "community";
   if (role === "reviewer" || role === "admin") return "reviewer";
   return handle ?? "community";
 }

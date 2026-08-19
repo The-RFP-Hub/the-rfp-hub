@@ -30,9 +30,10 @@ import type {
   OrganizationSummaryView,
   ReviewDecisionView,
 } from "../../shared/api-views.js";
-import { badRequest, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
+import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
+import { AuditService, OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
+import { resolvePublishAuthority } from "../auth/publish-authority.js";
 
 export type OrgRole = "owner" | "admin" | "publisher";
 
@@ -318,6 +319,154 @@ export class ReviewService {
   }
 
   /** Whether this account may edit the organisation's directory entry as its owner/admin. */
+  /**
+   * A VERIFIED MEMBER PUBLISHES THEIR OWN ORGANISATION'S QUEUE.
+   *
+   * The same act a T2 write performs automatically, performed deliberately after the fact: an entry
+   * filed under an organisation's namespace by somebody who could not auto-publish — a colleague
+   * without a key's `publish` scope, a submission that arrived before the organisation was verified,
+   * an edit that returned an approved entry to the queue — is the organisation's to release. Making
+   * them wait for a Hub reviewer to rubber-stamp their own programme is a queue that exists only
+   * because nobody wired this route.
+   *
+   * FOUR BOUNDARIES, and each one is a decision rather than an omission:
+   *
+   *   1. **VERIFIED membership, not any membership.** The list endpoint beside this one admits any
+   *      member, because looking is not publishing. This one publishes to the world, so it rides the
+   *      same trust event auto-publish does — the moment a reviewer verified the organisation.
+   *   2. **Session only.** A leaked key must not be able to publish unreviewed content, which is the
+   *      whole of the `canPublishImmediately` rule; approving is that same power in a second shape.
+   *   3. **The NAMESPACE, not any operating organisation.** Widening this to "any org named in
+   *      `operatingOrganizations`" was considered and rejected: an entry can name several operators,
+   *      and approving publishes it in the NAMESPACE's name — so a co-operator could publish under
+   *      somebody else's banner, which is the cross-org hazard the write path's containment rule
+   *      exists to close. An entry filed under a namespace you do not publish for is answered 404,
+   *      not 403, so this route cannot be used to enumerate other organisations' pending queues.
+   *   4. **BOTH VERBS, and a REQUIRED REASON on the rejection.** Verified members decide — approve
+   *      AND reject — within their own namespace; Hub reviewers decide anywhere. Rejection was
+   *      withheld at first over the obvious conflict of interest (anyone may submit an entry ABOUT
+   *      an organisation, and that organisation should not quietly suppress a third party's account
+   *      of its own programme), but withholding it left spam in an organisation's namespace waiting
+   *      on Hub staff. The counterweight is accountability rather than absence: a rejection here
+   *      REQUIRES a written reason, the trail attributes it to the member by handle rather than
+   *      coarsening it to "reviewer", and the submitter is shown that reason on their own listing.
+   *      An organisation may still refuse things — it may no longer do it silently or anonymously.
+   *
+   * The membership is re-proved UNDER THE ENTRY'S LOCK, not trusted from the request's principal:
+   * memberships are resolved when the bearer is exchanged, and a request can outlive that answer.
+   * A reviewer un-verifying the organisation while this is in flight must not be beaten by it, so
+   * the authority is read again inside the transaction, in the repo's standing lock order
+   * (entry → organisation → membership). Fails closed: gone or unverified ⇒ refused.
+   */
+  async approveForNamespace(accountId: number, slug: string, publicId: string) {
+    return this.decideForNamespace(accountId, slug, publicId, { approve: true });
+  }
+
+  /**
+   * The same authority, the other verdict — and the reason is not optional.
+   *
+   * See `approveForNamespace` for the four boundaries; they are identical, and deliberately so:
+   * the thing that makes a member trusted to publish is the thing that makes them trusted to
+   * refuse, and a route pair whose guards drifted apart would be the interesting bug.
+   */
+  async rejectForNamespace(accountId: number, slug: string, publicId: string, reason: string) {
+    const written = reason.trim();
+    if (written === "") {
+      throw badRequest(
+        "reason_required",
+        "rejecting an entry in your own namespace requires a reason. It is recorded against your account and shown to whoever submitted it — that accountability is what makes this decision yours to make.",
+      );
+    }
+    return this.decideForNamespace(accountId, slug, publicId, { approve: false, reason: written });
+  }
+
+  private async decideForNamespace(
+    accountId: number,
+    slug: string,
+    publicId: string,
+    decision: { approve: boolean; reason?: string },
+  ): Promise<ReviewDecisionView> {
+    return this.db.transaction(async (tx) => {
+      const row = await lockOpportunity(tx, publicId);
+      // Not 403: an entry filed under a namespace this account does not publish for is, as far as
+      // this route is concerned, not there at all.
+      if (row.sourcePublisher !== slug) {
+        throw notFound(`no opportunity ${JSON.stringify(publicId)} published under \`${slug}\`.`);
+      }
+
+      const authority = await resolvePublishAuthority(tx, accountId, slug);
+      if (!authority.member || !authority.verified) {
+        throw forbidden(
+          "not_a_verified_member",
+          `approving an entry published under \`${slug}\` requires a membership on it while it is a verified publisher.`,
+        );
+      }
+
+      if (row.reviewStatus !== "pending") {
+        throw conflict(
+          "not_pending",
+          `that entry is already ${row.reviewStatus}; only a pending entry can be decided here.`,
+        );
+      }
+
+      const now = new Date();
+      const target = decision.approve ? "approved" : "rejected";
+      const updated = await tx
+        .update(opportunities)
+        .set({
+          reviewStatus: target,
+          // APPROVAL IS NOT A LISTING DECISION, and the staff route has always known that: it
+          // preserves `is_listed` on approve and clears it on reject. Forcing it true here would
+          // silently republish a row a reviewer had deliberately unlisted, or one that was rejected
+          // (and therefore unlisted), edited, and requeued — an unlisting undone by somebody who
+          // never saw it. Rejection still unlists, because leaving the flag true records a listing
+          // intent that is no longer true and two flags that disagree are how a later query gets it
+          // wrong.
+          isListed: decision.approve ? row.isListed : false,
+          approvedBy: decision.approve ? (row.approvedBy ?? accountId) : row.approvedBy,
+          approvedAt: decision.approve ? (row.approvedAt ?? now) : row.approvedAt,
+          // A publisher releasing their own entry is the same "still real" signal a write is; a
+          // rejection says nothing about whether the programme exists.
+          lastSeenAt: decision.approve ? now : row.lastSeenAt,
+          updatedAt: now,
+        })
+        .where(eq(opportunities.id, row.id))
+        .returning();
+      const next = updated[0] ?? row;
+
+      await this.audit.record(tx, {
+        subjectKind: "opportunity",
+        subjectId: row.id,
+        actorKind: "user",
+        actorAccountId: accountId,
+        action: decision.approve ? "approve" : "reject",
+        patch: {
+          reviewStatus: { before: row.reviewStatus, after: target },
+          ...(decision.approve || row.isListed === false
+            ? {}
+            : { isListed: { before: row.isListed, after: false } }),
+          // `reason` is the human-facing half — the server's own words on an approval, the member's
+          // written justification on a rejection — and `via` is the machine-readable one. The trail
+          // has to distinguish a Hub reviewer's decision from a publisher's for BOTH verbs, and
+          // `reason` alone cannot carry that once it is holding somebody's sentence.
+          //
+          // `via` is ALSO what keeps the by-handle promise for a member who happens to be staff:
+          // the trail's public actor label coarsens a reviewer or admin to "reviewer", and a
+          // dual-role member deciding in their PUBLISHER capacity would otherwise be anonymised by
+          // a global role that had nothing to do with this decision. See `publicActor`.
+          reason: decision.approve ? "operating_org_approval" : (decision.reason as string),
+          via: OPERATING_ORG_CAPACITY,
+        },
+      });
+      return { id: next.publicId, reviewStatus: next.reviewStatus, isListed: next.isListed };
+    });
+  }
+
+  /** The organisation a slug names, or the same 404 every other organisation route answers with. */
+  async requireOrganization(slug: string): Promise<OrganizationRow> {
+    return findOrganization(this.db, slug);
+  }
+
   async isOrgManager(accountId: number, slug: string): Promise<boolean> {
     const rows = await this.db
       .select({ role: orgMemberships.role })
@@ -384,7 +533,7 @@ async function lockOpportunity(tx: TxLike, publicId: string): Promise<Opportunit
   return row;
 }
 
-async function findOrganization(tx: TxLike, slug: string): Promise<OrganizationRow> {
+async function findOrganization(tx: TxLike | DB, slug: string): Promise<OrganizationRow> {
   const rows = await tx.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
   const row = rows[0];
   if (!row) throw notFound(`no organisation \`${slug}\`.`);

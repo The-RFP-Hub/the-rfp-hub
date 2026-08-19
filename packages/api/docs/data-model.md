@@ -386,7 +386,10 @@ CREATE TABLE accounts (                  -- ✅ M3
   -- The PUBLIC identifier used for attribution: source.submittedBy becomes this handle, the
   -- publishing organization's slug, or 'community'. Deliberately not the email or the subject.
   handle         TEXT UNIQUE,
-  global_role    account_role NOT NULL DEFAULT 'submitter',   -- T1 default; T3/T4 elevate
+  -- T1 default; T3/T4 elevate. An account with no VERIFIED membership anywhere is also metered on
+  -- how many entries it may leave pending at once (SUBMISSION_PENDING_LIMIT, counted live from
+  -- opportunities.review_status — no counter column, so a decision frees a slot by itself).
+  global_role    account_role NOT NULL DEFAULT 'submitter',
   -- Publish in ANY namespace without a membership. Granted by T4, audited both ways, and
   -- independent of global_role — reviewing is not publishing.
   direct_create  BOOLEAN NOT NULL DEFAULT FALSE,

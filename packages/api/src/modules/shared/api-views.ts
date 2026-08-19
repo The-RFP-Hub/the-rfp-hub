@@ -280,6 +280,20 @@ export interface ApiKeyCreatedView {
 }
 
 // ── review and admin ─────────────────────────────────────────────────────────────
+/**
+ * The newest review decision on an entry, as its owner is entitled to see it.
+ *
+ * The trail already records this — action, reason and time — so nothing new is stored for it. What
+ * changes is that a submitter can finally READ why their entry was rejected, instead of finding it
+ * missing and having to ask.
+ */
+export interface ReviewDecisionSummaryView {
+  action: "approve" | "reject";
+  /** Whatever the decider wrote, when they wrote one. Null is honest, not an error. */
+  reason: string | null;
+  at: string;
+}
+
 export interface ManagedOpportunityView {
   id: string;
   title: string;
@@ -289,6 +303,8 @@ export interface ManagedOpportunityView {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  /** The newest approve/reject on this entry, or null while nobody has decided anything. */
+  lastDecision: ReviewDecisionSummaryView | null;
   createdAt: string;
   updatedAt: string;
 }
