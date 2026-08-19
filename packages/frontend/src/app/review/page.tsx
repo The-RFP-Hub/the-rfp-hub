@@ -43,16 +43,29 @@ import type {
 } from "@/lib/types";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 
 type Tab = "submissions" | "claims" | "duplicates" | "organisations";
 const TABS: Tab[] = ["submissions", "claims", "duplicates", "organisations"];
+const SUBMISSION_PAGE_SIZE = 50;
 const LABELS: Record<Tab, string> = {
   submissions: "Submissions",
   claims: "Claims",
   duplicates: "Duplicates",
   organisations: "Organisations",
 };
+
+function submissionPageFromUrl(raw: string | null | undefined): number {
+  if (!raw || !/^\d+$/.test(raw)) return 1;
+  const page = Number(raw);
+  return Number.isSafeInteger(page) &&
+    page > 1 &&
+    (page - 1) * SUBMISSION_PAGE_SIZE <= Number.MAX_SAFE_INTEGER
+    ? page
+    : 1;
+}
+
+const submissionHref = (page: number): string => (page > 1 ? `/review?page=${page}` : "/review");
 
 export default function ReviewPage() {
   return (
@@ -68,10 +81,16 @@ function Review() {
   const params = useSearchParams();
   const requested = params?.get("tab");
   const tab: Tab = TABS.includes(requested as Tab) ? (requested as Tab) : "submissions";
+  const [queuePage, setQueuePage] = useState(() => submissionPageFromUrl(params?.get("page")));
 
   const loadQueue = useCallback(
-    () => api.review.opportunities({ reviewStatus: "pending", limit: 50 }),
-    [api],
+    () =>
+      api.review.opportunities({
+        reviewStatus: "pending",
+        page: queuePage,
+        limit: SUBMISSION_PAGE_SIZE,
+      }),
+    [api, queuePage],
   );
   const loadClaims = useCallback(() => api.review.claims({ status: "pending" }), [api]);
   const loadDuplicates = useCallback(
@@ -82,6 +101,15 @@ function Review() {
   const queue = useResource(loadQueue);
   const claims = useResource(loadClaims);
   const duplicates = useResource(loadDuplicates);
+
+  useEffect(() => {
+    if (queue.state.status !== "ready") return;
+    if (queue.state.data.page > queue.state.data.totalPages) {
+      const page = queue.state.data.totalPages;
+      setQueuePage(page);
+      router.replace(submissionHref(page));
+    }
+  }, [queue.state, router]);
 
   const counts: Record<Tab, number | null> = {
     submissions: queue.state.status === "ready" ? queue.state.data.total : null,
@@ -101,12 +129,17 @@ function Review() {
    * silently resolves to `"http://localhost:3000"` instead of failing to compile — which is exactly
    * what happened here, and it typechecked perfectly while emitting no return parameter at all.
    */
-  const tabHref = (next: Tab) => (next === "submissions" ? "/review" : `/review?tab=${next}`);
+  const tabHref = (next: Tab) =>
+    next === "submissions" ? submissionHref(queuePage) : `/review?tab=${next}`;
   const returnHere = tabHref(tab);
 
   // `replace`, not `push`: switching tabs is not a navigation a reader wants to walk back through
   // one at a time, but the address still has to name where they are.
   const select = (next: Tab) => router.replace(tabHref(next));
+  const selectQueuePage = (page: number) => {
+    setQueuePage(page);
+    router.replace(submissionHref(page));
+  };
 
   return (
     <section>
@@ -127,7 +160,9 @@ function Review() {
         ))}
       </div>
 
-      {tab === "submissions" ? <Submissions queue={queue} origin={returnHere} /> : null}
+      {tab === "submissions" ? (
+        <Submissions queue={queue} origin={returnHere} onPage={selectQueuePage} />
+      ) : null}
       {tab === "claims" ? <Claims claims={claims} origin={returnHere} /> : null}
       {tab === "duplicates" ? <Duplicates duplicates={duplicates} origin={returnHere} /> : null}
       {tab === "organisations" ? <Organisations /> : null}
@@ -162,7 +197,12 @@ function useAction() {
 function Submissions({
   queue,
   origin,
-}: { queue: ResourceHandle<ManagedOpportunityList>; origin: string }) {
+  onPage,
+}: {
+  queue: ResourceHandle<ManagedOpportunityList>;
+  origin: string;
+  onPage: (page: number) => void;
+}) {
   const { note, busy, run } = useAction();
 
   return (
@@ -181,34 +221,57 @@ function Submissions({
               detail="Submissions from accounts without a verified membership land here. An empty queue means every one of them has been decided."
             />
           ) : (
-            <div className="table-scroll">
-              <table>
-                <caption>
-                  {list.total} awaiting a decision
-                  {list.total > list.items.length ? ` · showing ${list.items.length}` : null}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Listing</th>
-                    <th scope="col">Submitted by</th>
-                    <th scope="col">State</th>
-                    <th scope="col">Decision</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((item) => (
-                    <SubmissionRow
-                      key={item.id}
-                      item={item}
-                      busy={busy}
-                      run={run}
-                      reload={queue.reload}
-                      origin={origin}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="table-scroll">
+                <table>
+                  <caption>
+                    {list.total} awaiting a decision
+                    {list.total > list.items.length ? ` · showing ${list.items.length}` : null}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Listing</th>
+                      <th scope="col">Submitted by</th>
+                      <th scope="col">State</th>
+                      <th scope="col">Decision</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {list.items.map((item) => (
+                      <SubmissionRow
+                        key={item.id}
+                        item={item}
+                        busy={busy}
+                        run={run}
+                        reload={queue.reload}
+                        origin={origin}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {list.totalPages > 1 ? (
+                <nav className="pagination" aria-label="Submission queue pages">
+                  <button
+                    type="button"
+                    disabled={list.page <= 1}
+                    onClick={() => onPage(list.page - 1)}
+                  >
+                    Previous
+                  </button>
+                  <span>
+                    Page {list.page} of {list.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={list.page >= list.totalPages}
+                    onClick={() => onPage(list.page + 1)}
+                  >
+                    Next
+                  </button>
+                </nav>
+              ) : null}
+            </>
           )
         }
       </ResourceView>

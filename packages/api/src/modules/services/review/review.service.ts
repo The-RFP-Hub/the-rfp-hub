@@ -142,7 +142,9 @@ export class ReviewService {
     verified: boolean,
   ): Promise<OrganizationSummaryView> {
     return this.db.transaction(async (tx) => {
-      const row = await findOrganization(tx, slug);
+      // The no-op check is part of the write. Lock first so two identical concurrent decisions do
+      // not both read the old flag, both UPDATE it, and append two audit rows for one transition.
+      const row = await lockOrganization(tx, slug);
       if (row.verified === verified) return this.summarize(row);
       const now = new Date();
       const updated = await tx
@@ -168,9 +170,35 @@ export class ReviewService {
     actorAccountId: number,
     slug: string,
     metadata: OrganizationMetadata,
+    /** Owner/admin route only: re-prove the membership inside the transaction that writes. */
+    requireManager = false,
   ): Promise<OrganizationSummaryView> {
     return this.db.transaction(async (tx) => {
-      const row = await findOrganization(tx, slug);
+      // The controller's check is only a cheap fail-fast. A membership can be revoked after that
+      // read and before this UPDATE; locking the organisation first, then re-reading the membership
+      // under a shared lock, makes revocation and the write serialize in the repository's standing
+      // organisation → membership order. Whichever commits first is what the other observes.
+      const row = await lockOrganization(tx, slug);
+      if (requireManager) {
+        const membership = await tx
+          .select({ role: orgMemberships.role })
+          .from(orgMemberships)
+          .where(
+            and(
+              eq(orgMemberships.accountId, actorAccountId),
+              eq(orgMemberships.organizationId, row.id),
+            ),
+          )
+          .for("share")
+          .limit(1);
+        const role = membership[0]?.role;
+        if (role !== "owner" && role !== "admin") {
+          throw forbidden(
+            "not_an_org_manager",
+            `editing \`${slug}\` requires an owner or admin membership on it.`,
+          );
+        }
+      }
       const set: Partial<OrganizationRow> = { updatedAt: new Date() };
       const patch: Record<string, unknown> = {};
 
@@ -249,6 +277,10 @@ export class ReviewService {
           .where(
             and(eq(orgMemberships.accountId, accountId), eq(orgMemberships.organizationId, org.id)),
           )
+          // A concurrent revoke must finish before this grant decides whether to UPDATE or INSERT.
+          // Without the lock, DELETE can remove the row after this read; the UPDATE then affects
+          // zero rows while the endpoint still audits and reports a membership that does not exist.
+          .for("update")
           .limit(1);
 
         if (existing[0]) {
@@ -530,6 +562,19 @@ async function lockOpportunity(tx: TxLike, publicId: string): Promise<Opportunit
     .limit(1);
   const row = rows[0];
   if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
+  return row;
+}
+
+/** The organisation row a metadata transaction is about to change, locked before membership. */
+async function lockOrganization(tx: TxLike, slug: string): Promise<OrganizationRow> {
+  const rows = await tx
+    .select()
+    .from(organizations)
+    .where(eq(organizations.slug, slug))
+    .for("update")
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw notFound(`no organisation \`${slug}\`.`);
   return row;
 }
 

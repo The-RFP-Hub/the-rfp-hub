@@ -25,6 +25,7 @@ export const organizationsController = {
       principal.accountId,
       slug,
       bodyOf<OrganizationMetadata>(request),
+      !reviewer,
     );
   }),
 

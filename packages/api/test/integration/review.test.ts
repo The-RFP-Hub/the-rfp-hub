@@ -10,7 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
-import { opportunities, orgMemberships } from "../../src/db/schema.js";
+import { auditLog, opportunities, orgMemberships, organizations } from "../../src/db/schema.js";
 import {
   bearer,
   grantMembership,
@@ -21,17 +21,20 @@ import {
   testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
+import { openLockBarrier } from "../helpers/lock-barrier.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3rev";
 const CANDIDATE = "m3rev-candidate";
+const VERIFY_RACE = "m3rev-verify-race";
 const EMAILS = {
   submitter: "m3rev-submitter@rfphub.invalid",
   member: "m3rev-member@rfphub.invalid",
   reviewer: "m3rev-reviewer@rfphub.invalid",
   admin: "m3rev-admin@rfphub.invalid",
   raceMember: "m3rev-race-member@rfphub.invalid",
+  grantRevokeMember: "m3rev-grant-revoke-member@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -62,6 +65,7 @@ run("M3REV review and administration", () => {
 
     await seedOrganization({ slug: NS, verified: false });
     const candidate = await seedOrganization({ slug: CANDIDATE, verified: false });
+    await seedOrganization({ slug: VERIFY_RACE, verified: false });
     candidateOrgId = candidate.id;
     await grantMembership(member.account.id, candidate.id, "owner");
 
@@ -74,7 +78,7 @@ run("M3REV review and administration", () => {
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3rev",
-      organizationSlugs: [NS, CANDIDATE],
+      organizationSlugs: [NS, CANDIDATE, VERIFY_RACE],
       userIds,
       emails: Object.values(EMAILS),
     });
@@ -295,6 +299,63 @@ run("M3REV review and administration", () => {
     expect(afterUnverify.json().reviewStatus).toBe("pending");
   });
 
+  it("records one verification transition when two reviewers verify concurrently", async () => {
+    const organization = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.slug, VERIFY_RACE))
+      .limit(1);
+    const organizationId = organization[0]?.id;
+    expect(organizationId).toBeTypeOf("number");
+    if (organizationId === undefined) throw new Error("missing verification-race organization");
+
+    const before = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "organization"),
+          eq(auditLog.subjectId, organizationId),
+          eq(auditLog.action, "verify_organization"),
+        ),
+      );
+    const barrier = await openLockBarrier();
+    let barrierOpen = true;
+    try {
+      await barrier.run("select id from organizations where id = $1 for update", [organizationId]);
+      const verify = () =>
+        app.inject({
+          method: "POST",
+          url: `/v1/review/organizations/${VERIFY_RACE}/verify`,
+          headers: bearer(reviewerToken),
+        });
+      const first = verify();
+      const second = verify();
+      await barrier.waitForWaiters(2);
+      await barrier.commit();
+      barrierOpen = false;
+
+      for (const response of await Promise.all([first, second])) {
+        expect(response.statusCode, response.body).toBe(200);
+        expect(response.json().verified).toBe(true);
+      }
+    } finally {
+      if (barrierOpen) await barrier.rollback();
+    }
+
+    const after = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "organization"),
+          eq(auditLog.subjectId, organizationId),
+          eq(auditLog.action, "verify_organization"),
+        ),
+      );
+    expect(after).toHaveLength(before.length + 1);
+  });
+
   it("removes auto-approval the moment a membership is revoked", async () => {
     await app.inject({
       method: "POST",
@@ -379,6 +440,55 @@ run("M3REV review and administration", () => {
     expect(rows[0]?.role).toBe("publisher");
   });
 
+  it("does not report a membership grant that a concurrent revocation deleted", async () => {
+    const fresh = await seedIdentity(EMAILS.grantRevokeMember, {
+      handle: "m3rev-grant-revoke-member",
+    });
+    userIds.push(fresh.userId);
+    await grantMembership(fresh.account.id, candidateOrgId, "publisher");
+
+    const barrier = await openLockBarrier();
+    let barrierOpen = true;
+    try {
+      await barrier.run(
+        "select id from org_memberships where account_id = $1 and organization_id = $2 for update",
+        [fresh.account.id, candidateOrgId],
+      );
+      const grant = app.inject({
+        method: "POST",
+        url: `/v1/review/organizations/${CANDIDATE}/members`,
+        headers: bearer(reviewerToken),
+        payload: { accountId: fresh.account.id, role: "admin" },
+      });
+      await barrier.waitForWaiters(1);
+
+      // The revocation wins this ordering. The grant must then observe the missing row and insert
+      // it again; returning `member: true` while leaving no membership behind is a false success.
+      await barrier.run(
+        "delete from org_memberships where account_id = $1 and organization_id = $2",
+        [fresh.account.id, candidateOrgId],
+      );
+      await barrier.commit();
+      barrierOpen = false;
+
+      const response = await grant;
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json()).toMatchObject({ member: true, role: "admin" });
+      const rows = await db
+        .select({ role: orgMemberships.role })
+        .from(orgMemberships)
+        .where(
+          and(
+            eq(orgMemberships.accountId, fresh.account.id),
+            eq(orgMemberships.organizationId, candidateOrgId),
+          ),
+        );
+      expect(rows).toEqual([{ role: "admin" }]);
+    } finally {
+      if (barrierOpen) await barrier.rollback();
+    }
+  });
+
   it("edits organisation metadata through the reviewer route, audited, without touching verified", async () => {
     const res = await app.inject({
       method: "PATCH",
@@ -409,6 +519,51 @@ run("M3REV review and administration", () => {
     });
     expect(theirs.statusCode).toBe(403);
     expect(theirs.json().error).toBe("not_an_org_manager");
+  });
+
+  it("refuses an organisation edit when the manager membership is revoked mid-flight", async () => {
+    const before = await db
+      .select({ description: organizations.description })
+      .from(organizations)
+      .where(eq(organizations.id, candidateOrgId))
+      .limit(1);
+    const originalDescription = before[0]?.description ?? null;
+    const barrier = await openLockBarrier();
+    let barrierOpen = true;
+    let response: Awaited<ReturnType<typeof app.inject>> | undefined;
+
+    try {
+      // Hold the row the PATCH eventually updates. The request can still resolve its session and
+      // pass the controller's unlocked membership check, then queues on the UPDATE behind us.
+      await barrier.run("select id from organizations where id = $1 for update", [candidateOrgId]);
+      const patch = app.inject({
+        method: "PATCH",
+        url: `/v1/organizations/${CANDIDATE}`,
+        headers: bearer(memberToken),
+        payload: { description: "A revoked manager must not be able to write this." },
+      });
+      await barrier.waitForWaiters(1);
+
+      // The revocation commits before the blocked write is allowed to continue. A check performed
+      // only before the transaction is now stale; the transaction itself must re-prove the role.
+      await barrier.run(
+        "delete from org_memberships where account_id = $1 and organization_id = $2",
+        [memberId, candidateOrgId],
+      );
+      await barrier.commit();
+      barrierOpen = false;
+      response = await patch;
+    } finally {
+      if (barrierOpen) await barrier.rollback();
+      await grantMembership(memberId, candidateOrgId, "owner");
+      await db
+        .update(organizations)
+        .set({ description: originalDescription })
+        .where(eq(organizations.id, candidateOrgId));
+    }
+
+    expect(response?.statusCode, response?.body).toBe(403);
+    expect(response?.json().error).toBe("not_an_org_manager");
   });
 
   it("keeps role assignment to T4 and account/organisation discovery to T3", async () => {

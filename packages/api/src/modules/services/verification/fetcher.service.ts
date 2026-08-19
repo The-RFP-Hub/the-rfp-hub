@@ -372,7 +372,9 @@ export const undiciTransport: SourceTransport = async (url, options) => {
     let truncated = false;
     for await (const chunk of response.body) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBufferLike);
-      if (total + buffer.length >= options.maxBytes) {
+      // Reaching the cap exactly is not truncation. Keep reading until the stream ends or one more
+      // byte arrives; only the latter proves that the representation exceeded the recorded bytes.
+      if (total + buffer.length > options.maxBytes) {
         chunks.push(buffer.subarray(0, options.maxBytes - total));
         truncated = true;
         break;

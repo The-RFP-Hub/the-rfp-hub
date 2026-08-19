@@ -18,13 +18,15 @@ import type { ManagedOpportunityList, Me, MeMembership, PublisherList } from "@/
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { session, slug } = vi.hoisted(() => ({
+const { session, slug, query, replace } = vi.hoisted(() => ({
   session: {
     data: { user: { id: "u1" } } as { user: { id: string } } | null,
     isPending: false,
     error: null,
   },
   slug: { current: "filecoin" },
+  query: { current: "" },
+  replace: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -37,6 +39,8 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("next/navigation", () => ({
   useParams: () => ({ slug: slug.current }),
   usePathname: () => `/organisations/${slug.current}`,
+  useRouter: () => ({ replace }),
+  useSearchParams: () => new URLSearchParams(query.current),
 }));
 
 const membership = (over: Partial<MeMembership> = {}): MeMembership => ({
@@ -164,6 +168,7 @@ beforeEach(() => {
   listedFixture.current = false;
   session.data = { user: { id: "u1" } };
   slug.current = "filecoin";
+  query.current = "";
 });
 
 describe("who may see the page", () => {
@@ -334,6 +339,21 @@ describe("the way back", () => {
     // The slug is not what anybody calls it, so the display name rides along.
     expect(url.searchParams.get("backLabel")).toBe("Filecoin Foundation");
   });
+
+  it("keeps both table pages when a listing is opened and then revisited", async () => {
+    query.current = "publishedPage=2&pendingPage=3";
+    mount(me(), [
+      listing({ id: "filecoin:pending-1", title: "Dev Grants Q4", reviewStatus: "pending" }),
+    ]);
+
+    await waitFor(() => expect(asked.approved.at(-1)).toMatchObject({ page: 2 }));
+    await waitFor(() => expect(asked.pending.at(-1)).toMatchObject({ page: 3 }));
+    const link = await screen.findByRole("link", { name: "Dev Grants Q4" });
+    const url = new URL(link.getAttribute("href") ?? "", "https://x.example");
+    expect(url.searchParams.get("back")).toBe(
+      "/organisations/filecoin?publishedPage=2&pendingPage=3",
+    );
+  });
 });
 
 describe("the namespace queue", () => {
@@ -385,6 +405,63 @@ describe("paging through the two lists", () => {
     await waitFor(() => expect(approve).toHaveBeenCalled());
     // Approving a row on page 2 must not silently return the reader to the top of the queue.
     await waitFor(() => expect(asked.pending.at(-1)).toMatchObject({ page: 2 }));
+  });
+
+  it("steps back when deciding the last row makes the current queue page disappear", async () => {
+    let decided = false;
+    const requestedPages: number[] = [];
+    const api = client(me(), []);
+    api.organizations.approve = vi.fn(async () => {
+      decided = true;
+      return { id: "filecoin:last", reviewStatus: "approved", isListed: true };
+    });
+    api.organizations.opportunities = async (
+      _slug: string,
+      query?: { reviewStatus?: string; page?: number; limit?: number },
+    ) => {
+      const requested = query?.page ?? 1;
+      if (query?.reviewStatus !== "pending") {
+        return page([listing()], { page: requested, total: 60, totalPages: 3 });
+      }
+      requestedPages.push(requested);
+      if (decided && requested === 3) {
+        // The only row on page 3 just moved to Published. Forty rows remain, so page 3 no longer
+        // exists; trapping the reader on an empty page would claim the queue itself is empty.
+        return page([], { page: 3, total: 40, totalPages: 2 });
+      }
+      return page(
+        [
+          listing({
+            id: decided ? "filecoin:p40" : "filecoin:last",
+            title: decided ? "Queue entry 40" : "Last row on page three",
+            reviewStatus: "pending",
+          }),
+        ],
+        { page: requested, total: decided ? 40 : 41, totalPages: decided ? 2 : 3 },
+      );
+    };
+
+    render(
+      <ApiClientProvider value={api}>
+        <OrganisationPage />
+      </ApiClientProvider>,
+    );
+
+    const pager = await screen.findByRole("navigation", {
+      name: "Pages of submissions awaiting review",
+    });
+    fireEvent.click(within(pager).getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(requestedPages.at(-1)).toBe(2));
+    fireEvent.click(within(pager).getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(requestedPages.at(-1)).toBe(3));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Approve…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish it" }));
+
+    // The page count falls from 3 to 2 after the decision. The UI must follow the server's new
+    // last page rather than render "nothing is waiting" while forty rows remain elsewhere.
+    await waitFor(() => expect(requestedPages.at(-1)).toBe(2));
+    expect(await screen.findByText("Queue entry 40")).toBeTruthy();
   });
 });
 

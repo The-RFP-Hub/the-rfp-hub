@@ -191,6 +191,13 @@ describe("the directory's URL state", () => {
     expect(parsed.page).toBe(1);
   });
 
+  it("does not forward malformed or database-overflowing pages from a shared URL", () => {
+    // `parseInt` accepts a numeric prefix and rounds huge integers. The resulting value was sent
+    // to PostgreSQL as OFFSET; sufficiently large values turn a public URL into a 500 response.
+    expect(selectionFromParams(new URLSearchParams("page=2junk")).page).toBe(1);
+    expect(selectionFromParams(new URLSearchParams("page=9223372036854775807")).page).toBe(1);
+  });
+
   it("keeps free text verbatim, including the characters a querystring has to escape", () => {
     const selection = { ...DEFAULT_SELECTION, q: "zk & rollups", ecosystem: "ZKsync Era" };
     expect(roundTrip(selection)).toEqual(selection);
