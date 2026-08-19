@@ -28,12 +28,21 @@ export default function NewListingPage() {
               </p>
             ) : (
               <p className="muted footnote">
-                This account is not a member of a verified organisation, so this entry will be
+                This account is not a member of a verified organisation, so this submission will be
                 stored <strong>pending</strong> and stay invisible to the public reads until a
                 reviewer approves it. That is the normal path for a community submission.
               </p>
             )}
-            <OpportunityForm mode="create" initial={emptyForm()} />
+            <OpportunityForm
+              mode="create"
+              initial={emptyForm()}
+              // What the API is going to decide, handed to the form so the id field can say it
+              // live rather than after a round trip.
+              authority={{
+                verifiedNamespaces: verified.map((membership) => membership.slug),
+                directCreate: me.directCreate,
+              }}
+            />
           </section>
         );
       }}
