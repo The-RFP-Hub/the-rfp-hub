@@ -1,8 +1,8 @@
 # Scheduled jobs — schedule, guarantees and runbook
 
 The maintenance work the request path deliberately does not do: settling yesterday's analytics,
-catching up on embeddings and source checks, reading the identity provider's user records, and
-closing listings that have stopped being opportunities.
+catching up on embeddings and source checks, and closing listings that have stopped being
+opportunities.
 
 Everything here is implemented in `src/modules/services/jobs/*`, started by
 `scripts/jobs/run-job.ts` (built as `dist/jobs.js`) and scheduled by
@@ -18,7 +18,6 @@ Everything here is implemented in `src/modules/services/jobs/*`, started by
 | `retention` | sweep | Deletes raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
-| `account-enrichment` | cursor | Reads the identity provider's record for accounts whose `enriched_at` is still NULL. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. |
 
 The list lives in exactly one place — `src/modules/services/jobs/registry.ts` — which the runner,
@@ -51,7 +50,7 @@ stop and let tomorrow's run try again.
 | Value | Means |
 |---|---|
 | `locked` | Another run of the **same** job holds the database advisory lock. Added by the runner. |
-| anything else | The job's **feature** is not configured — no embedding provider, `VERIFICATION_ENABLED=false`, no identity-provider app secret. Reported by the job itself. |
+| anything else | The job's **feature** is not configured — no embedding provider, `VERIFICATION_ENABLED=false`. Reported by the job itself. |
 
 Both exit `0`. Only one of them is a statement about configuration, which is why a runner that
 collapsed them would report a permanently unconfigured job as healthy contention.
@@ -60,7 +59,7 @@ collapsed them would report a permanently unconfigured job as healthy contention
 
 ## 2. The schedule, and the ordering it exists to guarantee
 
-**One cron, `5 1 * * *`**, in `.github/workflows/jobs-nightly.yml`. The five independent jobs run in
+**One cron, `5 1 * * *`**, in `.github/workflows/jobs-nightly.yml`. The four independent jobs run in
 parallel; **`staleness` runs after them**; and the open-data export
 (`.github/workflows/nightly-export.yml`) is triggered by this workflow **completing successfully**.
 
@@ -68,8 +67,7 @@ parallel; **`staleness` runs after them**; and the open-data export
               ┌─ analytics-rollup ──────┐
               ├─ retention ─────────────┤
 5 1 * * * ────┼─ embedding-backfill ────┼──> staleness ──(workflow_run: success)──> nightly export
-              ├─ verification-backfill ─┤
-              └─ account-enrichment ────┘
+              └─ verification-backfill ─┘
 ```
 
 **Ordering is a dependency, not a second cron expression.** The export used to run on its own cron
@@ -153,7 +151,6 @@ secret list to keep in step with the service's.
   transaction, so a publisher's edit racing the walk wins. A second run finds nothing to close and
   writes no second audit row.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
-* `account-enrichment` selects on `enriched_at IS NULL` and stamps it.
 
 **Concurrency is excluded by `pg_try_advisory_lock`, taken on a dedicated connection.** Three
 decisions, each closing something real:
@@ -272,7 +269,6 @@ Before the first M3 job run on any deployment, in order:
 | `retention` | `ANALYTICS_RETENTION_DAYS` (default 180) |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_TIMEOUT_MS`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
-| `account-enrichment` | `PRIVY_APP_ID`, `PRIVY_APP_SECRET` (absent → inert, and it says so) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 
 `VERIFY_ALLOW_PRIVATE_HOSTS` is **never set in any deployed task definition**, including the

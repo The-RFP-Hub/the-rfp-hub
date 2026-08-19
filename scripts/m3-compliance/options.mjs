@@ -65,12 +65,12 @@ const NUMERIC = new Set(["--views", "--timeout", "--concurrency"]);
  * A harness that boots a stack and then runs this checker against it (see the E2E runner) can
  * hand them over in the child's environment instead, which `ps` does not print.
  *
- * The flags still WIN. A run that passes `--privy-token` gets that token, whatever the environment
+ * The flags still WIN. A run that passes `--session-token` gets that token, whatever the environment
  * says — otherwise an exported variable left over from an earlier session could silently redirect
  * a deliberate run, which is exactly the class of surprise this tool refuses elsewhere.
  */
 const CREDENTIAL_ENV = {
-  privyToken: "M3_PRIVY_TOKEN",
+  sessionToken: "M3_SESSION_TOKEN",
   adminToken: "M3_ADMIN_TOKEN",
   apiKey: "M3_API_KEY",
 };
@@ -113,8 +113,8 @@ export function parseArgs(argv, env = process.env) {
       case "--namespace":
         opts.namespace = next();
         break;
-      case "--privy-token":
-        opts.privyToken = next();
+      case "--session-token":
+        opts.sessionToken = next();
         break;
       case "--api-key":
         opts.apiKey = next();
@@ -177,9 +177,9 @@ export function refusals(opts) {
   } else if (!SLUG.test(opts.namespace)) {
     reasons.push(`--namespace must be a lowercase hyphenated slug, got "${opts.namespace}"`);
   }
-  if (!opts.privyToken && !opts.apiKey) {
+  if (!opts.sessionToken && !opts.apiKey) {
     reasons.push(
-      "one of --privy-token or --api-key is required — five of the seven criteria are about the write surface, and a run that silently checked only the other two would report a passing M3 sign-off it had not established",
+      "one of --session-token or --api-key is required — five of the seven criteria are about the write surface, and a run that silently checked only the other two would report a passing M3 sign-off it had not established",
     );
   }
   if (opts.baseUrl && !opts.allowProduction && requiresProductionOptIn(opts.baseUrl)) {

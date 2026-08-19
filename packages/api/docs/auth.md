@@ -21,7 +21,7 @@ One header carries either kind, and **which kind it is decides real authority**:
 
 | | What it is | How it is recognised |
 |---|---|---|
-| **Session** | An identity-provider access token, held by a signed-in human | Anything that does **not** start with `rfph_` |
+| **Session** | An opaque, signed session token, held by a signed-in human | Anything that does **not** start with `rfph_` |
 | **API key** | A long-lived, scoped delegation of one account | Starts with `rfph_` |
 
 The discrimination is made on the **token itself**, never on a header or parameter the caller
@@ -30,31 +30,53 @@ routes session-only: a caller cannot present a key and ask for it to be treated 
 
 ### Sessions
 
-Verified **locally**, with `jose`, against the identity provider's app verification key:
+A session is a **row**, and the token is an opaque reference to it plus a signature. There is no
+JWT: nothing about the session travels inside the credential, so nothing about it can be stale.
 
-* algorithm pinned to **ES256** — never read from the token's own header, which is the
-  `alg: none` family of forgeries;
-* `iss` must be `privy.io`;
-* `aud` must equal `PRIVY_APP_ID` — separate applications are used per environment, so a staging
-  token does not open production;
-* `exp` enforced, with no clock tolerance.
+Verification, in order:
 
-`PRIVY_VERIFICATION_KEY` (a PEM public key) is **the** mechanism. `PRIVY_JWKS_URL` is supported as
-an explicitly optional override and is **unverified**: no JWKS endpoint is documented for app access
-tokens. When both are set, the PEM wins.
+1. **HMAC-SHA256 over this deployment's `BETTER_AUTH_SECRET`, before any database access.** A
+   forged, truncated or foreign-deployment token costs one hash and no query. A token with no
+   signature at all is refused outright — `bearer({ requireSignature: true })` — so the signature
+   can never become decoration.
+2. **The session row**, looked up by token: it must exist and not have expired.
 
-Every failure mode — bad signature, expired, wrong audience, wrong issuer — returns the same 401 and
-the same message. Distinguishing them tells a prober which half of an attempt worked.
+This replaces what an audience claim used to do, and is stronger: a token minted for another
+environment fails locally even if that environment shares this database, because the secret differs.
+**Rotating `BETTER_AUTH_SECRET` signs everyone out** — the bearer path verifies against exactly one
+secret, there is no dual-secret window, and that is a deliberate property rather than an oversight.
 
-**Accounts are provisioned just in time, keyed on the DID and nothing else.** A wallet address that
-reaches the API arrived in a request, which makes it self-asserted, which makes it a forgeable
-authorization input. `accounts.primary_wallet` exists but is filled by the enrichment job from the
-provider's own record, and is usable as an authorization input only because of where it came from.
+Every failure mode — bad signature, unsigned, expired row, deleted row, garbage — returns the same
+401 with the same message. Distinguishing them tells a prober which half of an attempt worked.
+`test/integration/auth.test.ts` asserts that as a set: six different failures, one message.
 
-**Enrichment is never on the authentication path.** The provider's user endpoint needs a second
-credential and is heavily rate-limited, so a login completes with the DID alone and `enriched_at`
-stays `NULL` — which is the cursor the enrichment job selects on. A request never waits on the
-provider, and a provider outage never locks anyone out.
+**Revocation is now real, and immediate.** Signing out deletes the row, so the very next request
+with that token is a 401. Under the previous verifier a token was self-describing and could not be
+invalidated at all; role, membership and API-key revocation were already immediate (they are re-read
+from our tables on every request) and remain so.
+
+**Lifetime: 90 days, refreshed at most once a day** (`expiresIn` / `updateAge`). People should not
+be logged out of a tool they use weekly. The refresh is one `UPDATE` per session per day, and it
+re-issues the token — the client stores whatever the newest `set-auth-token` header carried.
+
+**Sign-in is a one-time code to an email address.** No password is stored, so there is no reset
+flow, no strength policy and nothing to leak; holding an address means controlling the mailbox,
+which is the same proof a password reset ultimately rests on. Codes are six digits, valid for five
+minutes, three attempts, and are stored **hashed** — a dump of the verification table is a list of
+short-lived digests, not live codes. Google sign-in is configured but ships dark: with no
+`GOOGLE_CLIENT_ID` the provider is not registered and no button is rendered.
+
+**A second provider on an address somebody already holds is the same person.** Account linking is
+enabled with `trustedProviders: []` (nothing links on an unverified address),
+`allowDifferentEmails: false` and `updateUserInfoOnLink: false`. One identity, one `accounts` row,
+role and history preserved — `test/integration/account-linking.test.ts` is the tripwire that keeps a
+dependency upgrade from quietly forking one person into two.
+
+**Accounts are provisioned just in time, keyed on the identity's SUBJECT and nothing else.** The
+subject is the opaque user id (`accounts.auth_user_id`), never an email address: an address is
+transferable and changeable, and it is what `audit_log` would end up pointing at through
+`accounts.id`. The `/v1/me.email` field is served by joining the identity table at read time, so the
+system keeps exactly one copy of that address.
 
 **Logging in grants nothing.** A session resolves to whatever role the database already holds. No
 environment variable promotes anybody, and that is the point: a role re-derived from configuration
@@ -65,13 +87,21 @@ the product.
 
 | Which admin | How | Credential |
 |---|---|---|
-| the first one | `pnpm --filter @the-rfp-hub/api grant-admin -- --did <privy-did> [--create] --yes` | the **migration** `DATABASE_URL` |
+| the first one | `pnpm --filter @the-rfp-hub/api grant-admin -- --email <address> [--create] --yes` | the **migration** `DATABASE_URL` |
 | every later one | `POST /v1/admin/accounts/:id/role` with `{"role": "admin"}` | an admin's session |
 | a lockout | the same script | the migration `DATABASE_URL` |
 
-The ceremony is a one-time install step, run with the same credential that creates the tables. It
-resolves the account by subject (`--create` provisions one that has never logged in), prints what it
-resolved and which `host:port/database` it is pointed at — never the URL, which carries a password —
+The ceremony is a one-time install step, run with the same credential that creates the tables.
+
+**The address is a LOOKUP, never the stored value.** An operator knows an email address; the column
+stores the identity's opaque subject. So `--email` resolves through the identity table to that
+subject and reports it, and `--subject <id>` is the alternative for an operator who already has one.
+An address nobody has ever signed in as is a refusal that says so — *that person must sign in once*
+— because an identity is created by signing in, not by this script. `--create` is the other case
+entirely: it provisions the `accounts` row for an identity that exists but has never made a `/v1`
+request, and it cannot conjure an identity.
+
+The script prints what it resolved and which `host:port/database` it is pointed at — never the URL, which carries a password —
 refuses a non-loopback target without `--allow-remote`, refuses to write at all without `--yes`, and
 exits non-zero on every refusal. It is idempotent: an account that is already an admin is a reported
 no-op with no second audit row. The grant is audited as an ordinary `assign_role` with
@@ -261,27 +291,79 @@ held to containment on replace — a foreign-operated one of those is still a `4
 
 ---
 
-## 7. The CORS invariant
+## 7. CORS — two policies, and why they differ
 
-`origin: "*"`, all the write verbs, `allowedHeaders: ["Content-Type", "Authorization"]`,
-**`credentials: false`**.
+There is **one** `@fastify/cors` registration and it chooses between two policies per request. Not
+by preference: the plugin decorates the request object unconditionally, so registering it twice —
+even inside an encapsulated scope — throws. Its `delegator` seam is the supported way, and it has
+the better property anyway, because both policies are then chosen in one visible place instead of
+depending on which registration's hook ran first (`src/app.ts`, `src/plugins/better-auth.ts`).
 
-That last one is the load-bearing half. **Every credential this API accepts is header-borne**, so a
+### `/v1` — `origin: "*"`, `credentials: false`
+
+`credentials: false` is the load-bearing half. **Every `/v1` credential is header-borne**, so a
 cross-site request carries no ambient authority: a browser attaches nothing the attacker's page does
 not already possess, and a page that possesses the token did not need CORS to use it.
 
-> **Introducing any cookie breaks this.** The moment a credential becomes a cookie, `origin: "*"`
-> becomes a cross-site request forgery surface and this must become an explicit origin allowlist
-> with `credentials: true`. Stated here and in `src/app.ts` because the change that breaks it will
-> not look like a CORS change.
+> **Introducing any cookie on `/v1` breaks this.** The moment a `/v1` credential becomes a cookie,
+> `origin: "*"` becomes a cross-site request forgery surface and this must become an explicit origin
+> allowlist with `credentials: true`. Stated here and in `src/app.ts` because the change that breaks
+> it will not look like a CORS change. **The session cookie the auth routes set does not break it**:
+> it is host-only on the API's own origin, `/v1` never reads it, and `/v1` authenticates from the
+> `Authorization` header alone.
+
+### `/api/auth/*` — an exact-origin allowlist, still `credentials: false`
+
+These routes do not inherit the wide policy, because they are not like `/v1`: they **mint** the
+credential, and they expose `set-auth-token` so a browser can read it.
+
+The honest version of the argument: `credentials: false` alone would not be a vulnerability here.
+There is no cryptographic bypass — signing in still requires a code that arrives in a mailbox the
+caller must control — so `origin: "*"` would not hand anybody a session. What it would hand them is
+a **working login client on any page on the web**: a phishing page that completes the flow in its
+own tab and reads the token out of the response. That widens phishing and violates least privilege
+for no benefit, so the allowlist is exact:
+
+* `TRUSTED_ORIGINS` — exact origins, compared whole. No suffix matching, no scheme guessing.
+* `PREVIEW_ORIGIN_PATTERN` — staging only, an **anchored** regular expression tied to our project
+  *and* our team slug. **Never a bare `*.vercel.app`**, which accepts any tenant on the platform.
+  The reader should know the residual trust it does carry: *this assumes the preview host will not
+  issue our team slug to somebody else.* The pattern must be anchored with `^`/`$` or the process
+  refuses to boot, because an unanchored pattern matches inside an origin an attacker chooses.
+
+The same list backs `trustedOrigins` for CSRF and the handoff redirect, so the CORS answer and the
+sign-in answer cannot drift apart. A disallowed origin gets **no** `Access-Control-Allow-Origin`
+header at all — not an echo, not a `*` — which is what a browser needs to see. Accept and reject
+cases are asserted in `test/integration/better-auth-mount.test.ts`.
+
+Google never touches CORS: it is a top-level navigation out and a top-level redirect back.
 
 ---
 
 ## 8. Curl walkthrough
 
+Signing in is two calls: ask for a code, then exchange it. The session token comes back in the
+**`set-auth-token`** response header — that is the value the browser stores and the value every
+`/v1` call carries afterwards.
+
 ```sh
 API=https://api.example.org
-TOKEN=<identity-provider access token>
+EMAIL=you@example.org
+
+# 1. Ask for a code. The answer is the same whether or not the address is known — that is
+#    deliberate, and it is why the send is not awaited internally either.
+curl -X POST -H 'content-type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"type\":\"sign-in\"}" \
+  $API/api/auth/email-otp/send-verification-otp
+
+# 2. Exchange the six-digit code for a session. Read the token out of the RESPONSE HEADER.
+curl -sS -D headers.txt -X POST -H 'content-type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"otp\":\"123456\"}" \
+  $API/api/auth/sign-in/email-otp
+TOKEN=$(grep -i '^set-auth-token:' headers.txt | tr -d '\r' | cut -d' ' -f2)
+
+# Signing out deletes the row, so the very next request with this token is a 401.
+#   curl -X POST -H "Authorization: Bearer $TOKEN" $API/api/auth/sign-out
 
 # Who am I, and what may I do?
 curl -H "Authorization: Bearer $TOKEN" $API/v1/me
@@ -304,6 +386,11 @@ curl -X POST -H "Authorization: Bearer $KEY" -H 'content-type: application/json'
 # Rotate: mint the replacement, deploy it, then revoke the old one.
 curl -X DELETE -H "Authorization: Bearer $TOKEN" $API/v1/keys/123
 ```
+
+`/v1/me` answers with the address the session belongs to (`email`), read from the identity table
+rather than copied into `accounts`. An **API key** presents an account without presenting a session,
+so `email` is `null` for one — the field says which credential you are holding as much as who you
+are.
 
 An invalid document comes back as:
 

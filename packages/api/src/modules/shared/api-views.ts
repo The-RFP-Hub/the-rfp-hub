@@ -240,8 +240,12 @@ export interface MeView {
   accountId: number;
   handle: string | null;
   displayName: string | null;
+  /**
+   * The verified address the account signs in with, read from the identity tables rather than
+   * stored here — see `me.controller.ts`. Null only for an API-key credential, which resolves an
+   * account without resolving a session.
+   */
   email: string | null;
-  primaryWallet: string | null;
   role: AccountRole;
   directCreate: boolean;
   /** Which credential this request presented — the thing that decides half the authorization. */

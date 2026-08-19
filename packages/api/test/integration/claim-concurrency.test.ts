@@ -17,10 +17,9 @@ import { OpportunityService } from "../../src/modules/services/opportunities/opp
 import {
   bearer,
   grantMembership,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { openLockBarrier } from "../helpers/lock-barrier.js";
@@ -32,10 +31,10 @@ const HOST = "m3claimconc-host";
 const OPERATOR = "m3claimconc-operator";
 /** Unverified, so its claim is queued for a reviewer instead. */
 const PENDER = "m3claimconc-pender";
-const DIDS = {
-  operator: "did:privy:m3claimconc-operator",
-  pender: "did:privy:m3claimconc-pender",
-  reviewer: "did:privy:m3claimconc-reviewer",
+const EMAILS = {
+  operator: "m3claimconc-operator@rfphub.invalid",
+  pender: "m3claimconc-pender@rfphub.invalid",
+  reviewer: "m3claimconc-reviewer@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -47,6 +46,7 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
   let penderToken: string;
   let reviewerToken: string;
   let operatorOrgId: number;
+  const userIds: string[] = [];
 
   /** One approved, listed entry published under `HOST` and operated by everyone who claims it. */
   async function seedEntry(localId: string) {
@@ -83,30 +83,35 @@ run("M3CLAIMCONC claims under a chosen schedule", () => {
     )[0];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const operator = await seedAccount({ did: DIDS.operator, handle: "m3claimconc-operator" });
-    const pender = await seedAccount({ did: DIDS.pender, handle: "m3claimconc-pender" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3claimconc-reviewer", role: "reviewer" });
+    const operator = await seedIdentity(EMAILS.operator, { handle: "m3claimconc-operator" });
+    const pender = await seedIdentity(EMAILS.pender, { handle: "m3claimconc-pender" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3claimconc-reviewer",
+      role: "reviewer",
+    });
+    userIds.push(operator.userId, pender.userId, reviewer.userId);
 
     await seedOrganization({ slug: HOST, verified: false });
     const operatorOrg = await seedOrganization({ slug: OPERATOR, verified: true });
     const penderOrg = await seedOrganization({ slug: PENDER, verified: false });
-    await grantMembership(operator.id, operatorOrg.id);
-    await grantMembership(pender.id, penderOrg.id);
+    await grantMembership(operator.account.id, operatorOrg.id);
+    await grantMembership(pender.account.id, penderOrg.id);
     operatorOrgId = operatorOrg.id;
 
-    operatorToken = await mintPrivyToken(DIDS.operator);
-    penderToken = await mintPrivyToken(DIDS.pender);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    operatorToken = operator.token;
+    penderToken = pender.token;
+    reviewerToken = reviewer.token;
   }, 30_000);
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: HOST,
       organizationSlugs: [HOST, OPERATOR, PENDER],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

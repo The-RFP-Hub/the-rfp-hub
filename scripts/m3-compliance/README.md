@@ -7,7 +7,7 @@ Mechanically verifies the M3 completion criteria against a **live deployment**. 
 node scripts/check-m3.mjs \
   --base-url https://api.staging.example.org \
   --namespace my-org \
-  --privy-token "$SESSION" \
+  --session-token "$SESSION" \
   --admin-token "$ADMIN_SESSION"
 ```
 
@@ -27,7 +27,7 @@ start in two situations, and both refusals are tested (`options.test.mjs`):
 
 | Refusal | Why |
 |---|---|
-| No `--privy-token` / `--api-key`, or no `--namespace` | A run that quietly performed the two read-only criteria and reported a passing M3 sign-off would be worse than no tool at all. |
+| No `--session-token` / `--api-key`, or no `--namespace` | A run that quietly performed the two read-only criteria and reported a passing M3 sign-off would be worse than no tool at all. |
 | A `--base-url` that does not look like staging or loopback, without `--allow-production` | **Default-deny.** A blocklist of production hostnames has to be right about a name nobody remembered to add, and the failure mode is fixture rows in the live dataset. |
 
 Everything it creates is named `<namespace>:m3check-<runstamp>-<what>`, so a leftover fixture is
@@ -68,7 +68,7 @@ Several skips are *correct outcomes* rather than gaps, and each says which:
   tell you to supply a credential for a **verified member** of `--namespace`.
 * No `--admin-token` — starting a job on demand is a T4, session-only capability, and a compliance
   run cannot wait for 01:05 to see whether a cron fired.
-* No `--privy-token` — key management is session-only by design, so an API-key run cannot exercise
+* No `--session-token` — key management is session-only by design, so an API-key run cannot exercise
   it.
 
 ## The two user-agents

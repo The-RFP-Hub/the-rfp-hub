@@ -72,7 +72,6 @@ on:
           - retention
           - embedding-backfill
           - verification-backfill
-          - account-enrichment
           - staleness
 
 # This workflow writes nothing to the repository; it reads the runner script out of a checkout and
@@ -101,7 +100,7 @@ env:
   SELECTED: ${{ github.event.inputs.job }}
 
 jobs:
-  # The five jobs that depend on nothing and on each other: the two analytics sweeps and the three
+  # The four jobs that depend on nothing and on each other: the two analytics sweeps and the two
   # backfills. Run in parallel, each with its own advisory lock, and `fail-fast: false` so one
   # failing does not cancel the others mid-write.
   maintenance:
@@ -116,7 +115,6 @@ jobs:
           - retention
           - embedding-backfill
           - verification-backfill
-          - account-enrichment
     steps:
       # `persist-credentials: false`: nothing here pushes, and a credential left in `.git/config`
       # is inherited by every later step for no reason. Same rule as nightly-export.yml.

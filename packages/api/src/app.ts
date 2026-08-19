@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { SPEC_VERSION } from "@the-rfp-hub/standard";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import { authConfigFromEnvironment } from "./auth/better-auth.js";
 import { config } from "./config.js";
 import { pool } from "./db/client.js";
 import { registerRoutes } from "./modules/routes/index.js";
@@ -12,14 +13,16 @@ import { responseSchemas } from "./openapi/schemas.js";
 import { registerAnalyticsContext } from "./plugins/analytics-context.js";
 import { registerApexHostRule } from "./plugins/apex-host.js";
 import { type AuthOptions, registerAuth } from "./plugins/auth.js";
+import { AUTH_BASE_PATH, authCorsOptions, registerBetterAuth } from "./plugins/better-auth.js";
 import { registerSwagger } from "./plugins/swagger.js";
 
 export interface BuildOptions {
   /** Pass a Fastify logger config; defaults to off (tests) / on (server). */
   logger?: boolean;
   /**
-   * Identity overrides. A deployment reads them from the environment; the integration suites inject
-   * their own ES256 verification key so they can mint tokens without a live identity provider.
+   * Identity overrides. A deployment builds its session authority from the environment; the
+   * integration suites inject their own instance over the test database, so they can sign
+   * identities in with no network and no third party.
    */
   auth?: AuthOptions;
   /**
@@ -69,12 +72,23 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // into a cross-site request forgery surface and forces this to become an explicit origin
   // allowlist with `credentials: true`. Stated here and in docs/auth.md because the change that
   // breaks it will not look like a CORS change.
-  await app.register(cors, {
-    origin: "*",
+  //
+  // TWO POLICIES, ONE REGISTRATION. `/api/auth/*` mints credentials and exposes `set-auth-token`,
+  // so it gets an EXACT-origin allowlist instead (see plugins/better-auth.ts for why, and for why
+  // this is a delegator rather than a second `register`: @fastify/cors decorates the request
+  // object unconditionally and throws on a second registration, even an encapsulated one).
+  const authCors = authCorsOptions(opts.auth?.config ?? authConfigFromEnvironment());
+  const publicCors = {
+    origin: "*" as const,
     methods: ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: false,
     maxAge: 600,
+  };
+  await app.register(cors, {
+    delegator: (request, callback) => {
+      callback(null, request.url.startsWith(AUTH_BASE_PATH) ? authCors : publicCors);
+    },
   });
 
   // Registered with `global: false`: no route is rate-limited by opting out, only by opting in.
@@ -92,6 +106,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     // routes wrap their handlers so this is normally unreachable; it is the backstop for a throw
     // from a hook or a serializer, where no wrapper is in the way.
     if (isHttpError(error)) {
+      // A 5xx is OURS, whoever raised it. A service that answers "the database is unreachable"
+      // deserves the same log line as an uncaught throw would have got — without it the only trace
+      // of an outage is a status code on somebody else's dashboard.
+      if (error.status >= 500) request.log.error(error);
       reply.code(error.status).send(error.toBody());
       return;
     }
@@ -139,7 +157,14 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
 
   // Decorated on the ROOT instance, before the routes, so every route module can read `app.auth`.
   // Fastify encapsulation would otherwise scope the decorators to whichever plugin declared them.
-  registerAuth(app, opts.auth);
+  const decorators = registerAuth(app, opts.auth);
+  // AFTER the global `/v1` CORS (so the narrow policy is registered in its own encapsulated scope
+  // rather than widened by it) and BEFORE the routes. Everything it registers — a raw-body parser,
+  // a second CORS policy, two hidden routes — stays inside that scope.
+  await app.register(registerBetterAuth, {
+    auth: decorators.auth,
+    config: opts.auth?.config ?? authConfigFromEnvironment(),
+  });
   // Same reason, and it CAPTURES NOTHING — it only supplies the per-request context that the
   // controllers' explicit capture calls read. See plugins/analytics-context.ts.
   registerAnalyticsContext(app);

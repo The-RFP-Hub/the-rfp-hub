@@ -34,10 +34,10 @@ export async function cleanup(report, ctx, state) {
   }
 
   // ── the key ──────────────────────────────────────────────────────────────────
-  if (state.mintedKeyId && ctx.privyToken) {
+  if (state.mintedKeyId && ctx.sessionToken) {
     const revoked = await callJson(ctx, `/v1/keys/${state.mintedKeyId}`, {
       method: "DELETE",
-      token: ctx.privyToken,
+      token: ctx.sessionToken,
     });
     c.expect(
       revoked.ok && (revoked.status === 200 || revoked.status === 204),
@@ -56,7 +56,7 @@ export async function cleanup(report, ctx, state) {
     c.skip("fixtures are taken off the public surface", "this run created none");
     return c.finish();
   }
-  const reviewer = ctx.adminToken ?? (state.me?.canReview ? ctx.privyToken : undefined);
+  const reviewer = ctx.adminToken ?? (state.me?.canReview ? ctx.sessionToken : undefined);
   if (!reviewer) {
     c.warn(
       "fixtures are taken off the public surface",

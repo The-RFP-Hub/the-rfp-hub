@@ -20,18 +20,17 @@ import { OpportunityService } from "../../src/modules/services/opportunities/opp
 import {
   bearer,
   grantMembership,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3ana";
-const DIDS = {
-  publisher: "did:privy:m3ana-publisher",
-  stranger: "did:privy:m3ana-stranger",
+const EMAILS = {
+  publisher: "m3ana-publisher@rfphub.invalid",
+  stranger: "m3ana-stranger@rfphub.invalid",
 };
 
 const PUBLIC_ID = `${NS}:live`;
@@ -98,16 +97,19 @@ run("M3ANA insights", () => {
       );
   };
 
+  const userIds: string[] = [];
+
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3ana-publisher" });
-    await seedAccount({ did: DIDS.stranger, handle: "m3ana-stranger" });
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3ana-publisher" });
+    const stranger = await seedIdentity(EMAILS.stranger, { handle: "m3ana-stranger" });
+    userIds.push(publisher.userId, stranger.userId);
     const org = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, org.id, "owner");
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    strangerToken = await mintPrivyToken(DIDS.stranger);
+    await grantMembership(publisher.account.id, org.id, "owner");
+    publisherToken = publisher.token;
+    strangerToken = stranger.token;
 
     liveId = await seed(PUBLIC_ID, { applicationUrl: APPLY_URL, website: SITE_URL });
     await seed(PENDING_ID, { reviewStatus: "pending", applicationUrl: APPLY_URL });
@@ -119,7 +121,8 @@ run("M3ANA insights", () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

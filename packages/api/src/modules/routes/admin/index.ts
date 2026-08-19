@@ -35,7 +35,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
         tags: ["admin"],
         summary: "Set an account's global role",
         description:
-          "Includes `admin`: administrators are granted and revoked in the product. The LAST remaining admin cannot be demoted here (409 `last_admin`) — that state is recoverable only by an operator running the grant-admin script against the database.",
+          "Includes `admin`: administrators are granted and revoked in the product. The LAST remaining admin cannot be demoted here (409 `last_admin`) — that state is recoverable only by an operator running the grant-admin script against the database. An account with no identity behind it cannot be granted anything (409 `unreachable_account`); it can still be demoted.",
         security: [{ bearerAuth: [] }],
         params: accountParams,
         body: {
@@ -63,7 +63,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
         tags: ["admin"],
         summary: "Grant or revoke publishing into any namespace without a membership",
         description:
-          "Independent of the global role: reviewing is not publishing. It never elevates an API key either — a `write`-only key on a direct-create account still lands its submissions pending.",
+          "Independent of the global role: reviewing is not publishing. It never elevates an API key either — a `write`-only key on a direct-create account still lands its submissions pending. An account with no identity behind it cannot be granted it (409 `unreachable_account`).",
         security: [{ bearerAuth: [] }],
         params: accountParams,
         body: {
@@ -72,7 +72,11 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { directCreate: { type: "boolean" } },
         },
-        response: { 200: { $ref: "AccountSummary#" }, ...errors },
+        response: {
+          200: { $ref: "AccountSummary#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     adminController.setDirectCreate,

@@ -4,6 +4,10 @@
  * Every suite tags its rows with a prefix (`m3auth:`, `m3write:`, …) and removes exactly those,
  * so the suites are order-independent and safe to run against a database that has other data in it.
  *
+ * The identity tables are cleaned alongside the account rows: `auth_session`/`auth_account`
+ * cascade from `auth_user`, but `auth_verification` is keyed on an ADDRESS and cascades from
+ * nothing, so it accumulates one row per sign-in code across runs unless it is collected by hand.
+ *
  * `audit_log` IS DELIBERATELY NOT CLEANED, and cannot be: a database trigger raises on `DELETE`
  * against it, which is the property the append-only design exists to have. Test rows accumulate;
  * they carry no foreign keys, they are scoped to subject ids that no longer resolve, and a history
@@ -14,6 +18,8 @@ import { db } from "../../src/db/client.js";
 import {
   accounts,
   apiKeys,
+  authUser,
+  authVerification,
   opportunities,
   opportunityClaims,
   orgMemberships,
@@ -25,8 +31,20 @@ export interface FixturePrefixes {
   opportunityPrefix?: string;
   /** Organisation slugs to remove outright. */
   organizationSlugs?: string[];
-  /** Identity-provider subjects the suite provisioned. */
-  privyDids?: string[];
+  /** The subjects the suite signed in — `userId` from `signIn()`, never an address. */
+  userIds?: string[];
+  /**
+   * Public handles this suite claims. Handles are globally unique, so a row left behind by an
+   * earlier run — or by a run of an older shape, which is what a pre-migration orphan is — would
+   * otherwise make the suite unseedable while telling it only that the insert did nothing.
+   */
+  handles?: string[];
+  /**
+   * Addresses whose IDENTITY rows should go too. Separate from `userIds` because a suite may want
+   * the account gone while the identity survives, and because a sign-in that never reached
+   * `accounts` leaves an `auth_user` row that nothing else would collect.
+   */
+  emails?: string[];
 }
 
 export async function cleanupFixtures(prefixes: FixturePrefixes): Promise<void> {
@@ -54,15 +72,37 @@ export async function cleanupFixtures(prefixes: FixturePrefixes): Promise<void> 
     await db.delete(organizations).where(eq(organizations.id, org.id));
   }
 
-  for (const did of prefixes.privyDids ?? []) {
+  for (const handle of prefixes.handles ?? []) {
     const rows = await db
       .select({ id: accounts.id })
       .from(accounts)
-      .where(eq(accounts.privyDid, did));
+      .where(eq(accounts.handle, handle));
+    for (const account of rows) {
+      await db.delete(apiKeys).where(eq(apiKeys.accountId, account.id));
+      await db.delete(orgMemberships).where(eq(orgMemberships.accountId, account.id));
+      await db.delete(accounts).where(eq(accounts.id, account.id));
+    }
+  }
+
+  for (const userId of prefixes.userIds ?? []) {
+    const rows = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.authUserId, userId));
     const account = rows[0];
     if (!account) continue;
     await db.delete(apiKeys).where(eq(apiKeys.accountId, account.id));
     await db.delete(orgMemberships).where(eq(orgMemberships.accountId, account.id));
     await db.delete(accounts).where(eq(accounts.id, account.id));
+  }
+
+  // The identity rows, last: sessions and linked provider accounts cascade from `auth_user`, so
+  // deleting it is enough for those two — but VERIFICATION rows do not cascade (they are keyed on
+  // an address, not on a user), so a suite that signed in repeatedly would leave one row per code
+  // behind forever. They are collected by identifier here.
+  for (const email of prefixes.emails ?? []) {
+    const address = email.trim().toLowerCase();
+    await db.delete(authVerification).where(like(authVerification.identifier, `%${address}`));
+    await db.delete(authUser).where(eq(authUser.email, address));
   }
 }

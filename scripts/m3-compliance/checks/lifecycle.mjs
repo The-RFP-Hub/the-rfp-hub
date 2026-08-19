@@ -58,10 +58,10 @@ export async function checkLifecycle(report, ctx, state) {
   }
 
   // ── mint a key, if we hold a session ──────────────────────────────────────────
-  if (ctx.privyToken) {
+  if (ctx.sessionToken) {
     const minted = await callJson(ctx, "/v1/keys", {
       method: "POST",
-      token: ctx.privyToken,
+      token: ctx.sessionToken,
       body: { name: `m3check ${state.run}`, scopes: ["read", "write", "publish"] },
     });
     if (minted.ok && (minted.status === 200 || minted.status === 201) && minted.json?.token) {
@@ -89,7 +89,7 @@ export async function checkLifecycle(report, ctx, state) {
   } else {
     c.skip(
       "POST /v1/keys mints a publishing credential",
-      "no --privy-token: key management is session-only by design, so an API-key run cannot exercise it",
+      "no --session-token: key management is session-only by design, so an API-key run cannot exercise it",
     );
   }
   state.writeToken ??= ctx.credential;

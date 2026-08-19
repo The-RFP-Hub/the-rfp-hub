@@ -11,7 +11,7 @@
  * It is also the lockout recovery: the route refuses to demote the last remaining admin, and if a
  * deployment reaches that state anyway, this is what undoes it.
  *
- *   pnpm --filter @the-rfp-hub/api grant-admin -- --did <privy-did> [--create] --yes
+ *   pnpm --filter @the-rfp-hub/api grant-admin -- --email <address> [--create] --yes
  *
  * `DATABASE_URL` comes from the environment and should be the ADMIN/migration URL. The script
  * echoes the host, port and database it resolved — never the URL itself, which carries a password —
@@ -19,14 +19,46 @@
  * all without `--yes`. Every refusal exits non-zero.
  */
 import { pathToFileURL } from "node:url";
+import { eq } from "drizzle-orm";
 import { config } from "../src/config.js";
+import { authUser } from "../src/db/auth-schema.js";
 import { pool } from "../src/db/client.js";
+import { db } from "../src/db/client.js";
 import { AccountService } from "../src/modules/services/auth/account.service.js";
 import { isHttpError } from "../src/modules/shared/http-error.js";
 import { isLoopbackHost } from "../src/shared/loopback.js";
 
+interface Identity {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+}
+
+/** The identity behind an address, or nothing. Addresses are stored lower-cased by the library. */
+async function identityByEmail(address: string): Promise<Identity | undefined> {
+  const rows = await db
+    .select({ id: authUser.id, email: authUser.email, emailVerified: authUser.emailVerified })
+    .from(authUser)
+    .where(eq(authUser.email, address.trim().toLowerCase()))
+    .limit(1);
+  return rows[0];
+}
+
+/** The identity a subject names, or nothing. */
+async function identityBySubject(subject: string): Promise<Identity | undefined> {
+  const rows = await db
+    .select({ id: authUser.id, email: authUser.email, emailVerified: authUser.emailVerified })
+    .from(authUser)
+    .where(eq(authUser.id, subject))
+    .limit(1);
+  return rows[0];
+}
+
 export interface GrantAdminOptions {
-  did?: string;
+  /** The address the person signs in with. A LOOKUP key — never what gets stored. */
+  email?: string;
+  /** The identity's opaque user id, for when an operator already has it. */
+  subject?: string;
   create: boolean;
   yes: boolean;
   allowRemote: boolean;
@@ -34,10 +66,13 @@ export interface GrantAdminOptions {
 }
 
 const USAGE = [
-  "Usage: pnpm --filter @the-rfp-hub/api grant-admin -- --did <privy-did> [--create] --yes",
+  "Usage: pnpm --filter @the-rfp-hub/api grant-admin -- --email <address> [--create] --yes",
   "",
-  "  --did <subject>   the identity provider's subject for the account to promote (required)",
-  "  --create          provision the account if that subject has never logged in",
+  "  --email <address>  the address the person signs in with. They must have signed in at least",
+  "                     once, so that an identity exists to promote",
+  "  --subject <id>     the identity's user id, if you already have it. Alternative to --email",
+  "  --create           provision the accounts row when the identity has signed in but has never",
+  "                     made an API request",
   "  --yes             actually write; without it the script only reports and exits non-zero",
   "  --allow-remote    permit a DATABASE_URL that is not loopback",
   "",
@@ -58,8 +93,11 @@ export function parseArgs(argv: string[]): GrantAdminOptions {
       // invocation carries it, so it is an argument this parser has to expect.
       case "--":
         break;
-      case "--did":
-        options.did = argv[++i];
+      case "--email":
+        options.email = argv[++i];
+        break;
+      case "--subject":
+        options.subject = argv[++i];
         break;
       case "--create":
         options.create = true;
@@ -111,10 +149,15 @@ export async function main(
     return 0;
   }
 
-  const did = options.did?.trim();
-  if (did === undefined || did === "") {
-    out("--did is required.");
+  const email = options.email?.trim();
+  const subject = options.subject?.trim();
+  if ((email === undefined || email === "") && (subject === undefined || subject === "")) {
+    out("one of --email or --subject is required.");
     out(USAGE);
+    return 2;
+  }
+  if (email && subject) {
+    out("--email and --subject name the same thing two ways; give one.");
     return 2;
   }
 
@@ -127,8 +170,33 @@ export async function main(
     return 1;
   }
 
+  // THE ADDRESS IS A LOOKUP, NEVER THE STORED VALUE. An address is transferable and can be
+  // changed; the subject is the one identifier that is stable for the life of the identity, and it
+  // is what `accounts.auth_user_id` holds. Resolving here means an operator can use the thing they
+  // actually know.
+  //
+  // BOTH SELECTORS ARE RESOLVED AGAINST THE IDENTITY TABLE, and `--subject` is not exempt. There is
+  // deliberately no foreign key from `accounts.auth_user_id` (an accounts row must outlive the
+  // identity it belonged to, because audit history points at it), so nothing in the database would
+  // catch a mistyped subject: `--subject --create` would mint an admin nobody can ever sign in as,
+  // and that ghost would then count toward the last-admin guard — the exact hazard the migration's
+  // orphan policy exists to clear.
+  const identity = subject
+    ? await identityBySubject(subject)
+    : await identityByEmail(email as string);
+  if (!identity) {
+    out(
+      subject
+        ? `refusing: no identity has the subject ${JSON.stringify(subject)}. Check it against \`auth_user.id\`, or use --email, which looks the subject up for you. Granting a subject that names nobody would create an admin who must sign in once and never can.`
+        : `refusing: nobody has signed in as ${JSON.stringify(email)}. That person must sign in once — the identity is created by signing in, not by this script — and then this command will find them.`,
+    );
+    return 1;
+  }
+  out(`identity: subject=${identity.id} email_verified=${identity.emailVerified}`);
+  const resolved = identity.id;
+
   const accounts = new AccountService();
-  const existing = await accounts.findByPrivyDid(did);
+  const existing = await accounts.findBySubject(resolved);
   if (existing) {
     out(
       `account: id=${existing.id} handle=${existing.handle ?? "(none)"} role=${existing.globalRole} created_at=${existing.createdAt.toISOString()}`,
@@ -146,7 +214,7 @@ export async function main(
   }
 
   try {
-    const grant = await accounts.grantAdmin(did, { create: options.create });
+    const grant = await accounts.grantAdmin(resolved, { create: options.create });
     if (grant.created) out(`created account id=${grant.account.id}`);
     if (grant.promoted) {
       out(`granted: account id=${grant.account.id} is now an admin.`);

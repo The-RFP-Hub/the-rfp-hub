@@ -32,7 +32,7 @@
  *
  * Usage:
  *   node scripts/check-m3.mjs --base-url https://api.staging.example.org \
- *     --namespace my-org --privy-token "$TOKEN"
+ *     --namespace my-org --session-token "$TOKEN"
  *
  * Exit codes: 0 every criterion exercised and held · 1 a criterion failed, or one was never
  * exercised (the run does not establish the milestone) · 2 the run could not be made.
@@ -53,7 +53,7 @@ import { Report } from "./m3-compliance/report.mjs";
 
 const USAGE = `M3 sign-off compliance checker
 
-  node scripts/check-m3.mjs --base-url <url> --namespace <slug> (--privy-token <t> | --api-key <k>)
+  node scripts/check-m3.mjs --base-url <url> --namespace <slug> (--session-token <t> | --api-key <k>)
 
 THIS TOOL WRITES to the deployment it is pointed at: it submits entries, mints an API key and
 generates analytics traffic. Everything it creates is prefixed \`m3check-\` and is rejected and
@@ -62,7 +62,7 @@ unlisted at the end when a reviewer credential is available.
 Required
   --base-url <url>        Origin of the deployed /v1/ API.
   --namespace <slug>      The namespace fixtures are created in. Lowercase, hyphenated.
-  --privy-token <token>   A signed-in session. Needed for key minting and for the session-only
+  --session-token <token> A signed-in session. Needed for key minting and for the session-only
                           surfaces; strongly preferred.
   --api-key <key>         An \`rfph_\` key, as an alternative. Criteria that require a session
                           report SKIP rather than pass.
@@ -84,7 +84,7 @@ Options
   --no-color              Plain output.
   -h, --help              This text.
 
-Credentials may also arrive as M3_PRIVY_TOKEN / M3_ADMIN_TOKEN / M3_API_KEY, which keeps them off
+Credentials may also arrive as M3_SESSION_TOKEN / M3_ADMIN_TOKEN / M3_API_KEY, which keeps them off
 the command line \`ps\` prints. The flags win wherever both are present.
 `;
 
@@ -119,7 +119,7 @@ async function main() {
     ...opts,
     // The credential the read-and-own checks use. A session where one exists, because it is the
     // account acting directly rather than a scoped delegation of it.
-    credential: opts.privyToken ?? opts.apiKey,
+    credential: opts.sessionToken ?? opts.apiKey,
   };
   const state = { run: runStamp(), fixtureIds: [] };
 
@@ -127,7 +127,7 @@ async function main() {
     baseUrl: ctx.baseUrl,
     namespace: ctx.namespace,
     fixturePrefix: `${ctx.namespace}:m3check-${state.run}-`,
-    credentialKind: opts.privyToken ? "session" : "api-key",
+    credentialKind: opts.sessionToken ? "session" : "api-key",
     adminToken: Boolean(opts.adminToken),
     views: ctx.views,
     node: process.version,

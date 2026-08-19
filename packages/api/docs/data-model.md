@@ -36,7 +36,7 @@ here so deferred work remains discoverable. The implemented slice lives in
 | `opportunities.next_deadline_at` (derived, denormalized) + `ix_opp_next_deadline` | ✅ M2 |
 | `dataset_snapshots` (nightly export bookkeeping) | ✅ M2 |
 | `organizations.verified`/`verified_at` + public `GET /v1/publishers` | ✅ M3 |
-| `accounts` (+ `handle`, `direct_create`, `enriched_at`), `api_keys`, `org_memberships` (auth tiers T1–T4) | ✅ M3 |
+| `accounts` (+ `handle`, `direct_create`, `auth_user_id`), `api_keys`, `org_memberships` (auth tiers T1–T4), and the four `auth_*` identity tables | ✅ M3 |
 | `opportunities.submitted_by`/`approved_by`/`approved_at`/`last_seen_at`/`merged_into_id` | ✅ M3 |
 | **`audit_log`** — one generalized, database-enforced append-only trail (replaces `opportunity_audit`) | ✅ M3 |
 | `opportunity_claims` | ✅ M3 |
@@ -344,34 +344,52 @@ Filtering by organization would otherwise mean a JSONB containment scan, so `org
 `?organization=<slug>` therefore matches an organization in **either role**, in any array
 position — not only the primary `operatingOrganizations[0]` entry.
 
-## Identity & access (Privy separate app + API keys)
+## Identity & access (sessions + API keys)
 
 > ✅ **M3.** M2 was unauthenticated read-only (tier T0 only) and created `organizations` alone.
 > `accounts`, `api_keys`, `org_memberships` and the two `verified*` columns land with the write API.
 
 **Model:** `accounts` are principals; `organizations` are issuers/namespaces (optionally `verified` publishers); `org_memberships` grant an account publishing rights on an org. A user can be permissioned on **many** orgs. **There is no separate publisher entity** — "publisher" = a user permissioned on a verified org.
 
+**Two tables own identity, and they are deliberately separate from `accounts`.** `auth_user`,
+`auth_session`, `auth_account` and `auth_verification` hold who somebody is and how they proved it —
+the verified address, the live sessions, the linked providers, the short-lived codes. `accounts`
+holds what this APPLICATION decides about them: role, direct-create, public handle. They join on
+one opaque value:
+
+```
+auth_user.id  ──(text, opaque)──▶  accounts.auth_user_id
+```
+
+* **No foreign key**, deliberately. An `accounts` row must be able to outlive the identity it
+  belonged to, because `audit_log` points at `accounts.id` and history is not deletable. Deleting a
+  person's identity must not require deleting what they did.
+* **The subject, never an address.** An address is transferable, changeable and routable; the
+  subject is stable for the life of the identity. `/v1/me.email` is served by joining `auth_user` at
+  read time, so exactly one copy of that address exists in the system.
+* **Same schema, explicit grants.** The identity tables live in `public` alongside everything else,
+  so a restricted runtime role can be granted on them by name — see `scripts/sql/grant-auth.sql`
+  and `docs/deploy.md`. Nothing grants them by default.
+* **Orphans.** Migration `0006` demotes every pre-existing `accounts` row to `submitter`, clears
+  `direct_create` and revokes its API keys, because a row with no `auth_user_id` can never be
+  authenticated as again — while an orphaned admin would still satisfy the last-admin guard and an
+  orphaned key would still open the account. The rows themselves stay, for the audit reason above.
+
 ```sql
 CREATE TABLE accounts (                  -- ✅ M3
   id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  -- THE join key, and the only one. A wallet that reaches the API is self-asserted and would be a
-  -- forgeable authorization input, so provisioning, lookup and admin bootstrap all key on the DID.
-  privy_did      TEXT UNIQUE,            -- from the SEPARATE identity app (PII isolated)
-  -- Filled by the enrichment job from the provider's own record, never from a request body.
-  primary_wallet TEXT,
-  email          TEXT,                   -- optional; PII — lives only in this app
+  -- THE join key, and the only one: the identity's opaque subject (auth_user.id). Never an email —
+  -- an address can be changed and reassigned, and this is what audit history hangs off. No FK: an
+  -- accounts row must outlive the identity, because audit_log points at accounts.id.
+  auth_user_id   TEXT UNIQUE,
   display_name   TEXT,
   -- The PUBLIC identifier used for attribution: source.submittedBy becomes this handle, the
-  -- publishing organization's slug, or 'community'. Deliberately not the email or the DID.
+  -- publishing organization's slug, or 'community'. Deliberately not the email or the subject.
   handle         TEXT UNIQUE,
   global_role    account_role NOT NULL DEFAULT 'submitter',   -- T1 default; T3/T4 elevate
   -- Publish in ANY namespace without a membership. Granted by T4, audited both ways, and
   -- independent of global_role — reviewing is not publishing.
   direct_create  BOOLEAN NOT NULL DEFAULT FALSE,
-  -- NULL is the enrichment job's cursor. Enrichment is off the authentication path (the provider's
-  -- user endpoint needs a second credential and is rate-limited), so a login completes with the DID
-  -- alone and this column records that the rest is still owed.
-  enriched_at    TIMESTAMPTZ,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );

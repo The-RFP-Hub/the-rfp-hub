@@ -14,10 +14,9 @@ import {
   bearer,
   grantMembership,
   mintApiKeyFor,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
@@ -25,11 +24,11 @@ import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3write";
 const OTHER_NS = "m3write-other";
-const DIDS = {
-  submitter: "did:privy:m3write-submitter",
-  publisher: "did:privy:m3write-publisher",
-  stranger: "did:privy:m3write-stranger",
-  reviewer: "did:privy:m3write-reviewer",
+const EMAILS = {
+  submitter: "m3write-submitter@rfphub.invalid",
+  publisher: "m3write-publisher@rfphub.invalid",
+  stranger: "m3write-stranger@rfphub.invalid",
+  reviewer: "m3write-reviewer@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -41,15 +40,20 @@ run("M3WRITE submissions", () => {
   let strangerToken: string;
   let reviewerToken: string;
   let publishKey: string;
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
 
-    const submitter = await seedAccount({ did: DIDS.submitter, handle: "m3write-submitter" });
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3write-publisher" });
-    await seedAccount({ did: DIDS.stranger, handle: "m3write-stranger" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3write-reviewer", role: "reviewer" });
+    const submitter = await seedIdentity(EMAILS.submitter, { handle: "m3write-submitter" });
+    const publisher = await seedIdentity(EMAILS.publisher, { handle: "m3write-publisher" });
+    const stranger = await seedIdentity(EMAILS.stranger, { handle: "m3write-stranger" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3write-reviewer",
+      role: "reviewer",
+    });
+    userIds.push(submitter.userId, publisher.userId, stranger.userId, reviewer.userId);
 
     // A VERIFIED organisation carrying real directory metadata — the row a submission must not be
     // able to rewrite.
@@ -58,22 +62,22 @@ run("M3WRITE submissions", () => {
       .update(organizations)
       .set({ website: "https://real.example", description: "Curated by its owner." })
       .where(eq(organizations.id, verified.id));
-    await grantMembership(publisher.id, verified.id, "owner");
+    await grantMembership(publisher.account.id, verified.id, "owner");
     await seedOrganization({ slug: OTHER_NS, verified: false });
 
-    submitterToken = await mintPrivyToken(DIDS.submitter);
-    publisherToken = await mintPrivyToken(DIDS.publisher);
-    strangerToken = await mintPrivyToken(DIDS.stranger);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
-    publishKey = await mintApiKeyFor(publisher.id, ["read", "write", "publish"]);
-    void submitter;
+    submitterToken = submitter.token;
+    publisherToken = publisher.token;
+    strangerToken = stranger.token;
+    reviewerToken = reviewer.token;
+    publishKey = await mintApiKeyFor(publisher.account.id, ["read", "write", "publish"]);
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3write",
       organizationSlugs: [NS, OTHER_NS],
-      privyDids: Object.values(DIDS),
+      userIds,
+      emails: Object.values(EMAILS),
     });
     await app.close();
     await pool.end();

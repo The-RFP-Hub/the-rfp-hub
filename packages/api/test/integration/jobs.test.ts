@@ -15,31 +15,19 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
-import { type OpportunityRow, accounts, auditLog, opportunities } from "../../src/db/schema.js";
-import { AccountEnrichmentService } from "../../src/modules/services/jobs/account-enrichment.service.js";
+import { type OpportunityRow, auditLog, opportunities } from "../../src/db/schema.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
 import { runJob } from "../../src/modules/services/jobs/runner.js";
 import { StalenessService } from "../../src/modules/services/jobs/staleness.service.js";
-import {
-  bearer,
-  mintApiKeyFor,
-  mintPrivyToken,
-  seedAccount,
-  testPrivyConfig,
-} from "../helpers/auth.js";
+import { bearer, mintApiKeyFor, seedIdentity, testAuth } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3job";
-const DIDS = {
-  admin: "did:privy:m3job-admin",
-  reviewer: "did:privy:m3job-reviewer",
-  enriched: "did:privy:m3job-enriched",
-  enrichFailed: "did:privy:m3job-enrich-failed",
+const EMAILS = {
+  admin: "m3job-admin@rfphub.invalid",
+  reviewer: "m3job-reviewer@rfphub.invalid",
 };
-
-/** The address the fixture's identity provider reports for the enriched account. */
-const PROVIDER_WALLET = "0xa11ce0000000000000000000000000000000b0b5";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-08-14T12:00:00.000Z");
@@ -120,18 +108,30 @@ run("M3JOB scheduled jobs", () => {
   let adminKey: string;
   /** `updated_at` as the INSERT left it — nothing this job does may move it. */
   const updatedAtAtInsert = new Map<string, Date>();
+  const userIds: string[] = [];
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
+    // Cleared on the way IN as well as out: a handle an earlier run left behind — including one
+    // of the pre-migration shape, which has no identity to clean it up by — would make the suite
+    // unseedable, since handles are globally unique.
+    await cleanupFixtures({
+      handles: ["m3job-admin", "m3job-reviewer"],
+      emails: Object.values(EMAILS),
+    });
 
-    const admin = await seedAccount({ did: DIDS.admin, handle: "m3job-admin", role: "admin" });
-    await seedAccount({ did: DIDS.reviewer, handle: "m3job-reviewer", role: "reviewer" });
-    adminToken = await mintPrivyToken(DIDS.admin);
-    reviewerToken = await mintPrivyToken(DIDS.reviewer);
+    const admin = await seedIdentity(EMAILS.admin, { handle: "m3job-admin", role: "admin" });
+    const reviewer = await seedIdentity(EMAILS.reviewer, {
+      handle: "m3job-reviewer",
+      role: "reviewer",
+    });
+    userIds.push(admin.userId, reviewer.userId);
+    adminToken = admin.token;
+    reviewerToken = reviewer.token;
     // An admin's OWN key, with every scope: the point of the 403 below is that a global role never
     // elevates an API key, not that this particular key was under-scoped.
-    adminKey = await mintApiKeyFor(admin.id, ["read", "write", "publish"]);
+    adminKey = await mintApiKeyFor(admin.account.id, ["read", "write", "publish"]);
 
     const inserted = await db
       .insert(opportunities)
@@ -156,7 +156,12 @@ run("M3JOB scheduled jobs", () => {
   });
 
   afterAll(async () => {
-    await cleanupFixtures({ opportunityPrefix: `${NS}:`, privyDids: Object.values(DIDS) });
+    await cleanupFixtures({
+      opportunityPrefix: `${NS}:`,
+      handles: ["m3job-admin", "m3job-reviewer"],
+      userIds,
+      emails: Object.values(EMAILS),
+    });
     await app.close();
     await pool.end();
   });
@@ -329,102 +334,8 @@ run("M3JOB scheduled jobs", () => {
     expect(retention.passes).toBe(1);
   });
 
-  it("reports a feature that is off as skipped, distinctly from the lock", async () => {
-    // The two `skipped` values mean opposite things — "nobody configured this" and "somebody else
-    // is already doing it" — and a runner that conflated them would report a permanently
-    // unconfigured job as healthy contention.
-    const enrichment = await runJob("account-enrichment");
-    if (config.privy.appSecret) {
-      // A developer with real credentials in their environment: the job is enabled, so what this
-      // case can still assert is that it did not report the lock.
-      expect(enrichment.skipped).not.toBe("locked");
-    } else {
-      expect(enrichment.skipped).toBe("no identity-provider app secret");
-    }
-  });
-
   it("refuses an unknown job name", async () => {
     await expect(runJob("delete-everything")).rejects.toThrow(/unknown job/);
-  });
-
-  // ── enrichment ───────────────────────────────────────────────────────────────────
-  it("stores the wallet and email the provider holds, and grants nothing by doing so", async () => {
-    // `accounts.primary_wallet` is trustworthy precisely because this job is its only writer — a
-    // wallet that arrives in a request is self-asserted. What it is NOT is an authorization input
-    // in its own right: nothing here promotes anybody, because a role that a column can confer is
-    // a role nobody granted. Admins are made by the ceremony or by an admin, never by enrichment.
-    const seeded = await seedAccount({ did: DIDS.enriched, handle: "m3job-enriched" });
-    expect(seeded.globalRole).toBe("submitter");
-
-    const enrichment = new AccountEnrichmentService(db, {
-      config,
-      // Only this suite's account is answered for. Every other pending account THROWS, which
-      // leaves `enriched_at` NULL and the account exactly as another suite left it — a fixture
-      // must not enrich the whole table as a side effect.
-      fetchUser: async (did: string) => {
-        if (did !== DIDS.enriched) throw new Error("not this suite's account");
-        return { primaryWallet: PROVIDER_WALLET, email: null };
-      },
-    });
-    expect((await enrichment.runBatch({ limit: 1000, now: NOW })).processed).toBe(1);
-
-    const enriched = (
-      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.enriched)).limit(1)
-    )[0];
-    expect(enriched?.primaryWallet).toBe(PROVIDER_WALLET);
-    expect(enriched?.enrichedAt).not.toBeNull();
-    expect(enriched?.globalRole).toBe("submitter");
-
-    const trail = await db
-      .select()
-      .from(auditLog)
-      .where(and(eq(auditLog.subjectKind, "account"), eq(auditLog.subjectId, enriched?.id ?? 0)));
-    expect(trail.filter((row) => row.action === "assign_role")).toHaveLength(0);
-  });
-
-  it("leaves an account in the cursor when its enrichment fails, and finishes it next run", async () => {
-    // `enriched_at` is what takes an account OUT of this cursor, so it must not be written by a
-    // pass that did not complete: a stamp that outlived a failure means the batch reports the
-    // account as failed and nothing ever selects it again.
-    const seeded = await seedAccount({ did: DIDS.enrichFailed, handle: "m3job-enrich-failed" });
-    expect(seeded.enrichedAt).toBeNull();
-
-    let attempt = 0;
-    // Only this suite's account is answered for; every other pending one throws, which leaves it
-    // exactly as another suite left it.
-    const fetchUser = async (did: string) => {
-      if (did !== DIDS.enrichFailed) throw new Error("not this suite's account");
-      if (++attempt === 1) throw new Error("the provider call failed");
-      return { primaryWallet: PROVIDER_WALLET, email: null };
-    };
-
-    const broken = await new AccountEnrichmentService(db, { config, fetchUser }).runBatch({
-      limit: 1000,
-      now: NOW,
-    });
-    expect(broken.processed).toBe(0);
-    // At least this suite's: the fixture refuses to answer for any other suite's pending account,
-    // so in a full run the failure count is however many of those the batch also swept up.
-    expect(broken.details?.failed).toBeGreaterThanOrEqual(1);
-
-    const rolledBack = (
-      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.enrichFailed)).limit(1)
-    )[0];
-    expect(rolledBack?.enrichedAt).toBeNull();
-    expect(rolledBack?.primaryWallet).toBeNull();
-
-    // …which is the point: the account is still selected, and the next run completes the work.
-    const retried = await new AccountEnrichmentService(db, { config, fetchUser }).runBatch({
-      limit: 1000,
-      now: NOW,
-    });
-    expect(retried.processed).toBe(1);
-
-    const settled = (
-      await db.select().from(accounts).where(eq(accounts.privyDid, DIDS.enrichFailed)).limit(1)
-    )[0];
-    expect(settled?.enrichedAt).not.toBeNull();
-    expect(settled?.primaryWallet).toBe(PROVIDER_WALLET);
   });
 
   // ── the convenience route ────────────────────────────────────────────────────────

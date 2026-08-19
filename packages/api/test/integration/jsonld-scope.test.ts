@@ -20,17 +20,16 @@ import { JSONLD_CONTEXT_LINK } from "../../src/modules/shared/jsonld-link.js";
 import {
   bearer,
   grantMembership,
-  mintPrivyToken,
-  seedAccount,
+  seedIdentity,
   seedOrganization,
-  testPrivyConfig,
+  testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
 const NS = "m3ld";
-const DIDS = { publisher: "did:privy:m3ld-publisher" };
+const EMAIL = "m3ld-publisher@rfphub.invalid";
 const PUBLIC_ID = `${NS}:one`;
 
 const run = describeWithDb;
@@ -41,14 +40,16 @@ const linkOf = (headers: Record<string, unknown>) => String(headers.link ?? "");
 run("M3LD JSON-LD context scope", () => {
   let app: FastifyInstance;
   let token: string;
+  let userId: string;
 
   beforeAll(async () => {
-    app = await buildApp({ auth: { privy: await testPrivyConfig() } });
+    app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
-    const publisher = await seedAccount({ did: DIDS.publisher, handle: "m3ld-publisher" });
+    const publisher = await seedIdentity(EMAIL, { handle: "m3ld-publisher" });
     const org = await seedOrganization({ slug: NS, verified: true });
-    await grantMembership(publisher.id, org.id, "owner");
-    token = await mintPrivyToken(DIDS.publisher);
+    await grantMembership(publisher.account.id, org.id, "owner");
+    token = publisher.token;
+    userId = publisher.userId;
 
     await ingest.upsertFromStandard(
       {
@@ -71,7 +72,8 @@ run("M3LD JSON-LD context scope", () => {
     await cleanupFixtures({
       opportunityPrefix: NS,
       organizationSlugs: [NS],
-      privyDids: Object.values(DIDS),
+      userIds: [userId],
+      emails: [EMAIL],
     });
     await app.close();
     await pool.end();

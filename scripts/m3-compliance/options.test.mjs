@@ -8,7 +8,7 @@ import { parseArgs, refusals, requiresProductionOptIn } from "./options.mjs";
 const complete = {
   baseUrl: "https://api.staging.example.org",
   namespace: "my-org",
-  privyToken: "t",
+  sessionToken: "t",
 };
 
 describe("the production guard", () => {
@@ -62,11 +62,11 @@ describe("refusals", () => {
     expect(refusals({}).length).toBe(3);
     expect(refusals({ ...complete, baseUrl: undefined })[0]).toMatch(/--base-url/);
     expect(refusals({ ...complete, namespace: undefined })[0]).toMatch(/--namespace/);
-    expect(refusals({ ...complete, privyToken: undefined })[0]).toMatch(/--privy-token/);
+    expect(refusals({ ...complete, sessionToken: undefined })[0]).toMatch(/--session-token/);
   });
 
   it("accepts an API key in place of a session", () => {
-    expect(refusals({ ...complete, privyToken: undefined, apiKey: "rfph_x" })).toEqual([]);
+    expect(refusals({ ...complete, sessionToken: undefined, apiKey: "rfph_x" })).toEqual([]);
   });
 
   it("holds the namespace to the slug shape ids are held to", () => {
@@ -89,7 +89,7 @@ describe("parseArgs", () => {
       "http://localhost:3001",
       "--namespace",
       "my-org",
-      "--privy-token",
+      "--session-token",
       "abc",
       "--admin-token",
       "def",
@@ -101,7 +101,7 @@ describe("parseArgs", () => {
     expect(opts).toMatchObject({
       baseUrl: "http://localhost:3001",
       namespace: "my-org",
-      privyToken: "abc",
+      sessionToken: "abc",
       adminToken: "def",
       views: 9,
       allowProduction: true,
@@ -111,19 +111,19 @@ describe("parseArgs", () => {
 
   it("falls back to the credential environment variables, but never over a flag", () => {
     const env = {
-      M3_PRIVY_TOKEN: "from-env",
+      M3_SESSION_TOKEN: "from-env",
       M3_ADMIN_TOKEN: "admin-from-env",
       M3_API_KEY: "rfph_from_env",
     };
     const fromEnv = parseArgs(["--base-url", "http://127.0.0.1:3001"], env);
     expect(fromEnv).toMatchObject({
-      privyToken: "from-env",
+      sessionToken: "from-env",
       adminToken: "admin-from-env",
       apiKey: "rfph_from_env",
     });
 
-    const flagWins = parseArgs(["--privy-token", "from-flag"], env);
-    expect(flagWins.privyToken).toBe("from-flag");
+    const flagWins = parseArgs(["--session-token", "from-flag"], env);
+    expect(flagWins.sessionToken).toBe("from-flag");
     // The other two still fall back — one explicit flag does not disable the mechanism.
     expect(flagWins.adminToken).toBe("admin-from-env");
   });

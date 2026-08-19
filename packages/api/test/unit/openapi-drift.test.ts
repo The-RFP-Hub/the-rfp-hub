@@ -525,7 +525,6 @@ describe("M3 closed components vs their view types", () => {
     handle: null,
     displayName: null,
     email: null,
-    primaryWallet: null,
     role: "submitter",
     directCreate: false,
     credentialKind: "session",

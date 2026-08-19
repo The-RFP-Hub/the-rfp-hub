@@ -18,33 +18,39 @@ import type { ApiKeyScope, Principal } from "../../shared/capabilities.js";
 import { unauthorized } from "../../shared/http-error.js";
 import { AccountService } from "./account.service.js";
 import { ApiKeyService } from "./api-key.service.js";
-import type { PrivyTokenService } from "./privy-token.service.js";
+import type { SessionService } from "./session.service.js";
 
 /** The principal plus the row-level facts the routes need beyond authorization. */
 export interface RequestPrincipal extends Principal {
   account: AccountRow;
   /** Which key acted, for `audit_log.actor_api_key_id`. Undefined for a session. */
   apiKeyId?: number;
+  /**
+   * The verified address this session belongs to — carried from the session lookup rather than
+   * stored on `accounts`, so `/v1/me` serves it without a second query and there is one copy of it
+   * in the system. Undefined for an API key, which identifies an account without a session.
+   */
+  email?: string | null;
 }
 
 export interface PrincipalDeps {
   accounts?: AccountService;
   keys?: ApiKeyService;
-  privy?: PrivyTokenService;
+  sessions?: SessionService;
 }
 
 export class PrincipalService {
   readonly accounts: AccountService;
   readonly keys: ApiKeyService;
-  readonly privy: PrivyTokenService;
+  readonly sessions: SessionService;
 
   constructor(db: DB = defaultDb, deps: PrincipalDeps = {}) {
     this.accounts = deps.accounts ?? new AccountService(db);
     this.keys = deps.keys ?? new ApiKeyService(db);
-    if (!deps.privy) {
-      throw new Error("PrincipalService requires a PrivyTokenService (see plugins/auth.ts)");
+    if (!deps.sessions) {
+      throw new Error("PrincipalService requires a SessionService (see plugins/auth.ts)");
     }
-    this.privy = deps.privy;
+    this.sessions = deps.sessions;
   }
 
   /** Resolve a bearer value, or throw the 401/403 it deserves. */
@@ -62,17 +68,21 @@ export class PrincipalService {
   }
 
   private async fromSession(token: string): Promise<RequestPrincipal> {
-    const claims = await this.privy.verify(token);
-    // JIT provisioning AND the bootstrap-admin re-evaluation both happen here, on every login.
-    const account = await this.accounts.resolveByPrivyDid(claims.did);
-    return this.assemble(account, "session", []);
+    const verified = await this.sessions.verify(token);
+    // One message for every way a token can fail to be a session — see `SessionService`.
+    if (!verified) throw unauthorized("the session token could not be verified.");
+    // JIT provisioning happens here, on the first `/v1` request an identity ever makes, rather than
+    // in a database hook on user creation: an account is what this API decides about a person, and
+    // it is created when they first act on it.
+    const account = await this.accounts.resolveBySubject(verified.subject);
+    return this.assemble(account, "session", [], { email: verified.email });
   }
 
   private async assemble(
     account: AccountRow,
     credentialKind: "session" | "api_key",
     scopes: ApiKeyScope[],
-    extra: { apiKeyId?: number } = {},
+    extra: { apiKeyId?: number; email?: string | null } = {},
   ): Promise<RequestPrincipal> {
     const memberships = await this.accounts.memberships(account.id);
     return {

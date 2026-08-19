@@ -135,7 +135,7 @@ queue, the audit trail, duplicate detection, source verification, publisher anal
 staleness job:
 
 ```bash
-pnpm check:m3 --base-url https://api.staging.example.org --namespace my-org --privy-token "$SESSION"
+pnpm check:m3 --base-url https://api.staging.example.org --namespace my-org --session-token "$SESSION"
 ```
 
 **It writes**, which is why it is stricter about being allowed to run: it refuses to start without

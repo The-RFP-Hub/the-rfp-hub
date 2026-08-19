@@ -43,6 +43,13 @@
       "when": 1787013289854,
       "tag": "0005_audit_actor_role",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787091438649,
+      "tag": "0006_better_auth",
+      "breakpoints": true
     }
   ]
 }
