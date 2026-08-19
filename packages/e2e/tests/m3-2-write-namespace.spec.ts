@@ -27,11 +27,15 @@ test.describe("M3-2 who may publish, and where", () => {
     stack,
     api,
     anonApi,
+    pendingHeadroom,
     opportunityFixture,
   }) => {
     // This one genuinely needs an account with NO verified membership — that absence is the whole
     // criterion, and no privileged actor can stand in for it.
     skipUnlessActor(stack, "submitter");
+    // The same absence is what the pending cap applies to, so the queue slot has to be there before
+    // this can assert anything about the entry. The cap itself is `m3-1`'s criterion.
+    await pendingHeadroom("submitter", 1);
     const submitter = await api("submitter");
     const document = opportunityFixture(stack.namespaces.publisher, `submitter-${Date.now()}`);
     const id = document.id as string;
@@ -188,11 +192,13 @@ test.describe("M3-2 provenance belongs to the server", () => {
   test("a client cannot forge who submitted an entry, when, or how it arrived", async ({
     stack,
     api,
+    pendingHeadroom,
     opportunityFixture,
   }) => {
     // Deliberately an unaffiliated account: `source.originalId` is forced null only for a credential
     // that cannot publish in the namespace, so a privileged actor would not exercise that clause.
     skipUnlessActor(stack, "submitter");
+    await pendingHeadroom("submitter", 1);
     const submitter = await api("submitter");
     const before = new Date(Date.now() - 60_000);
 
@@ -388,8 +394,13 @@ test.describe("M3-2 provenance belongs to the server", () => {
  *      aggregator-then-operator sequence the feature exists for.
  */
 test.describe("M3-2 claims", () => {
-  test.beforeEach(({ stack }) => {
+  test.beforeEach(async ({ stack, pendingHeadroom }) => {
     skipUnlessActor(stack, "publisher", "submitter", "reviewer");
+    // `publishedEntry` below submits as the submitter and has it approved a moment later, so each
+    // fixture holds a review-queue slot only briefly — but it does hold one, and an account with no
+    // verified membership has a fixed number. See `pendingHeadroom` for why this is done through a
+    // reviewer's decision rather than by editing the row.
+    await pendingHeadroom("submitter", 2);
   });
 
   /**

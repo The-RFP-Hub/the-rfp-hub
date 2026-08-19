@@ -36,6 +36,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
   test("a signed-in session shows the account and the navigation its capabilities allow", async ({
     page,
     stack,
+    api,
   }) => {
     await page.goto(stack.urls.frontend);
 
@@ -43,21 +44,79 @@ test.describe("M3-5 the signed-in dashboard", () => {
     // for the thing the criterion is about, rather than for a timeout to expire.
     await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
 
-    // `Directory` is public and always present; `Dashboard` is where the signed-in overview moved
-    // when `/` became the public directory. The rest is the capability-gated set — and every session
-    // may manage its own keys, so `API keys` is there for a plain submitter too.
+    // THE NAVIGATION IS GROUPED NOW, and this list follows the grouping rather than the old flat
+    // row. `Directory` and `How it works` are the public pair — present for a stranger too;
+    // `Dashboard`, `Your listings`, `Account` and `API keys` are what THIS ACCOUNT owns, rendered
+    // from what `GET /v1/me` answered, and every session may manage its own keys.
+    //
+    // `Listings` became `Your listings` in the regroup: the account group says whose things these
+    // are. The criterion is unchanged — a capability-gated link that exists only once the API has
+    // answered for this account — so the label is updated rather than the assertion weakened.
+    const nav = page.getByRole("navigation", { name: "Sections" });
     for (const label of [
       "Directory",
+      "How it works",
       "Dashboard",
-      "Listings",
-      "Duplicates",
-      "API keys",
+      "Your listings",
       "Account",
+      "API keys",
     ]) {
-      // `exact` matters: the brand link's accessible name ("RFP Hub — the directory and the…")
-      // contains "Directory" as a substring, so a loose match resolves to two elements and fails
-      // strict mode. The nav labels are exact strings; pinning them is the tighter assertion anyway.
-      await expect(page.getByRole("link", { name: label, exact: true })).toBeVisible();
+      // `exact` matters: the brand link's accessible name contains "Directory" as a substring, so a
+      // loose match resolves to two elements and fails strict mode. The nav labels are exact
+      // strings; pinning them is the tighter assertion anyway.
+      await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+    }
+
+    // AN ACCOUNT WITH MEMBERSHIPS GETS AN ORGANISATION ENTRY, beside its listings rather than behind
+    // two clicks on the account page. Its SHAPE follows the account: one membership gets the
+    // organisation's own name and its own address, because a landing page listing exactly one row is
+    // a click that answers nothing; several get a chooser.
+    //
+    // WHICH CASE THIS RUN IS IN IS READ FROM THE API, NOT ASSUMED. Earlier files grant the publisher
+    // memberships on further organisations while exercising claims, so the count here is a
+    // consequence of what has run — and hard-coding either shape would make this test an assertion
+    // about execution order.
+    const me = await (await api("publisher")).get<{
+      memberships: Array<{ slug: string; name: string }>;
+    }>("/v1/me");
+    expect(me.status).toBe(200);
+    const memberships = me.body.memberships;
+    expect(
+      memberships.length,
+      "this actor is a member of at least one organisation",
+    ).toBeGreaterThan(0);
+    const only = memberships.length === 1 ? memberships[0] : undefined;
+    const organisation = nav.getByRole("link", {
+      name: only ? only.name : "Organisations",
+      exact: true,
+    });
+    await expect(
+      organisation,
+      "a member's organisation belongs beside their listings, not behind two clicks",
+    ).toBeVisible();
+    await expect(organisation).toHaveAttribute(
+      "href",
+      only ? `/organisations/${encodeURIComponent(only.slug)}` : "/organisations",
+    );
+
+    // DUPLICATES LEFT THE TOP LEVEL, and the demotion is the assertion rather than a side effect:
+    // it is a view OF your listings, so it is reached from `/listings` and no longer competes with
+    // them in the header.
+    await expect(
+      nav.getByRole("link", { name: "Duplicates", exact: true }),
+      "Duplicates is not a top-level destination any more",
+    ).toHaveCount(0);
+    await page.goto(`${stack.urls.frontend}/listings`);
+    await expect(
+      page.getByRole("link", { name: /duplicate/i }).first(),
+      "…and `/listings` owes it a permanent way in, whether or not anything is flagged",
+    ).toBeVisible();
+
+    // The STAFF group is capability-gated on the API's own answer, and this actor is a plain
+    // publisher: hiding a link is presentation, but the link being absent is what `canReview` and
+    // `canAdmin` came back false for.
+    for (const label of ["Review queues", "Accounts & roles"]) {
+      await expect(nav.getByRole("link", { name: label, exact: true })).toHaveCount(0);
     }
   });
 
@@ -86,45 +145,106 @@ test.describe("M3-5 the signed-in dashboard", () => {
     await page.goto(`${stack.urls.frontend}/listings/new`);
     await expect(page.getByRole("heading", { name: "Submit an opportunity" })).toBeVisible();
 
-    // An empty form cannot be submitted: the button stays disabled and the non-conformance is shown
-    // by the client rather than being discovered by the server.
-    await expect(page.getByRole("button", { name: "Submit" })).toBeDisabled();
+    // THE STANDARD IS TYPED NOW, NOT PASTED: `fundingDetails` used to be a JSON textarea and is a
+    // set of sections keyed off the funding type. The two named after schema fields are asserted
+    // because a publisher reading a conformance error about `fundingInfo` or `fundingDetails` has
+    // to be able to find the part of the form that owns it.
+    //
+    // Matched loosely rather than exactly: the section NUMBER is a stylesheet counter on the
+    // legend, and generated content counts towards an accessible name.
+    await expect(page.getByRole("group", { name: /Funding information/ })).toBeVisible();
+    await expect(page.getByRole("group", { name: /Funding details — grant/ })).toBeVisible();
 
-    // …and then the form is actually FILLED AND SUBMITTED. Stopping at the disabled button proves
-    // only that the form renders: a broken submit handler, or a frontend pointed at the wrong API,
-    // passes that test unchanged. The assertion that matters is that a person typing into this form
-    // ends up with a row the API will serve back.
+    // SUBMIT IS ALWAYS LIVE, and that is the criterion rather than a relaxation of it. A disabled
+    // button that does not say why cannot be told apart from a broken page, so pressing it on an
+    // empty document REVEALS the problems instead of sending — and the same press must not have
+    // created anything.
+    const submit = page.getByRole("button", { name: "Submit", exact: true });
+    await expect(submit, "the button stays live so that pressing it can answer").toBeEnabled();
+    await submit.click();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Not conformant yet." }),
+      "pressing Submit on an empty form answers, in the page's own words",
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Submitted." }),
+      "…and answering is not sending",
+    ).toHaveCount(0);
+
+    // A PROBLEM IS ALSO ADDRESSED TO ITS FIELD, not only listed in the summary. That is the whole
+    // point of the per-field pass: `aria-invalid` is what a screen reader announces on the input
+    // rather than as loose red text somewhere below.
+    const title = page.getByLabel(/^Title/);
+    await expect(title).toHaveAttribute("aria-invalid", "true");
+
+    // …and then the form is actually FILLED AND SUBMITTED. Stopping at the refusal proves only that
+    // the form validates: a broken submit handler, or a frontend pointed at the wrong API, passes
+    // that unchanged. The assertion that matters is that a person typing into this form ends up
+    // with a row the API will serve back.
+    //
+    // THE LABELS ARE MATCHED BY PREFIX because several carry a suffix the form adds — "— optional"
+    // on anything the schema permits to be absent, "— permanent, cannot be changed later" on the
+    // id. Anchoring at the start pins the field without pinning the annotation.
     const localId = `form-${Date.now()}`;
     const id = `${stack.namespaces.publisher}:${localId}`;
-    await page.getByLabel("Id", { exact: true }).fill(id);
-    await page.getByLabel("Title", { exact: true }).fill(`Dashboard form entry ${localId}`);
+    await title.fill(`Dashboard form entry ${localId}`);
     await page
-      .getByLabel("Description", { exact: true })
+      .getByLabel(/^Description/)
       .fill(
         "An entry submitted through the publisher dashboard's own form by the end-to-end suite.",
       );
-    await page
-      .getByLabel("Operating organisation", { exact: true })
-      .fill(stack.namespaces.publisher);
-    await page
-      .getByLabel("Operating organisation slug", { exact: true })
-      .fill(stack.namespaces.publisher);
-    await page.getByLabel("Application URL", { exact: true }).fill(stack.urls.programme);
+    // The primary operating organisation: its name, and the slug that IS the publishing namespace.
+    await page.getByLabel(/^Name/).fill(stack.namespaces.publisher);
+    await page.getByLabel(/^Slug/).fill(stack.namespaces.publisher);
 
-    const submit = page.getByRole("button", { name: "Submit" });
-    await expect(submit, "a conformant form enables its submit button").toBeEnabled();
+    // THE APPLICATION LINK IS ADVISORY, NEVER BLOCKING — the schema makes it optional and the form
+    // does not overrule the schema. It says the consequence instead, and says it before anything is
+    // pressed, because advice that arrives after the fact cannot change the answer.
+    //
+    // It appears TWICE and both are intended: beside the field it is about, and in the advisory list
+    // alongside the validator's own check-tier findings. The count is asserted rather than papered
+    // over with `.first()`, because "one of them went missing" is a real regression.
+    const applicationUrl = page.getByLabel(/^Application URL/);
+    const advice = page.getByText(/no way to apply and source verification never runs/i);
+    await expect(advice, "advice is shown next to its field AND in the advisory list").toHaveCount(
+      2,
+    );
+    await expect(advice.first()).toBeVisible();
+    await expect(
+      applicationUrl,
+      "an empty application link is advised against, not marked invalid",
+    ).not.toHaveAttribute("aria-invalid", "true");
+    await applicationUrl.fill(stack.urls.programme);
+
+    // The id is filled LAST and on purpose: until it is touched it follows the title and the
+    // primary slug, and typing into it is what stops the derivation.
+    await page.getByLabel(/^Id\b/).fill(id);
+
     await submit.click();
+
+    // THE RESULT REPLACES THE FORM. A live Submit button under an outcome panel is how the same
+    // opportunity gets submitted twice, so the panel's presence and the form's absence are one
+    // assertion about the same fix.
+    await expect(page.getByRole("heading", { name: "Submitted." })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open this listing" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Submit another" })).toBeVisible();
+    await expect(submit, "the form is gone, so it cannot be sent again").toHaveCount(0);
 
     // The frontend reports the outcome in its own words; the API is the authority on whether the
     // row exists, so both are checked and the API's answer is the one that decides.
-    await expect(page.getByText(/Submitted\./i)).toBeVisible();
-
     const publisher = await api("publisher");
     const stored = await publisher.get<{ id: string; title: string }>(
       `/v1/me/opportunities/${encodeURIComponent(id)}`,
     );
     expect(stored.status, "the entry the form created must exist at the API").toBe(200);
     expect(stored.body.title).toBe(`Dashboard form entry ${localId}`);
+
+    // "Open this listing" goes to the row that was just created, which is the only thing that makes
+    // the panel a way forward rather than a dead end.
+    await page.getByRole("link", { name: "Open this listing" }).click();
+    // Compared on the DECODED path: an id carries a colon, which is percent-encoded in the address
+    // and would make a literal comparison a test of the encoder rather than of the destination.
+    await expect(page).toHaveURL((url) => decodeURIComponent(url.pathname) === `/listings/${id}`);
   });
 
   test("a key's secret is shown once and is gone after a reload", async ({ page, stack }) => {

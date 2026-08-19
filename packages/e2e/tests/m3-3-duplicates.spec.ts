@@ -42,8 +42,14 @@ function paraphrase(label: string) {
 }
 
 test.describe("@dedupe M3-3 detection", () => {
-  test.beforeEach(({ stack }) => {
+  test.beforeEach(async ({ stack, pendingHeadroom }) => {
     skipUnlessActor(stack, "publisher", "submitter", "reviewer");
+    // EVERY TEST HERE MANUFACTURES A PENDING ROW AS THE SUBMITTER, and an account with no verified
+    // membership may have only so many waiting at once (`PENDING_SUBMISSION_LIMIT`). That cap is a
+    // real rule this suite is a heavy user of, and it is asserted deliberately in `m3-1`; here it
+    // is only in the way, so the slots are freed the way the product frees them — by a reviewer
+    // deciding the oldest ones — rather than by pretending the rule is not there.
+    await pendingHeadroom("submitter", 2);
   });
 
   test("an equivalent submission is reported as a duplicate and the pair is persisted", async ({
@@ -133,8 +139,14 @@ test.describe("@dedupe M3-3 detection", () => {
 });
 
 test.describe("@dedupe M3-3 what a reviewer does with a pair", () => {
-  test.beforeEach(({ stack }) => {
+  test.beforeEach(async ({ stack, pendingHeadroom }) => {
     skipUnlessActor(stack, "publisher", "submitter", "reviewer");
+    // EVERY TEST HERE MANUFACTURES A PENDING ROW AS THE SUBMITTER, and an account with no verified
+    // membership may have only so many waiting at once (`PENDING_SUBMISSION_LIMIT`). That cap is a
+    // real rule this suite is a heavy user of, and it is asserted deliberately in `m3-1`; here it
+    // is only in the way, so the slots are freed the way the product frees them — by a reviewer
+    // deciding the oldest ones — rather than by pretending the rule is not there.
+    await pendingHeadroom("submitter", 2);
   });
 
   /** Publishes a pair and returns the reviewable pair id. */
