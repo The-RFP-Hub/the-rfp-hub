@@ -32,6 +32,7 @@ import type {
   DuplicatePair,
   DuplicatePairList,
   DuplicateStatus,
+  Health,
   InsightsSeries,
   InsightsSummary,
   ManagedOpportunityList,
@@ -113,6 +114,35 @@ type Query = Record<string, string | number | boolean | undefined>;
  * The list filters accept a comma-separated list as well as a single value; the browse UI sends one
  * value at a time, and the wire form is the same either way.
  */
+/**
+ * The querystring of `GET /v1/organizations/:slug/opportunities`.
+ *
+ * A `type` rather than an `interface`, for the same reason as `DirectoryQuery` below: only a type
+ * alias is assignable to `Query`'s index signature, and the endpoint validates with
+ * `additionalProperties: false`.
+ */
+export type OrganizationOpportunityQuery = {
+  reviewStatus?: ReviewStatus;
+  page?: number;
+  limit?: number;
+};
+
+/**
+ * The body of `PATCH /v1/organizations/:slug` — every member optional, nothing else accepted.
+ *
+ * `null` is a real value here and means "clear it", which is why the nullable members are typed as
+ * `string | null` rather than left off: omitting a key and sending `null` for it are different
+ * instructions, and a form that could only omit could never empty a website field.
+ */
+export interface OrganizationPatch {
+  name?: string;
+  description?: string | null;
+  website?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  ecosystems?: string[];
+}
+
 export type DirectoryQuery = {
   /** Free text over title, summary and description. */
   q?: string;
@@ -341,6 +371,58 @@ export function createApiClient(options: ApiClientOptions) {
         ),
     },
 
+    /**
+     * AN ORGANISATION ACTING ON ITSELF — a different authority from `review` above, and the reason
+     * these four are their own group rather than more members of it.
+     *
+     * `review.*` is Hub staff deciding about anybody. These are a MEMBER deciding about their own
+     * namespace, and the API scopes them accordingly: an id filed under another organisation answers
+     * 404 rather than 403, so this cannot be used to enumerate somebody else's queue.
+     *
+     * The two gates differ on purpose and the difference is the whole model:
+     *   - `opportunities` needs ANY membership. Verification governs publishing, not visibility, so
+     *     an unverified organisation can still see what has been filed in its name.
+     *   - `approve` and `reject` need a membership on a VERIFIED organisation, and are SESSION-ONLY.
+     *     Approving publishes unreviewed content to the world, which is exactly the power a leaked
+     *     API key must never hold.
+     */
+    organizations: {
+      opportunities: (slug: string, query?: OrganizationOpportunityQuery) =>
+        request<ManagedOpportunityList>(
+          "GET",
+          `/v1/organizations/${encodeURIComponent(slug)}/opportunities`,
+          { query },
+        ),
+      approve: (slug: string, id: string) =>
+        request<ReviewDecision>(
+          "POST",
+          `/v1/organizations/${encodeURIComponent(slug)}/opportunities/${encodeURIComponent(id)}/approve`,
+        ),
+      /**
+       * `reason` is REQUIRED by the API, not optional-with-a-default, and the asymmetry with
+       * `approve` is deliberate on their side: anyone may submit a listing ABOUT an organisation, so
+       * an organisation refusing one in its own namespace is a conflict of interest. The written
+       * reason is the counterweight — it is shown to the submitter, and the decision is attributed
+       * to the deciding member by handle rather than coarsened to "reviewer".
+       */
+      reject: (slug: string, id: string, reason: string) =>
+        request<ReviewDecision>(
+          "POST",
+          `/v1/organizations/${encodeURIComponent(slug)}/opportunities/${encodeURIComponent(id)}/reject`,
+          { body: { reason } },
+        ),
+      /**
+       * The organisation's own directory entry. Owner or admin, session only.
+       *
+       * `verified` is deliberately absent from the patch contract: an organisation verifying itself
+       * would make the flag meaningless. Every member below is optional — send only what changed.
+       */
+      update: (slug: string, patch: OrganizationPatch) =>
+        request<OrganizationSummary>("PATCH", `/v1/organizations/${encodeURIComponent(slug)}`, {
+          body: patch,
+        }),
+    },
+
     // ── administration (T4) ─────────────────────────────────────────────────────
     admin: {
       setRole: (accountId: number, role: "submitter" | "reviewer" | "admin") =>
@@ -377,6 +459,15 @@ export function createApiClient(options: ApiClientOptions) {
       /** Takes no parameters: the verified set is small and the route returns all of it. */
       list: () => request<PublisherList>("GET", "/v1/publishers"),
     },
+
+    /**
+     * Liveness, and what the sign-in screen may honestly offer.
+     *
+     * Unauthenticated. It REJECTS with a 503 when the database is down — the body still carries
+     * `auth`, but a caller that only wants the sign-in methods should treat a rejection as "the API
+     * did not say" rather than as "no Google", because those lead to different screens.
+     */
+    health: () => request<Health>("GET", "/v1/health"),
   };
 }
 

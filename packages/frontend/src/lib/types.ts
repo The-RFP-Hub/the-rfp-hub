@@ -294,6 +294,23 @@ export interface ApiKeyCreated {
 }
 
 // ── review and admin ────────────────────────────────────────────────────────────
+/**
+ * The newest approve/reject on a listing, as its owner is entitled to see it.
+ *
+ * THIS IS WHAT ENDS "IT JUST DISAPPEARED". Before it existed, a rejected submission was findable but
+ * mute: the owner could see the word `rejected` and nothing about why, and the only way to learn was
+ * to ask a reviewer who had already written the answer down. Nothing new is stored for it — the
+ * audit trail always held the action, the reason and the time — it is simply served now.
+ *
+ * `reason` is nullable and that is honest rather than a gap: an approval rarely carries one, and a
+ * rejection made before the reason became mandatory has none to show.
+ */
+export interface ReviewDecisionSummary {
+  action: "approve" | "reject";
+  reason: string | null;
+  at: string;
+}
+
 export interface ManagedOpportunity {
   id: string;
   title: string;
@@ -303,6 +320,8 @@ export interface ManagedOpportunity {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  /** The newest decision on this listing, or null while nobody has decided anything. */
+  lastDecision: ReviewDecisionSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -353,6 +372,19 @@ export interface MembershipResult {
   accountId: number;
   role: OrgRole | null;
   member: boolean;
+}
+
+/**
+ * `GET /v1/health` — liveness, database readiness, and which sign-in methods this deployment has.
+ *
+ * `auth` is OPTIONAL here on purpose. A deployment running an older API answers without it, and the
+ * sign-in screen has to tell "this deployment has no Google" apart from "this API does not say" —
+ * the first hides the button, the second falls back to trying.
+ */
+export interface Health {
+  status: string;
+  db: string;
+  auth?: { google?: boolean };
 }
 
 // ── publishers (public) ─────────────────────────────────────────────────────────
