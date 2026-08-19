@@ -183,7 +183,15 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
   const status = get("status");
   const fundingType = get("type");
   const ordering = get("sort");
-  const page = Number.parseInt(get("page"), 10);
+  const rawPage = get("page");
+  const page = /^\d+$/.test(rawPage) ? Number(rawPage) : Number.NaN;
+  // Keep both the page and the offset that the API will derive from it exact. Apart from accepting
+  // prefixes such as `2junk`, `parseInt` rounds oversized URL values; PostgreSQL then receives an
+  // OFFSET outside its integer range and the public directory renders a 500 error panel.
+  const safePage =
+    Number.isSafeInteger(page) && page > 1 && (page - 1) * PAGE_SIZE <= Number.MAX_SAFE_INTEGER
+      ? page
+      : 1;
 
   return {
     q: get("q"),
@@ -198,7 +206,7 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
           : DEFAULT_SELECTION.status,
     ecosystem: get("ecosystem"),
     ordering: ORDERING_VALUES.has(ordering) ? (ordering as Ordering) : DEFAULT_SELECTION.ordering,
-    page: Number.isFinite(page) && page > 1 ? page : 1,
+    page: safePage,
   };
 }
 

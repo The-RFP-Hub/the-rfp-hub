@@ -202,6 +202,88 @@ describe("the tabs", () => {
 });
 
 describe("deciding a submission", () => {
+  it("can reach submissions after the first fifty rows", async () => {
+    const requestedPages: number[] = [];
+    const api = client();
+    api.review.opportunities = async (query?: { page?: number; limit?: number }) => {
+      const requested = query?.page ?? 1;
+      requestedPages.push(requested);
+      return {
+        items: [
+          {
+            ...pending,
+            id: `indie:grant-${requested}`,
+            title: requested === 1 ? "First queue page" : "Submission fifty-one",
+          },
+        ],
+        page: requested,
+        limit: query?.limit ?? 50,
+        total: 51,
+        totalPages: 2,
+      };
+    };
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const pager = await screen.findByRole("navigation", { name: "Submission queue pages" });
+    fireEvent.click(within(pager).getByRole("button", { name: "Next" }));
+
+    await waitFor(() => expect(requestedPages.at(-1)).toBe(2));
+    const listing = await screen.findByRole("link", { name: "Submission fifty-one" });
+    const href = new URL(listing.getAttribute("href") ?? "", "https://x.example");
+    expect(href.searchParams.get("back")).toBe("/review?page=2");
+    expect(replace).toHaveBeenCalledWith("/review?page=2");
+  });
+
+  it("returns to the new last page after deciding its final submission", async () => {
+    const requestedPages: number[] = [];
+    let decided = false;
+    const api = client();
+    api.review.approve = async () => {
+      decided = true;
+      return { id: "indie:grant-51", reviewStatus: "approved", isListed: true };
+    };
+    api.review.opportunities = async (query?: { page?: number; limit?: number }) => {
+      const requested = query?.page ?? 1;
+      requestedPages.push(requested);
+      const finalPage = decided ? 1 : 2;
+      return {
+        items:
+          requested > finalPage
+            ? []
+            : [
+                {
+                  ...pending,
+                  id: requested === 1 ? "indie:grant-50" : "indie:grant-51",
+                  title: requested === 1 ? "Last submission on page one" : "Submission fifty-one",
+                },
+              ],
+        page: requested,
+        limit: query?.limit ?? 50,
+        total: decided ? 50 : 51,
+        totalPages: finalPage,
+      };
+    };
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const pager = await screen.findByRole("navigation", { name: "Submission queue pages" });
+    fireEvent.click(within(pager).getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Submission fifty-one")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish it" }));
+
+    await waitFor(() => expect(requestedPages.at(-1)).toBe(1));
+    expect(await screen.findByText("Last submission on page one")).toBeTruthy();
+    expect(screen.queryByText("Nothing waiting for review.")).toBeNull();
+  });
+
   it("shows the evidence a decision needs — for a PENDING row, which is all of them", async () => {
     mount();
 

@@ -86,6 +86,25 @@ describe("M3XPORT the pinning transport, over a real socket", () => {
     expect(fetched.finalUrl).toBe(`${origin}/programme`);
   }, 30_000);
 
+  it("does not call an exactly-at-the-cap response truncated", async () => {
+    const fetched = await fetchSource(`${origin}/programme`, {
+      allowPrivateHosts: true,
+      transport: undiciTransport,
+      maxBytes: Buffer.byteLength(PAGE),
+    });
+
+    expect(fetched.text).toBe(PAGE);
+    expect(fetched.truncated).toBe(false);
+
+    const capped = await fetchSource(`${origin}/programme`, {
+      allowPrivateHosts: true,
+      transport: undiciTransport,
+      maxBytes: Buffer.byteLength(PAGE) - 1,
+    });
+    expect(Buffer.byteLength(capped.text)).toBe(Buffer.byteLength(PAGE) - 1);
+    expect(capped.truncated).toBe(true);
+  }, 30_000);
+
   it("still refuses that same hostname when private hosts are not allowed", async () => {
     // The pin is not loosened by the fix: `localhost` resolves to loopback, and loopback is refused
     // unless a test explicitly opts in. A transport that fetched this would be an SSRF hole, so the

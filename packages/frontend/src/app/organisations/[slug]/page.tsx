@@ -41,11 +41,28 @@ import type {
   Publisher,
 } from "@/lib/types";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 /** Rows per page in both tables. Matches `/listings`, and well under the endpoint's maximum of 100. */
 const PAGE_SIZE = 20;
+
+function pageFromUrl(raw: string | null | undefined): number {
+  if (!raw || !/^\d+$/.test(raw)) return 1;
+  const page = Number(raw);
+  return Number.isSafeInteger(page) && page > 1 && (page - 1) * PAGE_SIZE <= Number.MAX_SAFE_INTEGER
+    ? page
+    : 1;
+}
+
+function organizationPageHref(slug: string, publishedPage: number, pendingPage: number): string {
+  const path = `/organisations/${encodeURIComponent(slug)}`;
+  const query = new URLSearchParams();
+  if (publishedPage > 1) query.set("publishedPage", String(publishedPage));
+  if (pendingPage > 1) query.set("pendingPage", String(pendingPage));
+  const encoded = query.toString();
+  return encoded === "" ? path : `${path}?${encoded}`;
+}
 
 export default function OrganisationPage() {
   const params = useParams<{ slug: string }>();
@@ -115,6 +132,8 @@ function Member({
   me: Me;
 }) {
   const api = useApi();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   // Verified organisations are the public list, so this is where `verifiedAt` and the published
   // description come from. It fails soft: an organisation is not less real because this read did
   // not return, and every line that depends on it is simply omitted rather than guessed.
@@ -127,7 +146,6 @@ function Member({
 
   const canDecide = membership.verified;
   const canEdit = membership.role === "owner" || membership.role === "admin";
-  const origin = `/organisations/${encodeURIComponent(slug)}`;
 
   /*
    * BOTH LISTS ARE OWNED HERE, because a decision moves a row from one to the other.
@@ -150,8 +168,22 @@ function Member({
    * A decision re-runs whichever `load` is current, and each closes over its own page — so
    * approving a row on page 3 refreshes page 3, rather than silently returning to the top.
    */
-  const [publishedPage, setPublishedPage] = useState(1);
-  const [pendingPage, setPendingPage] = useState(1);
+  const [publishedPage, setPublishedPage] = useState(() =>
+    pageFromUrl(searchParams?.get("publishedPage")),
+  );
+  const [pendingPage, setPendingPage] = useState(() =>
+    pageFromUrl(searchParams?.get("pendingPage")),
+  );
+  const origin = organizationPageHref(slug, publishedPage, pendingPage);
+
+  const movePublished = (page: number) => {
+    setPublishedPage(page);
+    router.replace(organizationPageHref(slug, page, pendingPage));
+  };
+  const movePending = (page: number) => {
+    setPendingPage(page);
+    router.replace(organizationPageHref(slug, publishedPage, page));
+  };
 
   const loadPublished = useCallback(
     () =>
@@ -173,6 +205,23 @@ function Member({
   );
   const published = useResource(loadPublished);
   const awaiting = useResource(loadPending);
+
+  // A decision removes a row from the pending result. If it was the only row on the last page,
+  // the server truthfully returns that now-out-of-range page as empty and reports a smaller
+  // `totalPages`; staying there would render "Nothing is waiting" while earlier pages still hold
+  // rows, with no pager in the empty branch to escape through. Follow the new last page and let the
+  // ordinary resource generation guard discard any superseded response.
+  useEffect(() => {
+    if (
+      awaiting.state.status === "ready" &&
+      awaiting.state.data.page > awaiting.state.data.totalPages
+    ) {
+      const page = awaiting.state.data.totalPages;
+      setPendingPage(page);
+      router.replace(organizationPageHref(slug, publishedPage, page));
+    }
+  }, [awaiting.state, publishedPage, router, slug]);
+
   const reloadBoth = useCallback(() => {
     published.reload();
     awaiting.reload();
@@ -236,7 +285,7 @@ function Member({
         resource={published}
         back={origin}
         label={membership.name}
-        onPage={setPublishedPage}
+        onPage={movePublished}
       />
       <AwaitingReview
         resource={awaiting}
@@ -246,7 +295,7 @@ function Member({
         back={origin}
         label={membership.name}
         onDecided={reloadBoth}
-        onPage={setPendingPage}
+        onPage={movePending}
       />
       <DirectoryEntry
         slug={slug}
