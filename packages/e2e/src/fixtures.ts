@@ -16,11 +16,12 @@
  *   3. **Everything minted is registered with the redactor**, so the end-of-run artifact scan is
  *      searching for the credentials this run actually created rather than a list from bring-up.
  */
+import type { BrowserContext } from "@playwright/test";
 import { test as base, expect } from "@playwright/test";
 import pg from "pg";
 import { ApiClient } from "./http.js";
 import { seedDocument } from "./identity/actors.js";
-import { sessionFor } from "./identity/sessions.js";
+import { addressFor, identityFor, sessionFor } from "./identity/sessions.js";
 import { register } from "./redact.js";
 import { type ActorName, type RunState, readState } from "./state.js";
 
@@ -49,7 +50,46 @@ export interface TestFixtures {
     suffix: string,
     over?: Record<string, unknown>,
   ) => Record<string, unknown>;
+  /**
+   * Makes room in the review queue for an account the pending cap applies to.
+   *
+   * See `PENDING_SUBMISSION_LIMIT` below for why this exists at all.
+   */
+  pendingHeadroom: (actor: ActorName, slots?: number) => Promise<void>;
+  /**
+   * A browser context signed in as somebody OTHER than the identity `storageState` holds.
+   *
+   * The project supplies one signed-in context, and it belongs to the publisher (see
+   * `skipUnlessBrowserSession`). A criterion about what a DIFFERENT account sees — a submitter
+   * reading the refusal on their own listing, an account that has no verified membership meeting
+   * the pending cap — cannot be driven by it. This signs in over the API the way `api()` does and
+   * seeds the token into a fresh context's storage, which is exactly what the frontend's own
+   * sign-in leaves behind (`SESSION_STORAGE_KEY` in `lib/auth-client.ts`).
+   *
+   * NOT a second implementation of signing in: `00-acceptance.setup.ts` and the bring-up login
+   * assert that the product's own form produces this state. This is how a spec ADOPTS that state
+   * for an identity the run did not put in the browser.
+   */
+  contextAs: (who: ActorName | { email: string }) => Promise<BrowserContext>;
 }
+
+/**
+ * How many entries an account with no verified membership may have awaiting review at once.
+ *
+ * `SUBMISSION_PENDING_LIMIT` in the API's configuration, whose default is 5. THIS SUITE HAS TO KNOW
+ * IT because the queue is a shared resource and this suite is a heavy user of it: the `submitter`
+ * actor is the run's general-purpose "some other account", it holds no verified membership
+ * anywhere, and half a dozen specs across three files use it to manufacture a pending entry. Past
+ * the fifth, the API answers 409 `pending_limit_reached` — correctly — and a spec that is about
+ * duplicate detection or audit redaction fails on a rule it never meant to exercise.
+ *
+ * The cap itself is asserted deliberately and in one place (`m3-1-lifecycle.spec.ts`), against an
+ * identity created for it, so that nothing else in the run has to care what order it ran in.
+ */
+export const PENDING_SUBMISSION_LIMIT = 5;
+
+/** Where the frontend keeps the session token. `SESSION_STORAGE_KEY` in `lib/auth-client.ts`. */
+const SESSION_STORAGE_KEY = "rfphub.session-token";
 
 export interface KeyClient {
   client: ApiClient;
@@ -149,7 +189,94 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       seedDocument(`${namespace}:${suffix}`, namespace, stack.urls.programme, over),
     );
   },
+
+  /**
+   * Frees review-queue slots THROUGH THE PRODUCT'S OWN ROUTE, never with an UPDATE.
+   *
+   * "A slot frees as soon as one of them is approved or rejected" is the API's own sentence, so a
+   * reviewer deciding the account's oldest pending entries is the documented way to make room —
+   * the same thing a person would do. Reaching into the table to flip `review_status` would
+   * manufacture a state by a path the product does not have, and would skip the audit row that
+   * makes the decision answerable.
+   *
+   * The OLDEST are decided first, and that is what makes this safe to call from any spec: files run
+   * serially with one worker, so anything older than the caller's own fixtures has already been
+   * asserted on. It is a no-op for an account with a verified membership, which the API exempts.
+   */
+  pendingHeadroom: async ({ api }, use) => {
+    await use(async (actor, slots = 1) => {
+      const owner = await api(actor);
+      const mine = await owner.get<{
+        total: number;
+        items: Array<{ id: string; createdAt: string }>;
+      }>("/v1/me/opportunities?reviewStatus=pending&limit=100");
+      if (mine.status !== 200) {
+        throw new Error(
+          `pendingHeadroom: GET /v1/me/opportunities → ${mine.status} ${mine.text.slice(0, 200)}`,
+        );
+      }
+      const surplus = mine.body.total + slots - PENDING_SUBMISSION_LIMIT;
+      if (surplus <= 0) return;
+
+      const reviewer = await api("reviewer");
+      const oldestFirst = [...mine.body.items].sort((left, right) =>
+        left.createdAt.localeCompare(right.createdAt),
+      );
+      for (const entry of oldestFirst.slice(0, surplus)) {
+        const decided = await reviewer.post(
+          `/v1/review/opportunities/${encodeURIComponent(entry.id)}/reject`,
+          {
+            reason:
+              "e2e: decided to free a review-queue slot. The suite's shared submitter identity is capped like any account without a verified membership.",
+          },
+        );
+        if (decided.status !== 200) {
+          throw new Error(
+            `pendingHeadroom: could not free a slot by rejecting ${entry.id} — ${decided.status} ${decided.text.slice(0, 200)}`,
+          );
+        }
+      }
+    });
+  },
+
+  contextAs: async ({ browser, stack }, use) => {
+    const opened: BrowserContext[] = [];
+    await use(async (who) => {
+      const email = typeof who === "string" ? requireActor(stack, who).email : who.email;
+      const { token } = await sessionFor(email);
+      const context = await browser.newContext({
+        userAgent: DESKTOP_UA,
+        storageState: {
+          cookies: [],
+          origins: [
+            {
+              origin: new URL(stack.urls.frontend).origin,
+              localStorage: [{ name: SESSION_STORAGE_KEY, value: token }],
+            },
+          ],
+        },
+      });
+      opened.push(context);
+      return context;
+    });
+    for (const context of opened) await context.close().catch(() => undefined);
+  },
 });
+
+/**
+ * Signs in as an address this run has not used before, creating the identity by using it.
+ *
+ * There is no provisioning step and no ceiling — see `identity/sessions.ts`. A spec reaches for
+ * this when the five named parts would all be the wrong shape for what it is asserting: the pending
+ * cap is about an account's OWN queue, and running it against the shared `submitter` would make the
+ * assertion depend on how many entries every earlier file happened to leave behind.
+ */
+export async function freshIdentity(
+  stack: RunState,
+  label: string,
+): Promise<{ email: string; token: string; userId: string }> {
+  return identityFor(addressFor(stack.runId, label));
+}
 
 /**
  * The actor, or a failure that names what is missing.

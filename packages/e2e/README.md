@@ -95,6 +95,35 @@ The fallback: drive the linking rules from an API integration test, supply `stor
 any dashboard spec that needs a signed-in social browser, and keep a manual checklist run against
 staging — never a pull-request gate, the posture `e2e:openai` already has.
 
+## Identities are created by using them, and specs may create their own
+
+The five named parts (`admin`/`reviewer`, `publisher`, `otherPublisher`, `submitter`) are established by
+bring-up and assigned in `src/identity/actors.ts`. A spec that needs an account **starting from
+nothing** — no membership, no pending submissions, no history any earlier file could have left behind
+— calls `freshIdentity(stack, "<label>")` and gets one, offline, in a round trip. It costs an address
+at `rfphub.invalid` and a code this run wrote to its own outbox; there is no ceiling and nothing to
+provision.
+
+Two fixtures exist because of that:
+
+| Fixture | What it is for |
+|---|---|
+| `contextAs(actor \| { email })` | A signed-in browser context for somebody **other** than the identity `storageState` holds. The project supplies one signed-in context and it belongs to the publisher, so any criterion about what a *different* account sees — a submitter reading the refusal on their own listing, a reviewer working the review queues — needs this. It seeds the session token the frontend's own sign-in would have left in storage; it is not a second sign-in implementation. |
+| `pendingHeadroom(actor, slots)` | Frees review-queue slots for an account the **pending cap** applies to, by having a reviewer decide its oldest pending entries — the way the product frees them, never with an `UPDATE`. |
+
+### The pending cap is a shared resource, and this suite is a heavy user of it
+
+An account holding no verified membership anywhere may have at most
+`SUBMISSION_PENDING_LIMIT` (default 5) entries awaiting review; the sixth is a 409
+`pending_limit_reached`. The `submitter` actor is exactly such an account **and** is the run's
+general-purpose "some other account" — half a dozen specs across `m3-2`, `m3-3` and `m3-4` use it to
+manufacture a pending entry. Left alone, one of them fails on a rule it never meant to exercise, and
+*which* one depends on execution order.
+
+So those specs call `pendingHeadroom("submitter", …)` before they submit, and the cap itself is
+asserted **once**, in `m3-1`, against an identity created for it that starts at zero. That is the
+only place in the run where hitting the limit is the point.
+
 ## The administrator is granted, not configured
 
 The API does not promote anyone named in its environment. Bring-up runs the shipped ceremony —

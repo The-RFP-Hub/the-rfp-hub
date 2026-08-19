@@ -92,6 +92,113 @@ test.describe("M3-7 the public directory", () => {
       // …and the filter genuinely narrowed rather than the page happening to be short.
       const searchHit = await page.getByRole("link", { name: new RegExp(token) }).count();
       expect(searchHit, "the search returns the one matching entry").toBe(1);
+
+      // THE SELECTION LIVES IN THE ADDRESS BAR. A filtered view that cannot be reloaded, shared or
+      // walked back out of is the bug this replaced, so the address is asserted rather than the
+      // controls alone: it is what makes reload and Back land on the same screen.
+      await expect(page).toHaveURL((url) => url.searchParams.get("q") === token);
+      await page.reload();
+      await expect(
+        page.getByRole("link", { name: new RegExp(`probe ${token}`) }),
+        "a filtered view survives a reload, because the filter is the address",
+      ).toBeVisible();
+      await expect(page.getByLabel("Search", { exact: true })).toHaveValue(token);
+    } finally {
+      await context.close();
+    }
+  });
+
+  /**
+   * THE DEFAULT NARROWING IS VISIBLE AND UNDOABLE.
+   *
+   * The directory opens showing open opportunities only, which is right for almost every reader and
+   * wrong in exactly one way if it is silent: a filter nobody can see is a filter nobody can turn
+   * off, and a publisher whose closed round has vanished has no way to tell that from it having
+   * been removed. So the control shows `open`, the result line says so, and there is a link out.
+   */
+  test("the directory opens narrowed to what is open, says so, and offers the way out", async ({
+    browser,
+    stack,
+    api,
+    opportunityFixture,
+  }) => {
+    const publisher = await api("publisher");
+    const stamp = Date.now();
+    const token = `statusprobe${stamp}`;
+
+    const open = opportunityFixture(stack.namespaces.publisher, `status-open-${stamp}`, {
+      title: `Open probe ${token}`,
+      status: "open",
+    });
+    const closed = opportunityFixture(stack.namespaces.publisher, `status-closed-${stamp}`, {
+      title: `Closed probe ${token}`,
+      status: "closed",
+    });
+    expect((await publisher.post("/v1/opportunities", open)).status).toBe(201);
+    expect((await publisher.post("/v1/opportunities", closed)).status).toBe(201);
+
+    const { context, page } = await anonymous(browser);
+    try {
+      await page.goto(`${stack.urls.frontend}?q=${encodeURIComponent(token)}`);
+
+      // The default is a REAL filter: the closed entry is published and listed, and is absent only
+      // because of it.
+      await expect(page.getByRole("link", { name: `Open probe ${token}` })).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: `Closed probe ${token}` }),
+        "the default narrowing hides a closed round",
+      ).toHaveCount(0);
+
+      // …and the control is holding the value rather than sitting blank over a narrowed list.
+      await expect(page.getByLabel("Status", { exact: true })).toHaveValue("open");
+
+      await page.getByRole("link", { name: "Include closed and upcoming" }).click();
+      await expect(
+        page.getByRole("link", { name: `Closed probe ${token}` }),
+        "and one click puts the closed round back",
+      ).toBeVisible();
+      await expect(page.getByRole("link", { name: `Open probe ${token}` })).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+/**
+ * The page that explains who does what, and the only route to it from a cold landing.
+ *
+ * A stranger arrives on the directory with no idea what this site is or whether they may put
+ * something on it. `/how-it-works` is the answer, and it is reachable from the footer of every
+ * page — so "the footer links to it" and "it renders" are one criterion rather than two: a link to
+ * a blank page is not a route to an explanation.
+ */
+test.describe("M3-7 what the Hub explains about itself", () => {
+  test("the footer reaches the role map, and the role map renders", async ({ browser, stack }) => {
+    const { context, page } = await anonymous(browser);
+    try {
+      await page.goto(stack.urls.frontend);
+
+      const footer = page.getByRole("contentinfo");
+      for (const label of ["About", "The Standard", "API & data", "GitHub"]) {
+        await expect(footer.getByRole("link", { name: label, exact: true })).toBeVisible();
+      }
+
+      // `About` is the in-app one and the only one followed here: the other three leave this
+      // origin, and clicking those would make an offline suite depend on github.com resolving.
+      await footer.getByRole("link", { name: "About", exact: true }).click();
+      await expect(page).toHaveURL((url) => url.pathname === "/how-it-works");
+      await expect(page.getByRole("heading", { name: "Who can do what" })).toBeVisible();
+
+      // The matrix is the substance of the page. Every column is asserted because the columns ARE
+      // the roles: one missing "Verified org member" has lost the distinction the page exists to
+      // draw. Names are matched loosely — a header may carry an inline note.
+      const roles = page.getByRole("table").first();
+      await expect(roles).toBeVisible();
+      for (const role of ["Visitor", "Submitter", "Verified org member", "Hub reviewer", "Admin"]) {
+        await expect(roles.getByRole("columnheader", { name: role, exact: true })).toBeVisible();
+      }
+      // …and at least one row, so an empty `<tbody>` cannot pass as a rendered map.
+      expect(await roles.getByRole("rowheader").count()).toBeGreaterThan(0);
     } finally {
       await context.close();
     }
@@ -218,7 +325,12 @@ test.describe("M3-7 what an anonymous visitor's traffic counts", () => {
       // publisher's own dashboard pages deliberately do NOT count, which is why this has to be the
       // public page in a real browser.
       await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
-      await expect(page.getByRole("link", { name: "Open the application page" })).toBeVisible();
+      // THE CONTROL IS NAMED FOR WHERE IT GOES. It used to say "Open the application page", which
+      // said neither whose page nor that the click leaves this site — and this page exists to send
+      // a reader somewhere else, because the Hub takes no applications. Matched by pattern rather
+      // than exactly: the label carries a trailing ↗ that says the same thing to the eye.
+      const apply = page.getByRole("link", { name: /Apply on the programme’s own site/ });
+      await expect(apply).toBeVisible();
 
       const afterRead = await pollUntil(
         "an anonymous read of the public page is counted as a detail view",
@@ -227,7 +339,7 @@ test.describe("M3-7 what an anonymous visitor's traffic counts", () => {
       );
 
       const popup = page.waitForEvent("popup").catch(() => undefined);
-      await page.getByRole("link", { name: "Open the application page" }).click();
+      await apply.click();
       const opened = await popup;
 
       // A 302, not a 200 at the destination: the redirect is what the API records, and a client that
