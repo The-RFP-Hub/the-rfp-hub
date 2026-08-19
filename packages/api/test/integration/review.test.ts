@@ -143,6 +143,99 @@ run("M3REV review and administration", () => {
     expect((await app.inject({ url: `/v1/opportunities/${rejectedId}` })).statusCode).toBe(404);
   });
 
+  it("tells the submitter WHY, by surfacing the newest decision on their own listing", async () => {
+    // The reason was already in the trail — the reject route has always accepted one and recorded
+    // it — but nothing served it back, so a submitter found their entry gone and had to ask. This
+    // is that gap closed: the same audit row, read on the owner's own view.
+    const rejectedId = `${NS}:decision-reject`;
+    const approvedId = `${NS}:decision-approve`;
+    const untouchedId = `${NS}:decision-none`;
+    for (const id of [rejectedId, approvedId, untouchedId]) {
+      const created = await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: bearer(submitterToken),
+        payload: submission(id, NS),
+      });
+      expect(created.statusCode, created.body).toBe(201);
+    }
+
+    await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${rejectedId}/reject`,
+      headers: bearer(reviewerToken),
+      payload: { reason: "the application URL points at a parked domain" },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${approvedId}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { reason: "checked against the source" },
+    });
+
+    const mine = await app.inject({
+      method: "GET",
+      url: "/v1/me/opportunities?limit=100",
+      headers: bearer(submitterToken),
+    });
+    expect(mine.statusCode, mine.body).toBe(200);
+    const byId = new Map(
+      (mine.json().items as { id: string; lastDecision: unknown }[]).map((i) => [i.id, i]),
+    );
+
+    expect(byId.get(rejectedId)?.lastDecision).toMatchObject({
+      action: "reject",
+      reason: "the application URL points at a parked domain",
+    });
+    expect(byId.get(approvedId)?.lastDecision).toMatchObject({
+      action: "approve",
+      reason: "checked against the source",
+    });
+    // A decision carries WHEN, because "rejected" without a date is not something a submitter can
+    // act on.
+    expect(String((byId.get(rejectedId)?.lastDecision as { at: string }).at)).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/,
+    );
+    // Nobody has decided anything about the third one. Null, not an empty object.
+    expect(byId.get(untouchedId)?.lastDecision).toBeNull();
+  });
+
+  it("reports the NEWEST decision when an entry has been decided more than once", async () => {
+    const id = `${NS}:decision-twice`;
+    await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(submitterToken),
+      payload: submission(id, NS),
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${id}/reject`,
+      headers: bearer(reviewerToken),
+      payload: { reason: "first look: not enough detail" },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${id}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { reason: "resubmitted with the missing detail" },
+    });
+
+    const mine = await app.inject({
+      method: "GET",
+      url: "/v1/me/opportunities?limit=100",
+      headers: bearer(submitterToken),
+    });
+    const entry = (mine.json().items as { id: string; lastDecision: { reason: string } }[]).find(
+      (i) => i.id === id,
+    );
+    // The trail keeps both; the view answers with the one that is currently true.
+    expect(entry?.lastDecision).toMatchObject({
+      action: "approve",
+      reason: "resubmitted with the missing detail",
+    });
+  });
+
   it("unlists and relists an approved entry", async () => {
     const id = `${NS}:to-approve`;
     const unlisted = await app.inject({

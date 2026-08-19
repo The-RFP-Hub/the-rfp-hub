@@ -177,6 +177,38 @@ run("/v1/opportunities filters, sort & pagination", () => {
     expect((await query("organization=org-op")).ids).toEqual(new Set(["ftest:b"]));
   });
 
+  it("matches ecosystems and organisations REGARDLESS OF CASE", async () => {
+    // The corpus is case-inconsistent because an ecosystem name is free text a publisher types:
+    // `Ethereum`, `ethereum` and `EVM`/`evm` all occur. A case-sensitive `&&` answered a query for
+    // one spelling with a fraction of the rows and gave no sign that it had — a filter returning a
+    // silent subset is worse than one returning nothing.
+    // Asked WITHOUT the helper, which always scopes by `ecosystem=<TAG>`: a second `ecosystem`
+    // value is OR'd with the first, so the tag itself is what has to be re-spelled here.
+    const spellings = await Promise.all(
+      [TAG, TAG.toLowerCase(), "FilterTest"].map(async (spelling) => {
+        const res = await app.inject({
+          method: "GET",
+          url: `/v1/opportunities?ecosystem=${spelling}&limit=100`,
+        });
+        expect(res.statusCode).toBe(200);
+        return new Set((res.json().items as Opportunity[]).map((o) => o.id));
+      }),
+    );
+    const [canonical, lowered, mixedCase] = spellings;
+    expect(canonical?.size).toBeGreaterThan(0);
+    expect(lowered).toEqual(canonical);
+    expect(mixedCase).toEqual(canonical);
+
+    // Slugs arrive in URLs people type as often as from links, so the same rule applies. This one
+    // goes through the helper: `organization` is a single parameter, so it narrows rather than ORs.
+    const org = await query("organization=ORG-A");
+    expect(org.ids).toEqual(new Set(["ftest:a", "ftest:c"]));
+    expect((await query("organization=Org-A")).ids).toEqual(org.ids);
+
+    // …and it is still a MATCH, not a prefix or a substring: nothing else leaks in.
+    expect((await query("organization=org")).ids).toEqual(new Set());
+  });
+
   it("q search over title/description", async () => {
     expect((await query("q=hackathon")).ids).toEqual(new Set(["ftest:b"]));
   });

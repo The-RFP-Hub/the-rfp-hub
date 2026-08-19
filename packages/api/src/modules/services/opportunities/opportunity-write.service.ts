@@ -54,12 +54,14 @@
  * punishing a flaky network. Anything else → 409.
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
-import { eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { humanizeErrors, validateOpportunity } from "rfphub-validate";
+import { config as defaultConfig } from "../../../config.js";
 import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityInsert,
   type OpportunityRow,
+  accounts,
   opportunities,
   organizations,
 } from "../../../db/schema.js";
@@ -79,6 +81,7 @@ import { violatedConstraint } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
 import {
   type PublishAuthorityResolver,
+  hasAnyVerifiedMembership,
   resolvePublishAuthority,
 } from "../auth/publish-authority.js";
 import type { DuplicateCheckResult } from "../dedupe/dedupe.service.js";
@@ -602,6 +605,19 @@ export class OpportunityWriteService {
     const { existing } = ctx;
     const now = new Date();
     const namespace = this.authorizationNamespace(ctx.document, existing);
+    // WHETHER THIS WRITE COULD PUT SOMETHING INTO THE REVIEW QUEUE — which is a create, and equally
+    // an edit of an entry that is NOT currently pending, because a content-changing replacement of
+    // an approved or rejected entry returns it to the queue (see `requeued` below). Metering only
+    // creates left the ceiling trivially bypassable: an account at its limit could edit its own
+    // older entries, one after another, and grow the queue without ever creating anything.
+    //
+    // An entry already pending is exempt: replacing it occupies the slot it already holds.
+    const mayEnterQueue = existing === undefined || existing.reviewStatus !== "pending";
+    // BEFORE `reproveAuthority`, which reads this same row FOR SHARE. Taking the exclusive lock
+    // first is not a preference: two such writes by one account would otherwise both hold the
+    // shared lock and both try to upgrade it, and Postgres answers that with a deadlock rather than
+    // a queue. Observed, not theorised — see `assertPendingHeadroom` for what the lock is FOR.
+    if (mayEnterQueue) await lockAccountRow(tx, ctx.principal.accountId);
     const principal = await this.reproveAuthority(tx, ctx.principal, namespace);
     const { caps, editorial, attributed } = this.decide({
       principal,
@@ -670,6 +686,12 @@ export class OpportunityWriteService {
     };
 
     const created = existing === undefined;
+    // The transition that costs a slot: something that was not in the queue is now in it. A create
+    // that auto-publishes never gets here, and neither does an edit of an entry that was already
+    // pending.
+    if (mayEnterQueue && values.reviewStatus === "pending") {
+      await this.assertPendingHeadroom(tx, principal.accountId);
+    }
 
     await insertOrganizationStubs(tx, document);
 
@@ -739,6 +761,50 @@ export class OpportunityWriteService {
     return { row: stored, namespace, created };
   }
 
+  /**
+   * The review queue is a shared resource, so one account may not fill it.
+   *
+   * WHO IT APPLIES TO: an account holding NO verified membership anywhere. A verified publisher's
+   * own writes auto-approve and never reach the queue at all, and metering their proposals into
+   * OTHER namespaces because of where they publish would punish exactly the people the Hub has
+   * already vouched for. So the exemption is total rather than per-namespace.
+   *
+   * WHAT IT COUNTS: rows CURRENTLY pending and owned by this account. It is a ceiling on the queue,
+   * not a quota on a lifetime — every decision a reviewer makes frees a slot, and so does the
+   * submitter's own edit that gets approved.
+   *
+   * WHEN IT RUNS: on every transition INTO the queue, not merely on creates. A content-changing
+   * replacement of an approved or rejected entry requeues it, so metering creates alone would have
+   * left the ceiling bypassable by editing old entries in turn. Replacing an entry that is ALREADY
+   * pending is exempt — it occupies the slot it already holds, and charging it again would stop an
+   * account at the limit from correcting its own submissions, which is the opposite of what a
+   * review queue wants.
+   *
+   * COUNT-THEN-INSERT UNDER THE ACCOUNT'S LOCK, which is the pattern `api-key.service.ts` uses for
+   * the 25-key limit and for the same reason: two concurrent creates that both counted 4 would both
+   * insert a 5th. The account row is the natural per-account serialisation point and needs no new
+   * advisory-lock namespace. The lock itself is taken at the TOP of `applyWrite` (see
+   * `lockAccountRow`); only the counting happens here.
+   */
+  private async assertPendingHeadroom(tx: Tx, accountId: number): Promise<void> {
+    const limit = defaultConfig.pendingSubmissionLimit;
+    if (await hasAnyVerifiedMembership(tx, accountId)) return;
+
+    const counted = await tx
+      .select({ value: count() })
+      .from(opportunities)
+      .where(
+        and(eq(opportunities.submittedBy, accountId), eq(opportunities.reviewStatus, "pending")),
+      );
+    const pending = counted[0]?.value ?? 0;
+    if (pending < limit) return;
+
+    throw conflict(
+      "pending_limit_reached",
+      `you have ${pending} submissions awaiting review, which is the limit of ${limit} for an account without a verified publisher membership. A slot frees as soon as one of them is approved or rejected.`,
+    );
+  }
+
   /** The post-commit seam. A hook failure is never allowed to un-store a stored entry. */
   private async runAfterCommit(event: AfterCommitEvent): Promise<AfterCommitOutcome | undefined> {
     if (!this.hooks.afterCommit) return undefined;
@@ -750,6 +816,25 @@ export class OpportunityWriteService {
       return undefined;
     }
   }
+}
+
+/**
+ * The per-account serialisation point for a create.
+ *
+ * Taken EXCLUSIVELY and taken FIRST. The write path reads this same row again a moment later, at
+ * `FOR SHARE`, to answer "may this account publish anywhere without a membership" — and a
+ * transaction that holds a shared lock and then asks for an exclusive one on the same row is a
+ * deadlock waiting for a second transaction to do the same thing. Two concurrent submissions by one
+ * account is exactly that pair, and Postgres reports it as `deadlock detected` on this very
+ * statement. Acquiring the strongest level once, up front, is the standard remedy and the reason
+ * this is not simply folded into the check that needs it.
+ */
+async function lockAccountRow(tx: Tx, accountId: number): Promise<void> {
+  await tx
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .for("update");
 }
 
 /**

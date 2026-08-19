@@ -13,8 +13,8 @@
  */
 import { type SQL, and, count, desc, eq, inArray, or } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type OpportunityRow, accounts, opportunities } from "../../../db/schema.js";
-import type { ManagedOpportunityView } from "../../shared/api-views.js";
+import { type OpportunityRow, accounts, auditLog, opportunities } from "../../../db/schema.js";
+import type { ManagedOpportunityView, ReviewDecisionSummaryView } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { paginate } from "../../shared/pagination.js";
 
@@ -52,6 +52,18 @@ export class ManagedOpportunityService {
     return this.list(undefined, query);
   }
 
+  /**
+   * Everything filed under ONE namespace, for the organisation's own members.
+   *
+   * `source_publisher`, not `org_slugs`. The denormalised slug array is the union that includes
+   * SPONSORS, and a sponsor is not a publisher: matching on it would show one organisation's
+   * unpublished queue to another that merely funds a programme. The same distinction the claim
+   * service makes about who may take ownership, applied to who may look.
+   */
+  async listForNamespace(slug: string, query: ManagedQuery): Promise<ManagedPage> {
+    return this.list(eq(opportunities.sourcePublisher, slug), query);
+  }
+
   private async list(scope: SQL | undefined, query: ManagedQuery): Promise<ManagedPage> {
     const { page, limit, offset } = paginate(query.page ?? 1, query.limit ?? 20);
     const where = and(
@@ -70,14 +82,64 @@ export class ManagedOpportunityService {
 
     const counted = await this.db.select({ value: count() }).from(opportunities).where(where);
     const total = counted[0]?.value ?? 0;
+    const decisions = await this.lastDecisions(rows.map((row) => row.opportunity.id));
 
     return {
-      items: rows.map((row) => toManagedView(row.opportunity, row.submitterHandle)),
+      items: rows.map((row) =>
+        toManagedView(row.opportunity, row.submitterHandle, decisions.get(row.opportunity.id)),
+      ),
       page,
       limit,
       total,
       totalPages: Math.max(1, Math.ceil(total / limit)),
     };
+  }
+
+  /**
+   * The newest approve/reject per entry, for the page that was just read.
+   *
+   * ONE query for the whole page rather than one per row, and a read rather than a column: the
+   * trail already holds this, and a copy on `opportunities` would be a second answer to a question
+   * that already has one — wrong the first time a decision is recorded and the copy is not.
+   *
+   * Ordered the way the trail's own index is (`subject_kind, subject_id, created_at DESC`), plus
+   * `id` as the tiebreak so two decisions inside one clock tick still order by the sequence that
+   * wrote them; the first row seen per subject is therefore the newest. Kept as an ordered scan
+   * rather than `DISTINCT ON` so the query stays inside the query builder and the ordering that
+   * makes it correct is the same ordering the index provides.
+   */
+  private async lastDecisions(ids: number[]): Promise<Map<number, ReviewDecisionSummaryView>> {
+    const decisions = new Map<number, ReviewDecisionSummaryView>();
+    if (ids.length === 0) return decisions;
+
+    const rows = await this.db
+      .select({
+        subjectId: auditLog.subjectId,
+        action: auditLog.action,
+        patch: auditLog.patch,
+        createdAt: auditLog.createdAt,
+      })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "opportunity"),
+          inArray(auditLog.subjectId, ids),
+          inArray(auditLog.action, ["approve", "reject"]),
+        ),
+      )
+      .orderBy(auditLog.subjectId, desc(auditLog.createdAt), desc(auditLog.id));
+
+    for (const row of rows) {
+      // First row per subject wins — the ordering above put the newest there.
+      if (decisions.has(row.subjectId)) continue;
+      const reason = (row.patch as { reason?: unknown } | null)?.reason;
+      decisions.set(row.subjectId, {
+        action: row.action === "reject" ? "reject" : "approve",
+        reason: typeof reason === "string" && reason.trim() !== "" ? reason : null,
+        at: row.createdAt.toISOString(),
+      });
+    }
+    return decisions;
   }
 
   /** One owned entry, whatever its review status — the route the public detail endpoint 404s. */
@@ -104,6 +166,7 @@ export class ManagedOpportunityService {
 export function toManagedView(
   row: OpportunityRow,
   submitterHandle: string | null,
+  lastDecision?: ReviewDecisionSummaryView,
 ): ManagedOpportunityView {
   return {
     id: row.publicId,
@@ -116,6 +179,7 @@ export function toManagedView(
     // The stored attribution string, falling back to the submitting account's handle: an entry
     // published as an organisation is credited to the organisation, and that is what belongs here.
     submittedBy: row.sourceSubmittedBy ?? submitterHandle,
+    lastDecision: lastDecision ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

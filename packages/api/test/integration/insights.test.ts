@@ -25,7 +25,11 @@ import {
   testAuth,
 } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
+import { openLockBarrier } from "../helpers/lock-barrier.js";
 import { describeWithDb } from "./db-gate.js";
+
+/** The UTC day a timestamp falls in, as the rollup keys its rows. */
+const utcDayOf = (at: Date) => at.toISOString().slice(0, 10);
 
 const NS = "m3ana";
 const EMAILS = {
@@ -119,7 +123,11 @@ run("M3ANA insights", () => {
 
   afterAll(async () => {
     await cleanupFixtures({
-      opportunityPrefix: NS,
+      // ANCHORED AT THE SEPARATOR. `LIKE '<ns>%'` also matches a LONGER namespace that starts with
+      // the same letters, so an unanchored prefix here reached into a neighbouring suite's rows and
+      // hard-deleted them mid-run — taking their analytics events with it through the cascade. Ids
+      // are `<namespace>:<local>`, so the colon is what makes this suite's own.
+      opportunityPrefix: `${NS}:`,
       organizationSlugs: [NS],
       userIds,
       emails: Object.values(EMAILS),
@@ -270,6 +278,54 @@ run("M3ANA insights", () => {
       headers: bearer(publisherToken),
     });
     expect(after.json().totals).toEqual(before.json().totals);
+  });
+
+  it("survives an entry deleted WHILE the sweep is running", async () => {
+    // A day-wide sweep reads the events and then writes the rows, and those are two statements. An
+    // opportunity deleted between them is invisible to the first and gone by the second, so the
+    // foreign key rejects the batch — and a nightly job that failed this way wrote nothing for the
+    // hundreds of entries that were perfectly fine. The entry that vanished has no statistics worth
+    // keeping; everybody else's must still land.
+    //
+    // Driven with the barrier because the interleaving IS the bug: an uncommitted delete is
+    // invisible to the sweep's own snapshot, and it lands while the sweep is parked on the foreign
+    // key check.
+    // BOTH entries are this case's own. Rolling `liveId` into a second day would change what the
+    // retention case below counts, and a test that quietly reshapes its neighbour's fixture is the
+    // kind of coupling this whole exercise is about.
+    const doomed = await seed(`${NS}:doomed`, {});
+    const survivor = await seed(`${NS}:survivor`, {});
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    for (const opportunityId of [doomed, survivor]) {
+      await db
+        .insert(opportunityEvents)
+        .values({ opportunityId, eventType: "detail_view", occurredAt: yesterday });
+    }
+
+    const barrier = await openLockBarrier();
+    let outcome: { processed: number };
+    try {
+      await barrier.run("delete from opportunities where id = $1", [doomed]);
+      const sweeping = new AnalyticsRollupService(db).runBatch({ days: 2 });
+      await barrier.waitForWaiters(1);
+      await barrier.commit();
+      outcome = await sweeping;
+    } finally {
+      await barrier.rollback();
+    }
+
+    // Completed rather than thrown, and the surviving entry got its row.
+    expect(outcome.processed).toBeGreaterThan(0);
+    const survivorRow = await db
+      .select()
+      .from(opportunityStatsDaily)
+      .where(
+        and(
+          eq(opportunityStatsDaily.opportunityId, survivor),
+          eq(opportunityStatsDaily.day, utcDayOf(yesterday)),
+        ),
+      );
+    expect(survivorRow.length, "the entries that still exist are still rolled up").toBe(1);
   });
 
   it("prunes raw events past the retention window and keeps the rollup", async () => {

@@ -19,7 +19,12 @@
  * (READ COMMITTED). Share rather than update because concurrent writers are not in conflict with
  * each other, only with whoever is taking the authority away.
  *
- * LOCK ORDER, REPO-WIDE: **entry → organisation → membership → account**. The caller holds
+ * LOCK ORDER, REPO-WIDE: **entry → organisation → membership → account** — with one stated
+ * exception. A path that needs the account row EXCLUSIVELY takes it before this read rather than
+ * after (the write path's create branch does, for its pending-submission ceiling), because holding
+ * the shared lock this function takes and then upgrading it is a deadlock between two such paths.
+ * The rule that actually matters is therefore: never hold a weaker lock on a row you will later
+ * need a stronger one on. The caller holds
  * `FOR UPDATE` on the opportunity row before calling this, and the claim service takes the same
  * order in both `grant()` and `decide()` (which is why a decision reads the entry it is about
  * before it locks the claim). API-key creation takes the account row alone, at the end of that
@@ -48,6 +53,26 @@ export type PublishAuthorityResolver = (
   accountId: number,
   namespace: string,
 ) => Promise<PublishAuthority>;
+
+/**
+ * Whether this account publishes for ANY verified organisation — a different question from
+ * `resolvePublishAuthority`, which asks about ONE namespace.
+ *
+ * It exists for the exemptions: a person the Hub has already vouched for somewhere is not the
+ * account a spam ceiling is aimed at, and their out-of-namespace proposals should not be metered
+ * because of where else they publish. Read inside the caller's transaction, unlocked: this widens
+ * rather than narrows, so the dangerous direction is a membership appearing mid-flight (it cannot —
+ * granting one is a reviewer action on another connection) rather than one disappearing.
+ */
+export async function hasAnyVerifiedMembership(tx: Tx, accountId: number): Promise<boolean> {
+  const rows = await tx
+    .select({ id: orgMemberships.id })
+    .from(organizations)
+    .innerJoin(orgMemberships, eq(orgMemberships.organizationId, organizations.id))
+    .where(and(eq(orgMemberships.accountId, accountId), eq(organizations.verified, true)))
+    .limit(1);
+  return rows.length > 0;
+}
 
 export const resolvePublishAuthority: PublishAuthorityResolver = async (
   tx,

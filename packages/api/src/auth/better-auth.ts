@@ -109,13 +109,25 @@ export function isAllowedOrigin(cfg: BetterAuthConfig, origin: string | undefine
   return cfg.trustedOrigins.includes(origin) || cfg.previewOriginPattern?.test(origin) === true;
 }
 
+/**
+ * Whether the Google provider is registered at all.
+ *
+ * Both halves are required: a client id with no secret cannot complete a callback, so registering
+ * the provider on the id alone would advertise a sign-in method that fails at the last step. The
+ * health endpoint reads the SAME predicate the composition below does, so what the API advertises
+ * and what it actually mounts cannot drift.
+ */
+export function googleConfigured(cfg: GoogleConfig): boolean {
+  return cfg.clientId !== undefined && cfg.clientSecret !== undefined;
+}
+
 export function createAuth(options: CreateAuthOptions = {}) {
   const db = options.db ?? defaultDb;
   const cfg = options.config ?? defaultConfig;
   const production = options.production ?? process.env.NODE_ENV === "production";
   const transport = options.transport ?? createEmailTransport(cfg.email, production);
   const logger = options.logger ?? consoleLogger;
-  const google = cfg.google.clientId !== undefined && cfg.google.clientSecret !== undefined;
+  const google = googleConfigured(cfg.google);
 
   return betterAuth({
     // The adapter matches MODEL names against this object's KEYS, which is what lets the tables

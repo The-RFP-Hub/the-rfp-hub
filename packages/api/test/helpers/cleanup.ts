@@ -27,7 +27,17 @@ import {
 } from "../../src/db/schema.js";
 
 export interface FixturePrefixes {
-  /** Public-id prefix, e.g. `m3write:`. Also matches the organisation slugs the suite creates. */
+  /**
+   * Public-id prefix, e.g. `m3write:`. Also matches the organisation slugs the suite creates.
+   *
+   * NO NAMESPACE MAY BE A PREFIX OF ANOTHER. This is a `LIKE '<prefix>%'`, and a bare namespace is
+   * the right thing to pass — several suites deliberately span `<ns>` and `<ns>-other` and need the
+   * wide sweep. What that costs is a naming rule: `m3ana` also matches `m3anashut:one`, and because
+   * suites run in PARALLEL that is not a tidy over-delete at the end of a run — it hard-deletes a
+   * neighbouring suite's rows while that suite is asserting on them, cascading their analytics
+   * events away too. Both collisions that existed (`m3ana`/`m3anashut`, `m3dup`/`m3dupoff`) were
+   * fixed by renaming the longer one, not by narrowing the sweep.
+   */
   opportunityPrefix?: string;
   /** Organisation slugs to remove outright. */
   organizationSlugs?: string[];

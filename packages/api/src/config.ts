@@ -142,6 +142,11 @@ export interface AppConfig {
   analytics: AnalyticsConfig;
   /** Days of no publisher touch after which a deadline-less open entry is closed as inactive. */
   stalenessInactiveDays: number;
+  /**
+   * How many entries one account may leave awaiting review at once, when it holds no verified
+   * membership anywhere. A queue is a shared resource: without a ceiling, one account can fill it.
+   */
+  pendingSubmissionLimit: number;
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -593,6 +598,7 @@ export const config: AppConfig = {
   },
 
   stalenessInactiveDays: readPositiveInt(process.env.STALENESS_INACTIVE_DAYS, 90),
+  pendingSubmissionLimit: readPositiveInt(process.env.SUBMISSION_PENDING_LIMIT, 5),
 };
 
 // Announced only where it costs something: a run with analytics off never touches the key, and a
