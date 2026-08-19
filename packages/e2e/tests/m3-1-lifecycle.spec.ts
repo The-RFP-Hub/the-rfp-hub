@@ -164,8 +164,7 @@ test.describe("M3-1 API keys", () => {
   }) => {
     test.skip(
       !stack.actors.otherPublisher && !stack.actors.submitter,
-      "BLOCKED-by-missing-external-config: cross-account key isolation needs a second identity. " +
-        "Unblocked by: E2E_PRIVY_TEST_EMAILS (a further distinct test account).",
+      "BLOCKED: cross-account key isolation needs a second identity, and none was established.",
     );
     const otherName = stack.actors.otherPublisher ? "otherPublisher" : "submitter";
     const mine = await keyClient("publisher", ["read"]);

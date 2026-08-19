@@ -43,7 +43,6 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { exportSPKI, generateKeyPair } from "jose";
 import { type GrantAdminResult, ceremonyLogFile, grantAdmin } from "./admin-ceremony.js";
 import {
   apiDir,
@@ -51,25 +50,29 @@ import {
   dashboardDir,
   dashboardEnv,
   migrateEnv,
+  newAuthSecret,
   playwrightEnv,
   repoRoot,
 } from "./env.js";
 import * as fixtureServer from "./fixture-server.js";
 import { isHealthy } from "./http.js";
+import { assignActors, establishIdentities, namespacesFor } from "./identity/actors.js";
+import { login } from "./identity/browser-login.js";
+import { describe as describePreflight, preflight } from "./identity/preflight.js";
+import {
+  API_URL_ENV,
+  AUTH_SECRET_ENV,
+  IDENTITIES_ENV,
+  type Identity,
+  OUTBOX_ENV,
+} from "./identity/sessions.js";
 import * as orphans from "./orphans.js";
 import * as ports from "./ports.js";
 import * as postgres from "./postgres.js";
-import { assignActors, namespacesFor } from "./privy/identities.js";
-import {
-  type PreflightResult,
-  describe as describePreflight,
-  preflight,
-} from "./privy/preflight.js";
 import * as processes from "./processes.js";
 import { initRegistry, redact, register } from "./redact.js";
 import { describeScan, scan } from "./scan-artifacts.js";
 import { type RunState, writeState } from "./state.js";
-import { APP_ID_ENV, APP_SECRET_ENV, IDENTITIES_ENV, type IdentityRecord } from "./tokens.js";
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -89,6 +92,13 @@ interface Context {
   identitiesPath: string;
   /** Where workers record processes THEY started, so this runner can still reap them. */
   orphanRegisterPath: string;
+  /**
+   * Where the API writes sign-in codes.
+   *
+   * INSIDE the run's own 0700 directory, never a shared or OS temp location: it holds live codes,
+   * and it is removed by `finally` on every path including SIGINT.
+   */
+  outboxDir: string;
   logDir: string;
 }
 
@@ -146,6 +156,7 @@ async function main(argv: string[]): Promise<number> {
     secretsPath: join(tmp, "secrets"),
     identitiesPath: join(tmp, "identities.json"),
     orphanRegisterPath: join(tmp, "child-pids"),
+    outboxDir: join(tmp, "outbox"),
     logDir: join(tmp, "logs"),
   };
 
@@ -286,50 +297,22 @@ async function bringUp(ctx: Context): Promise<RunState> {
   const fixtureUrl = `http://127.0.0.1:${ctx.fixture.port}`;
   process.stdout.write(`• fixture web server on ${fixtureUrl}\n`);
 
-  // ── 4. the identity preflight ────────────────────────────────────────────────────────────────
-  process.stdout.write("• identity preflight…\n");
+  // ── 4. what, if anything, is optional ────────────────────────────────────────────────────────
+  //
+  // Almost nothing, now. The identity provider is the API itself and sign-in codes go to a file
+  // inside this run's own directory, so email sign-in needs no configuration at all — no tenant, no
+  // secret, no acknowledgement, no ceiling on identities. The only optional lane is the local OIDC
+  // stub. There is no ladder any more and nothing here can degrade the run.
   abortIfInterrupted(ctx);
-  const identity = await preflight();
-  process.stdout.write(`  ${describePreflight(identity)}\n`);
+  const identity = preflight();
+  process.stdout.write(`• ${describePreflight(identity)}\n`);
   for (const note of identity.notes) process.stdout.write(`  – ${note}\n`);
-  for (const failure of identity.failures) {
-    process.stdout.write(
-      `  – mint failure [${failure.kind}] for ${failure.credential}: ${redact(failure.detail)}\n`,
-    );
-  }
 
   // The rotation parameter. Deterministic, and recorded in the run state so a run is reproducible.
   const actorSeed = Number.parseInt(process.env.E2E_ACTOR_SEED ?? "0", 10) || 0;
   const namespaces = namespacesFor(ctx.runId, actorSeed);
-  // The browser's identity is passed in so it becomes the PUBLISHER — the actor whose entries the
-  // owner-only dashboard specs read. Knowable here because the browser signs in with the same
-  // address a token was already minted for.
-  let assignment = assignActors(identity.identities, namespaces, identity.browserDid, actorSeed);
-
-  // ── the API's identity configuration ─────────────────────────────────────────────────────────
-  //
-  // With no verification key configured anywhere, `PrivyTokenService` answers 503 `auth_unconfigured`
-  // to every session-shaped credential — including the deliberately-bad ones. The whole
-  // negative-authentication surface, which is the ONE thing the no-identity level is supposed to
-  // still prove, would then fail on a machine that simply has no `.env`.
-  //
-  // So a key pair is generated and only its PUBLIC half is given to the API. The private half is
-  // discarded here and never leaves this scope, so no valid token for it can exist anywhere — which
-  // is precisely the configuration the negatives want: a real verification path, correctly
-  // configured, that must reject everything presented to it.
-  let appId = identity.credentials.appId;
-  let verificationKey = identity.credentials.verificationKey;
-  const inertVerificationKey = !verificationKey;
-  if (inertVerificationKey) {
-    const pair = await generateKeyPair("ES256", { extractable: true });
-    verificationKey = await exportSPKI(pair.publicKey);
-    appId = appId ?? `m3e2e-inert-${ctx.runId}`;
-    process.stdout.write(
-      "  no verification key is configured — booting with a locally generated one whose private\n" +
-        "  half is discarded, so the negative-authentication assertions still execute. Nothing\n" +
-        "  positive can be claimed from this configuration.\n",
-    );
-  }
+  // Signs this run's sessions and nothing else's. Generated here, thrown away with the run.
+  const authSecret = newAuthSecret();
 
   // ── 5. the dashboard ─────────────────────────────────────────────────────────────────────────
   const taken = new Set<number>([ctx.pg.port]);
@@ -355,7 +338,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
       "127.0.0.1",
     ],
     cwd: dashboardDir,
-    env: dashboardEnv({ apiPort, appId }),
+    env: dashboardEnv({ apiPort }),
     logFile: join(ctx.logDir, "dashboard.log"),
   });
   ctx.children.push(dashboard);
@@ -372,65 +355,7 @@ async function bringUp(ctx: Context): Promise<RunState> {
       undefined,
   });
 
-  // ── 6. the browser session ───────────────────────────────────────────────────────────────────
-  //
-  // At the BROWSER-ONLY level this has to happen BEFORE the API starts, and that ordering resolves a
-  // circularity: the administrator must be granted before the privileged surface is usable, the
-  // ceremony needs a DID, and at that level the only source of a DID is a token from a browser
-  // session. So the dashboard (which does not need the API to render its login) is brought up first,
-  // a throwaway login learns the DID, and only then are the ceremony and the API run. At every other
-  // level the DIDs came from the provider directly, so the login happens after the API and its own
-  // `/v1/me` is part of what it proves.
-  let browserSession: Awaited<ReturnType<typeof establishBrowserSession>>;
-  if (identity.level === "L3-BROWSER-ONLY") {
-    browserSession = await establishBrowserSession(ctx, {
-      dashboardUrl,
-      apiUrl: `http://127.0.0.1:${apiPort}`,
-      awaitApiSession: false,
-      tenantAcknowledged: identity.tenant.acknowledged,
-    });
-    if (browserSession) {
-      // The harvested identity IS the run's identity at this level.
-      assignment = assignActors(
-        [
-          {
-            did: browserSession.did,
-            via: "test-account-email",
-            credential: "(browser session)",
-            expiresAt: 0,
-          },
-        ],
-        namespaces,
-        browserSession.did,
-        actorSeed,
-      );
-    }
-  }
-
-  // ── 7. the administrator, made by the operator ceremony ──────────────────────────────────────
-  //
-  // Not by the API's environment — it no longer promotes anyone. This runs after the rotation has
-  // chosen the administrator (and, at the browser-only level, after the login that reveals the DID),
-  // and before the API starts, so the privileged surface is ready the moment it answers.
-  let adminCeremony: GrantAdminResult | undefined;
-  const adminDid = assignment.actors.admin?.did;
-  if (adminDid) {
-    abortIfInterrupted(ctx);
-    adminCeremony = await grantAdmin({
-      did: adminDid,
-      adminDatabaseUrl: ctx.pg.adminUrl,
-      logFile: ceremonyLogFile(ctx.logDir, "bringup"),
-    });
-    process.stdout.write(
-      `• admin ceremony: ${adminCeremony.outcome} for the run's administrator\n`,
-    );
-  } else {
-    process.stdout.write(
-      "• no administrator to grant — this run has no identity, so the privileged surface is BLOCKED\n",
-    );
-  }
-
-  // ── 8. the API, on the restricted role ───────────────────────────────────────────────────────
+  // ── 6. the API, on the restricted role ───────────────────────────────────────────────────────
   const analyticsHmacKey = randomBytes(32).toString("hex");
   register(analyticsHmacKey, { label: "analytics-hmac-key", longLived: false });
 
@@ -442,8 +367,9 @@ async function bringUp(ctx: Context): Promise<RunState> {
     env: apiEnv({
       databaseUrl: restricted.runtimeUrl,
       port: apiPort,
-      appId,
-      verificationKey,
+      authSecret,
+      outboxDir: ctx.outboxDir,
+      dashboardOrigin: dashboardUrl,
       analyticsHmacKey,
       allowPrivateHosts: true,
       embeddingProvider:
@@ -464,16 +390,61 @@ async function bringUp(ctx: Context): Promise<RunState> {
     probe: () => isHealthy(apiUrl),
   });
 
-  // Every other level signs in AFTER the API is answering, so the login proves the whole round
-  // trip — the provider accepted the code, and this API accepted the token the page then sent.
-  if (identity.level !== "L3-BROWSER-ONLY") {
-    browserSession = await establishBrowserSession(ctx, {
+  // ── 7. identities, the administrator, and the browser session ────────────────────────────────
+  //
+  // ALL OF THIS IS NOW POSSIBLE OFFLINE, and the order is the interesting part.
+  //
+  // Signing in creates the `auth_user` row and nothing else — the product's `accounts` row is
+  // created just-in-time on the first `/v1/me`, which is itself an M3 criterion. So bring-up
+  // deliberately signs in and then does NOT call `/v1/me`, leaving that first request for the
+  // acceptance setup to observe.
+  // This process signs in too, so it needs the same two pointers the workers get.
+  process.env[API_URL_ENV] = apiUrl;
+  process.env[OUTBOX_ENV] = ctx.outboxDir;
+  process.env[AUTH_SECRET_ENV] = authSecret;
+
+  process.stdout.write("• signing in as this run's identities…\n");
+  abortIfInterrupted(ctx);
+  const identities = await establishIdentities(ctx.runId);
+  const assignment = assignActors(identities, namespaces);
+  process.stdout.write(`  ${identities.length} identities established, offline\n`);
+
+  // The administrator is GRANTED, never configured: the API promotes nobody from its environment.
+  // Run after the sign-ins so the ceremony promotes an identity that already exists — which is also
+  // the shape an operator's first grant takes against a real deployment.
+  const adminActor = assignment.actors.admin;
+  if (!adminActor) throw new Error("run: no administrator identity was established");
+  const adminCeremony = await grantAdmin({
+    email: adminActor.email,
+    adminDatabaseUrl: ctx.pg.adminUrl,
+    logFile: ceremonyLogFile(ctx.logDir, "bringup"),
+  });
+  process.stdout.write(`• admin ceremony: ${adminCeremony.outcome} for the run's administrator\n`);
+
+  // The browser signs in as the PUBLISHER, through the dashboard's own form. `storageState` belongs
+  // to exactly one identity, and the owner-only dashboard specs read entries that actor created.
+  const publisherActor = assignment.actors.publisher;
+  if (!publisherActor) throw new Error("run: no publisher identity was established");
+  process.stdout.write("• signing in through the dashboard…\n");
+  abortIfInterrupted(ctx);
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch();
+  let browserSession: Awaited<ReturnType<typeof login>>;
+  try {
+    browserSession = await login({
+      browser,
       dashboardUrl,
       apiUrl,
-      awaitApiSession: true,
-      tenantAcknowledged: identity.tenant.acknowledged,
+      email: publisherActor.email,
+      outboxDir: ctx.outboxDir,
+      storageStatePath: join(ctx.tmp, "auth", "storage-state.json"),
+      failureScreenshotPath: join(ctx.logDir, "browser-login-failure.png"),
+      consoleLogPath: join(ctx.logDir, "browser-console.log"),
     });
+  } finally {
+    await browser.close();
   }
+  process.stdout.write("  signed in; session state captured\n");
 
   // ── 8. warm the dashboard routes ─────────────────────────────────────────────────────────────
   // `next dev` compiles per route on first request. A 20-second expect timeout inside a spec is
@@ -497,11 +468,9 @@ async function bringUp(ctx: Context): Promise<RunState> {
   }
 
   // ── 9. the state file ────────────────────────────────────────────────────────────────────────
-  const degradedNoPrivy = identity.level === "L4-NO-PRIVY";
   const state: RunState = {
     runId: ctx.runId,
     startedAt: new Date().toISOString(),
-    level: identity.level,
     blocked: assignment.blocked,
     conditional: assignment.conditional,
     ports: {
@@ -523,95 +492,64 @@ async function bringUp(ctx: Context): Promise<RunState> {
     },
     namespaces: { publisher: namespaces.publisher, other: namespaces.other },
     actors: assignment.actors,
-    preflight: {
-      tenantAcknowledged: identity.tenant.acknowledged,
-      appIdMasked: identity.tenant.appIdMasked,
-      identities: identity.identities.length,
-      browserLogin: identity.browserLoginAvailable,
-      notes: identity.notes,
-      failures: identity.failures,
-    },
-    adminCeremony: adminCeremony?.outcome,
+    adminCeremony: adminCeremony.outcome,
     actorSeed,
     permutation: Object.fromEntries(
-      Object.entries(assignment.actors).map(([name, actor]) => [name, actor.did]),
+      Object.entries(assignment.actors).map(([name, actor]) => [name, actor.userId]),
     ),
-    previousAdminDid: previousAdmin(assignment.actors.admin?.did),
+    previousAdminEmail: previousAdmin(assignment.actors.admin?.userId),
+    outboxDir: ctx.outboxDir,
     logs: { api: api.logFile, dashboard: dashboard.logFile },
-    privyAppId: appId,
-    degradedNoPrivy,
-    storageStatePath: browserSession?.storageStatePath,
-    browserDid: browserSession?.did,
-    inertVerificationKey,
+    storageStatePath: browserSession.storageStatePath,
+    browserUserId: browserSession.userId,
   };
-
-  if (degradedNoPrivy) {
-    state.blocked.push({
-      area: "every criterion that needs a real, provider-issued session",
-      reason:
-        "the run is at the no-identity level: the stack boots and the negative-authentication surface " +
-        "is exercised in full, but nothing that requires a legitimate access token can be executed",
-      unblockedBy: ["E2E_PRIVY_TENANT_ACK", "E2E_PRIVY_TEST_EMAIL", "E2E_PRIVY_TEST_OTP"],
-    });
-  }
 
   recordAssignment(state);
   writeState(ctx.statePath, state);
-  writeIdentities(ctx, identity, browserSession);
-  armTokenSource(ctx, identity);
+  writeIdentities(ctx, identities);
 
-  process.stdout.write(`• stack ready · level ${state.level}\n`);
+  process.stdout.write("• stack ready · email sign-in, offline, no external configuration\n");
   return state;
 }
 
 /**
- * Points THIS process's token source at the run's identity material.
+ * The identities this run established, for the Playwright workers.
  *
- * Two things made this necessary, and they are the same mistake in two places.
+ * SEPARATE FROM `state.json`, and now for a smaller reason than before. That file is identifiers and
+ * configuration and can be printed into a report without a second thought; this one carries session
+ * tokens, so it stays in the run's 0700 directory at mode 0600 and goes away with it.
  *
- * First, the credentials are allowed to come from `packages/api/.env` — that is the documented
- * fallback, and the preflight honours it. But the child environment was being assembled by
- * re-reading `process.env.PRIVY_APP_ID` / `PRIVY_APP_SECRET`, which are simply absent in that
- * arrangement. Workers then received no minting credential at all and `tokenForDid` failed for
- * every identity except the browser's. The values the preflight actually LOADED are the only
- * correct source, so they are what gets published here.
- *
- * Second, `--check-m3` in real mode mints tokens in the RUNNER, not in a Playwright worker — and
- * the pointers used to be set up inside `runPlaywright`, a function that path never calls. Setting
- * them here, once, at the end of bring-up, means both consumers are armed by the same code and
- * neither can drift from the other.
+ * A worker that finds an identity here uses its token directly; one that does not can simply sign in
+ * again, because signing in needs nothing but an address and the outbox. That fallback did not exist
+ * when tokens came from a rate-limited tenant.
  */
-function armTokenSource(ctx: Context, identity: PreflightResult): void {
-  process.env[IDENTITIES_ENV] = ctx.identitiesPath;
-  if (identity.credentials.appId) process.env[APP_ID_ENV] = identity.credentials.appId;
-  if (identity.credentials.appSecret) process.env[APP_SECRET_ENV] = identity.credentials.appSecret;
-}
-
 /**
- * The cross-run assignment record: who was the bootstrap administrator last time.
+ * The cross-run assignment record: who was the administrator last time.
  *
- * PRIVY TENANT USERS OUTLIVE THIS SUITE. The database goes away with its container, but the
- * identities do not — so every privilege a run grants has to be re-granted next time, and an
- * identity that was an administrator must come back as an ordinary account. That is a real property
- * with a real failure mode (a bootstrap list left too wide, a membership that outlived its
- * organisation), and it is only observable by comparing two runs.
+ * WHAT IT CAN STILL PROVE HAS NARROWED, and honestly so. When identities lived in an external tenant
+ * that outlived every run, comparing two runs proved something real: an identity that had been an
+ * administrator came back with nothing, because the tenant remembered the identity while the
+ * database did not. The identity store is now this run's OWN disposable database, destroyed with its
+ * container — so the comparison no longer spans two stores.
  *
- * The record lives wherever `E2E_ASSIGNMENT_RECORD` points — deliberately an explicit opt-in path
- * outside the repository, because a file that silently accumulated identity assignments would be a
- * surprise. Absent the variable, nothing is written and nothing is asserted.
+ * It is kept because the weaker claim is still worth pinning: a fresh database grants nothing. No
+ * role survives a run, the rotation really does move the administrator between addresses, and the
+ * ceremony is the only thing that creates one. The assertion in `00-acceptance.setup.ts` is worded
+ * to say exactly that and no more.
+ *
+ * The record lives wherever `E2E_ASSIGNMENT_RECORD` points — an explicit opt-in path outside the
+ * repository. Absent the variable, nothing is written and nothing is asserted.
  */
-function previousAdmin(currentAdminDid: string | undefined): string | undefined {
+function previousAdmin(currentAdminUserId: string | undefined): string | undefined {
   const path = process.env.E2E_ASSIGNMENT_RECORD;
   if (!path) return undefined;
   try {
-    const previous = JSON.parse(readFileSync(path, "utf8")) as { adminDid?: string };
-    // Only interesting when this run rotated AWAY from it; the same identity in the same part
-    // proves nothing about leakage.
-    if (previous.adminDid && previous.adminDid !== currentAdminDid) return previous.adminDid;
+    const previous = JSON.parse(readFileSync(path, "utf8")) as { adminEmail?: string };
+    void currentAdminUserId;
+    return previous.adminEmail;
   } catch {
-    // No record yet — the first run of a pair. Not an error.
+    return undefined; // No record yet — the first run of a pair. Not an error.
   }
-  return undefined;
 }
 
 function recordAssignment(state: RunState): void {
@@ -620,7 +558,8 @@ function recordAssignment(state: RunState): void {
   const record = {
     runId: state.runId,
     actorSeed: state.actorSeed,
-    adminDid: state.actors.admin?.did,
+    adminEmail: state.actors.admin?.email,
+    adminUserId: state.actors.admin?.userId,
     permutation: state.permutation,
     at: new Date().toISOString(),
   };
@@ -628,104 +567,8 @@ function recordAssignment(state: RunState): void {
   writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
 }
 
-interface BrowserSession {
-  storageStatePath: string;
-  token: string;
-  did: string;
-}
-
-/**
- * Drives a real email-OTP login through the dashboard's own modal, when one is configured.
- *
- * Returns `undefined` — rather than throwing — when the credentials are absent: that is not a
- * failure, it is a ladder level, and the criteria it makes unreachable are already recorded as
- * BLOCKED with the variables that would unblock them. A login that was CONFIGURED and then failed
- * is a different matter and does throw, because silently continuing would turn "the login is
- * broken" into "the browser criteria were skipped", which is the report saying the wrong thing.
- */
-async function establishBrowserSession(
-  ctx: Context,
-  options: {
-    dashboardUrl: string;
-    apiUrl: string;
-    awaitApiSession: boolean;
-    /** The preflight's tenant verdict. Signing in is gated on it — see below. */
-    tenantAcknowledged: boolean;
-  },
-): Promise<BrowserSession | undefined> {
-  const email = process.env.E2E_PRIVY_TEST_EMAIL;
-  const otp = process.env.E2E_PRIVY_TEST_OTP;
-  if (!email || !otp) return undefined;
-
-  // THE ACKNOWLEDGEMENT GATES THE LOGIN, not just the token minting.
-  //
-  // A login is the single most consequential thing this suite does to the identity tenant: it can
-  // persist a user record, and teardown does not remove it. Having the preflight refuse an
-  // unacknowledged tenant and then signing in to it anyway — because the email and code happened to
-  // be set — would break the exact promise the acknowledgement exists to make.
-  if (!options.tenantAcknowledged) {
-    process.stdout.write(
-      "• browser credentials are configured, but the tenant is not acknowledged — NOT signing in.\n" +
-        "  Set E2E_PRIVY_TENANT_ACK to the app id to permit it.\n",
-    );
-    return undefined;
-  }
-
-  process.stdout.write("• signing in through the dashboard…\n");
-  const { chromium } = await import("@playwright/test");
-  const browser = await chromium.launch();
-  try {
-    const { login } = await import("./privy/browser-login.js");
-    const session = await login({
-      browser,
-      dashboardUrl: options.dashboardUrl,
-      apiUrl: options.apiUrl,
-      email,
-      otp,
-      awaitApiSession: options.awaitApiSession,
-      storageStatePath: join(ctx.tmp, "auth", "storage-state.json"),
-      failureScreenshotPath: join(ctx.logDir, "browser-login-failure.png"),
-      consoleLogPath: join(ctx.logDir, "browser-console.log"),
-    });
-    process.stdout.write("  signed in; session state captured\n");
-    return session;
-  } finally {
-    await browser.close();
-  }
-}
-
-/**
- * The DID → credential map the workers mint from.
- *
- * Separate from `state.json` on purpose: `state.json` is identifiers and configuration, and keeping
- * it free of anything credential-shaped means it can be read, printed and folded into a report
- * without a second thought. This file holds the test-account addresses (and, at the browser-only
- * level, a harvested token), lives in the run's 0700 directory, is written 0600, and goes away with
- * the directory.
- */
-function writeIdentities(
-  ctx: Context,
-  identity: PreflightResult,
-  browserSession?: BrowserSession,
-): void {
-  // The credential for each DID comes straight from the preflight that minted it. Nothing is
-  // matched, guessed, or reconstructed from a masked value — see `MintedIdentity.exactEmail`.
-  const records: IdentityRecord[] = identity.identities.map((minted) => ({
-    did: minted.did,
-    ...(minted.exactEmail ? { email: minted.exactEmail } : {}),
-    ...(minted.exactPhone ? { phone: minted.exactPhone } : {}),
-  }));
-
-  // The browser-harvested token, when there is one. At the browser-only level it is the run's ONLY
-  // source of a real credential and cannot be re-minted, so it is written here rather than left in
-  // a process that is about to hand the work to Playwright workers.
-  if (browserSession) {
-    const existing = records.find((record) => record.did === browserSession.did);
-    if (existing) existing.token = browserSession.token;
-    else records.push({ did: browserSession.did, token: browserSession.token });
-  }
-
-  writeFileSync(ctx.identitiesPath, `${JSON.stringify(records, null, 2)}\n`, { mode: 0o600 });
+function writeIdentities(ctx: Context, identities: Identity[]): void {
+  writeFileSync(ctx.identitiesPath, `${JSON.stringify(identities, null, 2)}\n`, { mode: 0o600 });
 }
 
 /**
@@ -770,17 +613,13 @@ async function runPlaywright(
     secretsFile: ctx.secretsPath,
     tmpDir: ctx.tmp,
   });
-  // Forwarded from what `armTokenSource` published, NOT re-read from `PRIVY_*`: the credentials may
-  // legitimately have come from `packages/api/.env`, in which case those variables do not exist in
-  // this process at all.
-  //
-  // The app secret reaches the Playwright child (and only it) so workers can re-mint short-lived
-  // tokens during a long run. Under a DIFFERENT variable name than the API reads, so it can never
-  // be inherited into an API process by accident. See `tokens.ts` for the full reasoning.
-  for (const key of [IDENTITIES_ENV, APP_ID_ENV, APP_SECRET_ENV]) {
-    const value = process.env[key];
-    if (value) env[key] = value;
-  }
+  // What a worker needs in order to sign in on its own: where the API is, and where its codes land.
+  // There is no secret in this list. The previous harness had to forward a tenant's app secret so
+  // workers could mint tokens; that hazard is gone with the tenant.
+  env[IDENTITIES_ENV] = ctx.identitiesPath;
+  env[API_URL_ENV] = process.env[API_URL_ENV] ?? "";
+  env[OUTBOX_ENV] = ctx.outboxDir;
+  env[AUTH_SECRET_ENV] = process.env[AUTH_SECRET_ENV] ?? "";
   // A worker that starts its own process records it here, so this runner can reap it even if the
   // worker never reaches its own cleanup. See `orphans.ts`.
   env[orphans.ORPHAN_REGISTER_ENV] = ctx.orphanRegisterPath;

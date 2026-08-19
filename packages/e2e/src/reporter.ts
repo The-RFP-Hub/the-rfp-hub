@@ -52,7 +52,15 @@ interface RecordedTest {
  */
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUTPUT = join(packageDir, "test-results", "m3-e2e.json");
-const BLOCKED_MARKER = "BLOCKED-by-missing-external-config";
+/**
+ * The prefix a spec uses to say it could not run.
+ *
+ * It used to read `BLOCKED-by-missing-external-config`, because that was the only reason a spec ever
+ * skipped: some tenant credential was absent. There is no external configuration left to be missing,
+ * so a block now means a genuine limitation of the run — and the marker says just `BLOCKED` so
+ * nobody reads a real failure as somebody forgetting an environment variable.
+ */
+const BLOCKED_MARKER = "BLOCKED";
 
 export default class M3Reporter implements Reporter {
   private readonly tests: RecordedTest[] = [];
@@ -96,7 +104,6 @@ export default class M3Reporter implements Reporter {
     const blocked = this.tests.filter((entry) => entry.blockedByConfig);
     const summary = {
       runId: stack?.runId ?? "(unknown)",
-      ladderLevel: stack?.level ?? "(unknown)",
       startedAt: new Date(this.startedAt).toISOString(),
       finishedAt: new Date().toISOString(),
       overallStatus: result.status,
@@ -109,11 +116,12 @@ export default class M3Reporter implements Reporter {
         skipped: this.tests.filter((entry) => entry.status === "skipped").length,
         blockedByMissingConfig: blocked.length,
       },
-      // The runner's own findings about what this level could not reach, carried through so one
-      // document answers "what was proven" without a second lookup.
+      // The runner's own findings about anything it could not reach, carried through so one document
+      // answers "what was proven" without a second lookup. Expected to be empty: there is no
+      // external configuration left to be missing, so these fields exist to record a future genuine
+      // limitation rather than to report a routine one.
       declaredBlocked: stack?.blocked ?? [],
       declaredConditional: stack?.conditional ?? [],
-      preflight: stack?.preflight,
       tests: this.tests,
     };
 

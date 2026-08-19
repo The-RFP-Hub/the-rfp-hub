@@ -25,6 +25,16 @@ const execFileAsync = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
 const composeFile = join(here, "..", "docker-compose.e2e.yml");
 const hardenAuditSqlPath = join(here, "..", "..", "api", "scripts", "sql", "harden-audit.sql");
+const grantAuthSqlPath = join(here, "..", "..", "api", "scripts", "sql", "grant-auth.sql");
+
+/**
+ * The four tables the session library owns.
+ *
+ * They are named here for one purpose: to be REVOKED from the runtime role immediately after the
+ * blanket grant, so that `grant-auth.sql` is the only thing that can make them reachable. See
+ * `createRestrictedRole`.
+ */
+const AUTH_TABLES = ["auth_user", "auth_session", "auth_account", "auth_verification"] as const;
 
 /**
  * Ports this suite must never bind or connect to, because each one already names a KNOWN,
@@ -194,7 +204,7 @@ export function assertDisposable(url: string, ctx: { runId: string; containerNam
 
 /**
  * Creates (idempotently) the restricted runtime role the API processes run on, and applies the
- * real deploy artifact `packages/api/scripts/sql/harden-audit.sql` against it — the SAME file a
+ * real deploy artifacts `harden-audit.sql` AND `grant-auth.sql` against it — the SAME files a
  * real deployment runs, not a hand-copied approximation. Order matters and mirrors that file's own
  * documented sequence: the blanket CRUD grant happens first, then harden-audit.sql's targeted
  * `REVOKE UPDATE, DELETE, TRUNCATE ON audit_log` narrows it. Reversing the order would leave a
@@ -227,11 +237,30 @@ export async function createRestrictedRole(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${role}"`,
     );
     await admin.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "${role}"`);
+
+    // ── and then TAKE THE AUTH TABLES BACK ────────────────────────────────────────────────────
+    //
+    // The blanket grant above is a convenience this harness allows itself for the product's own
+    // tables. Applied to the session library's four, it would be actively harmful: it would make
+    // every login work in E2E for a reason that does not exist in production, where the runtime role
+    // is granted table by table and nothing is blanket-granted at all.
+    //
+    // `grant-auth.sql` is the deploy artifact that grants them, and it is the single most likely
+    // production-only failure of this whole adoption — the schema is perfectly correct, every test
+    // against an owner connection passes, and every real login fails on `SELECT` over `auth_session`.
+    // Revoking here is what makes this suite able to catch that: if the artifact is missing, wrong,
+    // or applied in the wrong order, sign-in fails HERE, on the first identity the run creates.
+    for (const table of AUTH_TABLES) {
+      await admin.query(`REVOKE ALL ON TABLE ${table} FROM "${role}"`);
+    }
   } finally {
     await admin.end();
   }
 
-  await runHardenAuditSql(target.projectName, role);
+  // Order matters and mirrors the runbook: migrations first (the caller has already run them, which
+  // is why these tables exist to be granted on), then the two artifacts.
+  await runSqlArtifact(target.projectName, role, hardenAuditSqlPath, "harden-audit.sql");
+  await runSqlArtifact(target.projectName, role, grantAuthSqlPath, "grant-auth.sql");
 
   const runtimeUrl = `postgres://${role}:${password}@127.0.0.1:${new URL(target.adminUrl).port}/rfphub`;
   return { role, password, runtimeUrl };
@@ -243,8 +272,13 @@ export async function createRestrictedRole(
  * `role` bound as a psql variable so the file's `:"role"`/`:'role'` substitutions resolve to this
  * run's restricted role rather than a hard-coded name.
  */
-async function runHardenAuditSql(projectName: string, role: string): Promise<void> {
-  const sql = readFileSync(hardenAuditSqlPath, "utf8");
+async function runSqlArtifact(
+  projectName: string,
+  role: string,
+  path: string,
+  label: string,
+): Promise<void> {
+  const sql = readFileSync(path, "utf8");
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(
@@ -276,9 +310,7 @@ async function runHardenAuditSql(projectName: string, role: string): Promise<voi
         resolve();
       } else {
         reject(
-          new Error(
-            `postgres.ts: harden-audit.sql exited ${code} against role "${role}":\n${stderr}`,
-          ),
+          new Error(`postgres.ts: ${label} exited ${code} against role "${role}":\n${stderr}`),
         );
       }
     });

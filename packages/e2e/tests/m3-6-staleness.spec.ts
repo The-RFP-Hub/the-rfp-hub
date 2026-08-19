@@ -245,9 +245,8 @@ test.describe("M3-6 who may run a job, and when", () => {
     // correct behaviour and not something to assert around. Gated rather than adjusted.
     test.skip(
       stack.actors.publisher?.aliasGroup === "privileged",
-      "BLOCKED-by-missing-external-config: the only available identity is the bootstrap " +
-        "administrator, so there is no unprivileged session to be refused. " +
-        "Unblocked by: E2E_PRIVY_TEST_EMAILS (a second distinct test account).",
+      "BLOCKED: the publisher is also the administrator in this run, so there is no unprivileged " +
+        "session to be refused.",
     );
 
     const publisher = await api("publisher");

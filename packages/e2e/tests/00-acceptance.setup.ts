@@ -5,117 +5,77 @@
  * runs first, its result is visible in the report, and a failure here stops the dependent projects
  * rather than letting forty specs fail one by one with the same cause.
  *
- * IT IS ALSO WHERE THE JUST-IN-TIME PROVISIONING CRITERION IS ASSERTED, and that is why the
- * preflight makes no call to this API. The very first `/v1/me` a fresh identity ever sends is the
- * assertion: an account must not exist before it, and must exist as a `submitter` after it. A
- * bring-up step that had "checked the token works" would have consumed that observation, and the
- * criterion could then only be claimed, never shown.
+ * IT IS WHERE THE JUST-IN-TIME PROVISIONING CRITERION IS ASSERTED, and that is why bring-up signs in
+ * and then deliberately does NOT call `/v1/me`. Signing in creates the identity row and nothing
+ * else; the product's `accounts` row is created by the API on the first `/v1/me` a fresh identity
+ * ever sends. That first request is the assertion — the account must not exist before it and must
+ * exist as a `submitter` after it — and a bring-up step that had "checked the session works" would
+ * have consumed the only chance to observe it.
+ *
+ * THE LADDER TEST THAT USED TO OPEN THIS FILE IS GONE. It recorded which rung a run had reached and
+ * which criteria were therefore blocked, because identities came from a third-party tenant and how
+ * much of the suite could execute depended on what somebody had provisioned there. Everything here
+ * runs offline now, so there is no level to record and nothing to be blocked by.
  *
  * Order is load-bearing:
- *   1. the ladder level and its blocked list are recorded — this runs at EVERY level, including the
- *      one where nothing else can, so a degraded run still produces executed evidence
- *   2. the plain submitter's first login (fresh account, `submitter`)
- *   3. the administrator the operator ceremony made (`admin`, `canAdmin`, the audited grant, and
- *      the ceremony's idempotence)
- *   4. every remaining identity's first login
+ *   1. a fresh database grants nothing (the re-scoped cross-run assertion)
+ *   2. the plain submitter's first request (fresh account, `submitter`)
+ *   3. the administrator the operator ceremony made, and the ceremony's idempotence
+ *   4. every remaining identity's first request
  *   5. provisioning: organisations, memberships, verification — all through real routes
  */
 import { dirname } from "node:path";
 import { ceremonyLogFile, grantAdmin } from "../src/admin-ceremony.js";
 import { DESKTOP_UA, expect, test } from "../src/fixtures.js";
 import { ApiClient } from "../src/http.js";
-import { ensureVerifiedPublisher, me } from "../src/privy/identities.js";
+import { ensureVerifiedPublisher, me } from "../src/identity/actors.js";
+import { sessionFor } from "../src/identity/sessions.js";
 import type { ActorName } from "../src/state.js";
 import { updateState } from "../src/state.js";
-import { tokenForDid } from "../src/tokens.js";
 
 /** Every part this run tries to fill, in the order their first logins are asserted. */
 const ORDER: ActorName[] = ["submitter", "admin", "publisher", "otherPublisher", "reviewer"];
 
 test.describe.configure({ mode: "serial" });
 
-test("the ladder level and every blocked criterion are recorded", async ({ stack }) => {
-  expect(
-    ["L0-FULL", "L1-REDUCED-IDENTITY", "L2-API-ONLY", "L3-BROWSER-ONLY", "L4-NO-PRIVY"],
-    "the runner must classify the run into a known level",
-  ).toContain(stack.level);
-
-  if (stack.level === "L4-NO-PRIVY") {
-    // The degraded level is a REPORTED state, not a silent one. Everything real-auth is blocked,
-    // and each blocked entry has to name the configuration that would unblock it — a run that said
-    // only "skipped" would be indistinguishable from a run that had nothing to test.
-    expect(
-      stack.blocked.length,
-      "the no-identity level must declare what it cannot reach",
-    ).toBeGreaterThan(0);
-    for (const entry of stack.blocked) {
-      expect(
-        entry.unblockedBy.length,
-        `"${entry.area}" must name what would unblock it`,
-      ).toBeGreaterThan(0);
-    }
-    expect(stack.preflight.tenantAcknowledged || stack.preflight.identities === 0).toBe(true);
-  }
-
-  // The stack itself is up at every level, which is what makes the negative-authentication surface
-  // and the least-privilege boot testable even with no identity at all.
-  const health = await new ApiClient({ baseUrl: stack.urls.api }).get<{
-    status: string;
-    db: string;
-  }>("/v1/health");
-  expect(health.status).toBe(200);
-  expect(health.body).toMatchObject({ status: "ok", db: "up" });
-});
-
-test("cross-run: an identity that was an administrator returns with no privileges", async ({
-  stack,
-  db,
-}) => {
+test("a fresh database grants nothing: no role survives a run", async ({ stack, db }) => {
   test.skip(
-    !stack.previousAdminDid,
-    "not applicable: no earlier run recorded a DIFFERENT bootstrap administrator. " +
-      "Set E2E_ASSIGNMENT_RECORD and run twice with different E2E_ACTOR_SEED values to exercise it.",
+    !stack.previousAdminEmail,
+    "not applicable: no earlier run recorded a different administrator. Set E2E_ASSIGNMENT_RECORD " +
+      "and run twice with different E2E_ACTOR_SEED values to exercise it.",
   );
-  const did = stack.previousAdminDid;
-  if (!did) return;
+  const previous = stack.previousAdminEmail;
+  if (!previous) return;
 
-  // WHY THIS IS WORTH AN ASSERTION. The database is destroyed with its container, but the identity
-  // tenant's users are not — they outlive every run. So "administrator" has to be something this
-  // run grants, never something the identity carries. If the bootstrap list were too wide, or a
-  // membership outlived the organisation it belonged to, this is where it would show.
+  // WHAT THIS ASSERTION IS, NOW, AND WHAT IT USED TO BE. It used to span two stores: identities
+  // lived in an external tenant that outlived every run while the database did not, so comparing
+  // runs proved that an identity which had been an administrator came back with nothing — the
+  // tenant remembered the person, the deployment had forgotten the privilege.
   //
-  // It runs BEFORE this run's provisioning, so nothing it observes can have been granted by this run.
-  expect(did, "the rotation must have moved the administrator to a different identity").not.toBe(
-    stack.actors.admin?.did,
-  );
+  // The identity store IS this run's database now, destroyed with its container, so that comparison
+  // no longer spans anything. Claiming it still did would be the report saying something it has not
+  // established. What remains true, and worth pinning, is the weaker statement: a fresh database
+  // grants nothing. No role survives a run; the rotation really does move the administrator between
+  // addresses; and the ceremony is the only thing that creates one.
+  expect(
+    previous,
+    "the rotation must have moved the administrator to a different address",
+  ).not.toBe(stack.actors.admin?.email);
 
-  const client = new ApiClient({
-    baseUrl: stack.urls.api,
-    token: await tokenForDid(did),
-    userAgent: DESKTOP_UA,
-  });
-  const view = await me(client);
+  // The previous run's administrator address exists nowhere in this database — not as an identity,
+  // not as an account, and certainly not as a role.
+  const identity = await db.query("SELECT id FROM auth_user WHERE email = $1", [
+    previous.toLowerCase(),
+  ]);
+  expect(identity.rowCount, "an address from an earlier run has no identity row here").toBe(0);
 
-  expect(view.role, "an identity's privileges do not survive the run that granted them").toBe(
-    "submitter",
+  const admins = await db.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM accounts WHERE global_role = 'admin'",
   );
-  expect(view.canAdmin).toBe(false);
-  expect(view.canReview).toBe(false);
-  expect(view.memberships, "no organisation membership may carry over either").toEqual([]);
-
-  // And in the database it holds nothing beyond a bare account row.
-  const rows = await db.query<{ global_role: string }>(
-    "SELECT global_role FROM accounts WHERE privy_did = $1",
-    [did],
-  );
-  expect(rows.rowCount).toBe(1);
-  expect(rows.rows[0]?.global_role).toBe("submitter");
-
-  const memberships = await db.query(
-    "SELECT 1 FROM org_memberships m JOIN accounts a ON a.id = m.account_id WHERE a.privy_did = $1",
-    [did],
-  );
-  expect(memberships.rowCount, "no membership row may exist for it").toBe(0);
+  expect(
+    admins.rows[0]?.n,
+    "exactly one administrator exists, and the ceremony is what made it",
+  ).toBe(1);
 });
 
 test("M3-1 just-in-time provisioning: a fresh identity's first request creates a submitter account", async ({
@@ -130,13 +90,12 @@ test("M3-1 just-in-time provisioning: a fresh identity's first request creates a
   // product defect, it is this criterion being unobservable for that identity, and the honest
   // response is to use a different one or report the criterion blocked.
   const untouched = ([stack.actors.submitter, stack.actors.publisher] as const).find(
-    (candidate) => candidate && candidate.did !== stack.browserDid,
+    (candidate) => candidate && candidate.userId !== stack.browserUserId,
   );
   test.skip(
     !untouched,
-    "BLOCKED-by-missing-external-config: every available non-administrator identity has already " +
-      "signed in through the browser during bring-up, so no first-ever request is left to observe. " +
-      "Unblocked by: E2E_PRIVY_TEST_EMAILS (a further distinct test account that the browser does not use).",
+    "BLOCKED: every available non-administrator identity has already signed in through the browser " +
+      "during bring-up, so no first-ever request is left to observe.",
   );
   const actor = untouched;
   if (!actor) return;
@@ -144,10 +103,12 @@ test("M3-1 just-in-time provisioning: a fresh identity's first request creates a
   // The account must not exist BEFORE the first request. Asserted against the database rather than
   // inferred from the response, because the response cannot distinguish "created just now" from
   // "existed already" — and that distinction is the whole criterion.
-  const before = await db.query("SELECT id FROM accounts WHERE privy_did = $1", [actor.did]);
-  expect(before.rowCount, `no account may exist for ${actor.did} before its first request`).toBe(0);
+  const before = await db.query("SELECT id FROM accounts WHERE auth_user_id = $1", [actor.userId]);
+  expect(before.rowCount, `no account may exist for ${actor.email} before its first request`).toBe(
+    0,
+  );
 
-  const token = await tokenForDid(actor.did);
+  const { token } = await sessionFor(actor.email);
   const client = new ApiClient({ baseUrl: stack.urls.api, token, userAgent: DESKTOP_UA });
   const view = await me(client);
 
@@ -160,15 +121,15 @@ test("M3-1 just-in-time provisioning: a fresh identity's first request creates a
   expect(view.canManageKeys).toBe(true);
   expect(view.memberships).toEqual([]);
 
-  const after = await db.query("SELECT id, global_role FROM accounts WHERE privy_did = $1", [
-    actor.did,
+  const after = await db.query("SELECT id, global_role FROM accounts WHERE auth_user_id = $1", [
+    actor.userId,
   ]);
   expect(after.rowCount).toBe(1);
   expect(after.rows[0].global_role).toBe("submitter");
 
   updateState((state) => {
     const target = ([state.actors.submitter, state.actors.publisher] as const).find(
-      (candidate) => candidate && candidate.did === actor.did,
+      (candidate) => candidate && candidate.userId === actor.userId,
     );
     if (target) {
       target.accountId = view.accountId;
@@ -182,11 +143,7 @@ test("M3-1 the operator ceremony made this run's administrator, and is idempoten
   db,
 }) => {
   const actor = stack.actors.admin;
-  test.skip(
-    !actor,
-    "BLOCKED-by-missing-external-config: no identity is available to be made administrator. " +
-      "Unblocked by: E2E_PRIVY_TENANT_ACK, E2E_PRIVY_TEST_EMAIL.",
-  );
+  test.skip(!actor, "BLOCKED: no identity was established to be made administrator.");
   if (!actor) return;
 
   // THE ADMINISTRATOR IS NOT CONFIGURED, IT IS GRANTED. The API no longer promotes anyone named in
@@ -199,7 +156,7 @@ test("M3-1 the operator ceremony made this run's administrator, and is idempoten
 
   const client = new ApiClient({
     baseUrl: stack.urls.api,
-    token: await tokenForDid(actor.did),
+    token: (await sessionFor(actor.email)).token,
     userAgent: DESKTOP_UA,
   });
   const view = await me(client);
@@ -228,7 +185,7 @@ test("M3-1 the operator ceremony made this run's administrator, and is idempoten
   // IDEMPOTENCE, pinned. Re-running the ceremony is the ordinary thing an operator does after an
   // interrupted install, and it must neither fail nor write a second grant into the trail.
   const repeat = await grantAdmin({
-    did: actor.did,
+    email: actor.email,
     adminDatabaseUrl: stack.db.adminUrl,
     logFile: ceremonyLogFile(dirname(stack.logs.api ?? "."), "acceptance-repeat"),
   });
@@ -263,26 +220,25 @@ test("ACCEPTANCE: every provisioned identity's token is accepted by the API", as
   const present = ORDER.filter((name) => stack.actors[name]);
   test.skip(
     present.length === 0,
-    "BLOCKED-by-missing-external-config: no legitimate access token could be obtained, so the " +
-      "acceptance bar — that provider-issued tokens are accepted by this API — cannot be executed. " +
-      "Unblocked by: E2E_PRIVY_TENANT_ACK, E2E_PRIVY_TEST_EMAIL, E2E_PRIVY_TEST_OTP.",
+    "BLOCKED: no identity was established, so the acceptance bar — that a session obtained by " +
+      "signing in is accepted by this API — cannot be executed.",
   );
 
   const seen = new Set<string>();
   for (const name of present) {
     const actor = stack.actors[name];
-    if (!actor || seen.has(actor.did)) continue;
-    seen.add(actor.did);
+    if (!actor || seen.has(actor.userId)) continue;
+    seen.add(actor.userId);
 
     const client = new ApiClient({
       baseUrl: stack.urls.api,
-      token: await tokenForDid(actor.did),
+      token: (await sessionFor(actor.email)).token,
       userAgent: DESKTOP_UA,
     });
     const response = await client.get<{ accountId: number }>("/v1/me");
-    expect(response.status, `${name} (${actor.did}) must be accepted`).toBe(200);
+    expect(response.status, `${name} (${actor.email}) must be accepted`).toBe(200);
 
-    const row = await db.query("SELECT id FROM accounts WHERE privy_did = $1", [actor.did]);
+    const row = await db.query("SELECT id FROM accounts WHERE auth_user_id = $1", [actor.userId]);
     expect(row.rowCount, `${name}'s account exists after its first request`).toBe(1);
 
     updateState((state) => {
@@ -298,8 +254,8 @@ test("provisioning: organisations exist, memberships are granted, verification i
 }) => {
   test.skip(
     !stack.actors.admin || !stack.actors.publisher,
-    "BLOCKED-by-missing-external-config: provisioning a verified publisher needs an administrator " +
-      "and at least one further identity. Unblocked by: E2E_PRIVY_TENANT_ACK, E2E_PRIVY_TEST_EMAILS.",
+    "BLOCKED: provisioning a verified publisher needs an administrator and at least one further " +
+      "identity.",
   );
   if (!stack.actors.admin || !stack.actors.publisher) return;
 
@@ -316,7 +272,7 @@ test("provisioning: organisations exist, memberships are granted, verification i
       name,
       new ApiClient({
         baseUrl: stack.urls.api,
-        token: await tokenForDid(actor.did),
+        token: (await sessionFor(actor.email)).token,
         userAgent: DESKTOP_UA,
       }),
     );

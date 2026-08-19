@@ -28,13 +28,13 @@ export interface GrantAdminResult {
  * a run whose whole privileged surface is untestable, and that must fail loudly at bring-up rather
  * than as forty confusing 403s later.
  *
- * `--create` provisions the account when the identity has never logged in, which is the normal case
+ * `--create` provisions the account when the address has never signed in, which is the normal case
  * here: the ceremony happens during bring-up, before anyone has authenticated. It is also why the
  * just-in-time provisioning assertion deliberately watches a NON-administrator identity — the
  * administrator's account now exists before its first request, by design.
  */
 export async function grantAdmin(options: {
-  did: string;
+  email: string;
   adminDatabaseUrl: string;
   logFile: string;
 }): Promise<GrantAdminResult> {
@@ -46,8 +46,8 @@ export async function grantAdmin(options: {
       "@the-rfp-hub/api",
       "grant-admin",
       "--",
-      "--did",
-      options.did,
+      "--email",
+      options.email,
       "--create",
       "--yes",
     ],
@@ -61,7 +61,7 @@ export async function grantAdmin(options: {
 
   if (result.code !== 0) {
     throw new Error(
-      `grant-admin exited ${result.code} for ${options.did}. The run has no administrator, so every ` +
+      `grant-admin exited ${result.code} for ${options.email}. The run has no administrator, so every ` +
         `privileged criterion would fail for the wrong reason.\n${result.output}`,
     );
   }

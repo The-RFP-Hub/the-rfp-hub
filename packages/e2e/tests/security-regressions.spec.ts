@@ -130,6 +130,50 @@ test.describe("security regressions over real HTTP", () => {
  * evidence that goes missing exactly when a reader most needs it.
  */
 test.describe("the application runs under least privilege", () => {
+  test("the runtime role holds exactly the four grants sign-in needs on the auth tables", async ({
+    stack,
+    restrictedDb,
+  }) => {
+    // THE MOST LIKELY PRODUCTION-ONLY FAILURE OF THE WHOLE AUTH ADOPTION, made executable.
+    //
+    // Migrations run as the MIGRATION role, which owns the tables it creates. The service runs as a
+    // different, restricted role, and a table it does not own grants it nothing by default. So a
+    // deployment that skipped `grant-auth.sql` has a perfectly correct schema, passes every test
+    // that runs against an owner connection, and fails every real sign-in with a permission error on
+    // `auth_session`. Nothing about that is visible until somebody tries to log in.
+    //
+    // This suite is only able to catch it because `postgres.ts` REVOKES the four tables from the
+    // runtime role immediately after its blanket grant, so the deploy artifact is the only thing
+    // that can put them back. Without that revoke the blanket grant would make sign-in work here for
+    // a reason that does not exist in production, and this assertion would be theatre.
+    const required = ["SELECT", "INSERT", "UPDATE", "DELETE"];
+    const tables = ["auth_user", "auth_session", "auth_account", "auth_verification"];
+
+    const granted = await restrictedDb.query<{ table_name: string; privilege_type: string }>(
+      `SELECT table_name, privilege_type
+         FROM information_schema.table_privileges
+        WHERE table_name = ANY($1) AND grantee = current_user`,
+      [tables],
+    );
+
+    for (const table of tables) {
+      const held = granted.rows
+        .filter((row) => row.table_name === table)
+        .map((row) => row.privilege_type)
+        .sort();
+      expect(held, `the runtime role needs all four privileges on ${table}`).toEqual(
+        [...required].sort(),
+      );
+    }
+
+    // And the whole run is the end-to-end proof: every identity in it signed in over HTTP against
+    // an API connected as this role. `stack.actors` exists only because those sign-ins worked.
+    expect(
+      Object.keys(stack.actors).length,
+      "identities were established through this role",
+    ).toBeGreaterThan(0);
+  });
+
   test("the API is running on the restricted role, and every route above worked on it", async ({
     stack,
     restrictedDb,

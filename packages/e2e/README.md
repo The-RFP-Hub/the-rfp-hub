@@ -41,46 +41,59 @@ runner's `finally`, and the temp directory (session state, minted secrets) goes 
 
 ## What the operator must supply
 
-The suite signs in through the same Privy application the API and dashboard already use for
-this environment. It never receives a long-lived application secret — only short-lived,
-purpose-scoped credentials — and it authenticates against your existing Privy test-account setup
-rather than provisioning a new tenant.
+**Nothing.** That is the headline of this suite, and it is worth stating as a requirement rather than
+a convenience: `pnpm e2e` runs on a laptop with no network, no accounts and no environment file.
 
-| Variable | Required | Purpose |
+There used to be a table here with seven variables — a tenant acknowledgement, an application id and
+secret, a fixed test address, a fixed one-time code, and lists of extra addresses and codes — because
+identities came from a third-party provider. A run's coverage depended on how many test accounts
+somebody had created in a dashboard, and a laptop on a train could exercise almost none of it.
+
+Identities are now created by using them. Each is an address at a reserved domain
+(`e2e+<runid>-<part>@rfphub.invalid` — `.invalid` can never resolve, so a misconfigured run cannot
+mail a live code to a real inbox), and the code is written by the API to a file inside the run's own
+`0700` directory. There is no ceiling on how many a run may create and nothing to configure.
+
+| Variable | When | What it does |
 |---|---|---|
-| `E2E_PRIVY_TENANT_ACK` | yes | Must equal `PRIVY_APP_ID` exactly. This is a deliberate, explicit acknowledgment that the suite is about to sign in test accounts against that Privy application — there is no automatic tenant discovery. Absent or mismatched, the run degrades to L4 (see below). |
-| `E2E_PRIVY_TEST_EMAIL` | for browser coverage | A test-account email address, configured under Privy Dashboard → *User management → Authentication → Advanced*. Needed for the real browser login the dashboard specs drive. |
-| `E2E_PRIVY_TEST_OTP` | for browser coverage | The fixed one-time code paired with the test email above. Privy test accounts use fixed OTPs; arbitrary values or plus-addressed variants are rejected by design. |
-| `E2E_PRIVY_TEST_PHONE` | optional | An additional test-account phone number, for identity-count coverage. Note that email and phone test credentials may resolve to the *same* underlying Privy identity — the suite dedupes by the token's `sub` claim, never by credential count. |
-| `E2E_PRIVY_TEST_EMAILS` | optional | Additional test-account emails (comma-separated), for role-choreography scenarios that want more than two distinct identities. These are used for API-actor tokens only, which the provider issues from the address alone — no code is involved. |
-| `E2E_PRIVY_TEST_OTPS` | optional | The codes belonging to those additional accounts (comma-separated). The suite does not need them — only the browser identity signs in — but any supplied here are registered with the redactor, so the end-of-run artifact scan searches for them as long-lived secrets. |
 | `OPENAI_API_KEY` | optional | Only read for `e2e:openai`; threaded into the API child solely for that run. |
+| `E2E_OIDC_STUB` | optional | Opt-in for the social-provider lane (see below). Not implemented yet. |
 
-None of these are written to a file. `packages/api/.env` is read (never written) for the tenant's
-`PRIVY_APP_ID` / `PRIVY_APP_SECRET` / `PRIVY_VERIFICATION_KEY`; a real environment variable of the
-same name always wins over the file. The application secret is never handed to an API process —
-only the runner/provisioner ever sees it.
+## The lanes
 
-## The fallback ladder
+| Lane | Condition | A gate? | What is real |
+|---|---|---|---|
+| **email** | none | **yes, every run** | every criterion, end to end, offline |
+| **social — stub** | `E2E_OIDC_STUB=1` | no | *not implemented; see below* |
+| **social — real** | a live provider account | never | manual, scheduled, reported separately |
 
-The suite does not fail outright when identity coverage is partial — it runs everything it safely
-can and reports the rest honestly. The level actually reached, and exactly what is CONDITIONAL or
-BLOCKED at that level, is written to `test-results/m3-e2e.json` and to the local report.
+The ladder that used to live here — five rungs from *full* down to *no identity provider*, with each
+spec consulting the level before deciding whether it was allowed to run — is **deleted**. It existed
+to answer "how much of this suite can execute on this machine today", and the answer is now "all of
+it". A degradation path that can no longer be reached is one nobody maintains and everybody trusts.
 
-| Level | Condition | What's real |
-|---|---|---|
-| **L0 — full** | tenant ack present, at least 4 distinct identities, browser OTP login works | every criterion in the test matrix |
-| **L1 — reduced identity** | tenant ack present, 2–3 distinct identities, browser OTP works | everything reachable through role transitions on fewer identities; scenarios needing a genuinely independent second publisher are CONDITIONAL |
-| **L2 — API-only** | tenant ack present, at least 2 identities, no browser OTP | every API-level (HTTP/INT) criterion; every criterion needing a signed-in browser is BLOCKED |
-| **L3 — browser-only** | tenant ack present, no server-side token minting available, browser OTP works | the one browser identity's full journey, using a Bearer harvested from its own session; multi-actor negatives needing a second real identity are BLOCKED |
-| **L4 — no identity provider** | tenant ack absent, or no token obtainable, or the acceptance check itself gets a 401 | the stack still boots, and the administrator ceremony is simply not performed (there is no identity to grant); only the negative-auth and integration/runner-level checks run. No real-auth criterion is claimed as passing |
+`BLOCKED` survives in the reporter with nothing to report, and that is deliberate: a future genuine
+limitation needs somewhere to be recorded, and "0 blocked" is a different statement from a missing
+field.
 
-The level is decided once, at the start of a run, from what the environment above actually
-provides — not asserted by a human, and not something a spec can talk its way around.
+### The social lane is not implemented
 
-A criterion the current level cannot execute is reported as a SKIP whose reason begins with
-`BLOCKED-by-missing-external-config` and names the variable that would unblock it. A criterion is
-never quietly passed for want of a credential.
+The plan timeboxed a local OIDC stub to one focused pass, with a documented fallback if it did not
+land. **It did not land, and the fallback is taken.** The obstacle is structural rather than fiddly:
+the API registers `socialProviders.google` and nothing else, so a stub would require registering the
+library's `genericOAuth` plugin in the API's auth instance — the object every other test in this
+suite now depends on — behind a test-only environment flag. That is not a change to make in passing
+on a branch where the email path has only just gone green.
+
+What that leaves uncovered, stated plainly rather than buried:
+
+* the social redirect, the callback and the account-linking rules;
+* the one-time-token handoff at `/auth/complete`, and with it the back-button replay case;
+* bearer storage on a foreign origin.
+
+The fallback: drive the linking rules from an API integration test, supply `storageState` by hand for
+any dashboard spec that needs a signed-in social browser, and keep a manual checklist run against
+staging — never a pull-request gate, the posture `e2e:openai` already has.
 
 ## The administrator is granted, not configured
 
@@ -105,35 +118,45 @@ which the cross-run assertion in `tests/00-acceptance.setup.ts` checks rather th
 | `E2E_TMP` | The PARENT directory to work under. The run's own private directory (mode `0700`) is always a fresh run-scoped child of it — holding the state file, the secret registry, `storageState` and the child logs — and only that child is ever removed, and only after its ownership marker is verified. Defaults to the OS temp location. Never inside the repository. |
 | `E2E_KEEP_TMP` | Leaves that directory in place after the run. A debugging escape hatch, announced loudly on the way out, because the directory holds session material. |
 | `E2E_EMBEDDING_PROVIDER` | `openai` switches the API child off deterministic embeddings for the optional `e2e:openai` run. Any other value leaves it deterministic. |
-| `E2E_CHECK_M3_AUTH` | Forces `e2e:check-m3` into `real` or `ephemeral` mode instead of choosing by what the ladder provides. Requesting `real` without a real identity is an error rather than a silent downgrade. |
+| `E2E_ACTOR_SEED` | Rotates which identity plays which part. Deterministic; recorded in the run state. |
+| `E2E_ASSIGNMENT_RECORD` | Where the cross-run assignment record is kept, for the "a fresh database grants nothing" assertion. Opt-in, outside the repository. |
 
-## `e2e:check-m3` and its two modes
+## `e2e:check-m3`
 
-The milestone checker needs credentials, and which kind it gets changes what its output means:
+One mode. It boots the same stack, signs in the way a person does, and runs the milestone checker
+against it.
 
-- **real** — provider-issued session tokens. The result means what the tool says it means.
-- **ephemeral** — no provider is reachable, so the runner generates an ES256 key pair, boots a
-  second API instance configured with that public key as its verification key, and signs its own
-  tokens. This is **DOMAIN EVIDENCE ONLY**: it establishes that the write path, the audit trail,
-  deduplication, verification, analytics and staleness behave correctly over real HTTP against a
-  real database, and it establishes *nothing* about the identity provider. The mode is printed on
-  the summary line and must never be quoted as if it were the real thing.
+There used to be two. When no provider was reachable the runner generated a key pair, booted a second
+API pinned to it, signed its own tokens and stamped the output `DOMAIN EVIDENCE ONLY` — an honest
+label for a run that proved the domain and nothing about authentication. Signing in needs no third
+party now, so that whole apparatus is gone along with `E2E_CHECK_M3_AUTH`.
+
+The caveat narrows rather than disappearing: **this establishes nothing about any social provider.**
+The email path it exercises is the real one.
 
 ## Artifacts, and the residue this suite does not pretend away
 
 Playwright's `test-results/` and `playwright-report/` are gitignored and excluded from the Docker
 build context. After Playwright exits, the runner greps both — decompressing trace archives — for
-every **long-lived** secret the run registered: the identity application secret, the one-time code,
-and every `rfph_…` key any worker minted. A hit fails the run and is reported as a security defect.
+every **long-lived** secret the run registered: this run's `BETTER_AUTH_SECRET`, and every `rfph_…`
+key any worker minted. A hit fails the run and is reported as a security defect.
 
 That guarantee is deliberately worded as *no long-lived secret in any artifact*, not *no secrets*.
-Playwright records request headers itself and offers no redaction hook, so short-lived (roughly an
-hour) access tokens **do** appear inside failure traces. They are gitignored, kept out of the image,
-and never leave the machine — but they are there, and saying otherwise would be false.
+Playwright records request headers itself and offers no redaction hook, so short-lived session tokens
+**do** appear inside failure traces. They are gitignored, kept out of the image, and never leave the
+machine — but they are there, and saying otherwise would be false.
+
+**One-time codes are not registered with the redactor, deliberately.** Six digits is below the
+scanner's minimum length and a catastrophic thing to grep for — `\b\d{6}\b` matches timestamps, byte
+counts and half the numbers in any log, so registering one would either redact the artifacts into
+uselessness or train a reader to ignore the markers. A code is single-use, lives 300 seconds, belongs
+to one address, and is deleted from the outbox the moment it is read; by the time anything is scanned
+it has stopped being a credential.
 
 Two further residues, stated rather than papered over:
 
-- a test-account login may persist a user record in the identity tenant, which teardown does not
-  remove — test accounts are pre-existing tenant fixtures, not something this suite created;
+- **nothing persists outside the run at all.** The identity store is this run's own database,
+  destroyed with its container — the previous provider left user records in a tenant that teardown
+  could not remove, and that residue is simply gone;
 - `packages/dashboard/.next/` is a shared dev cache, so concurrent runs are refused by
   `packages/dashboard/.e2e-next-lock` rather than supported.

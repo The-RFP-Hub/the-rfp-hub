@@ -19,14 +19,16 @@
  * the first hop injected, and the report records them at that layer rather than claiming them here.
  */
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { apiDir, apiEnv, readTenantCredentials } from "../src/env.js";
+import { apiDir, apiEnv } from "../src/env.js";
 import { expect, skipUnlessActor, test } from "../src/fixtures.js";
 import { ApiClient, isHealthy } from "../src/http.js";
+import { outboxFileFor } from "../src/identity/outbox.js";
+import { AUTH_SECRET_ENV, sessionFor } from "../src/identity/sessions.js";
 import * as orphans from "../src/orphans.js";
 import * as ports from "../src/ports.js";
 import * as processes from "../src/processes.js";
-import { tokenForDid } from "../src/tokens.js";
 
 /**
  * Every address family the classifier has to recognise, and why each one is on the list.
@@ -63,13 +65,15 @@ test.describe("SSRF: direct private targets are refused", () => {
       env: apiEnv({
         databaseUrl: stack.db.runtimeUrl,
         port,
-        appId: stack.privyAppId,
-        // The SAME verification key the main instance runs on. Omitting it does not merely weaken
-        // this instance — `privy-token.service.ts` answers 503 `auth_unconfigured` to every session
-        // token when it is absent, so the reviewer credential these assertions need could not
-        // authenticate at all and every refusal below would be an authentication failure wearing a
-        // refusal's clothes.
-        verificationKey: readTenantCredentials().verificationKey,
+        // Its own signing secret: sessions minted against the main instance are not valid here, so
+        // this instance signs in its own reviewer below rather than borrowing a token.
+        // THE SAME SECRET as the main instance, because this one shares its database. A session is
+        // a row plus an HMAC over it; a second instance signing with a different secret would refuse
+        // every token this run already holds, and each refusal below would be an authentication
+        // failure rather than the address check it claims to be.
+        authSecret: process.env[AUTH_SECRET_ENV] ?? "",
+        outboxDir: stack.outboxDir,
+        dashboardOrigin: stack.urls.dashboard,
         analyticsHmacKey: randomBytes(32).toString("hex"),
         // The whole point of this instance: the address checks are ON.
         allowPrivateHosts: false,
@@ -108,7 +112,7 @@ test.describe("SSRF: direct private targets are refused", () => {
 
     // The entries are created through the MAIN instance and verified through the flag-off one: both
     // processes share this run's database, so the same row is reachable from either.
-    const guarded = new ApiClient({ baseUrl, token: await tokenForDid(reviewer.did) });
+    const guarded = new ApiClient({ baseUrl, token: (await sessionFor(reviewer.email)).token });
 
     for (const [label, applicationUrl] of PRIVATE_TARGETS) {
       const document = opportunityFixture(
@@ -139,5 +143,93 @@ test.describe("SSRF: direct private targets are refused", () => {
         /address_refused/,
       );
     }
+  });
+});
+
+/**
+ * A deployment that cannot deliver a code cannot sign anybody in — and says so.
+ *
+ * THIS REPLACES A CASE THAT USED TO EXIST FOR A DIFFERENT REASON. The suite once reached
+ * `auth_unconfigured` by booting an API with no identity-provider key: the verifier had nothing to
+ * verify against and answered 503. There is no verifier key any more, so that path is gone — but the
+ * property it stood for is not. A deployment whose codes go nowhere is not degraded, it is a locked
+ * door: every sign-in would stall at "enter the code" with nothing wrong anywhere a person could
+ * see, which is precisely the failure that must be loud instead of silent.
+ *
+ * `EMAIL_TRANSPORT=null` is that deployment. It boots — the transport is a valid configuration, and
+ * `config.ts` refuses it only under `NODE_ENV=production` — and the sign-in surface reports itself
+ * unavailable rather than pretending to have sent something.
+ */
+test.describe("an API that cannot deliver a code refuses to start a sign-in", () => {
+  let unconfigured: processes.ManagedChild | undefined;
+  let unconfiguredUrl = "";
+
+  test.beforeAll(async ({ stack }) => {
+    const port = await ports.reserve(new Set(Object.values(stack.ports)));
+    unconfiguredUrl = `http://127.0.0.1:${port}`;
+    unconfigured = processes.start({
+      name: "api-no-email",
+      command: "pnpm",
+      args: ["exec", "tsx", "src/server.ts"],
+      cwd: apiDir,
+      env: apiEnv({
+        databaseUrl: stack.db.runtimeUrl,
+        port,
+        authSecret: process.env[AUTH_SECRET_ENV] ?? "",
+        outboxDir: stack.outboxDir,
+        dashboardOrigin: stack.urls.dashboard,
+        analyticsHmacKey: randomBytes(32).toString("hex"),
+        allowPrivateHosts: true,
+        // The whole point of this instance.
+        emailTransport: "null",
+      }),
+      logFile: join(process.env.E2E_TMP_DIR ?? ".", "logs", "api-no-email.log"),
+    });
+    orphans.register(unconfigured.pid, "ssrf.spec.ts no-email API");
+    await processes.waitFor({
+      what: "the no-email API",
+      watch: unconfigured,
+      timeoutMs: 90_000,
+      probe: () => isHealthy(unconfiguredUrl),
+    });
+  });
+
+  test.afterAll(async () => {
+    if (unconfigured) await processes.stop(unconfigured);
+  });
+
+  test("nothing is delivered, and nothing is written anywhere", async ({ stack }) => {
+    const email = `e2e+${stack.runId}-noemail@rfphub.invalid`;
+    const client = new ApiClient({ baseUrl: unconfiguredUrl });
+    const response = await client.post<{ error?: string }>(
+      "/api/auth/email-otp/send-verification-otp",
+      { email, type: "sign-in" },
+    );
+
+    // THE LOAD-BEARING ASSERTION: no code exists anywhere. A transport that quietly wrote the code
+    // somewhere readable would be far worse than one that drops it, so this is the half that has to
+    // hold whatever the status line says.
+    expect(
+      existsSync(outboxFileFor(stack.outboxDir, email)),
+      "an undeliverable transport must not leave a code lying about",
+    ).toBe(false);
+
+    // THE LOCKED DOOR NOW ANSWERS: the mount refuses to promise a code it cannot deliver, before
+    // delegating to the library at all. 503, and honest about whose fault it is.
+    expect(response.status, "send-verification-otp under EMAIL_TRANSPORT=null").toBe(503);
+    expect(response.body).toEqual({
+      error: "auth_unconfigured",
+      message: "email delivery is not configured, so no sign-in code can be sent.",
+    });
+
+    // …and the route that CONSUMES a code is untouched: guarding it would turn "was a code ever
+    // sent" into an oracle a caller could read off the verify response. A code that was never sent
+    // simply fails to verify, exactly as a wrong code does.
+    const verify = await client.post<{ code?: string }>("/api/auth/sign-in/email-otp", {
+      email,
+      otp: "000000",
+    });
+    expect(verify.status, "sign-in verify is unaffected by the transport").toBe(400);
+    expect(verify.body.code).toBeDefined();
   });
 });
