@@ -66,6 +66,16 @@ export interface HopResponse {
 
 export type SourceTransport = (url: string, options: TransportOptions) => Promise<HopResponse>;
 
+/**
+ * The `all: true` half of Node's `lookup` contract — an array of addresses rather than two spread
+ * arguments. Named here because the type undici publishes for `connect.lookup` describes only the
+ * legacy shape, so the cast at the call site needs something honest to cast TO.
+ */
+type LookupAllCallback = (
+  error: NodeJS.ErrnoException | null,
+  addresses: { address: string; family: number }[],
+) => void;
+
 /** A refusal, carrying the category so a failed verification run can record WHY. */
 export class SourceFetchError extends Error {
   constructor(
@@ -319,7 +329,25 @@ export const undiciTransport: SourceTransport = async (url, options) => {
           timeout: options.timeoutMs,
           // The whole point: whatever undici asks to resolve, it gets the address that was
           // validated a moment ago and nothing else.
-          lookup: (_hostname, _lookupOptions, callback) => {
+          //
+          // BOTH CALLBACK SHAPES, because the caller decides which one it asked for. `net.connect`
+          // runs with `autoSelectFamily` on by default from Node 20, and that path calls `lookup`
+          // with `all: true` and expects an ARRAY of `{address, family}`; the legacy path expects
+          // the two values spread as arguments. Answering the legacy shape to an `all: true` call
+          // put a string where an array was expected, and the socket died with
+          // "Invalid IP address: undefined" — a total failure of source verification against every
+          // real hostname, invisible to the suite because fixture URLs use the 127.0.0.1 LITERAL
+          // (an IP literal never reaches `lookup` at all).
+          //
+          // The pin is unchanged either way: one address, the one that was validated, and nothing
+          // else for the resolver to choose from.
+          lookup: (_hostname, lookupOptions, callback) => {
+            if (lookupOptions?.all === true) {
+              (callback as unknown as LookupAllCallback)(null, [
+                { address: pinned.address, family: pinned.family },
+              ]);
+              return;
+            }
             callback(null, pinned.address, pinned.family);
           },
           // SNI and certificate validation still target the NAME, so pinning the address does not
