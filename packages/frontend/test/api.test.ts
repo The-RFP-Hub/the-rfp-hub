@@ -290,3 +290,66 @@ describe("loadOpportunity", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+/**
+ * AN ORGANISATION ACTING ON ITSELF — four routes whose URLs carry the authorisation.
+ *
+ * The slug and the id are both in the path, and the API scopes the decision by BOTH: a listing filed
+ * under another organisation answers 404 rather than 403, so a mis-encoded slug does not silently
+ * decide somebody else's queue. That makes the exact path worth pinning.
+ */
+describe("the organisation routes", () => {
+  it("lists a namespace's own listings, filtered and paginated", async () => {
+    const { fetchImpl, calls } = stubFetch(() =>
+      json({ items: [], page: 1, limit: 20, total: 0, totalPages: 1 }),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.organizations.opportunities("filecoin", { reviewStatus: "pending", limit: 50 });
+
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/organizations/filecoin/opportunities?reviewStatus=pending&limit=50",
+    );
+  });
+
+  it("approves with no body — the route declares none", async () => {
+    const { fetchImpl, calls } = stubFetch(() =>
+      json({ id: "filecoin:1", reviewStatus: "approved", isListed: true }),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.organizations.approve("filecoin", "filecoin:1");
+
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/organizations/filecoin/opportunities/filecoin%3A1/approve",
+    );
+    expect(calls[0]?.init.body).toBeUndefined();
+  });
+
+  it("sends the reason on a rejection, which the API requires", async () => {
+    const { fetchImpl, calls } = stubFetch(() =>
+      json({ id: "filecoin:1", reviewStatus: "rejected", isListed: false }),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.organizations.reject("filecoin", "filecoin:1", "not our programme");
+
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/organizations/filecoin/opportunities/filecoin%3A1/reject",
+    );
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ reason: "not our programme" }));
+  });
+
+  it("patches the directory entry, sending null to clear rather than omitting", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ slug: "filecoin", name: "Filecoin" }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.organizations.update("filecoin", { name: "Filecoin", website: null });
+
+    expect(calls[0]?.url).toBe("https://api.example.com/v1/organizations/filecoin");
+    expect(calls[0]?.init.method).toBe("PATCH");
+    // `null` and "absent" are different instructions; a form that could only omit could never
+    // empty a website field.
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ name: "Filecoin", website: null }));
+  });
+});

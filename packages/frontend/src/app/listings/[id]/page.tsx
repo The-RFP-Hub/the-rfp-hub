@@ -14,6 +14,7 @@
  */
 import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { RequireSession } from "@/components/Chrome";
+import { ReturnLink } from "@/components/ReturnLink";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge } from "@/components/badges";
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
@@ -52,11 +53,13 @@ function Listing({ id, me }: { id: string; me: Me }) {
 
   return (
     <section>
-      <ResourceView resource={state} what="this entry" onRetry={reload}>
+      {/* Renders only when a review surface sent the reader here and said where from. */}
+      <ReturnLink />
+      <ResourceView resource={state} what="this listing" onRetry={reload}>
         {(entry) => <Header entry={entry} id={id} me={me} />}
       </ResourceView>
 
-      <div className="tabs" role="tablist" aria-label="Entry detail">
+      <div className="tabs" role="tablist" aria-label="Listing detail">
         {TABS.map((name) => (
           <button
             key={name}
@@ -148,7 +151,7 @@ function ClaimForm({ id, me }: { id: string; me: Me }) {
   if (me.memberships.length === 0) {
     return (
       <details className="card">
-        <summary>Claim this entry for an organisation</summary>
+        <summary>Claim this listing for an organisation</summary>
         <p className="muted">
           This account is not a member of any organisation, so there is nothing to claim on behalf
           of. A reviewer grants membership.
@@ -178,10 +181,10 @@ function ClaimForm({ id, me }: { id: string; me: Me }) {
 
   return (
     <details className="card">
-      <summary>Claim this entry for an organisation</summary>
+      <summary>Claim this listing for an organisation</summary>
       <p className="muted footnote">
         Granted immediately when the organisation is verified <em>and</em> appears among the
-        entry&rsquo;s operating organisations. Sponsorship is not operation, so a sponsor&rsquo;s
+        listing&rsquo;s operating organisations. Sponsorship is not operation, so a sponsor&rsquo;s
         claim is queued for a reviewer instead.
       </p>
       <div className="field">
@@ -220,51 +223,53 @@ function AuditTab({ id }: { id: string }) {
     <section aria-labelledby="audit-heading">
       <h2 id="audit-heading">History</h2>
       <p className="muted footnote">
-        Every mutation, append-only. As this entry&rsquo;s owner you see the full patch; a member of
-        the public sees the same actions with field names only.
+        Every mutation, append-only. As this listing&rsquo;s owner you see the full patch; a member
+        of the public sees the same actions with field names only.
       </p>
       <ResourceView resource={state} what="the audit trail" onRetry={reload}>
         {(trail) =>
           trail.entries.length === 0 ? (
             <EmptyState title="No recorded changes." />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">When</th>
-                  <th scope="col">Action</th>
-                  <th scope="col">Actor</th>
-                  <th scope="col">Fields</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trail.entries.map((entry) => (
-                  <tr key={`${entry.at}-${entry.action}`}>
-                    <td className="muted">{formatInstant(entry.at)}</td>
-                    <td>{entry.action}</td>
-                    <td>
-                      <UntrustedText value={entry.actor} />{" "}
-                      <span className="muted">({entry.actorKind})</span>
-                    </td>
-                    <td>
-                      {entry.changedFields.length === 0 ? (
-                        <span className="muted">—</span>
-                      ) : (
-                        <code>{entry.changedFields.join(", ")}</code>
-                      )}
-                      {entry.patch ? (
-                        <details>
-                          <summary className="muted">patch</summary>
-                          <pre className="untrusted-block">
-                            {JSON.stringify(entry.patch, null, 2)}
-                          </pre>
-                        </details>
-                      ) : null}
-                    </td>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Fields</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {trail.entries.map((entry) => (
+                    <tr key={`${entry.at}-${entry.action}`}>
+                      <td className="muted">{formatInstant(entry.at)}</td>
+                      <td>{entry.action}</td>
+                      <td>
+                        <UntrustedText value={entry.actor} />{" "}
+                        <span className="muted">({entry.actorKind})</span>
+                      </td>
+                      <td>
+                        {entry.changedFields.length === 0 ? (
+                          <span className="muted">—</span>
+                        ) : (
+                          <code>{entry.changedFields.join(", ")}</code>
+                        )}
+                        {entry.patch ? (
+                          <details>
+                            <summary className="muted">patch</summary>
+                            <pre className="untrusted-block">
+                              {JSON.stringify(entry.patch, null, 2)}
+                            </pre>
+                          </details>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )
         }
       </ResourceView>
@@ -302,7 +307,7 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
     <section aria-labelledby="verify-heading">
       <h2 id="verify-heading">Source verification</h2>
       <p className="muted footnote">
-        The check fetches this entry&rsquo;s <code>applicationUrl</code> and records what the page
+        The check fetches this listing&rsquo;s <code>applicationUrl</code> and records what the page
         said. A match is a <strong>low-bar anti-spam signal</strong> — the page exists and its title
         is about the same programme — and never a fact-check of the amounts or the deadlines.
       </p>
@@ -318,7 +323,7 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
 
       {neverChecked ? (
         <EmptyState
-          title="This entry has not been checked yet."
+          title="This listing has not been checked yet."
           detail="A submission with an application URL is queued for the nightly pass; a reviewer can also run it on demand."
         />
       ) : (
@@ -383,43 +388,45 @@ function DuplicatesTab({ id }: { id: string }) {
     <section aria-labelledby="dupes-heading">
       <h2 id="dupes-heading">Possible duplicates</h2>
       <p className="muted footnote">
-        Detected by comparing this entry against <strong>published</strong> entries only, so nothing
-        here reveals another account&rsquo;s pending work. An empty list means nothing similar was
-        found <em>if</em> the check has run — a deployment with detection switched off has nothing
-        to show either.
+        Detected by comparing this listing against <strong>published</strong> listings only, so
+        nothing here reveals another account&rsquo;s pending work. An empty list means nothing
+        similar was found <em>if</em> the check has run — a deployment with detection switched off
+        has nothing to show either.
       </p>
       <ResourceView resource={state} what="possible duplicates" onRetry={reload}>
         {(list) =>
           list.items.length === 0 ? (
-            <EmptyState title="No suspected duplicates recorded for this entry." />
+            <EmptyState title="No suspected duplicates recorded for this listing." />
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Other entry</th>
-                  <th scope="col">Similarity</th>
-                  <th scope="col">State</th>
-                  <th scope="col">Detected</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.items.map((match) => (
-                  <tr key={`${match.id}-${match.detectedAt}`}>
-                    <th scope="row">
-                      <Link href={`/listings/${encodeURIComponent(match.id)}`}>
-                        <UntrustedText value={match.title} />
-                      </Link>
-                      <div className="muted">
-                        <code>{match.id}</code>
-                      </div>
-                    </th>
-                    <td>{formatSimilarity(match.similarity)}</td>
-                    <td>{match.status}</td>
-                    <td className="muted">{formatInstant(match.detectedAt)}</td>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Other listing</th>
+                    <th scope="col">Similarity</th>
+                    <th scope="col">State</th>
+                    <th scope="col">Detected</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {list.items.map((match) => (
+                    <tr key={`${match.id}-${match.detectedAt}`}>
+                      <th scope="row">
+                        <Link href={`/listings/${encodeURIComponent(match.id)}`}>
+                          <UntrustedText value={match.title} />
+                        </Link>
+                        <div className="muted">
+                          <code>{match.id}</code>
+                        </div>
+                      </th>
+                      <td>{formatSimilarity(match.similarity)}</td>
+                      <td>{match.status}</td>
+                      <td className="muted">{formatInstant(match.detectedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )
         }
       </ResourceView>
