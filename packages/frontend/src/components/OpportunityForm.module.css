@@ -95,20 +95,36 @@
 .problem {
   display: block;
   color: var(--bad);
+  /*
+   * WEIGHT, not hue, is what makes this a failure.
+   *
+   * No colour on this site carries state, so `--bad` resolves to plain `--ink` — which is also the
+   * colour of ordinary prose. Left on colour alone this message rendered exactly like the body text
+   * around it. The weight is therefore load-bearing rather than decorative: it is the only thing
+   * separating "you must fix this" from "here is some text".
+   */
+  font-weight: 600;
   font-size: 0.88em;
   margin: 0.15rem 0 0;
 }
 
 /*
- * Advice, not a problem. Deliberately NOT red and deliberately not `.problem`: the document is
- * conformant with this and the submission is not blocked, so it reads as the advisory tier the
- * validator's own warnings use rather than as a failure.
+ * Advice, not a problem. Deliberately not `.problem`: the document is conformant with this and the
+ * submission is not blocked, so it reads as the advisory tier the validator's own warnings use
+ * rather than as a failure.
+ *
+ * THE RULE IN THE MARGIN IS THE SIGNAL, for the same reason the weight above is. `--warn` resolves
+ * to `--ink-soft` at 0.88em, which is precisely a `.hint` — so on colour alone a consequence a
+ * publisher should weigh was indistinguishable from helper text telling them what a field is for.
+ * The marginal rule says "this one is about what you have entered" without borrowing a hue.
  */
 .advisory {
   display: block;
   color: var(--warn);
   font-size: 0.88em;
-  margin: 0.15rem 0 0;
+  margin: 0.3rem 0 0;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--line);
   max-width: 60ch;
 }
 
@@ -117,22 +133,34 @@
   border-color: var(--bad);
 }
 
-/* The live "publishes as …" line under the id. */
+/*
+ * The live "publishes as …" line under the id, in its three states.
+ *
+ * WIDTH AND STYLE CARRY THE STATE, not shade. `--ok` and `--warn` both resolve into the ink family,
+ * so three solid rules at three greys left the single most consequential distinction on this form —
+ * "this goes live now" against "this waits for a reviewer" — resting on a shade a publisher would
+ * have to compare side by side to notice. A dashed rule reads as provisional, which is what pending
+ * IS; a thick solid one reads as settled. Neither needs a hue, and each of the three differs from
+ * the other two in more than one property.
+ */
 .consequence {
   margin: 0.4rem 0 0;
   padding: 0.55rem 0.8rem;
   background: var(--bg-soft);
   border-radius: var(--radius);
+  /* Not knowable: thin, pale, solid. */
   border-left: 3px solid var(--line);
   font-size: 0.94em;
 }
 
+/* Settled — it publishes on submit. */
 .consequenceNow {
-  border-left-color: var(--ok);
+  border-left: 5px solid var(--ok);
 }
 
+/* Provisional — it waits in the queue. */
 .consequenceLater {
-  border-left-color: var(--warn);
+  border-left: 5px dashed var(--warn);
 }
 
 /* An id that cannot be changed, shown as the fact it is rather than as a live input. */
@@ -285,10 +313,15 @@
   padding-top: 1.1rem;
 }
 
-.submitBar button[type="submit"] {
-  font-weight: 700;
-  padding: 0.5rem 1.5rem;
-}
+/*
+ * The submit button carries the global `.button-primary` instead of a local rule.
+ *
+ * There WAS a `.submitBar button[type="submit"]` here setting weight and padding, and it had to go
+ * rather than sit alongside the class: `.submitBar button[type="submit"]` out-specifies
+ * `.button-primary`, so keeping it would have quietly overridden the shared treatment's padding on
+ * the one screen nobody would think to check. The primary action on this form is the primary action
+ * everywhere else, and it should be one rule, not two that agree until they don't.
+ */
 
 /*
  * The outcome panel, which is an `<output>` — a live region, so a screen reader is told what

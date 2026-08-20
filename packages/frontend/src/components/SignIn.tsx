@@ -223,7 +223,7 @@ export function SignIn({
               placeholder="you@example.org"
             />
           </div>
-          <button type="submit" disabled={busy || email.trim() === ""}>
+          <button type="submit" className="button-primary" disabled={busy || email.trim() === ""}>
             {busy ? "Sending…" : "Send code"}
           </button>
         </form>
@@ -250,7 +250,11 @@ export function SignIn({
             />
           </div>
           <div className="row">
-            <button type="submit" disabled={busy || code.trim().length !== OTP_LENGTH}>
+            <button
+              type="submit"
+              className="button-primary"
+              disabled={busy || code.trim().length !== OTP_LENGTH}
+            >
               {busy ? "Signing in…" : "Sign in"}
             </button>
             <button type="button" onClick={() => void resend()} disabled={busy}>

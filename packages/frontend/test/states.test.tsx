@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 /**
  * THE SHARED FURNITURE, PROVEN RATHER THAN EYEBALLED: the read state machine, the failure states
  * every page renders through it, and the badges that carry editorial state.
@@ -248,6 +250,109 @@ describe("badges carry meaning without colour", () => {
     rerender(<VerifiedBadge verified />);
     expect(screen.queryByText(/publish immediately/)).toBeNull();
     expect(screen.getByText("verified").getAttribute("title")).toMatch(/without review/);
+  });
+});
+
+/* ---------------------------------------------------------- the accent discipline --- */
+
+/**
+ * THE ACCENT IS RATIONED, AND THIS IS THE RATION, ENFORCED.
+ *
+ * One olive accent exists on this site and it means exactly one thing: HERE IS WHERE YOU CAN ACT.
+ * The primary button, the focus ring, the current-section underline, the link colour, and the tint
+ * under a hovered control or row. That is the whole list.
+ *
+ * It is barred from every state, verdict and category — status, review status, listing,
+ * verification, success, error, warning, chart bars — because those are read by people who cannot
+ * see it, printed in black and white, and pasted into bug reports as greyscale screenshots. The
+ * moment a colour is the thing that distinguishes "approved" from "rejected", the design has
+ * quietly stopped working for a fair number of its readers.
+ *
+ * The scan reads the STYLESHEET rather than a rendered page: jsdom does not apply an external
+ * stylesheet, and the rule being protected is a rule about the source. A rendered-DOM assertion
+ * would pass forever while the CSS said something else entirely.
+ */
+describe("the accent never carries state", () => {
+  const css = readFileSync(join(process.cwd(), "src", "app", "globals.css"), "utf8");
+
+  /** Every `selector { … }` rule in the sheet, comments stripped so prose cannot trip the scan. */
+  const rules: { selector: string; body: string }[] = [
+    ...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g),
+  ].map((match) => ({ selector: (match[1] ?? "").trim(), body: match[2] ?? "" }));
+
+  it("finds a stylesheet with rules in it at all", () => {
+    // Without this, a rename or a failed read would make every assertion below vacuously pass.
+    expect(rules.length).toBeGreaterThan(50);
+    expect(rules.some((rule) => rule.body.includes("--accent"))).toBe(true);
+  });
+
+  it("names NO accent token on a badge, a state, a note or a chart", () => {
+    // Each of these carries meaning. Meaning is typographic here: weight, case, border style, fill.
+    const forbidden = /\.badge|\.note\b|\.state\b|\.bar\b|\.tile-value|\.empty-title/;
+    const offenders = rules
+      .filter((rule) => forbidden.test(rule.selector) && rule.body.includes("--accent"))
+      .map((rule) => rule.selector);
+    expect(offenders).toEqual([]);
+  });
+
+  it("spends the accent ONLY on action, focus, current-section, links and hover", () => {
+    // The complete allowlist, written out. A new accent usage fails this test until somebody adds
+    // it here on purpose — which is the review this discipline is asking for.
+    const allowed = [
+      "a", // textual links on paper
+      "button:hover",
+      'button[aria-pressed="true"],\nbutton[aria-selected="true"]',
+      ".button-primary",
+      ".button-primary:hover",
+      '.shell-nav a[aria-current="page"]',
+      ".shell-footer a",
+      "tbody tr:hover",
+    ];
+    const normalise = (selector: string) => selector.replace(/\s+/g, " ").trim();
+    const allowlist = new Set(allowed.map(normalise));
+    const used = rules
+      .filter((rule) => rule.body.includes("var(--accent"))
+      .map((rule) => normalise(rule.selector))
+      // The focus ring is one rule listing every focusable element; match it by shape.
+      .filter((selector) => !selector.includes("focus-visible"));
+
+    for (const selector of used) expect([...allowlist]).toContain(selector);
+  });
+
+  it("keeps the focus ring on the accent, at 2px, for everything focusable", () => {
+    const focus = rules.find((rule) => rule.selector.includes("focus-visible"));
+    expect(focus?.body).toContain("outline: 2px solid var(--accent)");
+    // One rule, not one per control — a focus ring that some controls miss is worse than none,
+    // because the reader learns to trust it.
+    for (const element of ["input", "select", "textarea", "button", "a"]) {
+      expect(focus?.selector).toContain(`${element}:focus-visible`);
+    }
+  });
+
+  it("declares an sRGB fallback before every oklch accent", () => {
+    // oklch is the source of truth; the hex before it is the same colour for anything that cannot
+    // parse the second declaration. A token with only the oklch form would resolve to nothing.
+    for (const token of ["--accent", "--accent-ink", "--accent-soft"]) {
+      const hex = new RegExp(`${token}:\\s*#[0-9a-f]{6};`);
+      const oklch = new RegExp(`${token}:\\s*oklch\\(`);
+      expect(css).toMatch(hex);
+      expect(css).toMatch(oklch);
+      expect(css.indexOf(`${token}: #`)).toBeLessThan(css.indexOf(`${token}: oklch`));
+    }
+  });
+
+  it("still resolves the hueless state tokens the submit form's stylesheet consumes", () => {
+    // `--ok`, `--warn` and `--bad` are referenced by `OpportunityForm.module.css`. They resolve to
+    // ink weights rather than a red/amber/green ramp: the accent is barred from state, and so is
+    // every other hue.
+    for (const token of ["--ok", "--warn", "--bad"]) {
+      expect(css).toMatch(new RegExp(`${token}:\\s*var\\(--ink`));
+    }
+    const form = readFileSync(
+      join(process.cwd(), "src", "components", "OpportunityForm.module.css"),
+      "utf8",
+    );
+    expect(form).not.toContain("--accent");
   });
 });
 

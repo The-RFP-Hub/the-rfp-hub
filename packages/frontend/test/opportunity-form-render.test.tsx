@@ -14,6 +14,7 @@
  * The API client is injected through the same context the application uses. No network, no auth SDK.
  */
 import { OpportunityForm } from "@/components/OpportunityForm";
+import styles from "@/components/OpportunityForm.module.css";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import {
@@ -488,6 +489,72 @@ describe("replacing a claimed listing", () => {
 
     expect(api.replace).not.toHaveBeenCalled();
     expect(screen.getAllByText(/published under acme/).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * NO HUE CARRIES STATE on this site, so `--ok` and `--bad` resolve to plain `--ink` and `--warn` to
+ * `--ink-soft`. That makes every state distinction on this form structural — weight, a rule in the
+ * margin, a border style — and structural distinctions are the kind a component can lose silently
+ * by handing two states the same class.
+ */
+describe("the states are told apart without a hue", () => {
+  const consequenceClass = () => document.querySelector(`.${styles.consequence}`)?.className ?? "";
+
+  it("gives publishes-now, publishes-later and not-knowable three different treatments", () => {
+    const seen: string[] = [];
+
+    const api = stub();
+    const show = (
+      id: string,
+      account?: { verifiedNamespaces: string[]; directCreate: boolean },
+    ) => {
+      const view = render(
+        <ApiClientProvider value={api.client}>
+          <OpportunityForm mode="create" initial={fill({ id })} authority={account} />
+        </ApiClientProvider>,
+      );
+      seen.push(consequenceClass());
+      view.unmount();
+    };
+
+    show("acme:x", { verifiedNamespaces: ["acme"], directCreate: false });
+    show("beta:x", { verifiedNamespaces: ["acme"], directCreate: false });
+    show("acme:x", undefined);
+
+    expect(seen[0]).toContain(styles.consequenceNow);
+    expect(seen[1]).toContain(styles.consequenceLater);
+    expect(seen[2]).not.toContain(styles.consequenceNow);
+    expect(seen[2]).not.toContain(styles.consequenceLater);
+    // Three states, three renderings — none of them collapsed into another.
+    expect(new Set(seen).size).toBe(3);
+  });
+
+  it("keeps a blocking problem and a non-blocking advisory on different classes", () => {
+    // Both resolve to the ink family; the module separates them by weight and by a marginal rule.
+    mount({ title: "", applicationUrl: "" });
+    submit();
+
+    const problem = document.querySelector(`.${styles.problem}`);
+    const advisory = document.querySelector(`.${styles.advisory}`);
+    expect(problem).not.toBeNull();
+    expect(advisory).not.toBeNull();
+    expect(problem?.className).not.toBe(advisory?.className);
+  });
+});
+
+describe("the primary action", () => {
+  it("carries the site-wide primary treatment rather than a local copy of it", () => {
+    mount();
+    expect(screen.getByRole("button", { name: "Submit" }).className).toContain("button-primary");
+  });
+
+  it("is the only filled button on the form", () => {
+    mount();
+    const filled = screen
+      .getAllByRole("button")
+      .filter((button) => button.className.includes("button-primary"));
+    expect(filled).toHaveLength(1);
   });
 });
 
