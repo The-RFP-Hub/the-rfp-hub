@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+import { originOf } from "./src/lib/csp";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +36,69 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * THE FOUR PATH PREFIXES THIS SITE DOES NOT OWN.
+ *
+ * `adr/0007` reserves the apex — `ethrfps.app` — for the Standard and its site, and mints every
+ * identifier the spec publishes underneath it: schema `$id`s under `/schemas/`, the meta-schema
+ * under `/meta/`, the registry entry schema under `/registries/`, and the versionless vocabulary
+ * namespace under `/ns/`. Those strings are forever. This package is the spec's site, and in
+ * production it is what the apex resolves to — which makes these four prefixes paths this app
+ * receives and must not answer.
+ *
+ * PROXIED, NEVER REDIRECTED. An identifier that 301s is an identifier that resolves somewhere
+ * else: a JSON Schema `$id` must dereference to the document at that exact URL, and a validator
+ * that followed a redirect would cache the bytes under the target's URL, not the identifier's.
+ * A rewrite is the one mechanism that keeps the URL and the bytes together.
+ *
+ * IN `beforeFiles`, so the proxy is decided before the filesystem is consulted at all — a route
+ * added here later cannot quietly take an identifier path. That is belt; the braces are
+ * `test/canonical-namespace.test.ts`, which fails if `src/app` ever grows a directory that spells
+ * one of these.
+ *
+ * `/ns/` is included even though the API serves nothing there yet: `adr/0007` leaves "should the
+ * vocabulary namespace dereference" open, and the carve-out is what makes answering it later a
+ * change to the API alone. Until then the prefix 404s from the API, which is the honest answer —
+ * an app page rendered at a vocabulary IRI would not be.
+ */
+export const CANONICAL_PREFIXES = Object.freeze(["schemas", "meta", "registries", "ns"] as const);
+
+/** Next exports no public alias for one rewrite entry; this is the half of its shape used here. */
+export interface ProxyRewrite {
+  source: string;
+  destination: string;
+}
+
+/**
+ * Where the canonical documents are proxied FROM this app TO the API.
+ *
+ * The API's ORIGIN, not `NEXT_PUBLIC_API_URL` verbatim: the canonical documents are mounted at the
+ * API's root rather than under `/v1/` — identifiers are not API resources and must not carry an API
+ * version (`packages/api/src/modules/routes/canonical`) — so a value that carries a path would send
+ * `/schemas/…` to the wrong place. `originOf` is the same parser the CSP's `connect-src` uses, so
+ * the origin this proxies to and the origin the browser is permitted to call cannot come out
+ * different.
+ *
+ * A MISSING VALUE PRODUCES NO REWRITES, and nothing throws. That is how the rest of this package
+ * treats the variable's absence — `lib/config.ts` reports it on screen, `lib/csp.ts` narrows the
+ * policy instead of widening it — and a config that threw at import would make a build the only
+ * way to discover an unset variable. Without the value there is no API to proxy to; the prefixes
+ * then 404 from this app, which is exactly what they did before it had them.
+ *
+ * Takes the URL rather than reading `process.env` so the rules are testable, and is read at call
+ * time rather than captured at module load so a test can state the value it is asserting about.
+ */
+export function canonicalProxyRewrites(apiUrl: string | undefined): ProxyRewrite[] {
+  const origin = originOf(apiUrl);
+  if (!origin) return [];
+  return CANONICAL_PREFIXES.map((prefix) => ({
+    // `:path*` is zero-or-more segments, so `/schemas` itself proxies too, not only what is
+    // below it. The destination repeats the prefix: this is a proxy, not a rebasing.
+    source: `/${prefix}/:path*`,
+    destination: `${origin}/${prefix}/:path*`,
+  }));
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
@@ -53,6 +117,9 @@ const nextConfig: NextConfig = {
   transpilePackages: ["rfphub-validate", "@the-rfp-hub/standard"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
+  },
+  async rewrites() {
+    return { beforeFiles: canonicalProxyRewrites(process.env.NEXT_PUBLIC_API_URL) };
   },
 };
 

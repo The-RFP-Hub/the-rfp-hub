@@ -66,7 +66,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 |---|---|---|
 | `NODE_ENV` | `production` | Also what makes `VERIFY_ALLOW_PRIVATE_HOSTS` and the non-delivering email transports refuse to boot |
 | `BETTER_AUTH_URL` | the API's own origin | The base every auth route and OAuth callback is built from. **Not** `PUBLIC_BASE_URL`, which is the OpenAPI document's `servers[0].url` and may legitimately differ |
-| `TRUSTED_ORIGINS` | the frontend's origin(s) | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart |
+| `TRUSTED_ORIGINS` | the frontend's origin(s) — `https://ethrfps.app` in production, `https://staging.ethrfps.app` in staging | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart. The production frontend is the **apex**: it is the spec's site, and it proxies `/schemas/`, `/meta/`, `/registries/` and `/ns/` back to this service ([`adr/0007`](../../../adr/0007-canonical-domain-and-spec-identity.md)) |
 | `PREVIEW_ORIGIN_PATTERN` | staging only | An **anchored** regular expression for preview origins, tied to our project *and* team slug. Never `*.vercel.app`. Unanchored → refuses to boot |
 | `EMAIL_TRANSPORT` | `ses` | How sign-in codes are delivered. `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
 | `EMAIL_FROM` | `no-reply@ethrfps.app` | The envelope sender. Its domain needs SPF/DKIM/DMARC, or the codes land in spam |

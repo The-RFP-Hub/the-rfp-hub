@@ -229,6 +229,17 @@ directory has an address worth indexing.
 
 ## Deployment — main is staging, a tag is production
 
+**Production is the apex: `https://ethrfps.app`.** That hostname is also the Standard's canonical
+identity — every schema `$id`, the meta-schema, the registries and the vocabulary namespace are
+URLs on it ([`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md)) — so this app
+carries four path prefixes it does not own. `next.config.ts` proxies `/schemas/`, `/meta/`,
+`/registries/` and `/ns/` to `NEXT_PUBLIC_API_URL`'s origin, in Next's `beforeFiles` bucket so the
+decision is made before the filesystem is consulted; they are never redirected, because an
+identifier that 301s resolves somewhere else. Adding a route under any of the four is forbidden and
+`test/canonical-namespace.test.ts` fails if one appears. Staging is
+`https://staging.ethrfps.app` — a single label, by the certificate rule that gives the API
+`api-staging.` rather than `api.staging.`.
+
 CI/CD lives in `.github/workflows/frontend-staging.yml` and `frontend-production.yml`: every
 frontend-affecting push to `main` deploys to the staging alias through Vercel's preview
 environment, and production moves only on a `prod-*` (whole-product) or `frontend-prod-*`

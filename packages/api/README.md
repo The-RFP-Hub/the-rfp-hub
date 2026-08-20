@@ -42,8 +42,12 @@ no version, including the `/v1/opportunities/schema` alias, is `public, max-age=
 must-revalidate`. No `Last-Modified`: the only timestamp available is the build's, and it changes
 for bytes that did not.
 
-These resolve once the apex is routed to this service — `ethrfps.app` is
-registered and delegated already, but it points at registrar URL forwarding rather than here. Spec resolution therefore rides this service's uptime for now; the recorded end
+These resolve through the apex, which in production is the reference frontend
+(`packages/frontend`) — the spec's site, on the hostname the spec reserved for it. That app answers
+none of these paths itself: it proxies `/schemas/`, `/meta/`, `/registries/` and `/ns/` back to this
+service, so an `$id` dereferences to these bytes at its own URL with no redirect in between
+([`adr/0007`](../../adr/0007-canonical-domain-and-spec-identity.md), addendum of 2026-08-20). Spec
+resolution therefore rides this service's uptime; the recorded end
 state is the package directory on object storage behind a CDN, which retires these routes
 without any identifier changing.
 
@@ -78,7 +82,7 @@ run offline, and no identifier names it.
 **Identifiers versus locators.** `https://ethrfps.app/…` stays the canonical identifier of every
 one of these documents — that is what an `$id` or a `@context` names, and it does not change when
 the serving arrangement does; `https://api.ethrfps.app/…` is merely a locator that happens to hold
-the same bytes today, and the apex will serve these same paths when the project site ships.
+the same bytes, and the apex serves these same paths by proxying to it.
 
 There are **no directory listings**: `GET /schemas/v1.0.0/` is a `404`. The package ships no index
 for that directory, and synthesising one would put an API-shaped document — whose format could
@@ -108,11 +112,13 @@ this service **wholesale** would not reserve it; it would publish the whole `/v1
 
 This is enforced in the application (`src/plugins/apex-host.ts`, an `onRequest` allowlist derived
 from the Standard's own `baseUrl`) and asserted with both `Host` headers in
-`test/integration/apex-host.test.ts`. **The infrastructure must enforce the same contract
-independently**: the apex listener rule belongs path-scoped to `/schemas/*`, `/meta/*` and
-`/registries/*`, so apex traffic for `/v1` never reaches a task at all. Two layers, because the
-application rule survives an infrastructure edit and the infrastructure rule survives a routing
-change here.
+`test/integration/apex-host.test.ts`. **The infrastructure enforces the same contract
+independently**: in production the apex resolves to the reference frontend, which proxies exactly
+`/schemas/`, `/meta/`, `/registries/` and `/ns/` to this service and claims none of them as app
+routes — so apex traffic for `/v1` never reaches a task at all. The table above still describes
+this service's behaviour under a `Host: ethrfps.app` header, and that is the point: it is what
+holds if the apex is ever routed here directly. Two layers, because the application rule survives
+an infrastructure edit and the infrastructure rule survives a routing change here.
 
 The apex `404` says where the API actually is, and takes that from `PUBLIC_BASE_URL` — the same
 value the OpenAPI document publishes, because it is the same fact and a second variable for it
