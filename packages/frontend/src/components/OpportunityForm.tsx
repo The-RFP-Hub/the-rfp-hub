@@ -1037,7 +1037,12 @@ export function OpportunityForm({
       ) : null}
 
       <div className={styles.submitBar}>
-        <button type="submit" disabled={busy}>
+        {/*
+         * The one filled button on this screen, and the same one the rest of the site uses. The
+         * global class rather than a copy of its declarations: a second definition of the primary
+         * action is a second thing to remember when the accent changes.
+         */}
+        <button type="submit" className="button-primary" disabled={busy}>
           {busy ? "Sending…" : mode === "create" ? "Submit" : "Replace"}
         </button>
         <span className="muted footnote">
