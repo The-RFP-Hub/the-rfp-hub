@@ -80,4 +80,4 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_SCOPE: ${{ secrets.VERCEL_ORG_ID }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
-        run: vercel alias "$DEPLOYMENT_URL" app-staging.ethrfps.app --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
+        run: vercel alias "$DEPLOYMENT_URL" staging.ethrfps.app --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
