@@ -1,0 +1,72 @@
+name: Dump cache
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dump-cache.yml'
+  workflow_dispatch:
+
+jobs:
+  dump-buildx:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: staging
+            prefix: Linux-buildx
+            fail_on_miss: true
+          # Tag-scoped; a PR against main often cannot restore this.
+          - name: prod
+            prefix: Linux-buildx-prod
+            fail_on_miss: false
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ matrix.prefix }}-will-miss
+          restore-keys: |
+            ${{ matrix.prefix }}
+          fail-on-cache-miss: ${{ matrix.fail_on_miss }}
+
+      - name: Pack
+        id: pack
+        run: |
+          if [ ! -d /tmp/.buildx-cache ]; then
+            echo "no cache directory; nothing to pack"
+            exit 0
+          fi
+          mkdir -p dump
+          du -sh /tmp/.buildx-cache | tee dump/listing.txt
+          find /tmp/.buildx-cache -maxdepth 3 -printf '%y %s %p\n' | head -200 >> dump/listing.txt
+          tar -C /tmp -czf dump/cache.tar.gz .buildx-cache
+          echo "packed=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.pack.outputs.packed == 'true'
+        with:
+          name: cache-dump-buildx-${{ matrix.name }}
+          path: dump
+          retention-days: 1
+
+  dump-pnpm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Pack
+        run: |
+          mkdir -p dump
+          store="$(pnpm store path)"
+          du -sh "$store" | tee dump/listing.txt
+          tar -C "$(dirname "$store")" -czf dump/cache.tar.gz "$(basename "$store")"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cache-dump-pnpm
+          path: dump
+          retention-days: 1
