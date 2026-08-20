@@ -598,7 +598,12 @@ export const config: AppConfig = {
   },
 
   stalenessInactiveDays: readPositiveInt(process.env.STALENESS_INACTIVE_DAYS, 90),
-  pendingSubmissionLimit: readPositiveInt(process.env.SUBMISSION_PENDING_LIMIT, 5),
+  // A product rule, not a deployment knob: a ceiling on the QUEUE, not a quota on a lifetime — every
+  // approval or rejection frees a slot, and replacing an entry that is already pending is not a new
+  // submission. Anybody holding a verified publisher membership anywhere is exempt entirely: their
+  // own writes auto-approve and never reach the queue. Fixed at 5 by decision, so it cannot be
+  // raised quietly by an operator holding only the deployment configuration.
+  pendingSubmissionLimit: 5,
 };
 
 // Announced only where it costs something: a run with analytics off never touches the key, and a

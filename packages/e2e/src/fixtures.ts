@@ -76,12 +76,13 @@ export interface TestFixtures {
 /**
  * How many entries an account with no verified membership may have awaiting review at once.
  *
- * `SUBMISSION_PENDING_LIMIT` in the API's configuration, whose default is 5. THIS SUITE HAS TO KNOW
- * IT because the queue is a shared resource and this suite is a heavy user of it: the `submitter`
- * actor is the run's general-purpose "some other account", it holds no verified membership
- * anywhere, and half a dozen specs across three files use it to manufacture a pending entry. Past
- * the fifth, the API answers 409 `pending_limit_reached` — correctly — and a spec that is about
- * duplicate detection or audit redaction fails on a rule it never meant to exercise.
+ * `pendingSubmissionLimit` in the API's configuration, fixed in code at 5 — a product rule, not an
+ * environment setting. THIS SUITE HAS TO KNOW IT because the queue is a shared resource and this
+ * suite is a heavy user of it: the `submitter` actor is the run's general-purpose "some other
+ * account", it holds no verified membership anywhere, and half a dozen specs across three files
+ * use it to manufacture a pending entry. Past the fifth, the API answers 409
+ * `pending_limit_reached` — correctly — and a spec that is about duplicate detection or audit
+ * redaction fails on a rule it never meant to exercise.
  *
  * The cap itself is asserted deliberately and in one place (`m3-1-lifecycle.spec.ts`), against an
  * identity created for it, so that nothing else in the run has to care what order it ran in.

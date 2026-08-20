@@ -92,7 +92,6 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `ANALYTICS_ENABLED` | `true` | |
 | `ANALYTICS_RETENTION_DAYS` | `180` | Enforced by the retention sweep, not by the schema |
 | `STALENESS_INACTIVE_DAYS` | `90` | |
-| `SUBMISSION_PENDING_LIMIT` | `5` | How many entries one account may leave awaiting review at once, when it holds no verified membership anywhere. A ceiling on the queue — every decision frees a slot — and verified publishers are exempt. Raising it raises how much of a reviewer's queue a single account can occupy |
 
 Use a **separate `BETTER_AUTH_SECRET` per environment** — development, staging and production each
 with their own — so a session minted for one environment cannot authenticate against another. That

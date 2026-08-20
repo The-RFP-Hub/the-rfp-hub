@@ -39,12 +39,13 @@ export default function ListingsPage() {
 /**
  * How many submissions an account may have in review at once, when it holds no verified membership.
  *
- * THIS MIRRORS THE DEFAULT OF THE API'S `SUBMISSION_PENDING_LIMIT`, and mirrors are allowed to drift:
- * a deployment that sets that variable to something else makes this denominator wrong. It is used
- * only to PHRASE the warning and never to gate anything — the submit button is never disabled from
- * here, and the API's 409 `pending_limit_reached` is the only thing that decides, carrying its own
- * sentence with the real number in it (surfaced verbatim by the form). So the worst case is a
- * denominator that reads oddly for one release, not a submission wrongly refused or wrongly allowed.
+ * THIS MIRRORS THE API'S `pendingSubmissionLimit`, a product rule fixed in code at 5, and mirrors
+ * are allowed to drift: if that fixed value is ever changed in `src/config.ts`, this denominator
+ * goes stale until someone updates it here too. It is used only to PHRASE the warning and never to
+ * gate anything — the submit button is never disabled from here, and the API's 409
+ * `pending_limit_reached` is the only thing that decides, carrying its own sentence with the real
+ * number in it (surfaced verbatim by the form). So the worst case is a denominator that reads oddly
+ * for one release, not a submission wrongly refused or wrongly allowed.
  *
  * The one shape that would look broken rather than merely stale — "7 of 5" — is unreachable: past
  * the mirrored limit the banner drops the denominator instead of printing a contradiction.

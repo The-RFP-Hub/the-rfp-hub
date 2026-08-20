@@ -204,9 +204,11 @@ organisation's pending queue.
 
 ### What limits an account with no verified membership
 
-At most **`SUBMISSION_PENDING_LIMIT` (default 5) entries awaiting review at once**, counted as rows
-currently `pending` and owned by the account. The review queue is a shared resource and reviewing is
-human work; without a ceiling one account can deny that work to everybody else at no cost to itself.
+At most **5 entries awaiting review at once**, counted as rows currently `pending` and owned by the
+account. The review queue is a shared resource and reviewing is human work; without a ceiling one
+account can deny that work to everybody else at no cost to itself. The limit is a product rule fixed
+in code (`pendingSubmissionLimit` in `src/config.ts`), not a deployment setting — no operator can
+raise it by configuring the environment.
 
 It is a ceiling on the **queue**, not a quota on a lifetime: every decision frees a slot, replacing
 an entry that is already pending is not a new submission, and anybody holding a verified membership

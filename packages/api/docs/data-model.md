@@ -387,7 +387,7 @@ CREATE TABLE accounts (                  -- ✅ M3
   -- publishing organization's slug, or 'community'. Deliberately not the email or the subject.
   handle         TEXT UNIQUE,
   -- T1 default; T3/T4 elevate. An account with no VERIFIED membership anywhere is also metered on
-  -- how many entries it may leave pending at once (SUBMISSION_PENDING_LIMIT, counted live from
+  -- how many entries it may leave pending at once (fixed in code at 5, counted live from
   -- opportunities.review_status — no counter column, so a decision frees a slot by itself).
   global_role    account_role NOT NULL DEFAULT 'submitter',
   -- Publish in ANY namespace without a membership. Granted by T4, audited both ways, and

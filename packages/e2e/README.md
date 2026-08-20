@@ -113,8 +113,8 @@ Two fixtures exist because of that:
 
 ### The pending cap is a shared resource, and this suite is a heavy user of it
 
-An account holding no verified membership anywhere may have at most
-`SUBMISSION_PENDING_LIMIT` (default 5) entries awaiting review; the sixth is a 409
+An account holding no verified membership anywhere may have at most 5 entries awaiting review — a
+product rule fixed in code, not an environment setting; the sixth is a 409
 `pending_limit_reached`. The `submitter` actor is exactly such an account **and** is the run's
 general-purpose "some other account" — half a dozen specs across `m3-2`, `m3-3` and `m3-4` use it to
 manufacture a pending entry. Left alone, one of them fails on a rule it never meant to exercise, and
