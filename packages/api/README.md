@@ -1,7 +1,7 @@
 # @the-rfp-hub/api
 
 The public **`/v1/` read API** for the RFP Hub — an unauthenticated Fastify + Postgres service that
-serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a curated 142-entry dataset
+serves [RFP Hub Standard v1.0.0](../standard) objects, backed by a curated 174-entry dataset
 committed to this repository, and repeatable open-data exports (CC0). This is milestone **M2**.
 
 ## Endpoints (`/v1`)
@@ -213,7 +213,7 @@ document points at itself with an atom `link rel="self"`.
 docker compose up -d                     # Postgres 15 (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
-pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # 142 entries, offline
+pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # 174 entries, offline
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./exports
 
@@ -411,10 +411,10 @@ gap for a reader to fall into.
   "license": "CC0-1.0",
   "runId": "9f2c…",
   "generatedAt": "2026-08-11T09:41:07.512Z",
-  "count": 142,
+  "count": 174,
   "artifacts": [
-    { "format": "json", "href": "opportunities-2026-08-11-<digest>.json", "sha256": "<64 hex>", "count": 142 },
-    { "format": "csv",  "href": "opportunities-2026-08-11-<digest>.csv",  "sha256": "<64 hex>", "count": 142 }
+    { "format": "json", "href": "opportunities-2026-08-11-<digest>.json", "sha256": "<64 hex>", "count": 174 },
+    { "format": "csv",  "href": "opportunities-2026-08-11-<digest>.csv",  "sha256": "<64 hex>", "count": 174 }
   ]
 }
 ```
@@ -562,7 +562,7 @@ cannot reshape the published dataset without a failing test.
 
 ## Seeding: a static, in-repo corpus
 
-**The dataset is a repo artifact.** `data/seed-corpus.json` holds 142 finished RFP Hub Standard
+**The dataset is a repo artifact.** `data/seed-corpus.json` holds 174 finished RFP Hub Standard
 v1.0.0 documents — reviewed in a pull request, versioned with the code, and diffable like any other
 source file. The seed loader reads that file and nothing else:
 
@@ -596,7 +596,7 @@ where the researched value contradicted the converted one, the researched value 
 `note` records that, including the caveat that statuses are a point-in-time reading and go stale.
 
 That reconciliation is evidenced by `additionalReferences` and by the dated readings written into
-the descriptions — **not** by `source.verifiedAgainstSource`, which is null on all 142. That flag
+the descriptions — **not** by `source.verifiedAgainstSource`, which is null on all 174. That flag
 records the verification-assist job, which has not run; a human pass is not the same claim and does
 not get to set it.
 
@@ -634,12 +634,13 @@ only carry a date the source itself published. It is never the date the file was
 optional and says null means unknown, so a record without one is a record whose announcement date
 could not be established — not a record nobody looked at.
 
-**103 of the 142 documents carry one.** All 76 researched records do: the 57 that shipped dateless
-were researched one by one, and each date is written into the record it dates — a bug bounty's
-"Live Since" line, a governance topic's creation date, a launch post, a press release. **Seven of
-those are archival bounds** where the funder published no announcement at all: those records say
-"publicly visible by", name the first capture of the funder's own page, and the field carries that
-bound. A bound is a source date, not a Hub timestamp.
+**125 of the 174 documents carry one.** Of the 108 researched records, 98 carry a source date — a
+bug bounty's "Live Since" line, a governance topic's creation date, a launch post or a press
+release. **Seven of those are archival bounds** where the funder published no announcement at all:
+those records say "publicly visible by", name the first capture of the funder's own page, and the
+field carries that bound. A bound is a source date, not a Hub timestamp. The other 10 researched
+records are VC funds whose primary pages publish only a year, no date, or no launch history; they
+carry no `postedAt` rather than a guessed timestamp.
 
 On the converted side the field had been inherited from the upstream snapshot's own row timestamp,
 byte-identical to `createdAt` on 65 of the 66 — an ingestion time, not an announcement. Those were
@@ -647,13 +648,14 @@ re-researched: **26 now carry a date the funder or organiser published** (11 exa
 announcements, 2 archival bounds) and **39 carry no `postedAt` at all**, because that is what the
 Standard has for unknown. Each of the 39 says in its own description what was searched.
 `test/unit/seed-corpus.test.ts` asserts the rule document by document — a date, if present,
-predates its own `createdAt` and never equals it — and pins the 103/76/27 split so it cannot drift.
+predates its own `createdAt` and never equals it — and pins the 125/98/27 split so it cannot drift.
 
 ### What the corpus contains
 
-142 documents, all validating against v1.0.0 with zero errors: 45 bounties, 44 grants, 44
-hackathons, 5 RFPs, 3 accelerators, 1 VC fund; 76 open and 66 closed; 66 converted (`fundingmap:`)
-and 76 researched (`curated:`). Statuses were re-read from source during curation, so "closed" is a
+174 documents, all validating against v1.0.0 with zero errors: 63 bounties, 44 grants, 44
+hackathons, 5 RFPs, 3 accelerators and 15 VC funds; 108 open and 66 closed; 66 converted
+(`fundingmap:`) and 108 researched (`curated:`). Statuses were re-read from source during
+curation, so "closed" is a
 finding rather than a default. Those per-type and per-status counts are the inventory at this
 commit, not a CI contract: what CI asserts is the >=130 floor, zero schema errors, unique ids, the
 advisory baseline below, and the bounty split.
@@ -679,7 +681,7 @@ Where the honest answer is less data, the corpus carries less data:
   The field is optional in the Standard; leaving it absent is a fact about the program, whereas
   substituting a listing page or an archive copy would put something in the field consumers read as
   "apply here" that the funder never published.
-- **19 documents carry no `fundingInfo`**, and for every one of them the absence has been chased to
+- **27 documents carry no `fundingInfo`**, and for every one of them the absence has been chased to
   the funder's own pages and written into the record. Several are deliberate on the funder's part —
   "This is not a grant program", "Budget envelope: Open — propose your number", hackathons whose
   prizes are certificates and mentorship — and the rest are programs that fund without ever
@@ -687,9 +689,10 @@ Where the honest answer is less data, the corpus carries less data:
   had survived from a source snapshot. The two Arbitrum DDA domains joined this list when their
   budgets could not be re-evidenced: the only source for them was a third-party aggregator frozen
   at the program's Season 1/2 state, and the DAO's own governance threads size the seasons without
-  publishing a remaining balance per domain. Each record names the places that were checked.
+  publishing a remaining balance per domain. Seven newly curated VC funds also publish neither a
+  check size nor a fund envelope; each record names the primary pages that were checked.
 
-Of the 45 bounties, **44 are `security` and 1 is `task`**, and each carries exactly one
+Of the 63 bounties, **62 are `security` and 1 is `task`**, and each carries exactly one
 compensation shape: a security record's published ceiling is a tier table rather than a scalar
 reward, because a scalar on a bug-bounty listing is a maximum and not a fee. That split and the
 invariant under it are pinned by `test/unit/seed-corpus.test.ts`, so a curation pass cannot quietly

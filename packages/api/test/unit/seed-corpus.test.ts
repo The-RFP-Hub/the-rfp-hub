@@ -243,6 +243,10 @@ describe("the committed corpus", () => {
    * published; the other 39 carry no `postedAt` at all, because absence is what the Standard has
    * for unknown and prose cannot turn a row timestamp into an announcement.
    *
+   * The VC-fund pass added 14 researched records. Four carry funder-published launch dates; the
+   * other ten deliberately carry no source date, because their primary pages publish only a year,
+   * no date, or no launch history at all.
+   *
    * That is why the equality guard below now runs on EVERY document rather than on `curated:`
    * only — the class it used to be scoped around is the class that no longer carries the values
    * it was scoped around.
@@ -263,12 +267,12 @@ describe("the committed corpus", () => {
    * snapshot's row timestamp again, and the honest count of what is actually dated is a number a
    * reviewer can check rather than a claim in prose.
    */
-  it("carries a source date on 121 documents and says nothing on the rest", () => {
+  it("carries a source date on 125 documents and says nothing on the rest", () => {
     const dated = DOCUMENTS.filter((d) => d.postedAt !== undefined && d.postedAt !== null);
-    expect(dated).toHaveLength(121);
+    expect(dated).toHaveLength(125);
 
     const byClass = (prefix: string) => dated.filter((d) => d.id.startsWith(prefix)).length;
-    expect(byClass("curated:")).toBe(94); // every researched record
+    expect(byClass("curated:")).toBe(98); // 94 earlier records plus 4 source-dated VC funds
     expect(byClass("fundingmap:")).toBe(27); // 26 re-researched here, plus fundingmap:1382
   });
 

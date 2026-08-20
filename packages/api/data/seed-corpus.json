@@ -1,5 +1,5 @@
 {
-  "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` means the date the SOURCE ITSELF announced the opportunity, and it is never the date this file was edited. On the 94 `curated:` records it is a date the funder published — a program page's \"Live Since\" line, a governance topic's creation date, a launch post or a press release — written into the description of the record it dates; seven of those are archival bounds instead (\"publicly visible by\", the first capture of the funder's own page), because their funder published no announcement at all, and each says so in its own description.\n\nOn the `fundingmap:` records the field used to carry the timestamp the upstream snapshot held for its own row — when that registry recorded the program, not when the funder announced it. Those values were not announcement dates and no longer ship: 65 of the 66 were re-researched here. 26 now carry a date the funder or organiser itself published (11 exact — a forum topic's creation time, a listing's own publication timestamp, a press release dateline; 13 dated launch announcements; 2 archival bounds), each written into the description of the record it dates. For the other 39 no publishable date could be established, so `postedAt` is absent — the Standard's \"unknown\" — and each of those records says in its own description what was searched. `fundingmap:1382` keeps the date researched for it earlier. 121 of the 160 documents therefore carry a `postedAt`, and every one of them is a source date.\n\n`createdAt`/`updatedAt` are Hub timestamps — on `curated:` records the curation date, on `fundingmap:` records the snapshot's own row timestamp — which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading and go stale: re-check against the funder before relying on one. The curation pass read them on 2026-08-11 (eighteen security-bounty records researched from their Sherlock, HackenProof and Immunefi programme pages were added and read on 2026-08-14); a pre-review pass on 2026-08-13 re-read a subset against the funder and corrected what had moved, and each record it touched carries its own dated reading. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
+  "note": "A static, curated dataset of Ethereum-ecosystem funding opportunities, maintained in this repository and versioned with it. Every document validates against RFP Hub Standard v1.0.0 with zero errors.\n\nPROVENANCE, IN TWO CLASSES, TOLD BY THE ID NAMESPACE. `fundingmap:` records were converted from a snapshot of an upstream registry and then reconciled against the funder's own published pages; they keep the identifier that registry issued in `source.originalId`. `curated:` records were researched here from the funder's own pages — site, docs, blog, governance forum or code host — and never existed in any upstream registry, so they carry no `source.originalId` and no upstream namespace. `source.ingestedVia` is `import` on both classes because both entered the Hub through a seed import; it describes the route in, not an upstream API. Where a researched value contradicted a converted one, the researched value was kept.\n\nWHAT THE PROVENANCE FIELDS DO AND DO NOT SAY. `source.verifiedAgainstSource` is null on every document: it records the verification-assist job, which has not run, not the human curation pass, which has. The reconciliation is evidenced by `additionalReferences` and by the dated readings in the descriptions, not by a machine-readable flag.\n\nDATES. `postedAt` means the date the SOURCE ITSELF announced the opportunity, and it is never the date this file was edited. Of the 108 `curated:` records, 98 carry a funder-published source date: a program page's \"Live Since\" line, a governance topic's creation date, a launch post or a press release. Seven of those are archival bounds instead (\"publicly visible by\", the first capture of the funder's own page), because their funder published no announcement at all. The other ten are VC-fund records whose primary pages publish only a year, no date, or no launch history; they carry no `postedAt` rather than a guessed timestamp.\n\nOn the `fundingmap:` records the field used to carry the timestamp the upstream snapshot held for its own row — when that registry recorded the program, not when the funder announced it. Those values were not announcement dates and no longer ship: 65 of the 66 were re-researched here. 26 now carry a date the funder or organiser itself published (11 exact — a forum topic's creation time, a listing's own publication timestamp, a press release dateline; 13 dated launch announcements; 2 archival bounds), each written into the description of the record it dates. For the other 39 no publishable date could be established, so `postedAt` is absent — the Standard's \"unknown\" — and each of those records says in its own description what was searched. `fundingmap:1382` keeps the date researched for it earlier. 125 of the 174 documents therefore carry a `postedAt`, and every one of them is a source date.\n\n`createdAt`/`updatedAt` are Hub timestamps — on `curated:` records the curation date, on `fundingmap:` records the snapshot's own row timestamp — which is what those fields mean.\n\nCAVEATS. Statuses are a point-in-time reading and go stale: re-check against the funder before relying on one. The original curation pass read them on 2026-08-11; eighteen security-bounty records were added and read on 2026-08-14; and fourteen VC-fund records were added, with Base Ecosystem Fund refreshed, from primary pages re-read on 2026-08-20. Each record touched by a later pass carries its own dated reading. Descriptions summarise and often quote the funder's own copy, promotional register included; they are reporting, not endorsement.",
   "documents": [
     {
       "specVersion": "1.0.0",
@@ -7913,7 +7913,7 @@
       "fundingType": "vc_fund",
       "title": "Base Ecosystem Fund",
       "description": "\"Base Ecosystem Fund is the strategic investment arm of Base. In partnership with Coinbase Ventures, we invest in pre-seed and seed stage startups that choose Base as their home. Our approach is borderless and uncompromisingly team-centric, focusing on accelerating the elite builders on Base.\" The fund positions itself as \"Pairing early-stage capital with deep ecosystem alignment to ensure the best teams have the resources to achieve venture-scale growth from day one.\"\n\nMission: \"to catalyze the Base economy by backing ambitious founders focused on delivering venture scale outcomes.\" Investment strategy: \"We invest in the world's top talent building the next generation of enduring and high-performance onchain primitives & businesses that drive real economic activity and define the onchain future.\"\n\nWhat portfolio companies get, in three published buckets: White Glove Support — \"Hands-on support from our ecosystem team to unlock partner integrations and amplify distribution\"; Exclusive Perks — \"Unlock credits from our partners including AWS, Azure, Alchemy, Spindl ad credits and more\"; and Coinbase Access — \"Get priority access to Coinbase Prime, Coinbase Business, and Coinbase Onramp API\".\n\nThe Ecosystem Fund is one rung of a published six-stage support ladder: (01) Idea — Base Batches, \"Base's in-house Accelerator program\"; (02) Pre-seed & Seed — Ecosystem Fund; (03) Growth — Coinbase Ventures; (04) Private Fundraise — Echo; (05) Public Token Sale — Sonar by Echo; (06) Listing — Coinbase. Teams at idea stage are therefore routed to Base Batches rather than to this fund.\n\nPortfolio companies named on the page: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC and Zynk, filterable by Trading, Payments, AI Agents and Other.\n\nApplication is a multi-step form at base.org/ecosystem-fund/apply with sections for Company, Team, Idea, Funding and Why Base; the first step asks for Company Name, \"What are you building?\", Website URL and X URL. No fund size, check size, instrument, ownership target, deadline or decision timeline is published.\n\nThe fund was announced on 23 February 2023, in Coinbase's Base launch post: \"We're also announcing the Base Ecosystem Fund, which invests in and supports early stage projects building on Base that meet our investment criteria. If you're interested, please fill out the form here.\" That is the entire announcement — it names no fund size, no check size and no target project count.\n\n**Nothing about the money is published — and Base publishes it for its neighbouring programs.** The fund page carries no fund size, check size, instrument, ownership target or decision timeline; the launch announcement quoted above named none; and the first-cohort post quantifies only demand (\"We received over 800 applications for our Base Ecosystem Fund\") with no per-deal amounts for any of the six investments. Base's own funding documentation does publish ranges one rung either side — Builder Rewards \"distributes 2 ETH weekly\", Builder Grants a \"Grant Range: 1-5 ETH\" — but does not list the Ecosystem Fund at all: re-read on 2026-08-13, docs.base.org/get-started/get-funded covers Builder Rewards, Builder Grants, OP Retro Funding and Base Batches, and the Ecosystem Fund is absent from it. This record previously said the docs listed the fund without a figure, which is a different and weaker claim than the one the page supports. There is no earlier version to fall back on either: the fund page has never been archived. The absence is the fund's own posture, which is why this record carries no `fundingInfo`.",
-      "summary": "The strategic investment arm of Base, investing pre-seed and seed alongside Coinbase Ventures in startups that choose Base as their home, with hands-on ecosystem support, partner credits and priority Coinbase access. Rolling applications; terms and fund size undisclosed.",
+      "summary": "The strategic investment arm of Base, investing pre-seed and seed alongside Coinbase Ventures in startups that choose Base as their home, with hands-on ecosystem support, partner credits and priority Coinbase access. Rolling application re-read 20 August 2026; terms and fund size undisclosed.",
       "status": "open",
       "operatingOrganizations": [
         {
@@ -7940,7 +7940,7 @@
       ],
       "postedAt": "2023-02-23T00:00:00.000Z",
       "createdAt": "2026-08-11T00:00:00.000Z",
-      "updatedAt": "2026-08-11T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
       "fundingDetails": {
         "fundingType": "vc_fund",
         "activelyInvesting": true,
@@ -7989,7 +7989,7 @@
         "stages": ["pre-seed", "seed"],
         "thesis": "\"We invest in the world's top talent building the next generation of enduring and high-performance onchain primitives & businesses that drive real economic activity and define the onchain future.\" Mission: \"to catalyze the Base economy by backing ambitious founders focused on delivering venture scale outcomes.\""
       },
-      "additionalReferences": "Fund page: https://www.base.org/ecosystem-fund · Launch announcement (Coinbase, 23 February 2023): https://www.coinbase.com/blog/introducing-base · First-cohort post (7 September 2023): https://blog.base.org/base-ecosystem-fund-announces-first-six-investments · Apply: https://www.base.org/ecosystem-fund/apply · Sibling programs on Base's published support ladder — Base Batches (idea-stage accelerator), Coinbase Ventures (growth), Echo (private fundraise), Sonar by Echo (public token sale), Coinbase (listing) · Named portfolio: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC, Zynk.",
+      "additionalReferences": "Fund page: https://www.base.org/ecosystem-fund · Canonical application, live when re-read 20 August 2026: https://www.base.org/ecosystem-fund/apply · Current Request for Builders, naming global onchain finance focus areas and linking the same application: https://blog.base.org/request-for-builders-1 · Launch announcement (Coinbase, 23 February 2023): https://www.coinbase.com/blog/introducing-base · First-cohort post (7 September 2023): https://blog.base.org/base-ecosystem-fund-announces-first-six-investments · Sibling programs on Base's published support ladder — Base Batches (idea-stage accelerator), Coinbase Ventures (growth), Echo (private fundraise), Sonar by Echo (public token sale), Coinbase (listing) · Named portfolio: Aerodrome, Avantis, Limitless, A0X, B3, BANKR, Berry, Blockrun, Boardwalk, Charms, Credit Coop, Crown, Ethos, Exactly Protocol, Flyra, Giza, Glider, HeyElsa, Jia, Kash, Kontigo, LiveFrame, Nuzo, Offramp, Onboard, OpenCover, Paragraph, Pred, Remix, Sapien, Senpi, Sport.Fun, Tailgate, Tenor, Truflation, Veil, ViFi, Wrapped CBDC, Zynk.",
       "categories": ["Funding Opportunity", "Early Stage", "Trading", "Payments", "AI Agents"],
       "prerequisites": "A multi-step application at base.org/ecosystem-fund/apply with sections for Company, Team, Idea, Funding and Why Base. The first step asks for Company Name, \"What are you building?\", Website URL and X URL.",
       "website": "https://www.base.org/ecosystem-fund",
@@ -16078,6 +16078,822 @@
       ],
       "prerequisites": "A proof of concept is required for critical, high and medium findings. Reporters must hold Immunefi's Intermediate researcher level or higher to have reports reviewed.",
       "website": "https://immunefi.com/bug-bounty/alchemix-1/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:dragonfly",
+      "fundingType": "vc_fund",
+      "title": "Dragonfly",
+      "description": "Dragonfly is a global crypto investment fund backing companies and protocols across sectors and stages. Its current site says it invests from seed through Series B and beyond and publishes checks \"anywhere from $3M to $30M+\". Because the upper figure is explicitly open-ended, this record carries the published $3M lower bound and does not turn $30M into a false ceiling.\n\nThe contact page was re-read on 2026-08-20 and has a dedicated Pitch option, so founder intake is open by form. The portfolio includes Ethereum-aligned companies and protocols such as Dune Analytics, EigenLayer, Ethena, Flashbots, Lido and MakerDAO, alongside projects from other ecosystems; this is a global, multichain mandate rather than an Ethereum-only fund.\n\nDragonfly's own current pages do not publish the fund's first-announcement date. No postedAt is asserted, and the Fund IV size and date reported outside Dragonfly's own pages are omitted.",
+      "summary": "Global crypto venture fund investing from seed through Series B and beyond, with a live pitch form and published checks beginning at $3M; the stated $30M+ upper figure is open-ended.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Dragonfly",
+          "slug": "dragonfly",
+          "orgType": "company",
+          "description": "Global crypto investment firm with offices in New York City and Singapore.",
+          "website": "https://www.dragonfly.xyz/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Crypto researchers, builders, companies and protocols seeking capital from seed through Series B and beyond. Dragonfly says it invests globally; the pitch form asks for name, email, company and a message.",
+      "applicationUrl": "https://www.dragonfly.xyz/contact",
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "checkSize": {
+          "min": 3000000
+        },
+        "stages": ["seed", "series-a", "series-b+"],
+        "thesis": "Dragonfly says it backs \"the best researchers and builders who will push the entire crypto ecosystem forward\" and supports teams tackling difficult problems across the crypto industry.",
+        "portfolio": ["Dune Analytics", "EigenLayer", "Ethena", "Flashbots", "Lido", "MakerDAO"],
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Fund, stage, check-size and portfolio page: https://www.dragonfly.xyz/ | Pitch form: https://www.dragonfly.xyz/contact | Re-read 2026-08-20; no funder-published first-announcement date was found.",
+      "categories": ["Funding Opportunity", "Venture Capital", "Crypto", "Infrastructure", "DeFi"],
+      "website": "https://www.dragonfly.xyz/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:1kx",
+      "fundingType": "vc_fund",
+      "title": "1kx",
+      "description": "1kx is a research-driven global crypto investment firm founded in 2018. Its current thesis is that blockchain can make trust instant, open and programmable, and that the largest outcomes accrue to networks and companies that reduce the cost of trust. Its published portfolio is strongly represented in Ethereum infrastructure, onchain finance and applications, including Blockscout, CoW Swap, Curve, Matter Labs, Nexus Mutual, Rocket Pool and Safe.\n\nThe contact page was re-read on 2026-08-20 and explicitly tells visitors to pick a lane among Investment, Pitch, Conference and Press; it also publishes team@1kx.capital. The portfolio lists investments through 2026, supporting the current actively-investing finding. 1kx does not publish a check size or a precise schema-compatible stage range on these pages, so both are omitted.\n\nThe site says the firm has operated since 2018 but provides no exact first-announcement date. No postedAt is asserted.",
+      "summary": "Research-driven crypto investor in networks and companies that make trust more open and programmable, with a live pitch lane and an Ethereum-dense multichain portfolio.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "1kx",
+          "slug": "1kx",
+          "orgType": "company",
+          "description": "Research-driven global investment firm focused on crypto networks, protocols and companies.",
+          "website": "https://1kx.capital/",
+          "contacts": [
+            {
+              "role": "General and pitch contact",
+              "email": "team@1kx.capital"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Founders building crypto networks, protocols and companies. The contact page provides a dedicated Pitch lane and asks for name, email, company and a message.",
+      "applicationUrl": "https://1kx.capital/contact",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "thesis": "1kx invests where blockchain reshapes the broader economy, backing networks and companies whose configurations compound and require a blockchain to exist.",
+        "portfolio": [
+          "Blockscout",
+          "CoW Swap",
+          "Curve",
+          "Matter Labs",
+          "Nexus Mutual",
+          "Rocket Pool",
+          "Safe"
+        ],
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Firm and thesis: https://1kx.capital/ | Investing approach: https://1kx.capital/our-approach | Pitch lane and email: https://1kx.capital/contact | Portfolio, including investments dated through 2026: https://1kx.capital/portfolio | Re-read 2026-08-20; no exact funder-published first-announcement date or check size was found.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Crypto",
+        "Infrastructure",
+        "Onchain Finance"
+      ],
+      "website": "https://1kx.capital/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:multicoin-capital-venture-fund-iii",
+      "fundingType": "vc_fund",
+      "title": "Multicoin Capital Venture Fund III",
+      "description": "Multicoin Capital says it is currently deploying its third venture fund, a $422M vehicle raised in January 2022, into early-stage crypto companies and founders with investments from $1M to $50M. Its 12 July 2022 launch post used the then-current rounded figures of $430M and $500K-$25M for early-stage opportunities, with larger later-stage investments alongside its liquid fund; this record uses the firm's current homepage figures because those are the deployment parameters it publishes now.\n\nThe current contact page explicitly welcomes crypto- or blockchain-related projects and companies. A warm introduction helps Multicoin qualify a pitch quickly but is not required; founders without one are told to use the form and wait for a response. Status and deployment were re-read on 2026-08-20.\n\nThis is a multichain fund, not an Ethereum-focused one. Its own writing and portfolio show a pronounced Solana thesis and substantial Solana exposure, while also documenting active Open Finance investing and Ethereum-aligned holdings including Dune Analytics, EigenLayer, Lido, MakerDAO and Optimism. It qualifies here because it actively funds Ethereum-ecosystem companies, not because its overall portfolio is Ethereum-dominant.",
+      "summary": "Multicoin's actively deploying $422M Venture Fund III backs early-stage crypto companies with published $1M-$50M investments and accepts cold pitches; its mandate is multichain and notably Solana-tilted.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Multicoin Capital",
+          "slug": "multicoin-capital",
+          "orgType": "company",
+          "description": "Thesis-driven crypto investment firm active across public and private markets.",
+          "website": "https://multicoin.capital/",
+          "contacts": [
+            {
+              "role": "General contact",
+              "email": "hello@multicoin.capital"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Founders working on a crypto- or blockchain-related project or company. The contact page says a warm introduction helps but is not required; cold pitches are accepted through the form and should include a clear description and evaluation materials.",
+      "prerequisites": "A clear description of the project or company and any resources that can help Multicoin evaluate the opportunity.",
+      "applicationUrl": "https://multicoin.capital/contact/",
+      "fundingInfo": {
+        "budget": 422000000,
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2022-07-12T00:00:00.000Z",
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "checkSize": {
+          "min": 1000000,
+          "max": 50000000
+        },
+        "thesis": "Multicoin makes long-term, high-conviction investments in category-defining crypto companies and protocols. Its published theses include Open Finance, Web3 infrastructure and consumer applications.",
+        "portfolio": ["Dune Analytics", "EigenLayer", "Lido", "MakerDAO", "Optimism"],
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Current fund size, deployment status and check range: https://multicoin.capital/ | Founder pitch process: https://multicoin.capital/contact/ | Fund III launch announcement (12 July 2022): https://multicoin.capital/2022/07/12/announcing-venture-fund-iii/ | Portfolio: https://multicoin.capital/portfolio/ | Re-read 2026-08-20.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Crypto",
+        "Open Finance",
+        "Infrastructure",
+        "Consumer"
+      ],
+      "website": "https://multicoin.capital/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:bankless-ventures",
+      "fundingType": "vc_fund",
+      "title": "Bankless Ventures",
+      "description": "Bankless Ventures launched on 28 April 2023 as an early-stage Web3 venture fund. Its Fund II announcement, published 20 February 2025, says the firm's $500K checks let it take meaningful positions in early-stage deals and that it was raising $50M for Fund II. The $50M is a fundraising target rather than a published final fund size, so it is kept in prose and not represented as a budget.\n\nThe founder submission form linked from Bankless Ventures' own research site was live when re-read on 2026-08-20. It asks for the company, category, financing history, founder profiles and a required pitch-deck link. The form also retains an old setup notice saying the firm is \"still ramping up and not actively deploying capital yet\"; because that wording conflicts with the later Fund II announcement and portfolio activity, this record does not assert activelyInvesting. Status open means the founder intake itself accepts submissions.\n\nThe official portfolio is dense with Ethereum and L2 infrastructure, DeFi and scaling companies including Aligned Layer, Espresso, ether.fi, Mode, Puffer, Renzo, Succinct and Swell.",
+      "summary": "Early-stage Web3 venture fund with a published $500K check size and live founder form requiring a pitch deck; its 2025 Fund II announcement stated a $50M fundraising target.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Bankless Ventures",
+          "slug": "bankless-ventures",
+          "orgType": "company",
+          "description": "Early-stage Web3 venture firm launched by the Bankless founders and investment team.",
+          "website": "https://www.bankless.ventures/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Base", "Optimism", "Arbitrum", "Multi-chain"],
+      "eligibility": "Early-stage Web3 companies and organizations. The form covers blockchain networks, DeFi, NFTs/metaverse, infrastructure/middleware, gaming and an open Other category.",
+      "prerequisites": "Company and founder information, prior financing dates and valuations, social profiles and a required pitch-deck link.",
+      "applicationUrl": "https://docs.google.com/forms/d/e/1FAIpQLSfSt0qkdfDMIWMJ2ZEsyfSDeKh4acon5JLzESs6MiGHmQeyjg/viewform",
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2023-04-28T00:00:00.000Z",
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "checkSize": {
+          "min": 500000,
+          "max": 500000
+        },
+        "thesis": "Bankless Ventures focuses on early-stage opportunities intended to grow the crypto frontier, with published themes spanning DeFi, L2s, restaking, zero-knowledge systems, Bitcoin L2s and crypto x AI.",
+        "portfolio": [
+          "Aligned Layer",
+          "Espresso",
+          "ether.fi",
+          "Mode",
+          "Puffer",
+          "Renzo",
+          "Succinct",
+          "Swell"
+        ],
+        "contactMethod": "form"
+      },
+      "additionalReferences": "Launch announcement (28 April 2023): https://www.research.bankless.ventures/about | Fund II target and $500K check size (20 February 2025): https://www.research.bankless.ventures/p/were-opening-bankless-ventures-fund | Current portfolio and contact form: https://www.bankless.ventures/ | Founder form: https://docs.google.com/forms/d/e/1FAIpQLSfSt0qkdfDMIWMJ2ZEsyfSDeKh4acon5JLzESs6MiGHmQeyjg/viewform | Re-read 2026-08-20.",
+      "categories": ["Funding Opportunity", "Venture Capital", "Web3", "DeFi", "Infrastructure"],
+      "website": "https://www.bankless.ventures/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:lattice",
+      "fundingType": "vc_fund",
+      "title": "Lattice",
+      "description": "Lattice is a venture capital firm investing in infrastructure, networks and applications that expand access to money, markets and other resources. Its thesis is that open markets outperform closed ones, open-source software compounds faster than private networks, and money should move as quickly as information.\n\nThe current site publishes $250K-$1M checks from pre-seed through Series A and links to Leland, its no-signup deck submission and feedback tool. Leland accepts a PDF or DocSend URL, reviews the deck confidentially within the Lattice team and offers a partner calendar link when a pitch fits. Both pages and 2026 investment posts were re-read on 2026-08-20, supporting open status and active deployment.\n\nLattice publishes no exact first-announcement date on the checked pages, so no postedAt is asserted.",
+      "summary": "Early-stage investor in open markets, open-source infrastructure and applications, writing $250K-$1M checks from pre-seed through Series A through a no-signup deck intake.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Lattice",
+          "slug": "lattice",
+          "orgType": "company",
+          "description": "Early-stage venture firm headquartered in New York City and San Francisco.",
+          "website": "https://lattice.fund/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Companies globally at pre-seed through Series A building infrastructure, networks or applications that expand access to money, markets or other resources.",
+      "prerequisites": "A pitch deck as a PDF upload or DocSend URL, plus founder name and email.",
+      "applicationUrl": "https://leland.lattice.fund/",
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "checkSize": {
+          "min": 250000,
+          "max": 1000000
+        },
+        "stages": ["pre-seed", "seed", "series-a"],
+        "thesis": "Lattice believes open markets beat closed ones, open-source software compounds faster than private networks, and money should move as quickly as information.",
+        "portfolio": ["LI.FI", "RedStone", "Midas", "Privy", "Goldsky"],
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Thesis, check size, stages, portfolio and pitch link: https://lattice.fund/ | No-signup deck submission: https://leland.lattice.fund/ | Current investment writing: https://www.lattice.fund/writing-and-press | Re-read 2026-08-20; no exact funder-published first-announcement date was found.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Open Markets",
+        "Open Source",
+        "Infrastructure"
+      ],
+      "website": "https://lattice.fund/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:maven-11-blockchain-venture-fund-3",
+      "fundingType": "vc_fund",
+      "title": "Maven 11 Blockchain Venture Fund 3",
+      "description": "Maven 11's current Fund III page publishes a $102M closed-ended vehicle established in 2024, with a pre-seed and seed focus, $1M-$1.5M initial checks, about 60 investments per fund and follow-on reserves. It describes the fund's phase as \"Deploying\" and its focus as enabling infrastructure, financial primitives and applications, particularly DeFi, payments and financial infrastructure.\n\nThe page's \"Open/closed: Closed\" label describes the closed-ended fund vehicle and investor subscription state, not founder intake. Maven 11's separate contact page was re-read on 2026-08-20 and still offers \"For investment in your blockchain venture\" as a form route; paired with Fund III's deploying phase, founder status is open.\n\nThe source publishes only the establishment year, not an exact announcement date, so no postedAt is asserted. The current $102M and $1M-$1.5M figures replace older third-party figures from the research shortlist.",
+      "summary": "Deploying $102M Maven 11 Fund III focused on pre-seed and seed blockchain infrastructure and financial applications, with published $1M-$1.5M initial checks and a founder investment form.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Maven 11",
+          "slug": "maven-11",
+          "orgType": "company",
+          "description": "Global blockchain and crypto-focused investment firm founded in Amsterdam in 2017.",
+          "website": "https://maven11.com/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Pre-seed and seed founders building enabling infrastructure, financial primitives and applications, with particular focus on DeFi, payments and financial infrastructure.",
+      "applicationUrl": "https://maven11.com/contact",
+      "fundingInfo": {
+        "budget": 102000000,
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "checkSize": {
+          "min": 1000000,
+          "max": 1500000
+        },
+        "stages": ["pre-seed", "seed"],
+        "thesis": "Fund III backs early-stage founders using blockchain rails to redefine credit, payments, stablecoins and trading, combining research-driven conviction with active founder support.",
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Current Fund III summary, phase, fund size, stages and initial checks: https://invest.maven11.com/blockchain-venture-fund-3 | Firm thesis and current activity: https://invest.maven11.com/ | Founder investment contact: https://maven11.com/contact | Re-read 2026-08-20; only an establishment year is published, so no postedAt is asserted.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "DeFi",
+        "Payments",
+        "Stablecoins",
+        "Infrastructure"
+      ],
+      "website": "https://invest.maven11.com/blockchain-venture-fund-3"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:p2-ventures",
+      "fundingType": "vc_fund",
+      "title": "P2 Ventures",
+      "description": "P2 Ventures, formerly presented as Polygon Ventures in testimonials still carried on its site, is a multichain Web3 investor that says it backs visionary teams at the earliest stages across all categories. It supports founders through operations, technology, distribution, strategic partnerships, advisory, marketing, technical support and community building.\n\nThe official site and its Apply Now link were re-read on 2026-08-20. Apply Now resolves to a live Typeform titled \"Investments Application\", so founder intake is open. P2 publishes neither a check size nor an exact schema-compatible stage list beyond \"the earliest stages\", and no precise launch announcement was found; checkSize, stages and postedAt are therefore omitted.\n\nAlthough its stated mandate is now multichain, the firm's own site retains its Polygon lineage and founder testimonials about access to projects building on Polygon. The record carries Polygon and Ethereum alignment without describing the fund as Polygon-exclusive.",
+      "summary": "Polygon-rooted, now multichain Web3 investor backing teams at the earliest stages, with a live Investments Application Typeform and broad operational and technical support.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "P2 Ventures",
+          "slug": "p2-ventures",
+          "orgType": "company",
+          "description": "Multichain Web3 investment firm formerly known as Polygon Ventures.",
+          "website": "https://www.p2v.ventures/"
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Polygon", "Ethereum", "Multi-chain"],
+      "eligibility": "Visionary teams across the multichain ecosystem, at the earliest stages and across all Web3 categories.",
+      "applicationUrl": "https://ecz7z2m96ab.typeform.com/to/wM52knaT",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "thesis": "P2 Ventures backs teams bringing the open internet to the masses and invests in startups and protocols intended to become leaders in emerging Web3 categories.",
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Firm, multichain mandate, earliest-stage focus, Polygon lineage and Apply Now link: https://www.p2v.ventures/ | Live Investments Application: https://ecz7z2m96ab.typeform.com/to/wM52knaT | Re-read 2026-08-20; no published check size or exact fund announcement date was found.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Web3",
+        "Multi-chain",
+        "Infrastructure"
+      ],
+      "website": "https://www.p2v.ventures/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:consensys-mesh-investments",
+      "fundingType": "vc_fund",
+      "title": "Consensys Mesh Investments",
+      "description": "Consensys Mesh is not presented as a single conventional fund vehicle: its current description names four components — investment, incubation, research and development, and acceleration — and says it has invested in more than 190 projects while supporting an Ethereum-rooted network of founders and builders. This record represents Mesh's direct investment channel, not its separate Tachyon program.\n\nThe contact page was re-read on 2026-08-20 and publishes investments@mesh.xyz specifically \"For Founders\". That current source does not require a warm introduction, so contactMethod is email rather than the earlier research note's intro-only label. Mesh publishes no check size, fund envelope or stage range for this direct channel, and no first-announcement date for it was established; those fields are omitted.\n\nTachyon is deliberately not curated here. Its live site remains framed around a 2025 cohort and says application review is paused until an unspecified fall, so its present intake status cannot be dated confidently as of 2026-08-20.",
+      "summary": "Direct founder investment channel for Ethereum-rooted Consensys Mesh, a platform spanning investment, incubation, R&D and acceleration; founders can email investments@mesh.xyz without a published warm-intro requirement.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Consensys Mesh",
+          "slug": "consensys-mesh",
+          "orgType": "company",
+          "description": "Ethereum-rooted network supporting Web3 founders through investment, incubation, research and development, and acceleration.",
+          "website": "https://www.mesh.xyz/",
+          "contacts": [
+            {
+              "role": "Founder investment contact",
+              "email": "investments@mesh.xyz"
+            }
+          ],
+          "ecosystems": ["Ethereum", "Linea"]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Linea", "Multi-chain"],
+      "eligibility": "Founders raising for decentralized Web3 projects. Mesh's published portfolio and history emphasize Ethereum software, DeFi, DAO governance and tooling, and blockchain protocol development.",
+      "applicationUrl": "mailto:investments@mesh.xyz",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "thesis": "Consensys Mesh champions the global adoption of Web3 by investing in, incubating and accelerating decentralized projects and equipping founders with resources, connections and capital.",
+        "portfolio": ["MetaMask", "Gitcoin", "Gnosis", "Tribute Labs", "Safe"],
+        "contactMethod": "email",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Current description of Mesh and its investment/incubation/R&D/acceleration model (16 December 2024): https://www.mesh.xyz/post/consensys-mesh | Founder investment email: https://www.mesh.xyz/contact | Portfolio: https://www.mesh.xyz/portfolio | Separate Tachyon status checked at https://tachyon.xyz/ and excluded from this record | Re-read 2026-08-20; no direct-channel fund size, check size, stage range or first-announcement date was published.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Ethereum",
+        "Web3",
+        "Infrastructure",
+        "DeFi"
+      ],
+      "website": "https://www.mesh.xyz/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:blockchain-capital",
+      "fundingType": "vc_fund",
+      "title": "Blockchain Capital",
+      "description": "Blockchain Capital describes itself as a partner to crypto builders since 2013. Its current homepage publishes representative investments across DeFi, centralized and decentralized infrastructure and consumer products, with entry stages spanning seed, Series A, Series B and growth. Ethereum-aligned examples include Aave, Circle, Coinbase, EigenLayer, OpenSea, Polymarket and World.\n\nThe founder route was re-read on 2026-08-20. The contact page explicitly asks founders to get in touch and share a pitch deck or other materials with contact@blockchaincapital.com, so the opportunity is open by email. The pages checked do not publish a check size, current fund envelope or an exact first-announcement date for the ongoing investment platform; those fields are omitted.\n\nThe reported April 2026 fundraising target in the research shortlist came from outside Blockchain Capital's own current pages and is not carried in this record.",
+      "summary": "Long-running crypto venture investor with a portfolio spanning seed through growth and a published founder email inviting pitch decks and other materials.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Blockchain Capital",
+          "slug": "blockchain-capital",
+          "orgType": "company",
+          "description": "Crypto-focused venture investment firm partnering with builders since 2013.",
+          "website": "https://www.blockchaincapital.com/",
+          "contacts": [
+            {
+              "role": "Founder pitch contact",
+              "email": "contact@blockchaincapital.com"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Crypto founders seeking venture investment. The founder contact asks applicants to share a pitch deck or other evaluation materials by email.",
+      "prerequisites": "A pitch deck or other materials describing the company and opportunity.",
+      "applicationUrl": "mailto:contact@blockchaincapital.com",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "stages": ["seed", "series-a", "series-b+", "growth"],
+        "thesis": "Blockchain Capital partners with crypto builders and invests across DeFi, infrastructure, centralized services and consumer applications.",
+        "portfolio": ["Aave", "Circle", "Coinbase", "EigenLayer", "OpenSea", "Polymarket", "World"],
+        "contactMethod": "email",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Firm and representative portfolio with published entry stages: https://www.blockchaincapital.com/ | Founder pitch-deck email instruction: https://www.blockchaincapital.com/contact-us | Re-read 2026-08-20; no funder-published check size, current fund envelope or exact first-announcement date was found.",
+      "categories": ["Funding Opportunity", "Venture Capital", "Crypto", "DeFi", "Infrastructure"],
+      "website": "https://www.blockchaincapital.com/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:electric-capital",
+      "fundingType": "vc_fund",
+      "title": "Electric Capital",
+      "description": "Electric Capital invests in founders building frontier technologies including artificial intelligence, cryptography and distributed systems, with a stated focus on technologies that reduce reliance on intermediaries. Its current homepage publishes a pre-seed-through-Series A focus and a \"$1-15M+\" check range.\n\nBecause the published upper figure is explicitly open-ended, checkSize carries the $1M lower bound without inventing a $15M ceiling; the exact $1M-$15M+ wording remains in prose. The contact page was re-read on 2026-08-20 and says founders building frontier technologies should email info@electriccapital.com, so intake and active deployment are recorded as open.\n\nElectric says it has invested since 2018 but does not publish an exact first-announcement date on the checked pages. No postedAt is asserted.",
+      "summary": "Technical venture investor backing frontier technologies from pre-seed through Series A, with checks published as $1M-$15M+ and an open founder email.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Electric Capital",
+          "slug": "electric-capital",
+          "orgType": "company",
+          "description": "Technical investment firm focused on frontier technologies and trust-minimized systems.",
+          "website": "https://www.electriccapital.com/",
+          "contacts": [
+            {
+              "role": "Founder contact",
+              "email": "info@electriccapital.com"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Founders building frontier technologies in areas Electric lists including AI, cryptography, distributed systems, fintech, identity and reputation, creator products and other trust-minimized systems.",
+      "applicationUrl": "mailto:info@electriccapital.com",
+      "fundingInfo": {
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "checkSize": {
+          "min": 1000000
+        },
+        "stages": ["pre-seed", "seed", "series-a"],
+        "thesis": "Electric Capital invests in builders of frontier technologies that reduce reliance on intermediaries, including AI, cryptography and distributed systems.",
+        "contactMethod": "email",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Current thesis, pre-seed-through-Series A stages and $1M-$15M+ checks: https://www.electriccapital.com/ | Founder email invitation: https://www.electriccapital.com/contact/ | Re-read 2026-08-20; no exact funder-published first-announcement date was found.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Cryptography",
+        "Distributed Systems",
+        "Artificial Intelligence"
+      ],
+      "website": "https://www.electriccapital.com/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:variant-4",
+      "fundingType": "vc_fund",
+      "title": "Variant 4",
+      "description": "Variant announced Variant 4 on 3 June 2026 as a $222M venture fund that leads at the earliest possible stage and participates in liquid and growth investments as projects mature. Its current thesis is autonomy: technology that gives users greater agency through access, knowledge and ownership, spanning new markets, infrastructure and applications.\n\nThe fund's own announcement names Ethereum and Solana among its public-blockchain investments and highlights Ethereum-ecosystem portfolio companies including Blockaid, Turnkey, Relay, Uniswap and Morpho. This is a multichain fund with substantial Ethereum alignment rather than an Ethereum-exclusive mandate.\n\nVariant's site was re-read on 2026-08-20. It invites founders to share ideas and what they are building at info@variant.fund, and it publishes new investment posts through July 2026, supporting open status and active deployment. No check size is published, so checkSize is omitted.",
+      "summary": "Variant's $222M 2026 fund investing at the earliest stage and in liquid/growth opportunities under an autonomy thesis, with a live founder email and current investment activity.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Variant",
+          "slug": "variant",
+          "orgType": "company",
+          "description": "Venture capital firm investing in technology that expands human autonomy.",
+          "website": "https://variant.fund/",
+          "contacts": [
+            {
+              "role": "Founder and ideas contact",
+              "email": "info@variant.fund"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Multi-chain"],
+      "eligibility": "Founders building new markets, infrastructure and applications that expand human autonomy through greater access, knowledge and ownership.",
+      "applicationUrl": "mailto:info@variant.fund",
+      "fundingInfo": {
+        "budget": 222000000,
+        "currency": "USD"
+      },
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2026-06-03T00:00:00.000Z",
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "stages": ["pre-seed", "growth"],
+        "thesis": "Variant invests in technology that expands autonomy, focusing on new markets, infrastructure and applications that give users more agency through increased access, knowledge and ownership.",
+        "portfolio": ["Blockaid", "Turnkey", "Relay", "Uniswap", "Morpho"],
+        "contactMethod": "email",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Variant 4 announcement, $222M size, stage posture and thesis (3 June 2026): https://variant.fund/articles/variant-4-autonomy/ | Current site, founder email and recent activity: https://variant.fund/ | Writing, including July 2026 investment posts: https://variant.fund/writing/ | Re-read 2026-08-20; no check size is published.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Autonomy",
+        "Open Source",
+        "Markets",
+        "Infrastructure"
+      ],
+      "website": "https://variant.fund/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:uniswap-labs-ventures",
+      "fundingType": "vc_fund",
+      "title": "Uniswap Labs Ventures",
+      "description": "Uniswap Labs launched its corporate venture arm on 11 April 2022 to invest across different stages and levels of the Web3 stack, from infrastructure and developer tools to consumer-facing applications. It focuses on teams aligned with long-term building, open collaboration with communities and putting users first, and offers support across strategy, product, partnerships, engineering and design.\n\nThe venture page was live and re-read on 2026-08-20. It still explicitly invites builders to email ventures@uniswap.org, so founder intake is recorded as open. The page does not publish a fund size, check size or exact schema-compatible stage list, so those fields are omitted; \"different stages\" is retained in prose rather than converted into invented enum values.\n\nThe published launch portfolio is Ethereum-dense, including Tenderly, MakerDAO, Aave and Compound, alongside LayerZero and PartyDAO. The page also states that the team participates in relevant onchain and offchain protocol governance.",
+      "summary": "Uniswap Labs' corporate venture arm invests across the Web3 stack and different stages, with a published builder email and an Ethereum-dense launch portfolio.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Uniswap Labs",
+          "slug": "uniswap-labs",
+          "orgType": "company",
+          "description": "Company building products around the Uniswap ecosystem and operating Uniswap Labs Ventures.",
+          "website": "https://uniswap.org/",
+          "contacts": [
+            {
+              "role": "Ventures founder contact",
+              "email": "ventures@uniswap.org"
+            }
+          ],
+          "ecosystems": ["Ethereum", "Unichain", "Uniswap"]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Unichain", "Uniswap", "Multi-chain"],
+      "eligibility": "Teams at different stages building infrastructure, developer tools or consumer-facing Web3 applications and aligned with long-term building, open community collaboration and user-first products.",
+      "applicationUrl": "mailto:ventures@uniswap.org",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "postedAt": "2022-04-11T00:00:00.000Z",
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "thesis": "Uniswap Labs Ventures invests across the Web3 stack in teams building for the long term, collaborating openly with communities and putting users first.",
+        "portfolio": ["Tenderly", "LayerZero", "MakerDAO", "Aave", "Compound", "PartyDAO"],
+        "contactMethod": "email"
+      },
+      "additionalReferences": "Launch announcement, thesis, portfolio and founder email (11 April 2022): https://blog.uniswap.org/ventures | Re-read 2026-08-20; the page publishes no fund size, check size or exact stage list.",
+      "categories": [
+        "Funding Opportunity",
+        "Corporate Venture Capital",
+        "DeFi",
+        "Infrastructure",
+        "Developer Tools",
+        "Consumer"
+      ],
+      "website": "https://blog.uniswap.org/ventures"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:symbolic-capital",
+      "fundingType": "vc_fund",
+      "title": "Symbolic Capital",
+      "description": "Symbolic Capital describes itself as a people-driven investment firm supporting Web3 founders globally. Its team page identifies co-founder Sandeep Nailwal, who also co-founded Polygon, and its founder writing emphasizes backing ambitious builders based on merit rather than pedigree. The firm's own investment posts document activity across infrastructure, AI and crypto, DeFi and multichain systems.\n\nThe contact page was re-read on 2026-08-20 and has a dedicated \"Pitch Us\" link to a Symbolic Pitch Form hosted on Airtable. The Airtable endpoint itself timed out during this check, so the durable fund-owned contact page — which also contains a general contact form and the pitch link — is used as applicationUrl. Open status reports what the live contact page publishes; it does not claim that the external form's fields were inspected.\n\nSymbolic's site does not publish a fund size, check size, general stage range or exact fund launch date. The $50M launch figure from outside press is omitted under the primary-source rule.",
+      "summary": "People-driven Web3 investor co-founded by Polygon co-founder Sandeep Nailwal, with a live fund-owned Pitch Us page linking to an Airtable submission form.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "Symbolic Capital",
+          "slug": "symbolic-capital",
+          "orgType": "company",
+          "description": "Global Web3 investment firm founded by Web3 operators.",
+          "website": "https://www.symbolic.capital/",
+          "contacts": [
+            {
+              "role": "General contact",
+              "email": "info@symbolic.capital"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Polygon", "Multi-chain"],
+      "eligibility": "Web3 founders globally. Symbolic's founder and firm pages emphasize people, merit, conviction, technical ambition and durable founder relationships rather than a published geography, age or pedigree filter.",
+      "applicationUrl": "https://www.symbolic.capital/contact",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "thesis": "Symbolic Capital is a people-driven Web3 investment firm that seeks lasting founder partnerships grounded in trust and conviction.",
+        "portfolio": ["Primus", "TAC", "0G", "dappOS", "Side Protocol", "CUBE3.AI", "NodeKit"],
+        "contactMethod": "form",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Firm thesis: https://www.symbolic.capital/about | Dedicated Pitch Us link and contact form: https://www.symbolic.capital/contact | Team and Polygon-founder lineage: https://www.symbolic.capital/team and https://www.symbolic.capital/team/sandeep-nailwal | Investment writing: https://www.symbolic.capital/writings | Re-read 2026-08-20; the linked Airtable endpoint timed out, so its fields are not represented. No funder-published fund size, check size, general stage range or launch date was found.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Web3",
+        "Infrastructure",
+        "Artificial Intelligence"
+      ],
+      "website": "https://www.symbolic.capital/"
+    },
+    {
+      "specVersion": "1.0.0",
+      "id": "curated:iosg-ventures",
+      "fundingType": "vc_fund",
+      "title": "IOSG Ventures",
+      "description": "IOSG Ventures describes itself as a research-driven Web3 investment fund founded in 2017, supporting community-friendly, protocol-native projects across infrastructure, middleware, security and social or consumer applications. Its published portfolio is strongly represented in the Ethereum ecosystem, including Morpho, 0x, Centrifuge, Flashbots, EigenLayer, Consensys, Infura, StarkWare, Taiko, zkSync, Optimism and Polygon.\n\nThe homepage was fetched and re-read on 2026-08-20. Its Investment section instructs founders to email a project summary with a pitch deck and/or white paper to pitch@iosg.vc, and the site carried investment research dated 13 August 2026. That current activity and explicit pitch route support open status and activelyInvesting.\n\nIOSG publishes no check size, general stage range, fund envelope or exact first-announcement date for the ongoing venture platform, so those fields are omitted. The separate IOSG Kickstarter builders program, which advertises up to $100,000, is not folded into this venture-fund record.",
+      "summary": "Research-driven Web3 investor with an Ethereum-heavy portfolio and a published email pitch process requiring a project summary plus a deck and/or white paper.",
+      "status": "open",
+      "operatingOrganizations": [
+        {
+          "name": "IOSG Ventures",
+          "slug": "iosg-ventures",
+          "orgType": "company",
+          "description": "Research-driven Web3 investment firm founded in 2017.",
+          "website": "https://iosg.vc/",
+          "contacts": [
+            {
+              "role": "Founder pitch contact",
+              "email": "pitch@iosg.vc"
+            }
+          ]
+        }
+      ],
+      "source": {
+        "ingestedVia": "import",
+        "verifiedAgainstSource": null
+      },
+      "ecosystems": ["Ethereum", "Optimism", "Polygon", "Taiko", "ZKsync Era", "Multi-chain"],
+      "eligibility": "Web3 founders building protocol-native infrastructure, middleware, security, social or consumer applications.",
+      "prerequisites": "An emailed project summary with a pitch deck and/or white paper.",
+      "applicationUrl": "mailto:pitch@iosg.vc",
+      "deadlines": [
+        {
+          "deadlineType": "rolling",
+          "label": "application"
+        }
+      ],
+      "createdAt": "2026-08-20T00:00:00.000Z",
+      "updatedAt": "2026-08-20T00:00:00.000Z",
+      "fundingDetails": {
+        "fundingType": "vc_fund",
+        "thesis": "IOSG backs protocol-native Web3 projects capable of reshaping infrastructure, middleware, security and social or consumer applications, using a research-driven investment approach.",
+        "portfolio": [
+          "Morpho",
+          "0x",
+          "Centrifuge",
+          "Flashbots",
+          "EigenLayer",
+          "Consensys",
+          "Infura",
+          "StarkWare",
+          "Taiko",
+          "zkSync",
+          "Optimism",
+          "Polygon"
+        ],
+        "contactMethod": "email",
+        "activelyInvesting": true
+      },
+      "additionalReferences": "Firm thesis, founder email instruction, portfolio and current August 2026 research: https://iosg.vc/ | Re-read 2026-08-20; the separate Kickstarter program is excluded. No funder-published check size, general stage range, fund envelope or exact first-announcement date was found.",
+      "categories": [
+        "Funding Opportunity",
+        "Venture Capital",
+        "Web3",
+        "Infrastructure",
+        "Middleware",
+        "Security"
+      ],
+      "website": "https://iosg.vc/"
     }
   ]
 }
