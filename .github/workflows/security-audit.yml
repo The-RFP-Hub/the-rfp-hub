@@ -1,0 +1,98 @@
+name: Security audit
+
+# The standing check on the PRODUCTION dependency tree — the one thing CI cannot do for itself,
+# because a vulnerability is published against code that was already green.
+#
+# WHY A SCHEDULE AND NOT A PUSH TRIGGER. Nothing in this repository changes when an advisory is
+# filed: the lockfile is the same, the tests still pass, and the only event is somebody else's
+# disclosure. A check that runs only on a push therefore reports the state of the world as it was
+# the last time anyone happened to commit. A weekly run is the smallest schedule that answers
+# "is the tree we ship still clean" without depending on a contributor being around to ask.
+#
+# THIS WORKFLOW HOLDS NO CREDENTIAL, and can hold none. It reads a public registry with a public
+# lockfile: there is nothing to authenticate to, nothing to deploy, and nothing to write back. So
+# `permissions: contents: read`, no `secrets` anywhere, and `persist-credentials: false` on the
+# checkout — a token left in `.git/config` would be inherited by every later step for no reason.
+# That is also what makes it safe as a scheduled workflow on a public repository.
+#
+# `--prod` IS THE POINT. Development dependencies are not shipped and are not reachable by anyone
+# who is not already running the build; auditing them would fill this report with findings nobody
+# can act on and teach everyone to ignore the red. `--audit-level moderate` sets the floor: this
+# fails on moderate and above, which is the level the project's own triage treats as actionable.
+#
+# WHAT A RED RUN MEANS: an advisory now covers something the deployed image installs. It does NOT
+# mean the deployment is exploitable — every finding still needs a reachability answer, and the
+# repository's audit notes record those per advisory. The action is to triage: bump the direct
+# dependency where one exists, add a `pnpm.overrides` pin where the fix is transitive and the parent
+# has not moved, and write down the reachability rationale for anything deliberately accepted. A red
+# run is a task, not an outage — nothing here gates a deploy.
+
+on:
+  schedule:
+    # Monday morning: a week is short enough to catch a disclosure while it is still news, and the
+    # start of the week is when somebody is around to triage what it found.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+# Read a checkout, read a registry. Nothing is written anywhere.
+permissions:
+  contents: read
+
+# One audit at a time. A dispatch during the weekly run would report on the same lockfile twice.
+concurrency:
+  group: security-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # `--frozen-lockfile`, so the audit describes the tree the deployment installs rather than
+      # whatever the registry would resolve today.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level moderate
+
+  # Reported, never enforced. "A newer version exists" is not a defect, and a job that failed on it
+  # would be red almost permanently — at which point the audit above stops being read too. It runs
+  # as its own job so its outcome is visible in the run summary rather than buried in a step of one
+  # that is allowed to fail.
+  outdated:
+    name: Outdated report (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: List outdated dependencies
+        run: pnpm -r outdated
