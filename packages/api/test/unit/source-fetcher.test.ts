@@ -1,0 +1,151 @@
+/**
+ * The fetcher's protocol-level rules, driven through the injected transport: schemes, redirect
+ * hops, the content-type allowlist, the byte cap's digest, and what the request carries.
+ *
+ * The ADDRESS rules are not here. They are a fact about a resolved address and belong to the real
+ * transport, which `test/integration/verification.test.ts` drives against real loopback and
+ * link-local targets. Splitting them this way is what makes both halves testable: this file needs
+ * no socket, and that one needs no fixture.
+ */
+import { describe, expect, it } from "vitest";
+import {
+  SourceFetchError,
+  type SourceTransport,
+  VERIFIER_USER_AGENT,
+  fetchSource,
+} from "../../src/modules/services/verification/fetcher.service.js";
+
+const PAGE = "<!doctype html><html><head><title>A programme</title></head><body>Hi.</body></html>";
+
+function transport(
+  pages: Record<string, { status?: number; headers?: Record<string, string>; body?: string }>,
+  seen?: { url: string; headers: Record<string, string> }[],
+): SourceTransport {
+  return async (url, options) => {
+    seen?.push({ url, headers: options.headers });
+    const page = pages[url] ?? { status: 404, body: "" };
+    return {
+      status: page.status ?? 200,
+      headers: { "content-type": "text/html; charset=utf-8", ...(page.headers ?? {}) },
+      bytes: Buffer.from(page.body ?? ""),
+      truncated: false,
+    };
+  };
+}
+
+const options = { transport: transport({ "https://example.org/a": { body: PAGE } }) };
+
+describe("source fetcher", () => {
+  it("returns the page, its digest, and the hop it ended on", async () => {
+    const result = await fetchSource("https://example.org/a", options);
+    expect(result.status).toBe(200);
+    expect(result.finalUrl).toBe("https://example.org/a");
+    expect(result.text).toContain("A programme");
+    expect(result.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.redirects).toEqual([]);
+  });
+
+  it("carries an identifying agent and nothing that could be a credential", async () => {
+    const seen: { url: string; headers: Record<string, string> }[] = [];
+    await fetchSource("https://example.org/a", {
+      transport: transport({ "https://example.org/a": { body: PAGE } }, seen),
+    });
+    const headers = seen[0]?.headers ?? {};
+    expect(headers["user-agent"]).toBe(VERIFIER_USER_AGENT);
+    // A verifier that forwarded a credential would be handing it to whoever the submitter chose.
+    for (const forbidden of ["authorization", "cookie", "referer"]) {
+      expect(Object.keys(headers), forbidden).not.toContain(forbidden);
+    }
+  });
+
+  it("refuses every scheme that is not http(s)", async () => {
+    for (const url of [
+      "file:///etc/passwd",
+      "gopher://example.org/1",
+      "data:text/html,<h1>hi</h1>",
+      "ftp://example.org/x",
+    ]) {
+      await expect(fetchSource(url, options), url).rejects.toMatchObject({
+        category: "scheme_not_allowed",
+      });
+    }
+  });
+
+  it("follows redirects by hand, and gives up at the hop budget", async () => {
+    const chain = transport({
+      "https://example.org/1": { status: 302, headers: { location: "/2" } },
+      "https://example.org/2": { status: 301, headers: { location: "/3" } },
+      "https://example.org/3": { body: PAGE },
+    });
+    const result = await fetchSource("https://example.org/1", { transport: chain });
+    expect(result.finalUrl).toBe("https://example.org/3");
+    expect(result.redirects).toEqual(["https://example.org/2", "https://example.org/3"]);
+    // The requested URL is preserved, so the off-domain check compares the right two hosts.
+    expect(result.requestedUrl).toBe("https://example.org/1");
+
+    const loop = transport({
+      "https://example.org/x": { status: 302, headers: { location: "/x" } },
+    });
+    await expect(
+      fetchSource("https://example.org/x", { transport: loop, maxRedirects: 2 }),
+    ).rejects.toMatchObject({ category: "too_many_redirects" });
+  });
+
+  it("refuses a redirect that names nowhere to go", async () => {
+    const headless = transport({ "https://example.org/z": { status: 302 } });
+    await expect(
+      fetchSource("https://example.org/z", { transport: headless }),
+    ).rejects.toMatchObject({ category: "redirect_without_location" });
+  });
+
+  it("refuses a body that is not a source page", async () => {
+    const binary = transport({
+      "https://example.org/v": { headers: { "content-type": "video/mp4" }, body: "not a page" },
+    });
+    await expect(fetchSource("https://example.org/v", { transport: binary })).rejects.toMatchObject(
+      {
+        category: "content_type_not_allowed",
+      },
+    );
+
+    // An ABSENT content type is unstated, not wrong — plenty of real servers omit it.
+    const bare = transport({ "https://example.org/w": { headers: {}, body: PAGE } });
+    const result = await fetchSource("https://example.org/w", {
+      transport: async (url, opts) => {
+        const hop = await bare(url, opts);
+        return { ...hop, headers: {} };
+      },
+    });
+    expect(result.contentType).toBeNull();
+    expect(result.text).toContain("A programme");
+  });
+
+  it("decodes a declared charset, and falls back rather than failing on a bad label", async () => {
+    const latin = Buffer.from([0x63, 0x61, 0x66, 0xe9]); // "café" in latin1
+    const result = await fetchSource("https://example.org/c", {
+      transport: async () => ({
+        status: 200,
+        headers: { "content-type": "text/html; charset=iso-8859-1" },
+        bytes: latin,
+        truncated: false,
+      }),
+    });
+    expect(result.text).toBe("café");
+
+    const nonsense = await fetchSource("https://example.org/c", {
+      transport: async () => ({
+        status: 200,
+        headers: { "content-type": "text/html; charset=not-a-charset" },
+        bytes: Buffer.from("plain"),
+        truncated: false,
+      }),
+    });
+    expect(nonsense.text).toBe("plain");
+  });
+
+  it("carries the refusal category, so a failed run can record why", async () => {
+    const error = await fetchSource("file:///etc/passwd", options).catch((e) => e);
+    expect(error).toBeInstanceOf(SourceFetchError);
+    expect(error.category).toBe("scheme_not_allowed");
+  });
+});

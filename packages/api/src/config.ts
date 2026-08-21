@@ -8,6 +8,7 @@
  * variable declared here is a variable every deployment has to reason about — so a variable no
  * request path reads does not belong here.
  */
+import { randomBytes } from "node:crypto";
 import { config as loadDotenv } from "dotenv";
 import { isLoopbackHost } from "./shared/loopback.js";
 
@@ -15,6 +16,104 @@ import { isLoopbackHost } from "./shared/loopback.js";
 // process.env read below. dotenv never overwrites variables that already reached the process, so
 // exported shell vars and a deployment's injected environment always win over the file.
 loadDotenv({ quiet: true });
+
+/** The session authority: what signs session tokens, where it lives, and who may talk to it. */
+export interface BetterAuthConfig {
+  /**
+   * Signs and verifies session tokens (HMAC-SHA256, checked before any database access).
+   *
+   * ROTATING IT LOGS EVERYONE OUT. There is no dual-secret verification on the bearer path — the
+   * library HMACs against exactly one value — so this is a deliberate global sign-out, not a
+   * seamless roll. Said here because a reader will otherwise assume the opposite.
+   */
+  secret: string;
+  /** True when the secret came from the environment rather than from a per-boot fallback. */
+  secretConfigured: boolean;
+  /**
+   * The API's OWN origin — the base every auth route and OAuth callback is built from.
+   *
+   * Deliberately not `publicBaseUrl`, which is the OpenAPI document's `servers[0].url` and may
+   * legitimately differ (a docs host, a path prefix behind a gateway).
+   */
+  url: string;
+  /** Exact origins allowed to drive sign-in: CSRF, `callbackURL`, the handoff, and CORS. */
+  trustedOrigins: string[];
+  /** Staging only: an anchored preview-origin predicate. Never a bare `*.vercel.app`. */
+  previewOriginPattern: RegExp | undefined;
+}
+
+/** Optional social sign-in. Absent client id → the provider is not registered at all. */
+export interface GoogleConfig {
+  clientId: string | undefined;
+  clientSecret: string | undefined;
+}
+
+/** How a one-time code reaches a person. */
+export type EmailTransportKind =
+  | "ses"
+  | "resend"
+  | "mailgun"
+  | "file"
+  | "stdout"
+  | "memory"
+  | "null";
+
+export interface EmailConfig {
+  transport: EmailTransportKind;
+  /** The envelope sender. Required for any transport that actually sends. */
+  from: string;
+  /** `file` transport only: where the outbox lives. */
+  outboxDir: string | undefined;
+  /** `ses` transport only. No credential — the task role carries it. */
+  sesRegion: string | undefined;
+  /** `resend` only. Kept as an interface-level alternative; unused by any deployment today. */
+  resendApiKey: string | undefined;
+  /** `mailgun` only. The HTTP Basic password; the user is the literal `api`. */
+  mailgunApiKey: string | undefined;
+  /**
+   * `mailgun` only. The SENDING domain, which is a path segment of the send URL rather than
+   * anything about the sender — it may legitimately differ from `from`'s domain, and normally does
+   * (a subdomain carries the DKIM records so the apex keeps its own mail reputation).
+   */
+  mailgunDomain: string | undefined;
+  /** `mailgun` only. Which regional endpoint the account lives on. Always set; see the reader. */
+  mailgunApiBase: string;
+}
+
+export type EmbeddingProvider = "openai" | "deterministic" | "disabled";
+
+export interface EmbeddingConfig {
+  provider: EmbeddingProvider;
+  apiKey: string | undefined;
+  model: string;
+  timeoutMs: number;
+}
+
+export interface DedupeConfig {
+  /** Cosine similarity at or above which a pair is recorded as suspected. Per-provider. */
+  similarityThreshold: number;
+  maxMatches: number;
+}
+
+export interface VerificationConfig {
+  enabled: boolean;
+  onSubmit: boolean;
+  timeoutMs: number;
+  maxBytes: number;
+  queueMax: number;
+  /** SSRF escape hatch for one loopback test. Refused outright under NODE_ENV=production. */
+  allowPrivateHosts: boolean;
+  egressProxy: string | undefined;
+}
+
+export interface AnalyticsConfig {
+  enabled: boolean;
+  /** HMAC key for the session/IP hashes. */
+  hmacKey: string;
+  /** True when no key was supplied and a per-boot random one is in use. */
+  hmacKeyGenerated: boolean;
+  retentionDays: number;
+}
 
 export interface AppConfig {
   databaseUrl: string;
@@ -42,6 +141,29 @@ export interface AppConfig {
    * with no shared-instance constraints needs no configuration.
    */
   dbPoolMax: number;
+  /**
+   * What Fastify is told to trust for `request.ip` and `request.protocol`.
+   *
+   * DELIBERATELY NEVER `true`. `X-Forwarded-For` is a client-supplied header, and trusting it
+   * unconditionally lets any caller choose the address that ends up in the analytics hash and in
+   * any rate-limit key. A hop count or a CIDR list names the proxy that is actually in front of
+   * this process. `undefined` (the default) trusts nothing.
+   */
+  trustProxy: number | string[] | undefined;
+  betterAuth: BetterAuthConfig;
+  google: GoogleConfig;
+  email: EmailConfig;
+  embedding: EmbeddingConfig;
+  dedupe: DedupeConfig;
+  verification: VerificationConfig;
+  analytics: AnalyticsConfig;
+  /** Days of no publisher touch after which a deadline-less open entry is closed as inactive. */
+  stalenessInactiveDays: number;
+  /**
+   * How many entries one account may leave awaiting review at once, when it holds no verified
+   * membership anywhere. A queue is a shared resource: without a ceiling, one account can fill it.
+   */
+  pendingSubmissionLimit: number;
 }
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -141,10 +263,498 @@ export function readPublicBaseUrl(raw: string | undefined, fallback = "/"): stri
   return url.href.replace(/\/+$/, "");
 }
 
+// ── M3 readers ───────────────────────────────────────────────────────────────────────────────
+//
+// One reader per variable, each exported and unit-tested. The shared shape: a blank or absent
+// value is "unset" and takes the default; a SET-but-unusable value takes the default too, EXCEPT
+// where a wrong value is dangerous rather than merely wrong, in which case it throws at boot. The
+// line between those two is drawn deliberately below, per variable.
+
+/** A trimmed value, or undefined when absent/blank. Blank is unset — an unsubstituted template. */
+export function readOptional(raw: string | undefined): string | undefined {
+  const value = (raw ?? "").trim();
+  return value === "" ? undefined : value;
+}
+
+/**
+ * A boolean flag. `1/true/yes/on` and `0/false/no/off`, case-insensitively; anything else — and
+ * anything blank — is the default. Deliberately not `Boolean(raw)`, under which the string
+ * `"false"` is true, which is the single most common way a feature flag lies.
+ */
+export function readBoolean(raw: string | undefined, fallback: boolean): boolean {
+  const value = (raw ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(value)) return true;
+  if (["0", "false", "no", "off"].includes(value)) return false;
+  return fallback;
+}
+
+/** A whole number > 0, or the default. Same `Number("") === 0` trap as `readPort`. */
+export function readPositiveInt(raw: string | undefined, fallback: number): number {
+  const parsed = Number((raw ?? "").trim());
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** A comma-separated list, trimmed, blanks dropped, duplicates removed, order preserved. */
+export function readList(raw: string | undefined): string[] {
+  return [
+    ...new Set(
+      (raw ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v !== ""),
+    ),
+  ];
+}
+
+/**
+ * A PEM key from an environment variable.
+ *
+ * PEM is multi-line and most secret stores, task definitions and shells are happier with one line,
+ * so `\n` written as two characters is the near-universal way this value arrives. Restoring the
+ * newlines here means a key pasted either way verifies tokens, instead of failing with an opaque
+ * parse error that looks like a wrong key.
+ */
+export function readPem(raw: string | undefined): string | undefined {
+  const value = readOptional(raw);
+  return value === undefined ? undefined : value.replace(/\\n/g, "\n");
+}
+
+const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ["openai", "deterministic", "disabled"];
+
+/**
+ * Which embedding provider backs duplicate detection.
+ *
+ * The default is deliberately conservative in both directions: with an API key present, `openai`;
+ * without one, `disabled` — never `deterministic`. The deterministic provider is a hashed token
+ * bag: it is exactly right for CI, where dedupe tests must run without a credential, and it is not
+ * a semantic model. Falling back to it silently would leave a deployment reporting duplicate
+ * checks it is not really performing, which is worse than reporting none.
+ */
+export function readEmbeddingProvider(
+  raw: string | undefined,
+  apiKey: string | undefined,
+): EmbeddingProvider {
+  const value = (raw ?? "").trim().toLowerCase();
+  if ((EMBEDDING_PROVIDERS as string[]).includes(value)) return value as EmbeddingProvider;
+  if (value !== "") {
+    throw new Error(
+      `EMBEDDING_PROVIDER must be one of ${EMBEDDING_PROVIDERS.join(", ")}, got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return apiKey === undefined ? "disabled" : "openai";
+}
+
+/**
+ * Per-provider similarity defaults. A threshold is a property of an embedding space, not a
+ * universal constant: the same number means different things to a 1536-dimension model and to a
+ * hashed token bag, so one shared default would be wrong for at least one of them.
+ *
+ * `deterministic` is SETTLED at 0.74 — the midpoint of the separating band measured by
+ * `scripts/dedupe-threshold-report.ts` over the committed corpus (worst positive 0.911, best
+ * negative 0.571). `test/unit/dedupe-threshold.test.ts` asserts that band in CI, so a corpus change
+ * that closes it fails the build rather than silently degrading detection.
+ *
+ * `openai` remains PROVISIONAL: settling it needs a key, which CI does not have and must not have,
+ * so the number is a documented starting point rather than a measured one. See docs/data-model.md.
+ */
+export const DEFAULT_SIMILARITY_THRESHOLD: Record<EmbeddingProvider, number> = {
+  openai: 0.86,
+  deterministic: 0.74,
+  disabled: 1,
+};
+
+/** A similarity threshold in [0, 1]. Out of range is meaningless rather than merely wrong. */
+export function readSimilarityThreshold(
+  raw: string | undefined,
+  provider: EmbeddingProvider,
+): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return DEFAULT_SIMILARITY_THRESHOLD[provider];
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(
+      `DEDUPE_SIMILARITY_THRESHOLD must be a cosine similarity in [0, 1], got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * The SSRF escape hatch, and the one reader that refuses rather than falls back.
+ *
+ * Enabling it lets the verifier fetch loopback, link-local and private addresses — which is what
+ * one end-to-end test needs and what an attacker would need to reach the instance metadata
+ * endpoint. There is no deployment in which that is the right setting, so under
+ * `NODE_ENV=production` it is not a value that gets ignored: the process refuses to start, loudly,
+ * rather than serving with the guard off.
+ */
+export function readAllowPrivateHosts(raw: string | undefined, production: boolean): boolean {
+  const allow = readBoolean(raw, false);
+  if (allow && production) {
+    throw new Error(
+      "VERIFY_ALLOW_PRIVATE_HOSTS is enabled under NODE_ENV=production. It disables the verifier's " +
+        "SSRF address checks — including the block on the link-local metadata endpoint — and exists " +
+        "only for one loopback test. Unset it.",
+    );
+  }
+  return allow;
+}
+
+/**
+ * What sits in front of this process, for `X-Forwarded-For` purposes.
+ *
+ * A hop count (`1`) or a CIDR/address list (`10.0.0.0/8,192.168.0.0/16`), passed through to
+ * Fastify. `true` is REJECTED rather than accepted: it is the value everyone reaches for, and it
+ * means "believe whatever the client claims its address is", which turns the analytics hash into
+ * client-controlled input. Unset trusts nothing.
+ */
+export function readTrustProxy(raw: string | undefined): number | string[] | undefined {
+  const value = (raw ?? "").trim();
+  if (value === "") return undefined;
+  if (["true", "false", "yes", "no"].includes(value.toLowerCase())) {
+    throw new Error(
+      `TRUST_PROXY is not a boolean: it names WHICH proxy to trust. Use a hop count (e.g. 1) or a comma-separated list of proxy addresses/CIDRs (e.g. 10.0.0.0/8). Got ${JSON.stringify(raw)}.`,
+    );
+  }
+  const hops = Number(value);
+  if (Number.isInteger(hops) && hops > 0) return hops;
+  const list = readList(value);
+  if (list.length === 0) {
+    throw new Error(
+      `TRUST_PROXY must be a hop count or an address list, got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return list;
+}
+
+/**
+ * The analytics HMAC key.
+ *
+ * Unset is survivable, so it does not throw: a random per-boot key still keeps the hashes
+ * unlinkable to an IP address, which is the privacy property. What it costs is continuity —
+ * session de-duplication resets on every restart — so it warns, and says which of the two it is.
+ * The key is never derived from anything in the image; see docs/deploy.md.
+ */
+export function readAnalyticsHmacKey(raw: string | undefined): {
+  key: string;
+  generated: boolean;
+} {
+  const value = readOptional(raw);
+  if (value !== undefined) return { key: value, generated: false };
+  return { key: randomBytes(32).toString("hex"), generated: true };
+}
+
+/** A secret this short is not a secret. Long enough that a guess is not a strategy. */
+const SECRET_MIN_LENGTH = 32;
+
+/**
+ * The session-signing secret.
+ *
+ * PRODUCTION THROWS; everything else generates one per boot and says what that costs. The two
+ * halves are different failures: a deployment without a secret would sign sessions with a value
+ * that changes on every restart, so every deploy — and every scale event — would log every user
+ * out, and nobody would connect the two. A developer's laptop doing the same is merely mildly
+ * annoying, and demanding a secret to run the test suite would be friction for nothing.
+ *
+ * The length floor is checked with the same severity as absence: a two-character secret is the
+ * failure that looks configured.
+ */
+export function readBetterAuthSecret(
+  raw: string | undefined,
+  production: boolean,
+): { secret: string; configured: boolean } {
+  const value = readOptional(raw);
+  if (value !== undefined && value.length >= SECRET_MIN_LENGTH) {
+    return { secret: value, configured: true };
+  }
+  if (production) {
+    throw new Error(
+      value === undefined
+        ? `BETTER_AUTH_SECRET is required when NODE_ENV=production. It signs every session token; without it each restart would silently sign everyone out. Supply at least ${SECRET_MIN_LENGTH} random characters through the task definition's secrets.`
+        : `BETTER_AUTH_SECRET must be at least ${SECRET_MIN_LENGTH} characters (got ${value.length}). It is the only thing standing between a forged token and a session.`,
+    );
+  }
+  return { secret: randomBytes(32).toString("hex"), configured: false };
+}
+
+/**
+ * The preview-origin predicate, as a source pattern.
+ *
+ * ANCHORED TO OUR PROJECT AND OUR TEAM, never a bare `*.vercel.app` — that would accept any tenant
+ * on the platform, which is every attacker who can sign up. The residual trust is stated rather
+ * than hidden: this assumes the preview host will not hand our team slug to somebody else.
+ *
+ * Supplied as a full regular expression by the deployment (staging only) so the exact shape stays a
+ * deployment property; anchors are enforced here rather than trusted, because an unanchored pattern
+ * matches in the middle of an attacker-chosen origin.
+ */
+export function readPreviewOriginPattern(raw: string | undefined): RegExp | undefined {
+  const value = readOptional(raw);
+  if (value === undefined) return undefined;
+  if (!value.startsWith("^") || !value.endsWith("$")) {
+    throw new Error(
+      `PREVIEW_ORIGIN_PATTERN must be anchored with ^ and $ — an unanchored pattern matches inside an origin an attacker chooses (e.g. "https://evil.example/?x=${value}"). Got ${JSON.stringify(raw)}.`,
+    );
+  }
+  try {
+    return new RegExp(value);
+  } catch (error) {
+    throw new Error(
+      `PREVIEW_ORIGIN_PATTERN is not a valid regular expression: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/** Transports that only make sense on a developer's machine or in a test run. */
+const LOCAL_ONLY_TRANSPORTS: ReadonlySet<string> = new Set(["file", "stdout", "memory", "null"]);
+const EMAIL_TRANSPORTS: ReadonlySet<string> = new Set([
+  "ses",
+  "resend",
+  "mailgun",
+  "file",
+  "stdout",
+  "memory",
+  "null",
+]);
+
+/**
+ * How one-time codes are delivered.
+ *
+ * Refuses to boot in production on any transport that does not actually send an email, in the shape
+ * `readAllowPrivateHosts` uses: a deployment whose sign-in codes go to a file nobody reads is not a
+ * degraded deployment, it is a locked door, and it would present as "the code never arrived" for
+ * every user at once.
+ */
+export function readEmailTransport(
+  raw: string | undefined,
+  production: boolean,
+): EmailTransportKind {
+  const value = (readOptional(raw) ?? (production ? "ses" : "stdout")).toLowerCase();
+  if (!EMAIL_TRANSPORTS.has(value)) {
+    throw new Error(
+      `EMAIL_TRANSPORT must be one of ${[...EMAIL_TRANSPORTS].join(", ")}. Got ${JSON.stringify(raw)}.`,
+    );
+  }
+  if (production && LOCAL_ONLY_TRANSPORTS.has(value)) {
+    throw new Error(
+      `EMAIL_TRANSPORT=${value} under NODE_ENV=production. Nothing would be delivered, so every sign-in would fail at the "enter the code" step with no error anywhere. Use ses or mailgun.`,
+    );
+  }
+  return value as EmailTransportKind;
+}
+
+const DEFAULT_MAILGUN_API_BASE = "https://api.mailgun.net";
+
+/**
+ * Which Mailgun endpoint the account lives on.
+ *
+ * It exists because the US and EU regions are DIFFERENT HOSTS (`api.mailgun.net` and
+ * `api.eu.mailgun.net`) holding different accounts: sending an EU account's domain to the US host
+ * is not a slow path, it is a 401 on every message. The default is the US host, which is where an
+ * account is unless somebody chose otherwise at signup.
+ *
+ * Validated in the spirit of `readPublicBaseUrl` rather than falling back, because the fallback
+ * would be the wrong region and would present as "the code never arrived": it must parse as an
+ * absolute URL and the trailing slash is stripped (the send path is appended and already starts
+ * with `/`).
+ *
+ * The SCHEME IS ALLOW-LISTED, not merely required to be https off loopback. Two different things
+ * are being refused and the loopback exemption only covers one of them: `http:` is refused remotely
+ * because the request carries the API key in an `Authorization` header and plaintext would publish
+ * it — which loopback traffic, never leaving the machine, genuinely escapes, so a test double may
+ * be a local http server. But `ftp://localhost` or `ws://127.0.0.1` is not a privacy question at
+ * all: `fetch` cannot send to either, from anywhere, so accepting one at boot buys a configuration
+ * that looks fine until the first sign-in fails inside a detached promise. So: `https:` anywhere,
+ * `http:` on loopback, nothing else.
+ *
+ * It is also an ORIGIN, optionally with a path prefix, and nothing else — because the send URL is
+ * built by CONCATENATION (`${base}/v3/${domain}/messages`), and the components refused below each
+ * survive that in their own wrong way: a query absorbs the path into itself
+ * (`…net?x=1/v3/…/messages` is one query string, not a route), a fragment leaves the request on
+ * `/`, and userinfo makes `fetch` throw outright. All three parse cleanly, so none of them is
+ * caught by anything above — and all three boot a deployment that delivers no mail at all. A plain
+ * path prefix, which is what a proxy in front of the account looks like, stays allowed.
+ */
+export function readMailgunApiBase(
+  raw: string | undefined,
+  fallback = DEFAULT_MAILGUN_API_BASE,
+): string {
+  const value = readOptional(raw);
+  if (value === undefined) return fallback;
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(
+      `MAILGUN_API_BASE must be an absolute URL (e.g. ${DEFAULT_MAILGUN_API_BASE}, or https://api.eu.mailgun.net for an EU account), got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(
+      `MAILGUN_API_BASE must be an https:// URL — the send is an HTTPS request, and nothing else is a scheme it could be made over. Got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  if (url.protocol !== "https:" && !isLoopbackHost(url.hostname)) {
+    throw new Error(
+      `MAILGUN_API_BASE must use https:// for any host that is not loopback — every send carries the API key in an Authorization header, and plaintext would publish it to the network. Got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  const carried = [
+    url.username !== "" || url.password !== "" ? "credentials" : undefined,
+    url.search !== "" ? "a query string" : undefined,
+    url.hash !== "" ? "a fragment" : undefined,
+  ].filter((part): part is string => part !== undefined);
+
+  if (carried.length > 0) {
+    throw new Error(
+      `MAILGUN_API_BASE carries ${carried.join(" and ")}, and it must be an origin (optionally with a path prefix): the send path is appended to it, so a query string swallows that path, a fragment sends the request to / instead, and credentials make the request throw. Each of those boots normally and then delivers nothing. Got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  return url.href.replace(/\/+$/, "");
+}
+
+/**
+ * The Mailgun credential pair, checked TOGETHER and only when it is the transport in use.
+ *
+ * Neither half is usable alone: the key is the HTTP Basic password and the domain is a path segment
+ * of the send URL, so a deployment holding one of them delivers exactly as much mail as one holding
+ * neither. Under `NODE_ENV=production` that refuses the boot, in the shape `readAllowPrivateHosts`
+ * uses — a mail transport that cannot authenticate is a locked door, not a degraded service, and it
+ * would present as "the code never arrived" for every user at once with nothing in the logs.
+ *
+ * Off the production path it passes them through as they are, and the transport itself refuses when
+ * it is built (see `email-transport.ts`, same precedent as `resend`) — so a developer who sets the
+ * transport and nothing else still hears about it, at the moment the configuration is wrong rather
+ * than inside a detached send nobody is awaiting.
+ */
+export function readMailgunCredentials(
+  transport: EmailTransportKind,
+  apiKey: string | undefined,
+  domain: string | undefined,
+  production: boolean,
+): { apiKey: string | undefined; domain: string | undefined } {
+  const missing = [
+    apiKey === undefined ? "MAILGUN_API_KEY" : undefined,
+    domain === undefined ? "MAILGUN_DOMAIN" : undefined,
+  ].filter((name): name is string => name !== undefined);
+
+  if (production && transport === "mailgun" && missing.length > 0) {
+    throw new Error(
+      `EMAIL_TRANSPORT=mailgun under NODE_ENV=production without ${missing.join(" and ")}. The key is the send credential and the domain is part of the send URL, so without both nothing can be delivered and every sign-in would stall at the code prompt. Supply them through the task definition's secrets.`,
+    );
+  }
+  return { apiKey, domain };
+}
+
+const embeddingApiKey = readOptional(process.env.OPENAI_API_KEY);
+const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER, embeddingApiKey);
+const analyticsHmac = readAnalyticsHmacKey(process.env.ANALYTICS_HMAC_KEY);
+const betterAuthSecret = readBetterAuthSecret(process.env.BETTER_AUTH_SECRET, isProduction);
+const emailTransport = readEmailTransport(process.env.EMAIL_TRANSPORT, isProduction);
+const mailgun = readMailgunCredentials(
+  emailTransport,
+  readOptional(process.env.MAILGUN_API_KEY),
+  readOptional(process.env.MAILGUN_DOMAIN),
+  isProduction,
+);
+
 export const config: AppConfig = {
   databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
   port: readPort(process.env.PORT),
   host: process.env.HOST ?? "0.0.0.0",
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
+  trustProxy: readTrustProxy(process.env.TRUST_PROXY),
+
+  betterAuth: {
+    secret: betterAuthSecret.secret,
+    secretConfigured: betterAuthSecret.configured,
+    // Falls back to this process's own address so a local run needs no configuration; a deployment
+    // sets it to the API's public origin, which is what the OAuth callback is built from.
+    url:
+      readOptional(process.env.BETTER_AUTH_URL) ?? `http://127.0.0.1:${readPort(process.env.PORT)}`,
+    trustedOrigins: readList(process.env.TRUSTED_ORIGINS),
+    previewOriginPattern: readPreviewOriginPattern(process.env.PREVIEW_ORIGIN_PATTERN),
+  },
+
+  google: {
+    clientId: readOptional(process.env.GOOGLE_CLIENT_ID),
+    clientSecret: readOptional(process.env.GOOGLE_CLIENT_SECRET),
+  },
+
+  email: {
+    transport: emailTransport,
+    from: readOptional(process.env.EMAIL_FROM) ?? "no-reply@ethrfps.app",
+    outboxDir: readOptional(process.env.EMAIL_OUTBOX_DIR),
+    sesRegion: readOptional(process.env.AWS_SES_REGION) ?? readOptional(process.env.AWS_REGION),
+    resendApiKey: readOptional(process.env.RESEND_API_KEY),
+    mailgunApiKey: mailgun.apiKey,
+    mailgunDomain: mailgun.domain,
+    mailgunApiBase: readMailgunApiBase(process.env.MAILGUN_API_BASE),
+  },
+
+  embedding: {
+    provider: embeddingProvider,
+    apiKey: embeddingApiKey,
+    model: readOptional(process.env.EMBEDDING_MODEL) ?? "text-embedding-3-small",
+    timeoutMs: readPositiveInt(process.env.EMBEDDING_TIMEOUT_MS, 5_000),
+  },
+
+  dedupe: {
+    similarityThreshold: readSimilarityThreshold(
+      process.env.DEDUPE_SIMILARITY_THRESHOLD,
+      embeddingProvider,
+    ),
+    maxMatches: readPositiveInt(process.env.DEDUPE_MAX_MATCHES, 5),
+  },
+
+  verification: {
+    enabled: readBoolean(process.env.VERIFICATION_ENABLED, true),
+    // Default-on where it earns its keep and off under test, where a submission fixture must not
+    // reach out to the network as a side effect of being created.
+    onSubmit: readBoolean(process.env.VERIFY_ON_SUBMIT, process.env.NODE_ENV !== "test"),
+    timeoutMs: readPositiveInt(process.env.VERIFY_TIMEOUT_MS, 10_000),
+    maxBytes: readPositiveInt(process.env.VERIFY_MAX_BYTES, 2 * 1024 * 1024),
+    queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
+    allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
+    egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
+  },
+
+  analytics: {
+    enabled: readBoolean(process.env.ANALYTICS_ENABLED, true),
+    hmacKey: analyticsHmac.key,
+    hmacKeyGenerated: analyticsHmac.generated,
+    retentionDays: readPositiveInt(process.env.ANALYTICS_RETENTION_DAYS, 180),
+  },
+
+  stalenessInactiveDays: readPositiveInt(process.env.STALENESS_INACTIVE_DAYS, 90),
+  // A product rule, not a deployment knob: a ceiling on the QUEUE, not a quota on a lifetime — every
+  // approval or rejection frees a slot, and replacing an entry that is already pending is not a new
+  // submission. Anybody holding a verified publisher membership anywhere is exempt entirely: their
+  // own writes auto-approve and never reach the queue. Fixed at 5 by decision, so it cannot be
+  // raised quietly by an operator holding only the deployment configuration.
+  pendingSubmissionLimit: 5,
 };
+
+// Announced only where it costs something: a run with analytics off never touches the key, and a
+// test run generates one on purpose. Both cases are noise, and noise is how a real warning gets
+// missed.
+// Said once, at boot, because the consequence is invisible until it bites: a per-boot secret means
+// every restart invalidates every session, which presents to users as "it logged me out again" and
+// to an operator as nothing at all.
+if (!config.betterAuth.secretConfigured && process.env.NODE_ENV !== "test") {
+  console.error(
+    "BETTER_AUTH_SECRET unset (or shorter than 32 characters) — using a random per-boot secret. Sessions are signed with it, so EVERY RESTART SIGNS EVERYONE OUT. Set it in the environment; see packages/api/docs/deploy.md.",
+  );
+}
+
+if (config.analytics.enabled && analyticsHmac.generated && process.env.NODE_ENV !== "test") {
+  console.error(
+    "ANALYTICS_HMAC_KEY unset — using a random per-boot key. The hashes stay unlinkable to an address either way; what is lost is continuity, so session de-duplication resets on every restart. Supply the key through the task definition's secrets (packages/api/docs/deploy.md).",
+  );
+}

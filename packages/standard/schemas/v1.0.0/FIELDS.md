@@ -38,14 +38,15 @@ Schema. Where that is the case, this document says so at the point of the rule.
 
 ## Scope
 
-The Hub is **ETH-scoped**, not a multi-ecosystem catch-all. It does not attempt to absorb
-Solana/Cosmos/other non-ETH ecosystems. However, `ecosystems` is an **open, extensible
-list — not a closed enum** — so the Ethereum L1 plus L2s and ETH-adjacent ecosystems
-(Optimism, Base, Arbitrum, Polygon, Scroll, zkSync, Linea, OP Stack, Celo, …) are all
-first-class. `ecosystems` is deliberately **not** registry-governed: a registry over a list of
-chain names reads as an allowed-values list however carefully the normative document words it,
-and it would put a review step in front of a newly launched chain for no interoperability gain.
-Write the ecosystem's usual name.
+The Hub is **ETH-scoped** in focus — the Ethereum ecosystem is its center of gravity — but this is
+not an exclusion rule. `ecosystems` is an **open, extensible list — not a closed enum** — so it
+never turns an ecosystem away: Ethereum and its L2s (Optimism, Base, Arbitrum, Polygon, Scroll,
+zkSync, Linea, OP Stack, Celo, …) are first-class, and Solana, Cosmos, or a newly launched chain are
+equally valid values. `ecosystems` is
+deliberately **not** registry-governed: a registry over a list of chain names reads as an
+allowed-values list however carefully the normative document words it, and it would put a review
+step in front of a newly launched chain for no interoperability gain. Write the ecosystem's usual
+name.
 
 ## Design principles
 

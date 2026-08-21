@@ -7,8 +7,11 @@ import { listQuerySchema } from "./types.js";
 export const opportunities = async (router: FastifyInstance): Promise<void> => {
   // Every application/json opportunity response advertises the canonical JSON-LD context, so a
   // conformant processor reads it as linked data without an `@context` in the payload. Scoped
-  // to this plugin: it must never land on the `application/schema+json` route below.
-  advertiseJsonLdContext(router);
+  // to this plugin AND narrowed to the two operations that actually serve Standard objects: the
+  // `application/schema+json` route below must never carry it, and neither must anything added
+  // here later. The writes, the claim and the audit/duplicate/verification sub-resources live in
+  // their own plugins (routes/submissions, routes/opportunity-meta) for the same reason.
+  advertiseJsonLdContext(router, { only: ["/v1/opportunities", "/v1/opportunities/:id"] });
 
   router.get(
     "/",

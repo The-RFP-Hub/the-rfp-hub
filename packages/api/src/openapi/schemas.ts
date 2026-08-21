@@ -205,7 +205,671 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     required: ["status"],
-    properties: { status: { type: "string" }, db: { type: "string" } },
+    properties: {
+      status: { type: "string" },
+      db: { type: "string" },
+      auth: {
+        type: "object",
+        additionalProperties: false,
+        required: ["google"],
+        description:
+          "Which optional sign-in methods this deployment has configured, so a client can advertise only what exists. Email one-time codes are always available and are therefore not reported.",
+        properties: {
+          google: {
+            type: "boolean",
+            description: "True when the Google provider is registered (client id AND secret).",
+          },
+        },
+      },
+    },
+  },
+  // ── M3 components ──────────────────────────────────────────────────────────────
+  // Every one of these closes its shape, so the serializer drops anything a controller returns
+  // that is not declared. `modules/shared/api-views.ts` holds the producer types, and the drift
+  // guard builds a typed sample of each — that pairing is what makes a silently-dropped field a
+  // test failure rather than a mystery in production.
+  {
+    $id: "ValidationErrorResponse",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A rejected write. `errors` carries the humanized, field-by-field report when the body failed Standard validation — the reason the write routes install a pass-through Fastify validator and let the service validate instead. It is absent for the rejections that are about ONE thing (a mismatched id, a namespace that cannot be resolved), where the message is the whole answer.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", description: "Stable machine-readable error code (snake_case)." },
+      message: { type: "string", description: "Human-readable summary." },
+      errors: {
+        type: "array",
+        items: { type: "string" },
+        description: "One human-readable sentence per violation, naming the field and the rule.",
+      },
+    },
+  },
+  {
+    $id: "SubmissionResult",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The outcome of a create or replace. `reviewStatus` is `approved` only when the credential could publish into the resolved namespace — a submission that lands `pending` is stored and invisible to the public reads until a reviewer approves it.",
+    required: [
+      "opportunity",
+      "created",
+      "reviewStatus",
+      "isListed",
+      "warnings",
+      "duplicateCheck",
+      "duplicates",
+    ],
+    properties: {
+      opportunity: { $ref: "Opportunity" },
+      created: {
+        type: "boolean",
+        description:
+          "True for a create, including an identical repeat of one (which returns 200 with the original result rather than a conflict).",
+      },
+      reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+      isListed: { type: "boolean" },
+      warnings: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Advisory check-tier findings. Never fatal — a conformant document may carry them.",
+      },
+      duplicateCheck: {
+        type: "string",
+        enum: ["ok", "unavailable", "disabled"],
+        description:
+          "Whether duplicate detection RAN. `ok` with an empty `duplicates` means checked and nothing similar; `unavailable` means the embedding call failed or timed out and a backfill still owes this entry a check; `disabled` means no provider is configured. Without this a client cannot tell the three apart. Detection never blocks a write — a failure is reported here, not as an error.",
+      },
+      duplicates: {
+        type: "array",
+        items: { $ref: "DuplicateMatch" },
+        description:
+          "Suspected matches, searched over PUBLICLY VISIBLE entries only — a duplicate check must never disclose another account's pending or unlisted title and id.",
+      },
+    },
+  },
+  {
+    $id: "AuditEntry",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One recorded mutation. Public callers get the changed field NAMES and a coarse actor; the entry's submitter, its publisher and reviewers additionally get `patch`.",
+    required: ["action", "at", "actorKind", "actor", "changedFields"],
+    properties: {
+      action: { type: "string" },
+      at: { type: "string", format: "date-time" },
+      actorKind: { type: "string", enum: ["user", "api_key", "job", "outbox"] },
+      actor: {
+        type: "string",
+        description: "A public handle, an organisation slug, `reviewer`, `job` or `community`.",
+      },
+      changedFields: { type: "array", items: { type: "string" } },
+      patch: {
+        type: "object",
+        additionalProperties: true,
+        description: "`{field: {before, after}}`. Present only for the owner and reviewers.",
+      },
+    },
+  },
+  {
+    $id: "AuditTrail",
+    type: "object",
+    additionalProperties: false,
+    required: ["entries"],
+    properties: { entries: { type: "array", items: { $ref: "AuditEntry" } } },
+  },
+  {
+    $id: "DuplicateMatch",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A suspected or decided duplicate pair, named by the OTHER entry. A submitter only ever sees pairs whose other side is publicly visible.",
+    required: ["id", "title", "similarity", "status", "detectedAt"],
+    properties: {
+      id: { type: "string", description: "The other entry's public id." },
+      title: { type: "string" },
+      similarity: { type: ["number", "null"] },
+      status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
+      detectedAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "DuplicateList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "DuplicateMatch" } } },
+  },
+  {
+    $id: "DuplicateSide",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One entry of a pair, as the REVIEW queue sees it — including the editorial state that decides which of the two may survive a merge.",
+    required: ["id", "title", "reviewStatus", "isListed", "namespace", "mergedInto", "updatedAt"],
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+      isListed: { type: "boolean" },
+      namespace: { type: ["string", "null"] },
+      mergedInto: {
+        type: ["string", "null"],
+        description:
+          "The survivor of an earlier merge. A merge target that carries this is refused — that is what prevents chains and, transitively, cycles.",
+      },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "DuplicatePair",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A suspected or decided pair, both sides shown. `id` is the PAIR's own id — what /v1/review/duplicates/{id}/… names, never an opportunity id.",
+    required: ["id", "status", "similarity", "detectedAt", "reviewedAt", "left", "right"],
+    properties: {
+      id: { type: "integer" },
+      status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
+      similarity: { type: ["number", "null"] },
+      detectedAt: { type: "string", format: "date-time" },
+      reviewedAt: { type: ["string", "null"], format: "date-time" },
+      left: { $ref: "DuplicateSide" },
+      right: { $ref: "DuplicateSide" },
+    },
+  },
+  {
+    $id: "DuplicatePairList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "DuplicatePair" } } },
+  },
+  {
+    $id: "MergeResult",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The outcome of a merge. The loser is rejected, unlisted, archived and pointed at the survivor — its row is KEPT, because its public id may already be in an export, a feed or somebody's bookmarks.",
+    required: ["pair", "survivorId", "mergedId", "copiedFields"],
+    properties: {
+      pair: { $ref: "DuplicatePair" },
+      survivorId: { type: "string" },
+      mergedId: { type: "string" },
+      copiedFields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Which whitelisted fields were carried over. Empty by default — a merge copies nothing unless asked, and a copy that would leave the survivor invalid against the Standard rolls the whole merge back.",
+      },
+    },
+  },
+  {
+    $id: "VerificationRun",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The most recent check of an entry's `applicationUrl`. A FAILED run is recorded too — `error` says why — because silence is indistinguishable from never having run.",
+    required: [
+      "runAt",
+      "requestedUrl",
+      "finalUrl",
+      "httpStatus",
+      "existsAtSource",
+      "matched",
+      "fieldDiff",
+      "extracted",
+      "snapshotSha256",
+      "error",
+    ],
+    properties: {
+      runAt: { type: "string", format: "date-time" },
+      requestedUrl: { type: ["string", "null"] },
+      finalUrl: { type: ["string", "null"] },
+      httpStatus: { type: ["integer", "null"] },
+      existsAtSource: { type: ["boolean", "null"] },
+      matched: {
+        type: ["boolean", "null"],
+        description: "A low-bar anti-spam signal, not a fact-check. A reviewer still approves.",
+      },
+      fieldDiff: { type: ["object", "null"], additionalProperties: true },
+      extracted: { type: ["object", "null"], additionalProperties: true },
+      snapshotSha256: {
+        type: ["string", "null"],
+        description: "Digest of the RAW bytes that produced the stored extract.",
+      },
+      error: { type: ["string", "null"] },
+    },
+  },
+  {
+    $id: "InsightsTotals",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "API reads and link-outs, NOT page views. The four counts are kept apart because a publisher's real question is whether anyone clicked through to apply, which a merged `views` cannot answer.",
+    required: ["listViews", "detailViews", "sourceClicks", "applyClicks"],
+    properties: {
+      listViews: { type: "integer", description: "Appearances in a list response." },
+      detailViews: { type: "integer", description: "Reads of the full record." },
+      sourceClicks: {
+        type: "integer",
+        description: "Link-outs to `website` via /v1/r/{id}/source.",
+      },
+      applyClicks: {
+        type: "integer",
+        description: "Link-outs to `applicationUrl` via /v1/r/{id}/apply.",
+      },
+    },
+  },
+  {
+    $id: "InsightsPoint",
+    type: "object",
+    additionalProperties: false,
+    required: ["day", "listViews", "detailViews", "sourceClicks", "applyClicks"],
+    properties: {
+      day: { type: "string", description: "`YYYY-MM-DD`, UTC." },
+      listViews: { type: "integer" },
+      detailViews: { type: "integer" },
+      sourceClicks: { type: "integer" },
+      applyClicks: { type: "integer" },
+    },
+  },
+  {
+    $id: "InsightsSeries",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One entry's daily series. BEST-EFFORT: our own automation is excluded by name, crawlers and `DNT: 1` are dropped, and capture is buffered in memory and so crash-lossy. Days before today come from the nightly rollup; today is aggregated live from the raw events, so traffic from an hour ago is already here.",
+    required: ["opportunityId", "title", "from", "to", "totals", "days"],
+    properties: {
+      opportunityId: { type: "string" },
+      title: { type: "string" },
+      from: { type: "string" },
+      to: { type: "string" },
+      totals: { $ref: "InsightsTotals" },
+      days: {
+        type: "array",
+        items: { $ref: "InsightsPoint" },
+        description: "Zero-filled: a day with no traffic is a zero, never a gap in the series.",
+      },
+    },
+  },
+  {
+    $id: "InsightsEntry",
+    type: "object",
+    additionalProperties: false,
+    required: ["opportunityId", "title", "listViews", "detailViews", "sourceClicks", "applyClicks"],
+    properties: {
+      opportunityId: { type: "string" },
+      title: { type: "string" },
+      listViews: { type: "integer" },
+      detailViews: { type: "integer" },
+      sourceClicks: { type: "integer" },
+      applyClicks: { type: "integer" },
+    },
+  },
+  {
+    $id: "InsightsSummary",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "Every entry this account submitted or publishes, totalled over the window. Same best-effort caveat as InsightsSeries.",
+    required: ["from", "to", "totals", "opportunities"],
+    properties: {
+      from: { type: "string" },
+      to: { type: "string" },
+      totals: { $ref: "InsightsTotals" },
+      opportunities: { type: "array", items: { $ref: "InsightsEntry" } },
+    },
+  },
+  {
+    $id: "ClaimResult",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The outcome of claiming publisher ownership. `granted` transferred it immediately (the organisation is verified and OPERATES the entry); `queued` filed a claim for review.",
+    required: ["outcome", "claimId", "opportunityId", "organizationSlug", "message"],
+    properties: {
+      outcome: { type: "string", enum: ["granted", "queued", "unchanged"] },
+      claimId: { type: ["integer", "null"] },
+      opportunityId: { type: "string" },
+      organizationSlug: { type: "string" },
+      message: {
+        type: "string",
+        description:
+          "What the outcome means for future writes — in particular, a grant on an UNVERIFIED organisation transfers ownership without unlocking auto-approval.",
+      },
+    },
+  },
+  {
+    $id: "ClaimSummary",
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "id",
+      "opportunityId",
+      "opportunityTitle",
+      "organizationSlug",
+      "organizationVerified",
+      "claimedBy",
+      "status",
+      "note",
+      "createdAt",
+      "decidedAt",
+    ],
+    properties: {
+      id: { type: "integer" },
+      opportunityId: { type: "string" },
+      opportunityTitle: { type: "string" },
+      organizationSlug: { type: "string" },
+      organizationVerified: { type: "boolean" },
+      claimedBy: { type: "string" },
+      status: { type: "string", enum: ["pending", "approved", "rejected", "withdrawn"] },
+      note: { type: ["string", "null"] },
+      createdAt: { type: "string", format: "date-time" },
+      decidedAt: { type: ["string", "null"], format: "date-time" },
+    },
+  },
+  {
+    $id: "ClaimList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "ClaimSummary" } } },
+  },
+  {
+    $id: "Publisher",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A VERIFIED organisation — the namespace a write can auto-approve into. Verification is a publishing relationship, not an attribute of the issuer, so the directory holds many organisations that are not here.",
+    required: ["slug", "name", "description", "website", "logoUrl", "ecosystems", "verifiedAt"],
+    properties: {
+      slug: {
+        type: "string",
+        description: "The namespace. Public ids under it read `<slug>:<local>`.",
+      },
+      name: { type: "string" },
+      description: { type: ["string", "null"] },
+      website: { type: ["string", "null"] },
+      logoUrl: { type: ["string", "null"] },
+      ecosystems: { type: "array", items: { type: "string" } },
+      verifiedAt: { type: ["string", "null"], format: "date-time" },
+    },
+  },
+  {
+    $id: "PublisherList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items", "total"],
+    properties: {
+      items: { type: "array", items: { $ref: "Publisher" } },
+      total: { type: "integer" },
+    },
+  },
+  {
+    $id: "MeMembership",
+    type: "object",
+    additionalProperties: false,
+    required: ["slug", "name", "role", "verified"],
+    properties: {
+      slug: { type: "string" },
+      name: { type: "string" },
+      role: { type: "string", enum: ["owner", "admin", "publisher"] },
+      verified: {
+        type: "boolean",
+        description: "Only a membership on a VERIFIED organisation auto-approves a write.",
+      },
+    },
+  },
+  {
+    $id: "Me",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The authenticated account, as resolved for THIS request. `credentialKind` is part of the answer, not decoration: an API key never manages keys, changes identity, reviews or administers, whatever role the account holds.",
+    required: [
+      "accountId",
+      "handle",
+      "displayName",
+      "email",
+      "role",
+      "directCreate",
+      "credentialKind",
+      "scopes",
+      "memberships",
+      "canManageKeys",
+      "canReview",
+      "canAdmin",
+      "createdAt",
+    ],
+    properties: {
+      accountId: { type: "integer" },
+      handle: {
+        type: ["string", "null"],
+        description: "The public identifier attribution uses. Null until it is chosen.",
+      },
+      displayName: { type: ["string", "null"] },
+      email: {
+        type: ["string", "null"],
+        description:
+          "The verified address this account signs in with. Null when the request presented an API key, which identifies an account without identifying a session.",
+      },
+      role: { type: "string", enum: ["submitter", "reviewer", "admin"] },
+      directCreate: { type: "boolean" },
+      credentialKind: { type: "string", enum: ["session", "api_key"] },
+      scopes: { type: "array", items: { type: "string" } },
+      memberships: { type: "array", items: { $ref: "MeMembership" } },
+      canManageKeys: { type: "boolean" },
+      canReview: { type: "boolean" },
+      canAdmin: { type: "boolean" },
+      createdAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "ApiKey",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "An API key WITHOUT its secret. The secret exists once, at mint, and is never returned again.",
+    required: [
+      "id",
+      "name",
+      "keyPrefix",
+      "scopes",
+      "createdAt",
+      "lastUsedAt",
+      "expiresAt",
+      "revokedAt",
+    ],
+    properties: {
+      id: { type: "integer" },
+      name: { type: ["string", "null"] },
+      keyPrefix: {
+        type: "string",
+        description: "The public 8-character identifier. Not a secret; it is how a key is named.",
+      },
+      scopes: { type: "array", items: { type: "string", enum: ["read", "write", "publish"] } },
+      createdAt: { type: "string", format: "date-time" },
+      lastUsedAt: {
+        type: ["string", "null"],
+        format: "date-time",
+        description: "Refreshed at most once every five minutes, best-effort.",
+      },
+      expiresAt: { type: ["string", "null"], format: "date-time" },
+      revokedAt: {
+        type: ["string", "null"],
+        format: "date-time",
+        description: "Revocation is soft, so an audit row naming this key always resolves.",
+      },
+    },
+  },
+  {
+    $id: "ApiKeyList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "ApiKey" } } },
+  },
+  {
+    $id: "ApiKeyCreated",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A freshly minted key. `token` is shown EXACTLY ONCE — it is not stored and cannot be recovered.",
+    required: ["key", "token"],
+    properties: {
+      key: { $ref: "ApiKey" },
+      token: { type: "string", description: "The full credential: `rfph_<prefix>_<secret>`." },
+    },
+  },
+  {
+    $id: "ManagedOpportunity",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The editorial projection of an entry — what an owner sees on their own listings and what a reviewer sees in the queue, including entries the public reads cannot see.",
+    required: [
+      "id",
+      "title",
+      "fundingType",
+      "status",
+      "reviewStatus",
+      "isListed",
+      "namespace",
+      "submittedBy",
+      "lastDecision",
+      "createdAt",
+      "updatedAt",
+    ],
+    properties: {
+      id: { type: "string" },
+      title: { type: "string" },
+      fundingType: { type: "string" },
+      status: { type: "string" },
+      reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+      isListed: { type: "boolean" },
+      namespace: { type: ["string", "null"] },
+      submittedBy: { type: ["string", "null"] },
+      lastDecision: {
+        type: ["object", "null"],
+        additionalProperties: false,
+        description:
+          "The newest approve/reject recorded against this entry, read from the audit trail. Null until somebody decides. `reason` is whatever the decider wrote — including the server's own reason for an automatic approval — and is null when none was given.",
+        required: ["action", "reason", "at"],
+        properties: {
+          action: { type: "string", enum: ["approve", "reject"] },
+          reason: { type: ["string", "null"] },
+          at: { type: "string", format: "date-time" },
+        },
+      },
+      createdAt: { type: "string", format: "date-time" },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "ManagedOpportunityList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items", "page", "limit", "total", "totalPages"],
+    properties: {
+      items: { type: "array", items: { $ref: "ManagedOpportunity" } },
+      page: { type: "integer" },
+      limit: { type: "integer" },
+      total: { type: "integer" },
+      totalPages: { type: "integer" },
+    },
+  },
+  {
+    $id: "ReviewDecision",
+    type: "object",
+    additionalProperties: false,
+    required: ["id", "reviewStatus", "isListed"],
+    properties: {
+      id: { type: "string" },
+      reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+      isListed: { type: "boolean" },
+    },
+  },
+  {
+    $id: "AccountSummary",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "An account as the review and admin screens see it. Never carries the DID or the email.",
+    required: ["id", "handle", "displayName", "globalRole", "directCreate", "createdAt"],
+    properties: {
+      id: { type: "integer" },
+      handle: { type: ["string", "null"] },
+      displayName: { type: ["string", "null"] },
+      globalRole: { type: "string", enum: ["submitter", "reviewer", "admin"] },
+      directCreate: { type: "boolean" },
+      createdAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    $id: "AccountList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "AccountSummary" } } },
+  },
+  {
+    $id: "OrganizationSummary",
+    type: "object",
+    additionalProperties: false,
+    required: ["slug", "name", "verified", "verifiedAt", "website", "ecosystems", "memberCount"],
+    properties: {
+      slug: { type: "string" },
+      name: { type: "string" },
+      verified: { type: "boolean" },
+      verifiedAt: { type: ["string", "null"], format: "date-time" },
+      website: { type: ["string", "null"] },
+      ecosystems: { type: "array", items: { type: "string" } },
+      memberCount: { type: "integer" },
+    },
+  },
+  {
+    $id: "OrganizationList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "OrganizationSummary" } } },
+  },
+  {
+    $id: "MembershipResult",
+    type: "object",
+    additionalProperties: false,
+    required: ["organizationSlug", "accountId", "role", "member"],
+    properties: {
+      organizationSlug: { type: "string" },
+      accountId: { type: "integer" },
+      role: { type: ["string", "null"], enum: ["owner", "admin", "publisher", null] },
+      member: { type: "boolean", description: "False when the membership was revoked." },
+    },
+  },
+  {
+    $id: "JobRunResult",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One scheduled maintenance run. `shape` is `cursor` when the run retires its own selection (so it may repeat while it is making progress) and `sweep` when it reprocesses a fixed window by design, in which case `remaining` is always 0. `skipped` says the run correctly did nothing: `locked` when another run of the same job held the database advisory lock, or a sentence naming the feature that is not configured.",
+    required: ["job", "shape", "processed", "remaining", "passes", "elapsedMs"],
+    properties: {
+      job: { type: "string" },
+      shape: { type: "string", enum: ["cursor", "sweep"] },
+      processed: { type: "integer", description: "Rows this invocation changed." },
+      remaining: { type: "integer" },
+      skipped: { type: "string" },
+      passes: { type: "integer" },
+      elapsedMs: { type: "integer" },
+      details: {
+        type: "object",
+        additionalProperties: { type: "integer" },
+        description: "Per-job counters. The members vary by job and are not part of the contract.",
+      },
+    },
   },
   {
     $id: "ErrorResponse",

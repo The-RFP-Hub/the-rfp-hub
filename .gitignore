@@ -14,10 +14,43 @@ coverage/
 # PUBLISHED dataset and has to stay tracked (see .github/workflows/nightly-export.yml).
 packages/api/exports/
 
-# report written by scripts/check-m2.mjs (a record of one run against one deployment)
+# reports written by scripts/check-m2.mjs and scripts/check-m3.mjs (each a record of one run
+# against one deployment)
 m2-compliance-report.json
+m3-compliance-report.json
+
+# The safety dump scripts/upgrade-dev-postgres.sh takes before moving the dev database onto a new
+# image. It is a copy of one developer's local data — not a repo artifact, and potentially large.
+packages/api/.local-backup-*.sql
+
+# Next.js build output (the frontend, M3). Machine-written, and big.
+packages/frontend/.next/
 
 # offline converter working files (raw upstream snapshot + draft corpus) — see
 # packages/api/tools/converter/README.md. The CURATED dataset it feeds is
 # packages/api/data/seed-corpus.json, which IS committed.
 packages/api/tools/converter/out/
+
+# Playwright run output for packages/e2e — machine-written per run, and potentially carries
+# short-lived session material in a failure trace (see that package's README).
+packages/e2e/test-results/
+packages/e2e/playwright-report/
+
+# The E2E runner's exclusive lock on the frontend dev server. It sits BESIDE `.next/` rather than
+# inside it because `next dev` rewrites that directory on start and would delete a lock kept there.
+packages/frontend/.e2e-next-lock
+
+# the E2E suite's local report. Specifically this filename, not every `*.local.md` — see
+# packages/e2e/README.md and the M3 E2E plan for why the rule must exist before the file is ever
+# written.
+/M3-E2E-REPORT.local.md
+
+# Next 16's postinstall writes agent-rules files into the frontend package pointing at its own
+# docs under node_modules. This repository deliberately carries no agent-rules files, so these are
+# ignored rather than reviewed on every install.
+packages/frontend/AGENTS.md
+packages/frontend/CLAUDE.md
+
+# operator correspondence drafted locally (deployment values, provider names). Never a repo
+# artifact: the tree is source-neutral and this file is not.
+/INFRA-REQUEST.local.md

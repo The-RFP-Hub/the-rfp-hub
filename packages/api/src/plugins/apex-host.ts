@@ -26,10 +26,19 @@
  * The apex is derived from the Standard's own `baseUrl`, never typed here — the same rule the
  * rest of this module follows, so a domain decision stays a one-line edit in `spec.config.json`.
  *
- * **The load balancer must agree.** A host rule that forwards `ethrfps.app` to this service
- * wholesale is what makes this hook load-bearing; the listener rule should be path-scoped to the
- * canonical document prefixes so the apex's `/v1` traffic never reaches a task at all. This hook
- * is the second half of that, and the half that survives an infrastructure edit.
+ * **What the apex actually resolves to now.** In production the apex is the reference frontend —
+ * that package is the spec's site, and the site is what belongs on the hostname the spec reserved
+ * for it. The frontend does not answer the identifier paths itself: it PROXIES `/schemas/`,
+ * `/meta/`, `/registries/` and `/ns/` back to this service, so the bytes below are still the bytes
+ * an `$id` dereferences to, at the identifier's own URL, with no redirect in between. Everything
+ * else on the apex is the site, and `/v1` is not reachable there at all — which is the reservation
+ * holding by topology rather than by refusal.
+ *
+ * This hook stays load-bearing anyway, for the routing this does not describe: a listener rule that
+ * forwards `ethrfps.app` to this service directly — the arrangement before the frontend took the
+ * apex, and the one an infrastructure edit could restore — would publish the whole API at the
+ * identifier authority. The hook is the half of the contract that survives such an edit, and it
+ * costs one set lookup per request to keep.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { config } from "../config.js";

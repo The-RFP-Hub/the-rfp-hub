@@ -19,3 +19,15 @@ export const pool = new pg.Pool({
 export const db = drizzle(pool, { schema, casing: "snake_case" });
 
 export type DB = typeof db;
+
+/**
+ * The handle a `db.transaction(...)` callback receives.
+ *
+ * Named here because the M3 write paths hand it down: an audit row is written by the audit service
+ * with the SAME handle that wrote the mutation, so a rolled-back mutation can never leave a
+ * history row claiming it happened. A service that takes `DbLike` works on either.
+ */
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Either the pool-backed client or an open transaction. */
+export type DbLike = DB | Tx;
