@@ -392,3 +392,69 @@ exist.
   not required to dereference, and `ARTIFACTS.md` already schedules `vocabulary.ttl` behind "a
   consumer asks for it". If it is ever built, that document is what the namespace resolves to.
 - `adr/README.md` gains a 0007 index row.
+
+---
+
+## Addendum — 2026-08-20: the reference frontend takes the apex
+
+- **Status:** accepted. Amends the *Serving* section and the first follow-up; the decision above is
+  unchanged.
+
+The first follow-up said the routing was undone and only a human could do it. It is being done now,
+and doing it forced the question this ADR left implicit: the apex is reserved for "the spec **and
+its site**", and the project has since built the site. `packages/frontend` is the reference client —
+the public opportunity directory and the publisher workbench — and it is the only thing this project
+has that is the spec's site. In production it is what `https://ethrfps.app` resolves to. Staging
+stays on a single label, `https://staging.ethrfps.app`, by the same certificate rule as `api-`.
+
+That does not loosen the reservation, because the reservation was never about which process answers.
+It is about four path prefixes: `/schemas/`, `/meta/`, `/registries/` and `/ns/` are the standard's
+namespace, and nothing may be published under them but the standard's own files. Under the new
+topology those prefixes are **carved out of the frontend and proxied to the API service**:
+
+| Prefix | Where the request arrives | Where the bytes come from |
+|---|---|---|
+| `/schemas/:path*` | The frontend, on the apex | The API, at the same path |
+| `/meta/:path*` | " | " |
+| `/registries/:path*` | " | " |
+| `/ns/:path*` | " | " (nothing is published there yet — see below) |
+
+**Proxied, never redirected, and this is the whole of it.** A `301` from an `$id` is an identifier
+that resolves *somewhere else*: a validator that follows one caches the document under the target's
+URL, and a JSON-LD processor that follows one is fetching a context whose own URL disagrees with the
+`@context` value that named it. The frontend rewrite keeps the URL and the bytes together — same
+path, same media type, same `ETag`, same `Cache-Control`, because they are the API's bytes,
+unaltered. The API already answers these paths on **every** hostname, deliberately (an identifier
+that resolves on one host only is not more reserved, just harder to serve), so proxying to the API's
+own origin is not a special case anybody has to maintain.
+
+**The prefixes are forbidden as app routes**, which is a stronger claim than "we did not add one".
+The rewrites sit in Next's `beforeFiles` bucket, so they are decided before the filesystem is
+consulted at all and a page added later could not take an identifier path even by accident; and
+`packages/frontend/test/canonical-namespace.test.ts` pins both halves — the four rewrites, exactly,
+pointing at the API's origin, and a scan of `src/app` that fails if any directory (including one
+inside a route group, where it would be easiest to miss) spells one of the four. `/ns/` is carved
+out with the other three even though nothing is served there yet: the fourth follow-up above leaves
+"should the vocabulary namespace dereference" open, and reserving the prefix now is what keeps that
+a decision about the API alone. Until it is answered, `/ns/` 404s from the API — the honest answer,
+and a better one than a site page rendered at a vocabulary IRI.
+
+**The application-layer guard stays, and is still load-bearing.**
+`packages/api/src/plugins/apex-host.ts` is not made redundant by the frontend occupying the apex —
+it is what holds if the apex is ever routed to the API service directly, which is the arrangement
+this addendum replaces and the one an infrastructure edit could restore. The two-layer table in
+*Serving* is therefore amended rather than retired: the load-balancer row now reads "the apex
+forwards to the frontend, which proxies the four prefixes to the API", and the application row is
+unchanged. Neither layer is redundant, for the same reason as before.
+
+- **Good:** the apex carries something worth visiting, and the availability obligation it took on is
+  now shared with a service whose whole job is to be up for readers.
+- **Good:** the recorded CDN migration is unaffected. It swaps what the four prefixes proxy *to*;
+  the carve-out, the test and the identifiers are the same afterwards.
+- **Bad — who pays:** spec resolution now rides two hops instead of one, so the frontend's
+  availability is added to the API's for anything dereferencing an `$id` on the apex. The
+  compensating fact is unchanged: these documents are cached hard (a year and `immutable` for
+  anything under a version directory), so a processor that has fetched one keeps a usable copy.
+- **Neutral:** the frontend must know the API's origin to proxy at all. It already does —
+  `NEXT_PUBLIC_API_URL` is inlined at build time and named in the page's `connect-src` — so a
+  deployment pointing at a different API must be rebuilt, which was already true.
