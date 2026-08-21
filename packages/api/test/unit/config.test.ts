@@ -361,10 +361,31 @@ describe("readMailgunApiBase", () => {
     }
   });
 
+  // The send URL is built by concatenation, so anything that is not an origin-plus-path survives
+  // that in its own wrong way — and all of these parse cleanly, so nothing above catches them: a
+  // query swallows the appended path into itself, a fragment leaves the request on `/`, and
+  // userinfo makes fetch throw. Every one of them boots and then delivers nothing.
+  it("refuses a base carrying a query, a fragment or credentials", () => {
+    for (const raw of [
+      "https://api.mailgun.net?region=us",
+      "https://api.mailgun.net#frag",
+      "https://user:pw@api.mailgun.net",
+      "https://user@api.mailgun.net",
+    ]) {
+      expect(() => readMailgunApiBase(raw), raw).toThrow(/MAILGUN_API_BASE/);
+    }
+  });
+
   it("accepts a plaintext loopback base, so a test double can be a local server", () => {
     expect(readMailgunApiBase("http://127.0.0.1:8025")).toBe("http://127.0.0.1:8025");
     expect(readMailgunApiBase("http://localhost:8025/")).toBe("http://localhost:8025");
     expect(readMailgunApiBase("https://api.eu.mailgun.net")).toBe("https://api.eu.mailgun.net");
+    expect(readMailgunApiBase("https://api.eu.mailgun.net/")).toBe("https://api.eu.mailgun.net");
+    // A PATH PREFIX IS NOT ONE OF THE REFUSED COMPONENTS: it concatenates correctly, and it is
+    // what a proxy in front of the account looks like.
+    expect(readMailgunApiBase("http://127.0.0.1:8025/mailgun-double")).toBe(
+      "http://127.0.0.1:8025/mailgun-double",
+    );
   });
 
   it("rejects a value that is not an absolute URL", () => {

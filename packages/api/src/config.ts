@@ -566,6 +566,14 @@ const DEFAULT_MAILGUN_API_BASE = "https://api.mailgun.net";
  * all: `fetch` cannot send to either, from anywhere, so accepting one at boot buys a configuration
  * that looks fine until the first sign-in fails inside a detached promise. So: `https:` anywhere,
  * `http:` on loopback, nothing else.
+ *
+ * It is also an ORIGIN, optionally with a path prefix, and nothing else — because the send URL is
+ * built by CONCATENATION (`${base}/v3/${domain}/messages`), and the components refused below each
+ * survive that in their own wrong way: a query absorbs the path into itself
+ * (`…net?x=1/v3/…/messages` is one query string, not a route), a fragment leaves the request on
+ * `/`, and userinfo makes `fetch` throw outright. All three parse cleanly, so none of them is
+ * caught by anything above — and all three boot a deployment that delivers no mail at all. A plain
+ * path prefix, which is what a proxy in front of the account looks like, stays allowed.
  */
 export function readMailgunApiBase(
   raw: string | undefined,
@@ -592,6 +600,18 @@ export function readMailgunApiBase(
   if (url.protocol !== "https:" && !isLoopbackHost(url.hostname)) {
     throw new Error(
       `MAILGUN_API_BASE must use https:// for any host that is not loopback — every send carries the API key in an Authorization header, and plaintext would publish it to the network. Got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  const carried = [
+    url.username !== "" || url.password !== "" ? "credentials" : undefined,
+    url.search !== "" ? "a query string" : undefined,
+    url.hash !== "" ? "a fragment" : undefined,
+  ].filter((part): part is string => part !== undefined);
+
+  if (carried.length > 0) {
+    throw new Error(
+      `MAILGUN_API_BASE carries ${carried.join(" and ")}, and it must be an origin (optionally with a path prefix): the send path is appended to it, so a query string swallows that path, a fragment sends the request to / instead, and credentials make the request throw. Each of those boots normally and then delivers nothing. Got ${JSON.stringify(value)}.`,
     );
   }
 
