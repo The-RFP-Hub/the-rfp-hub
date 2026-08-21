@@ -47,6 +47,14 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # validate's codegen imports @the-rfp-hub/standard's BUILT entry (dist/index.js), not its
+      # source, so on a clean runner (no dist yet) the drift check below dies with
+      # ERR_MODULE_NOT_FOUND before it gets to check anything. Building only this one workspace
+      # package — not the full `pnpm build` — keeps the check cheap and keeps "drift check before
+      # full build" a meaningful ordering.
+      - name: Build @the-rfp-hub/standard (dependency of the type drift check)
+        run: pnpm --filter @the-rfp-hub/standard build
+
       - name: Type drift check (generated artifacts vs schema + spec.config.json)
         run: pnpm codegen:check
 
