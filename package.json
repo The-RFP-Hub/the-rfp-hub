@@ -12,6 +12,7 @@
     "codegen:check": "pnpm -r --if-present codegen:check",
     "check": "pnpm -r --if-present check",
     "check:neutral": "node scripts/check-neutral.mjs",
+    "check:deploy": "node scripts/check-deploy.mjs",
     "check:m2": "node scripts/check-m2.mjs",
     "check:m3": "node scripts/check-m3.mjs",
     "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",

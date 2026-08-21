@@ -9,8 +9,10 @@ on:
 
 name: Production API
 
-# Mirrors staging.yml — pulls `.env` from `production/rfp-hub`,
-# bakes into the image, deploys to the production ECS cluster.
+# Mirrors staging.yml, against the production ECS cluster. The image
+# carries no configuration: the task definition's `secrets:` array
+# resolves keys of the `production/rfp-hub` Secrets Manager value at task
+# start (packages/api/docs/deploy.md).
 # Triggers ONLY on `prod-*` tags or manual dispatch (no auto-deploy
 # on push to main) so production releases are explicit.
 
@@ -49,9 +51,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Get .env from Secret Manager
-        run: |
-          aws secretsmanager get-secret-value --secret-id production/rfp-hub --query SecretString --output text >> .env
+      # NOTE: no secret is fetched into the build context — see the same note in staging.yml and
+      # packages/api/docs/deploy.md. Configuration reaches the container through the ECS task
+      # definition's `secrets:` array, resolving keys of the `production/rfp-hub` Secrets Manager
+      # value at task start, never through a build layer.
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -139,6 +142,18 @@ jobs:
           aws ecs describe-task-definition --task-definition ${{ env.ECS_CONTAINER }} --query taskDefinition > task-definition.json
           echo "revision=$(cat task-definition.json | jq .revision)" >> "$GITHUB_OUTPUT"
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      # The clean path's one hard prerequisite, checked where it bites: a task definition without
+      # a `secrets:` mapping for DATABASE_URL means the container this deploy ships would boot
+      # with no database at all — the image no longer bakes configuration, so this is the exact
+      # first-deploy crash the migration ordering exists to prevent. Refusing HERE keeps the old
+      # revision serving instead of shipping a crash-loop.
+      - name: Require task-definition secret injection
+        run: |
+          if ! jq -e '.containerDefinitions[] | select(.name == "${{ env.ECS_CONTAINER }}") | .secrets[]? | select(.name == "DATABASE_URL")' task-definition.json > /dev/null; then
+            echo "::error::the ${{ env.ECS_CONTAINER }} task definition carries no secrets: entry for DATABASE_URL. Add the secrets: array (and its execution-role policy) first — see packages/api/docs/deploy.md."
+            exit 1
+          fi
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def

@@ -394,55 +394,41 @@ Rotation is step 1 for a reason: every later step is worthless while the old val
 
 ---
 
-## 8. `pnpm.overrides`, and why `better-auth` needs three of them
+## 8. `pnpm.overrides` — the inventory, and how to retire an entry
 
 The root `package.json`'s `pnpm.overrides` block exists to keep `pnpm audit --prod --audit-level
-moderate` — the gate `.github/workflows/security-audit.yml` runs weekly — clean. Most entries pin a
-single transitive package past a known advisory (`@fastify/static`, `brace-expansion`, `fast-uri`,
-`fastify>find-my-way`, `postcss>nanoid`) and are self-explanatory from the pin alone. Three exist for
-a less obvious reason, worth recording so the next `better-auth` bump does not silently reopen them:
+moderate` — the gate `.github/workflows/security-audit.yml` runs weekly — clean. **Every entry is
+debt**: it pins a fact about somebody else's dependency graph, and the graph moves. The block is
+kept to the entries an empirical check still proves load-bearing — *delete the override, `pnpm
+install`, `pnpm audit --prod`*: if the advisory does not come back, the entry was dead weight and
+stays out.
 
-**`better-auth@1.7.1` declares `vitest` and `drizzle-kit` as PEER dependencies, not real ones** — a
-correct choice for a library that must not version-lock its host's test runner or migration tool.
-But this project's own root `vitest` devDependency satisfies that peer, and pnpm's peer resolution
-wires it into the graph under `better-auth`'s node. `pnpm audit --prod` walks that graph from a
-production dependency (`better-auth` itself, a real `dependencies` entry in both `packages/api` and
-`packages/frontend`) and counts everything reachable from it — including the peer-satisfied
-`vitest` and everything transitively beneath it (`vite`, `postcss`, `esbuild`) — as production
-exposure. None of it is runtime-reachable; the audit gate cannot tell the difference.
+Why any of this is audit-visible at all: `better-auth` declares `vitest` and `drizzle-kit` as PEER
+dependencies, this workspace's own devDependencies satisfy them, and pnpm wires the satisfied peers
+into the graph under `better-auth`'s node — a real `dependencies` entry of both `packages/api` and
+`packages/frontend`. `pnpm audit --prod` counts everything reachable from there (`vite`, `esbuild`,
+`drizzle-kit`'s loader chain) as production exposure, runtime-reachable or not.
 
-**A scoped override (`"better-auth>vitest": ">=X"`) does NOT work for this.** It was tried first, and
-`pnpm install` accepted it silently but left the actually-installed peer untouched (confirmed via
-`pnpm -r why --prod vitest` before and after) — pnpm's override rewriting targets real dependency
-edges, and a peer satisfied by the workspace's own hoisted devDependency has no such edge for the
-scoped path to rewrite. The only fix that actually moves the installed version is bumping the real
-devDependency: **root `vitest` and `packages/frontend`'s `vitest` both went from `^2.1.8` to
-`^3.2.7`**, which is a real (if incidental) test-runner upgrade, not a pin. It was regression-verified
-against every suite that uses `testAuth`/`testUtils` plus the full root and frontend runs before
-being treated as safe — see the validation trail in this change's report.
+| Override | Forces | Advisories | Why it is reachable | Remove when |
+|---|---|---|---|---|
+| `@esbuild-kit/core-utils>esbuild` | `>=0.28.1` | GHSA-67mh-4wv8-2f99, GHSA-g7r4-m6w7-qqqr | `better-auth` (prod) → peer `drizzle-kit` → legacy `@esbuild-kit` loader → its own `esbuild` | `drizzle-kit` drops `@esbuild-kit` (its changelog has promised to). Verify by deletion: remove the line, `pnpm install`, `pnpm audit --prod` — clean means gone for good |
+| `vite>esbuild` | `>=0.28.1` | same pair | `better-auth` (prod) → peer `vitest` → `vite` → its bundled `esbuild` | `vite` ships `esbuild >=0.28.1` in its own range. Same verify-by-deletion |
 
-**`vite` still needed a global override.** Bumping `vitest` alone left its own `vite` peer resolving
-to the newest 5.x patch available (`5.4.21`), which the advisory covers (fixed only from `6.4.3`).
-`"vite": "7.3.6"` pins it inside both `vitest@3.2.7`'s accepted peer range (`^5 || ^6 || ^7.0.0-0`)
-and `@vitejs/plugin-react@4.7.0`'s (`^4.2 || ^5 || ^6 || ^7`). The override alone was **not
-sufficient for `@vitejs/plugin-react`'s own peer slot** — it kept resolving to whatever the latest
-published `vite` was (`8.x`, itself unaffected but outside both accepted ranges) until `vite` was
-also added as an explicit `packages/frontend` devDependency pinned to the same `7.3.6`, giving that
-peer a real edge to anchor on. Confirmed stable across three consecutive `rm -rf node_modules &&
-pnpm install` cycles before being treated as deterministic.
+Both pin `>=0.28.1`, not the advisory's stated `>=0.25.0` floor: `>=0.25.0` re-resolved to
+`0.27.x`, which a second, lower-severity esbuild advisory also covers; `>=0.28.1` clears both.
+They are two entries because they are two unrelated dependency paths that share a package name.
 
-**Two separate `esbuild` chains needed their own pins**, because they are unrelated dependency paths
-that happen to share a package name: `vite>esbuild` (vite's own bundled copy) and
-`@esbuild-kit/core-utils>esbuild` (pulled in by `drizzle-kit`'s legacy `@esbuild-kit` loader, a
-different peer chain entirely). Both are pinned to `>=0.28.1` — not the advisory's stated `>=0.25.0`
-floor, because `>=0.25.0` alone re-resolved to `0.27.x`, which a *second*, lower-severity esbuild
-advisory (Windows dev-server file read) also covers; `>=0.28.1` clears both in one pin.
+**Retired entries, and why** (recorded so a red weekly audit has its history in one place): the
+empirical remove-all-and-re-resolve check showed upstream caught up on `brace-expansion`,
+`fast-uri`, `fastify>find-my-way` and `postcss>nanoid` — today's default resolution satisfies all
+four advisories with no pin. `@fastify/static: 10.1.2` was needed only while `swagger-ui` was v5;
+the API's `@fastify/swagger-ui@^6` pulls a fixed `static` in its own range. The global
+`vite: 7.3.6` override was redundant with the real `packages/frontend` devDependency pinned to the
+same version — the devDependency is what gives `@vitejs/plugin-react`'s peer slot a real edge to
+anchor on, which is the part an override alone was proven not to reach.
 
-**Recheck all three on every `better-auth` version bump.** They are pinned to what `1.7.1`'s peer
-ranges currently accept; a future `better-auth` release can shift those ranges (or drop the `vitest`/
-`drizzle-kit` peers entirely) and make some or all of this unnecessary — or insufficient. Re-verify
-with `pnpm -r why --prod vitest`, `pnpm -r why --prod vite`, `pnpm -r why --prod esbuild`, then
-`pnpm audit --prod --audit-level moderate`, before assuming the pins still apply.
+**Recheck on every `better-auth` bump**: its peer ranges are what make the whole chain reachable.
+`pnpm -r why --prod esbuild`, then the audit, before assuming anything still applies.
 
 Five other, older overrides (`@coinbase/cdp-sdk>axios`, `viem>ws`, `@metamask/utils>uuid`,
 `@metamask/sdk>uuid`, `@metamask/sdk-communication-layer>uuid`) were removed in the same change:

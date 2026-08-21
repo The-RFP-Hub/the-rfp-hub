@@ -77,6 +77,12 @@ jobs:
       - name: Source neutrality (repo-wide)
         run: pnpm check:neutral
 
+      # No secret may reach the container image or the buildx layer cache, which for this public
+      # repository is stored in its own Actions cache. Runs before the build, because the thing it
+      # protects is the build.
+      - name: Deploy hygiene (no secrets in the image)
+        run: pnpm check:deploy
+
       # Build first: validate's typecheck/tests resolve @the-rfp-hub/standard from its built dist.
       - name: Build
         run: pnpm build
