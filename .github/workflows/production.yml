@@ -9,8 +9,9 @@ on:
 
 name: Production RFP Hub API
 
-# Mirrors staging.yml — pulls `.env` from `production/rfp-hub`,
-# bakes into the image, deploys to the production ECS cluster.
+# Mirrors staging.yml — builds a configuration-free image and lets ECS
+# resolve runtime secrets from the task definition when each task starts;
+# no secret enters the Docker build context or the layer cache.
 # Triggers ONLY on `prod-*` tags or manual dispatch (no auto-deploy
 # on push to main) so production releases are explicit.
 
@@ -21,6 +22,9 @@ env:
   # variables -> Actions -> Variables. The deploy job below refuses to run while it is unset,
   # because an empty `cluster:` silently means ECS's `default` cluster.
   ECS_CLUSTER: ${{ vars.PRODUCTION_ECS_CLUSTER }}
+  # Base ARN of the runtime secret (JSON keys, one per injected variable) — same reasoning as
+  # the cluster: an account/resource identity, so a repository variable, not a literal here.
+  ECS_RUNTIME_SECRET_ARN: ${{ vars.PRODUCTION_RFP_HUB_RUNTIME_SECRET_ARN }}
   ECR_REPOSITORY_MAIN: production-rfp-hub
   ECS_CONTAINER: rfp-hub-production
 
@@ -49,9 +53,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.PRODUCTION_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Get .env from Secret Manager
-        run: |
-          aws secretsmanager get-secret-value --secret-id production/rfp-hub --query SecretString --output text >> .env
+      # Deliberately no runtime-configuration fetch here: ECS resolves the task
+      # definition's secret references when each task starts, so the build needs
+      # nothing secret and the image carries nothing secret.
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -61,9 +65,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-prod-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-v2-production-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx-prod
+            ${{ runner.os }}-buildx-v2-production-
 
       - name: Build image
         id: build-image
@@ -111,10 +115,14 @@ jobs:
 
       # Fail before touching AWS rather than after: `cluster:` empty is not an error to the
       # deploy action, it is a request for the account's `default` cluster.
-      - name: Require the cluster variable
+      - name: Require deployment variables
         run: |
-          if [ -z "${{ env.ECS_CLUSTER }}" ]; then
+          if [ -z "$ECS_CLUSTER" ]; then
             echo "::error::Repository variable PRODUCTION_ECS_CLUSTER is unset (Settings -> Secrets and variables -> Actions -> Variables)."
+            exit 1
+          fi
+          if [ -z "$ECS_RUNTIME_SECRET_ARN" ]; then
+            echo "::error::Repository variable PRODUCTION_RFP_HUB_RUNTIME_SECRET_ARN is unset (Settings -> Secrets and variables -> Actions -> Variables)."
             exit 1
           fi
 
@@ -147,6 +155,11 @@ jobs:
           task-definition: task-definition.json
           container-name: ${{ env.ECS_CONTAINER }}
           image: ${{ steps.download-task.outputs.image }}
+          # Reassert the runtime secret mapping on every revision this workflow registers,
+          # so a drifted base task definition cannot silently drop it. Upserts by variable
+          # name; other secret entries in the downloaded definition are preserved.
+          secrets: |
+            DATABASE_URL=${{ env.ECS_RUNTIME_SECRET_ARN }}:DATABASE_URL::
 
       - name: Deploy Amazon ECS task definition and service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2

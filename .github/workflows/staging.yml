@@ -14,9 +14,10 @@ on:
 
 name: Staging RFP Hub API
 
-# Mirrors the operator's existing service deployment: pull `.env` from
-# AWS Secrets Manager into the build context, bake it into the Docker
-# image, push to ECR, then update the ECS task definition and service.
+# Build a configuration-free image, push it to ECR, then update the ECS
+# task definition and service. Runtime secrets are resolved by ECS at task
+# start from the task definition's `secrets` references; no secret enters
+# the Docker build context or the layer cache.
 #
 # No DB migration job — Drizzle migrations (`pnpm migrate` in
 # packages/api) are a manual operator step against the staging RDS,
@@ -29,6 +30,9 @@ env:
   # variables -> Actions -> Variables. The deploy job below refuses to run while it is unset,
   # because an empty `cluster:` silently means ECS's `default` cluster.
   ECS_CLUSTER: ${{ vars.STAGING_ECS_CLUSTER }}
+  # Base ARN of the runtime secret (JSON keys, one per injected variable) — same reasoning as
+  # the cluster: an account/resource identity, so a repository variable, not a literal here.
+  ECS_RUNTIME_SECRET_ARN: ${{ vars.STAGING_RFP_HUB_RUNTIME_SECRET_ARN }}
   ECR_REPOSITORY_MAIN: staging-rfp-hub
   ECS_CONTAINER: rfp-hub-staging
 
@@ -57,13 +61,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # Pulls the full env file out of Secrets Manager. The secret value
-      # is expected to be the raw .env contents (KEY=VALUE per line).
-      # Variables baked into the image at build time via `COPY .env*` in
-      # the Dockerfile.
-      - name: Get .env from Secret Manager
-        run: |
-          aws secretsmanager get-secret-value --secret-id staging/rfp-hub --query SecretString --output text >> .env
+      # Deliberately no runtime-configuration fetch here: ECS resolves the task
+      # definition's secret references when each task starts, so the build needs
+      # nothing secret and the image carries nothing secret.
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -73,9 +73,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-v2-staging-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx
+            ${{ runner.os }}-buildx-v2-staging-
 
       - name: Build image
         id: build-image
@@ -123,10 +123,14 @@ jobs:
 
       # Fail before touching AWS rather than after: `cluster:` empty is not an error to the
       # deploy action, it is a request for the account's `default` cluster.
-      - name: Require the cluster variable
+      - name: Require deployment variables
         run: |
-          if [ -z "${{ env.ECS_CLUSTER }}" ]; then
+          if [ -z "$ECS_CLUSTER" ]; then
             echo "::error::Repository variable STAGING_ECS_CLUSTER is unset (Settings -> Secrets and variables -> Actions -> Variables)."
+            exit 1
+          fi
+          if [ -z "$ECS_RUNTIME_SECRET_ARN" ]; then
+            echo "::error::Repository variable STAGING_RFP_HUB_RUNTIME_SECRET_ARN is unset (Settings -> Secrets and variables -> Actions -> Variables)."
             exit 1
           fi
 
@@ -159,6 +163,11 @@ jobs:
           task-definition: task-definition.json
           container-name: ${{ env.ECS_CONTAINER }}
           image: ${{ steps.download-task.outputs.image }}
+          # Reassert the runtime secret mapping on every revision this workflow registers,
+          # so a drifted base task definition cannot silently drop it. Upserts by variable
+          # name; other secret entries in the downloaded definition are preserved.
+          secrets: |
+            DATABASE_URL=${{ env.ECS_RUNTIME_SECRET_ARN }}:DATABASE_URL::
 
       - name: Deploy Amazon ECS task definition and service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2

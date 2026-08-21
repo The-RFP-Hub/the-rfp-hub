@@ -277,10 +277,11 @@ node packages/api/dist/seed.js packages/api/data/seed-corpus.json --strict
 node packages/api/dist/export.js
 ```
 
-`DATABASE_URL` comes from the **task environment**, exactly as it does for the server: the image's
-baked `.env` if there is one, and the task definition's own environment on top of it — a real
-environment variable always wins over the file (see [Configuration](#configuration)). Nothing here
-takes a connection string on the command line.
+`DATABASE_URL` comes from the **task environment**, exactly as it does for the server. On ECS the
+task definition resolves it from Secrets Manager when the task starts; for a local `docker run`,
+pass it with `--env` or Docker's host-side `--env-file`. The image itself carries no environment
+file (see [Configuration](#configuration)). Nothing here takes a connection string on the command
+line.
 
 Notes on each:
 

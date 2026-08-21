@@ -9,3 +9,11 @@ docs
 # Published open data, not an image input: the Dockerfile copies named paths and never this one,
 # so keeping it out of the build context spares the daemon a transfer nothing in the image uses.
 exports
+
+# Runtime configuration never enters the Docker build context. Both root and
+# nested variants stay out: `COPY packages ./packages` would otherwise carry a
+# developer's packages/api/.env into the builder stage and its layer cache.
+.env
+.env.*
+**/.env
+**/.env.*

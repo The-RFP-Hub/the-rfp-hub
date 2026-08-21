@@ -76,16 +76,17 @@ COPY --from=builder /app/packages/api/data/seed-corpus.json packages/api/data/se
 # this path; the ordinary run leaves it in the container's own layer.
 RUN mkdir -p /app/exports && chown node:node /app/exports
 
-# Bake `.env` into the image. The CI workflow pulls the file from AWS
-# Secrets Manager (staging/rfp-hub or production/rfp-hub) before the
-# Docker build so this COPY picks it up. Glob form (`.env*`) means the
-# build doesn't fail when no .env is present (e.g. local `docker build`
-# during dev). `src/config.ts` loads it with dotenv, and the CMD also
-# passes Node's --env-file-if-exists; both paths leave real environment
-# variables winning over .env values, so a task definition that supplies
-# DATABASE_URL overrides whatever was baked in. That is what lets the
-# one-off tasks below run as a bare `node …` with no flag of their own.
-COPY .env* ./
+# Runtime configuration is injected by the container runtime, never copied
+# into the image. On ECS, DATABASE_URL comes from the task definition's
+# `secrets` array, resolved when each task starts — the one-off tasks below
+# inherit it the same way, because a run-task command override replaces only
+# the command, not the container definition. Local `docker run` callers use
+# Docker's host-side `--env-file`; local pnpm commands still get
+# src/config.ts's dotenv load. Real process variables retain precedence in
+# every path.
+#
+# `.dockerignore` excludes root and nested env files so neither the runtime
+# stage nor the mode=max builder cache can acquire one through a COPY.
 
 # PORT is fixed here rather than in the secret so it always matches the
 # container_port/back_end_port wired into the ECS task and ALB target group.
@@ -93,4 +94,4 @@ ENV PORT=3004
 EXPOSE 3004
 USER node
 
-CMD ["node", "--env-file-if-exists=.env", "packages/api/dist/server.js"]
+CMD ["node", "packages/api/dist/server.js"]
