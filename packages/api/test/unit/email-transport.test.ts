@@ -48,8 +48,14 @@ const MESSAGE = {
 interface SeenRequest {
   url: string;
   method: string | undefined;
+  /** Only what the transport set by hand. `content-type` must NOT be among them; see below. */
   headers: Record<string, string>;
-  fields: URLSearchParams;
+  /**
+   * The parts, read off the `FormData` the transport passed — NOT off a serialised body. Nothing
+   * here reconstructs the multipart encoding, because nothing in the transport writes it: `fetch`
+   * does, with the boundary, which is the whole reason the header is left to it.
+   */
+  fields: FormData;
   signal: AbortSignal | null | undefined;
 }
 
@@ -62,13 +68,20 @@ function stubFetch(reply: Response | Error): SeenRequest[] {
       url: String(input),
       method: init?.method,
       headers: Object.fromEntries(headers.entries()),
-      fields: new URLSearchParams(String(init?.body ?? "")),
+      fields: init?.body instanceof FormData ? init.body : new FormData(),
       signal: init?.signal,
     });
     if (reply instanceof Error) throw reply;
     return reply;
   });
   return seen;
+}
+
+/** Every part, flattened, for the assertions that are about what must NOT be in the body. */
+function partsOf(request: SeenRequest | undefined): string {
+  return [...(request?.fields.entries() ?? [])]
+    .map(([name, value]) => `${name}=${value}`)
+    .join("&");
 }
 
 afterEach(() => {
@@ -84,10 +97,23 @@ describe("mailgun transport", () => {
     const request = seen[0];
     expect(request?.url).toBe("https://api.mailgun.net/v3/mg.rfphub.invalid/messages");
     expect(request?.method).toBe("POST");
-    expect(request?.headers["content-type"]).toBe("application/x-www-form-urlencoded");
     // Abandoned rather than left hanging: the send is not awaited by any request, so a silent
     // provider would otherwise hold a socket per sign-in attempt for as long as it stayed silent.
     expect(request?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  // FETCH OWNS THE CONTENT-TYPE, because only fetch knows the boundary it generated for the
+  // multipart body. A hand-set `multipart/form-data` header would arrive without that boundary and
+  // the provider would have no way to parse a single part — a failure that shows up nowhere but a
+  // detached promise's log line.
+  it("sets the authorization header and leaves content-type to fetch", async () => {
+    const seen = stubFetch(new Response("{}", { status: 200 }));
+    await createEmailTransport(mailgunConfig()).send(MESSAGE);
+
+    expect(Object.keys(seen[0]?.headers ?? {})).toEqual(["authorization"]);
+    expect(seen[0]?.headers["content-type"]).toBeUndefined();
+    // …and the body really is the multipart the documented endpoint takes, not a url-encoded one.
+    expect(seen[0]?.fields).toBeInstanceOf(FormData);
   });
 
   // The one detail that is wrong in exactly one way and cannot be caught anywhere else: Mailgun's
@@ -116,7 +142,7 @@ describe("mailgun transport", () => {
     expect(fields?.get("html")).toBeNull();
     // The credential travels in the header and only there — a body copy would reach any middlebox
     // logging form fields, and Mailgun echoes the request in its own logs.
-    expect(String(seen[0]?.fields)).not.toContain(API_KEY);
+    expect(partsOf(seen[0])).not.toContain(API_KEY);
     expect(seen[0]?.url).not.toContain(API_KEY);
   });
 

@@ -555,10 +555,17 @@ const DEFAULT_MAILGUN_API_BASE = "https://api.mailgun.net";
  *
  * Validated in the spirit of `readPublicBaseUrl` rather than falling back, because the fallback
  * would be the wrong region and would present as "the code never arrived": it must parse as an
- * absolute URL, the trailing slash is stripped (the send path is appended and already starts with
- * `/`), and the scheme must be https for any host that is not loopback — the request carries the
- * API key in an `Authorization` header, so plaintext to a remote host publishes the credential.
- * Loopback stays plaintext-able so a test double can be a local server.
+ * absolute URL and the trailing slash is stripped (the send path is appended and already starts
+ * with `/`).
+ *
+ * The SCHEME IS ALLOW-LISTED, not merely required to be https off loopback. Two different things
+ * are being refused and the loopback exemption only covers one of them: `http:` is refused remotely
+ * because the request carries the API key in an `Authorization` header and plaintext would publish
+ * it — which loopback traffic, never leaving the machine, genuinely escapes, so a test double may
+ * be a local http server. But `ftp://localhost` or `ws://127.0.0.1` is not a privacy question at
+ * all: `fetch` cannot send to either, from anywhere, so accepting one at boot buys a configuration
+ * that looks fine until the first sign-in fails inside a detached promise. So: `https:` anywhere,
+ * `http:` on loopback, nothing else.
  */
 export function readMailgunApiBase(
   raw: string | undefined,
@@ -573,6 +580,12 @@ export function readMailgunApiBase(
   } catch {
     throw new Error(
       `MAILGUN_API_BASE must be an absolute URL (e.g. ${DEFAULT_MAILGUN_API_BASE}, or https://api.eu.mailgun.net for an EU account), got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(
+      `MAILGUN_API_BASE must be an https:// URL — the send is an HTTPS request, and nothing else is a scheme it could be made over. Got ${JSON.stringify(value)}.`,
     );
   }
 

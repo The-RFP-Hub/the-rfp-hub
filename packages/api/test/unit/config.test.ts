@@ -340,15 +340,31 @@ describe("readMailgunApiBase", () => {
   // Every send carries the API key in an Authorization header, so plaintext to a remote host
   // publishes the credential — the same rule readPublicBaseUrl draws, for the same transport
   // reason, and it holds whoever owns the host.
-  it("rejects a non-https scheme on any host that is not loopback", () => {
-    for (const raw of ["http://api.mailgun.net", "http://proxy.example.org", "ftp://example.org"]) {
+  it("rejects plaintext on any host that is not loopback", () => {
+    for (const raw of ["http://api.mailgun.net", "http://proxy.example.org"]) {
       expect(() => readMailgunApiBase(raw), raw).toThrow(/https/i);
+    }
+  });
+
+  // A DIFFERENT REFUSAL, and the loopback exemption does not reach it: these are not a privacy
+  // question, they are schemes `fetch` cannot send to from anywhere. Accepting one would boot a
+  // deployment that looks configured until the first sign-in fails inside a detached promise.
+  it("rejects a scheme no send could be made over, loopback or not", () => {
+    for (const raw of [
+      "ftp://localhost",
+      "ws://127.0.0.1",
+      "ftp://example.org",
+      "wss://api.mailgun.net",
+      "file:///tmp/mailgun",
+    ]) {
+      expect(() => readMailgunApiBase(raw), raw).toThrow(/MAILGUN_API_BASE/);
     }
   });
 
   it("accepts a plaintext loopback base, so a test double can be a local server", () => {
     expect(readMailgunApiBase("http://127.0.0.1:8025")).toBe("http://127.0.0.1:8025");
     expect(readMailgunApiBase("http://localhost:8025/")).toBe("http://localhost:8025");
+    expect(readMailgunApiBase("https://api.eu.mailgun.net")).toBe("https://api.eu.mailgun.net");
   });
 
   it("rejects a value that is not an absolute URL", () => {

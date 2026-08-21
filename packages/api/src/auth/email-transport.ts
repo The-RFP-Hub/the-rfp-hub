@@ -216,9 +216,17 @@ const MAILGUN_TIMEOUT_MS = 10_000;
  * role to lend SES.
  *
  * ONE HTTPS CALL, so it is written as one: HTTP Basic with the literal user `api`, the key as the
- * password, and a form-encoded body. An SDK here would be a dependency, a transitive tree and a
- * release cadence in exchange for `fetch` plus `URLSearchParams`, on the one path that must keep
+ * password, and a `multipart/form-data` body. An SDK here would be a dependency, a transitive tree
+ * and a release cadence in exchange for `fetch` plus `FormData`, on the one path that must keep
  * working for anybody to sign in at all.
+ *
+ * MULTIPART IS THE DOCUMENTED ENCODING, and it is the only one the provider's reference for this
+ * endpoint promises — url-encoded may well be accepted today, but it is undocumented behaviour, and
+ * this send happens inside a detached promise whose only failure signal is a log line. An encoding
+ * that stops working here presents as "the code never arrived", so it is not a place to rely on
+ * something unpromised. The CONTENT-TYPE IS DELIBERATELY NOT SET HERE: `fetch` derives it from the
+ * `FormData` together with the boundary that makes the body parseable, and a hand-written
+ * `multipart/form-data` header without that boundary is the classic way this breaks.
  *
  * The SENDING DOMAIN IS PART OF THE URL, not part of the message: it is the domain whose DKIM keys
  * Mailgun holds, and it is routinely a subdomain of `EMAIL_FROM`'s domain rather than the same
@@ -246,21 +254,19 @@ function mailgunTransport(cfg: EmailConfig): EmailTransport {
   return {
     kind: "mailgun",
     async send(message) {
+      // The same four fields SES and Resend are given. There is no `html` part anywhere in this
+      // file: the message is a six-digit code and a sentence, and a text-only body is one fewer
+      // thing a mail client can render into something the recipient did not expect.
+      const form = new FormData();
+      form.set("from", cfg.from);
+      form.set("to", message.to);
+      form.set("subject", message.subject);
+      form.set("text", message.text);
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          authorization,
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        // The same four fields SES and Resend are given. There is no `html` part anywhere in this
-        // file: the message is a six-digit code and a sentence, and a text-only body is one fewer
-        // thing a mail client can render into something the recipient did not expect.
-        body: new URLSearchParams({
-          from: cfg.from,
-          to: message.to,
-          subject: message.subject,
-          text: message.text,
-        }),
+        // `authorization` and nothing else — see the note above on who owns `content-type`.
+        headers: { authorization },
+        body: form,
         signal: AbortSignal.timeout(MAILGUN_TIMEOUT_MS),
       });
       // The body echoes the recipient and the status alone says what an operator needs to know —
