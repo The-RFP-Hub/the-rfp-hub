@@ -113,6 +113,30 @@ importers:
         specifier: ^4.19.2
         version: 4.22.4
 
+  packages/e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.62.1
+        version: 1.62.1
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      jose:
+        specifier: ^6.2.8
+        version: 6.2.8
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/frontend:
     dependencies:
       '@the-rfp-hub/standard':
@@ -4308,7 +4332,6 @@ snapshots:
   '@playwright/test@1.62.1':
     dependencies:
       playwright: 1.62.1
-    optional: true
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
@@ -5544,15 +5567,13 @@ snapshots:
       mlly: 1.8.2
       pathe: 2.0.3
 
-  playwright-core@1.62.1:
-    optional: true
+  playwright-core@1.62.1: {}
 
   playwright@1.62.1:
     dependencies:
       playwright-core: 1.62.1
     optionalDependencies:
       fsevents: 2.3.2
-    optional: true
 
   postcss-load-config@6.0.1(postcss@8.5.26)(tsx@4.22.4)(yaml@2.9.0):
     dependencies:
