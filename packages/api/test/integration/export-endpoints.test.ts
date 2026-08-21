@@ -148,7 +148,11 @@ run("GET /v1/export/opportunities.{json,csv}", () => {
    * the last attempt asserts unconditionally so a real mismatch fails with the real diff rather
    * than with "never settled".
    */
-  const ATTEMPTS = 10;
+  // Raised for M3: the identity and review suites do not merely seed fixtures in `beforeAll` and
+  // remove them in `afterAll` — they approve, reject, unlist and relist entries THROUGHOUT their
+  // run, so the public set legitimately moves many times while this suite is reading it. Ten
+  // attempts was tuned against suites that changed the dataset twice.
+  const ATTEMPTS = 60;
 
   it("serves the whole public dataset as a JSON attachment in the published envelope", async () => {
     const res = await get(JSON_URL);
@@ -240,7 +244,9 @@ run("GET /v1/export/opportunities.{json,csv}", () => {
       const csvIds = rows.map((r) => r[header.indexOf("id")]);
       const jsonIds = json.opportunities.map((o: Opportunity) => o.id);
 
-      const settled = csvIds.length === jsonIds.length;
+      // The two representations are fetched one after the other, so "settled" has to mean the
+      // dataset did not move BETWEEN them — not merely that the counts happen to agree.
+      const settled = csvIds.join("\u0000") === jsonIds.join("\u0000");
       if (settled || attempt === ATTEMPTS - 1) {
         expect(csvIds).toEqual(jsonIds);
         return;
@@ -306,7 +312,12 @@ run("GET /v1/export/opportunities.{json,csv}", () => {
     for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
       const [firstJson, secondJson] = [await get(JSON_URL), await get(JSON_URL)];
       const [firstCsv, secondCsv] = [await get(CSV_URL), await get(CSV_URL)];
-      const settled = secondCsv.rawPayload.equals(firstCsv.rawPayload);
+      // Both pairs, not just the CSV one: the JSON pair is read FIRST, so a dataset that moves
+      // between the two JSON requests and then holds still would satisfy a CSV-only settle check
+      // while the JSON tags legitimately differ.
+      const settled =
+        secondCsv.rawPayload.equals(firstCsv.rawPayload) &&
+        secondJson.headers.etag === firstJson.headers.etag;
       if (settled || attempt === ATTEMPTS - 1) {
         expect(secondJson.headers.etag).toBe(firstJson.headers.etag);
         expect(secondCsv.headers.etag).toBe(firstCsv.headers.etag);
@@ -373,10 +384,16 @@ run("GET /v1/export/opportunities.{json,csv}", () => {
           csv: await readFile(join(outDir, "latest.csv"), "utf8"),
         };
 
-        // A sibling suite committing a fixture between the two reads is a moved dataset, not a
-        // format mismatch — retry, but assert unconditionally on the final attempt so a genuine
-        // divergence fails with the diff rather than with a timeout.
-        const settled = served.csv === published.csv;
+        // A sibling suite committing a fixture between the reads is a moved dataset, not a format
+        // mismatch — retry, but assert unconditionally on the final attempt so a genuine divergence
+        // fails with the diff rather than with a timeout.
+        //
+        // BOTH representations have to settle, not just the CSV. The two are fetched one after the
+        // other, so a dataset that moves between them can leave the CSV agreeing with the writer
+        // while the JSON — read a moment earlier — does not. Treating the CSV alone as the settled
+        // signal turns that ordinary race into a failure.
+        const settled =
+          served.csv === published.csv && stripStamp(served.json) === stripStamp(published.json);
         if (settled || attempt === ATTEMPTS - 1) {
           expect(served.csv).toBe(published.csv);
           expect(stripStamp(served.json)).toBe(stripStamp(published.json));
