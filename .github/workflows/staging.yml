@@ -14,13 +14,19 @@ on:
 
 name: Staging RFP Hub API
 
-# Mirrors the operator's existing service deployment: pull `.env` from
-# AWS Secrets Manager into the build context, bake it into the Docker
-# image, push to ECR, then update the ECS task definition and service.
+# Build the image, push to ECR, then update the ECS task definition and
+# service. The image carries NO configuration: every variable is supplied
+# by the task definition's `secrets:` array, which resolves keys of the
+# `staging/rfp-hub` Secrets Manager value at task start. See
+# packages/api/docs/deploy.md.
 #
 # No DB migration job — Drizzle migrations (`pnpm migrate` in
-# packages/api) are a manual operator step against the staging RDS,
-# not a per-deploy task.
+# packages/api, or `node packages/api/dist/migrate.js` in this image) are
+# a manual operator step against the staging RDS, not a per-deploy task.
+# Gating the deploy on a migration one-off task is designed in
+# docs/deploy.md ("Gating deploys on migrations") and needs a task
+# definition, subnets/security groups and a DDL-capable credential that
+# must exist before it can be wired in.
 
 env:
   # The cluster is the hosting account's own resource name, not a fact about this project, so
@@ -57,13 +63,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # Pulls the full env file out of Secrets Manager. The secret value
-      # is expected to be the raw .env contents (KEY=VALUE per line).
-      # Variables baked into the image at build time via `COPY .env*` in
-      # the Dockerfile.
-      - name: Get .env from Secret Manager
-        run: |
-          aws secretsmanager get-secret-value --secret-id staging/rfp-hub --query SecretString --output text >> .env
+      # NOTE: no secret is fetched into the build context. Configuration reaches the container
+      # through the ECS task definition's `secrets:` array (each entry resolving a key of the
+      # `staging/rfp-hub` Secrets Manager value at task start), never through the image — see
+      # packages/api/docs/deploy.md. The step that used to write `.env` here was removed together
+      # with the Dockerfile's `COPY .env*`, because the layer cache below is `mode=max` and is
+      # stored in this PUBLIC repository's Actions cache: every secret in a build layer was
+      # readable by anyone who could read that cache. `scripts/check-deploy.mjs` guards the
+      # Dockerfile/.dockerignore half of that fix in CI.
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -151,6 +158,18 @@ jobs:
           aws ecs describe-task-definition --task-definition ${{ env.ECS_CONTAINER }} --query taskDefinition > task-definition.json
           echo "revision=$(cat task-definition.json | jq .revision)" >> "$GITHUB_OUTPUT"
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      # The clean path's one hard prerequisite, checked where it bites: a task definition without
+      # a `secrets:` mapping for DATABASE_URL means the container this deploy ships would boot
+      # with no database at all — the image no longer bakes configuration, so this is the exact
+      # first-deploy crash the migration ordering exists to prevent. Refusing HERE keeps the old
+      # revision serving instead of shipping a crash-loop.
+      - name: Require task-definition secret injection
+        run: |
+          if ! jq -e '.containerDefinitions[] | select(.name == "${{ env.ECS_CONTAINER }}") | .secrets[]? | select(.name == "DATABASE_URL")' task-definition.json > /dev/null; then
+            echo "::error::the ${{ env.ECS_CONTAINER }} task definition carries no secrets: entry for DATABASE_URL. Add the secrets: array (and its execution-role policy) first — see packages/api/docs/deploy.md."
+            exit 1
+          fi
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
