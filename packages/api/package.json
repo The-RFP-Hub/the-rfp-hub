@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": "20 || >=22"
   },
   "main": "./dist/server.js",
   "scripts": {
@@ -17,28 +17,38 @@
     "db:generate": "drizzle-kit generate",
     "db:create": "tsx scripts/create-db.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "grant-admin": "tsx scripts/grant-admin.ts",
     "seed": "tsx scripts/seed.ts",
     "export": "tsx scripts/export.ts",
+    "jobs": "tsx scripts/jobs/run-job.ts",
+    "demo:traffic": "tsx scripts/demo-traffic.ts",
     "export:api": "tsx scripts/export-from-api.ts",
     "corpus:fetch": "tsx tools/converter/fetch-corpus.ts",
-    "corpus:convert": "tsx tools/converter/convert.ts"
+    "corpus:convert": "tsx tools/converter/convert.ts",
+    "dedupe:threshold": "tsx scripts/dedupe-threshold-report.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.1113.0",
     "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@fastify/swagger": "^9.4.2",
-    "@fastify/swagger-ui": "^5.2.1",
+    "@fastify/swagger-ui": "^6.1.1",
     "@the-rfp-hub/standard": "workspace:*",
+    "better-auth": "1.7.1",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.38.3",
-    "fastify": "^5.8.5",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.12.0",
+    "jose": "^6.2.8",
     "pg": "^8.13.1",
-    "rfphub-validate": "workspace:*"
+    "rfphub-validate": "workspace:*",
+    "undici": "^7.16.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "drizzle-kit": "^0.30.1",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.2"
   },
   "repository": {

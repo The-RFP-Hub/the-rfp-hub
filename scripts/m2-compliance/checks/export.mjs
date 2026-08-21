@@ -40,8 +40,18 @@ export async function checkExport(report, ctx, { standard }) {
   );
 
   // ── download ─────────────────────────────────────────────────────────────────────────────
-  const jsonRes = await request(url(ctx.exportUrl, "/latest.json"), { timeoutMs: ctx.timeoutMs });
-  const csvRes = await request(url(ctx.exportUrl, "/latest.csv"), { timeoutMs: ctx.timeoutMs });
+  // Every fetch in this criterion opts INTO following redirects (`follow: true`). The published
+  // artifacts are served by a static file host, where a redirect is ordinary plumbing — and the
+  // question here is what a consumer ends up downloading, not which hop served it. The API's own
+  // operations are the opposite case and are checked unfollowed; see `request` in ../http.mjs.
+  const jsonRes = await request(url(ctx.exportUrl, "/latest.json"), {
+    timeoutMs: ctx.timeoutMs,
+    follow: true,
+  });
+  const csvRes = await request(url(ctx.exportUrl, "/latest.csv"), {
+    timeoutMs: ctx.timeoutMs,
+    follow: true,
+  });
 
   if (!jsonRes.ok || jsonRes.status !== 200) {
     c.fail(
@@ -102,7 +112,10 @@ export async function checkExport(report, ctx, { standard }) {
 
   let licenceFound = null;
   for (const name of LICENSE_NAMES) {
-    const res = await request(url(ctx.exportUrl, `/${name}`), { timeoutMs: ctx.timeoutMs });
+    const res = await request(url(ctx.exportUrl, `/${name}`), {
+      timeoutMs: ctx.timeoutMs,
+      follow: true,
+    });
     if (res.ok && res.status === 200 && CC0_MARKERS.some((re) => re.test(res.body))) {
       licenceFound = { name, body: res.body };
       break;
@@ -264,7 +277,10 @@ export async function checkExport(report, ctx, { standard }) {
  * `probeArchives`.
  */
 async function probeManifest(c, ctx, { jsonBody, csvBody, envelope }) {
-  const res = await request(url(ctx.exportUrl, `/${MANIFEST_NAME}`), { timeoutMs: ctx.timeoutMs });
+  const res = await request(url(ctx.exportUrl, `/${MANIFEST_NAME}`), {
+    timeoutMs: ctx.timeoutMs,
+    follow: true,
+  });
   if (!res.ok || res.status !== 200) {
     c.skip(
       "the aliases are provably one run's",
@@ -332,7 +348,10 @@ async function probeManifest(c, ctx, { jsonBody, csvBody, envelope }) {
       verified.push(`${a.href} (from the ${a.format} alias's own bytes)`);
       continue;
     }
-    const fetched = await request(url(ctx.exportUrl, `/${a.href}`), { timeoutMs: ctx.timeoutMs });
+    const fetched = await request(url(ctx.exportUrl, `/${a.href}`), {
+      timeoutMs: ctx.timeoutMs,
+      follow: true,
+    });
     if (!fetched.ok || fetched.status !== 200) {
       failures.push(
         `${a.href} → ${fetched.ok ? fetched.status : fetched.error} (the manifest names an artifact that is not served)`,
@@ -416,6 +435,7 @@ async function probeArchives(c, ctx, { jsonBody, csvBody, envelope }) {
     const res = await request(url(ctx.exportUrl, `/${name}`), {
       method: "HEAD",
       timeoutMs: ctx.timeoutMs,
+      follow: true,
     });
     found[format] = res.ok && res.status === 200 ? name : null;
   }

@@ -54,6 +54,18 @@ import {
 loadDotenv({ quiet: true });
 
 /** The API's own maximum page size (see listQuerySchema). Fewer round trips is the only reason. */
+/**
+ * WHO THIS RUN IS, said out loud on every request.
+ *
+ * The exporter walks every entry in the corpus, nightly, against production. Sending no identifying
+ * `User-Agent` meant the deployment could not tell its own publisher apart from a reader — so every
+ * publisher's view count would have been mostly us. The analytics capture excludes this name (see
+ * `modules/shared/analytics-hash.ts`), which only works if the name is actually sent.
+ *
+ * The token, not the version, is the contract: the exclusion matches `rfphub-exporter` as a word.
+ */
+const EXPORTER_USER_AGENT = `rfphub-exporter/${SPEC_VERSION}`;
+
 const PAGE_SIZE = 100;
 /** Detail requests in flight. Bounded so a publisher never behaves like a load generator. */
 const CONCURRENCY = 8;
@@ -263,7 +275,7 @@ async function getJson(url: string): Promise<unknown> {
     let res: Response;
     try {
       res = await fetch(url, {
-        headers: { accept: "application/json" },
+        headers: { accept: "application/json", "user-agent": EXPORTER_USER_AGENT },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch (err) {

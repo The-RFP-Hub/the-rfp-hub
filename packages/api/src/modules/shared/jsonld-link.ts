@@ -35,8 +35,24 @@ export const JSONLD_CONTEXT_LINK = `<${CONTEXT_URL}>; rel="${JSONLD_CONTEXT_REL}
  * it to that plugin's routes and nothing else, so the canonical-document routes registered
  * elsewhere cannot pick it up by accident.
  */
-export function advertiseJsonLdContext(router: FastifyInstance): void {
-  router.addHook("onSend", async (_req, reply, payload) => {
+export interface JsonLdScope {
+  /**
+   * The route urls (as Fastify knows them, prefix included) whose responses ARE Standard
+   * opportunities.
+   *
+   * Encapsulation already keeps the hook inside one plugin, and that was enough while the plugin
+   * served nothing but Standard objects. It is not enough as a guarantee: the header instructs a
+   * conformant processor to interpret the body through the opportunity context, so anything that
+   * ever gets added to this plugin and is NOT an opportunity would be advertised as one. Naming the
+   * operations makes the boundary a decision rather than a side effect of where a route was put.
+   */
+  only: string[];
+}
+
+export function advertiseJsonLdContext(router: FastifyInstance, scope?: JsonLdScope): void {
+  const only = scope === undefined ? undefined : new Set(scope.only);
+  router.addHook("onSend", async (request, reply, payload) => {
+    if (only !== undefined && !only.has(request.routeOptions.url ?? "")) return payload;
     const contentType = reply.getHeader("content-type");
     if (reply.statusCode === 200 && String(contentType ?? "").startsWith("application/json")) {
       reply.header("link", JSONLD_CONTEXT_LINK);
