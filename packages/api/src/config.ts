@@ -49,7 +49,14 @@ export interface GoogleConfig {
 }
 
 /** How a one-time code reaches a person. */
-export type EmailTransportKind = "ses" | "resend" | "file" | "stdout" | "memory" | "null";
+export type EmailTransportKind =
+  | "ses"
+  | "resend"
+  | "mailgun"
+  | "file"
+  | "stdout"
+  | "memory"
+  | "null";
 
 export interface EmailConfig {
   transport: EmailTransportKind;
@@ -61,6 +68,16 @@ export interface EmailConfig {
   sesRegion: string | undefined;
   /** `resend` only. Kept as an interface-level alternative; unused by any deployment today. */
   resendApiKey: string | undefined;
+  /** `mailgun` only. The HTTP Basic password; the user is the literal `api`. */
+  mailgunApiKey: string | undefined;
+  /**
+   * `mailgun` only. The SENDING domain, which is a path segment of the send URL rather than
+   * anything about the sender — it may legitimately differ from `from`'s domain, and normally does
+   * (a subdomain carries the DKIM records so the apex keeps its own mail reputation).
+   */
+  mailgunDomain: string | undefined;
+  /** `mailgun` only. Which regional endpoint the account lives on. Always set; see the reader. */
+  mailgunApiBase: string;
 }
 
 export type EmbeddingProvider = "openai" | "deterministic" | "disabled";
@@ -493,6 +510,7 @@ const LOCAL_ONLY_TRANSPORTS: ReadonlySet<string> = new Set(["file", "stdout", "m
 const EMAIL_TRANSPORTS: ReadonlySet<string> = new Set([
   "ses",
   "resend",
+  "mailgun",
   "file",
   "stdout",
   "memory",
@@ -519,10 +537,85 @@ export function readEmailTransport(
   }
   if (production && LOCAL_ONLY_TRANSPORTS.has(value)) {
     throw new Error(
-      `EMAIL_TRANSPORT=${value} under NODE_ENV=production. Nothing would be delivered, so every sign-in would fail at the "enter the code" step with no error anywhere. Use ses.`,
+      `EMAIL_TRANSPORT=${value} under NODE_ENV=production. Nothing would be delivered, so every sign-in would fail at the "enter the code" step with no error anywhere. Use ses or mailgun.`,
     );
   }
   return value as EmailTransportKind;
+}
+
+const DEFAULT_MAILGUN_API_BASE = "https://api.mailgun.net";
+
+/**
+ * Which Mailgun endpoint the account lives on.
+ *
+ * It exists because the US and EU regions are DIFFERENT HOSTS (`api.mailgun.net` and
+ * `api.eu.mailgun.net`) holding different accounts: sending an EU account's domain to the US host
+ * is not a slow path, it is a 401 on every message. The default is the US host, which is where an
+ * account is unless somebody chose otherwise at signup.
+ *
+ * Validated in the spirit of `readPublicBaseUrl` rather than falling back, because the fallback
+ * would be the wrong region and would present as "the code never arrived": it must parse as an
+ * absolute URL, the trailing slash is stripped (the send path is appended and already starts with
+ * `/`), and the scheme must be https for any host that is not loopback — the request carries the
+ * API key in an `Authorization` header, so plaintext to a remote host publishes the credential.
+ * Loopback stays plaintext-able so a test double can be a local server.
+ */
+export function readMailgunApiBase(
+  raw: string | undefined,
+  fallback = DEFAULT_MAILGUN_API_BASE,
+): string {
+  const value = readOptional(raw);
+  if (value === undefined) return fallback;
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(
+      `MAILGUN_API_BASE must be an absolute URL (e.g. ${DEFAULT_MAILGUN_API_BASE}, or https://api.eu.mailgun.net for an EU account), got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  if (url.protocol !== "https:" && !isLoopbackHost(url.hostname)) {
+    throw new Error(
+      `MAILGUN_API_BASE must use https:// for any host that is not loopback — every send carries the API key in an Authorization header, and plaintext would publish it to the network. Got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  return url.href.replace(/\/+$/, "");
+}
+
+/**
+ * The Mailgun credential pair, checked TOGETHER and only when it is the transport in use.
+ *
+ * Neither half is usable alone: the key is the HTTP Basic password and the domain is a path segment
+ * of the send URL, so a deployment holding one of them delivers exactly as much mail as one holding
+ * neither. Under `NODE_ENV=production` that refuses the boot, in the shape `readAllowPrivateHosts`
+ * uses — a mail transport that cannot authenticate is a locked door, not a degraded service, and it
+ * would present as "the code never arrived" for every user at once with nothing in the logs.
+ *
+ * Off the production path it passes them through as they are, and the transport itself refuses when
+ * it is built (see `email-transport.ts`, same precedent as `resend`) — so a developer who sets the
+ * transport and nothing else still hears about it, at the moment the configuration is wrong rather
+ * than inside a detached send nobody is awaiting.
+ */
+export function readMailgunCredentials(
+  transport: EmailTransportKind,
+  apiKey: string | undefined,
+  domain: string | undefined,
+  production: boolean,
+): { apiKey: string | undefined; domain: string | undefined } {
+  const missing = [
+    apiKey === undefined ? "MAILGUN_API_KEY" : undefined,
+    domain === undefined ? "MAILGUN_DOMAIN" : undefined,
+  ].filter((name): name is string => name !== undefined);
+
+  if (production && transport === "mailgun" && missing.length > 0) {
+    throw new Error(
+      `EMAIL_TRANSPORT=mailgun under NODE_ENV=production without ${missing.join(" and ")}. The key is the send credential and the domain is part of the send URL, so without both nothing can be delivered and every sign-in would stall at the code prompt. Supply them through the task definition's secrets.`,
+    );
+  }
+  return { apiKey, domain };
 }
 
 const embeddingApiKey = readOptional(process.env.OPENAI_API_KEY);
@@ -530,6 +623,12 @@ const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER, 
 const analyticsHmac = readAnalyticsHmacKey(process.env.ANALYTICS_HMAC_KEY);
 const betterAuthSecret = readBetterAuthSecret(process.env.BETTER_AUTH_SECRET, isProduction);
 const emailTransport = readEmailTransport(process.env.EMAIL_TRANSPORT, isProduction);
+const mailgun = readMailgunCredentials(
+  emailTransport,
+  readOptional(process.env.MAILGUN_API_KEY),
+  readOptional(process.env.MAILGUN_DOMAIN),
+  isProduction,
+);
 
 export const config: AppConfig = {
   databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
@@ -561,6 +660,9 @@ export const config: AppConfig = {
     outboxDir: readOptional(process.env.EMAIL_OUTBOX_DIR),
     sesRegion: readOptional(process.env.AWS_SES_REGION) ?? readOptional(process.env.AWS_REGION),
     resendApiKey: readOptional(process.env.RESEND_API_KEY),
+    mailgunApiKey: mailgun.apiKey,
+    mailgunDomain: mailgun.domain,
+    mailgunApiBase: readMailgunApiBase(process.env.MAILGUN_API_BASE),
   },
 
   embedding: {

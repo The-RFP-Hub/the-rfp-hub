@@ -47,6 +47,9 @@ function testConfig(secret: string): AuthConfig {
     outboxDir: undefined,
     sesRegion: undefined,
     resendApiKey: undefined,
+    mailgunApiKey: undefined,
+    mailgunDomain: undefined,
+    mailgunApiBase: "https://api.mailgun.net",
   };
   return {
     betterAuth: {

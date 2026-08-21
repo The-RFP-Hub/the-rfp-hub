@@ -2,7 +2,7 @@
  * How a one-time code reaches a person — the one seam between "the API decided to send a code" and
  * a third party.
  *
- * It is an interface with six implementations rather than a call to an SDK because the same code
+ * It is an interface with seven implementations rather than a call to an SDK because the same code
  * path has to serve four situations that have nothing in common: a deployment that must really send
  * mail, an E2E run that must read the code back from another process, an integration test that must
  * read it back in-process, and a developer who just wants to see it. Every one of those is a
@@ -16,8 +16,8 @@
  * arrived", for every user at once, with nothing in the logs. The check is repeated here as a
  * defence in depth, because this factory is also reachable from a test that builds a config by hand.
  *
- * NOTHING HERE LOGS A CODE except the transports whose entire purpose is to reveal it. `ses` and
- * `resend` never write the body anywhere.
+ * NOTHING HERE LOGS A CODE except the transports whose entire purpose is to reveal it. `ses`,
+ * `resend` and `mailgun` never write the body anywhere.
  */
 import { createHash } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
@@ -200,6 +200,78 @@ function resendTransport(cfg: EmailConfig): EmailTransport {
   };
 }
 
+/**
+ * A single send may hang for this long before it is abandoned.
+ *
+ * The send is NOT awaited by the request that triggered it (see `better-auth.ts`), so a hung
+ * connection costs nobody a response — what it costs is a socket and a pending promise, per
+ * sign-in attempt, for as long as the provider stays silent. Ten seconds is the same order as the
+ * verifier's own fetch bound, and well inside the five-minute life of the code being carried: a
+ * send that has not completed by then has missed the only window it mattered in.
+ */
+const MAILGUN_TIMEOUT_MS = 10_000;
+
+/**
+ * Mailgun's messages API — for a deployment that already operates Mailgun and does not have a task
+ * role to lend SES.
+ *
+ * ONE HTTPS CALL, so it is written as one: HTTP Basic with the literal user `api`, the key as the
+ * password, and a form-encoded body. An SDK here would be a dependency, a transitive tree and a
+ * release cadence in exchange for `fetch` plus `URLSearchParams`, on the one path that must keep
+ * working for anybody to sign in at all.
+ *
+ * The SENDING DOMAIN IS PART OF THE URL, not part of the message: it is the domain whose DKIM keys
+ * Mailgun holds, and it is routinely a subdomain of `EMAIL_FROM`'s domain rather than the same
+ * string. Both are needed and neither substitutes for the other.
+ */
+function mailgunTransport(cfg: EmailConfig): EmailTransport {
+  // Checked HERE rather than inside `send`, for the reason `resend` spells out: a credential the
+  // transport cannot work without is a boot-time fact, and discovering it at send time means
+  // discovering it in a detached promise nobody is waiting on. `config.ts` refuses the boot on the
+  // same pair under NODE_ENV=production; this is the defence in depth that also covers a config
+  // built by hand in a test, and the only check a developer's machine gets.
+  const apiKey = cfg.mailgunApiKey;
+  const domain = cfg.mailgunDomain;
+  if (apiKey === undefined || domain === undefined) {
+    throw new Error(
+      "EMAIL_TRANSPORT=mailgun requires MAILGUN_API_KEY and MAILGUN_DOMAIN. The key authenticates the send and the domain is the part of the URL that says which sending domain it is; without both, no sign-in code can be delivered and every sign-in would stall at the code prompt.",
+    );
+  }
+  // Built once, not per message: it is a constant of the configuration, and re-deriving it on every
+  // send would put the key through a base64 encode on the login path for nothing.
+  const authorization = `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`;
+  // Encoded, though a sending domain is a hostname and needs no encoding: this value comes from the
+  // environment and lands in a URL path, so it is escaped rather than trusted to be well-behaved.
+  const endpoint = `${cfg.mailgunApiBase}/v3/${encodeURIComponent(domain)}/messages`;
+  return {
+    kind: "mailgun",
+    async send(message) {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          authorization,
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        // The same four fields SES and Resend are given. There is no `html` part anywhere in this
+        // file: the message is a six-digit code and a sentence, and a text-only body is one fewer
+        // thing a mail client can render into something the recipient did not expect.
+        body: new URLSearchParams({
+          from: cfg.from,
+          to: message.to,
+          subject: message.subject,
+          text: message.text,
+        }),
+        signal: AbortSignal.timeout(MAILGUN_TIMEOUT_MS),
+      });
+      // The body echoes the recipient and the status alone says what an operator needs to know —
+      // same line as `resend`, deliberately, because it is the same fact. A rejection from `fetch`
+      // (DNS, TLS, the timeout above) is left to propagate as itself.
+      if (!response.ok)
+        throw new Error(`the email provider refused the message (${response.status})`);
+    },
+  };
+}
+
 /** Every transport that really sends needs somebody to send AS. */
 function requireSender(cfg: EmailConfig, kind: EmailTransportKind): void {
   if (cfg.from.trim() === "") {
@@ -221,6 +293,9 @@ export function createEmailTransport(cfg: EmailConfig, production = false): Emai
     case "resend":
       requireSender(cfg, "resend");
       return resendTransport(cfg);
+    case "mailgun":
+      requireSender(cfg, "mailgun");
+      return mailgunTransport(cfg);
     case "file": {
       if (cfg.outboxDir === undefined) {
         throw new Error("EMAIL_TRANSPORT=file requires EMAIL_OUTBOX_DIR.");

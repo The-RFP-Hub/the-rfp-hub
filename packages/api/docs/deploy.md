@@ -58,6 +58,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `BETTER_AUTH_SECRET` | `BETTER_AUTH_SECRET` | Signs every session token, and is checked before any database access. **≥32 random characters, different per environment** — the process refuses to boot without it under `NODE_ENV=production`. **Rotating it signs everyone out**: there is no dual-secret verification, so plan a rotation as a deliberate global sign-out |
 | `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | Only when Google sign-in is enabled. Absent → the provider is not registered at all |
 | `OPENAI_API_KEY` | `OPENAI_API_KEY` | Embedding provider credential. Absent → the deterministic provider, and dedupe reports itself unavailable rather than failing a submission |
+| `MAILGUN_API_KEY` | `MAILGUN_API_KEY` | Only when `EMAIL_TRANSPORT=mailgun`. The HTTP Basic password for the send (the user is the literal `api`). Missing → **refuses to boot** in production, because a mail transport that cannot authenticate delivers nothing to anyone |
 | `ANALYTICS_HMAC_KEY` | `ANALYTICS_HMAC_KEY` | Keys the session/IP HMAC. **Never baked**: a leaked key makes the whole IPv4 space brute-forceable against the stored hashes. Unset → a random per-boot key and a warning |
 
 ### Non-secret settings → `environment`
@@ -68,9 +69,11 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `BETTER_AUTH_URL` | the API's own origin | The base every auth route and OAuth callback is built from. **Not** `PUBLIC_BASE_URL`, which is the OpenAPI document's `servers[0].url` and may legitimately differ |
 | `TRUSTED_ORIGINS` | the frontend's origin(s) — `https://ethrfps.app` in production, `https://staging.ethrfps.app` in staging | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart. The production frontend is the **apex**: it is the spec's site, and it proxies `/schemas/`, `/meta/`, `/registries/` and `/ns/` back to this service ([`adr/0007`](../../../adr/0007-canonical-domain-and-spec-identity.md)) |
 | `PREVIEW_ORIGIN_PATTERN` | staging only | An **anchored** regular expression for preview origins, tied to our project *and* team slug. Never `*.vercel.app`. Unanchored → refuses to boot |
-| `EMAIL_TRANSPORT` | `ses` | How sign-in codes are delivered. `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
+| `EMAIL_TRANSPORT` | `ses` or `mailgun` | How sign-in codes are delivered. Those two are the delivering transports; `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
 | `EMAIL_FROM` | `no-reply@ethrfps.app` | The envelope sender. Its domain needs SPF/DKIM/DMARC, or the codes land in spam |
-| `AWS_SES_REGION` | the SES region | **No credential** — the task role carries it. That is why SES was chosen over an API-key provider |
+| `AWS_SES_REGION` | the SES region | `ses` only. **No credential** — the task role carries it. That is why SES was chosen over an API-key provider |
+| `MAILGUN_DOMAIN` | the sending domain, e.g. `mg.ethrfps.app` | `mailgun` only. A path segment of the send URL, not a property of the message: it is the domain whose DKIM records Mailgun holds, and it is normally a **subdomain** of `EMAIL_FROM`'s domain. Missing → **refuses to boot** in production, with the key above |
+| `MAILGUN_API_BASE` | unset (US), or `https://api.eu.mailgun.net` | `mailgun` only. The regional endpoints are different hosts holding different accounts, so the wrong one is a 401 on every message rather than a slow path. Must be https for any host that is not loopback — every send carries the key in an `Authorization` header |
 | `GOOGLE_CLIENT_ID` | per environment | Absent → no Google provider, no button. Pairs with the secret above |
 | `PORT` | `3004` | Set in the `Dockerfile` so it always matches the container port and target group |
 | `HOST` | `0.0.0.0` | |
@@ -122,12 +125,20 @@ target, so it is the only one that could be an open redirect.
 #### Email delivery
 
 Sign-in is a one-time code, so **email is on the critical path of every login**: if it does not
-arrive, nobody signs in. SES was chosen because it needs no long-lived credential — the task role
-carries it — which is one less secret to rotate and one less to leak.
+arrive, nobody signs in. SES is the default because it needs no long-lived credential — the task
+role carries it — which is one less secret to rotate and one less to leak. **Mailgun** is the
+alternative for a deployment that already operates it, or that has no task role to lend SES: it
+costs one secret (`MAILGUN_API_KEY`) and is otherwise one HTTPS call, with no SDK in the image.
 
-Before the first deploy, confirm: `EMAIL_FROM`'s domain has SPF, DKIM and DMARC records, and the
-account is **out of the SES sandbox** in the target region (in the sandbox, SES silently refuses
-every address you have not verified — which presents as "the code never arrived").
+Before the first deploy, confirm — for either transport — that `EMAIL_FROM`'s domain has SPF, DKIM
+and DMARC records. Then, whichever one you run:
+
+* **SES:** the account is **out of the sandbox** in the target region. In the sandbox, SES silently
+  refuses every address you have not verified — which presents as "the code never arrived".
+* **Mailgun:** `MAILGUN_DOMAIN` is **verified** in the account, and it is the SENDING domain
+  (`mg.ethrfps.app`), not `EMAIL_FROM`'s domain — an unverified or merely mistyped domain is a 401
+  on every message. Set `MAILGUN_API_BASE` if the account is in the EU region; the endpoints are
+  different hosts holding different accounts, and the default is the US one.
 
 ---
 
@@ -251,9 +262,9 @@ identity tables.
 | 2 | **Stop the API service** (desired count → 0). | The running old image queries the dropped column during step 3 and errors on every authenticated request. |
 | 3 | **Run `0006`** as the migration role, on the image being deployed. It drops the legacy columns **and** applies the orphan policy. **Record the revoked-key count it reports.** | Running it after the deploy: the new image queries `auth_user_id` against a table that has no such column. |
 | 4 | **Apply `grant-auth.sql`** as the admin/owner connection. | Every login 500s while every test stays green. See above. |
-| 5 | **Deploy the new API image** with `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`, `AWS_SES_REGION`. Scale back up. | — |
+| 5 | **Deploy the new API image** with `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `EMAIL_TRANSPORT=ses`, `EMAIL_FROM`, `AWS_SES_REGION` — or `EMAIL_TRANSPORT=mailgun`, `EMAIL_FROM`, `MAILGUN_DOMAIN` and the `MAILGUN_API_KEY` secret. Scale back up. | — |
 | 6 | **Rebuild and redeploy the frontend.** Its public variables are inlined at build time, so redeploying the old build keeps it pointing at the old identity provider. | The frontend sends credentials the new verifier cannot read: 401 on everything. |
-| 7 | **Smoke:** sign in by email, confirm the code arrives from SES, `GET /v1/me` returns your address and role. | — |
+| 7 | **Smoke:** sign in by email, confirm the code arrives through the configured transport, `GET /v1/me` returns your address and role. | — |
 | 8 | **The first admin signs in, then the operator runs `grant-admin --email`.** | **Every account is a `submitter` until this is done** — by design, see below. |
 
 **The orphan policy, and why the rows stay.** Every `accounts` row that predates the swap loses its

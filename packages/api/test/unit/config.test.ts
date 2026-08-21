@@ -11,8 +11,11 @@ import {
   readAnalyticsHmacKey,
   readBoolean,
   readDbPoolMax,
+  readEmailTransport,
   readEmbeddingProvider,
   readList,
+  readMailgunApiBase,
+  readMailgunCredentials,
   readPem,
   readPort,
   readPositiveInt,
@@ -290,6 +293,119 @@ describe("readTrustProxy", () => {
     for (const raw of ["true", "TRUE", "false", "yes"]) {
       expect(() => readTrustProxy(raw), raw).toThrow(/hop count/);
     }
+  });
+});
+
+describe("readEmailTransport", () => {
+  it("defaults to a delivering transport in production and a visible one outside it", () => {
+    expect(readEmailTransport(undefined, true)).toBe("ses");
+    expect(readEmailTransport("", false)).toBe("stdout");
+  });
+
+  it("takes any known transport, case-insensitively", () => {
+    expect(readEmailTransport("mailgun", true)).toBe("mailgun");
+    expect(readEmailTransport(" Mailgun ", false)).toBe("mailgun");
+    expect(readEmailTransport("resend", true)).toBe("resend");
+    expect(readEmailTransport("memory", false)).toBe("memory");
+  });
+
+  it("rejects an unknown transport rather than silently picking one", () => {
+    expect(() => readEmailTransport("smtp", false)).toThrow(/EMAIL_TRANSPORT must be one of/);
+  });
+
+  // A deployment whose codes go to a file nobody reads is a locked door, not a degraded service —
+  // and the refusal has to name the transports that WOULD work, or it is a dead end.
+  it("refuses a non-delivering transport in production, naming both that do deliver", () => {
+    for (const raw of ["file", "stdout", "memory", "null"]) {
+      expect(() => readEmailTransport(raw, true), raw).toThrow(/Use ses or mailgun/);
+      expect(readEmailTransport(raw, false), raw).toBe(raw);
+    }
+  });
+});
+
+describe("readMailgunApiBase", () => {
+  it("defaults to the US endpoint, which is where an account is unless somebody chose", () => {
+    for (const raw of [undefined, "", "   "]) {
+      expect(readMailgunApiBase(raw), JSON.stringify(raw)).toBe("https://api.mailgun.net");
+    }
+  });
+
+  // The regional endpoints are different hosts holding different accounts: the EU one is not a
+  // latency preference, it is where the account exists.
+  it("takes the EU endpoint, and strips a trailing slash", () => {
+    expect(readMailgunApiBase("https://api.eu.mailgun.net")).toBe("https://api.eu.mailgun.net");
+    expect(readMailgunApiBase(" https://api.eu.mailgun.net/ ")).toBe("https://api.eu.mailgun.net");
+  });
+
+  // Every send carries the API key in an Authorization header, so plaintext to a remote host
+  // publishes the credential — the same rule readPublicBaseUrl draws, for the same transport
+  // reason, and it holds whoever owns the host.
+  it("rejects a non-https scheme on any host that is not loopback", () => {
+    for (const raw of ["http://api.mailgun.net", "http://proxy.example.org", "ftp://example.org"]) {
+      expect(() => readMailgunApiBase(raw), raw).toThrow(/https/i);
+    }
+  });
+
+  it("accepts a plaintext loopback base, so a test double can be a local server", () => {
+    expect(readMailgunApiBase("http://127.0.0.1:8025")).toBe("http://127.0.0.1:8025");
+    expect(readMailgunApiBase("http://localhost:8025/")).toBe("http://localhost:8025");
+  });
+
+  it("rejects a value that is not an absolute URL", () => {
+    for (const raw of ["api.mailgun.net", "//api.mailgun.net", "not a url"]) {
+      expect(() => readMailgunApiBase(raw), raw).toThrow(/MAILGUN_API_BASE/);
+    }
+  });
+});
+
+describe("readMailgunCredentials", () => {
+  it("passes the pair through when both halves are present", () => {
+    expect(readMailgunCredentials("mailgun", "key-abc", "mg.example.org", true)).toEqual({
+      apiKey: "key-abc",
+      domain: "mg.example.org",
+    });
+  });
+
+  // THE GUARD. The key is the send credential and the domain is part of the send URL, so half a
+  // pair delivers exactly as much mail as none of it — and it would present as "the code never
+  // arrived", for every user at once, with nothing in the logs.
+  it("refuses to boot under NODE_ENV=production with either half missing", () => {
+    expect(() => readMailgunCredentials("mailgun", undefined, "mg.example.org", true)).toThrow(
+      /MAILGUN_API_KEY/,
+    );
+    expect(() => readMailgunCredentials("mailgun", "key-abc", undefined, true)).toThrow(
+      /MAILGUN_DOMAIN/,
+    );
+    // Both, named in one message: a deployment that fixes one and redeploys to hear about the
+    // other has paid for two deploys to learn one thing.
+    const both = (() => {
+      try {
+        readMailgunCredentials("mailgun", undefined, undefined, true);
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+      return "";
+    })();
+    expect(both).toContain("MAILGUN_API_KEY");
+    expect(both).toContain("MAILGUN_DOMAIN");
+  });
+
+  // Only when it is the transport in use: a production deployment on SES holds no Mailgun key and
+  // must not be refused for it.
+  it("says nothing about a transport that is not mailgun", () => {
+    expect(readMailgunCredentials("ses", undefined, undefined, true)).toEqual({
+      apiKey: undefined,
+      domain: undefined,
+    });
+  });
+
+  // Off the production path it passes through; the transport itself refuses when it is built, so a
+  // developer still hears about it — see email-transport.test.ts.
+  it("does not refuse outside production", () => {
+    expect(readMailgunCredentials("mailgun", undefined, undefined, false)).toEqual({
+      apiKey: undefined,
+      domain: undefined,
+    });
   });
 });
 
