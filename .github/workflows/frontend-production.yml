@@ -1,0 +1,111 @@
+# Deploys the frontend to PRODUCTION when a release tag is pushed.
+#
+# Two tag families trigger it: `prod-*` — the repository's whole-product release tag, which also
+# deploys the API (production.yml), so one tag moves both halves and the frontend's baked
+# NEXT_PUBLIC_API_URL always points at an API of the same release — and `frontend-prod-*`, for a
+# frontend-only release when the API is not changing. The rationale for CLI-driven deploys, and
+# for why the Git integration cannot express "production moves on a tag", is in
+# frontend-staging.yml; this workflow is its production twin: same steps, production environment,
+# `--prod` deploy. The production domain is assigned by Vercel to the promoted deployment, so no
+# alias step is needed here.
+#
+# Rollback is a git operation: push a new `frontend-prod-*` tag pointing at the previous good
+# commit (or dispatch this workflow with that tag).
+name: Production frontend
+
+on:
+  push:
+    tags:
+      - "prod-*"
+      - "frontend-prod-*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to deploy (e.g. frontend-prod-2026-08-19)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # One production deploy at a time, and a superseded one must not be cancelled mid-flight —
+  # a half-promoted production is worse than a queued one.
+  group: frontend-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # A dispatched ref must BE a tag before anything is checked out: this workflow deploys
+      # PRODUCTION, and a branch or bare SHA here would make the release untraceable against the
+      # rollback convention (push a tag pointing at the previous good commit). Tag pushes skip
+      # this — the ref is a tag by construction.
+      - name: Require the dispatched ref to be a tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! git ls-remote --exit-code "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" > /dev/null; then
+            echo "::error::'${TAG}' is not a tag on this repository. Push a frontend-prod-* (or prod-*) tag and dispatch with its exact name."
+            exit 1
+          fi
+
+      - name: Checkout the tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Blank on a tag push (checks out the pushed tag); the dispatched form names one.
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      # Pinned, not @latest — same reasoning and same version as frontend-staging.yml; upgrade the
+      # two together.
+      - name: Install Vercel CLI
+        run: npm install -g vercel@59.3.0
+
+      - name: Pull Vercel environment (production)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      # The four canonical namespace prefixes must be proxied by the built output, or the apex
+      # 404s every published identifier of the Standard the moment this deploy goes live. Their
+      # presence in the artifact IS the fact "NEXT_PUBLIC_API_URL was present and valid at build
+      # time": the rewrites are derived from it and vanish silently when it is missing, so this
+      # asserts on the artifact rather than trusting the environment — and it runs BEFORE the
+      # deploy, because a green deploy of a broken apex is the failure mode it exists to prevent.
+      - name: Assert the canonical-namespace proxy survived the build
+        run: |
+          node -e '
+            const { readFileSync } = require("node:fs");
+            const config = JSON.parse(readFileSync(".vercel/output/config.json", "utf8"));
+            const haystack = JSON.stringify([config.routes ?? [], config.rewrites ?? []]);
+            const missing = ["/schemas", "/meta", "/registries", "/ns"].filter(
+              (prefix) => !haystack.includes(prefix),
+            );
+            if (missing.length > 0) {
+              console.error(
+                "canonical proxy missing from the built output for: " + missing.join(", ") +
+                " — NEXT_PUBLIC_API_URL was absent or invalid at build time; refusing to ship a frontend that would 404 the published identifiers.",
+              );
+              process.exit(1);
+            }
+            console.log("canonical namespace proxy present: /schemas /meta /registries /ns");
+          '
+
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
