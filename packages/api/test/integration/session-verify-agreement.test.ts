@@ -1,0 +1,156 @@
+/**
+ * The one assumption the `/v1` auth path rests on, pinned.
+ *
+ * `SessionService` does not ask the library to read the `Authorization` header. It builds a COOKIE
+ * header by hand — `<name>=<token>` — because the plugin that would otherwise do that conversion
+ * runs as a request hook, and `/v1` calls the session lookup directly rather than through the
+ * library's own routing. That shortcut is only safe while the two paths agree about what a session
+ * is, and "the cookie is named what we think it is named" is a fact about a dependency's internals
+ * (it gains a `__Secure-` prefix under HTTPS, which is why the name is read from the instance
+ * rather than spelled anywhere).
+ *
+ * So this file drives BOTH paths over the same tokens and asserts they never disagree — including
+ * on the negatives, where a mismatch would be the dangerous direction: one path accepting what the
+ * other refuses.
+ *
+ * Isolation tag: `M3AGREE` / `m3agree-*@rfphub.invalid`.
+ */
+import type { FastifyInstance } from "fastify";
+import { afterAll, beforeAll, expect, it } from "vitest";
+import { buildApp } from "../../src/app.js";
+import type { Auth } from "../../src/auth/better-auth.js";
+import { pool } from "../../src/db/client.js";
+import { SessionService } from "../../src/modules/services/auth/session.service.js";
+import {
+  bearer,
+  foreignToken,
+  signIn,
+  signOut,
+  testAuth,
+  testAuthConfig,
+  unsignedToken,
+} from "../helpers/auth.js";
+import { cleanupFixtures } from "../helpers/cleanup.js";
+import { describeWithDb } from "./db-gate.js";
+
+const EMAILS = {
+  live: "m3agree-live@rfphub.invalid",
+  foreign: "m3agree-foreign@rfphub.invalid",
+  unsigned: "m3agree-unsigned@rfphub.invalid",
+  revoked: "m3agree-revoked@rfphub.invalid",
+};
+
+const run = describeWithDb;
+
+run("M3AGREE the two session-verification paths", () => {
+  let app: FastifyInstance;
+  let sessions: SessionService;
+
+  beforeAll(async () => {
+    const auth = await testAuth();
+    app = await buildApp({ auth: { auth, config: testAuthConfig() } });
+    await app.ready();
+    sessions = new SessionService(auth);
+  }, 60_000);
+
+  afterAll(async () => {
+    await cleanupFixtures({ emails: Object.values(EMAILS) });
+    await app.close();
+    await pool.end();
+  }, 60_000);
+
+  /** The library's OWN path: its route, its bearer hook, its header parsing. */
+  const throughTheMount = async (token: string): Promise<string | null> => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/auth/get-session",
+      headers: bearer(token),
+    });
+    if (res.statusCode !== 200) return null;
+    const body = res.body === "" ? null : res.json();
+    return body?.user?.id ?? null;
+  };
+
+  it("resolves the SAME session through the hand-built cookie and the bearer header", async () => {
+    const identity = await signIn(EMAILS.live);
+
+    const direct = await sessions.verify(identity.token);
+    const mounted = await throughTheMount(identity.token);
+
+    expect(direct?.subject).toBe(identity.userId);
+    expect(mounted).toBe(identity.userId);
+    // The address rides along on the direct path so `/v1/me` needs no second query — and it is the
+    // same address the identity signed in with, not something derived.
+    expect(direct?.email).toBe(EMAILS.live);
+  }, 60_000);
+
+  it("refuses the same tokens on both paths — a disagreement here is the dangerous kind", async () => {
+    const revoked = await signIn(EMAILS.revoked);
+    await signOut(revoked.token);
+
+    const cases: [string, string][] = [
+      ["garbage", "not-a-token"],
+      ["empty", ""],
+      ["foreign deployment", await foreignToken(EMAILS.foreign)],
+      ["unsigned", await unsignedToken(EMAILS.unsigned)],
+      ["revoked", revoked.token],
+    ];
+
+    for (const [label, token] of cases) {
+      expect(await sessions.verify(token), `direct: ${label}`).toBeNull();
+      expect(await throughTheMount(token), `mounted: ${label}`).toBeNull();
+    }
+  }, 60_000);
+
+  it("answers 503, not 401, when the lookup itself cannot be performed", async () => {
+    // THE MISDIAGNOSIS THIS PREVENTS. A database that stopped answering is not a verdict on
+    // anybody's token, but collapsing every exception to `null` would tell every signed-in user
+    // their session is invalid — the dashboard signs them out and discards a token that was in fact
+    // perfectly good — and would show an operator a 401 spike, which reads as an attack rather than
+    // as an outage.
+    const outage = Object.assign(new Error("terminating connection due to administrator command"), {
+      // A driver error, shaped like the real thing: SQLSTATE 57P01, admin shutdown.
+      code: "57P01",
+    });
+    const broken = {
+      $context: (await testAuth()).$context,
+      api: {
+        getSession: async () => {
+          throw outage;
+        },
+      },
+    } as unknown as Auth;
+
+    const service = new SessionService(broken);
+    await expect(service.verify("looks-like-a-token.signature")).rejects.toMatchObject({
+      status: 503,
+      code: "auth_unavailable",
+    });
+
+    // …and it reaches the caller as a 503, not as a 500 and not as a 401.
+    const failing = await buildApp({ auth: { auth: broken, config: testAuthConfig() } });
+    await failing.ready();
+    try {
+      const res = await failing.inject({
+        method: "GET",
+        url: "/v1/me",
+        headers: bearer("looks-like-a-token.signature"),
+      });
+      expect(res.statusCode).toBe(503);
+      expect(res.json().error).toBe("auth_unavailable");
+      // The driver's message never reaches the response — it travels on `cause`, for the log.
+      expect(res.body).not.toContain("57P01");
+      expect(res.body).not.toContain("terminating connection");
+    } finally {
+      await failing.close();
+    }
+  }, 60_000);
+
+  it("never throws — a malformed credential is a 401, never a 500", async () => {
+    for (const token of ["\u0000", "a.b.c.d.e", "x".repeat(5000), "%%%"]) {
+      expect(await sessions.verify(token)).toBeNull();
+      const res = await app.inject({ method: "GET", url: "/v1/me", headers: bearer(token) });
+      expect(res.statusCode, token.slice(0, 12)).toBe(401);
+    }
+  }, 60_000);
+});

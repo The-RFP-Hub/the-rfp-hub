@@ -14,7 +14,14 @@
 # ============================================================================
 services:
   postgres:
-    image: postgres:15-alpine
+    # pgvector's image, not the plain one: M3 stores opportunity embeddings in a `vector(1536)`
+    # column with an HNSW index, and `CREATE EXTENSION vector` fails on an image that does not ship
+    # the extension. SAME MAJOR VERSION (15), so the existing rfphub_pgdata volume is reused — an
+    # image change recreates the CONTAINER, never the volume. The base image does change from
+    # alpine/musl to debian/glibc, which changes the collation provider version: run
+    # `scripts/upgrade-dev-postgres.sh` rather than `docker compose up -d` by hand, so the dump,
+    # the collation refresh, the reindex and the row-count comparison all happen.
+    image: pgvector/pgvector:pg15
     container_name: rfphub-postgres
     restart: unless-stopped
     environment:

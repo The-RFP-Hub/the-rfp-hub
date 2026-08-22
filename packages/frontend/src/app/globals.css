@@ -1,0 +1,1009 @@
+/*
+ * One stylesheet, plain CSS, no framework.
+ *
+ * The frontend is a public register plus a dozen data-dense work screens. A utility framework or a
+ * component library would be more bytes and another supply-chain surface than the whole of the rest
+ * of this package, for layout a stylesheet does in a few hundred lines.
+ *
+ * FONTS ARE SELF-HOSTED, not linked. The three families arrive as `--font-display`, `--font-body`
+ * and `--font-mono` from `lib/fonts.ts`, which downloads them at BUILD time and serves them from
+ * this origin — so `font-src` stays `'self'` and no reader's address reaches a font CDN. See that
+ * module for the whole argument.
+ *
+ * THE PALETTE IS NEAR-COLOURLESS AND THE ONE EXCEPTION IS RATIONED. Near-black ink on warm
+ * near-white paper, warm grays, and a single olive accent — "Oliva cadastral" — which exists to
+ * mark WHERE YOU CAN ACT and nowhere else. Status, emphasis and hierarchy stay typographic: weight,
+ * size, case, border style. That is what keeps every state on this site legible to a colourblind
+ * reader by construction rather than by audit, and it is why the accent is forbidden from carrying
+ * information (see the discipline below).
+ *
+ * THE ACCENT DISCIPLINE, in full, because a token with no rule attached becomes a decoration:
+ *
+ *   --accent-ink   Textual links on paper — a title link in a table, an editorial link in prose.
+ *                  The UNDERLINE STAYS. Colour is added to a link affordance, never substituted
+ *                  for one; a reader who sees no colour must still see a link.
+ *   --accent       THE primary action (the one filled button on a screen), the 2px focus ring, and
+ *                  the current-navigation underline. Nothing else, ever.
+ *   --accent-soft  The hover and selected state of controls and rows. NEVER ALONE AS A SIGNAL —
+ *                  it is 1.12:1 against paper, which is a tint, not a mark, so every use of it is
+ *                  paired with a border or a weight change that carries the meaning on its own.
+ *                  Never an informational panel background.
+ *
+ *   NEVER: badges, status, success, error, warning, pending, rejected, verification verdicts,
+ *   categories, chart bars. Those are ink, and a unit test pins it.
+ */
+
+:root {
+  /* Paper and ink. */
+  --paper: #fcfcfa;
+  --ink: #1a1917;
+  /* Warm grays, light to dark: hairline, rule, panel fill, secondary ink. */
+  --line-faint: #e8e6e1;
+  --line: #d6d3ce;
+  --panel: #f4f3f0;
+  --ink-soft: #57534e;
+  --ink-faint: #a8a29e;
+
+  /*
+   * THE ACCENT. oklch is the source of truth — it is the space the ramp was chosen in, where the
+   * three steps really are equal-chroma at one hue and a later tweak stays predictable. The hex
+   * above each is the SAME colour, declared first as a fallback for anything that cannot parse
+   * oklch; a browser that understands the second declaration takes it and ignores the first.
+   */
+  --accent: #6d7123;
+  --accent: oklch(53% 0.1 112);
+  --accent-ink: #4e511b;
+  --accent-ink: oklch(42% 0.075 112);
+  --accent-soft: #eef1de;
+  --accent-soft: oklch(95% 0.025 112);
+
+  /*
+   * Editorial state, still HUELESS. These three are consumed by the submit form's own stylesheet
+   * for validity and result styling; they resolve to ink weights rather than a red/amber/green
+   * ramp, because the accent is barred from carrying state and no other hue is allowed to either.
+   * The form pairs each with a border or a weight, which is what actually distinguishes them.
+   */
+  --ok: var(--ink);
+  --warn: var(--ink-soft);
+  --bad: var(--ink);
+
+  --radius: 6px;
+
+  /* Kept as aliases so a rule written against the old names still resolves while pages migrate. */
+  --bg: var(--paper);
+  --bg-soft: var(--panel);
+
+  font-family: var(--font-body), -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/*
+ * Headings are the display face, and they are the only place it appears. Tight tracking at size is
+ * what makes an 800 weight read as institutional rather than as shouting.
+ */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+h1 {
+  font-weight: 800;
+  font-size: 1.95rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin: 1.6rem 0 0.5rem;
+}
+
+h3 {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/*
+ * A textual link is the accent's darkest step, AND STILL UNDERLINED. The underline is not a
+ * leftover from the colourless design — it is the half of the affordance that survives greyscale,
+ * a printout and a colourblind reader, and adding colour is not a reason to spend it. The hover
+ * thickens the rule rather than changing the hue.
+ */
+a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+code {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  font-size: 0.88em;
+  background: var(--panel);
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+}
+
+/*
+ * Hover and selected are the accent's lightest step — AND A BORDER, AND (when selected) A WEIGHT.
+ * The tint alone is 1.12:1 against paper: it reads as warmth, not as a mark, so it is never asked
+ * to say anything by itself. The border is what a reader actually sees change.
+ */
+button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+button[aria-pressed="true"],
+button[aria-selected="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/*
+ * THE ONE CONSEQUENTIAL BUTTON SHAPE, and the accent's whole reason for existing: the action a
+ * page was opened to take — apply, submit, publish, log in. It is still the only FILLED thing on
+ * any screen, so the shape carries it without the colour; the accent is what makes it findable in
+ * a peripheral glance. Paper on accent is 5.06:1, so the label is readable text rather than a
+ * decorated shape.
+ */
+.button-primary {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+  font-weight: 700;
+  padding: 0.55rem 1.15rem;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.button-primary:hover {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  width: 100%;
+}
+
+/*
+ * THE FOCUS RING IS THE ACCENT, at 2px, everywhere. It is the keyboard reader's cursor — the exact
+ * equivalent of "where you can act right now" — which is the accent's whole remit. It clears 3:1
+ * against every surface it can land on: paper 5.06, the filter bar's panel 4.69, and a hovered
+ * control's own accent-soft 4.53.
+ */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+textarea {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-height: 8rem;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+/*
+ * Column headers are labels, not content: small, upper, tracked, secondary ink, over a heavy rule.
+ * The heavy rule under the head and the hairline between rows is the whole table idiom here.
+ */
+thead th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 0.5rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--line-faint);
+  vertical-align: top;
+}
+
+/*
+ * A ROW HEADER IS A HEADER SEMANTICALLY, NOT VISUALLY. `<th scope="row">` on the first cell is what
+ * tells a screen reader which column labels the rest of the row, and the user agent renders it
+ * bold — which put the summary line, the id and every other secondary thing inside that cell in the
+ * same weight as the title. Emphasis is applied deliberately in this package (`.row-title`), so the
+ * cell itself is reset to the reading weight and the bold goes back to meaning something.
+ */
+tbody th[scope="row"] {
+  font-weight: 400;
+}
+
+/*
+ * ROW HOVER. The lightest accent step as a pointer affordance — "the row under your cursor" — and
+ * nothing more: it never marks a row as selected, flagged, new or anything else a reader would
+ * have to interpret. A signal would need a border or a weight, per the discipline at the top.
+ */
+tbody tr:hover {
+  background: var(--accent-soft);
+}
+
+th:first-child,
+td:first-child {
+  padding-left: 0;
+}
+
+th:last-child,
+td:last-child {
+  padding-right: 0;
+}
+
+/*
+ * Numbers align on their digits, and they align on each other. `nowrap` because the things in this
+ * column are dates and counts: "23 Aug 18:30 UTC" broken over two lines reads as two facts, and a
+ * column of two-line dates loses the vertical rhythm that made it scannable in the first place.
+ */
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+caption {
+  text-align: left;
+  color: var(--ink-soft);
+  padding-bottom: 0.4rem;
+}
+
+/*
+ * EVERY TABLE GETS ONE. A table wider than its column scrolls inside this rather than pushing the
+ * page sideways — on a phone the alternative is a horizontal scrollbar on the document and a
+ * header that has drifted off the left edge.
+ */
+.table-scroll {
+  overflow-x: auto;
+  /* Keeps a focus ring on a cell from being clipped by the scroll container. */
+  padding: 2px;
+  margin: 0 -2px;
+}
+
+/* ------------------------------------------------------------------ the shell --- */
+
+.shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 2rem 3rem;
+}
+
+.shell-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1rem 1.75rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--ink);
+}
+
+/*
+ * The wordmark stays INK. It is an identity, not a link a reader follows out of prose, and an
+ * olive wordmark would make the accent the brand — which is the one thing a rationed accent must
+ * not become. Same reasoning for the navigation below.
+ */
+.brand {
+  font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand-tagline {
+  display: block;
+  font-family: var(--font-body), sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+}
+
+/*
+ * THREE NAVIGATIONS, GROUPED AND VISIBLY SEPARATED: what anybody may read, what this account owns,
+ * and what a staff role may do. They are one row with rules between the groups rather than one
+ * undifferentiated list, because "Directory" and "Accounts & roles" are not peers and a flat list
+ * says they are.
+ */
+.shell-nav {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 1.1rem;
+  font-size: 14px;
+  flex: 1;
+}
+
+.shell-nav-group {
+  display: flex;
+  align-items: baseline;
+  gap: 1.1rem;
+  padding-right: 1.1rem;
+  border-right: 1px solid var(--line);
+}
+
+.shell-nav-group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+/*
+ * Navigation labels are INK and carry their own underline idiom instead of the link colour: a
+ * header of eight olive words would spend the accent on the one thing a reader never has to hunt
+ * for. What the accent marks here is WHERE YOU ARE — the current section's underline, which is a
+ * genuine "you can act here" mark and clears 3:1 against paper at 5.06. The weight is what says it
+ * in greyscale.
+ */
+.shell-nav a {
+  color: var(--ink);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.shell-nav a:hover {
+  border-bottom-color: var(--line);
+}
+
+.shell-nav a[aria-current="page"] {
+  font-weight: 700;
+  border-bottom-color: var(--accent);
+}
+
+.shell-session {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 14px;
+  margin-left: auto;
+}
+
+.shell-main {
+  padding: 2rem 0 0;
+}
+
+.shell-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  border-top: 1px solid var(--line);
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/*
+ * Footer links ARE editorial links — About, The Standard, the API docs, the source — so they take
+ * the link colour like any other. They stay quiet through size, not through being greyed into
+ * looking disabled. 7.5:1 at 13px.
+ */
+.shell-footer a {
+  color: var(--accent-ink);
+}
+
+.shell-footer-note {
+  margin-left: auto;
+}
+
+/* ------------------------------------------------------------------- reading --- */
+
+.lede {
+  max-width: 68ch;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+  margin: 0 0 1.75rem;
+}
+
+.lede strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+.faint {
+  color: var(--ink-faint);
+}
+
+.footnote {
+  font-size: 0.9em;
+  max-width: 68ch;
+}
+
+.prose {
+  max-width: 70ch;
+}
+
+.row-between {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 0.3rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/*
+ * Present to a screen reader, absent to the eye. Used for the legends that name a group of
+ * buttons: the grouping is real and has to be announced, but repeating "Window" above three
+ * buttons that already read "7 days / 30 days / 90 days" would be noise on screen.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* -------------------------------------------------------------------- states --- */
+
+.state {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  display: block;
+}
+
+/*
+ * AN ERROR IS A HEAVIER RULE, NOT A RED ONE. It has to read as consequential without hue: two solid
+ * ink pixels down the leading edge is louder than a pink panel and survives greyscale, print and a
+ * colourblind reader.
+ */
+.state.error {
+  background: var(--paper);
+  border-color: var(--line);
+  border-left: 3px solid var(--ink);
+}
+
+/*
+ * LOADING RESERVES ITS HEIGHT. Without this the skeleton is one line tall, the content that
+ * arrives is twenty, and everything below jumps — including whatever the reader was reaching for.
+ */
+.state.loading {
+  min-height: 8rem;
+  color: var(--ink-soft);
+}
+
+.empty-title {
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.state p:last-child {
+  margin-bottom: 0;
+}
+
+.note {
+  margin: 0.4rem 0;
+  display: block;
+}
+
+.note.ok {
+  font-weight: 600;
+}
+
+.note.error {
+  font-weight: 600;
+  border-left: 3px solid var(--ink);
+  padding-left: 0.6rem;
+}
+
+/* -------------------------------------------------------------------- badges --- */
+
+/*
+ * STATUS IS TYPOGRAPHIC. Four shapes, no hue, each one legible as a word before it is legible as a
+ * shape: a bordered box is live, a filled box is finished, a dashed box is provisional, and struck
+ * muted text is refused. Printed in black and white, or read by somebody who sees no colour at
+ * all, every one of them still says what it says.
+ */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--ink);
+}
+
+/* Live, current, included: an outline. */
+.badge-open,
+.badge-approved,
+.badge-listed,
+.badge-verified,
+.badge-matched {
+  border-style: solid;
+}
+
+/* Finished, decided, closed: filled ink. The heaviest thing in the row, because it is terminal. */
+.badge-closed,
+.badge-archived {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Provisional — waiting on somebody: a dashed outline in secondary ink. */
+.badge-pending,
+.badge-upcoming,
+.badge-unverified,
+.badge-unknown {
+  border-style: dashed;
+  border-color: var(--ink-soft);
+  color: var(--ink-soft);
+}
+
+/* Refused: struck through and quiet. Nothing is going to happen to it. */
+.badge-rejected,
+.badge-unlisted,
+.badge-unmatched {
+  border-color: var(--line);
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* A badge that carries its explanation beside it rather than only in a tooltip. */
+.badge-labelled {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.badge-labelled .badge-gloss {
+  font-size: 0.85em;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* --------------------------------------------------------------------- tiles --- */
+
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 9rem;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+
+.tile-value {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-label {
+  color: var(--ink-soft);
+  font-size: 0.9em;
+}
+
+.chart {
+  margin: 1rem 0;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 180px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.bar {
+  fill: var(--ink);
+}
+
+.bar-zero {
+  fill: var(--line);
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85em;
+  padding-top: 0.3rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--line);
+  margin: 1rem 0;
+  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/*
+ * A SECTION RULE, not a heading that happens to be bold.
+ *
+ * The same small/upper/tracked label as a table's column head, over the same two-pixel rule — so a
+ * section title and the header of the table beneath it read as one object rather than two competing
+ * headings. `-quiet` is the same shape at lower contrast, for a section that is subordinate to the
+ * one above it (search results under the curated lists) rather than its peer.
+ */
+.section-head {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 1.75rem 0 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.section-head-quiet {
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  margin: 0.75rem 0;
+}
+
+/* The one card that is an instruction rather than a container: two solid pixels, per the mock. */
+.card-strong {
+  border: 2px solid var(--ink);
+}
+
+/*
+ * A confirmation is a `<fieldset>`, which arrives with user-agent padding and an inline-ish
+ * intrinsic width that fights the card. `min-inline-size: 0` is the one that matters: without it a
+ * fieldset refuses to shrink below its content and pushes a table sideways.
+ */
+.confirm {
+  min-inline-size: 0;
+  max-width: 46rem;
+}
+
+.confirm > legend {
+  padding: 0 0.35rem;
+  margin-left: -0.35rem;
+}
+
+.field {
+  margin: 0.75rem 0;
+  max-width: 46rem;
+}
+
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.field .hint {
+  color: var(--ink-soft);
+  font-size: 0.88em;
+  margin: 0.2rem 0 0.35rem;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0 1rem;
+}
+
+/* Definition lists are how every fact table in this package is marked up; give them a shape. */
+.grid-2 dt {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--ink-soft);
+  margin-top: 0.6rem;
+}
+
+.grid-2 dd {
+  margin: 0;
+}
+
+/* A list that is a list semantically and a stack of lines visually. */
+ul.plain {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* ------------------------------------------------------------ the directory --- */
+
+/*
+ * The filter bar. Every control is a `.field`, so it inherits the label and input styling every
+ * form in this package uses; the row only decides how they sit next to each other.
+ */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.5rem;
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.filters .field {
+  margin: 0;
+  flex: 1 1 11rem;
+  max-width: 20rem;
+}
+
+/*
+ * Filter labels are the same small-caps as a column header, because they name the same thing: the
+ * axis, not the value.
+ */
+.filters label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+/* The submit button sizes to its text rather than stretching across a column of its own. */
+.filters .field-action {
+  flex: 0 0 auto;
+}
+
+/*
+ * A FILTER THAT IS NARROWING THE RESULT LOOKS DIFFERENT FROM ONE THAT IS NOT. The directory opens
+ * on `status: open`, which is a real filter with a real effect, so the control that holds it is
+ * inked and weighted rather than sitting silently at a default the reader cannot see.
+ */
+.filters .is-set select,
+.filters .is-set input {
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.result-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0 0.6rem;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.result-line strong {
+  color: var(--ink);
+}
+
+/*
+ * The title cell: a bold link, and the publisher's own summary line under it.
+ *
+ * IT KEEPS ITS UNDERLINE. The mock drew these without one, and that was defensible while nothing
+ * on the page was coloured — but the moment the link is olive and the summary beneath it is grey,
+ * dropping the underline would leave colour doing the work of telling a reader which line is
+ * clickable. Weight plus underline plus colour; any two of the three survive on their own.
+ */
+.row-title {
+  font-weight: 700;
+}
+
+.row-summary {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  /* Two lines at most: the summary is orientation, and a six-line cell stops the table scanning. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/*
+ * The same secondary line WITHOUT the clamp, for a table that is being read rather than scanned.
+ * The role matrix on /how-it-works is reference material: truncating "The Hub never takes
+ * applications" to "The Hub never takes…" on the one page that exists to answer that question is
+ * the clamp doing exactly the wrong thing.
+ */
+.cell-note {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  max-width: 46ch;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.untrusted-block {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 70ch;
+}
+
+pre.untrusted-block {
+  font-family: var(--font-mono), ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+/*
+ * The sign-in panel. Positioned in the stylesheet rather than with inline styles, because
+ * `style-src 'unsafe-inline'` is the one relaxation left in the policy and nothing new should lean
+ * on it.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+  background: rgba(26, 25, 23, 0.45);
+  z-index: 10;
+}
+
+/*
+ * A non-modal `<dialog open>` is `position: absolute` with its own border and margins in the user
+ * agent stylesheet, which would take it straight out of the flex centring above. These four
+ * declarations are undoing that, not decorating — the `.card` rules supply the actual look.
+ */
+.overlay-panel {
+  position: static;
+  width: 100%;
+  max-width: 26rem;
+  background: var(--paper);
+  color: inherit;
+  margin: 0;
+}
+
+.signin h2 {
+  margin-top: 0;
+}
+
+.signin-or {
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.9em;
+}
+
+.secret {
+  font-family: var(--font-mono), ui-monospace, Menlo, monospace;
+  word-break: break-all;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+}
+
+/* ---------------------------------------------------------------- narrow --- */
+
+@media (max-width: 40rem) {
+  .shell {
+    padding: 0 1rem 3rem;
+  }
+
+  .shell-nav-group {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+  }
+}

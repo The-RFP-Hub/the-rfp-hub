@@ -5,14 +5,17 @@
   "description": "RFP Hub — open standard, validation tooling, API, client, and agent libraries for Ethereum-ecosystem funding opportunities.",
   "packageManager": "pnpm@10.17.1",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "codegen": "pnpm -r --if-present codegen",
     "codegen:check": "pnpm -r --if-present codegen:check",
     "check": "pnpm -r --if-present check",
     "check:neutral": "node scripts/check-neutral.mjs",
+    "check:deploy": "node scripts/check-deploy.mjs",
     "check:m2": "node scripts/check-m2.mjs",
+    "check:m3": "node scripts/check-m3.mjs",
+    "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
@@ -20,7 +23,17 @@
     "format": "biome format --write ."
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": ["esbuild"],
+    "overrides": {
+      "@fastify/static": "10.1.2",
+      "brace-expansion@5.0.6": "5.0.9",
+      "fast-uri@3.1.2": "3.1.5",
+      "fastify>find-my-way": "9.8.0",
+      "postcss>nanoid": "3.3.18",
+      "@esbuild-kit/core-utils>esbuild": ">=0.28.1",
+      "vite>esbuild": ">=0.28.1",
+      "vite": "7.3.6"
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -32,6 +45,6 @@
     "rfphub-validate": "workspace:*",
     "tsup": "^8.3.5",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.7"
   }
 }

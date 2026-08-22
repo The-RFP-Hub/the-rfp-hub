@@ -29,11 +29,22 @@ name: Nightly open-data export
 
 on:
   workflow_dispatch:
-  # Enabled after one manual dispatch (run 31742168996, 2026-08-13) published and verified a
-  # snapshot end to end. Scheduled workflows are read from the DEFAULT BRANCH, so the cron only
-  # fires once this file is on main.
-  schedule:
-    - cron: "17 3 * * *"
+  # CHAINED, NOT SCHEDULED, and that is a correctness change rather than a tidying one.
+  #
+  # This job used to run on its own cron at 03:17, seventeen minutes after the staleness job was
+  # meant to have closed past-due and long-inactive entries. Scheduled workflows start late
+  # routinely — a busy queue, a maintenance window, a runner shortage — so "seventeen minutes
+  # later" guarantees nothing, and a late maintenance run would publish a dataset still
+  # advertising programmes the API had already decided were closed. Publishing is downstream of
+  # maintenance, so it is expressed as a dependency on the maintenance run's SUCCESS.
+  #
+  # A `workflow_run` trigger fires only for the copy of this file on the default branch, exactly
+  # like the cron it replaces, and the run it starts checks out the default branch — which is what
+  # this job pushes to anyway. `workflow_dispatch` is untouched and is the recovery path when the
+  # maintenance chain fails.
+  workflow_run:
+    workflows: ["Nightly maintenance jobs"]
+    types: [completed]
 
 # The whole point of the job: it writes a commit to the default branch.
 permissions:
@@ -55,6 +66,25 @@ jobs:
     name: Publish and verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # THE PREREQUISITE IS THE WHOLE CHAIN, NOT MERELY A GREEN RUN, and `conclusion == 'success'`
+    # alone does not say that. `Nightly maintenance jobs` also accepts a dispatch that runs ONE job
+    # — `job=analytics-rollup` skips every staleness step and still concludes successfully — and a
+    # dispatch that maintains STAGING, whose database this workflow's production export never
+    # reads. Either would satisfy a conclusion check while leaving the stated staleness prerequisite
+    # unmet.
+    #
+    # `github.event.workflow_run.event` is the trigger of the run that completed, and the SCHEDULE
+    # is the one trigger that always runs the whole chain against production (jobs-nightly.yml
+    # defaults `environment` to production and leaves `job` blank). So the chain is expressed as
+    # "the scheduled maintenance run succeeded", and a partial or staging dispatch publishes
+    # nothing.
+    #
+    # A manual dispatch OF THIS workflow has no triggering run and is always allowed — it is the
+    # recovery path, and the operator using it is the one asserting the prerequisite.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'schedule')
 
     steps:
       # Full history: the push below rebases onto whatever main has become, which a shallow clone

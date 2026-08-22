@@ -1,0 +1,83 @@
+# Deploys the frontend to its STAGING address on every push to main that could change it.
+#
+# WHY THE CLI AND NOT THE GIT INTEGRATION. Vercel's Git integration deploys branches, not tags,
+# and this repository's release convention is "main is only ever staging; production moves on a
+# tag" (see production.yml / frontend-production.yml). Driving both environments from the CLI in
+# Actions keeps the two deploy paths identical in shape, auditable in one place, and able to bake
+# the right NEXT_PUBLIC_* values per environment — those are inlined at build time, so WHICH
+# environment's variables `vercel pull` fetches decides which API the shipped bundle talks to.
+# The project's own git.deploymentEnabled turns the integration off for main (packages/frontend/
+# vercel.json) so a push cannot double-deploy; feature-branch previews are untouched.
+#
+# Vercel's "preview" environment IS this project's staging — the alias below gives it the stable
+# address. Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID (project-scoped; Settings →
+# General). Environment variables live in Vercel (Settings → Environment Variables), never here.
+name: Staging frontend
+
+on:
+  push:
+    branches: [main]
+    # The frontend's build inputs only: its own package plus the workspace packages it bundles
+    # (the validator and the schemas it precompiles) and the lockfile that pins them. The nightly
+    # `exports/` commits and API-only changes deploy nothing here.
+    paths:
+      - "packages/frontend/**"
+      - "packages/validate/**"
+      - "packages/standard/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/frontend-staging.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Only the newest main state matters; superseded staging builds are cancelled.
+  group: frontend-staging
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      # Fetches the PREVIEW environment's variables — this project's staging configuration —
+      # into .vercel/ on the runner. Nothing is written into any container build context
+      # (scripts/check-deploy.mjs's concern); the Vercel build consumes it in place.
+      - name: Pull Vercel environment (preview = staging)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      - name: Build
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --token="$VERCEL_TOKEN"
+
+      - name: Deploy
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          url=$(vercel deploy --prebuilt --token="$VERCEL_TOKEN")
+          echo "deployment_url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Alias the staging domain
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_SCOPE: ${{ secrets.VERCEL_ORG_ID }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: vercel alias "$DEPLOYMENT_URL" staging.ethrfps.app --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
