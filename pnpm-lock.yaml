@@ -101,6 +101,10 @@ importers:
       ajv-formats:
         specifier: ^3.0.1
         version: 3.0.1(ajv@8.20.0)
+    devDependencies:
+      esbuild:
+        specifier: ^0.27.7
+        version: 0.27.7
 
 packages:
 
