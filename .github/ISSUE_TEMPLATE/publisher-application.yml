@@ -1,0 +1,157 @@
+name: Publisher application
+description: Apply to publish your organisation's funding opportunities directly
+title: "Publisher application: <organisation>"
+labels: ["publisher-application"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read [PUBLISHERS.md](https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/PUBLISHERS.md)
+        first — it describes what qualifies, what is checked, what approval grants, and how
+        verification is revoked.
+
+        **Your organisation does not need to be pre-registered.** Submitting a programme that names
+        it in `operatingOrganizations` registers it as an unverified directory stub — its slug taken
+        from that operating organisation. Approving this application is a reviewer **verifying that
+        stub** and granting you a membership; there is no separate create-organisation step.
+
+        **This issue is public.** Who may publish as whom should be a visible, arguable decision.
+        Do not paste credentials, private contact details, or anything you would not put on a
+        website; a public channel is what the review needs.
+
+  - type: input
+    id: organisation
+    attributes:
+      label: Organisation
+      description: The name as you want it to appear on every entry you publish.
+      placeholder: Example Ecosystem Foundation
+    validations:
+      required: true
+
+  - type: input
+    id: namespace
+    attributes:
+      label: Requested namespace slug
+      description: >-
+        Lowercase and hyphenated, and specific to you — this becomes the permanent prefix of every
+        id you publish (`my-org:2026-round-1`). Generic terms somebody else has an equal claim to
+        (`grants`, `ethereum`, `bounties`) are refused.
+      placeholder: example-foundation
+    validations:
+      required: true
+
+  - type: input
+    id: website
+    attributes:
+      label: Public URL for the organisation
+      description: A site, governance forum, or repository that exists independently of this issue.
+      placeholder: https://example.org
+    validations:
+      required: true
+
+  - type: textarea
+    id: programmes
+    attributes:
+      label: Programmes you intend to publish
+      description: >-
+        One line each — the programme name and its public `applicationUrl` (the page or thread where
+        somebody actually applies). An entry with no public way to apply cannot be listed.
+      placeholder: |
+        Builder Grants — https://example.org/grants/apply
+        Security Bounty — https://example.org/security/bounty
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: relationship
+    attributes:
+      label: Your relationship to these programmes
+      description: >-
+        Sponsorship is a real relationship and it is recorded, but it is not publisher ownership:
+        publishing and claiming require that you operate the programme.
+      options:
+        - "We operate them — we decide who is funded, or we run the process that decides"
+        - "We sponsor or fund them; somebody else operates them"
+        - "Mixed — explained below"
+    validations:
+      required: true
+
+  - type: input
+    id: maintainer
+    attributes:
+      label: Maintainer account handle
+      description: The account that will hold the membership and mint the publishing key.
+    validations:
+      required: true
+
+  - type: input
+    id: contact
+    attributes:
+      label: Public contact channel
+      description: >-
+        Where we reach you when a listing is wrong — a forum account, a repository, a published
+        address. Public, not personal.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: How can we confirm this application comes from the organisation?
+      description: >-
+        The organisation has to say it, not the applicant. Link a post from its forum account, a
+        commit or file in its repository, a message from its published contact address, or name an
+        address it is publicly known by. Say which one you are offering.
+    validations:
+      required: true
+
+  - type: textarea
+    id: existing
+    attributes:
+      label: Do entries for these programmes already exist on the Hub?
+      description: >-
+        Search https://api.ethrfps.app/v1/opportunities and paste any ids you find. Existing entries
+        are **claimed**, not duplicated — the id, the history and anything already pointing at it
+        survive, and publisher ownership transfers to you.
+      placeholder: "some-namespace:1459 — our Builder Grants round"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: upkeep
+    attributes:
+      label: How will the listings be kept current?
+      description: >-
+        A listing with a passed deadline closes automatically; one with no future deadline that
+        nobody has touched for 90 days closes as inactive. Any update resets that clock.
+      options:
+        - "By hand, through the dashboard"
+        - "An integration or script against the API"
+        - "An agent"
+        - "Not decided yet"
+    validations:
+      required: true
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      validations:
+        required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Before submitting
+      options:
+        - label: >-
+            Every programme listed above is a genuine funding opportunity.
+          required: true
+        - label: >-
+            We will publish only programmes we operate, and keep our entries accurate.
+          required: true
+        - label: >-
+            We understand that verification can be revoked, that revocation takes effect on the next
+            request, and that it does not delete anything already published.
+          required: true

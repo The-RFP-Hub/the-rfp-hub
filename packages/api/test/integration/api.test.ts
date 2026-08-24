@@ -95,15 +95,29 @@ run("/v1 API", () => {
     await pool.end();
   });
 
-  it("GET /v1/health → ok", async () => {
+  it("GET /v1/health → ok, and says which optional sign-in methods exist", async () => {
     const res = await app.inject({ method: "GET", url: "/v1/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ status: "ok" });
+    // So a sign-in screen can advertise honestly instead of rendering a button, letting somebody
+    // press it, and withdrawing it when the route turns out not to exist. A configuration read: no
+    // probe, nothing that can fail, and it stays public and cheap.
+    expect(typeof res.json().auth.google).toBe("boolean");
+    // Nothing configures Google in a test run, so the honest answer here is false — and the value
+    // comes from the same predicate the auth instance uses to decide whether to register it.
+    expect(res.json().auth.google).toBe(false);
   });
 
-  // Fully public, unauthenticated read API: without these headers no browser client can call it
-  // at all. Only the read-safe verbs are advertised — this API never mutates.
-  it("answers cross-origin reads from any origin, for read-safe verbs only", async () => {
+  // Without these headers no browser client can call the API at all. Any origin is allowed, and
+  // since M3 that includes the write verbs and the `Authorization` header.
+  //
+  // WHAT MAKES `*` SAFE, and what this case is really pinning: `credentials: false`. Every
+  // credential this API accepts is header-borne, so a cross-site request carries no ambient
+  // authority — a browser attaches nothing the calling page does not already hold. The day a
+  // cookie credential is introduced, `*` becomes a request-forgery surface and this has to become
+  // an origin allowlist with `credentials: true`. The assertion below fails if that flips, which
+  // is the point: the change that breaks the invariant will not look like a CORS change.
+  it("answers cross-origin requests from any origin, without credentials", async () => {
     const res = await app.inject({
       method: "GET",
       url: "/v1/health",
@@ -120,7 +134,20 @@ run("/v1 API", () => {
     expect(preflight.statusCode).toBe(204);
     expect(preflight.headers["access-control-allow-origin"]).toBe("*");
     const allowed = String(preflight.headers["access-control-allow-methods"]);
-    expect(allowed.split(/,\s*/).sort()).toEqual(["GET", "HEAD", "OPTIONS"]);
+    expect(allowed.split(/,\s*/).sort()).toEqual([
+      "DELETE",
+      "GET",
+      "HEAD",
+      "OPTIONS",
+      "PATCH",
+      "POST",
+      "PUT",
+    ]);
+    expect(
+      String(preflight.headers["access-control-allow-headers"]).toLowerCase().split(/,\s*/),
+    ).toEqual(["content-type", "authorization"]);
+    // The invariant itself: no credentialed cross-origin request is ever permitted.
+    expect(preflight.headers["access-control-allow-credentials"]).toBeUndefined();
   });
 
   it("GET /v1/opportunities returns only approved+listed, thin projection, with pagination", async () => {

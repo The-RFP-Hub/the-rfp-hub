@@ -13,6 +13,7 @@
     "check": "pnpm -r --if-present check",
     "check:neutral": "node scripts/check-neutral.mjs",
     "check:m2": "node scripts/check-m2.mjs",
+    "check:m3": "node scripts/check-m3.mjs",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
@@ -22,7 +23,8 @@
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild"],
     "overrides": {
-      "@fastify/static": "10.1.2"
+      "@esbuild-kit/core-utils>esbuild": ">=0.28.1",
+      "vite>esbuild": ">=0.28.1"
     }
   },
   "devDependencies": {
