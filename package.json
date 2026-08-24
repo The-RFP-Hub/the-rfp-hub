@@ -25,14 +25,8 @@
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild"],
     "overrides": {
-      "@fastify/static": "10.1.2",
-      "brace-expansion@5.0.6": "5.0.9",
-      "fast-uri@3.1.2": "3.1.5",
-      "fastify>find-my-way": "9.8.0",
-      "postcss>nanoid": "3.3.18",
       "@esbuild-kit/core-utils>esbuild": ">=0.28.1",
-      "vite>esbuild": ">=0.28.1",
-      "vite": "7.3.6"
+      "vite>esbuild": ">=0.28.1"
     }
   },
   "devDependencies": {

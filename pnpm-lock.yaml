@@ -5,14 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@fastify/static': 10.1.2
-  brace-expansion@5.0.6: 5.0.9
-  fast-uri@3.1.2: 3.1.5
-  fastify>find-my-way: 9.8.0
-  postcss>nanoid: 3.3.18
   '@esbuild-kit/core-utils>esbuild': '>=0.28.1'
   vite>esbuild: '>=0.28.1'
-  vite: 7.3.6
 
 importers:
 
@@ -1598,7 +1592,7 @@ packages:
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
-      vite: 7.3.6
+      vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
 
   '@vitest/expect@3.2.7':
     resolution: {integrity: sha512-E8eBXaKibuvH2pSZErOjdVb5vF4PbKYcrnluBTYxEk1l/VhhwZg1kZQsdtjq+CsF5CFydf2Rdkz7jDHKSisi3w==}
@@ -1607,7 +1601,7 @@ packages:
     resolution: {integrity: sha512-Trr0hYO9CM3Wj6ksWHRhK9IZpIY6wTMO5u/MqXurMxT57sWBaOPEtP3Oq60ihZuh5JsiagKfz95OcxdEP6dBrA==}
     peerDependencies:
       msw: ^2.4.9
-      vite: 7.3.6
+      vite: ^5.0.0 || ^6.0.0 || ^7.0.0-0
     peerDependenciesMeta:
       msw:
         optional: true
