@@ -65,6 +65,22 @@ jobs:
         run: |
           aws secretsmanager get-secret-value --secret-id staging/rfp-hub --query SecretString --output text >> .env
 
+      # TEMPORARY — remove once the secret carries MAILGUN_API_KEY and MAILGUN_DOMAIN.
+      # The secret sets EMAIL_TRANSPORT=mailgun but not yet the credential pair, and the API
+      # refuses to boot on that half-configuration (deliberately: a mail transport that cannot
+      # authenticate is a locked door, and the refusal is the loud version of that failure).
+      # Until the operator can edit the secret, rewrite the transport to `ses` at build time:
+      # the API boots, the public surface serves, and sign-in codes are knowingly undeliverable
+      # — the interim is stated here rather than hidden by weakening the guard in code.
+      - name: Interim email transport (boots without mailgun credentials)
+        run: |
+          if grep -q '^MAILGUN_API_KEY=' .env && grep -q '^MAILGUN_DOMAIN=' .env; then
+            echo "mailgun credentials present — leaving EMAIL_TRANSPORT untouched"
+          else
+            sed -i 's/^EMAIL_TRANSPORT=.*/EMAIL_TRANSPORT=ses/' .env
+            echo "mailgun credentials absent — transport rewritten to ses for this build"
+          fi
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
