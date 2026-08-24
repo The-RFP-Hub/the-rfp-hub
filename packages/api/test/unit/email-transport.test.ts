@@ -181,16 +181,20 @@ describe("mailgun transport", () => {
     );
   });
 
-  // Boot-time, not send-time: a credential the transport cannot work without is a fact about the
-  // configuration, and discovering it inside a detached send means discovering it in a log nobody
-  // reads while every request keeps answering 200.
-  it("refuses to be built without the key or the domain", () => {
-    expect(() => createEmailTransport(mailgunConfig({ mailgunApiKey: undefined }))).toThrow(
-      /MAILGUN_API_KEY/,
-    );
-    expect(() => createEmailTransport(mailgunConfig({ mailgunDomain: undefined }))).toThrow(
-      /MAILGUN_DOMAIN/,
-    );
+  // DEGRADED, NOT FATAL: a missing half of the pair used to refuse construction, which coupled
+  // the whole service's boot to a mail key. Now the factory hands back a transport that cannot
+  // send (defence in depth if something skips the predicate) and `deliversEmail` answers false —
+  // which is what routes the sender endpoints to their explicit 503.
+  it("builds a degraded transport without the key or the domain — and deliversEmail says so", async () => {
+    for (const overrides of [{ mailgunApiKey: undefined }, { mailgunDomain: undefined }]) {
+      const cfg = mailgunConfig(overrides);
+      expect(deliversEmail(cfg)).toBe(false);
+      const transport = createEmailTransport(cfg);
+      expect(transport.kind).toBe("mailgun");
+      await expect(transport.send(MESSAGE)).rejects.toThrow(/MAILGUN_API_KEY\/MAILGUN_DOMAIN/);
+    }
+    // The complete pair still delivers, and the predicate says that too.
+    expect(deliversEmail(mailgunConfig())).toBe(true);
   });
 
   it("refuses to be built without an envelope sender", () => {
