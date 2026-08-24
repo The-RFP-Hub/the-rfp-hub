@@ -172,6 +172,12 @@ export function SignIn({
       const { error } = await authClient.signIn.social({
         provider: "google",
         callbackURL: handoffUrl,
+        // THE ONE EXCEPTION to the package-wide `credentials: "omit"` (see lib/auth-client.ts).
+        // This response sets the OAuth state cookie, and under `omit` the browser discards it —
+        // the callback then fails `state_mismatch` for everyone, always. The cookie is a
+        // ten-minute anti-CSRF nonce on the API's own origin, not a session: including
+        // credentials here attaches no ambient authority anywhere else.
+        fetchOptions: { credentials: "include" },
       });
       // Reached only if the redirect did NOT happen — i.e. the call failed.
       if (error?.status === 404) {

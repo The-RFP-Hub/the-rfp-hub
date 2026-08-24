@@ -213,6 +213,12 @@ describe("the Google button", () => {
         callbackURL: `${API}/api/auth-handoff?returnTo=${encodeURIComponent(
           window.location.origin,
         )}`,
+        // THE REGRESSION PIN for the state cookie. This is the one call in the package that runs
+        // with credentials, because the response SETS the OAuth state cookie and a browser in
+        // `omit` mode discards that header — which failed every real Google callback with
+        // `state_mismatch` while every mock passed. If this assertion ever loosens, that bug
+        // comes back silently.
+        fetchOptions: { credentials: "include" },
       }),
     );
   });

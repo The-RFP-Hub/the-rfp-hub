@@ -72,9 +72,15 @@ export function authCorsOptions(config: AuthConfig): FastifyCorsOptions {
       // server, curl. Nothing is granted by answering false, and nothing is exposed by it either.
       callback(null, isAllowedOrigin(config.betterAuth, origin ?? undefined));
     },
-    // Never true. The browser holds the session as a bearer token, not as a cookie it would attach
-    // ambiently; the only cookie in play is host-only on this API's own origin for the OAuth hop.
-    credentials: false,
+    // True, and ONLY here — never on `/v1`. The session stays a bearer token, but the OAuth hop
+    // cannot work without one cookie: `sign-in/social` answers with the state nonce in a
+    // `Set-Cookie`, and a browser in credentials-mode `omit` DISCARDS that header, so every Google
+    // callback died on `state_mismatch`. Allowing credentials on these routes lets the one fetch
+    // that starts the hop (and only it — the client stays `omit` everywhere else) store the state
+    // cookie the callback navigation then presents. The cookie is a ten-minute nonce, not a
+    // session: it grants nothing by being attached, and only origins this callback already
+    // trusts ever receive this answer.
+    credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     // The whole point of the split policy: this is the header the client reads its session out of.
