@@ -176,6 +176,8 @@ export function Chrome({ children }: { children: ReactNode }) {
         <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
           GitHub
         </a>
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
         <span className="shell-footer-note">Open data · CC0 exports · MIT code</span>
       </footer>
     </div>
