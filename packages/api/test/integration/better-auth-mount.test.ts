@@ -74,9 +74,13 @@ run("M3MOUNT the auth mount", () => {
       },
     });
     expect(preflight.headers["access-control-allow-origin"]).toBe(ALLOWED);
-    // `credentials:false` is half of what keeps this safe; the other half is that the exposed
-    // header list is exactly one entry long.
-    expect(preflight.headers["access-control-allow-credentials"]).toBeUndefined();
+    // Credentials are ALLOWED here, and only here — the OAuth state cookie must be storable from
+    // the trusted origin's sign-in fetch, or every Google callback dies on `state_mismatch` (the
+    // browser discards the Set-Cookie in `omit` mode). The safety envelope is the pairing this
+    // test pins: the answer names exactly one origin (never `*`, which the spec forbids with
+    // credentials anyway) and exposes exactly one header. `/v1` keeps its own wide,
+    // credential-free policy, asserted elsewhere.
+    expect(preflight.headers["access-control-allow-credentials"]).toBe("true");
 
     const actual = await app.inject({
       method: "POST",
