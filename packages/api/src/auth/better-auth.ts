@@ -147,6 +147,24 @@ export function createAuth(options: CreateAuthOptions = {}) {
     trustedOrigins: (request) => allowedOrigins(cfg.betterAuth, request),
 
     session: { expiresIn: SESSION_EXPIRES_IN, updateAge: SESSION_UPDATE_AGE },
+    // OWNER DECISION: session rows keep NO network identity. The library fills `ipAddress` and
+    // `userAgent` from request headers by default, which would make every signed-in user's raw
+    // address a durable database record — the exact thing the analytics design (a keyed,
+    // day-scoped hash, never the address) exists to avoid. Stripped here, at the persistence
+    // seam, rather than via `advanced.ipAddress.disableIpTracking`: that flag also changes how
+    // the library keys its rate limiting, and this decision is about what is STORED, not about
+    // what a request transiently is. The columns stay in the schema — no migration; they are
+    // simply always empty — so the library's own reads keep their shape.
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => ({ data: { ...session, ipAddress: "", userAgent: "" } }),
+        },
+        update: {
+          before: async (session) => ({ data: { ...session, ipAddress: "", userAgent: "" } }),
+        },
+      },
+    },
 
     // WRITTEN OUT RATHER THAN DEFAULTED, because every one of these four is a security decision:
     //   enabled              a second provider on a verified address joins two proofs of one
