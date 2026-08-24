@@ -9,6 +9,13 @@
  * is what keeps `credentials: "omit"` true across the whole package and keeps CSRF off the table for
  * `/v1`: a cross-site request to this API has no ambient authority to abuse.
  *
+ * ONE EXCEPTION, stated here so the rule stays honest: starting a Google sign-in
+ * (`signIn.social` in `components/SignIn.tsx`) runs with `credentials: "include"`, because the
+ * OAuth hop is specified around a state cookie — the sign-in response sets it, the provider
+ * callback presents it — and a browser in `omit` mode discards the `Set-Cookie` outright, which
+ * failed every callback with `state_mismatch`. That cookie is a short-lived anti-CSRF nonce on
+ * the API's own origin, not a session; nothing else in the package attaches credentials.
+ *
  * WHERE THE TOKEN COMES FROM. Every Better-Auth response that establishes or refreshes a session
  * carries a `set-auth-token` header (the bearer plugin's `after` hook mirrors the session cookie
  * into it, and the API exposes that header through CORS). `onSuccess` below is the single place that
