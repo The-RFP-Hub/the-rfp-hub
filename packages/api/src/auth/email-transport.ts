@@ -56,7 +56,16 @@ export interface EmailTransport {
  * configuration strings and drifting the moment a transport is added.
  */
 export function deliversEmail(cfg: EmailConfig): boolean {
-  return cfg.transport !== "null";
+  if (cfg.transport === "null") return false;
+  // A mailgun transport without its credential pair EXISTS but cannot authenticate. Answering
+  // "does not deliver" here is what turns a half-configured deployment into a degraded one
+  // instead of a broken one: the sender routes read this predicate and refuse with an explicit
+  // 503, everything that sends nothing keeps serving, and the moment both keys reach the
+  // environment the same build answers true and delivery is live — no code change, no redeploy.
+  if (cfg.transport === "mailgun") {
+    return cfg.mailgunApiKey !== undefined && cfg.mailgunDomain !== undefined;
+  }
+  return true;
 }
 
 /** The transports that reveal the code instead of delivering it. Refused in production. */
@@ -233,17 +242,23 @@ const MAILGUN_TIMEOUT_MS = 10_000;
  * string. Both are needed and neither substitutes for the other.
  */
 function mailgunTransport(cfg: EmailConfig): EmailTransport {
-  // Checked HERE rather than inside `send`, for the reason `resend` spells out: a credential the
-  // transport cannot work without is a boot-time fact, and discovering it at send time means
-  // discovering it in a detached promise nobody is waiting on. `config.ts` refuses the boot on the
-  // same pair under NODE_ENV=production; this is the defence in depth that also covers a config
-  // built by hand in a test, and the only check a developer's machine gets.
+  // A missing half of the credential pair is DEGRADED, NOT FATAL. Refusing to construct here
+  // used to couple the whole service's boot to a mail key — a half-configured secret crash-looped
+  // a deployment whose public surface needed no email at all. The wired path never reaches this
+  // transport's send while the pair is incomplete (`deliversEmail` answers false and the sender
+  // routes 503 first, loudly), so the throw below is defence in depth for a hand-built config
+  // that skipped the predicate — it rejects the send, it never takes down a boot.
   const apiKey = cfg.mailgunApiKey;
   const domain = cfg.mailgunDomain;
   if (apiKey === undefined || domain === undefined) {
-    throw new Error(
-      "EMAIL_TRANSPORT=mailgun requires MAILGUN_API_KEY and MAILGUN_DOMAIN. The key authenticates the send and the domain is the part of the URL that says which sending domain it is; without both, no sign-in code can be delivered and every sign-in would stall at the code prompt.",
-    );
+    return {
+      kind: "mailgun",
+      async send() {
+        throw new Error(
+          "mailgun transport has no MAILGUN_API_KEY/MAILGUN_DOMAIN — delivery is disabled and this send should have been unreachable (deliversEmail gates the sender routes).",
+        );
+      },
+    };
   }
   // Built once, not per message: it is a constant of the configuration, and re-deriving it on every
   // send would put the key through a base64 encode on the login path for nothing.

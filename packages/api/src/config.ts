@@ -619,36 +619,31 @@ export function readMailgunApiBase(
 }
 
 /**
- * The Mailgun credential pair, checked TOGETHER and only when it is the transport in use.
+ * The boot-time noise for a half-configured Mailgun pair — a WARNING, never a refusal.
  *
- * Neither half is usable alone: the key is the HTTP Basic password and the domain is a path segment
- * of the send URL, so a deployment holding one of them delivers exactly as much mail as one holding
- * neither. Under `NODE_ENV=production` that refuses the boot, in the shape `readAllowPrivateHosts`
- * uses — a mail transport that cannot authenticate is a locked door, not a degraded service, and it
- * would present as "the code never arrived" for every user at once with nothing in the logs.
- *
- * Off the production path it passes them through as they are, and the transport itself refuses when
- * it is built (see `email-transport.ts`, same precedent as `resend`) — so a developer who sets the
- * transport and nothing else still hears about it, at the moment the configuration is wrong rather
- * than inside a detached send nobody is awaiting.
+ * It used to refuse the boot, and that was the wrong coupling: a mail secret missing half its pair
+ * crash-looped the whole service, holding the public read surface hostage to an email credential.
+ * Completeness is judged where it matters instead — `deliversEmail()` answers false for an
+ * incomplete pair, the four code-sending routes refuse with an explicit 503, and everything that
+ * sends nothing keeps serving. The moment both keys reach the environment, the same build delivers
+ * — no code change. This function is the replacement noise, in the shape of this file's other
+ * warnings: said once, loudly, naming exactly the key(s) that fix it. The local-only transports
+ * (`file`/`stdout`/`memory`/`null`) keep their production refusal in `readEmailTransport` — codes
+ * going to a file nobody reads is a misconfiguration with no valid interim state, a different
+ * class entirely.
  */
-export function readMailgunCredentials(
-  transport: EmailTransportKind,
-  apiKey: string | undefined,
-  domain: string | undefined,
-  production: boolean,
-): { apiKey: string | undefined; domain: string | undefined } {
+export function mailgunCredentialWarning(email: {
+  transport: EmailTransportKind;
+  mailgunApiKey: string | undefined;
+  mailgunDomain: string | undefined;
+}): string | undefined {
+  if (email.transport !== "mailgun") return undefined;
   const missing = [
-    apiKey === undefined ? "MAILGUN_API_KEY" : undefined,
-    domain === undefined ? "MAILGUN_DOMAIN" : undefined,
+    email.mailgunApiKey === undefined ? "MAILGUN_API_KEY" : undefined,
+    email.mailgunDomain === undefined ? "MAILGUN_DOMAIN" : undefined,
   ].filter((name): name is string => name !== undefined);
-
-  if (production && transport === "mailgun" && missing.length > 0) {
-    throw new Error(
-      `EMAIL_TRANSPORT=mailgun under NODE_ENV=production without ${missing.join(" and ")}. The key is the send credential and the domain is part of the send URL, so without both nothing can be delivered and every sign-in would stall at the code prompt. Supply them through the task definition's secrets.`,
-    );
-  }
-  return { apiKey, domain };
+  if (missing.length === 0) return undefined;
+  return `EMAIL_TRANSPORT=mailgun without ${missing.join(" and ")} — the transport is configured but cannot authenticate, so sign-in code delivery is DISABLED: the code-sending routes answer 503 until the missing key(s) reach the environment, and everything that does not send email keeps serving. Supply them through the task definition's secrets (packages/api/docs/deploy.md).`;
 }
 
 const embeddingApiKey = readOptional(process.env.OPENAI_API_KEY);
@@ -656,12 +651,6 @@ const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER, 
 const analyticsHmac = readAnalyticsHmacKey(process.env.ANALYTICS_HMAC_KEY);
 const betterAuthSecret = readBetterAuthSecret(process.env.BETTER_AUTH_SECRET, isProduction);
 const emailTransport = readEmailTransport(process.env.EMAIL_TRANSPORT, isProduction);
-const mailgun = readMailgunCredentials(
-  emailTransport,
-  readOptional(process.env.MAILGUN_API_KEY),
-  readOptional(process.env.MAILGUN_DOMAIN),
-  isProduction,
-);
 
 export const config: AppConfig = {
   databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
@@ -693,8 +682,8 @@ export const config: AppConfig = {
     outboxDir: readOptional(process.env.EMAIL_OUTBOX_DIR),
     sesRegion: readOptional(process.env.AWS_SES_REGION) ?? readOptional(process.env.AWS_REGION),
     resendApiKey: readOptional(process.env.RESEND_API_KEY),
-    mailgunApiKey: mailgun.apiKey,
-    mailgunDomain: mailgun.domain,
+    mailgunApiKey: readOptional(process.env.MAILGUN_API_KEY),
+    mailgunDomain: readOptional(process.env.MAILGUN_DOMAIN),
     mailgunApiBase: readMailgunApiBase(process.env.MAILGUN_API_BASE),
   },
 
@@ -751,6 +740,11 @@ if (!config.betterAuth.secretConfigured && process.env.NODE_ENV !== "test") {
   console.error(
     "BETTER_AUTH_SECRET unset (or shorter than 32 characters) — using a random per-boot secret. Sessions are signed with it, so EVERY RESTART SIGNS EVERYONE OUT. Set it in the environment; see packages/api/docs/deploy.md.",
   );
+}
+
+const mailgunWarning = mailgunCredentialWarning(config.email);
+if (mailgunWarning !== undefined && process.env.NODE_ENV !== "test") {
+  console.error(mailgunWarning);
 }
 
 if (config.analytics.enabled && analyticsHmac.generated && process.env.NODE_ENV !== "test") {
