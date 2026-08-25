@@ -22,6 +22,7 @@ import { formatInstant } from "@/lib/format";
 import {
   PUBLISHER_STATUS_LABELS,
   type PublisherStatus,
+  ROUTE_GATE_COPY,
   fundingTypeLabel,
   isOpenDuplicateStatus,
   opportunityStatusLabel,
@@ -43,7 +44,9 @@ const FILTERS: { value: PublisherStatus | "all"; label: string }[] = [
 ];
 
 export default function ListingsPage() {
-  return <RequireSession>{(me) => <Listings me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.listings}>{(me) => <Listings me={me} />}</RequireSession>
+  );
 }
 
 /**

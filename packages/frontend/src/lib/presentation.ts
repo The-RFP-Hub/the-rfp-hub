@@ -209,19 +209,85 @@ export function isOpenDuplicateStatus(status: DuplicateStatus): boolean {
   return status === "suspected" || status === "confirmed";
 }
 
-/** Shared wording for pages gated by a global staff role. */
+export interface GateCopy {
+  title: string;
+  detail: string;
+}
+
+/**
+ * What each signed-out route needs an account for.
+ *
+ * These are route facts rather than auth vocabulary: the gate should name the work waiting behind
+ * it, not make every signed-out destination sound like the same generic dashboard.
+ */
 export const ROUTE_GATE_COPY = {
-  reviewer: {
-    title: "This account does not have Hub reviewer access.",
-    label: "Hub reviewer access",
-    role: "Hub reviewer",
+  listings: {
+    title: "Sign in to manage your listings.",
+    detail: "See what is waiting for review, live, rejected, merged, or hidden.",
+  },
+  newListing: {
+    title: "Sign in to submit an opportunity.",
+    detail: "After signing in, you can restore any draft saved for this account on this device.",
+  },
+  listing: {
+    title: "Sign in to view this listing.",
+    detail: "See its review status, history, matches, and publishing controls.",
+  },
+  editListing: {
+    title: "Sign in to edit this listing.",
+    detail: "Open the saved listing and the account controls available to you.",
+  },
+  account: {
+    title: "Sign in to view your account.",
+    detail: "See your Hub role and verified organisation memberships.",
+  },
+  organisations: {
+    title: "Sign in to view your organisations.",
+    detail: "See the organisations where this account has publishing rights.",
+  },
+  organisation: {
+    title: "Sign in to view this organisation.",
+    detail: "Check your membership and manage the listings in its namespace.",
+  },
+  duplicates: {
+    title: "Sign in to review matches involving your listings.",
+    detail: "These matches are private to listing owners and reviewers.",
+  },
+  keys: {
+    title: "Sign in to manage API keys.",
+    detail: "API keys can publish or update listings on your behalf.",
+  },
+  review: {
+    title: "Sign in with a Hub reviewer account.",
+    detail: "Review submissions, claims, organisations, and duplicate matches.",
   },
   admin: {
-    title: "This account does not have Hub admin access.",
-    label: "Hub admin access",
-    role: "Hub admin",
+    title: "Sign in with a Hub administrator account.",
+    detail: "Manage Hub roles and direct-publishing access.",
   },
-} as const;
+} as const satisfies Record<string, GateCopy>;
+
+/** Dashboard keeps its richer hand-written signed-out state, but shares the route-first tone. */
+export const DASHBOARD_GATE_COPY: GateCopy = {
+  title: "Sign in to view your listings’ traffic.",
+  detail: "See aggregate directory opens and outbound clicks for published listings.",
+};
+
+/** Capability refusals are account facts, distinct from the signed-out route invitation above. */
+export const CAPABILITY_DENIAL_COPY = {
+  reviewer: {
+    title: "This account does not have Hub reviewer access.",
+    detail: "Review submissions, claims, organisations, and duplicate matches requires that role.",
+  },
+  admin: {
+    title: "This account does not have Hub administrator access.",
+    detail: "Managing Hub roles and direct-publishing access requires that role.",
+  },
+  keyManagement: {
+    title: "This account does not have API key management access.",
+    detail: "Only an account allowed to manage API keys can open this page.",
+  },
+} as const satisfies Record<string, GateCopy>;
 
 /** Raw values retained by the audit disclosure, grouped here for its three rendering surfaces. */
 export function auditTechnicalRecord(entry: AuditEntry) {

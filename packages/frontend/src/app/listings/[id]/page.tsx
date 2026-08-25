@@ -28,7 +28,7 @@ import {
 import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
-import { duplicateStatusLabel, fundingTypeLabel } from "@/lib/presentation";
+import { ROUTE_GATE_COPY, duplicateStatusLabel, fundingTypeLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
@@ -49,7 +49,11 @@ const TAB_LABELS: Record<Tab, string> = {
 export default function ListingPage() {
   const params = useParams<{ id: string }>();
   const id = decodeURIComponent(String(params.id ?? ""));
-  return <RequireSession>{(me) => <Listing id={id} me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.listing}>
+      {(me) => <Listing id={id} me={me} />}
+    </RequireSession>
+  );
 }
 
 function Listing({ id, me }: { id: string; me: Me }) {

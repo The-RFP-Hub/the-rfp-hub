@@ -23,7 +23,7 @@ import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
-import { ROUTE_GATE_COPY, accountRoleLabel } from "@/lib/presentation";
+import { CAPABILITY_DENIAL_COPY, ROUTE_GATE_COPY, accountRoleLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import type { AccountRole, AccountSummary, Me } from "@/lib/types";
@@ -43,7 +43,10 @@ const ROLE_MEANING: Record<AccountRole, string> = {
 
 export default function AdminPage() {
   return (
-    <RequireSession capability={{ needs: (me) => me.canAdmin, ...ROUTE_GATE_COPY.admin }}>
+    <RequireSession
+      gate={ROUTE_GATE_COPY.admin}
+      capability={{ needs: (me) => me.canAdmin, ...CAPABILITY_DENIAL_COPY.admin }}
+    >
       {(me) => (
         <section>
           <h1>Accounts &amp; roles</h1>

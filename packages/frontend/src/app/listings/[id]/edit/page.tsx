@@ -14,6 +14,7 @@ import { OpportunityForm } from "@/components/OpportunityForm";
 import { ResourceView } from "@/components/states";
 import { loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { fromDocument } from "@/lib/opportunity-form";
+import { ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Me } from "@/lib/types";
@@ -23,7 +24,11 @@ import { useCallback } from "react";
 export default function EditListingPage() {
   const params = useParams<{ id: string }>();
   const id = decodeURIComponent(String(params.id ?? ""));
-  return <RequireSession>{(me) => <EditForm id={id} me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.editListing}>
+      {(me) => <EditForm id={id} me={me} />}
+    </RequireSession>
+  );
 }
 
 function EditForm({ id, me }: { id: string; me: Me }) {

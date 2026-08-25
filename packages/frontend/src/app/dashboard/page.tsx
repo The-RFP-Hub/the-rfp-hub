@@ -15,6 +15,7 @@ import { UntrustedText } from "@/components/UntrustedText";
 import { AuthUnavailable, ResourceView } from "@/components/states";
 import { METRIC_LABELS, formatCount, formatDay } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { DASHBOARD_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import Link from "next/link";
@@ -31,7 +32,8 @@ export default function DashboardPage() {
   if (!session.authenticated) {
     return (
       <section>
-        <h1>Your listings&rsquo; traffic</h1>
+        <h1>{DASHBOARD_GATE_COPY.title}</h1>
+        <p className="lede">{DASHBOARD_GATE_COPY.detail}</p>
         <p className="footnote">
           Submit funding opportunities to the RFP Hub, keep them current, and see what they get read
           and applied for. Signing in creates an account the first time; publishing without review

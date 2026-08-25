@@ -37,7 +37,7 @@ import {
 import type { OrganizationPatch } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
-import { fundingTypeLabel, orgRoleLabel } from "@/lib/presentation";
+import { ROUTE_GATE_COPY, fundingTypeLabel, orgRoleLabel } from "@/lib/presentation";
 import { type ResourceHandle, useResource } from "@/lib/resource";
 import { detailHref } from "@/lib/return-to";
 import { useApi } from "@/lib/session";
@@ -75,7 +75,11 @@ function organizationPageHref(slug: string, publishedPage: number, pendingPage: 
 export default function OrganisationPage() {
   const params = useParams<{ slug: string }>();
   const slug = decodeURIComponent(String(params.slug ?? ""));
-  return <RequireSession>{(me) => <Organisation slug={slug} me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.organisation}>
+      {(me) => <Organisation slug={slug} me={me} />}
+    </RequireSession>
+  );
 }
 
 function Organisation({ slug, me }: { slug: string; me: Me }) {

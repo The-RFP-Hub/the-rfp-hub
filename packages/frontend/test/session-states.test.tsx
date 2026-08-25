@@ -18,7 +18,7 @@ import { NavigationBlockerProvider, useNavigationBlocker } from "@/components/Na
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import { opportunityDraftKey } from "@/lib/opportunity-draft";
-import { ROUTE_GATE_COPY } from "@/lib/presentation";
+import { CAPABILITY_DENIAL_COPY, type GateCopy, ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -74,10 +74,11 @@ const me: Me = {
 function renderGate(
   client: ApiClient,
   capability?: Parameters<typeof RequireSession>[0]["capability"],
+  gate?: GateCopy,
 ) {
   return render(
     <ApiClientProvider value={client}>
-      <RequireSession capability={capability}>
+      <RequireSession capability={capability} gate={gate}>
         {(account) => <p>Hello {account.handle}</p>}
       </RequireSession>
     </ApiClientProvider>,
@@ -109,6 +110,85 @@ describe("RequireSession", () => {
     expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
   });
 
+  it.each([
+    [
+      "/listings",
+      ROUTE_GATE_COPY.listings,
+      "Sign in to manage your listings.",
+      "See what is waiting for review, live, rejected, merged, or hidden.",
+    ],
+    [
+      "/listings/new",
+      ROUTE_GATE_COPY.newListing,
+      "Sign in to submit an opportunity.",
+      "After signing in, you can restore any draft saved for this account on this device.",
+    ],
+    [
+      "/listings/[id]",
+      ROUTE_GATE_COPY.listing,
+      "Sign in to view this listing.",
+      "See its review status, history, matches, and publishing controls.",
+    ],
+    [
+      "/listings/[id]/edit",
+      ROUTE_GATE_COPY.editListing,
+      "Sign in to edit this listing.",
+      "Open the saved listing and the account controls available to you.",
+    ],
+    [
+      "/account",
+      ROUTE_GATE_COPY.account,
+      "Sign in to view your account.",
+      "See your Hub role and verified organisation memberships.",
+    ],
+    [
+      "/organisations",
+      ROUTE_GATE_COPY.organisations,
+      "Sign in to view your organisations.",
+      "See the organisations where this account has publishing rights.",
+    ],
+    [
+      "/organisations/[slug]",
+      ROUTE_GATE_COPY.organisation,
+      "Sign in to view this organisation.",
+      "Check your membership and manage the listings in its namespace.",
+    ],
+    [
+      "/duplicates",
+      ROUTE_GATE_COPY.duplicates,
+      "Sign in to review matches involving your listings.",
+      "These matches are private to listing owners and reviewers.",
+    ],
+    [
+      "/keys",
+      ROUTE_GATE_COPY.keys,
+      "Sign in to manage API keys.",
+      "API keys can publish or update listings on your behalf.",
+    ],
+    [
+      "/review",
+      ROUTE_GATE_COPY.review,
+      "Sign in with a Hub reviewer account.",
+      "Review submissions, claims, organisations, and duplicate matches.",
+    ],
+    [
+      "/admin",
+      ROUTE_GATE_COPY.admin,
+      "Sign in with a Hub administrator account.",
+      "Manage Hub roles and direct-publishing access.",
+    ],
+  ] as const)("renders the route-specific gate for %s", (_route, gate, title, detail) => {
+    renderGate(
+      clientFor(async () => me),
+      undefined,
+      gate,
+    );
+
+    expect(screen.getByText(title)).toBeTruthy();
+    expect(screen.getByText(detail)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+  });
+
   it("says sign-in is unavailable — not 'logged out' — when the API could not be asked", () => {
     session.error = { status: 0, message: "Failed to fetch" };
     renderGate(clientFor(async () => me));
@@ -128,17 +208,19 @@ describe("RequireSession", () => {
     await waitFor(() => expect(screen.getByText(/Hello acme-programs/)).toBeTruthy());
   });
 
-  it("reports a missing capability from the API's own answer, and never a queue", async () => {
+  it.each([
+    ["reviewer", CAPABILITY_DENIAL_COPY.reviewer],
+    ["administrator", CAPABILITY_DENIAL_COPY.admin],
+    ["key management", CAPABILITY_DENIAL_COPY.keyManagement],
+  ] as const)("reports a missing %s capability from the API's own answer", async (_name, copy) => {
     session.data = { user: { id: "user_1" } };
     renderGate(
       clientFor(async () => me),
-      {
-        needs: (account) => account.canReview,
-        ...ROUTE_GATE_COPY.reviewer,
-      },
+      { needs: () => false, ...copy },
     );
 
-    await waitFor(() => expect(screen.getByText(/does not have Hub reviewer access/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(copy.title)).toBeTruthy());
+    expect(screen.getByText(copy.detail)).toBeTruthy();
     expect(screen.getByRole("link", { name: "See who can do what" }).getAttribute("href")).toBe(
       "/how-it-works#roles",
     );

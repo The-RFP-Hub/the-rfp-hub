@@ -11,10 +11,11 @@
 import { RequireSession } from "@/components/Chrome";
 import { OpportunityForm } from "@/components/OpportunityForm";
 import { emptyForm } from "@/lib/opportunity-form";
+import { ROUTE_GATE_COPY } from "@/lib/presentation";
 
 export default function NewListingPage() {
   return (
-    <RequireSession>
+    <RequireSession gate={ROUTE_GATE_COPY.newListing}>
       {(me) => {
         const verified = me.memberships.filter((membership) => membership.verified);
         return (

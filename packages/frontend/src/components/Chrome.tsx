@@ -20,6 +20,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { HOW_IT_WORKS, HOW_IT_WORKS_ROLES, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import type { GateCopy } from "@/lib/presentation";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { usePathname } from "next/navigation";
@@ -200,15 +201,15 @@ export function Chrome({ children }: { children: ReactNode }) {
 export function RequireSession({
   children,
   capability,
+  gate,
 }: {
   children: (me: Me) => ReactNode;
-  /** An extra gate for the review and administration pages, mirrored from the API's own answer. */
+  /** Route-specific signed-out wording. Omitted consumers retain the established generic gate. */
+  gate?: GateCopy;
+  /** An extra capability gate, mirrored from the API's own answer. */
   capability?: {
     needs: (me: Me) => boolean;
-    label: string;
-    title?: string;
-    role?: string;
-  };
+  } & GateCopy;
 }) {
   const session = useSession();
 
@@ -217,9 +218,10 @@ export function RequireSession({
   if (!session.authenticated) {
     return (
       <div className="state empty">
-        <p className="empty-title">You are not signed in.</p>
+        <p className="empty-title">{gate?.title ?? "You are not signed in."}</p>
         <p className="muted">
-          This page shows one account&rsquo;s own listings and traffic, so it needs a session.
+          {gate?.detail ??
+            "This page shows one account’s own listings and traffic, so it needs a session."}
         </p>
         <p className="row">
           <button type="button" className="button-primary" onClick={session.login}>
@@ -248,13 +250,8 @@ export function RequireSession({
   if (capability && !capability.needs(me)) {
     return (
       <div className="state empty">
-        <p className="empty-title">
-          {capability.title ?? `This account does not have ${capability.label}.`}
-        </p>
-        <p className="muted">
-          This page is reserved for {capability.role ?? capability.label}. Check your account or
-          compare the roles to see which access you have.
-        </p>
+        <p className="empty-title">{capability.title}</p>
+        <p className="muted">{capability.detail}</p>
         <p className="row">
           <GuardedLink href="/account">Check your account</GuardedLink>
           <GuardedLink href={HOW_IT_WORKS_ROLES}>See who can do what</GuardedLink>

@@ -15,14 +15,16 @@ import { UntrustedText } from "@/components/UntrustedText";
 import { VerifiedBadge } from "@/components/badges";
 import { ActionNote, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
-import { accountRoleLabel, orgRoleLabel } from "@/lib/presentation";
+import { ROUTE_GATE_COPY, accountRoleLabel, orgRoleLabel } from "@/lib/presentation";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
 import { useState } from "react";
 
 export default function AccountPage() {
-  return <RequireSession>{(me) => <Account me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.account}>{(me) => <Account me={me} />}</RequireSession>
+  );
 }
 
 function Account({ me }: { me: Me }) {

@@ -17,6 +17,7 @@ import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
+import { CAPABILITY_DENIAL_COPY, ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { ApiKeyScope } from "@/lib/types";
@@ -35,7 +36,10 @@ const SCOPES: { value: ApiKeyScope; label: string; detail: string }[] = [
 
 export default function KeysPage() {
   return (
-    <RequireSession capability={{ needs: (me) => me.canManageKeys, label: "key management" }}>
+    <RequireSession
+      gate={ROUTE_GATE_COPY.keys}
+      capability={{ needs: (me) => me.canManageKeys, ...CAPABILITY_DENIAL_COPY.keyManagement }}
+    >
       {() => <Keys />}
     </RequireSession>
   );

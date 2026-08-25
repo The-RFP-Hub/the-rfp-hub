@@ -35,6 +35,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
 import {
+  CAPABILITY_DENIAL_COPY,
   ROUTE_GATE_COPY,
   accountRoleLabel,
   duplicateStatusLabel,
@@ -83,7 +84,10 @@ const submissionHref = (page: number): string => (page > 1 ? `/review?page=${pag
 
 export default function ReviewPage() {
   return (
-    <RequireSession capability={{ needs: (me) => me.canReview, ...ROUTE_GATE_COPY.reviewer }}>
+    <RequireSession
+      gate={ROUTE_GATE_COPY.review}
+      capability={{ needs: (me) => me.canReview, ...CAPABILITY_DENIAL_COPY.reviewer }}
+    >
       {() => <Review />}
     </RequireSession>
   );

@@ -12,14 +12,14 @@ import { RequireSession } from "@/components/Chrome";
 import { UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
 import { formatInstant, formatSimilarity } from "@/lib/format";
-import { duplicateStatusLabel } from "@/lib/presentation";
+import { ROUTE_GATE_COPY, duplicateStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import Link from "next/link";
 import { useCallback } from "react";
 
 export default function DuplicatesPage() {
-  return <RequireSession>{() => <Duplicates />}</RequireSession>;
+  return <RequireSession gate={ROUTE_GATE_COPY.duplicates}>{() => <Duplicates />}</RequireSession>;
 }
 
 function Duplicates() {

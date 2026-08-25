@@ -17,12 +17,16 @@ import { UntrustedText } from "@/components/UntrustedText";
 import { VerifiedBadge } from "@/components/badges";
 import { EmptyState } from "@/components/states";
 import { HOW_IT_WORKS } from "@/lib/links";
-import { orgRoleLabel } from "@/lib/presentation";
+import { ROUTE_GATE_COPY, orgRoleLabel } from "@/lib/presentation";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
 
 export default function OrganisationsPage() {
-  return <RequireSession>{(me) => <Organisations me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.organisations}>
+      {(me) => <Organisations me={me} />}
+    </RequireSession>
+  );
 }
 
 function Organisations({ me }: { me: Me }) {
