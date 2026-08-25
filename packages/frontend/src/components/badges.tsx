@@ -1,0 +1,142 @@
+/**
+ * Editorial state, shown as a WORD and a SHAPE, never as a hue.
+ *
+ * Every badge here reports SERVER state — review status, listing, organisation verification, the
+ * publisher's own `status`. None of it is computed in the browser.
+ *
+ * THE FOUR SHAPES ARE THE VOCABULARY, and they are defined once in the stylesheet rather than
+ * per-badge: a solid outline is live or included, filled ink is finished and terminal, a dashed
+ * outline is provisional and waiting on somebody, and struck-through muted text is refused. A
+ * reader who sees no colour at all, a printout, and a screenshot in a bug report all carry exactly
+ * the same information as the screen does. That is the point of doing it this way rather than with
+ * a green tick and a red cross.
+ *
+ * THE TOOLTIP IS NEVER THE ONLY EXPLANATION where the badge is load-bearing. A `title` does not
+ * exist on a touch device and is not reliably announced; where a badge decides what happens to
+ * somebody's work — the account page's organisation table above all — `gloss` puts the sentence on
+ * screen beside it and the tooltip stays as the longer form.
+ */
+
+export function ReviewStatusBadge({ status }: { status: string }) {
+  const explanation =
+    status === "pending"
+      ? "Stored, and invisible to the public reads until a reviewer approves it"
+      : status === "approved"
+        ? "Approved by a reviewer, or auto-approved for a verified namespace"
+        : status === "rejected"
+          ? "Rejected — not published"
+          : status;
+  return (
+    <span className={`badge badge-${status}`} title={explanation}>
+      {status}
+    </span>
+  );
+}
+
+/**
+ * The publisher's own lifecycle status, as the directory column reads it.
+ *
+ * It is a DIFFERENT AXIS from review status and the two are routinely confused: `open` is a
+ * statement about whether the programme is taking applications, `approved` is a statement about
+ * whether the Hub has published the listing. A closed listing is still published; a pending listing
+ * may well be open. Rendering them with the same vocabulary of shapes and never merging them into
+ * one column is what keeps that distinction visible.
+ */
+export function StatusBadge({ status }: { status: string }) {
+  const explanation =
+    status === "open"
+      ? "Taking applications now, as the publisher stated it"
+      : status === "upcoming"
+        ? "Announced, not yet taking applications"
+        : status === "closed"
+          ? "No longer taking applications"
+          : status === "archived"
+            ? "Kept for the record; the programme is over"
+            : status;
+  return (
+    <span className={`badge badge-${status}`} title={explanation}>
+      {status}
+    </span>
+  );
+}
+
+/**
+ * Listing is a separate axis from approval: an approved entry can be unlisted, and then it is not
+ * in the public reads either. Showing only the review status would misreport that.
+ */
+export function ListedBadge({ isListed }: { isListed: boolean }) {
+  return (
+    <span
+      className={isListed ? "badge badge-listed" : "badge badge-unlisted"}
+      title={
+        isListed
+          ? "Included in the public list and detail reads"
+          : "Withheld from the public reads, whatever its review status"
+      }
+    >
+      {isListed ? "listed" : "unlisted"}
+    </span>
+  );
+}
+
+/**
+ * Organisation verification, which is what auto-approval hangs off: writes from a verified
+ * namespace publish immediately, writes from an unverified one land pending.
+ *
+ * `gloss` puts that consequence on screen. "Verified" on its own reads as a vanity tick, and the
+ * one place a member most needs to know what it actually means for them — their own account page —
+ * is the one place a hover tooltip is least likely to be found.
+ */
+export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: boolean }) {
+  const explanation = verified
+    ? "Verified organisation — its members' listings publish without review"
+    : "Not verified — listings published under this namespace land pending";
+  const badge = (
+    <span
+      className={verified ? "badge badge-verified" : "badge badge-unverified"}
+      title={explanation}
+    >
+      {verified ? "verified" : "unverified"}
+    </span>
+  );
+  if (!gloss) return badge;
+  return (
+    <span className="badge-labelled">
+      {badge}
+      <span className="badge-gloss">
+        {verified
+          ? "your listings in this namespace publish immediately"
+          : "your listings in this namespace wait for a reviewer"}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The verification-assist verdict on a listing's `applicationUrl`.
+ *
+ * `matched` is a LOW-BAR anti-spam signal — the page exists and its title is about the same
+ * programme — and never a fact-check. The title text says that, because a tick that reads as
+ * "these details are correct" would be the single most misleading thing on this frontend.
+ */
+export function MatchBadge({ matched }: { matched: boolean | null }) {
+  if (matched === null) {
+    return (
+      <span className="badge badge-unknown" title="This listing's link has not been checked yet">
+        not checked
+      </span>
+    );
+  }
+  return (
+    <span
+      className={matched ? "badge badge-matched" : "badge badge-unmatched"}
+      title={
+        matched
+          ? "The linked page exists and its title is about this programme. A low-bar anti-spam signal, not a fact-check."
+          : "The linked page did not resolve, or its title does not look like this programme"
+      }
+    >
+      {matched ? "link looks right" : "link did not match"}
+    </span>
+  );
+}

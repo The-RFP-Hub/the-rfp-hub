@@ -297,6 +297,13 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # The frontend runs its OWN vitest config (jsdom, React Testing Library) and the root
+      # `vitest.config.ts` excludes `packages/frontend/**`, so `pnpm test` above cannot reach it.
+      # Without this step the render proof, the API-wrapper contract and the untrusted-content scan
+      # would exist in the tree and never run in CI. `pnpm build` already builds the package.
+      - name: Frontend tests
+        run: pnpm --filter @the-rfp-hub/frontend test
+
       - name: Lint
         run: pnpm lint
 
