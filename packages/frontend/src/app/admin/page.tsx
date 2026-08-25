@@ -21,8 +21,7 @@
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError } from "@/lib/api";
+import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
 import { ROUTE_GATE_COPY, accountRoleLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
@@ -44,7 +43,7 @@ const ROLE_MEANING: Record<AccountRole, string> = {
 
 export default function AdminPage() {
   return (
-    <RequireSession capability={{ needs: (me) => me.canAdmin, label: ROUTE_GATE_COPY.admin.label }}>
+    <RequireSession capability={{ needs: (me) => me.canAdmin, ...ROUTE_GATE_COPY.admin }}>
       {(me) => (
         <section>
           <h1>Accounts &amp; roles</h1>
@@ -79,11 +78,7 @@ function Accounts({ me }: { me: Me }) {
       setNote({ kind: "ok", message: await work() });
       reload();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError ? `${error.message} (${error.code})` : "The change failed.",
-      });
+      setNote(actionErrorNote(error, "The change failed."));
     } finally {
       setBusy(false);
     }

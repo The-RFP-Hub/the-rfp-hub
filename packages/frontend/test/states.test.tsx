@@ -21,7 +21,7 @@ import {
 import { EmptyState, ErrorState, Loading, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { useResource } from "@/lib/resource";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useCallback, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -125,7 +125,9 @@ describe("useResource", () => {
     // refresh is a dashboard reporting figures that are quietly hours old.
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.queryByText("first answer")).toBeNull();
-    expect(screen.getByText("The API fell over.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("The API fell over.")).toBeTruthy();
   });
 });
 
@@ -143,11 +145,12 @@ describe("ErrorState", () => {
       />,
     );
 
-    expect(screen.getByText("The API did not accept this session.")).toBeTruthy();
-    // The API's own sentence survives the framing — this branch is reached both by a session that
-    // aged out mid-task and by a one-shot credential that had already been spent, and only the
-    // API knows which.
-    expect(screen.getByText("No session was presented.")).toBeTruthy();
+    expect(screen.getByText("Your sign-in has ended.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("No session was presented.")).toBeTruthy();
+    expect(within(details).getByText("unauthenticated")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Log in again" }));
     expect(login).toHaveBeenCalledTimes(1);
@@ -167,11 +170,19 @@ describe("ErrorState", () => {
     // ends exactly where it started is the worst thing this component could do.
     expect(screen.queryByRole("button", { name: "Log in again" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
-    expect(screen.getByText(/may not read the review queue/)).toBeTruthy();
-    expect(screen.getByText(/403 · forbidden/)).toBeTruthy();
+    expect(screen.getByText(/You don’t have access to the review queue/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Check your account" }).getAttribute("href")).toBe(
+      "/account",
+    );
+    expect(screen.getByRole("link", { name: "See who can do what" }).getAttribute("href")).toBe(
+      "/how-it-works#roles",
+    );
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("forbidden")).toBeTruthy();
   });
 
-  it("still quotes the code for everything else, so a bug report can carry it", () => {
+  it("keeps generic diagnostics in a closed disclosure", () => {
     render(
       <ErrorState
         error={new ApiError(0, "network_error", "Could not reach the API.")}
@@ -179,7 +190,30 @@ describe("ErrorState", () => {
       />,
     );
 
-    expect(screen.getByText(/no response · network_error/)).toBeTruthy();
+    expect(screen.getByText(/We couldn’t load the directory/)).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("0 (no response)")).toBeTruthy();
+    expect(within(details).getByText("network_error")).toBeTruthy();
+  });
+
+  it("gives a 404 a directory action and no retry", () => {
+    render(
+      <ErrorState
+        error={new ApiError(404, "not_found", "No opportunity matched this id.")}
+        what="this listing"
+        onRetry={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/We couldn’t find this listing/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Search the directory" }).getAttribute("href")).toBe(
+      "/",
+    );
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("No opportunity matched this id.")).toBeTruthy();
   });
 });
 

@@ -25,7 +25,13 @@ import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, VerifiedBadge } from "@/components/badges";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
+import {
+  ActionNote,
+  type ActionNoteValue,
+  EmptyState,
+  ResourceView,
+  actionErrorNote,
+} from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
 import {
@@ -77,9 +83,7 @@ const submissionHref = (page: number): string => (page > 1 ? `/review?page=${pag
 
 export default function ReviewPage() {
   return (
-    <RequireSession
-      capability={{ needs: (me) => me.canReview, label: ROUTE_GATE_COPY.reviewer.label }}
-    >
+    <RequireSession capability={{ needs: (me) => me.canReview, ...ROUTE_GATE_COPY.reviewer }}>
       {() => <Review />}
     </RequireSession>
   );
@@ -182,19 +186,16 @@ function Review() {
 
 /** One action, its in-flight flag and whatever the API said about it. */
 function useAction() {
-  const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const [note, setNote] = useState<ActionNoteValue | null>(null);
   const [busy, setBusy] = useState(false);
-  const run = async (work: () => Promise<string>) => {
+  const run = async (work: () => Promise<string | ActionNoteValue>) => {
     setBusy(true);
     setNote(null);
     try {
-      setNote({ kind: "ok", message: await work() });
+      const result = await work();
+      setNote(typeof result === "string" ? { kind: "ok", message: result } : result);
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError ? `${error.message} (${error.code})` : "The action failed.",
-      });
+      setNote(actionErrorNote(error, "The action failed."));
     } finally {
       setBusy(false);
     }
@@ -512,7 +513,7 @@ function SubmissionDetails({ item, origin }: { item: ManagedOpportunity; origin:
           onClick={() =>
             void run(async () => {
               const result = await api.review.verifySource(item.id);
-              return `Source check: ${
+              const message = `Source check: ${
                 result.matched === null
                   ? "no verdict"
                   : result.matched
@@ -527,6 +528,14 @@ function SubmissionDetails({ item, origin }: { item: ManagedOpportunity; origin:
                       ? "page not found"
                       : "no result"
               }.`;
+              return {
+                kind: "ok",
+                message,
+                technical: [
+                  { label: "HTTP status", value: result.httpStatus ?? "—" },
+                  ...(result.error ? [{ label: "Error", value: result.error }] : []),
+                ],
+              };
             })
           }
         >
@@ -848,14 +857,10 @@ function PairCard({
       } catch (error) {
         if (error instanceof ApiError && error.code === "survivor_already_merged") {
           setSurvivorElsewhere(error.survivorId ?? null);
-          setNote({ kind: "error", message: error.message });
+          setNote(actionErrorNote(error, "The merge failed."));
           return;
         }
-        setNote({
-          kind: "error",
-          message:
-            error instanceof ApiError ? `${error.message} (${error.code})` : "The merge failed.",
-        });
+        setNote(actionErrorNote(error, "The merge failed."));
       }
     })();
 

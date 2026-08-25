@@ -27,8 +27,14 @@ import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, StatusBadge, VerifiedBadge } from "@/components/badges";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError, type OrganizationPatch } from "@/lib/api";
+import {
+  ActionNote,
+  type ActionNoteValue,
+  EmptyState,
+  ResourceView,
+  actionErrorNote,
+} from "@/components/states";
+import type { OrganizationPatch } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
 import { fundingTypeLabel, orgRoleLabel } from "@/lib/presentation";
@@ -546,7 +552,7 @@ function AwaitingReview({
                         setNote({ kind: "ok", message });
                         onDecided();
                       }}
-                      onFailed={(message) => setNote({ kind: "error", message })}
+                      onFailed={(failure) => setNote(failure)}
                     />
                   ))}
                 </tbody>
@@ -585,7 +591,7 @@ function PendingRow({
   back: string;
   label: string;
   onDecided: (message: string) => void;
-  onFailed: (message: string) => void;
+  onFailed: (failure: ActionNoteValue) => void;
 }) {
   const [panel, setPanel] = useState<RowPanel>("none");
   const [reason, setReason] = useState("");
@@ -608,11 +614,7 @@ function PendingRow({
       setPanel("none");
       setReason("");
     } catch (error) {
-      onFailed(
-        error instanceof ApiError
-          ? `${error.message} (${error.code})`
-          : "The decision could not be recorded.",
-      );
+      onFailed(actionErrorNote(error, "The decision could not be recorded."));
     } finally {
       setBusy(false);
     }
@@ -884,13 +886,7 @@ function DirectoryEntry({
         message: "Saved. The change appears on every listing that names this organisation.",
       });
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError
-            ? `${error.message} (${error.code})`
-            : "The change could not be saved.",
-      });
+      setNote(actionErrorNote(error, "The change could not be saved."));
     } finally {
       setBusy(false);
     }

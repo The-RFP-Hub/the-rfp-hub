@@ -15,8 +15,7 @@
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError } from "@/lib/api";
+import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
@@ -82,11 +81,7 @@ function Keys() {
       setCreateNote({ kind: "ok", message: "Key created. The secret below is shown once." });
       reload();
     } catch (error) {
-      setCreateNote({
-        kind: "error",
-        message:
-          error instanceof ApiError ? `${error.message} (${error.code})` : "Could not mint a key.",
-      });
+      setCreateNote(actionErrorNote(error, "Could not mint a key."));
     } finally {
       setCreateBusy(false);
     }
@@ -109,11 +104,7 @@ function Keys() {
     } catch (error) {
       setRevokeResult({
         keyId: id,
-        note: {
-          kind: "error",
-          message:
-            error instanceof ApiError ? `${error.message} (${error.code})` : "Could not revoke.",
-        },
+        note: actionErrorNote(error, "Could not revoke."),
       });
     } finally {
       setRevokingKeyId(null);

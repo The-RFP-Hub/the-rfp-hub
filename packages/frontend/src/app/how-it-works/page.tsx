@@ -146,7 +146,7 @@ export default function HowItWorksPage() {
         makes no decision about who gets funded.
       </p>
 
-      <h2>The five roles</h2>
+      <h2 id="roles">The five roles</h2>
 
       <dl className="grid-2 card">
         <div>

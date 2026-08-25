@@ -25,7 +25,7 @@ import {
   ReviewStatusBadge,
   StatusBadge,
 } from "@/components/badges";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
+import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
 import { duplicateStatusLabel, fundingTypeLabel } from "@/lib/presentation";
@@ -249,10 +249,7 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
       setNote({ kind: "ok", message: "Checked. The run below is the result." });
       reload();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message: error instanceof ApiError ? error.message : "The check could not be run.",
-      });
+      setNote(actionErrorNote(error, "The check could not be run."));
     } finally {
       setBusy(false);
     }

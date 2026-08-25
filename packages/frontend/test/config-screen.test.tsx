@@ -14,7 +14,8 @@
  * These tests import the module graph FRESH under each environment, which is the only way to
  * exercise module-scope behaviour: `vi.resetModules()` plus a dynamic import.
  */
-import { render, screen } from "@testing-library/react";
+import { AuthBoundary } from "@/components/ErrorBoundary";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
@@ -81,5 +82,27 @@ describe("a valid API origin", () => {
 
     expect(screen.getByText("the app")).toBeTruthy();
     expect(screen.queryByText("This frontend is not configured")).toBeNull();
+  });
+});
+
+describe("an unexpected startup failure", () => {
+  it("keeps deployment diagnostics in a closed disclosure", () => {
+    const report = vi.spyOn(console, "error").mockImplementation(() => {});
+    function Broken(): never {
+      throw new Error("The configured origin is invalid.");
+    }
+
+    render(
+      <AuthBoundary>
+        <Broken />
+      </AuthBoundary>,
+    );
+
+    expect(screen.getByText("This deployment cannot reach its service.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("The configured origin is invalid.")).toBeTruthy();
+    expect(within(details).getByText("NEXT_PUBLIC_API_URL")).toBeTruthy();
+    report.mockRestore();
   });
 });

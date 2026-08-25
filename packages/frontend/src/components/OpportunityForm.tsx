@@ -40,7 +40,7 @@ import {
   TextField,
   fieldId,
 } from "@/components/form-fields";
-import { ActionNote } from "@/components/states";
+import { ActionNote, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { describeDuplicateCheck } from "@/lib/format";
 import {
@@ -284,9 +284,9 @@ export function OpportunityForm({
     } catch (error) {
       if (error instanceof ApiError) {
         setServerErrors(error.details);
-        setNote({ kind: "error", message: `${error.message} (${error.code})` });
+        setNote(actionErrorNote(error, "The submission could not be sent."));
       } else {
-        setNote({ kind: "error", message: "The submission could not be sent." });
+        setNote(actionErrorNote(error, "The submission could not be sent."));
       }
     } finally {
       setBusy(false);

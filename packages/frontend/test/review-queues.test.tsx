@@ -126,6 +126,18 @@ const reviewOpportunity = vi.fn(async () => ({
   applicationUrl: "https://indie.example.org/apply",
 }));
 const verifyOrganization = vi.fn(async () => verifiedOrg);
+const verifySource = vi.fn(async () => ({
+  runAt: "2026-08-25T12:00:00Z",
+  requestedUrl: "https://indie.example.org/apply",
+  finalUrl: "https://indie.example.org/apply",
+  httpStatus: 200,
+  existsAtSource: true,
+  matched: true,
+  fieldDiff: null,
+  extracted: null,
+  snapshotSha256: null,
+  error: null,
+}));
 const grantMembership = vi.fn(async () => ({
   organizationSlug: "indie-collective",
   accountId: 42,
@@ -185,7 +197,7 @@ function client(): ApiClient {
       grantMembership,
       accounts,
       unverifyOrganization: vi.fn(),
-      verifySource: vi.fn(),
+      verifySource,
     },
   } as unknown as ApiClient;
 }
@@ -324,7 +336,14 @@ describe("deciding a submission", () => {
     // Both the row and the panel name the submitter; the panel is what is under test.
     expect(screen.getAllByText("indie2").length).toBeGreaterThan(1);
     expect(screen.getAllByText("indie-collective").length).toBeGreaterThan(1);
-    expect(screen.getByRole("button", { name: /Check the source link/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Check the source link/ }));
+    expect(await screen.findByText(/Source response: page found/)).toBeTruthy();
+    const technical = screen
+      .getByText("Technical details")
+      .closest("details") as HTMLDetailsElement;
+    expect(technical.open).toBe(false);
+    expect(within(technical).getByText("HTTP status")).toBeTruthy();
+    expect(within(technical).getByText("200")).toBeTruthy();
   });
 
   it("does not publish on the first click", async () => {

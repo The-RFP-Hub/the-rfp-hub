@@ -12,7 +12,7 @@ import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import { AuthRoot } from "@/lib/auth-root";
 import type { ClaimResult, Me, MeMembership } from "@/lib/types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { authSession } = vi.hoisted(() => ({
@@ -235,9 +235,13 @@ describe("the extracted claim form", () => {
 
     const message = await screen.findByText(
       "This opportunity already has a different verified publisher.",
+      { selector: "output" },
     );
     expect(message.tagName).toBe("OUTPUT");
     expect(message.className).toContain("error");
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("verified_publisher_conflict")).toBeTruthy();
   });
 
   it("shows the API's error feedback and allows another attempt", async () => {
@@ -248,7 +252,9 @@ describe("the extracted claim form", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
 
-    expect(await screen.findByText("Claims are temporarily unavailable.")).toBeTruthy();
+    expect(
+      await screen.findByText("Claims are temporarily unavailable.", { selector: "output" }),
+    ).toBeTruthy();
     expect(screen.getByRole("button", { name: "File the claim" })).toHaveProperty(
       "disabled",
       false,

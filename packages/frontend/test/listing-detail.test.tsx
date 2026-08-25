@@ -230,7 +230,7 @@ describe("merged listing detail and edit routes", () => {
 
     mount(<ListingPage />, failing);
 
-    expect(await screen.findByText("Could not load this listing.")).toBeTruthy();
+    expect(await screen.findByText(/We couldn’t load this listing/)).toBeTruthy();
     expect(screen.queryByRole("tab")).toBeNull();
   });
 });

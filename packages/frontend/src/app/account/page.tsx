@@ -13,8 +13,7 @@
 import { RequireSession } from "@/components/Chrome";
 import { UntrustedText } from "@/components/UntrustedText";
 import { VerifiedBadge } from "@/components/badges";
-import { ActionNote } from "@/components/states";
-import { ApiError } from "@/lib/api";
+import { ActionNote, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
 import { accountRoleLabel, orgRoleLabel } from "@/lib/presentation";
 import { useApi, useSession } from "@/lib/session";
@@ -42,13 +41,7 @@ function Account({ me }: { me: Me }) {
       setNote({ kind: "ok", message: "Saved." });
       session.reloadMe();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError
-            ? `${error.message} (${error.code})`
-            : "Could not save changes.",
-      });
+      setNote(actionErrorNote(error, "Could not save changes."));
     } finally {
       setBusy(false);
     }

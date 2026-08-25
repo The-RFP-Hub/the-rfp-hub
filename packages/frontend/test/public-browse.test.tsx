@@ -22,7 +22,7 @@ import { PublicOpportunity } from "@/components/PublicOpportunity";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { AuditTrail, Me, Opportunity, PaginatedOpportunities } from "@/lib/types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -725,7 +725,11 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:nope" />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.getByText(/not found/)).toBeTruthy();
-    expect(screen.getByText(/404 · not_found/)).toBeTruthy();
+    expect(screen.getByText(/We couldn’t find this opportunity/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Search the directory" })).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("404")).toBeTruthy();
+    expect(within(details).getByText("not_found")).toBeTruthy();
   });
 });

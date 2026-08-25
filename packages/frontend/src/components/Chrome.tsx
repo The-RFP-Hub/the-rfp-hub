@@ -18,7 +18,7 @@
  * renders the API's own 403.
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
-import { HOW_IT_WORKS, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import { HOW_IT_WORKS, HOW_IT_WORKS_ROLES, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
@@ -197,7 +197,12 @@ export function RequireSession({
 }: {
   children: (me: Me) => ReactNode;
   /** An extra gate for the review and administration pages, mirrored from the API's own answer. */
-  capability?: { needs: (me: Me) => boolean; label: string };
+  capability?: {
+    needs: (me: Me) => boolean;
+    label: string;
+    title?: string;
+    role?: string;
+  };
 }) {
   const session = useSession();
 
@@ -237,11 +242,16 @@ export function RequireSession({
   if (capability && !capability.needs(me)) {
     return (
       <div className="state empty">
-        <p className="empty-title">This account does not have {capability.label}.</p>
+        <p className="empty-title">
+          {capability.title ?? `This account does not have ${capability.label}.`}
+        </p>
         <p className="muted">
-          The API is the authority on that — this page is only reporting what it answered for your
-          account. <Link href={HOW_IT_WORKS}>Who can do what</Link> explains which role holds it;
-          ask an administrator if you believe yours should.
+          This page is reserved for {capability.role ?? capability.label}. Check your account or
+          compare the roles to see which access you have.
+        </p>
+        <p className="row">
+          <Link href="/account">Check your account</Link>
+          <Link href={HOW_IT_WORKS_ROLES}>See who can do what</Link>
         </p>
       </div>
     );

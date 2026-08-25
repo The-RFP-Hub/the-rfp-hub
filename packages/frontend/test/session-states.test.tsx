@@ -16,9 +16,10 @@
 import { RequireSession } from "@/components/Chrome";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
+import { ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -109,8 +110,11 @@ describe("RequireSession", () => {
     session.error = { status: 0, message: "Failed to fetch" };
     renderGate(clientFor(async () => me));
 
-    expect(screen.getByText("Sign-in is unavailable.")).toBeTruthy();
-    expect(screen.getByText(/Failed to fetch/)).toBeTruthy();
+    expect(screen.getByText("This deployment cannot reach its service.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText(/Failed to fetch/)).toBeTruthy();
+    expect(within(details).getByText("NEXT_PUBLIC_API_URL")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Log in" })).toBeNull();
   });
 
@@ -127,11 +131,14 @@ describe("RequireSession", () => {
       clientFor(async () => me),
       {
         needs: (account) => account.canReview,
-        label: "Hub reviewer access",
+        ...ROUTE_GATE_COPY.reviewer,
       },
     );
 
     await waitFor(() => expect(screen.getByText(/does not have Hub reviewer access/)).toBeTruthy());
+    expect(screen.getByRole("link", { name: "See who can do what" }).getAttribute("href")).toBe(
+      "/how-it-works#roles",
+    );
     expect(screen.queryByText(/Hello acme-programs/)).toBeNull();
   });
 });

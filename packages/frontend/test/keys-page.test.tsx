@@ -161,7 +161,12 @@ describe("revoking a key", () => {
     const panel = screen.getByRole("group", { name: "Revoke Production ingest?" });
     fireEvent.click(within(panel).getByRole("button", { name: "Revoke key" }));
 
-    expect(await screen.findByText("Key service unavailable. (unavailable)")).toBeTruthy();
+    expect(
+      await screen.findByText("Key service unavailable.", { selector: "output" }),
+    ).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("unavailable")).toBeTruthy();
     expect(screen.getByRole("group", { name: "Revoke Production ingest?" })).toBeTruthy();
   });
 });

@@ -8,8 +8,7 @@
  * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
  * paraphrase is exactly where a dashboard would start promising something the API did not.
  */
-import { ActionNote } from "@/components/states";
-import { ApiError } from "@/lib/api";
+import { ActionNote, actionErrorNote } from "@/components/states";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { type ReactNode, useState } from "react";
@@ -51,10 +50,7 @@ function ClaimFields({ id, me }: { id: string; me: Me }) {
       });
       setResult({ kind: "ok", message: `${claim.outcome}: ${claim.message}` });
     } catch (error) {
-      setResult({
-        kind: "error",
-        message: error instanceof ApiError ? error.message : "The claim could not be filed.",
-      });
+      setResult(actionErrorNote(error, "The claim could not be filed."));
     } finally {
       setBusy(false);
     }
@@ -107,7 +103,7 @@ export function PublicClaimControl({ id }: { id: string }) {
   if (session.error) {
     content = (
       <ActionNote
-        note={{ kind: "error", message: `Sign-in is unavailable: ${session.error.message}` }}
+        note={{ kind: "error", message: "Sign-in is unavailable right now.", error: session.error }}
       />
     );
   } else if (!session.ready) {
@@ -128,7 +124,9 @@ export function PublicClaimControl({ id }: { id: string }) {
   } else if (session.me.status === "error") {
     content = (
       <>
-        <ActionNote note={{ kind: "error", message: session.me.error.message }} />
+        <ActionNote
+          note={actionErrorNote(session.me.error, "Could not load your organisations.")}
+        />
         <button type="button" onClick={session.reloadMe}>
           Try again
         </button>
