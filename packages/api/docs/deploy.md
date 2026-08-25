@@ -64,7 +64,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `BETTER_AUTH_SECRET` | `BETTER_AUTH_SECRET` | Signs every session token, and is checked before any database access. **≥32 random characters, different per environment** — the process refuses to boot without it under `NODE_ENV=production`. **Rotating it signs everyone out**: there is no dual-secret verification, so plan a rotation as a deliberate global sign-out |
 | `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | Only when Google sign-in is enabled. Absent → the provider is not registered at all |
 | `OPENAI_API_KEY` | `OPENAI_API_KEY` | Embedding provider credential. Absent → the deterministic provider, and dedupe reports itself unavailable rather than failing a submission |
-| `MAILGUN_API_KEY` | `MAILGUN_API_KEY` | Only when `EMAIL_TRANSPORT=mailgun`. The HTTP Basic password for the send (the user is the literal `api`). Missing → **refuses to boot** in production, because a mail transport that cannot authenticate delivers nothing to anyone |
+| `MAILGUN_API_KEY` | `MAILGUN_API_KEY` | Only when `EMAIL_TRANSPORT=mailgun`. The HTTP Basic password for the send (the user is the literal `api`). Missing → the service boots **degraded**: a loud warning, the four code-sending routes answering 503 until the pair is complete, everything that sends nothing serving normally |
 | `ANALYTICS_HMAC_KEY` | `ANALYTICS_HMAC_KEY` | Keys the session/IP HMAC. **Never baked**: a leaked key makes the whole IPv4 space brute-forceable against the stored hashes. Unset → a random per-boot key and a warning |
 
 ### Non-secret settings → `environment`
@@ -78,7 +78,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `EMAIL_TRANSPORT` | `ses` or `mailgun` | How sign-in codes are delivered. Those two are the delivering transports; `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
 | `EMAIL_FROM` | `no-reply@ethrfps.app` | The envelope sender. Its domain needs SPF/DKIM/DMARC, or the codes land in spam |
 | `AWS_SES_REGION` | the SES region | `ses` only. **No credential** — the task role carries it. That is why SES was chosen over an API-key provider |
-| `MAILGUN_DOMAIN` | the sending domain, e.g. `mg.ethrfps.app` | `mailgun` only. A path segment of the send URL, not a property of the message: it is the domain whose DKIM records Mailgun holds, and it is normally a **subdomain** of `EMAIL_FROM`'s domain. Missing → **refuses to boot** in production, with the key above |
+| `MAILGUN_DOMAIN` | the sending domain, e.g. `mg.ethrfps.app` | `mailgun` only. A path segment of the send URL, not a property of the message: it is the domain whose DKIM records Mailgun holds, and it is normally a **subdomain** of `EMAIL_FROM`'s domain. Missing → same **degraded** boot as the key above: sign-in code delivery disabled with an explicit 503, never a dead service |
 | `MAILGUN_API_BASE` | unset (US), or `https://api.eu.mailgun.net` | `mailgun` only. The regional endpoints are different hosts holding different accounts, so the wrong one is a 401 on every message rather than a slow path. Must be https for any host that is not loopback — every send carries the key in an `Authorization` header |
 | `GOOGLE_CLIENT_ID` | per environment | Absent → no Google provider, no button. Pairs with the secret above |
 | `PORT` | `3004` | Set in the `Dockerfile` so it always matches the container port and target group |
