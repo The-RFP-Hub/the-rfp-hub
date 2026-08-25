@@ -70,7 +70,13 @@ describe("the Standard's published directories, mirrored at the host root", () =
   // ------------------------------------------------------------------ the tree ---
 
   it("mirrors exactly the files the package publishes — no more, no fewer", () => {
-    expect(specArtifacts.map((a) => a.source)).toEqual(repoSources);
+    // Plus exactly ONE deliberate non-file route: the extensionless vocabulary identifier. The
+    // vocab IRI is `…/ns/rfp#term`, and a fragment IRI dereferences at the IRI minus its
+    // fragment — so `/ns/rfp` must answer even though the bytes live in `ns/rfp.jsonld`. Every
+    // OTHER artifact still maps one file to one path; the dedup below is what proves the alias
+    // is the only exception rather than a leak in the mirror.
+    const sources = [...new Set(specArtifacts.map((a) => a.source))].sort();
+    expect(sources).toEqual(repoSources);
     // The mirror is a superset of the identifiers, which is what makes the directory a directory
     // rather than a shortlist of five documents with holes between them.
     for (const doc of canonicalDocuments) {
@@ -98,10 +104,34 @@ describe("the Standard's published directories, mirrored at the host root", () =
   });
 
   it("gives every file the path and URL its own place in the package implies", () => {
+    const aliases: string[] = [];
     for (const artifact of specArtifacts) {
-      expect(artifact.path, artifact.source).toBe(`/${artifact.source}`);
+      if (artifact.path !== `/${artifact.source}`) {
+        aliases.push(artifact.path);
+        continue;
+      }
       expect(artifact.url, artifact.source).toBe(`${specConfig.baseUrl}${artifact.path}`);
     }
+    // The one path that is not its source's own name is the vocabulary identifier, and only it.
+    expect(aliases).toEqual(["/ns/rfp"]);
+  });
+
+  it("dereferences the vocabulary IRI at the identifier itself, as JSON-LD", async () => {
+    // The IRI in spec.config.json is the contract; the route is derived, so derive the
+    // expectation the same way rather than typing /ns/rfp twice.
+    const vocabPath = new URL(specConfig.vocabIri).pathname;
+    const res = await get(vocabPath);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/ld+json");
+    const doc = res.json();
+    const namespace = (doc["@graph"] ?? []).find(
+      (node: { "@id"?: string }) => node["@id"] === specConfig.vocabIri,
+    );
+    expect(namespace, "the namespace node must carry the vocab IRI itself").toBeTruthy();
+    // Same bytes at the file's own path — the alias is an address, not a second document.
+    const file = await get(`${vocabPath}.jsonld`);
+    expect(file.statusCode).toBe(200);
+    expect(file.body).toBe(res.body);
   });
 
   // The two modules read one package by two different routes — the `exports` map a subpath at a

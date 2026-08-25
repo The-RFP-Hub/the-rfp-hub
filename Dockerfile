@@ -53,6 +53,7 @@ COPY --from=builder /app/packages/standard/schemas packages/standard/schemas
 COPY --from=builder /app/packages/standard/registries packages/standard/registries
 COPY --from=builder /app/packages/standard/conformance packages/standard/conformance
 COPY --from=builder /app/packages/standard/meta packages/standard/meta
+COPY --from=builder /app/packages/standard/ns packages/standard/ns
 COPY --from=builder /app/packages/standard/spec.config.json packages/standard/spec.config.json
 COPY --from=builder /app/packages/validate/dist packages/validate/dist
 

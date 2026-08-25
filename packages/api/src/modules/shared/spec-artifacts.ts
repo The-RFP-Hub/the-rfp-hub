@@ -51,11 +51,13 @@ import {
 /**
  * The directories the Standard publishes under its canonical authority.
  *
- * Not a guess about the package's contents: these are the three path prefixes `adr/0007` says the
- * apex listener rule forwards, and the package's `exports` map exposes each of them as a subpath
- * pattern. Adding a fourth is an infrastructure decision as much as a code one.
+ * Not a guess about the package's contents: these are the path prefixes `adr/0007` reserves for
+ * the spec, the frontend's apex proxy forwards, and the package's `exports` map exposes as
+ * subpath patterns. Adding one is an infrastructure decision as much as a code one — `ns` joined
+ * when the vocabulary IRI started dereferencing (adr/0007's open follow-up), and the frontend's
+ * canonical-namespace carve-out already carried `/ns/*` in anticipation.
  */
-export const PUBLISHED_TREES = Object.freeze(["schemas", "meta", "registries"] as const);
+export const PUBLISHED_TREES = Object.freeze(["schemas", "meta", "registries", "ns"] as const);
 
 /**
  * What a file's name says it is.
@@ -131,7 +133,7 @@ function buildPublicationTree(): SpecArtifact[] {
 
   // readdir order is filesystem-dependent; sorting makes the route table, and every test that
   // enumerates it, identical on every machine.
-  return sources.sort().map((source) => {
+  const artifacts = sources.sort().map((source) => {
     const path = `/${source}`;
     const body = readFileSync(join(standardPackageRoot, source));
     return {
@@ -144,6 +146,21 @@ function buildPublicationTree(): SpecArtifact[] {
       etag: entityTag(body),
     };
   });
+
+  // THE ONE EXTENSIONLESS IDENTIFIER. The vocabulary IRI is `…/ns/rfp#term`, and a fragment IRI
+  // dereferences the document at the IRI minus its fragment — `/ns/rfp`, no extension, because
+  // the namespace's identity carries no serialization hint. The bytes live in `ns/rfp.jsonld`
+  // (editors and diff tools deserve the extension); this alias serves the same bytes at the path
+  // the IRI actually names. Both stay published: the file's own path is a fine secondary address,
+  // the extensionless one is the identifier.
+  for (const artifact of [...artifacts]) {
+    if (artifact.source.startsWith("ns/") && artifact.source.endsWith(".jsonld")) {
+      const path = artifact.path.slice(0, -".jsonld".length);
+      artifacts.push({ ...artifact, path, url: `${specConfig.baseUrl}${path}` });
+    }
+  }
+
+  return artifacts;
 }
 
 /** The published tree, read once at boot. A SUPERSET of `canonicalDocuments`, by construction. */

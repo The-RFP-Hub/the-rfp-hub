@@ -22,6 +22,7 @@
     "./registries/*": "./registries/*",
     "./conformance/*": "./conformance/*",
     "./meta/*": "./meta/*",
+    "./ns/*": "./ns/*",
     "./spec.config.json": "./spec.config.json"
   },
   "files": [
@@ -30,6 +31,7 @@
     "registries",
     "conformance",
     "meta",
+    "ns",
     "spec.config.json",
     "CHANGELOG.md",
     "NORMATIVE.md",
