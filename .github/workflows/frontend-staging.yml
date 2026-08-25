@@ -52,6 +52,15 @@ jobs:
         with:
           persist-credentials: false
 
+      # `vercel build` runs the build ON THIS RUNNER and shells out to pnpm (detected from the
+      # lockfile and the packageManager field) — on Vercel's own infrastructure pnpm is provided,
+      # here it has to be installed or the build dies with `spawn pnpm ENOENT`.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       # Pinned, not @latest: this CLI both builds and promotes the deployment, so "which tool ran"
       # must be a fact of the commit rather than whatever npm served that morning. Upgrading is a
       # deliberate edit to this file, in both frontend workflows together.
