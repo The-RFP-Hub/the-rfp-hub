@@ -40,6 +40,7 @@ import {
   accountRoleLabel,
   duplicateStatusLabel,
   fundingTypeLabel,
+  isOpenDuplicateStatus,
   opportunityStatusLabel,
   orgRoleLabel,
 } from "@/lib/presentation";
@@ -55,6 +56,7 @@ import type {
   ManagedOpportunity,
   ManagedOpportunityList,
   Me,
+  MergeResult,
   Opportunity,
   OrgRole,
   OrganizationSummary,
@@ -103,6 +105,9 @@ function Review({ me }: { me: Me }) {
   const requested = params?.get("tab");
   const tab: Tab = TABS.includes(requested as Tab) ? (requested as Tab) : "submissions";
   const [queuePage, setQueuePage] = useState(() => submissionPageFromUrl(params?.get("page")));
+  const [duplicateDecisions, setDuplicateDecisions] = useState<Record<number, DuplicateDecision>>(
+    {},
+  );
 
   const loadQueue = useCallback(
     () =>
@@ -121,10 +126,22 @@ function Review({ me }: { me: Me }) {
     ]);
     return { items: [...suspected.items, ...confirmed.items] } satisfies DuplicatePairList;
   }, [api]);
+  const loadMergedDuplicates = useCallback(
+    () => api.review.duplicates({ status: "merged", limit: 200 }),
+    [api],
+  );
 
   const queue = useResource(loadQueue);
   const claims = useResource(loadClaims);
   const duplicates = useResource(loadDuplicates);
+  const mergedDuplicates = useResource(loadMergedDuplicates, { enabled: tab === "duplicates" });
+
+  const recordDuplicateDecision = useCallback((pair: DuplicatePair, mergeResult?: MergeResult) => {
+    setDuplicateDecisions((current) => ({
+      ...current,
+      [pair.id]: { pair, mergeResult },
+    }));
+  }, []);
 
   useEffect(() => {
     if (queue.state.status !== "ready") return;
@@ -138,7 +155,12 @@ function Review({ me }: { me: Me }) {
   const counts: Record<Tab, number | null> = {
     submissions: queue.state.status === "ready" ? queue.state.data.total : null,
     claims: claims.state.status === "ready" ? claims.state.data.items.length : null,
-    duplicates: duplicates.state.status === "ready" ? duplicates.state.data.items.length : null,
+    duplicates:
+      duplicates.state.status === "ready"
+        ? duplicates.state.data.items
+            .map((pair) => duplicateDecisions[pair.id]?.pair ?? pair)
+            .filter((pair) => isOpenDuplicateStatus(pair.status)).length
+        : null,
     organisations: null,
   };
 
@@ -188,7 +210,15 @@ function Review({ me }: { me: Me }) {
         <Submissions queue={queue} origin={returnHere} onPage={selectQueuePage} />
       ) : null}
       {tab === "claims" ? <Claims claims={claims} origin={returnHere} /> : null}
-      {tab === "duplicates" ? <Duplicates duplicates={duplicates} origin={returnHere} /> : null}
+      {tab === "duplicates" ? (
+        <Duplicates
+          duplicates={duplicates}
+          merged={mergedDuplicates}
+          decisions={duplicateDecisions}
+          onDecision={recordDuplicateDecision}
+          origin={returnHere}
+        />
+      ) : null}
       {tab === "organisations" ? <Organisations memberships={me.memberships} /> : null}
     </section>
   );
@@ -802,10 +832,24 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
 
 // ── duplicates ────────────────────────────────────────────────────────────────────
 
+interface DuplicateDecision {
+  pair: DuplicatePair;
+  mergeResult?: MergeResult;
+}
+
 function Duplicates({
   duplicates,
+  merged,
+  decisions,
+  onDecision,
   origin,
-}: { duplicates: ResourceHandle<DuplicatePairList>; origin: string }) {
+}: {
+  duplicates: ResourceHandle<DuplicatePairList>;
+  merged: ResourceHandle<DuplicatePairList>;
+  decisions: Record<number, DuplicateDecision>;
+  onDecision: (pair: DuplicatePair, mergeResult?: MergeResult) => void;
+  origin: string;
+}) {
   const [minimumSimilarity, setMinimumSimilarity] = useState(85);
   const [showBelowThreshold, setShowBelowThreshold] = useState(false);
 
@@ -822,7 +866,8 @@ function Duplicates({
         onRetry={duplicates.reload}
       >
         {(list) => {
-          const sorted = [...list.items].sort(
+          const tracked = list.items.map((pair) => decisions[pair.id]?.pair ?? pair);
+          const sorted = [...tracked].sort(
             (a, b) =>
               (b.similarity ?? Number.NEGATIVE_INFINITY) -
               (a.similarity ?? Number.NEGATIVE_INFINITY),
@@ -833,8 +878,10 @@ function Duplicates({
                 (pair) => pair.similarity !== null && pair.similarity * 100 >= minimumSimilarity,
               );
           const hidden = sorted.length - shown.length;
+          const open = sorted.filter((pair) => isOpenDuplicateStatus(pair.status));
+          const shownOpen = shown.filter((pair) => isOpenDuplicateStatus(pair.status));
 
-          return list.items.length === 0 ? (
+          return tracked.length === 0 ? (
             <EmptyState
               title="No open pairs."
               detail="Detection runs against published listings when something is submitted. An empty queue means nothing recent looked like anything already published."
@@ -858,7 +905,7 @@ function Duplicates({
                 <strong>{minimumSimilarity}%</strong>
               </div>
               <p className="muted footnote">
-                {shown.length} of {sorted.length} open pairs loaded on this page.
+                {shownOpen.length} of {open.length} open pairs loaded on this page.
                 {hidden > 0 ? (
                   <>
                     {" "}
@@ -880,9 +927,46 @@ function Duplicates({
                 />
               ) : null}
               {shown.map((pair) => (
-                <PairCard key={pair.id} pair={pair} onChanged={duplicates.reload} origin={origin} />
+                <PairCard
+                  key={pair.id}
+                  pair={pair}
+                  mergeResult={decisions[pair.id]?.mergeResult}
+                  onDecision={onDecision}
+                  origin={origin}
+                />
               ))}
             </>
+          );
+        }}
+      </ResourceView>
+      <h2 className="section-head section-head-quiet">Recently resolved</h2>
+      <p className="muted footnote">Showing up to 200 recently merged pairs.</p>
+      <ResourceView
+        resource={merged.state}
+        what="recently merged duplicate pairs"
+        onRetry={merged.reload}
+      >
+        {(list) => {
+          const openIds =
+            duplicates.state.status === "ready"
+              ? new Set(duplicates.state.data.items.map((pair) => pair.id))
+              : new Set<number>();
+          const recent = list.items.filter((pair) => !openIds.has(pair.id));
+          return recent.length === 0 ? (
+            <EmptyState
+              title="No recent merges."
+              detail="Merged pairs will remain available here after the queue is reloaded."
+            />
+          ) : (
+            recent.map((pair) => (
+              <PairCard
+                key={pair.id}
+                pair={decisions[pair.id]?.pair ?? pair}
+                mergeResult={decisions[pair.id]?.mergeResult}
+                onDecision={onDecision}
+                origin={origin}
+              />
+            ))
           );
         }}
       </ResourceView>
@@ -892,11 +976,17 @@ function Duplicates({
 
 function PairCard({
   pair,
-  onChanged,
+  mergeResult,
+  onDecision,
   origin,
-}: { pair: DuplicatePair; onChanged: () => void; origin: string }) {
+}: {
+  pair: DuplicatePair;
+  mergeResult?: MergeResult;
+  onDecision: (pair: DuplicatePair, mergeResult?: MergeResult) => void;
+  origin: string;
+}) {
   const api = useApi();
-  const { note, busy, run, setNote } = useAction();
+  const { note, busy, run } = useAction();
   const [survivor, setSurvivor] = useState<string>(pair.left.id);
   const [confirming, setConfirming] = useState(false);
   const [comparing, setComparing] = useState(false);
@@ -905,28 +995,23 @@ function PairCard({
   const loser = survivor === pair.left.id ? pair.right : pair.left;
 
   const merge = () =>
-    void (async () => {
+    void run(async () => {
       setSurvivorElsewhere(null);
-      setNote(null);
       try {
         const result = await api.review.mergeDuplicate(pair.id, { survivorId: survivor });
         setConfirming(false);
-        onChanged();
-        setNote({
-          kind: "ok",
-          message: `Merged ${result.mergedId} into ${result.survivorId}. Copied fields: ${
-            result.copiedFields.length === 0 ? "none" : result.copiedFields.join(", ")
-          }.`,
-        });
+        onDecision(result.pair, result);
+        return `Merged ${result.mergedId} into ${result.survivorId}.`;
       } catch (error) {
         if (error instanceof ApiError && error.code === "survivor_already_merged") {
           setSurvivorElsewhere(error.survivorId ?? null);
-          setNote(actionErrorNote(error, "The merge failed."));
-          return;
         }
-        setNote(actionErrorNote(error, "The merge failed."));
+        throw error;
       }
-    })();
+    });
+
+  const mergedInto = mergeResult?.survivorId ?? pair.left.mergedInto ?? pair.right.mergedInto;
+  const canMerge = pair.status === "suspected" || pair.status === "confirmed";
 
   return (
     <div className="card">
@@ -943,6 +1028,7 @@ function PairCard({
           group={`survivor-${pair.id}`}
           selected={survivor === pair.left.id}
           onSelect={setSurvivor}
+          selectable={canMerge}
           origin={origin}
         />
         <Side
@@ -950,43 +1036,94 @@ function PairCard({
           group={`survivor-${pair.id}`}
           selected={survivor === pair.right.id}
           onSelect={setSurvivor}
+          selectable={canMerge}
           origin={origin}
         />
       </div>
       <div className="row">
-        <button type="button" onClick={() => setComparing((value) => !value)}>
+        <button type="button" disabled={busy} onClick={() => setComparing((value) => !value)}>
           {comparing ? "Hide comparison" : "Compare descriptions"}
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              await api.review.confirmDuplicate(pair.id);
-              onChanged();
-              return "Recorded as the same programme. Neither listing was touched.";
-            })
-          }
-        >
-          Confirm
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              await api.review.dismissDuplicate(pair.id);
-              onChanged();
-              return "Dismissed. Re-running detection will not resurrect this pair.";
-            })
-          }
-        >
-          Dismiss
-        </button>
-        <button type="button" disabled={busy} onClick={() => setConfirming(!confirming)}>
-          Merge…
-        </button>
+        {pair.status === "suspected" ? (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const next = await api.review.confirmDuplicate(pair.id);
+                  onDecision(next);
+                  return "Recorded as the same programme. Neither listing was touched.";
+                })
+              }
+            >
+              Confirm
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const next = await api.review.dismissDuplicate(pair.id);
+                  onDecision(next);
+                  return "Dismissed. You can undo this decision while this row remains on the page.";
+                })
+              }
+            >
+              Dismiss
+            </button>
+          </>
+        ) : null}
+        {canMerge ? (
+          <button type="button" disabled={busy} onClick={() => setConfirming(!confirming)}>
+            Merge…
+          </button>
+        ) : null}
       </div>
+
+      {pair.status === "confirmed" ? (
+        <p className="note">
+          <strong>Confirmed</strong> — Recorded as the same programme. Choose the survivor to merge
+          the listings, or leave both records unchanged.
+        </p>
+      ) : null}
+      {pair.status === "dismissed" ? (
+        <p className="note">
+          <strong>Dismissed</strong> —{" "}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const next = await api.review.reopenDuplicate(pair.id);
+                onDecision(next);
+                return "Reopened for duplicate review.";
+              })
+            }
+          >
+            {busy ? "Reopening…" : "Undo"}
+          </button>
+        </p>
+      ) : null}
+      {pair.status === "merged" ? (
+        <div className="note">
+          <p>
+            <strong>
+              {mergedInto ? (
+                <>
+                  Merged into <code>{mergedInto}</code> ·{" "}
+                  <Link href={detailHref("/listings", mergedInto, origin)}>view</Link>
+                </>
+              ) : (
+                "Merged"
+              )}
+            </strong>
+          </p>
+          {mergeResult && mergeResult.copiedFields.length > 0 ? (
+            <p>Copied fields: {mergeResult.copiedFields.join(", ")}.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {comparing ? <PairComparison pair={pair} /> : null}
 
@@ -1136,26 +1273,30 @@ function Side({
   group,
   selected,
   onSelect,
+  selectable,
   origin,
 }: {
   side: DuplicateSide;
   group: string;
   selected: boolean;
   onSelect: (id: string) => void;
+  selectable: boolean;
   origin: string;
 }) {
   return (
     <div>
-      <label className="row">
-        <input
-          type="radio"
-          name={group}
-          checked={selected}
-          onChange={() => onSelect(side.id)}
-          style={{ width: "auto" }}
-        />
-        <span>keep this one</span>
-      </label>
+      {selectable ? (
+        <label className="row">
+          <input
+            type="radio"
+            name={group}
+            checked={selected}
+            onChange={() => onSelect(side.id)}
+            style={{ width: "auto" }}
+          />
+          <span>keep this one</span>
+        </label>
+      ) : null}
       <p>
         <Link href={detailHref("/listings", side.id, origin)}>
           <UntrustedText value={side.title} />

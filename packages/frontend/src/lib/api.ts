@@ -355,6 +355,8 @@ export function createApiClient(options: ApiClientOptions) {
         request<DuplicatePair>("POST", `/v1/review/duplicates/${pairId}/confirm`),
       dismissDuplicate: (pairId: number) =>
         request<DuplicatePair>("POST", `/v1/review/duplicates/${pairId}/dismiss`),
+      reopenDuplicate: (pairId: number) =>
+        request<DuplicatePair>("POST", `/v1/review/duplicates/${pairId}/reopen`),
       /** `fields` is omitted by default: a merge copies nothing unless a reviewer asks it to. */
       mergeDuplicate: (pairId: number, body: { survivorId: string; fields?: string[] }) =>
         request<MergeResult>("POST", `/v1/review/duplicates/${pairId}/merge`, { body }),

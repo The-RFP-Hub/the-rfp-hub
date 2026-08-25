@@ -19,7 +19,7 @@ import type { ApiClient } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { DuplicatePair, Me, Opportunity, OrganizationSummary } from "@/lib/types";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session, tab, replace } = vi.hoisted(() => ({
@@ -543,6 +543,173 @@ describe("merging duplicates", () => {
     expect(screen.getByText("Legacy programme description.")).toBeTruthy();
     expect(screen.getByText("https://acme.example/apply")).toBeTruthy();
     expect(screen.getAllByText("Different").length).toBeGreaterThan(0);
+  });
+
+  it("keeps a dismissed row in place and reopens it through Undo", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const dismiss = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "dismissed" as const,
+      reviewedAt: "2026-08-25T12:00:00Z",
+    }));
+    const reopen = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "suspected" as const,
+      reviewedAt: "2026-08-25T12:01:00Z",
+    }));
+    api.review.dismissDuplicate = dismiss;
+    api.review.reopenDuplicate = reopen;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
+
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
+    expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByRole("button", { name: "Confirm" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+    expect(reopen).toHaveBeenCalledWith(duplicatePair.id);
+  });
+
+  it("keeps a confirmation visible while leaving the merge available", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const confirm = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "confirmed" as const,
+      reviewedAt: "2026-08-25T12:00:00Z",
+    }));
+    api.review.confirmDuplicate = confirm;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("Confirmed", { selector: "strong" })).toBeTruthy();
+    expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Merge…" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+  });
+
+  it("marks merge busy, then keeps a receipt without inventing copied fields", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const mergedPair = {
+      ...duplicatePair,
+      status: "merged" as const,
+      reviewedAt: "2026-08-25T12:00:00Z",
+      right: {
+        ...duplicatePair.right,
+        reviewStatus: "rejected" as const,
+        isListed: false,
+        mergedInto: duplicatePair.left.id,
+      },
+    };
+    let finishMerge!: (result: {
+      pair: DuplicatePair;
+      survivorId: string;
+      mergedId: string;
+      copiedFields: string[];
+    }) => void;
+    const merge = vi.fn(
+      () =>
+        new Promise<{
+          pair: DuplicatePair;
+          survivorId: string;
+          mergedId: string;
+          copiedFields: string[];
+        }>((resolve) => {
+          finishMerge = resolve;
+        }),
+    );
+    api.review.mergeDuplicate = merge;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Merge…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge them" }));
+
+    expect(screen.getByRole("button", { name: "Merging…" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Compare descriptions" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+
+    await act(async () => {
+      finishMerge({
+        pair: mergedPair,
+        survivorId: duplicatePair.left.id,
+        mergedId: duplicatePair.right.id,
+        copiedFields: [],
+      });
+    });
+
+    expect(
+      await screen.findByText((_, node) =>
+        Boolean(
+          node?.tagName === "STRONG" &&
+            node.textContent?.includes(`Merged into ${duplicatePair.left.id} · view`),
+        ),
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "view" })).toBeTruthy();
+    expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(screen.queryByText(/Copied fields: none/)).toBeNull();
+    expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
+  });
+
+  it("restores merged receipts from the explicitly bounded resolved page", async () => {
+    tab.current = "duplicates";
+    const mergedPair: DuplicatePair = {
+      ...duplicatePair,
+      status: "merged",
+      right: { ...duplicatePair.right, mergedInto: duplicatePair.left.id },
+    };
+    const requested: Array<{ status?: string; limit?: number } | undefined> = [];
+    const api = client();
+    api.review.duplicates = async (query) => {
+      requested.push(query);
+      return { items: query?.status === "merged" ? [mergedPair] : [] };
+    };
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("Recently resolved")).toBeTruthy();
+    expect(
+      await screen.findByText((_, node) =>
+        Boolean(
+          node?.tagName === "STRONG" &&
+            node.textContent?.includes(`Merged into ${duplicatePair.left.id} · view`),
+        ),
+      ),
+    ).toBeTruthy();
+    expect(requested).toContainEqual({ status: "merged", limit: 200 });
   });
 });
 

@@ -160,6 +160,17 @@ describe("createApiClient", () => {
     expect(error.survivorId).toBe("acme:c");
   });
 
+  it("reopens a dismissed duplicate through the pair route without a body", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ id: 17, status: "suspected" }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.review.reopenDuplicate(17);
+
+    expect(calls[0]?.url).toBe("https://api.example.com/v1/review/duplicates/17/reopen");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.body).toBeUndefined();
+  });
+
   it("does not pretend a non-JSON body is JSON", async () => {
     const { fetchImpl } = stubFetch(
       () => new Response("<html>gateway timeout</html>", { status: 504 }),
