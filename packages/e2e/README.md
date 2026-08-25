@@ -123,7 +123,7 @@ only place in the run where hitting the limit is the point.
 ## The administrator is granted, not configured
 
 The API does not promote anyone named in its environment. Bring-up runs the shipped ceremony —
-`pnpm --filter @the-rfp-hub/api grant-admin -- --did <did> --create --yes`, with the **admin**
+`pnpm --filter @the-rfp-hub/api grant-admin -- --subject <id> --create --yes`, with the **admin**
 database URL in the child's environment — against whichever identity the rotation selected. That is
 a one-off audited event (`actor_kind: "job"`, `action: "assign_role"`, `reason:
 "operator_grant_admin"`), revocable afterwards over the ordinary admin route, rather than a standing
