@@ -46,7 +46,7 @@ import {
 } from "@/components/form-fields";
 import { ActionNote, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { describeDuplicateCheck } from "@/lib/format";
+import { describeDuplicateCheck, formatSimilarity } from "@/lib/format";
 import {
   BEFORE_DRAFTS_CLEARED_EVENT,
   canonicalForm,
@@ -2045,6 +2045,7 @@ function SubmissionOutcome({
   mode: "create" | "edit";
   onAgain: () => void;
 }) {
+  const [duplicatesAcknowledged, setDuplicatesAcknowledged] = useState(false);
   const source = { mergedInto: null, reviewStatus: result.reviewStatus, isListed: result.isListed };
   const status = publisherStatus(source);
   const hasPublicPage = result.reviewStatus === "approved" && result.isListed;
@@ -2079,19 +2080,43 @@ function SubmissionOutcome({
                 ? "Rejected — it is not in the public directory."
                 : "Merged into another listing."}
       </p>
-      <p>{describeDuplicateCheck(result.duplicateCheck, result.duplicates.length)}</p>
-      {result.duplicates.length > 0 ? (
-        <ul>
-          {result.duplicates.map((match) => (
-            <li key={match.id}>
-              <GuardedLink href={`/listings/${encodeURIComponent(match.id)}`}>
-                {match.title}
-              </GuardedLink>{" "}
-              <code>{match.id}</code>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {result.duplicates.length === 0 ? (
+        <p>{describeDuplicateCheck(result.duplicateCheck, 0)}</p>
+      ) : duplicatesAcknowledged ? (
+        <p className="muted">
+          Marked as a different programme on this screen. Reviewers will still see the possible
+          match.
+        </p>
+      ) : (
+        <section className={styles.duplicateWarning} aria-labelledby="duplicate-warning-heading">
+          <div className={styles.duplicateWarningHeading}>
+            <span aria-hidden="true">⚠</span>
+            <h3 id="duplicate-warning-heading">Possible duplicate</h3>
+          </div>
+          <p>{describeDuplicateCheck(result.duplicateCheck, result.duplicates.length)}</p>
+          <ul>
+            {result.duplicates.map((match) => (
+              <li key={match.id}>
+                <strong>{formatSimilarity(match.similarity)}</strong> —{" "}
+                <GuardedLink
+                  href={`${match.isPublic ? "/opportunities" : "/listings"}/${encodeURIComponent(match.id)}`}
+                >
+                  <UntrustedText value={match.title} />
+                </GuardedLink>{" "}
+                <code>{match.id}</code>
+              </li>
+            ))}
+          </ul>
+          <p>
+            {status === "pending"
+              ? "A reviewer will compare the pair before publication."
+              : "A reviewer will also see this match."}
+          </p>
+          <button type="button" onClick={() => setDuplicatesAcknowledged(true)}>
+            This is a different programme
+          </button>
+        </section>
+      )}
       {result.warnings.length > 0 ? (
         <>
           <p>

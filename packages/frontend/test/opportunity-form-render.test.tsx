@@ -67,7 +67,7 @@ function outcome(over: Partial<SubmissionResult> = {}): SubmissionResult {
     reviewStatus: "approved",
     isListed: true,
     warnings: [],
-    duplicateCheck: "ran",
+    duplicateCheck: "ok",
     duplicates: [],
     ...over,
   } as SubmissionResult;
@@ -920,6 +920,81 @@ describe("after a submission", () => {
     expect(screen.getByRole("link", { name: "Open this listing" }).getAttribute("href")).toBe(
       "/listings/acme%3Around-one",
     );
+  });
+
+  it("warns visibly about matches and routes each side by its public visibility", async () => {
+    mount(
+      {},
+      {
+        result: outcome({
+          duplicates: [
+            {
+              id: "public:earlier round",
+              title: "Earlier Public Round",
+              isPublic: true,
+              similarity: 0.912,
+              status: "suspected",
+              detectedAt: "2026-08-25T00:00:00Z",
+            },
+            {
+              id: "private:queued round",
+              title: "Queued Private Round",
+              isPublic: false,
+              similarity: 0.86,
+              status: "suspected",
+              detectedAt: "2026-08-25T00:00:00Z",
+            },
+          ],
+        }),
+      },
+    );
+    submit();
+
+    const warning = await screen.findByRole("heading", { name: "Possible duplicate" });
+    expect(warning.closest(`.${styles.duplicateWarning}`)).not.toBeNull();
+    expect(screen.getByText("91% similar")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Earlier Public Round" }).getAttribute("href")).toBe(
+      "/opportunities/public%3Aearlier%20round",
+    );
+    expect(screen.getByRole("link", { name: "Queued Private Round" }).getAttribute("href")).toBe(
+      "/listings/private%3Aqueued%20round",
+    );
+    expect(screen.getByText("A reviewer will also see this match.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Withdraw/i })).toBeNull();
+    expect(screen.getByRole("link", { name: "View it as applicants see it" })).toBeTruthy();
+  });
+
+  it("acknowledges a different programme locally without disturbing the success actions", async () => {
+    const api = mount(
+      {},
+      {
+        result: outcome({
+          reviewStatus: "pending",
+          isListed: false,
+          duplicates: [
+            {
+              id: "acme:earlier",
+              title: "Earlier Round",
+              isPublic: true,
+              similarity: 0.9,
+              status: "suspected",
+              detectedAt: "2026-08-25T00:00:00Z",
+            },
+          ],
+        }),
+      },
+    );
+    submit();
+
+    expect(
+      await screen.findByText("A reviewer will compare the pair before publication."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "This is a different programme" }));
+
+    expect(screen.queryByRole("heading", { name: "Possible duplicate" })).toBeNull();
+    expect(screen.getByText(/Reviewers will still see the possible match/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open this listing" })).toBeTruthy();
+    expect(api.create).toHaveBeenCalledTimes(1);
   });
 
   it("calls an approved but unlisted submission hidden rather than live", async () => {

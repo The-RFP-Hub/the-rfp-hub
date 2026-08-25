@@ -372,3 +372,33 @@
 .outcome {
   display: block;
 }
+
+/*
+ * A possible duplicate needs to interrupt the success scan without competing with its primary
+ * next step. A complete warning-colour border makes the block legible on every edge and avoids the
+ * generic alert-stripe treatment; the icon and literal heading keep the meaning independent of hue.
+ */
+.duplicateWarning {
+  border: 2px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  padding: 0.85rem 1rem;
+  margin: 1rem 0;
+  max-width: 46rem;
+}
+
+.duplicateWarningHeading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--warn);
+}
+
+.duplicateWarningHeading h3 {
+  margin: 0;
+}
+
+.duplicateWarning p,
+.duplicateWarning ul {
+  margin: 0.65rem 0;
+}
