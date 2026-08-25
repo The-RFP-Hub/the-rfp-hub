@@ -7,7 +7,7 @@ on:
       - 'prod-*'
   workflow_dispatch:
 
-name: Production RFP Hub API
+name: Production API
 
 # Mirrors staging.yml — pulls `.env` from `production/rfp-hub`,
 # bakes into the image, deploys to the production ECS cluster.
@@ -177,5 +177,5 @@ jobs:
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          title: 'Production RFP Hub API deployed'
+          title: 'Production API deployed'
           description: 'Image: ${{ needs.build_image.outputs.image }}'
