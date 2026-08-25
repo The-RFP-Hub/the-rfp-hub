@@ -1,0 +1,77 @@
+import AccountPage from "@/app/account/page";
+import type { ApiClient } from "@/lib/api";
+import { ApiClientProvider } from "@/lib/api-context";
+import type { Me } from "@/lib/types";
+import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { session } = vi.hoisted(() => ({
+  session: { data: { user: { id: "u1" } }, isPending: false, error: null },
+}));
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { useSession: () => session, signOut: vi.fn(), getSession: vi.fn() },
+  clearSessionToken: vi.fn(),
+  refreshSession: vi.fn(),
+  readSessionToken: () => null,
+}));
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/account" }));
+
+const account: Me = {
+  accountId: 1,
+  handle: "publisher",
+  displayName: "Publisher",
+  email: "publisher@example.org",
+  role: "submitter",
+  directCreate: false,
+  credentialKind: "session",
+  scopes: [],
+  memberships: [],
+  canManageKeys: true,
+  canReview: false,
+  canAdmin: false,
+  createdAt: "2026-08-01T00:00:00Z",
+};
+
+function mount(me: Me) {
+  const client = {
+    baseUrl: "https://api.example.com",
+    me: { get: async () => me, update: vi.fn() },
+  } as unknown as ApiClient;
+  return render(
+    <ApiClientProvider value={client}>
+      <AccountPage />
+    </ApiClientProvider>,
+  );
+}
+
+beforeEach(() => {
+  session.data = { user: { id: "u1" } };
+});
+
+describe("account organisation links", () => {
+  it("links the organisation index beside the heading and from the empty state", async () => {
+    mount(account);
+
+    const links = await screen.findAllByRole("link", { name: "Browse organisations" });
+    expect(links).toHaveLength(2);
+    expect(links.every((link) => link.getAttribute("href") === "/organisations")).toBe(true);
+  });
+
+  it("keeps membership names direct while exposing the organisation index", async () => {
+    mount({
+      ...account,
+      memberships: [
+        { slug: "acme collective", name: "Acme Foundation", role: "publisher", verified: true },
+      ],
+    });
+
+    expect(
+      (await screen.findByRole("link", { name: "Acme Foundation" })).getAttribute("href"),
+    ).toBe("/organisations/acme%20collective");
+    expect(screen.getByRole("link", { name: "Browse organisations" }).getAttribute("href")).toBe(
+      "/organisations",
+    );
+  });
+});

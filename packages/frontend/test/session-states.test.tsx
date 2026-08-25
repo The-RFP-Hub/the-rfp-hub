@@ -13,7 +13,7 @@
  * the swap verbatim, which is the evidence that `SessionState` really did keep its contract:
  * `RequireSession` runs its real logic and calls the real `GET /v1/me` through an injected client.
  */
-import { Chrome, RequireSession } from "@/components/Chrome";
+import { Chrome, RequireSession, organisationNav } from "@/components/Chrome";
 import { NavigationBlockerProvider, useNavigationBlocker } from "@/components/NavigationBlocker";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
@@ -226,6 +226,32 @@ describe("RequireSession", () => {
     );
     expect(screen.queryByText(/Hello acme-programs/)).toBeNull();
   });
+});
+
+describe("organisation navigation", () => {
+  const acme: Me["memberships"][number] = {
+    slug: "acme",
+    name: "Acme Foundation",
+    role: "publisher",
+    verified: true,
+  };
+  const beta: Me["memberships"][number] = {
+    slug: "beta collective",
+    name: "Beta Collective",
+    role: "owner",
+    verified: false,
+  };
+
+  it.each([
+    ["zero memberships", [], "/organisations", "Organisations"],
+    ["one membership", [acme], "/organisations/acme", "Acme Foundation"],
+    ["multiple memberships", [acme, beta], "/organisations", "Organisations"],
+  ] as const)(
+    "links %s to the useful organisation destination",
+    (_case, memberships, href, label) => {
+      expect(organisationNav({ ...me, memberships: [...memberships] })).toEqual({ href, label });
+    },
+  );
 });
 
 /**

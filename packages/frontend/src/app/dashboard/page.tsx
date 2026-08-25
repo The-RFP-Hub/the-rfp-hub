@@ -67,7 +67,12 @@ function Overview() {
 
   return (
     <section>
-      <h1>Your listings&rsquo; traffic</h1>
+      <div className="row-between">
+        <h1>Your listings&rsquo; traffic</h1>
+        <Link className="button-primary" href="/listings/new">
+          Submit an opportunity
+        </Link>
+      </div>
       <ResourceView resource={state} what="your traffic summary" onRetry={reload}>
         {(summary) => (
           <>

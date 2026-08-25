@@ -53,6 +53,7 @@ import type {
   DuplicateSide,
   ManagedOpportunity,
   ManagedOpportunityList,
+  Me,
   OrgRole,
   OrganizationSummary,
 } from "@/lib/types";
@@ -88,12 +89,12 @@ export default function ReviewPage() {
       gate={ROUTE_GATE_COPY.review}
       capability={{ needs: (me) => me.canReview, ...CAPABILITY_DENIAL_COPY.reviewer }}
     >
-      {() => <Review />}
+      {(me) => <Review me={me} />}
     </RequireSession>
   );
 }
 
-function Review() {
+function Review({ me }: { me: Me }) {
   const api = useApi();
   const router = useRouter();
   const params = useSearchParams();
@@ -183,7 +184,7 @@ function Review() {
       ) : null}
       {tab === "claims" ? <Claims claims={claims} origin={returnHere} /> : null}
       {tab === "duplicates" ? <Duplicates duplicates={duplicates} origin={returnHere} /> : null}
-      {tab === "organisations" ? <Organisations /> : null}
+      {tab === "organisations" ? <Organisations memberships={me.memberships} /> : null}
     </section>
   );
 }
@@ -1032,7 +1033,7 @@ function Side({
  * So the page shows what is already trusted or already peopled, and everything else is behind a
  * deliberate search.
  */
-function Organisations() {
+function Organisations({ memberships }: { memberships: Me["memberships"] }) {
   const api = useApi();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
@@ -1119,7 +1120,13 @@ function Organisations() {
               detail="Nothing publishes without review until one is. Find an organisation with members below, or by searching."
             />
           ) : (
-            <OrgTable orgs={list.items} busy={busy} run={run} reload={reloadAll} />
+            <OrgTable
+              orgs={list.items}
+              memberships={memberships}
+              busy={busy}
+              run={run}
+              reload={reloadAll}
+            />
           )
         }
       </ResourceView>
@@ -1138,7 +1145,13 @@ function Organisations() {
             />
           ) : (
             <>
-              <OrgTable orgs={peopled} busy={busy} run={run} reload={reloadAll} />
+              <OrgTable
+                orgs={peopled}
+                memberships={memberships}
+                busy={busy}
+                run={run}
+                reload={reloadAll}
+              />
               {list.items.length >= 100 ? (
                 <p className="muted footnote">
                   Showing the first 100 unverified organisations by slug. There are at least that
@@ -1164,6 +1177,7 @@ function Organisations() {
               ) : (
                 <OrgTable
                   orgs={list.items}
+                  memberships={memberships}
                   busy={busy}
                   run={run}
                   reload={reloadAll}
@@ -1180,12 +1194,14 @@ function Organisations() {
 
 function OrgTable({
   orgs,
+  memberships,
   busy,
   run,
   reload,
   showStubGuard,
 }: {
   orgs: OrganizationSummary[];
+  memberships: Me["memberships"];
   busy: boolean;
   run: (work: () => Promise<string>) => Promise<void>;
   reload: () => void;
@@ -1208,6 +1224,7 @@ function OrgTable({
             <OrgRow
               key={org.slug}
               org={org}
+              canOpen={memberships.some((membership) => membership.slug === org.slug)}
               busy={busy}
               run={run}
               reload={reload}
@@ -1222,12 +1239,14 @@ function OrgTable({
 
 function OrgRow({
   org,
+  canOpen,
   busy,
   run,
   reload,
   showStubGuard,
 }: {
   org: OrganizationSummary;
+  canOpen: boolean;
   busy: boolean;
   run: (work: () => Promise<string>) => Promise<void>;
   reload: () => void;
@@ -1242,7 +1261,13 @@ function OrgRow({
     <>
       <tr>
         <th scope="row">
-          <UntrustedText value={org.name} className="row-title" />
+          {canOpen ? (
+            <Link className="row-title" href={`/organisations/${encodeURIComponent(org.slug)}`}>
+              <UntrustedText value={org.name} />
+            </Link>
+          ) : (
+            <UntrustedText value={org.name} className="row-title" />
+          )}
           <div className="muted">
             <code>{org.slug}</code>
           </div>

@@ -52,26 +52,27 @@ function accountNav(me: Me): NavItem[] {
   return [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/listings", label: "Your listings" },
-    ...(organisation ? [organisation] : []),
+    organisation,
     { href: "/account", label: "Account" },
     { href: "/keys", label: "API keys", requires: (item) => item.canManageKeys },
   ];
 }
 
 /**
- * The organisation link, or none.
+ * The organisation link.
  *
  * ONE MEMBERSHIP GETS ITS OWN NAME AND ITS OWN ADDRESS. A landing page listing exactly one row is a
  * click that answers nothing, and "Organisations" as a label for a single named thing is vaguer than
- * the thing itself. Several memberships need somewhere to choose between them, and none gets no
- * link at all — an empty destination in a header is a promise the account cannot keep.
+ * the thing itself. Several memberships need somewhere to choose between them. An account with no
+ * memberships still gets the index: its empty state explains how publishing rights are granted,
+ * and keeping that route in the signed-in navigation makes it discoverable before the first grant.
  *
  * The label for the single case is publisher-supplied text. It is rendered as a text child like
  * every other untrusted string in this package, never as markup.
  */
-export function organisationNav(me: Me): NavItem | null {
+export function organisationNav(me: Me): NavItem {
   const [only] = me.memberships;
-  if (!only) return null;
+  if (!only) return { href: "/organisations", label: "Organisations" };
   if (me.memberships.length === 1) {
     return { href: `/organisations/${encodeURIComponent(only.slug)}`, label: only.name };
   }

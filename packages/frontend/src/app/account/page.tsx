@@ -127,13 +127,21 @@ function Account({ me }: { me: Me }) {
       </div>
 
       <div className="card">
-        <h2>Organisations</h2>
+        <div className="row-between">
+          <h2>Organisations</h2>
+          <Link href="/organisations">Browse organisations</Link>
+        </div>
         {me.memberships.length === 0 ? (
-          <p className="muted">
-            No memberships. Submissions from this account land pending, which is the normal path for
-            a community submission. Claiming an entry for an organisation you run is how that
-            changes.
-          </p>
+          <>
+            <p className="muted">
+              No memberships. Submissions from this account land pending, which is the normal path
+              for a community submission. Claiming an entry for an organisation you run is how that
+              changes.
+            </p>
+            <p>
+              <Link href="/organisations">Browse organisations</Link>
+            </p>
+          </>
         ) : (
           <div className="table-scroll">
             <table>

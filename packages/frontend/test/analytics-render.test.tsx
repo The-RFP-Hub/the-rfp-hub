@@ -11,12 +11,24 @@
  * out inside the component under test: the component fetches, awaits and renders exactly as it does
  * in a browser. No network, no auth SDK, no database.
  */
+import DashboardPage from "@/app/dashboard/page";
 import { AnalyticsTab } from "@/components/AnalyticsTab";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { InsightsSeries } from "@/lib/types";
+import type { InsightsSeries, InsightsSummary, Me } from "@/lib/types";
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+const { session } = vi.hoisted(() => ({
+  session: { data: { user: { id: "u1" } }, isPending: false, error: null },
+}));
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { useSession: () => session, signOut: vi.fn(), getSession: vi.fn() },
+  clearSessionToken: vi.fn(),
+  refreshSession: vi.fn(),
+  readSessionToken: () => null,
+}));
 
 /** Zero-filled for the whole window, exactly as the API returns it — including the empty days. */
 const series: InsightsSeries = {
@@ -121,5 +133,55 @@ describe("the analytics tab", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByText(/This entry is not yours\./)).toBeTruthy();
     expect(screen.getByText(/forbidden/)).toBeTruthy();
+  });
+});
+
+describe("the dashboard", () => {
+  it("keeps submission in the header when published analytics already exist", async () => {
+    const me: Me = {
+      accountId: 1,
+      handle: "publisher",
+      displayName: null,
+      email: null,
+      role: "submitter",
+      directCreate: false,
+      credentialKind: "session",
+      scopes: [],
+      memberships: [],
+      canManageKeys: true,
+      canReview: false,
+      canAdmin: false,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const summary: InsightsSummary = {
+      from: "2026-07-26",
+      to: "2026-08-25",
+      totals: { listViews: 20, detailViews: 8, sourceClicks: 3, applyClicks: 2 },
+      opportunities: [
+        {
+          opportunityId: "acme:round-1",
+          title: "Acme Round One",
+          listViews: 20,
+          detailViews: 8,
+          sourceClicks: 3,
+          applyClicks: 2,
+        },
+      ],
+    };
+    const client = {
+      baseUrl: "https://api.example.com",
+      me: { get: async () => me },
+      insights: { summary: vi.fn(async () => summary) },
+    } as unknown as ApiClient;
+
+    render(
+      <ApiClientProvider value={client}>
+        <DashboardPage />
+      </ApiClientProvider>,
+    );
+
+    const link = await screen.findByRole("link", { name: "Submit an opportunity" });
+    expect(link.getAttribute("href")).toBe("/listings/new");
+    expect(await screen.findByText("Acme Round One")).toBeTruthy();
   });
 });

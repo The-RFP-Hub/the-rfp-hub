@@ -165,10 +165,10 @@ const organizations = vi.fn(
   },
 );
 
-function client(): ApiClient {
+function client(account: Me = me): ApiClient {
   return {
     baseUrl: "https://api.example.com",
-    me: { get: async () => me },
+    me: { get: async () => account },
     /*
      * THE PUBLIC READ 404s A PENDING LISTING — which is the whole population of this queue. A panel
      * built on it could never once have shown the thing it exists to show, so the stub refuses it
@@ -202,9 +202,9 @@ function client(): ApiClient {
   } as unknown as ApiClient;
 }
 
-const mount = () =>
+const mount = (account: Me = me) =>
   render(
-    <ApiClientProvider value={client()}>
+    <ApiClientProvider value={client(account)}>
       <ReviewPage />
     </ApiClientProvider>,
   );
@@ -433,6 +433,19 @@ describe("the organisations tab", () => {
     expect(screen.getByText(/Has members, not verified/)).toBeTruthy();
     await waitFor(() => expect(screen.getByText("Filecoin Foundation")).toBeTruthy());
     expect(screen.getByText("Indie Collective")).toBeTruthy();
+  });
+
+  it("links only organisations this reviewer belongs to", async () => {
+    mount({
+      ...me,
+      memberships: [
+        { slug: "filecoin", name: "Filecoin Foundation", role: "publisher", verified: true },
+      ],
+    });
+
+    const memberLink = await screen.findByRole("link", { name: "Filecoin Foundation" });
+    expect(memberLink.getAttribute("href")).toBe("/organisations/filecoin");
+    expect(screen.getByText("Indie Collective").closest("a")).toBeNull();
   });
 
   it("hides directory stubs until somebody searches for one", async () => {
