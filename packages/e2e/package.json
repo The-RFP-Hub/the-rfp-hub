@@ -10,7 +10,6 @@
   },
   "scripts": {
     "e2e": "tsx src/run.ts",
-    "e2e:openai": "E2E_EMBEDDING_PROVIDER=openai tsx src/run.ts --grep @dedupe",
     "e2e:check-m3": "tsx src/run.ts --check-m3",
     "typecheck": "tsc --noEmit"
   },

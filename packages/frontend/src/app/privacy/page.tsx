@@ -15,7 +15,7 @@ export default function PrivacyPage() {
         The RFP Hub is an open index of funding opportunities. No account is required to read the
         directory; like any web service, it still processes request metadata, described below. This
         page says what the Hub stores, what leaves its servers, what is public forever, and how to
-        leave. Effective 24&nbsp;August&nbsp;2026.
+        leave. Effective 25&nbsp;August&nbsp;2026.
       </p>
 
       <h2>What we store when you sign in</h2>
@@ -93,12 +93,11 @@ export default function PrivacyPage() {
         codes, the way any mail carrier does. Google is involved only if you choose Google sign-in.
       </p>
       <p>
-        When semantic duplicate-detection is enabled, a listing&rsquo;s text fields — title,
-        summary, description, funding type, ecosystems, categories and operating organisations — are
-        sent to OpenAI to compute embeddings. Account data is never sent. Submitting a listing with
-        an application URL normally triggers a server-side check of that URL: the destination site
-        sees a request from the Hub&rsquo;s servers with a Hub user-agent, carrying no cookies and
-        no referrer.
+        Listing text is processed for duplicate detection{" "}
+        <strong>entirely on the Hub&rsquo;s own servers</strong> — no AI vendor, no third party,
+        nothing sent anywhere. Submitting a listing with an application URL normally triggers a
+        server-side check of that URL: the destination site sees a request from the Hub&rsquo;s
+        servers with a Hub user-agent, carrying no cookies and no referrer.
       </p>
       <p>
         The Hub does not sell personal data, runs no third-party trackers, and shows no advertising.
