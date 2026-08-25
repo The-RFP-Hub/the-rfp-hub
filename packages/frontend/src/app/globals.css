@@ -804,6 +804,68 @@ caption {
   border: 2px solid var(--ink);
 }
 
+.duplicate-filter {
+  display: grid;
+  grid-template-columns: max-content minmax(12rem, 24rem) max-content;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 1rem;
+}
+
+.duplicate-filter label,
+.duplicate-filter strong {
+  font-size: 0.9rem;
+}
+
+.duplicate-comparison {
+  border-top: 1px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 0.25rem;
+}
+
+.duplicate-comparison-scroll {
+  overflow-x: auto;
+}
+
+.duplicate-comparison-grid {
+  display: grid;
+  grid-template-columns: 9rem minmax(15rem, 1fr) minmax(15rem, 1fr);
+  min-width: 42rem;
+}
+
+.duplicate-comparison-grid > * {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding: 0.7rem 0.75rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.duplicate-comparison-grid > :nth-child(-n + 3) {
+  border-top: 0;
+}
+
+.duplicate-comparison-grid h3 {
+  font-size: 1rem;
+}
+
+.duplicate-comparison-grid h4 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+
+.duplicate-comparison-grid .untrusted-block {
+  margin: 0;
+}
+
+.duplicate-comparison-difference {
+  background: var(--panel);
+}
+
 /*
  * A confirmation is a `<fieldset>`, which arrives with user-agent padding and an inline-ish
  * intrinsic width that fights the card. `min-inline-size: 0` is the one that matters: without it a

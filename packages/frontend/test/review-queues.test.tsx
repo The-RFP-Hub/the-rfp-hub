@@ -18,7 +18,7 @@ import ReviewPage from "@/app/review/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { DuplicatePair, Me, OrganizationSummary } from "@/lib/types";
+import type { DuplicatePair, Me, Opportunity, OrganizationSummary } from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -116,6 +116,22 @@ const duplicatePair: DuplicatePair = {
     updatedAt: "2026-08-24T00:00:00Z",
   },
 };
+
+const opportunity = (id: string, over: Partial<Opportunity> = {}): Opportunity =>
+  ({
+    specVersion: "1.0.0",
+    id,
+    fundingType: "grant",
+    title: id,
+    summary: null,
+    description: `Description for ${id}.`,
+    status: "open",
+    applicationUrl: null,
+    operatingOrganizations: [{ name: "Acme", slug: "acme" }],
+    source: {},
+    fundingDetails: { fundingType: "grant" },
+    ...over,
+  }) as Opportunity;
 
 const approve = vi.fn(async () => ({ id: "x", reviewStatus: "approved", isListed: true }));
 const reject = vi.fn(async () => ({ id: "x", reviewStatus: "rejected", isListed: false }));
@@ -406,7 +422,9 @@ describe("merging duplicates", () => {
   it("says the loser's public link will forward to the survivor", async () => {
     tab.current = "duplicates";
     const api = client();
-    api.review.duplicates = async () => ({ items: [duplicatePair] });
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
     render(
       <ApiClientProvider value={api}>
         <ReviewPage />
@@ -418,6 +436,113 @@ describe("merging duplicates", () => {
     expect(panel.textContent).toContain(
       "leaves the public directory and its public link forwards to the survivor",
     );
+  });
+
+  it("loads both open statuses with explicit limits, then filters and sorts the loaded page", async () => {
+    tab.current = "duplicates";
+    const requested: Array<{ status?: string; limit?: number } | undefined> = [];
+    const api = client();
+    api.review.duplicates = async (query) => {
+      requested.push(query);
+      if (query?.status === "suspected") {
+        return {
+          items: [
+            {
+              ...duplicatePair,
+              id: 18,
+              similarity: 0.84,
+              left: { ...duplicatePair.left, title: "Below" },
+            },
+            {
+              ...duplicatePair,
+              id: 19,
+              similarity: 0.88,
+              left: { ...duplicatePair.left, title: "Second" },
+            },
+          ],
+        };
+      }
+      if (query?.status === "confirmed") {
+        return {
+          items: [
+            {
+              ...duplicatePair,
+              id: 20,
+              status: "confirmed",
+              similarity: 0.96,
+              left: { ...duplicatePair.left, title: "First" },
+            },
+          ],
+        };
+      }
+      return { items: [] };
+    };
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("First")).toBeTruthy();
+    expect(requested).toEqual(
+      expect.arrayContaining([
+        { status: "suspected", limit: 200 },
+        { status: "confirmed", limit: 200 },
+      ]),
+    );
+    expect(screen.queryByText("Below")).toBeNull();
+    expect(screen.getByText(/2 of 3 open pairs loaded on this page/)).toBeTruthy();
+    const visibleCards = document.querySelectorAll(".card");
+    expect(visibleCards[0]?.textContent).toContain("First");
+    expect(visibleCards[1]?.textContent).toContain("Second");
+
+    fireEvent.click(screen.getByRole("button", { name: "1 below the threshold — show them" }));
+    expect(screen.getByText("Below")).toBeTruthy();
+  });
+
+  it("fetches full descriptions lazily from the reviewer detail routes", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const fetchOpportunity = vi.fn(async (id: string) =>
+      id === duplicatePair.left.id
+        ? opportunity(id, {
+            title: duplicatePair.left.title,
+            summary: "Current programme summary.",
+            description: "Current programme description.",
+            applicationUrl: "https://acme.example/apply",
+          })
+        : opportunity(id, {
+            title: duplicatePair.right.title,
+            fundingType: "rfp",
+            summary: "Legacy programme summary.",
+            description: "Legacy programme description.",
+            applicationUrl: "https://legacy.example/apply",
+          }),
+    );
+    api.review.opportunity = fetchOpportunity;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const compare = await screen.findByRole("button", { name: "Compare descriptions" });
+    expect(fetchOpportunity).not.toHaveBeenCalled();
+    fireEvent.click(compare);
+
+    await waitFor(() =>
+      expect(fetchOpportunity.mock.calls.map(([id]) => id)).toEqual([
+        duplicatePair.left.id,
+        duplicatePair.right.id,
+      ]),
+    );
+    expect(await screen.findByText("Current programme description.")).toBeTruthy();
+    expect(screen.getByText("Legacy programme description.")).toBeTruthy();
+    expect(screen.getByText("https://acme.example/apply")).toBeTruthy();
+    expect(screen.getAllByText("Different").length).toBeGreaterThan(0);
   });
 });
 

@@ -23,7 +23,7 @@
  */
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
-import { UntrustedText } from "@/components/UntrustedText";
+import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, VerifiedBadge } from "@/components/badges";
 import {
   ActionNote,
@@ -40,6 +40,7 @@ import {
   accountRoleLabel,
   duplicateStatusLabel,
   fundingTypeLabel,
+  opportunityStatusLabel,
   orgRoleLabel,
 } from "@/lib/presentation";
 import { type ResourceHandle, useResource } from "@/lib/resource";
@@ -54,12 +55,13 @@ import type {
   ManagedOpportunity,
   ManagedOpportunityList,
   Me,
+  Opportunity,
   OrgRole,
   OrganizationSummary,
 } from "@/lib/types";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 type Tab = "submissions" | "claims" | "duplicates" | "organisations";
 const TABS: Tab[] = ["submissions", "claims", "duplicates", "organisations"];
@@ -112,10 +114,13 @@ function Review({ me }: { me: Me }) {
     [api, queuePage],
   );
   const loadClaims = useCallback(() => api.review.claims({ status: "pending" }), [api]);
-  const loadDuplicates = useCallback(
-    () => api.review.duplicates({ status: "suspected", limit: 100 }),
-    [api],
-  );
+  const loadDuplicates = useCallback(async () => {
+    const [suspected, confirmed] = await Promise.all([
+      api.review.duplicates({ status: "suspected", limit: 200 }),
+      api.review.duplicates({ status: "confirmed", limit: 200 }),
+    ]);
+    return { items: [...suspected.items, ...confirmed.items] } satisfies DuplicatePairList;
+  }, [api]);
 
   const queue = useResource(loadQueue);
   const claims = useResource(loadClaims);
@@ -801,6 +806,9 @@ function Duplicates({
   duplicates,
   origin,
 }: { duplicates: ResourceHandle<DuplicatePairList>; origin: string }) {
+  const [minimumSimilarity, setMinimumSimilarity] = useState(85);
+  const [showBelowThreshold, setShowBelowThreshold] = useState(false);
+
   return (
     <>
       <p className="muted footnote">
@@ -813,20 +821,70 @@ function Duplicates({
         what="the duplicate queue"
         onRetry={duplicates.reload}
       >
-        {(list) =>
-          list.items.length === 0 ? (
+        {(list) => {
+          const sorted = [...list.items].sort(
+            (a, b) =>
+              (b.similarity ?? Number.NEGATIVE_INFINITY) -
+              (a.similarity ?? Number.NEGATIVE_INFINITY),
+          );
+          const shown = showBelowThreshold
+            ? sorted
+            : sorted.filter(
+                (pair) => pair.similarity !== null && pair.similarity * 100 >= minimumSimilarity,
+              );
+          const hidden = sorted.length - shown.length;
+
+          return list.items.length === 0 ? (
             <EmptyState
-              title="No suspected pairs."
+              title="No open pairs."
               detail="Detection runs against published listings when something is submitted. An empty queue means nothing recent looked like anything already published."
             />
           ) : (
             <>
-              {list.items.map((pair) => (
+              <div className="duplicate-filter">
+                <label htmlFor="minimum-similarity">Minimum similarity</label>
+                <input
+                  id="minimum-similarity"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={minimumSimilarity}
+                  onChange={(event) => {
+                    setMinimumSimilarity(Number(event.target.value));
+                    setShowBelowThreshold(false);
+                  }}
+                />
+                <strong>{minimumSimilarity}%</strong>
+              </div>
+              <p className="muted footnote">
+                {shown.length} of {sorted.length} open pairs loaded on this page.
+                {hidden > 0 ? (
+                  <>
+                    {" "}
+                    <button type="button" onClick={() => setShowBelowThreshold(true)}>
+                      {hidden} below the threshold — show them
+                    </button>
+                  </>
+                ) : null}
+              </p>
+              {shown.length === 0 ? (
+                <EmptyState
+                  title={`No loaded pairs meet ${minimumSimilarity}%.`}
+                  detail="Lower the minimum similarity or show the pairs below the threshold."
+                  action={
+                    <button type="button" onClick={() => setShowBelowThreshold(true)}>
+                      Show all loaded pairs
+                    </button>
+                  }
+                />
+              ) : null}
+              {shown.map((pair) => (
                 <PairCard key={pair.id} pair={pair} onChanged={duplicates.reload} origin={origin} />
               ))}
             </>
-          )
-        }
+          );
+        }}
       </ResourceView>
     </>
   );
@@ -841,6 +899,7 @@ function PairCard({
   const { note, busy, run, setNote } = useAction();
   const [survivor, setSurvivor] = useState<string>(pair.left.id);
   const [confirming, setConfirming] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const [survivorElsewhere, setSurvivorElsewhere] = useState<string | null>(null);
 
   const loser = survivor === pair.left.id ? pair.right : pair.left;
@@ -895,6 +954,9 @@ function PairCard({
         />
       </div>
       <div className="row">
+        <button type="button" onClick={() => setComparing((value) => !value)}>
+          {comparing ? "Hide comparison" : "Compare descriptions"}
+        </button>
         <button
           type="button"
           disabled={busy}
@@ -925,6 +987,8 @@ function PairCard({
           Merge…
         </button>
       </div>
+
+      {comparing ? <PairComparison pair={pair} /> : null}
 
       {confirming ? (
         <ConfirmPanel
@@ -963,6 +1027,107 @@ function PairCard({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function PairComparison({ pair }: { pair: DuplicatePair }) {
+  const api = useApi();
+  const load = useCallback(
+    () =>
+      Promise.all([api.review.opportunity(pair.left.id), api.review.opportunity(pair.right.id)]),
+    [api, pair.left.id, pair.right.id],
+  );
+  const comparison = useResource(load);
+
+  return (
+    <section className="duplicate-comparison" aria-label={`Comparison for pair ${pair.id}`}>
+      <ResourceView
+        resource={comparison.state}
+        what={`pair ${pair.id}'s descriptions`}
+        onRetry={comparison.reload}
+      >
+        {([left, right]) => <ComparisonFields left={left} right={right} />}
+      </ResourceView>
+    </section>
+  );
+}
+
+function ComparisonFields({ left, right }: { left: Opportunity; right: Opportunity }) {
+  const fields = useMemo(
+    () => [
+      {
+        label: "Title",
+        left: <UntrustedText value={left.title} />,
+        right: <UntrustedText value={right.title} />,
+        differs: left.title !== right.title,
+      },
+      {
+        label: "Funding type",
+        left: fundingTypeLabel(left.fundingType),
+        right: fundingTypeLabel(right.fundingType),
+        differs: left.fundingType !== right.fundingType,
+      },
+      {
+        label: "Application stage",
+        left: opportunityStatusLabel(left.status),
+        right: opportunityStatusLabel(right.status),
+        differs: left.status !== right.status,
+      },
+      {
+        label: "Summary",
+        left: <UntrustedBlock value={left.summary} fallback="No summary was provided." />,
+        right: <UntrustedBlock value={right.summary} fallback="No summary was provided." />,
+        differs: (left.summary ?? "") !== (right.summary ?? ""),
+      },
+      {
+        label: "Description",
+        left: <UntrustedBlock value={left.description} />,
+        right: <UntrustedBlock value={right.description} />,
+        differs: left.description !== right.description,
+      },
+      {
+        label: "Application URL",
+        left: <UntrustedLink href={left.applicationUrl} />,
+        right: <UntrustedLink href={right.applicationUrl} />,
+        differs: (left.applicationUrl ?? "") !== (right.applicationUrl ?? ""),
+      },
+    ],
+    [left, right],
+  );
+
+  return (
+    <div className="duplicate-comparison-scroll">
+      <div className="duplicate-comparison-grid">
+        <div aria-hidden="true" />
+        <h3>
+          <UntrustedText value={left.title} />
+        </h3>
+        <h3>
+          <UntrustedText value={right.title} />
+        </h3>
+        {fields.map((field) => (
+          <ComparisonField key={field.label} {...field} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComparisonField({
+  label,
+  left,
+  right,
+  differs,
+}: { label: string; left: ReactNode; right: ReactNode; differs: boolean }) {
+  return (
+    <Fragment>
+      <h4 className={differs ? "duplicate-comparison-difference" : undefined}>
+        {label}
+        {differs ? <span className="badge">Different</span> : null}
+      </h4>
+      <div className={differs ? "duplicate-comparison-difference" : undefined}>{left}</div>
+      <div className={differs ? "duplicate-comparison-difference" : undefined}>{right}</div>
+    </Fragment>
   );
 }
 
