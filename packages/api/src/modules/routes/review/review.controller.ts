@@ -109,6 +109,12 @@ export const reviewController = {
     return dedupe.decide(principal.accountId, idParam(id, "duplicate pair"), "dismiss");
   }),
 
+  reopenDuplicate: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { pairId } = paramsOf<{ pairId: string }>(request);
+    return dedupe.reopen(principal.accountId, idParam(pairId, "duplicate pair"));
+  }),
+
   mergeDuplicate: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);

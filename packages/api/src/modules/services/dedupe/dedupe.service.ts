@@ -11,9 +11,10 @@
  * 2. **A pair is unordered, so it is written ordered.** `ux_dup_pair` is unique on
  *    `(least, greatest)`, so (A,B) and (B,A) are the same key and a dismissal cannot be undone by
  *    the mirrored row staying suspected.
- * 3. **A decision is never resurrected.** Re-embedding only ever touches `suspected` rows;
+ * 3. **Detection never resurrects a decision.** Re-embedding only ever touches `suspected` rows;
  *    `dismissed`, `confirmed` and `merged` are somebody's judgement and this pass has no new
- *    information about them.
+ *    information about them. A reviewer explicitly reopening a dismissal is a separate audited
+ *    transition.
  * 4. **Stale pairs are removed exactly, not approximately.** An update that makes two entries
  *    unalike must delete the suspected pair — but "it fell out of the top 20" is not the same fact
  *    as "it is below the threshold". So the cleanup recomputes the similarity of each existing
@@ -46,6 +47,7 @@ import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
+import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
   type EmbeddingProvider,
   createEmbeddingProvider,
@@ -516,6 +518,40 @@ export class DedupeService {
         action: decision === "confirm" ? "confirm_duplicate" : "dismiss_duplicate",
         patch: { status: { before: pair.status, after: status } },
       });
+      const [left, right] = await Promise.all([
+        loadRowById(tx, next.opportunityId),
+        loadRowById(tx, next.duplicateOfId),
+      ]);
+      const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
+      return toPairView(next, left, right, survivors);
+    });
+  }
+
+  /** Undo a dismissal by returning the pair to the suspected queue. */
+  async reopen(reviewerId: number, pairId: number): Promise<DuplicatePairView> {
+    return this.db.transaction(async (tx) => {
+      const pair = await lockPair(tx, pairId);
+      const transition = duplicateReopenTransition(pair.status);
+      let next = pair;
+
+      if (transition === "reopen") {
+        const now = new Date();
+        const updated = await tx
+          .update(opportunityDuplicates)
+          .set({ status: "suspected", reviewedBy: reviewerId, reviewedAt: now })
+          .where(eq(opportunityDuplicates.id, pairId))
+          .returning();
+        next = updated[0] ?? pair;
+        await this.audit.record(tx, {
+          subjectKind: "duplicate",
+          subjectId: pairId,
+          actorKind: "user",
+          actorAccountId: reviewerId,
+          action: "reopen",
+          patch: { status: { before: pair.status, after: "suspected" } },
+        });
+      }
+
       const [left, right] = await Promise.all([
         loadRowById(tx, next.opportunityId),
         loadRowById(tx, next.duplicateOfId),

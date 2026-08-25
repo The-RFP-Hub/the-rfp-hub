@@ -166,6 +166,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/review/opportunities", "get"],
       ["/v1/review/opportunities/{id}", "get"],
       ["/v1/review/duplicates", "get"],
+      ["/v1/review/duplicates/{pairId}/reopen", "post"],
       ["/v1/review/duplicates/{id}/merge", "post"],
       ["/v1/review/opportunities/{id}/verify", "post"],
       ["/v1/insights/me/summary", "get"],
@@ -211,6 +212,15 @@ run("OpenAPI 3.1 live-spec contract", () => {
         .schema;
     expect(rejectClaimConflict.properties.error.enum).toEqual(["claim_decided"]);
     expect(rejectClaimConflict.description).not.toContain("opportunity_merged");
+    const reopenDuplicateConflict =
+      doc.paths["/v1/review/duplicates/{pairId}/reopen"].post.responses["409"].content[
+        "application/json"
+      ].schema;
+    expect(reopenDuplicateConflict.properties.error.enum).toEqual([
+      "already_merged",
+      "duplicate_not_dismissed",
+    ]);
+    expect(reopenDuplicateConflict.description).toContain("confirmed");
     // no trailing-slash paths, and every operation carries a unique operationId
     const operationIds: string[] = [];
     for (const [path, ops] of Object.entries<Record<string, { operationId?: string }>>(doc.paths)) {

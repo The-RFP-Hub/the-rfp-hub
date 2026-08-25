@@ -13,7 +13,7 @@
  */
 process.env.EMBEDDING_PROVIDER = "deterministic";
 
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import type { EmbeddingProvider } from "../../src/modules/services/dedupe/embedding-provider.js";
@@ -81,6 +81,7 @@ run("M3DUP duplicate detection", () => {
   let publisherToken: string;
   let strangerToken: string;
   let reviewerToken: string;
+  let reviewerAccountId: number;
 
   const post = async (token: string, payload: Record<string, unknown>) =>
     app.inject({ method: "POST", url: "/v1/opportunities", headers: bearer(token), payload });
@@ -137,6 +138,7 @@ run("M3DUP duplicate detection", () => {
     publisherToken = publisher.token;
     strangerToken = stranger.token;
     reviewerToken = reviewer.token;
+    reviewerAccountId = reviewer.account.id;
   });
 
   afterAll(async () => {
@@ -504,6 +506,142 @@ run("M3DUP duplicate detection", () => {
   });
 
   // ── T-DUP-5 ───────────────────────────────────────────────────────────────────
+  it("reopens only dismissed pairs, returns them to review, and audits the transition once", async () => {
+    const original = await post(
+      publisherToken,
+      entry(`${NS}:reopen`, "Superchain Reopen Fund", ALPHA_BODY),
+    );
+    expect(original.statusCode, original.body).toBe(201);
+    const copy = await post(
+      publisherToken,
+      entry(`${NS}:reopen-copy`, "Superchain Reopen Fund | Directory", reword(ALPHA_BODY)),
+    );
+    expect(copy.statusCode, copy.body).toBe(201);
+
+    const pair = await pairBetween(`${NS}:reopen`, `${NS}:reopen-copy`);
+    expect(pair, "reopen fixtures should be suspected duplicates").toBeTruthy();
+    if (!pair) throw new Error("missing reopen pair");
+
+    // A retry that arrives before the dismissal is already in the requested state: success, with
+    // neither a timestamp rewrite nor a fictional transition in the append-only audit trail.
+    const alreadySuspected = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(alreadySuspected.statusCode, alreadySuspected.body).toBe(200);
+    expect(alreadySuspected.json().status).toBe("suspected");
+
+    const confirmed = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/confirm`,
+      headers: bearer(reviewerToken),
+    });
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    expect(confirmed.json().status).toBe("confirmed");
+
+    const confirmedReopen = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(confirmedReopen.statusCode, confirmedReopen.body).toBe(409);
+    expect(confirmedReopen.json()).toEqual(
+      expect.objectContaining({
+        error: "duplicate_not_dismissed",
+        message: expect.stringContaining("confirmed, not dismissed"),
+      }),
+    );
+
+    // Confirmed ↔ dismissed remains an ordinary decision; reopen starts only after that dismissal.
+    const dismissed = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/dismiss`,
+      headers: bearer(reviewerToken),
+    });
+    expect(dismissed.statusCode, dismissed.body).toBe(200);
+    expect(dismissed.json().status).toBe("dismissed");
+    expect(
+      (await new DedupeService().listForReview("suspected", 200)).some(
+        (candidate) => candidate.id === pair.id,
+      ),
+    ).toBe(false);
+
+    const reopened = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(reopened.statusCode, reopened.body).toBe(200);
+    expect(reopened.json()).toEqual(
+      expect.objectContaining({ id: pair.id, status: "suspected", reviewedAt: expect.any(String) }),
+    );
+    expect(
+      (await new DedupeService().listForReview("suspected", 200)).map((candidate) => candidate.id),
+    ).toContain(pair.id);
+
+    const stored = await pairBetween(`${NS}:reopen`, `${NS}:reopen-copy`);
+    expect(stored).toEqual(
+      expect.objectContaining({
+        status: "suspected",
+        reviewedBy: reviewerAccountId,
+        reviewedAt: expect.any(Date),
+      }),
+    );
+    const reopenAudits = await db
+      .select({
+        subjectKind: auditLog.subjectKind,
+        subjectId: auditLog.subjectId,
+        actorKind: auditLog.actorKind,
+        actorAccountId: auditLog.actorAccountId,
+        action: auditLog.action,
+        patch: auditLog.patch,
+      })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "duplicate"),
+          eq(auditLog.subjectId, pair.id),
+          eq(auditLog.action, "reopen"),
+        ),
+      );
+    expect(reopenAudits).toEqual([
+      {
+        subjectKind: "duplicate",
+        subjectId: pair.id,
+        actorKind: "user",
+        actorAccountId: reviewerAccountId,
+        action: "reopen",
+        patch: { status: { before: "dismissed", after: "suspected" } },
+      },
+    ]);
+
+    const repeated = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(repeated.statusCode, repeated.body).toBe(200);
+    expect(repeated.json()).toEqual(reopened.json());
+    const auditCount = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "duplicate"),
+          eq(auditLog.subjectId, pair.id),
+          eq(auditLog.action, "reopen"),
+        ),
+      );
+    expect(auditCount).toHaveLength(1);
+
+    // These deliberately near-identical fixtures have finished their job. Remove them before the
+    // later ANN tests so they do not consume slots in the detector's fixed top-20 candidate window.
+    await db
+      .delete(opportunities)
+      .where(inArray(opportunities.publicId, [`${NS}:reopen`, `${NS}:reopen-copy`]));
+  });
+
   it("never resurrects a dismissed pair", async () => {
     const pair = await pairBetween(`${NS}:alpha`, `${NS}:probe`);
     expect(pair).toBeTruthy();
@@ -553,6 +691,14 @@ run("M3DUP duplicate detection", () => {
     expect(merged.json().survivorId).toBe(`${NS}:beta`);
     expect(merged.json().mergedId).toBe(`${NS}:beta-copy`);
     expect(merged.json().copiedFields).toEqual([]);
+
+    const reopened = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair?.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(reopened.statusCode, reopened.body).toBe(409);
+    expect(reopened.json().error).toBe("already_merged");
 
     // The loser's old public id remains a 404, enriched only with its currently-public survivor.
     const formerPublic = await app.inject({ url: `/v1/opportunities/${NS}:beta-copy` });

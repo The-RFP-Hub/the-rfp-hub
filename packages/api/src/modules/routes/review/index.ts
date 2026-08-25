@@ -24,6 +24,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     required: ["id"],
     properties: { id: { type: "string", pattern: "^[0-9]+$" } },
   };
+  const reopenPairParams = {
+    type: "object",
+    required: ["pairId"],
+    properties: { pairId: { type: "string", pattern: "^[0-9]+$" } },
+  };
   const errors = {
     401: { $ref: "ErrorResponse#" },
     403: { $ref: "ErrorResponse#" },
@@ -46,6 +51,17 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     properties: {
       ...claimDecidedConflict.properties,
       error: { type: "string", enum: ["claim_decided", "opportunity_merged"] },
+    },
+  };
+  const duplicateReopenConflict = {
+    type: "object",
+    additionalProperties: false,
+    description:
+      "`already_merged` when the pair is terminal; `duplicate_not_dismissed` when it is confirmed and must use the existing duplicate decision actions.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", enum: ["already_merged", "duplicate_not_dismissed"] },
+      message: { type: "string" },
     },
   };
 
@@ -259,6 +275,28 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       },
     },
     reviewController.dismissDuplicate,
+  );
+
+  router.post(
+    "/duplicates/:pairId/reopen",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "reopenDuplicate",
+        tags: ["review"],
+        summary: "Return a dismissed pair to the suspected duplicate queue",
+        description:
+          "Idempotent for an already-suspected pair. A merged pair is terminal, while a confirmed pair remains a duplicate decision and must use the existing confirm/dismiss actions.",
+        security: [{ bearerAuth: [] }],
+        params: reopenPairParams,
+        response: {
+          200: { $ref: "DuplicatePair#" },
+          409: duplicateReopenConflict,
+          ...errors,
+        },
+      },
+    },
+    reviewController.reopenDuplicate,
   );
 
   router.post(
