@@ -329,12 +329,21 @@ export class DedupeService {
    * result: a pair can leave the top 20 while still being over the threshold, and deleting it then
    * would silently drop a real match. A counterpart with no stored vector is left alone — there is
    * nothing to compare it to, which is not the same as being dissimilar.
+   *
+   * "No stored vector" MEANS no vector in this provider's space. The join carries the same
+   * model-and-provider predicate as `search()`, because during a provider switch a counterpart's
+   * row may still hold the OLD space's coordinates: a cosine across spaces is a meaningless number
+   * that typically lands below any threshold, and without the predicate this method read it as
+   * "dissimilar" and deleted a pair that was never re-measured. The backfill re-embeds the
+   * counterpart eventually; until then its pairs are left exactly as the comment above promises.
    */
   private async pruneStalePairs(
     opportunityId: number,
     vector: number[],
     threshold: number,
   ): Promise<void> {
+    const provider = this.provider;
+    if (!provider) return;
     const counterpart = sql`case when ${opportunityDuplicates.opportunityId} = ${opportunityId} then ${opportunityDuplicates.duplicateOfId} else ${opportunityDuplicates.opportunityId} end`;
 
     const rows = await this.db
@@ -345,7 +354,11 @@ export class DedupeService {
       .from(opportunityDuplicates)
       .innerJoin(
         opportunityEmbeddings,
-        sql`${opportunityEmbeddings.opportunityId} = ${counterpart}`,
+        and(
+          sql`${opportunityEmbeddings.opportunityId} = ${counterpart}`,
+          eq(opportunityEmbeddings.model, provider.model),
+          eq(opportunityEmbeddings.providerId, provider.id),
+        ),
       )
       .where(
         and(
