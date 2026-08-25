@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SIMILARITY_THRESHOLD,
+  mailgunCredentialWarning,
   readAllowPrivateHosts,
   readAnalyticsHmacKey,
   readBoolean,
@@ -15,7 +16,6 @@ import {
   readEmbeddingProvider,
   readList,
   readMailgunApiBase,
-  readMailgunCredentials,
   readPem,
   readPort,
   readPositiveInt,
@@ -395,54 +395,34 @@ describe("readMailgunApiBase", () => {
   });
 });
 
-describe("readMailgunCredentials", () => {
-  it("passes the pair through when both halves are present", () => {
-    expect(readMailgunCredentials("mailgun", "key-abc", "mg.example.org", true)).toEqual({
-      apiKey: "key-abc",
-      domain: "mg.example.org",
-    });
+describe("mailgunCredentialWarning", () => {
+  const email = (apiKey?: string, domain?: string, transport = "mailgun" as const) => ({
+    transport,
+    mailgunApiKey: apiKey,
+    mailgunDomain: domain,
   });
 
-  // THE GUARD. The key is the send credential and the domain is part of the send URL, so half a
-  // pair delivers exactly as much mail as none of it — and it would present as "the code never
-  // arrived", for every user at once, with nothing in the logs.
-  it("refuses to boot under NODE_ENV=production with either half missing", () => {
-    expect(() => readMailgunCredentials("mailgun", undefined, "mg.example.org", true)).toThrow(
-      /MAILGUN_API_KEY/,
+  it("says nothing when the pair is complete, or when mailgun is not the transport", () => {
+    expect(mailgunCredentialWarning(email("key-abc", "mg.example.org"))).toBeUndefined();
+    expect(mailgunCredentialWarning({ ...email(), transport: "ses" })).toBeUndefined();
+  });
+
+  // THE DESIGN CORRECTION this function records: a half-configured pair used to REFUSE the boot,
+  // which crash-looped a whole deployment over a mail key — the public surface held hostage to a
+  // credential nothing on it needs. Now it is one loud line naming exactly what is missing, and
+  // the 503 on the sender routes (deliversEmail) carries the enforcement.
+  it("names exactly the missing key(s), and never throws", () => {
+    expect(mailgunCredentialWarning(email(undefined, "mg.example.org"))).toContain(
+      "MAILGUN_API_KEY",
     );
-    expect(() => readMailgunCredentials("mailgun", "key-abc", undefined, true)).toThrow(
-      /MAILGUN_DOMAIN/,
+    expect(mailgunCredentialWarning(email(undefined, "mg.example.org"))).not.toContain(
+      "MAILGUN_DOMAIN",
     );
-    // Both, named in one message: a deployment that fixes one and redeploys to hear about the
-    // other has paid for two deploys to learn one thing.
-    const both = (() => {
-      try {
-        readMailgunCredentials("mailgun", undefined, undefined, true);
-      } catch (error) {
-        return error instanceof Error ? error.message : String(error);
-      }
-      return "";
-    })();
-    expect(both).toContain("MAILGUN_API_KEY");
-    expect(both).toContain("MAILGUN_DOMAIN");
-  });
-
-  // Only when it is the transport in use: a production deployment on SES holds no Mailgun key and
-  // must not be refused for it.
-  it("says nothing about a transport that is not mailgun", () => {
-    expect(readMailgunCredentials("ses", undefined, undefined, true)).toEqual({
-      apiKey: undefined,
-      domain: undefined,
-    });
-  });
-
-  // Off the production path it passes through; the transport itself refuses when it is built, so a
-  // developer still hears about it — see email-transport.test.ts.
-  it("does not refuse outside production", () => {
-    expect(readMailgunCredentials("mailgun", undefined, undefined, false)).toEqual({
-      apiKey: undefined,
-      domain: undefined,
-    });
+    expect(mailgunCredentialWarning(email("key-abc", undefined))).toContain("MAILGUN_DOMAIN");
+    const both = mailgunCredentialWarning(email());
+    expect(both).toContain("MAILGUN_API_KEY and MAILGUN_DOMAIN");
+    expect(both).toContain("503");
+    expect(both).toContain("keeps");
   });
 });
 
