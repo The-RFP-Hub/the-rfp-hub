@@ -495,6 +495,51 @@ caption {
   flex-wrap: wrap;
 }
 
+/*
+ * One compact route through the publisher workflow. The current step is weight plus a rule; the
+ * skipped review step says why in words, so neither progress nor direct publication depends on
+ * colour. The ordered-list semantics remain even though the visual separators are arrows.
+ */
+.publisher-journey {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0;
+  margin: 0.55rem 0 1.2rem;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.publisher-journey li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  color: var(--ink-soft);
+}
+
+.publisher-journey li:not(:last-child)::after {
+  content: "→";
+  margin-left: 0.1rem;
+  color: var(--ink-faint);
+  font-weight: 400;
+}
+
+.publisher-journey li[data-state="complete"],
+.publisher-journey li[aria-current="step"] {
+  color: var(--ink);
+}
+
+.publisher-journey li[aria-current="step"] > :first-child {
+  border-bottom: 2px solid var(--ink);
+  font-weight: 700;
+}
+
+.publisher-journey-note {
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
 .stack {
   display: flex;
   flex-direction: column;

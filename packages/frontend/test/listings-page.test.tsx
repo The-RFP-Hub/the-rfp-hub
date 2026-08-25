@@ -147,6 +147,29 @@ describe("the merged row on Your listings", () => {
     );
   });
 
+  it("loads pending count for a verified member and shows the journey when one exists", async () => {
+    const api = client([]);
+    api.me.get = async () => ({
+      ...me,
+      memberships: [{ slug: "acme", name: "Acme Foundation", role: "publisher", verified: true }],
+    });
+    const opportunities = vi.fn(async (query?: { publisherStatus?: PublisherStatus }) =>
+      query?.publisherStatus === "pending" ? { ...page([]), total: 1 } : page([]),
+    );
+    api.me.opportunities = opportunities;
+
+    render(
+      <ApiClientProvider value={api}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    const journey = await screen.findByRole("list", { name: "Publishing journey" });
+    expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("In review");
+    expect(opportunities).toHaveBeenCalledWith({ publisherStatus: "pending", limit: 1 });
+    expect(screen.queryByText(/submission slots in review/)).toBeNull();
+  });
+
   it("explains that the duplicate queue identifies both sides", async () => {
     const api = client();
     api.me.duplicates = async () => ({

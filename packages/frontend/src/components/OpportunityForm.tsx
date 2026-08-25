@@ -28,6 +28,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  *    waiting to happen.
  */
 import styles from "@/components/OpportunityForm.module.css";
+import { PublisherJourney } from "@/components/PublisherJourney";
 import { PublisherStatusBadge } from "@/components/badges";
 import {
   CheckField,
@@ -2045,9 +2046,18 @@ function SubmissionOutcome({
 }) {
   const source = { mergedInto: null, reviewStatus: result.reviewStatus, isListed: result.isListed };
   const status = publisherStatus(source);
+  const journey =
+    mode === "create" && result.reviewStatus === "pending"
+      ? { current: "review" as const, reviewSkipped: false }
+      : mode === "create" && result.reviewStatus === "approved" && result.isListed
+        ? { current: "live" as const, reviewSkipped: true }
+        : null;
   return (
     <output className={`card ${styles.outcome}`}>
       <h2>{result.created ? "Submitted." : "Replaced."}</h2>
+      {journey ? (
+        <PublisherJourney current={journey.current} reviewSkipped={journey.reviewSkipped} />
+      ) : null}
       <p>
         <PublisherStatusBadge source={source} />
       </p>

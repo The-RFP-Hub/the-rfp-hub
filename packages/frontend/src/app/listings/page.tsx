@@ -14,6 +14,7 @@
  * the README rather than pretended away.
  */
 import { RequireSession } from "@/components/Chrome";
+import { PublisherJourney } from "@/components/PublisherJourney";
 import { UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, PublisherStatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
@@ -97,16 +98,16 @@ function Listings({ me }: { me: Me }) {
    * it cannot come from the table above — that list is filtered, paginated, and usually showing
    * something else. `limit: 1` because only `total` is wanted.
    *
-   * Skipped entirely for an account with a verified membership anywhere, because the API exempts
-   * those from the cap: showing somebody a limit that does not apply to them is worse than showing
-   * nothing.
+   * It runs for every account because the same cheap count also decides whether this page shows the
+   * journey at "In review". Verified memberships remove the CAP, not the possibility that a
+   * submission is pending — for example, one filed under a different namespace.
    */
   const capped = !me.memberships.some((membership) => membership.verified);
   const loadPending = useCallback(
     () => api.me.opportunities({ publisherStatus: "pending", limit: 1 }),
     [api],
   );
-  const pending = useResource(loadPending, { enabled: capped });
+  const pending = useResource(loadPending);
   const pendingTotal = pending.state.status === "ready" ? pending.state.data.total : null;
 
   return (
@@ -117,6 +118,8 @@ function Listings({ me }: { me: Me }) {
           Submit an opportunity
         </Link>
       </div>
+
+      {pendingTotal !== null && pendingTotal > 0 ? <PublisherJourney current="review" /> : null}
 
       {capped && pendingTotal !== null && pendingTotal >= PENDING_WARN_AT ? (
         <p className="note">

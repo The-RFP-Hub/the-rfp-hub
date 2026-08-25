@@ -10,6 +10,7 @@
  */
 import { RequireSession } from "@/components/Chrome";
 import { OpportunityForm } from "@/components/OpportunityForm";
+import { PublisherJourney } from "@/components/PublisherJourney";
 import { emptyForm } from "@/lib/opportunity-form";
 import { ROUTE_GATE_COPY } from "@/lib/presentation";
 
@@ -21,6 +22,7 @@ export default function NewListingPage() {
         return (
           <section>
             <h1>Submit an opportunity</h1>
+            <PublisherJourney current="submit" />
             {verified.length > 0 ? (
               <p className="muted footnote">
                 This account publishes into{" "}

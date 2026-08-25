@@ -18,6 +18,7 @@ import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
  */
 import { OpportunityForm } from "@/components/OpportunityForm";
 import styles from "@/components/OpportunityForm.module.css";
+import { PublisherJourney } from "@/components/PublisherJourney";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import {
@@ -870,6 +871,14 @@ describe("drafts and dirty navigation", () => {
 });
 
 describe("after a submission", () => {
+  it("starts the blank submission journey at Submit", () => {
+    render(<PublisherJourney current="submit" />);
+
+    const journey = screen.getByRole("list", { name: "Publishing journey" });
+    expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("Submit");
+    expect(within(journey).getAllByRole("listitem")).toHaveLength(3);
+  });
+
   it("replaces the form, so the same opportunity cannot be sent twice", async () => {
     const api = mount();
     submit();
@@ -877,6 +886,9 @@ describe("after a submission", () => {
     await waitFor(() => expect(screen.getByText("Submitted.")).toBeTruthy());
     expect(screen.getByText("Live", { selector: ".badge-live" })).toBeTruthy();
     expect(api.create).toHaveBeenCalledTimes(1);
+    const journey = screen.getByRole("list", { name: "Publishing journey" });
+    expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("Live");
+    expect(within(journey).getByText("Review not required")).toBeTruthy();
     // The whole form is gone — there is no second Submit to press.
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.queryByLabelText("Title")).toBeNull();
@@ -896,6 +908,9 @@ describe("after a submission", () => {
 
     await waitFor(() => expect(screen.getByText(/Stored as a pending submission/)).toBeTruthy());
     expect(screen.getByText("Waiting for review", { selector: ".badge-pending" })).toBeTruthy();
+    const journey = screen.getByRole("list", { name: "Publishing journey" });
+    expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("In review");
+    expect(within(journey).queryByText("Review not required")).toBeNull();
   });
 
   it("calls an approved but unlisted submission hidden rather than live", async () => {
