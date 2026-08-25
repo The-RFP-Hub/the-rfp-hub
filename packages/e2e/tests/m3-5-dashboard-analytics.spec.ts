@@ -227,7 +227,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     // opportunity gets submitted twice, so the panel's presence and the form's absence are one
     // assertion about the same fix.
     await expect(page.getByRole("heading", { name: "Submitted." })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open this listing" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "View it as applicants see it" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Submit another" })).toBeVisible();
     await expect(submit, "the form is gone, so it cannot be sent again").toHaveCount(0);
 
@@ -240,12 +240,14 @@ test.describe("M3-5 the signed-in dashboard", () => {
     expect(stored.status, "the entry the form created must exist at the API").toBe(200);
     expect(stored.body.title).toBe(`Dashboard form entry ${localId}`);
 
-    // "Open this listing" goes to the row that was just created, which is the only thing that makes
-    // the panel a way forward rather than a dead end.
-    await page.getByRole("link", { name: "Open this listing" }).click();
+    // The primary action goes to the public page that applicants see, which proves the successful
+    // direct publication is more than a row in the publisher workbench.
+    await page.getByRole("link", { name: "View it as applicants see it" }).click();
     // Compared on the DECODED path: an id carries a colon, which is percent-encoded in the address
     // and would make a literal comparison a test of the encoder rather than of the destination.
-    await expect(page).toHaveURL((url) => decodeURIComponent(url.pathname) === `/listings/${id}`);
+    await expect(page).toHaveURL(
+      (url) => decodeURIComponent(url.pathname) === `/opportunities/${id}`,
+    );
   });
 
   test("a key's secret is shown once and is gone after a reload", async ({ page, stack }) => {

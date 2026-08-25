@@ -29,6 +29,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  */
 import styles from "@/components/OpportunityForm.module.css";
 import { PublisherJourney } from "@/components/PublisherJourney";
+import { UntrustedText } from "@/components/UntrustedText";
 import { PublisherStatusBadge } from "@/components/badges";
 import {
   CheckField,
@@ -2046,6 +2047,7 @@ function SubmissionOutcome({
 }) {
   const source = { mergedInto: null, reviewStatus: result.reviewStatus, isListed: result.isListed };
   const status = publisherStatus(source);
+  const hasPublicPage = result.reviewStatus === "approved" && result.isListed;
   const journey =
     mode === "create" && result.reviewStatus === "pending"
       ? { current: "review" as const, reviewSkipped: false }
@@ -2058,6 +2060,11 @@ function SubmissionOutcome({
       {journey ? (
         <PublisherJourney current={journey.current} reviewSkipped={journey.reviewSkipped} />
       ) : null}
+      <p className="lede">
+        <strong>
+          <UntrustedText value={result.opportunity.title} />
+        </strong>
+      </p>
       <p>
         <PublisherStatusBadge source={source} />
       </p>
@@ -2098,11 +2105,14 @@ function SubmissionOutcome({
         </>
       ) : null}
       <p className="row">
-        <GuardedLink href={`/listings/${encodeURIComponent(result.opportunity.id)}`}>
-          Open this listing
+        <GuardedLink
+          className="button-primary"
+          href={`/${hasPublicPage ? "opportunities" : "listings"}/${encodeURIComponent(result.opportunity.id)}`}
+        >
+          {hasPublicPage ? "View it as applicants see it" : "Open this listing"}
         </GuardedLink>
         <button type="button" onClick={onAgain}>
-          {mode === "create" ? "Submit another" : "Keep editing"}
+          {mode === "create" ? "Submit another" : "Continue editing"}
         </button>
       </p>
     </output>

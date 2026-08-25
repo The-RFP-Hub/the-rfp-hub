@@ -864,7 +864,7 @@ describe("drafts and dirty navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Replace" }));
 
     await waitFor(() => expect(api.replace).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("link", { name: "Open this listing" }));
+    fireEvent.click(screen.getByRole("link", { name: "View it as applicants see it" }));
     expect(confirm).not.toHaveBeenCalled();
     confirm.mockRestore();
   });
@@ -885,6 +885,7 @@ describe("after a submission", () => {
 
     await waitFor(() => expect(screen.getByText("Submitted.")).toBeTruthy());
     expect(screen.getByText("Live", { selector: ".badge-live" })).toBeTruthy();
+    expect(screen.getByText("Round One").closest("strong")).toBeTruthy();
     expect(api.create).toHaveBeenCalledTimes(1);
     const journey = screen.getByRole("list", { name: "Publishing journey" });
     expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("Live");
@@ -892,8 +893,13 @@ describe("after a submission", () => {
     // The whole form is gone — there is no second Submit to press.
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.queryByLabelText("Title")).toBeNull();
-    expect(screen.getByRole("link", { name: "Open this listing" }).getAttribute("href")).toBe(
-      "/listings/acme%3Around-one",
+    const primary = screen.getByRole("link", { name: "View it as applicants see it" });
+    const secondary = screen.getByRole("button", { name: "Submit another" });
+    expect(primary.getAttribute("href")).toBe("/opportunities/acme%3Around-one");
+    expect(primary.className).toContain("button-primary");
+    expect(secondary.className).not.toContain("button-primary");
+    expect(primary.compareDocumentPosition(secondary) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(
+      0,
     );
   });
 
@@ -911,6 +917,9 @@ describe("after a submission", () => {
     const journey = screen.getByRole("list", { name: "Publishing journey" });
     expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("In review");
     expect(within(journey).queryByText("Review not required")).toBeNull();
+    expect(screen.getByRole("link", { name: "Open this listing" }).getAttribute("href")).toBe(
+      "/listings/acme%3Around-one",
+    );
   });
 
   it("calls an approved but unlisted submission hidden rather than live", async () => {
@@ -924,6 +933,9 @@ describe("after a submission", () => {
 
     await waitFor(() => expect(screen.getByText("Hidden from directory")).toBeTruthy());
     expect(screen.getByText("Approved, but hidden from the public directory.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open this listing" }).getAttribute("href")).toBe(
+      "/listings/acme%3Around-one",
+    );
   });
 
   it("offers a fresh form rather than the one that was just sent", async () => {
@@ -961,7 +973,10 @@ describe("after a submission", () => {
     await waitFor(() => expect(screen.getByText("Replaced.")).toBeTruthy());
     expect(api.replace).toHaveBeenCalledWith("acme:round-one", expect.anything());
 
-    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(
+      screen.getByRole("link", { name: "View it as applicants see it" }).getAttribute("href"),
+    ).toBe("/opportunities/acme%3Around-one");
+    fireEvent.click(screen.getByRole("button", { name: "Continue editing" }));
     expect(valueIn(screen.getByLabelText("Title"))).toBe("Round One");
   });
 });
