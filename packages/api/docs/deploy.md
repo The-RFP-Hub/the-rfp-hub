@@ -230,7 +230,10 @@ DATABASE_URL=… pnpm --filter @the-rfp-hub/api grant-admin -- --email you@examp
 ```
 
 The address is a **lookup**: it resolves through the identity table to the opaque subject the
-`accounts` row stores. An address nobody has signed in as is a refusal that says so.
+`accounts` row stores. An address nobody has signed in as is a refusal that says so. `--create` is
+there because signing in makes the identity but not the `accounts` row — that is provisioned lazily
+on the identity's first authenticated `/v1` request, which has not happened yet immediately after
+sign-in. Without `--create` the same run refuses with "no account for that subject".
 
 It echoes the `host:port/database` it resolved (never the URL — that carries a password), refuses a
 non-loopback target without `--allow-remote`, refuses to write without `--yes`, exits non-zero on
