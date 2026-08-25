@@ -830,35 +830,44 @@ held to containment on replace — a foreign-operated one is still rejected.
 - **ID scheme** — `public_id` as a human namespaced slug vs opaque ULID. Slug is friendlier and
   matches the standard examples. **Settled for M3:** the derivation rule is `<namespace>:<local>`,
   enforced on write (see "Standard ↔ storage mapping").
-- **Embedding model/dim** — `vector(1536)` matches `text-embedding-3-small`, and the deterministic
-  CI provider projects to the same width so both fit one column. Changing the dimension is a
-  migration, not a config change; changing the *provider* is a config change, which is why
-  `provider_id` is stored and is part of `content_hash`.
+- **Embedding model/dim** — `vector(1536)` is the width the lexical featurizer's hashed bag
+  projects to, and the sweep measured it saturated: 4096 dimensions buy a band improvement of
+  0.001 over 1536, so a wider vector is a migration that purchases nothing. Changing the dimension
+  is a migration, not a config change; changing the *model or weighting* is a model-string change,
+  which is why `provider_id` and `model` are stored and are part of `content_hash` — the backfill
+  re-embeds exactly what stops matching.
 - **Dedup threshold** — the operating point is **per provider**, because a cosine means different
   things in a learned 1536-dimension space and in a hashed token bag.
 
-  **`deterministic` is settled at 0.74.** `pnpm --filter @the-rfp-hub/api dedupe:threshold` sweeps
-  pairs derived from the committed corpus — positives are the realistic duplicate (the same
-  programme reworded the way a second publisher would write it: site furniture on the title, a body
-  with a sixth of the words dropped and the domain's near-synonyms swapped), negatives are distinct
-  corpus records paired at a fixed stride, so they share the whole domain vocabulary rather than
-  nothing. Over 12 of each:
+  **`lexical` is settled at 0.75.** `pnpm --filter @the-rfp-hub/api dedupe:threshold` sweeps the
+  committed corpus: positives are six deterministic mutation classes of the realistic duplicate
+  (from the honest re-listing to the evasive rewrite), and negatives are EVERY distinct pair of
+  corpus documents — the full pairwise scan, because the stride sample this report once used
+  missed the hardest cases entirely (the unweighted bag's honest band was 0.018, with sixteen
+  real corpus pairs above its threshold; the fix is the idf² weighting the featurizer now carries).
 
   | | value |
   |---|---|
-  | worst positive | 0.911 |
-  | best negative | 0.571 (two genuinely adjacent grant rounds from one publisher) |
-  | separation margin | 0.340 |
-  | operating point | **0.74** — the midpoint of the band, not its edge |
+  | worst positive (M0 paraphrase) | 0.913 |
+  | hardest of 12 720 corpus negatives | 0.592 |
+  | separation margin | 0.321 |
+  | corpus pairs at or above the threshold | **0** |
+  | operating point | **0.75** — the midpoint of the band, not its edge |
 
-  `test/unit/dedupe-threshold.test.ts` re-derives those pairs on every commit and fails if the
-  classes stop separating, if either class falls below 8 pairs, if the margin drops under 0.15, or
-  if the threshold ends up within 0.05 of either class. A corpus change that closes the band is
-  therefore a red build and a decision to make again, not a silent loss of detection.
+  The mutation ladder is recorded honestly, limits included: heavy synonym swaps and
+  synonym-plus-compression are caught at full recall; a body truncated to 40 % (M3), or truncated
+  AND compressed AND reordered (M5), is asserted at zero AT THE CONFIGURED THRESHOLD — a property
+  of the mid-band operating point chosen for false-positive headroom, not an absolute bound (the
+  same featurizer recovers both rungs at its zero-false-positive point, which the report prints).
+  Closing that gap without spending the headroom is the case for structural signals, which need
+  their own labelled data first. A held-out check (weights from half the corpus, band measured on
+  the other half) guards the frozen idf table against overfitting its source.
 
-  **`openai` 0.86 remains provisional.** Settling it needs a credential this public repository does
-  not have and must not have, so the sweep cannot run against that space in CI. The number is a
-  documented starting point; a real-model run is an optional smoke test for whoever holds a key.
+  `test/unit/dedupe-threshold.test.ts` re-derives all of it on every commit and fails if the
+  classes stop separating, if the margin drops under 0.30, if any corpus pair crosses the
+  threshold, or if the threshold ends up within 0.05 of either class. A corpus change that closes
+  the band is therefore a red build and a decision to make again, not a silent loss of
+  detection.
 - **Public analytics beacon** — dropped from M3 on purpose: an unauthenticated event endpoint lets
   anyone fabricate a publisher's numbers, and rate limiting is not integrity. A beacon with
   short-lived signed event tokens is the M4 shape.

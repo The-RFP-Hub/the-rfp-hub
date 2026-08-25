@@ -267,9 +267,18 @@ Before the first M3 job run on any deployment, in order:
 |---|---|
 | `analytics-rollup` | none. It reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
 | `retention` | `ANALYTICS_RETENTION_DAYS` (default 180) |
-| `embedding-backfill` | `EMBEDDING_PROVIDER`, `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_TIMEOUT_MS`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
+| `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
+
+After a **model-string change** (a new featurizer weighting or a refreshed idf table), every stored
+vector is stale by content-hash design and `embedding-backfill`'s first pass selects the whole
+table — run it to `remaining: 0` in the same maintenance step as the deploy. Until the drain
+finishes, NEW detection is degraded but not wrong (`search()` filters on the current model, so
+old-space vectors are invisible rather than incomparable) — while PAIRS RECORDED BY THE OLD SPACE
+remain visible in the review queue as they stand, because a suspected pair carries no model of its
+own: each is re-judged, and pruned if unalike, only when one of its entries is re-embedded. The
+drain is what retires them.
 
 `VERIFY_ALLOW_PRIVATE_HOSTS` is **never set in any deployed task definition**, including the
 maintenance one. It is a test-only SSRF escape hatch and the process refuses to boot with it enabled
