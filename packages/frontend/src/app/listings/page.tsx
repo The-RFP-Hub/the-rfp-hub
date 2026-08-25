@@ -288,9 +288,13 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
     return (
       <div className="cell-note">
         Merged into{" "}
-        <Link href={`/opportunities/${encodeURIComponent(item.mergedInto.id)}`}>
-          <UntrustedText value={item.mergedInto.title} />
-        </Link>{" "}
+        {item.mergedInto.title === null ? (
+          <UntrustedText value={item.mergedInto.id} />
+        ) : (
+          <Link href={`/opportunities/${encodeURIComponent(item.mergedInto.id)}`}>
+            <UntrustedText value={item.mergedInto.title} />
+          </Link>
+        )}{" "}
         by a reviewer. This archived record now points to that listing.
       </div>
     );

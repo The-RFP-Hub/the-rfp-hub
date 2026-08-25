@@ -11,7 +11,7 @@
  * namespace this account publishes for. The second is what a granted claim transfers — ownership
  * follows the namespace, not the original typist.
  */
-import { type SQL, and, count, desc, eq, inArray, or } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type OpportunityRow, accounts, auditLog, opportunities } from "../../../db/schema.js";
@@ -80,7 +80,16 @@ export class ManagedOpportunityService {
       .select({
         opportunity: opportunities,
         submitterHandle: accounts.handle,
-        survivor: { id: survivor.publicId, title: survivor.title },
+        survivor: {
+          id: survivor.publicId,
+          // The merge audit already entitles an owner to the survivor's id. Its current title is
+          // public data only while the survivor itself satisfies the public-read invariant.
+          title: sql<string | null>`case
+            when ${survivor.reviewStatus} = 'approved' and ${survivor.isListed}
+            then ${survivor.title}
+            else null
+          end`,
+        },
       })
       .from(opportunities)
       .leftJoin(accounts, eq(accounts.id, opportunities.submittedBy))
@@ -181,7 +190,7 @@ export class ManagedOpportunityService {
 export function toManagedView(
   row: OpportunityRow,
   submitterHandle: string | null,
-  mergedInto: { id: string; title: string } | null,
+  mergedInto: { id: string; title: string | null } | null,
   lastDecision?: ReviewDecisionSummaryView,
 ): ManagedOpportunityView {
   return {

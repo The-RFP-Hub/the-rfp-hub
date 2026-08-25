@@ -60,13 +60,13 @@ const page = (items: ManagedOpportunity[]): ManagedOpportunityList => ({
   totalPages: 1,
 });
 
-function client(): ApiClient {
+function client(items: ManagedOpportunity[] = [merged]): ApiClient {
   return {
     baseUrl: "https://api.example.com",
     me: {
       get: async () => me,
       opportunities: async (query?: { reviewStatus?: string }) =>
-        query?.reviewStatus === "pending" ? page([]) : page([merged]),
+        query?.reviewStatus === "pending" ? page([]) : page(items),
       duplicates: async () => ({ items: [] }),
     },
     opportunities: {
@@ -124,5 +124,21 @@ describe("the merged row on Your listings", () => {
     expect(screen.queryByText(/No reason was recorded/)).toBeNull();
     expect(screen.queryByText(/Editing it and saving resubmits/)).toBeNull();
     expect(screen.queryByRole("link", { name: "Fix and resubmit" })).toBeNull();
+  });
+
+  it("shows a hidden survivor's id as plain text without a public link", async () => {
+    const hiddenSurvivor = {
+      ...merged,
+      mergedInto: { id: "acme:new round", title: null },
+    } satisfies ManagedOpportunity;
+    render(
+      <ApiClientProvider value={client([hiddenSurvivor])}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("acme:new round")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "acme:new round" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Current Round" })).toBeNull();
   });
 });

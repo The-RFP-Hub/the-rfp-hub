@@ -798,11 +798,11 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: ["object", "null"],
         additionalProperties: false,
         description:
-          "The survivor of a terminal merge, using its public id and current title; null for an active or ordinary managed row.",
+          "The survivor of a terminal merge. Its id remains visible to the owner through the merge audit; its current title is present only while the survivor is approved and listed. Null for an active or ordinary managed row.",
         required: ["id", "title"],
         properties: {
           id: { type: "string" },
-          title: { type: "string" },
+          title: { type: ["string", "null"] },
         },
       },
       lastDecision: {

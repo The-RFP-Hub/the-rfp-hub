@@ -193,6 +193,16 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "error",
       "mergedInto",
     ]);
+    expect(
+      [
+        ...doc.components.schemas.ManagedOpportunity.properties.mergedInto.properties.title.type,
+      ].sort(),
+    ).toEqual(["null", "string"]);
+    for (const path of ["/v1/review/claims/{id}/approve", "/v1/review/claims/{id}/reject"]) {
+      const conflict = doc.paths[path].post.responses["409"].content["application/json"].schema;
+      expect(conflict.properties.error.enum).toEqual(["claim_decided", "opportunity_merged"]);
+      expect(conflict.description).toContain("opportunity_merged");
+    }
     // no trailing-slash paths, and every operation carries a unique operationId
     const operationIds: string[] = [];
     for (const [path, ops] of Object.entries<Record<string, { operationId?: string }>>(doc.paths)) {

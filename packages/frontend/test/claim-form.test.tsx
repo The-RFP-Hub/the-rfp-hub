@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 /**
  * CLAIMING FROM THE PUBLIC PAGE, including the session boundary around the extracted form.
  *
@@ -11,8 +13,6 @@ import { ApiClientProvider } from "@/lib/api-context";
 import { AuthRoot } from "@/lib/auth-root";
 import type { ClaimResult, Me, MeMembership } from "@/lib/types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { authSession } = vi.hoisted(() => ({
@@ -112,11 +112,12 @@ afterEach(() => {
 
 describe("the public claim control", () => {
   it("opens the existing sign-in overlay from the signed-out CTA without requesting /v1/me", async () => {
-    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(
-        JSON.stringify({ status: "ok", db: "up", auth: { google: false } }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ status: "ok", db: "up", auth: { google: false } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
     vi.stubGlobal("fetch", fetch);
 
@@ -230,10 +231,7 @@ describe("the extracted claim form", () => {
   });
 
   it("keeps the private listing page free of claim UI and claim calls", () => {
-    const source = readFileSync(
-      join(process.cwd(), "src/app/listings/[id]/page.tsx"),
-      "utf8",
-    );
+    const source = readFileSync(join(process.cwd(), "src/app/listings/[id]/page.tsx"), "utf8");
 
     expect(source).not.toContain("ClaimForm");
     expect(source).not.toContain("opportunities.claim");

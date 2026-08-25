@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 /**
  * THE PUBLIC READ INVARIANT, re-proved after every mutation type this wave introduces.
  *
@@ -144,11 +144,36 @@ run("M3INV the public read invariant", () => {
     const byPublicId = new Map(rows.map((row) => [row.publicId, row.id]));
     const low = Math.min(byPublicId.get(survivorId) as number, byPublicId.get(loserId) as number);
     const high = Math.max(byPublicId.get(survivorId) as number, byPublicId.get(loserId) as number);
-    const inserted = await db
-      .insert(opportunityDuplicates)
-      .values({ opportunityId: low, duplicateOfId: high, similarity: "0.99" })
-      .returning({ id: opportunityDuplicates.id });
-    await new DedupeService().merge(reviewerId, inserted[0]?.id as number, {
+    // With deterministic embeddings, submit-time detection has already inserted this pair. With
+    // embeddings disabled (the local default), the test must create it itself. Resolve either
+    // orientation before inserting so the invariant is proved in both environments without
+    // violating the unordered pair's expression-backed unique index.
+    const existing = await db
+      .select({ id: opportunityDuplicates.id })
+      .from(opportunityDuplicates)
+      .where(
+        or(
+          and(
+            eq(opportunityDuplicates.opportunityId, low),
+            eq(opportunityDuplicates.duplicateOfId, high),
+          ),
+          and(
+            eq(opportunityDuplicates.opportunityId, high),
+            eq(opportunityDuplicates.duplicateOfId, low),
+          ),
+        ),
+      )
+      .limit(1);
+    const pair =
+      existing[0] ??
+      (
+        await db
+          .insert(opportunityDuplicates)
+          .values({ opportunityId: low, duplicateOfId: high, similarity: "0.99" })
+          .returning({ id: opportunityDuplicates.id })
+      )[0];
+    expect(pair, "the merge pair exists with either embedding configuration").toBeDefined();
+    await new DedupeService().merge(reviewerId, pair?.id as number, {
       survivorId,
     });
 

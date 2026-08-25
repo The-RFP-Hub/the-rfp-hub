@@ -323,8 +323,8 @@ export interface ManagedOpportunityView {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
-  /** The public listing this archived record was merged into, with its current title. */
-  mergedInto: { id: string; title: string } | null;
+  /** The survivor, whose title is present only while it is currently public. */
+  mergedInto: { id: string; title: string | null } | null;
   /** The newest approve/reject on this entry, or null while nobody has decided anything. */
   lastDecision: ReviewDecisionSummaryView | null;
   createdAt: string;

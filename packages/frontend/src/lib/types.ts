@@ -332,8 +332,8 @@ export interface ManagedOpportunity {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
-  /** The public listing this terminal record was merged into, with its current title. */
-  mergedInto: { id: string; title: string } | null;
+  /** The merge survivor; its title is withheld while that survivor is not publicly visible. */
+  mergedInto: { id: string; title: string | null } | null;
   /** The newest decision on this listing, or null while nobody has decided anything. */
   lastDecision: ReviewDecisionSummary | null;
   createdAt: string;

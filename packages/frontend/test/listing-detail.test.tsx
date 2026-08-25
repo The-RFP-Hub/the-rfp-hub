@@ -67,14 +67,14 @@ const managed: ManagedOpportunity = {
   updatedAt: "2026-08-20T00:00:00Z",
 };
 
-function client(): ApiClient {
+function client(managedOpportunity: ManagedOpportunity = managed): ApiClient {
   return {
     baseUrl: "https://api.example.com",
     me: {
       get: async () => me,
       opportunity: async () => entry,
       opportunities: async () => ({
-        items: [managed],
+        items: [managedOpportunity],
         page: 1,
         limit: 1,
         total: 1,
@@ -141,6 +141,24 @@ describe("merged listing detail and edit routes", () => {
     expect(screen.getByRole("link", { name: "Current Round" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Replace" })).toBeNull();
     expect(screen.queryByText(/A replace re-runs Standard validation/)).toBeNull();
+  });
+
+  it("renders a hidden survivor's id without a public link on detail and edit", async () => {
+    const hiddenSurvivor = {
+      ...managed,
+      mergedInto: { id: "acme:current round", title: null },
+    } satisfies ManagedOpportunity;
+
+    const detail = mount(<ListingPage />, client(hiddenSurvivor));
+    const detailBanner = await screen.findByLabelText("Merged listing");
+    expect(detailBanner.textContent).toContain("acme:current round");
+    expect(screen.queryByRole("link", { name: "acme:current round" })).toBeNull();
+    detail.unmount();
+
+    mount(<EditListingPage />, client(hiddenSurvivor));
+    const editBanner = await screen.findByLabelText("Merged listing");
+    expect(editBanner.textContent).toContain("acme:current round");
+    expect(screen.queryByRole("link", { name: "acme:current round" })).toBeNull();
   });
 
   it("names the loaded listing in its duplicate rows and routes counterparts by publicity", async () => {

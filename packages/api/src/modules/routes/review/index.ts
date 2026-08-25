@@ -29,6 +29,17 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     403: { $ref: "ErrorResponse#" },
     404: { $ref: "ErrorResponse#" },
   };
+  const claimDecisionConflict = {
+    type: "object",
+    additionalProperties: false,
+    description:
+      "`claim_decided` when the claim is no longer pending; `opportunity_merged` when its listing has become a terminal merge loser.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", enum: ["claim_decided", "opportunity_merged"] },
+      message: { type: "string" },
+    },
+  };
 
   router.get(
     "/opportunities",
@@ -316,7 +327,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { verifyOrganization: { type: "boolean" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecisionConflict, ...errors },
       },
     },
     reviewController.approveClaim,
@@ -336,7 +347,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           required: ["id"],
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecisionConflict, ...errors },
       },
     },
     reviewController.rejectClaim,

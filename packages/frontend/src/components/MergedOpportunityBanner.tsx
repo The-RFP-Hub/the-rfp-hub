@@ -13,9 +13,13 @@ export function MergedOpportunityBanner({
       <p className="empty-title">This listing has been merged.</p>
       <p>
         Merged into{" "}
-        <Link href={`/opportunities/${encodeURIComponent(mergedInto.id)}`}>
-          <UntrustedText value={mergedInto.title} />
-        </Link>{" "}
+        {mergedInto.title === null ? (
+          <UntrustedText value={mergedInto.id} />
+        ) : (
+          <Link href={`/opportunities/${encodeURIComponent(mergedInto.id)}`}>
+            <UntrustedText value={mergedInto.title} />
+          </Link>
+        )}{" "}
         by a reviewer. This archived record now points to that listing.
       </p>
     </aside>

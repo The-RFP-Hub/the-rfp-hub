@@ -593,6 +593,35 @@ run("M3DUP duplicate detection", () => {
       }),
     ]);
 
+    // The owner remains entitled to the survivor id through the merge audit, but unlisting the
+    // survivor makes its current title private and removes the public destination the UI could
+    // safely link to.
+    const unlisted = await app.inject({
+      method: "PATCH",
+      url: `/v1/review/opportunities/${NS}:beta`,
+      headers: bearer(reviewerToken),
+      payload: { isListed: false },
+    });
+    expect(unlisted.statusCode, unlisted.body).toBe(200);
+    const mineWithHiddenSurvivor = await app.inject({
+      url: `/v1/me/opportunities?id=${encodeURIComponent(`${NS}:beta-copy`)}`,
+      headers: bearer(publisherToken),
+    });
+    expect(mineWithHiddenSurvivor.statusCode, mineWithHiddenSurvivor.body).toBe(200);
+    expect(mineWithHiddenSurvivor.json().items).toEqual([
+      expect.objectContaining({
+        id: `${NS}:beta-copy`,
+        mergedInto: { id: `${NS}:beta`, title: null },
+      }),
+    ]);
+    const relisted = await app.inject({
+      method: "PATCH",
+      url: `/v1/review/opportunities/${NS}:beta`,
+      headers: bearer(reviewerToken),
+      payload: { isListed: true },
+    });
+    expect(relisted.statusCode, relisted.body).toBe(200);
+
     // A merge is terminal at the services that own every revival path: create/replace, both
     // approval authorities, and the listing decision route all return the same stable conflict.
     const loserDocument = entry(

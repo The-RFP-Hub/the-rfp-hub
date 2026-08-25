@@ -469,6 +469,12 @@ export class ClaimService {
         .limit(1);
       const entry = entryRows[0];
       if (!entry) throw notFound(`no opportunity for claim ${claimId}.`);
+      if (entry.mergedIntoId !== null) {
+        throw conflict(
+          "opportunity_merged",
+          `opportunity ${JSON.stringify(entry.publicId)} has been merged and its claims cannot be decided.`,
+        );
+      }
 
       const rows = await tx
         .select({ claim: opportunityClaims, organization: organizations })
