@@ -63,7 +63,6 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `DATABASE_URL` | `DATABASE_URL` | **Runtime** connection string — the low-privilege role of §3, never the DDL role |
 | `BETTER_AUTH_SECRET` | `BETTER_AUTH_SECRET` | Signs every session token, and is checked before any database access. **≥32 random characters, different per environment** — the process refuses to boot without it under `NODE_ENV=production`. **Rotating it signs everyone out**: there is no dual-secret verification, so plan a rotation as a deliberate global sign-out |
 | `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | Only when Google sign-in is enabled. Absent → the provider is not registered at all |
-| `OPENAI_API_KEY` | `OPENAI_API_KEY` | Embedding provider credential. Absent → the deterministic provider, and dedupe reports itself unavailable rather than failing a submission |
 | `MAILGUN_API_KEY` | `MAILGUN_API_KEY` | Only when `EMAIL_TRANSPORT=mailgun`. The HTTP Basic password for the send (the user is the literal `api`). Missing → **refuses to boot** in production, because a mail transport that cannot authenticate delivers nothing to anyone |
 | `ANALYTICS_HMAC_KEY` | `ANALYTICS_HMAC_KEY` | Keys the session/IP HMAC. **Never baked**: a leaked key makes the whole IPv4 space brute-forceable against the stored hashes. Unset → a random per-boot key and a warning |
 
@@ -86,9 +85,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `DB_POOL_MAX` | `10` | Bound it on a shared instance |
 | `PUBLIC_BASE_URL` | the API's **own** origin, https | Published as `servers[0].url`; never the specification's apex |
 | `TRUST_PROXY` | the load balancer's CIDR, or a hop count | **Not a boolean.** Blanket trust lets any client spoof `X-Forwarded-For`, and that header is an analytics input. Unset → no proxy is trusted |
-| `EMBEDDING_PROVIDER` | `openai` \| `deterministic` | `deterministic` needs no key and is what CI runs |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | |
-| `EMBEDDING_TIMEOUT_MS` | `5000` | |
+| `EMBEDDING_PROVIDER` | `lexical` \| `disabled` | Needs no key and no network — the in-process lexical featurizer is the default and the detector everywhere, CI included |
 | `DEDUPE_SIMILARITY_THRESHOLD` | per-provider default | Thresholds are **not** comparable between providers |
 | `DEDUPE_MAX_MATCHES` | `5` | |
 | `VERIFICATION_ENABLED` | `true` | |

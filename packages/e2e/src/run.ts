@@ -372,9 +372,6 @@ async function bringUp(ctx: Context): Promise<RunState> {
       frontendOrigin: frontendUrl,
       analyticsHmacKey,
       allowPrivateHosts: true,
-      embeddingProvider:
-        process.env.E2E_EMBEDDING_PROVIDER === "openai" ? "openai" : "deterministic",
-      openaiApiKey: process.env.OPENAI_API_KEY,
     }),
     logFile: join(ctx.logDir, "api.log"),
   });
