@@ -21,6 +21,9 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Date inputs are interpreted in the publisher's local zone. Keep the suite away from UTC so
+    // an accidental UTC/local equivalence cannot make timezone-sensitive assertions pass.
+    env: { TZ: "America/Sao_Paulo" },
     globals: true,
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     // Build output contains copies of the source, whose test blocks would otherwise be collected
