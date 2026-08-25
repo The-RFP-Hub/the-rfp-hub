@@ -33,6 +33,7 @@ import {
   CheckField,
   CheckList,
   Field,
+  type FieldChrome,
   Repeatable,
   Section,
   SelectField,
@@ -620,9 +621,14 @@ export function OpportunityForm({
         </div>
       ) : null}
 
+      <p className={styles.requiredLegend}>
+        <span aria-hidden="true">*</span> Required
+      </p>
+
       <Section title="What is it">
         <TextField
           {...at("title")}
+          required
           label="Title"
           hint="The name the programme is published under."
           maxLength={300}
@@ -632,6 +638,7 @@ export function OpportunityForm({
         <div className={styles.cols}>
           <SelectField
             {...at("fundingType")}
+            required
             label="Funding type"
             hint={`Decides the details requested for this funding type below — currently ${DETAILS_SUFFIX[form.fundingType]}.`}
             options={FUNDING_TYPES}
@@ -652,6 +659,7 @@ export function OpportunityForm({
         </div>
         <TextArea
           {...at("description")}
+          required
           label="Description"
           hint="Markdown is permitted by the Standard. This frontend renders it as plain text everywhere, deliberately — see the README."
           rows={7}
@@ -661,6 +669,9 @@ export function OpportunityForm({
       </Section>
 
       <Section title="Who runs it">
+        <p className={styles.requiredLegend}>
+          Running organisations <span aria-hidden="true">*</span>
+        </p>
         <p className="hint">
           The organisations that actually run the intake — not necessarily who pays. The first one
           is the primary: it is the one displayed, and its slug is the namespace this listing
@@ -726,6 +737,7 @@ export function OpportunityForm({
       <Section title="Identity">
         <TextField
           {...at("id")}
+          required
           label={
             mode === "edit" ? (
               <>
@@ -770,6 +782,7 @@ export function OpportunityForm({
         ) : null}
         <SelectField
           {...at("status")}
+          required
           label="Status"
           hint="'upcoming' is also the value for a posting made before the intake opens — there is no draft status."
           options={STATUSES}
@@ -1402,6 +1415,7 @@ function OrganizationFields({
       <div className={styles.cols}>
         <TextField
           {...at(`${prefix}.name`)}
+          required
           className={styles.grow}
           label="Name"
           maxLength={256}
@@ -1410,6 +1424,7 @@ function OrganizationFields({
         />
         <TextField
           {...at(`${prefix}.slug`)}
+          required
           label="Slug"
           hint="Lowercase, URL-safe. Also this organisation's namespace."
           value={row.slug}
@@ -1497,6 +1512,7 @@ function DeadlineFields({
     <div className={styles.cols}>
       <SelectField
         {...at(`deadlines.${index}.deadlineType`)}
+        required
         label="Deadline kind"
         options={DEADLINE_TYPES}
         labels={LABELS}
@@ -1514,6 +1530,7 @@ function DeadlineFields({
       {row.deadlineType === "fixed" ? (
         <MomentField
           {...at(`deadlines.${index}.date`)}
+          required
           label="Date"
           value={row.date}
           onChange={(date) => onChange({ ...row, date })}
@@ -1553,6 +1570,7 @@ function SocialLinkFields({
     <div className={styles.cols}>
       <SelectField
         {...at(`socialLinks.${index}.platform`)}
+        required
         label="Platform"
         options={SOCIAL_PLATFORMS}
         value={row.platform}
@@ -1560,6 +1578,7 @@ function SocialLinkFields({
       />
       <TextField
         {...at(`socialLinks.${index}.url`)}
+        required
         className={styles.grow}
         label="URL"
         type="url"
@@ -1594,6 +1613,7 @@ function PrizeFields({
       />
       <NumberField
         {...at(`details.hackathon.prizes.${index}.amount`)}
+        required
         label="Amount"
         value={row.amount}
         onChange={(amount) => onChange({ ...row, amount })}
@@ -1628,6 +1648,7 @@ function BountyDetails({
       <div className={styles.cols}>
         <SelectField
           {...at("details.bounty.bountyKind")}
+          required
           label="Bounty kind"
           hint="Security bounties always pay against a reward table. A task bounty offers a single reward or a table — never both."
           options={BOUNTY_KINDS}
@@ -1665,6 +1686,7 @@ function BountyDetails({
         <>
           <SelectField
             {...at("details.bounty.rewardMode")}
+            required
             label="Compensation"
             hint="Exactly one of the two. Switching removes the other from the document — they are alternative descriptions of the same money."
             options={["single", "tiers"]}
@@ -1716,6 +1738,7 @@ function BountyDetails({
       ) : (
         <NumberField
           {...at("details.bounty.reward")}
+          required
           label="Reward"
           hint="Paid on completion, in the currency set under Funding information."
           value={bounty.reward}
@@ -1789,6 +1812,7 @@ function RewardTable({
                   <td>
                     <SelectField
                       {...at(`${base}.payout.model`)}
+                      required
                       label={
                         <span className="visually-hidden">Payout model, tier {index + 1}</span>
                       }
@@ -1865,18 +1889,20 @@ function PayoutAmounts({
   const amount = (
     member: "amount" | "min" | "max" | "percent" | "floor" | "cap",
     label: string,
-  ) => (
-    <NumberField
-      {...at(`${base}.${member}`)}
-      label={
+    required = false,
+  ) => {
+    const props = {
+      ...at(`${base}.${member}`),
+      label: (
         <span className="visually-hidden">
           {label}, tier {index + 1}
         </span>
-      }
-      value={payout[member]}
-      onChange={(value) => onChange({ ...row, payout: { ...payout, [member]: value } })}
-    />
-  );
+      ),
+      value: payout[member],
+      onChange: (value: string) => onChange({ ...row, payout: { ...payout, [member]: value } }),
+    };
+    return required ? <NumberField {...props} required /> : <NumberField {...props} />;
+  };
 
   if (payout.model === "discretionary") {
     return <span className="muted">Decided case by case — no figure.</span>;
@@ -1884,21 +1910,22 @@ function PayoutAmounts({
 
   return (
     <div className={styles.amounts}>
-      {payout.model === "fixed" ? amount("amount", "Amount") : null}
+      {payout.model === "fixed" ? amount("amount", "Amount", true) : null}
       {payout.model === "range" ? (
         <>
-          {amount("min", "Lower bound")}
+          {amount("min", "Lower bound", true)}
           <span aria-hidden="true">to</span>
-          {amount("max", "Upper bound")}
+          {amount("max", "Upper bound", true)}
         </>
       ) : null}
-      {payout.model === "up_to" ? amount("max", "Ceiling") : null}
+      {payout.model === "up_to" ? amount("max", "Ceiling", true) : null}
       {payout.model === "percentage" ? (
         <>
-          {amount("percent", "Percentage")}
+          {amount("percent", "Percentage", true)}
           <span aria-hidden="true">% of</span>
           <SelectField
             {...at(`${base}.basis`)}
+            required
             label={<span className="visually-hidden">Basis, tier {index + 1}</span>}
             options={PAYOUT_BASES}
             labels={LABELS}
@@ -1918,17 +1945,14 @@ function PayoutAmounts({
 // ── two thin wrappers, for the shapes used everywhere ───────────────────────────
 
 /** An amount or count input: right-aligned, decimal keypad, and never `type="number"` — see below. */
-function NumberField(props: {
-  path: string;
-  label: ReactNode;
-  hint?: ReactNode;
-  problem?: string;
-  optional?: boolean;
-  value: string;
-  onBlur?: () => void;
-  onChange: (value: string) => void;
-  className?: string;
-}) {
+function NumberField(
+  props: FieldChrome & {
+    value: string;
+    onBlur?: () => void;
+    onChange: (value: string) => void;
+    className?: string;
+  },
+) {
   // `type="number"` silently discards a value the browser considers malformed, which means the
   // publisher's typo becomes an empty field and the form has nothing to complain about. Text plus
   // `inputMode` gets the numeric keypad without the data loss.
@@ -1936,15 +1960,13 @@ function NumberField(props: {
 }
 
 /** A UTC instant. The Standard's timestamps are all UTC with a trailing `Z`. */
-function MomentField(props: {
-  path: string;
-  label: ReactNode;
-  hint?: ReactNode;
-  problem?: string;
-  value: string;
-  onBlur?: () => void;
-  onChange: (value: string) => void;
-}) {
+function MomentField(
+  props: FieldChrome & {
+    value: string;
+    onBlur?: () => void;
+    onChange: (value: string) => void;
+  },
+) {
   return (
     <TextField
       {...props}
@@ -1959,17 +1981,15 @@ function MomentField(props: {
 }
 
 /** The three-state select. Named apart from the primitive so the import list stays readable. */
-function TriField2(props: {
-  path: string;
-  label: ReactNode;
-  hint?: ReactNode;
-  problem?: string;
-  value: Tri;
-  onChange: (value: Tri) => void;
-  onBlur?: () => void;
-}) {
+function TriField2(
+  props: FieldChrome & {
+    value: Tri;
+    onChange: (value: Tri) => void;
+    onBlur?: () => void;
+  },
+) {
   return (
-    <Field path={props.path} label={props.label} hint={props.hint} problem={props.problem}>
+    <Field {...props}>
       {(chrome) => (
         <select
           {...chrome}

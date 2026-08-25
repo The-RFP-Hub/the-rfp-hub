@@ -22,6 +22,28 @@
   counter-reset: formsection;
 }
 
+.requiredLegend {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.requiredMark {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  margin-bottom: 0.2rem;
+}
+
+.labelRow label {
+  margin-bottom: 0;
+}
+
 .section {
   display: flex;
   flex-direction: column;
@@ -54,7 +76,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0 1rem;
-  align-items: flex-start;
+  align-items: stretch;
+}
+
+/*
+ * Every variable-height label, hint, counter and problem sits above the control. Stretching the
+ * sibling fields and spending their remaining space before `.control` keeps inputs on one row at
+ * every intrinsic wrap point — no viewport breakpoint and no reserved fixed height.
+ */
+.fieldLayout {
+  display: flex;
+  flex-direction: column;
+}
+
+.control {
+  margin-top: auto;
 }
 
 .cols > * {

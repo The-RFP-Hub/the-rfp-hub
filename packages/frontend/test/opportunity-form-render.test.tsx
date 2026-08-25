@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
 /**
  * THE FORM AS A PUBLISHER MEETS IT.
@@ -27,6 +29,7 @@ import {
   type OpportunityFormState,
   emptyForm,
   emptyOrganization,
+  emptyRewardTier,
   fromDocument,
 } from "@/lib/opportunity-form";
 import type { Opportunity, SubmissionResult } from "@/lib/types";
@@ -593,6 +596,91 @@ describe("the primary action", () => {
       .getAllByRole("button")
       .filter((button) => button.className.includes("button-primary"));
     expect(filled).toHaveLength(1);
+  });
+});
+
+describe("required fields and intrinsic alignment", () => {
+  const expectRequired = (control: HTMLElement) => {
+    expect(control.getAttribute("required")).not.toBeNull();
+    expect(control.getAttribute("aria-required")).toBe("true");
+  };
+
+  it("marks required controls without changing their accessible labels", () => {
+    mount();
+
+    for (const name of ["Title", "Funding type", "Description", /^Id/, "Status", "Name", /^Slug/]) {
+      expectRequired(screen.getByLabelText(name));
+    }
+    // The marker is deliberately absent from the accessible name, preserving exact e2e anchors.
+    expect(screen.getByLabelText("Title", { exact: true })).toBeTruthy();
+    expect(screen.queryByLabelText("Title *", { exact: true })).toBeNull();
+    const titleLabel = document.querySelector('label[for="f-title"]') as HTMLLabelElement;
+    const marker = titleLabel.parentElement?.querySelector('[aria-hidden="true"]');
+    expect(marker?.textContent).toContain("*");
+
+    const summary = screen.getByLabelText("Summary — optional");
+    expect(summary.getAttribute("required")).toBeNull();
+    expect(summary.getAttribute("aria-required")).toBeNull();
+    expect(screen.getByText(/Required/).textContent).toContain("Required");
+    expect(screen.getByText(/Running organisations/).textContent).toContain(
+      "Running organisations",
+    );
+  });
+
+  it("marks each conditional row field that becomes required", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add a link/ }));
+    expectRequired(screen.getByLabelText("Platform"));
+    expectRequired(screen.getByLabelText("URL"));
+
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add a deadline/ }));
+    expectRequired(screen.getByLabelText("Deadline kind"));
+    expectRequired(screen.getByLabelText("Date — UTC"));
+    fireEvent.change(screen.getByLabelText("Deadline kind"), { target: { value: "rolling" } });
+    expect(screen.queryByLabelText("Date — UTC")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Funding type"), { target: { value: "hackathon" } });
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add a prize/ }));
+    expectRequired(screen.getByLabelText("Amount"));
+
+    fireEvent.change(screen.getByLabelText("Funding type"), { target: { value: "bounty" } });
+    expectRequired(screen.getByLabelText("Bounty kind"));
+    expectRequired(screen.getByLabelText("Compensation"));
+    expectRequired(screen.getByLabelText("Reward"));
+  });
+
+  it("marks the active payout model's figures, but not optional percentage bounds", () => {
+    const form = fill({ fundingType: "bounty" });
+    form.details.bounty.bountyKind = "security";
+    form.details.bounty.rewardTiers = [emptyRewardTier()];
+    mount({}, { initial: form });
+
+    expectRequired(screen.getByLabelText("Payout model, tier 1"));
+    expectRequired(screen.getByLabelText("Amount, tier 1"));
+    fireEvent.change(screen.getByLabelText("Payout model, tier 1"), {
+      target: { value: "percentage" },
+    });
+    expectRequired(screen.getByLabelText("Percentage, tier 1"));
+    expectRequired(screen.getByLabelText("Basis, tier 1"));
+    expect(screen.getByLabelText("Floor, tier 1").getAttribute("required")).toBeNull();
+    expect(screen.getByLabelText("Cap, tier 1").getAttribute("required")).toBeNull();
+  });
+
+  it("aligns paired controls through intrinsic flex wrapping at every width", () => {
+    mount();
+    const funding = screen.getByLabelText("Funding type");
+    expect(funding.closest(`.${styles.control}`)).not.toBeNull();
+    expect(funding.closest(`.${styles.fieldLayout}`)).not.toBeNull();
+
+    const css = readFileSync(
+      join(process.cwd(), "src", "components", "OpportunityForm.module.css"),
+      "utf8",
+    );
+    expect(css).toMatch(/\.cols\s*{[^}]*flex-wrap:\s*wrap;[^}]*align-items:\s*stretch;/s);
+    expect(css).toMatch(/\.cols\s*>\s*\*\s*{[^}]*flex:\s*1 1 12rem;/s);
+    expect(css).toMatch(/\.fieldLayout\s*{[^}]*flex-direction:\s*column;/s);
+    expect(css).toMatch(/\.control\s*{[^}]*margin-top:\s*auto;/s);
+    expect(css).not.toContain("@media");
   });
 });
 

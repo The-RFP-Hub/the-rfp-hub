@@ -28,7 +28,7 @@ export function fieldId(path: string): string {
   return `f-${path.replace(/[^A-Za-z0-9]+/g, "-")}`;
 }
 
-export interface FieldChrome {
+interface FieldChromeBase {
   path: string;
   label: ReactNode;
   hint?: ReactNode;
@@ -41,9 +41,15 @@ export interface FieldChrome {
   advisory?: string;
   /** Rendered under the input, above the problem — the character counters live here. */
   meter?: ReactNode;
-  /** Marks the label so a publisher can tell what they may leave alone. */
-  optional?: boolean;
 }
+
+/** Required and optional are explicit, mutually exclusive claims. */
+export type FieldChrome = FieldChromeBase &
+  (
+    | { required: true; optional?: never }
+    | { optional: true; required?: never }
+    | { required?: false; optional?: false }
+  );
 
 /**
  * The wiring, without the control.
@@ -60,6 +66,7 @@ export function Field({
   advisory,
   meter,
   optional,
+  required,
   className,
   children,
 }: FieldChrome & {
@@ -68,7 +75,9 @@ export function Field({
     id: string;
     "aria-describedby": string | undefined;
     "aria-invalid": boolean | undefined;
+    "aria-required": true | undefined;
     className: string | undefined;
+    required: boolean | undefined;
   }) => ReactNode;
 }) {
   const id = fieldId(path);
@@ -78,22 +87,27 @@ export function Field({
   const describedBy = [hintId, problemId, advisoryId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className={className ? `field ${className}` : "field"}>
-      <label htmlFor={id}>
-        {label}
-        {optional ? <span className="muted"> — optional</span> : null}
-      </label>
+    <div
+      className={
+        className ? `field ${styles.fieldLayout} ${className}` : `field ${styles.fieldLayout}`
+      }
+    >
+      <div className={styles.labelRow}>
+        <label htmlFor={id}>
+          {label}
+          {optional ? <span className="muted"> — optional</span> : null}
+        </label>
+        {required ? (
+          <span className={styles.requiredMark} aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </div>
       {hint ? (
         <p className="hint" id={hintId}>
           {hint}
         </p>
       ) : null}
-      {children({
-        id,
-        "aria-describedby": describedBy,
-        "aria-invalid": problem ? true : undefined,
-        className: problem ? styles.invalid : undefined,
-      })}
       {meter}
       {problem ? (
         <span className={styles.problem} id={problemId}>
@@ -105,6 +119,16 @@ export function Field({
           {advisory}
         </span>
       ) : null}
+      <div className={styles.control}>
+        {children({
+          id,
+          "aria-describedby": describedBy,
+          "aria-invalid": problem ? true : undefined,
+          "aria-required": required ? true : undefined,
+          className: problem ? styles.invalid : undefined,
+          required: required ? true : undefined,
+        })}
+      </div>
     </div>
   );
 }
