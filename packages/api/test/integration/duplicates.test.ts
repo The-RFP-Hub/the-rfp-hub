@@ -11,7 +11,7 @@
  * contained. CI sets the same variable globally (`.github/workflows/ci.yml`); this makes the suite
  * self-sufficient rather than dependent on that, which matters when somebody runs one file by hand.
  */
-process.env.EMBEDDING_PROVIDER = "deterministic";
+process.env.EMBEDDING_PROVIDER = "lexical";
 
 import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -31,7 +31,7 @@ const { auditLog, opportunities, opportunityDuplicates, opportunityEmbeddings } 
   "../../src/db/schema.js"
 );
 const { contentHash, embeddingText } = await import("../../src/modules/shared/embedding-text.js");
-const { DeterministicEmbeddingProvider } = await import(
+const { LexicalEmbeddingProvider } = await import(
   "../../src/modules/services/dedupe/embedding-provider.js"
 );
 const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = await import(
@@ -350,7 +350,7 @@ run("M3DUP duplicate detection", () => {
     expect(created.statusCode, created.body).toBe(201);
     const rowId = await rowIdOf(`${NS}:racing-embed`);
 
-    const real = new DeterministicEmbeddingProvider();
+    const real = new LexicalEmbeddingProvider();
     const project = (row: {
       title: string;
       summary: string | null;
