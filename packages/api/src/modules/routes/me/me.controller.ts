@@ -5,9 +5,9 @@ import { AccountService } from "../../services/auth/account.service.js";
 import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
 import { OpportunityMetaService } from "../../services/opportunities/opportunity-meta.service.js";
 import type {
-  DuplicateListView,
   ManagedOpportunityListView,
   MeView,
+  OwnedDuplicateListView,
 } from "../../shared/api-views.js";
 import { effectiveCaps } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
@@ -85,6 +85,6 @@ export const meController = {
   listDuplicates: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const items = await meta.duplicatesForOwner(principal);
-    return { items } satisfies DuplicateListView;
+    return { items } satisfies OwnedDuplicateListView;
   }),
 };

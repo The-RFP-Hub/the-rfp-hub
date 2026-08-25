@@ -82,6 +82,32 @@ beforeEach(() => {
 });
 
 describe("the merged row on Your listings", () => {
+  it("explains that the duplicate queue identifies both sides", async () => {
+    const api = client();
+    api.me.duplicates = async () => ({
+      items: [
+        {
+          id: "acme:other",
+          title: "Other Round",
+          isPublic: true,
+          similarity: 0.9,
+          status: "suspected",
+          detectedAt: "2026-08-20T00:00:00Z",
+          yourListing: { id: "acme:mine", title: "My Round" },
+        },
+      ],
+    });
+
+    render(
+      <ApiClientProvider value={api}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText(/See which of your listings was matched/i)).toBeTruthy();
+    expect(screen.queryByText(/not which of yours/i)).toBeNull();
+  });
+
   it("links to the survivor and replaces rejection actions with one terminal badge", async () => {
     render(
       <ApiClientProvider value={client()}>

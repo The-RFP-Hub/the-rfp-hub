@@ -43,6 +43,7 @@ import type {
   Opportunity,
   OrganizationList,
   OrganizationSummary,
+  OwnedDuplicateList,
   PaginatedOpportunities,
   PublisherList,
   ReviewDecision,
@@ -269,7 +270,7 @@ export function createApiClient(options: ApiClientOptions) {
       /** The one route that serves an owner their own pending or rejected record in full. */
       opportunity: (id: string) =>
         request<Opportunity>("GET", `/v1/me/opportunities/${encodeURIComponent(id)}`),
-      duplicates: () => request<DuplicateList>("GET", "/v1/me/duplicates"),
+      duplicates: () => request<OwnedDuplicateList>("GET", "/v1/me/duplicates"),
     },
 
     keys: {

@@ -169,9 +169,11 @@ run("M3DUP duplicate detection", () => {
     expect(second.statusCode, second.body).toBe(201);
     expect(second.json().duplicateCheck).toBe("ok");
     expect(ours(second)).toContain(`${NS}:alpha`);
-    expect(
-      second.json().duplicates.find((d: { id: string }) => d.id === `${NS}:alpha`).similarity,
-    ).toBeGreaterThan(0.74);
+    const submissionMatch = second
+      .json()
+      .duplicates.find((d: { id: string }) => d.id === `${NS}:alpha`);
+    expect(submissionMatch.similarity).toBeGreaterThan(0.74);
+    expect(submissionMatch.isPublic).toBe(true);
 
     const pair = await pairBetween(`${NS}:alpha`, `${NS}:alpha-copy`);
     expect(pair?.status).toBe("suspected");
@@ -180,10 +182,25 @@ run("M3DUP duplicate detection", () => {
     const mine = await app.inject({ url: "/v1/me/duplicates", headers: bearer(publisherToken) });
     expect(mine.statusCode).toBe(200);
     expect(mine.json().items.length).toBeGreaterThan(0);
+    expect(mine.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `${NS}:alpha-copy`,
+          yourListing: { id: `${NS}:alpha`, title: "Superchain Builders Fund" },
+        }),
+      ]),
+    );
+    for (const item of mine.json().items) {
+      expect(item.yourListing).toEqual({
+        id: expect.any(String),
+        title: expect.any(String),
+      });
+    }
 
     const sub = await app.inject({ url: `/v1/opportunities/${NS}:alpha-copy/duplicates` });
     expect(sub.statusCode).toBe(200);
-    expect(sub.json().items.map((d: { id: string }) => d.id)).toContain(`${NS}:alpha`);
+    const publicCounterpart = sub.json().items.find((d: { id: string }) => d.id === `${NS}:alpha`);
+    expect(publicCounterpart).toEqual(expect.objectContaining({ isPublic: true }));
   });
 
   // ── T-DUP-2 ───────────────────────────────────────────────────────────────────
@@ -261,6 +278,15 @@ run("M3DUP duplicate detection", () => {
         pair.right.id,
       ]);
     expect(sides).toContain(`${OTHER_NS}:hidden`);
+
+    // Reviewer visibility is not ownership: their account-scoped queue remains empty because none
+    // of these pairs touches a listing they submitted or publish by namespace.
+    const reviewerMine = await app.inject({
+      url: "/v1/me/duplicates",
+      headers: bearer(reviewerToken),
+    });
+    expect(reviewerMine.statusCode).toBe(200);
+    expect(reviewerMine.json().items).toEqual([]);
   });
 
   it("still shows an owner a pair of their OWN entries when neither side is public", async () => {
@@ -284,11 +310,48 @@ run("M3DUP duplicate detection", () => {
     // is not one it can find. The all-scope pass — what the backfill job runs — is.
     await new DedupeService().embedAndDetect(await rowIdOf(`${OTHER_NS}:hidden-twin`), "all");
     expect(await pairBetween(`${OTHER_NS}:hidden`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();
+    expect(await pairBetween(`${NS}:alpha`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();
 
     const mine = await app.inject({ url: "/v1/me/duplicates", headers: bearer(strangerToken) });
     expect(mine.statusCode).toBe(200);
-    const items = mine.json().items.map((item: { id: string }) => item.id);
-    expect(items).toContain(`${OTHER_NS}:hidden`);
+    const items = mine.json().items as Array<{
+      id: string;
+      isPublic: boolean;
+      yourListing: { id: string; title: string };
+    }>;
+
+    // The all-owned pair is one stored pair and therefore one row. Its canonical left side is the
+    // account side, even though both sides qualify as owned.
+    const pendingPair = items.filter(
+      (item) =>
+        new Set([item.yourListing.id, item.id]).size === 2 &&
+        [item.yourListing.id, item.id].every((id) =>
+          [`${OTHER_NS}:hidden`, `${OTHER_NS}:hidden-twin`].includes(id),
+        ),
+    );
+    expect(pendingPair).toEqual([
+      expect.objectContaining({
+        id: `${OTHER_NS}:hidden-twin`,
+        isPublic: false,
+        yourListing: expect.objectContaining({ id: `${OTHER_NS}:hidden` }),
+      }),
+    ]);
+
+    // Two owned submissions can match the same public listing. `yourListing` keeps those rows
+    // distinct instead of leaving two indistinguishable copies of the public counterpart.
+    const againstAlpha = items.filter((item) => item.id === `${NS}:alpha`);
+    expect(againstAlpha).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          isPublic: true,
+          yourListing: expect.objectContaining({ id: `${OTHER_NS}:hidden` }),
+        }),
+        expect.objectContaining({
+          isPublic: true,
+          yourListing: expect.objectContaining({ id: `${OTHER_NS}:hidden-twin` }),
+        }),
+      ]),
+    );
 
     // …and the sub-resource agrees, from either side of the same pair.
     const sub = await app.inject({
@@ -296,7 +359,11 @@ run("M3DUP duplicate detection", () => {
       headers: bearer(strangerToken),
     });
     expect(sub.statusCode).toBe(200);
-    expect(sub.json().items.map((item: { id: string }) => item.id)).toContain(`${OTHER_NS}:hidden`);
+    expect(sub.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: `${OTHER_NS}:hidden`, isPublic: false }),
+      ]),
+    );
 
     // The leak stays closed: neither pending entry has become visible to the publisher, who owns
     // the public entry they were both matched against.

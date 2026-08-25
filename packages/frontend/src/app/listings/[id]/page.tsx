@@ -70,29 +70,31 @@ function Listing({ id, me }: { id: string; me: Me }) {
               <MergedOpportunityBanner mergedInto={managed.mergedInto} />
             ) : null}
             <Header entry={entry} id={id} managed={managed} />
+
+            <div className="tabs" role="tablist" aria-label="Listing detail">
+              {TABS.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === name}
+                  aria-pressed={tab === name}
+                  onClick={() => setTab(name)}
+                >
+                  {TAB_LABELS[name]}
+                </button>
+              ))}
+            </div>
+
+            {tab === "analytics" ? <AnalyticsTab opportunityId={id} /> : null}
+            {tab === "audit" ? <AuditTab id={id} /> : null}
+            {tab === "verification" ? <VerificationTab id={id} canTrigger={me.canReview} /> : null}
+            {tab === "duplicates" ? (
+              <DuplicatesTab yourListing={{ id: entry.id, title: entry.title }} />
+            ) : null}
           </>
         )}
       </ResourceView>
-
-      <div className="tabs" role="tablist" aria-label="Listing detail">
-        {TABS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={tab === name}
-            aria-pressed={tab === name}
-            onClick={() => setTab(name)}
-          >
-            {TAB_LABELS[name]}
-          </button>
-        ))}
-      </div>
-
-      {tab === "analytics" ? <AnalyticsTab opportunityId={id} /> : null}
-      {tab === "audit" ? <AuditTab id={id} /> : null}
-      {tab === "verification" ? <VerificationTab id={id} canTrigger={me.canReview} /> : null}
-      {tab === "duplicates" ? <DuplicatesTab id={id} /> : null}
     </section>
   );
 }
@@ -322,19 +324,26 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
   );
 }
 
-function DuplicatesTab({ id }: { id: string }) {
+function DuplicatesTab({
+  yourListing,
+}: {
+  yourListing: Pick<Opportunity, "id" | "title">;
+}) {
   const api = useApi();
-  const load = useCallback(() => api.opportunities.duplicates(id), [api, id]);
+  const load = useCallback(
+    () => api.opportunities.duplicates(yourListing.id),
+    [api, yourListing.id],
+  );
   const { state, reload } = useResource(load);
 
   return (
     <section aria-labelledby="dupes-heading">
       <h2 id="dupes-heading">Possible duplicates</h2>
       <p className="muted footnote">
-        Detected by comparing this listing against <strong>published</strong> listings only, so
-        nothing here reveals another account&rsquo;s pending work. An empty list means nothing
-        similar was found <em>if</em> the check has run — a deployment with detection switched off
-        has nothing to show either.
+        The other side appears only when this session may see it. Public matches open in the
+        directory; non-public matches stay in the workbench. An empty list means nothing similar was
+        found <em>if</em> the check has run — a deployment with detection switched off has nothing
+        to show either.
       </p>
       <ResourceView resource={state} what="possible duplicates" onRetry={reload}>
         {(list) =>
@@ -345,7 +354,8 @@ function DuplicatesTab({ id }: { id: string }) {
               <table>
                 <thead>
                   <tr>
-                    <th scope="col">Other listing</th>
+                    <th scope="col">Your listing</th>
+                    <th scope="col">Matched against</th>
                     <th scope="col">Similarity</th>
                     <th scope="col">State</th>
                     <th scope="col">Detected</th>
@@ -353,9 +363,19 @@ function DuplicatesTab({ id }: { id: string }) {
                 </thead>
                 <tbody>
                   {list.items.map((match) => (
-                    <tr key={`${match.id}-${match.detectedAt}`}>
+                    <tr key={`${yourListing.id}-${match.id}-${match.detectedAt}`}>
                       <th scope="row">
-                        <Link href={`/listings/${encodeURIComponent(match.id)}`}>
+                        <Link href={`/listings/${encodeURIComponent(yourListing.id)}`}>
+                          <UntrustedText value={yourListing.title} />
+                        </Link>
+                        <div className="muted">
+                          <code>{yourListing.id}</code>
+                        </div>
+                      </th>
+                      <th scope="row">
+                        <Link
+                          href={`${match.isPublic ? "/opportunities" : "/listings"}/${encodeURIComponent(match.id)}`}
+                        >
                           <UntrustedText value={match.title} />
                         </Link>
                         <div className="muted">

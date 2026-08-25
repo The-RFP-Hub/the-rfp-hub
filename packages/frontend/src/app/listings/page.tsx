@@ -132,8 +132,7 @@ function Listings({ me }: { me: Me }) {
             {duplicates.state.data.items.length === 1 ? "" : "s"} touch your listings
           </Link>{" "}
           <span className="muted">
-            — counted across all of them; the API reports the other side of each pair, not which of
-            yours it was matched against.
+            — see which of your listings was matched and what it resembles.
           </span>
         </p>
       ) : (

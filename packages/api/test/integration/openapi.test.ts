@@ -145,6 +145,8 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "ApiKeyCreated",
       "ManagedOpportunityList",
       "MergedOpportunityErrorResponse",
+      "OwnedDuplicateMatch",
+      "OwnedDuplicateList",
       "DuplicatePairList",
       "MergeResult",
       "InsightsSeries",

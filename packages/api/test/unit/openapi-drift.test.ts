@@ -65,6 +65,8 @@ import type {
   MergeResultView,
   OrganizationListView,
   OrganizationSummaryView,
+  OwnedDuplicateListView,
+  OwnedDuplicateMatchView,
   PublisherListView,
   PublisherView,
   ReviewDecisionView,
@@ -302,6 +304,8 @@ describe("closed response components vs their producers", () => {
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
       "OrganizationList",
       "OrganizationSummary",
+      "OwnedDuplicateList",
+      "OwnedDuplicateMatch",
       "PaginatedOpportunities",
       "Publisher",
       "PublisherList",
@@ -425,6 +429,7 @@ describe("M3 closed components vs their view types", () => {
   const duplicateMatchSample: DuplicateMatchView = {
     id: "example-org:other",
     title: "Other",
+    isPublic: true,
     similarity: 0.91,
     status: "suspected",
     detectedAt: "2026-08-14T00:00:00.000Z",
@@ -447,6 +452,10 @@ describe("M3 closed components vs their view types", () => {
     patch: { title: { before: "a", after: "b" } },
   };
   const duplicateMatch: DuplicateMatchView = duplicateMatchSample;
+  const ownedDuplicateMatch: OwnedDuplicateMatchView = {
+    ...duplicateMatch,
+    yourListing: { id: "example-org:mine", title: "Mine" },
+  };
   const duplicateSide: DuplicateSideView = {
     id: "example-org:one",
     title: "One",
@@ -588,6 +597,8 @@ describe("M3 closed components vs their view types", () => {
     AuditTrail: { entries: [auditEntry] } satisfies AuditTrailView,
     DuplicateMatch: duplicateMatch,
     DuplicateList: { items: [duplicateMatch] } satisfies DuplicateListView,
+    OwnedDuplicateMatch: ownedDuplicateMatch,
+    OwnedDuplicateList: { items: [ownedDuplicateMatch] } satisfies OwnedDuplicateListView,
     DuplicateSide: duplicateSide,
     DuplicatePair: duplicatePair,
     DuplicatePairList: { items: [duplicatePair] } satisfies DuplicatePairListView,

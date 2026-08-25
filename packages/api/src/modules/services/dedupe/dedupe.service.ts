@@ -174,6 +174,7 @@ export class DedupeService {
     return kept.map((match) => ({
       id: match.publicId,
       title: match.title,
+      isPublic: match.isPublic,
       similarity: round(match.similarity),
       status: "suspected" as const,
       detectedAt: new Date().toISOString(),
@@ -257,7 +258,9 @@ export class DedupeService {
   private async search(
     vector: number[],
     options: { exclude: number; scope: CandidateScope },
-  ): Promise<{ id: number; publicId: string; title: string; similarity: number }[]> {
+  ): Promise<
+    { id: number; publicId: string; title: string; isPublic: boolean; similarity: number }[]
+  > {
     const provider = this.provider;
     if (!provider) return [];
     // pgvector's cosine-distance operator, written out rather than through Drizzle's
@@ -280,6 +283,8 @@ export class DedupeService {
         id: opportunities.id,
         publicId: opportunities.publicId,
         title: opportunities.title,
+        reviewStatus: opportunities.reviewStatus,
+        isListed: opportunities.isListed,
         similarity: sql<number>`1 - (${distance})`,
       })
       .from(opportunityEmbeddings)
@@ -288,7 +293,11 @@ export class DedupeService {
       .orderBy(asc(distance))
       .limit(ANN_CANDIDATES);
 
-    return rows.map((row) => ({ ...row, similarity: Number(row.similarity) }));
+    return rows.map(({ reviewStatus, isListed, ...row }) => ({
+      ...row,
+      isPublic: reviewStatus === "approved" && isListed,
+      similarity: Number(row.similarity),
+    }));
   }
 
   /** Insert the pairs that are new; refresh the similarity of the ones already suspected. */

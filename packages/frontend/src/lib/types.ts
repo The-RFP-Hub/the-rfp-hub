@@ -126,6 +126,8 @@ export interface DuplicateMatch {
   /** The OTHER entry's public id. */
   id: string;
   title: string;
+  /** Whether the other entry has a public detail page; otherwise use the entitled workbench. */
+  isPublic: boolean;
   similarity: number | null;
   status: DuplicateStatus;
   detectedAt: string;
@@ -133,6 +135,14 @@ export interface DuplicateMatch {
 
 export interface DuplicateList {
   items: DuplicateMatch[];
+}
+
+export interface OwnedDuplicateMatch extends DuplicateMatch {
+  yourListing: { id: string; title: string };
+}
+
+export interface OwnedDuplicateList {
+  items: OwnedDuplicateMatch[];
 }
 
 export interface DuplicateSide {

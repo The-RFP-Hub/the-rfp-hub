@@ -285,7 +285,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "array",
         items: { $ref: "DuplicateMatch" },
         description:
-          "Suspected matches, searched over PUBLICLY VISIBLE entries only — a duplicate check must never disclose another account's pending or unlisted title and id.",
+          "Suspected matches, searched over PUBLICLY VISIBLE entries only — a duplicate check must never disclose another account's pending or unlisted title and id. `isPublic` is therefore deliberately always true in this SubmissionResult array, while the shared DuplicateMatch component also serves routes that can expose an owner-visible, non-public counterpart.",
       },
     },
   },
@@ -324,11 +324,16 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "A suspected or decided duplicate pair, named by the OTHER entry. A submitter only ever sees pairs whose other side is publicly visible.",
-    required: ["id", "title", "similarity", "status", "detectedAt"],
+      "A suspected or decided duplicate pair, named by the OTHER entry. This published component retains that top-level meaning for compatibility with an external compliance checker; the account-specific OwnedDuplicateMatch adds `yourListing` instead of repurposing these fields.",
+    required: ["id", "title", "isPublic", "similarity", "status", "detectedAt"],
     properties: {
       id: { type: "string", description: "The other entry's public id." },
       title: { type: "string" },
+      isPublic: {
+        type: "boolean",
+        description:
+          "True when the other entry is approved and listed, so a client may use its public detail route; false means an entitled workbench route is required.",
+      },
       similarity: { type: ["number", "null"] },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       detectedAt: { type: "string", format: "date-time" },
@@ -340,6 +345,42 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     required: ["items"],
     properties: { items: { type: "array", items: { $ref: "DuplicateMatch" } } },
+  },
+  {
+    $id: "OwnedDuplicateMatch",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "An account-owned duplicate pair. `yourListing` identifies the side owned by the current account; all top-level match fields continue to name the OTHER entry. DuplicateMatch and DuplicateList are published public-API components documented that way and checked by an external compliance consumer, which is why this owner-specific component adds a field instead of changing their meaning.",
+    required: ["id", "title", "isPublic", "similarity", "status", "detectedAt", "yourListing"],
+    properties: {
+      id: { type: "string", description: "The other entry's public id." },
+      title: { type: "string" },
+      isPublic: {
+        type: "boolean",
+        description:
+          "True when the other entry is approved and listed; false when it is visible only through an entitled workbench route.",
+      },
+      similarity: { type: ["number", "null"] },
+      status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
+      detectedAt: { type: "string", format: "date-time" },
+      yourListing: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    $id: "OwnedDuplicateList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "OwnedDuplicateMatch" } } },
   },
   {
     $id: "DuplicateSide",

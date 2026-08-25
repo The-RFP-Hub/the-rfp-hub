@@ -1,9 +1,9 @@
 import EditListingPage from "@/app/listings/[id]/edit/page";
 import ListingPage from "@/app/listings/[id]/page";
-import type { ApiClient } from "@/lib/api";
+import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session } = vi.hoisted(() => ({
@@ -91,11 +91,33 @@ function client(): ApiClient {
         days: [],
       }),
     },
+    opportunities: {
+      duplicates: async () => ({
+        items: [
+          {
+            id: "public:current round",
+            title: "Public Current Round",
+            isPublic: true,
+            similarity: 0.92,
+            status: "suspected",
+            detectedAt: "2026-08-21T00:00:00Z",
+          },
+          {
+            id: "private:queued round",
+            title: "Private Queued Round",
+            isPublic: false,
+            similarity: 0.83,
+            status: "confirmed",
+            detectedAt: "2026-08-22T00:00:00Z",
+          },
+        ],
+      }),
+    },
   } as unknown as ApiClient;
 }
 
-const mount = (node: React.ReactNode) =>
-  render(<ApiClientProvider value={client()}>{node}</ApiClientProvider>);
+const mount = (node: React.ReactNode, api: ApiClient = client()) =>
+  render(<ApiClientProvider value={api}>{node}</ApiClientProvider>);
 
 beforeEach(() => {
   session.data = { user: { id: "u1" } };
@@ -119,5 +141,35 @@ describe("merged listing detail and edit routes", () => {
     expect(screen.getByRole("link", { name: "Current Round" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Replace" })).toBeNull();
     expect(screen.queryByText(/A replace re-runs Standard validation/)).toBeNull();
+  });
+
+  it("names the loaded listing in its duplicate rows and routes counterparts by publicity", async () => {
+    mount(<ListingPage />);
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Duplicates" }));
+
+    expect(await screen.findByRole("columnheader", { name: "Your listing" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Matched against" })).toBeTruthy();
+    for (const ownLink of screen.getAllByRole("link", { name: "Old Round" })) {
+      expect(ownLink.getAttribute("href")).toBe("/listings/acme%3Aold");
+    }
+    expect(screen.getByRole("link", { name: "Public Current Round" }).getAttribute("href")).toBe(
+      "/opportunities/public%3Acurrent%20round",
+    );
+    expect(screen.getByRole("link", { name: "Private Queued Round" }).getAttribute("href")).toBe(
+      "/listings/private%3Aqueued%20round",
+    );
+  });
+
+  it("renders no detail tabs when the full listing fails to load", async () => {
+    const failing = client();
+    failing.me.opportunity = async () => {
+      throw new ApiError(500, "load_failed", "The full listing failed to load.");
+    };
+
+    mount(<ListingPage />, failing);
+
+    expect(await screen.findByText("Could not load this listing.")).toBeTruthy();
+    expect(screen.queryByRole("tab")).toBeNull();
   });
 });

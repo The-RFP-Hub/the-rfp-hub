@@ -128,10 +128,10 @@ export const me = async (router: FastifyInstance): Promise<void> => {
         tags: ["account"],
         summary: "Suspected duplicates against this account's entries",
         description:
-          "Pairs are surfaced by the duplicate-detection pass. An entry that has not been through it — or a deployment with detection disabled — has none, and an empty list is that answer.",
+          "Pairs are surfaced by the duplicate-detection pass. Each row names the account-owned side in `yourListing`; the existing top-level fields keep naming the other entry for compatibility with the published DuplicateMatch contract. An entry that has not been through detection — or a deployment with detection disabled — has none, and an empty list is that answer.",
         security: [{ bearerAuth: [] }],
         response: {
-          200: { $ref: "DuplicateList#" },
+          200: { $ref: "OwnedDuplicateList#" },
           401: { $ref: "ErrorResponse#" },
         },
       },
