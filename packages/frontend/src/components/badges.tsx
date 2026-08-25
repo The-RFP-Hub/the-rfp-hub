@@ -1,8 +1,9 @@
 /**
  * Editorial state, shown as a WORD and a SHAPE, never as a hue.
  *
- * Every badge here reports SERVER state — review status, listing, organisation verification, the
- * publisher's own `status`. None of it is computed in the browser.
+ * Every badge here is grounded in server state — review status, listing, organisation verification,
+ * and the publisher's own `status`. The publisher-facing listing badge is the one deterministic
+ * projection over those server axes.
  *
  * THE FOUR SHAPES ARE THE VOCABULARY, and they are defined once in the stylesheet rather than
  * per-badge: a solid outline is live or included, filled ink is finished and terminal, a dashed
@@ -16,7 +17,30 @@
  * somebody's work — the account page's organisation table above all — `gloss` puts the sentence on
  * screen beside it and the tooltip stays as the longer form.
  */
-import { opportunityStatusLabel, reviewStatusLabel } from "@/lib/presentation";
+import {
+  PUBLISHER_STATUS_LABELS,
+  type PublisherStatusSource,
+  opportunityStatusLabel,
+  publisherStatus,
+  reviewStatusLabel,
+} from "@/lib/presentation";
+
+/** The one state a publisher needs to understand whether a listing is public and what happens next. */
+export function PublisherStatusBadge({ source }: { source: PublisherStatusSource }) {
+  const status = publisherStatus(source);
+  const explanation = {
+    merged: "Merged into another listing; this record is terminal",
+    rejected: "Rejected by a Hub reviewer and not visible in the public directory",
+    pending: "Stored and waiting for a Hub reviewer",
+    hidden: "Approved, but hidden from the public directory",
+    live: "Approved and visible in the public directory",
+  }[status];
+  return (
+    <span className={`badge badge-${status}`} title={explanation}>
+      {PUBLISHER_STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 export function ReviewStatusBadge({ status }: { status: string }) {
   const explanation =

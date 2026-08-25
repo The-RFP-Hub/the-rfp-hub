@@ -18,11 +18,17 @@ import { RequireSession } from "@/components/Chrome";
 import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
-import { MatchBadge } from "@/components/badges";
+import {
+  ListedBadge,
+  MatchBadge,
+  PublisherStatusBadge,
+  ReviewStatusBadge,
+  StatusBadge,
+} from "@/components/badges";
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
 import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
-import { duplicateStatusLabel, fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
+import { duplicateStatusLabel, fundingTypeLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
@@ -115,9 +121,12 @@ function Header({
   return (
     <>
       <div className="row-between">
-        <h1>
-          <UntrustedText value={entry.title} />
-        </h1>
+        <div className="row">
+          <h1>
+            <UntrustedText value={entry.title} />
+          </h1>
+          <PublisherStatusBadge source={managed} />
+        </div>
         {managed.mergedInto ? null : (
           <Link href={`/listings/${encodeURIComponent(id)}/edit`}>
             <button type="button">Edit</button>
@@ -125,8 +134,7 @@ function Header({
         )}
       </div>
       <p className="muted">
-        <code>{entry.id}</code> · {fundingTypeLabel(entry.fundingType)} ·{" "}
-        {opportunityStatusLabel(entry.status)}
+        <code>{entry.id}</code> · {fundingTypeLabel(entry.fundingType)}
         {source.publisher ? (
           <>
             {" "}
@@ -140,6 +148,20 @@ function Header({
           </>
         ) : null}
       </p>
+
+      <div className="row" aria-label="Listing state details">
+        <span>
+          <span className="muted">Application stage</span> <StatusBadge status={entry.status} />
+        </span>
+        <span>
+          <span className="muted">Review decision</span>{" "}
+          <ReviewStatusBadge status={managed.reviewStatus} />
+        </span>
+        <span>
+          <span className="muted">Public visibility</span>{" "}
+          <ListedBadge isListed={managed.isListed} />
+        </span>
+      </div>
 
       <div className="row">
         {entry.applicationUrl ? (

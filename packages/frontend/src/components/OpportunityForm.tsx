@@ -27,6 +27,7 @@
  *    waiting to happen.
  */
 import styles from "@/components/OpportunityForm.module.css";
+import { PublisherStatusBadge } from "@/components/badges";
 import {
   CheckField,
   CheckList,
@@ -88,7 +89,7 @@ import {
   replaceRow,
   toDocument,
 } from "@/lib/opportunity-form";
-import { fundingTypeLabel, opportunityStatusLabel, reviewStatusLabel } from "@/lib/presentation";
+import { fundingTypeLabel, opportunityStatusLabel, publisherStatus } from "@/lib/presentation";
 import { useApi } from "@/lib/session";
 import type { SubmissionResult } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
@@ -1671,16 +1672,24 @@ function SubmissionOutcome({
   mode: "create" | "edit";
   onAgain: () => void;
 }) {
-  const published = result.reviewStatus === "approved" && result.isListed;
+  const source = { mergedInto: null, reviewStatus: result.reviewStatus, isListed: result.isListed };
+  const status = publisherStatus(source);
   return (
     <output className={`card ${styles.outcome}`}>
       <h2>{result.created ? "Submitted." : "Replaced."}</h2>
       <p>
-        {published
+        <PublisherStatusBadge source={source} />
+      </p>
+      <p>
+        {status === "live"
           ? "Published — it is in the public directory now."
-          : result.reviewStatus === "pending"
+          : status === "pending"
             ? "Stored as a pending submission. It is hidden from the public directory until a Hub reviewer approves it; publishing immediately requires membership of a verified organisation for this organisation prefix."
-            : `Stored with the review decision “${reviewStatusLabel(result.reviewStatus)}”.`}
+            : status === "hidden"
+              ? "Approved, but hidden from the public directory."
+              : status === "rejected"
+                ? "Rejected — it is not in the public directory."
+                : "Merged into another listing."}
       </p>
       <p>{describeDuplicateCheck(result.duplicateCheck, result.duplicates.length)}</p>
       {result.duplicates.length > 0 ? (

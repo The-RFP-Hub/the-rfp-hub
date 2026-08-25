@@ -67,11 +67,11 @@ const managed: ManagedOpportunity = {
   updatedAt: "2026-08-20T00:00:00Z",
 };
 
-function client(managedOpportunity: ManagedOpportunity = managed): ApiClient {
+function client(managedOpportunity: ManagedOpportunity = managed, currentMe: Me = me): ApiClient {
   return {
     baseUrl: "https://api.example.com",
     me: {
-      get: async () => me,
+      get: async () => currentMe,
       opportunity: async () => entry,
       opportunities: async () => ({
         items: [managedOpportunity],
@@ -124,6 +124,49 @@ beforeEach(() => {
 });
 
 describe("merged listing detail and edit routes", () => {
+  it("shows one publisher state by the title and keeps application stage separate", async () => {
+    const hidden = {
+      ...managed,
+      reviewStatus: "approved",
+      isListed: false,
+      mergedInto: null,
+    } satisfies ManagedOpportunity;
+    mount(<ListingPage />, client(hidden));
+
+    expect(
+      await screen.findByText("Hidden from directory", { selector: ".badge-hidden" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Archived", { selector: ".badge-archived" })).toBeTruthy();
+    expect(screen.getByText("Application stage")).toBeTruthy();
+    expect(screen.getByText("Approved", { selector: ".badge-approved" })).toBeTruthy();
+    expect(
+      screen.getByText("Hidden from the public directory", { selector: ".badge-unlisted" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Review decision")).toBeTruthy();
+    expect(screen.getByText("Public visibility")).toBeTruthy();
+  });
+
+  it("retains the full editorial axes when a Hub reviewer opens the detail", async () => {
+    const hidden = {
+      ...managed,
+      reviewStatus: "approved",
+      isListed: false,
+      mergedInto: null,
+    } satisfies ManagedOpportunity;
+    const reviewer = { ...me, role: "reviewer", canReview: true } satisfies Me;
+    mount(<ListingPage />, client(hidden, reviewer));
+
+    expect(
+      await screen.findByText("Hidden from directory", { selector: ".badge-hidden" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Approved", { selector: ".badge-approved" })).toBeTruthy();
+    expect(
+      screen.getByText("Hidden from the public directory", { selector: ".badge-unlisted" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Review decision")).toBeTruthy();
+    expect(screen.getByText("Public visibility")).toBeTruthy();
+  });
+
   it("shows the survivor banner on detail and removes Edit", async () => {
     mount(<ListingPage />);
 

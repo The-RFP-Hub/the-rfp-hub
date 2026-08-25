@@ -15,27 +15,31 @@
  */
 import { RequireSession } from "@/components/Chrome";
 import { UntrustedText } from "@/components/UntrustedText";
-import { ListedBadge, MatchBadge, MergedBadge, ReviewStatusBadge } from "@/components/badges";
+import { MatchBadge, PublisherStatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
 import {
+  PUBLISHER_STATUS_LABELS,
+  type PublisherStatus,
   fundingTypeLabel,
   isOpenDuplicateStatus,
   opportunityStatusLabel,
-  reviewStatusLabel,
+  publisherStatus,
 } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { ManagedOpportunity, Me, ReviewStatus } from "@/lib/types";
+import type { ManagedOpportunity, Me } from "@/lib/types";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
-const FILTERS: { value: ReviewStatus | "all"; label: string }[] = [
+const FILTERS: { value: PublisherStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
+  { value: "live", label: PUBLISHER_STATUS_LABELS.live },
+  { value: "pending", label: PUBLISHER_STATUS_LABELS.pending },
+  { value: "hidden", label: PUBLISHER_STATUS_LABELS.hidden },
   { value: "rejected", label: "Rejected" },
+  { value: "merged", label: "Merged" },
 ];
 
 export default function ListingsPage() {
@@ -62,13 +66,13 @@ const PENDING_WARN_AT = 3;
 
 function Listings({ me }: { me: Me }) {
   const api = useApi();
-  const [filter, setFilter] = useState<ReviewStatus | "all">("all");
+  const [filter, setFilter] = useState<PublisherStatus | "all">("all");
   const [page, setPage] = useState(1);
 
   const load = useCallback(
     () =>
       api.me.opportunities({
-        reviewStatus: filter === "all" ? undefined : filter,
+        publisherStatus: filter === "all" ? undefined : filter,
         page,
         limit: 20,
       }),
@@ -96,7 +100,7 @@ function Listings({ me }: { me: Me }) {
    */
   const capped = !me.memberships.some((membership) => membership.verified);
   const loadPending = useCallback(
-    () => api.me.opportunities({ reviewStatus: "pending", limit: 1 }),
+    () => api.me.opportunities({ publisherStatus: "pending", limit: 1 }),
     [api],
   );
   const pending = useResource(loadPending, { enabled: capped });
@@ -160,7 +164,7 @@ function Listings({ me }: { me: Me }) {
       )}
 
       <fieldset className="segmented">
-        <legend className="visually-hidden">Review status</legend>
+        <legend className="visually-hidden">Listing status</legend>
         {FILTERS.map((option) => (
           <button
             key={option.value}
@@ -184,7 +188,7 @@ function Listings({ me }: { me: Me }) {
               detail={
                 filter === "all"
                   ? "Everything you submit shows up on this page — published or not — and stays visible to you while a reviewer looks at it."
-                  : `No listings with the review decision “${reviewStatusLabel(filter)}”. Other decisions may still have some.`
+                  : `No listings marked “${PUBLISHER_STATUS_LABELS[filter]}”. Other statuses may still have some.`
               }
               action={
                 filter === "all" ? (
@@ -234,14 +238,7 @@ function Listings({ me }: { me: Me }) {
                           <Outcome item={item} />
                         </th>
                         <td>
-                          {item.mergedInto ? (
-                            <MergedBadge />
-                          ) : (
-                            <>
-                              <ReviewStatusBadge status={item.reviewStatus} />{" "}
-                              <ListedBadge isListed={item.isListed} />
-                            </>
-                          )}
+                          <PublisherStatusBadge source={item} />
                         </td>
                         <td>
                           <VerificationCell id={item.id} />
@@ -294,8 +291,9 @@ function Listings({ me }: { me: Me }) {
  */
 function Outcome({ item }: { item: ManagedOpportunity }) {
   const decision = item.lastDecision;
+  const status = publisherStatus(item);
 
-  if (item.mergedInto) {
+  if (status === "merged" && item.mergedInto) {
     return (
       <div className="cell-note">
         Merged into{" "}
@@ -311,7 +309,7 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
     );
   }
 
-  if (item.reviewStatus === "rejected") {
+  if (status === "rejected") {
     return (
       <div className="cell-note">
         <strong>Not published.</strong>{" "}
@@ -331,11 +329,19 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
     );
   }
 
-  if (item.reviewStatus === "pending") {
+  if (status === "pending") {
     return (
       <div className="cell-note muted">
         Waiting for a reviewer. It is stored and nothing is wrong with it — it is not in the public
         directory until somebody approves it, and you will see the reason here if it is refused.
+      </div>
+    );
+  }
+
+  if (status === "hidden") {
+    return (
+      <div className="cell-note muted">
+        Approved, but hidden from the public directory. A Hub reviewer can make it visible again.
       </div>
     );
   }

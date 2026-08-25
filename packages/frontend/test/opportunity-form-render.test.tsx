@@ -598,6 +598,7 @@ describe("after a submission", () => {
     submit();
 
     await waitFor(() => expect(screen.getByText("Submitted.")).toBeTruthy());
+    expect(screen.getByText("Live", { selector: ".badge-live" })).toBeTruthy();
     expect(api.create).toHaveBeenCalledTimes(1);
     // The whole form is gone — there is no second Submit to press.
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
@@ -617,6 +618,20 @@ describe("after a submission", () => {
     submit();
 
     await waitFor(() => expect(screen.getByText(/Stored as a pending submission/)).toBeTruthy());
+    expect(screen.getByText("Waiting for review", { selector: ".badge-pending" })).toBeTruthy();
+  });
+
+  it("calls an approved but unlisted submission hidden rather than live", async () => {
+    const api = stub(outcome({ reviewStatus: "approved", isListed: false }));
+    render(
+      <ApiClientProvider value={api.client}>
+        <OpportunityForm mode="create" initial={fill()} />
+      </ApiClientProvider>,
+    );
+    submit();
+
+    await waitFor(() => expect(screen.getByText("Hidden from directory")).toBeTruthy());
+    expect(screen.getByText("Approved, but hidden from the public directory.")).toBeTruthy();
   });
 
   it("offers a fresh form rather than the one that was just sent", async () => {

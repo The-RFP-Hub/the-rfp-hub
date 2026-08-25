@@ -608,6 +608,7 @@ caption {
 .badge-open,
 .badge-approved,
 .badge-listed,
+.badge-live,
 .badge-verified,
 .badge-matched {
   border-style: solid;
@@ -634,6 +635,7 @@ caption {
 /* Refused: struck through and quiet. Nothing is going to happen to it. */
 .badge-rejected,
 .badge-unlisted,
+.badge-hidden,
 .badge-unmatched {
   border-color: var(--line);
   color: var(--ink-soft);

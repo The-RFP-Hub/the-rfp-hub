@@ -2,8 +2,9 @@ import ListingsPage from "@/app/listings/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
+import type { PublisherStatus } from "@/lib/presentation";
 import type { ManagedOpportunity, ManagedOpportunityList, Me } from "@/lib/types";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session } = vi.hoisted(() => ({
@@ -65,8 +66,8 @@ function client(items: ManagedOpportunity[] = [merged]): ApiClient {
     baseUrl: "https://api.example.com",
     me: {
       get: async () => me,
-      opportunities: async (query?: { reviewStatus?: string }) =>
-        query?.reviewStatus === "pending" ? page([]) : page(items),
+      opportunities: async (query?: { publisherStatus?: PublisherStatus }) =>
+        query?.publisherStatus === "pending" ? page([]) : page(items),
       duplicates: async () => ({ items: [] }),
     },
     opportunities: {
@@ -82,6 +83,70 @@ beforeEach(() => {
 });
 
 describe("the merged row on Your listings", () => {
+  it("renders exactly one derived badge for every reachable publisher state", async () => {
+    const row = (
+      status: PublisherStatus,
+      over: Partial<ManagedOpportunity>,
+    ): ManagedOpportunity => ({
+      ...merged,
+      id: `acme:${status}`,
+      title: status,
+      mergedInto: null,
+      lastDecision: null,
+      ...over,
+    });
+    const items = [
+      { ...merged, isListed: true },
+      row("rejected", { reviewStatus: "rejected", isListed: true }),
+      row("pending", { reviewStatus: "pending", isListed: true }),
+      row("hidden", { reviewStatus: "approved", isListed: false }),
+      row("live", { reviewStatus: "approved", isListed: true }),
+    ];
+
+    render(
+      <ApiClientProvider value={client(items)}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    for (const [status, label] of [
+      ["merged", "Merged"],
+      ["rejected", "Rejected"],
+      ["pending", "Waiting for review"],
+      ["hidden", "Hidden from directory"],
+      ["live", "Live"],
+    ] as const) {
+      expect(await screen.findByText(label, { selector: `.badge-${status}` })).toBeTruthy();
+    }
+    expect(screen.queryByText("Approved", { selector: ".badge" })).toBeNull();
+    expect(
+      screen.queryByText("Visible in the public directory", { selector: ".badge" }),
+    ).toBeNull();
+  });
+
+  it("sends publisherStatus only from the publisher filter", async () => {
+    const api = client([]);
+    const opportunities = vi.fn(async (_query?: { publisherStatus?: PublisherStatus }) => page([]));
+    api.me.opportunities = opportunities;
+    render(
+      <ApiClientProvider value={api}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Hidden from directory" }));
+    await waitFor(() =>
+      expect(opportunities).toHaveBeenCalledWith({
+        publisherStatus: "hidden",
+        page: 1,
+        limit: 20,
+      }),
+    );
+    expect(opportunities.mock.calls.some(([query]) => query && "reviewStatus" in query)).toBe(
+      false,
+    );
+  });
+
   it("explains that the duplicate queue identifies both sides", async () => {
     const api = client();
     api.me.duplicates = async () => ({
