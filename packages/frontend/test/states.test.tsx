@@ -248,7 +248,7 @@ describe("badges carry meaning without colour", () => {
         <StatusBadge status="closed" />
         <ReviewStatusBadge status="pending" />
         <ReviewStatusBadge status="rejected" />
-        <ListedBadge isListed={false} />
+        <ListedBadge isListed={false} reviewStatus="approved" />
         <MatchBadge matched={null} />
       </>,
     );
@@ -270,6 +270,17 @@ describe("badges carry meaning without colour", () => {
       expect(badge.className).toMatch(/badge-/);
       expect(badge.getAttribute("style")).toBeNull();
     }
+  });
+
+  it("distinguishes a public listing from a pending public preference", () => {
+    const { rerender } = render(<ListedBadge isListed reviewStatus="pending" />);
+
+    expect(screen.getByText("Will appear once approved")).toBeTruthy();
+    expect(screen.queryByText("Visible in the public directory")).toBeNull();
+    expect(screen.getByText("Will appear once approved").className).toContain("badge-pending");
+
+    rerender(<ListedBadge isListed reviewStatus="approved" />);
+    expect(screen.getByText("Visible in the public directory").className).toContain("badge-listed");
   });
 
   it("says what a verification verdict is NOT, in the badge's own title", () => {

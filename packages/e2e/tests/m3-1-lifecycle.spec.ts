@@ -268,11 +268,13 @@ test.describe("M3-1 how many submissions may wait at once", () => {
     // configurable, so the only number a reader can trust is the one the server put in the message.
     // A generic "something went wrong" here would leave somebody deleting drafts at random.
     await expect(
-      page.getByText(
-        new RegExp(
-          `which is the limit of ${PENDING_SUBMISSION_LIMIT} for an account without a verified publisher membership`,
+      page
+        .getByRole("status")
+        .getByText(
+          new RegExp(
+            `which is the limit of ${PENDING_SUBMISSION_LIMIT} for an account without a verified publisher membership`,
+          ),
         ),
-      ),
       "the form shows what the API said, including the number it enforced",
     ).toBeVisible();
     await expect(page.getByText(/pending_limit_reached/)).toBeVisible();

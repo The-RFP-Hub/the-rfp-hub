@@ -590,7 +590,13 @@ describe("merging duplicates", () => {
       status: "confirmed" as const,
       reviewedAt: "2026-08-25T12:00:00Z",
     }));
+    const dismiss = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "dismissed" as const,
+      reviewedAt: "2026-08-25T12:01:00Z",
+    }));
     api.review.confirmDuplicate = confirm;
+    api.review.dismissDuplicate = dismiss;
     api.review.duplicates = async (query) => ({
       items: query?.status === "suspected" ? [duplicatePair] : [],
     });
@@ -604,8 +610,13 @@ describe("merging duplicates", () => {
 
     expect(await screen.findByText("Confirmed", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Merge…" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
   });
 
   it("marks merge busy, then keeps a receipt without inventing copied fields", async () => {

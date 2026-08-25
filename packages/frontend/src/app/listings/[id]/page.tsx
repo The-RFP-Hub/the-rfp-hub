@@ -180,7 +180,7 @@ function Header({
         </span>
         <span>
           <span className="muted">Public visibility</span>{" "}
-          <ListedBadge isListed={managed.isListed} />
+          <ListedBadge isListed={managed.isListed} reviewStatus={managed.reviewStatus} />
         </span>
       </div>
 

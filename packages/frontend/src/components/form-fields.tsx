@@ -88,6 +88,7 @@ export function Field({
 
   return (
     <div
+      data-field-path={path}
       className={
         className ? `field ${styles.fieldLayout} ${className}` : `field ${styles.fieldLayout}`
       }
@@ -367,7 +368,7 @@ export function CheckField({
   const id = fieldId(path);
   const hintId = hint ? `${id}-hint` : undefined;
   return (
-    <div className="field">
+    <div className="field" data-field-path={path}>
       <label className={styles.check} htmlFor={id}>
         <input
           id={id}
@@ -404,7 +405,7 @@ export function CheckList({
   onChange: (selected: string[]) => void;
 }) {
   return (
-    <fieldset className="field">
+    <fieldset className="field" data-field-path={path}>
       <legend>{legend}</legend>
       {hint ? <p className="hint">{hint}</p> : null}
       <div className={styles.checks}>

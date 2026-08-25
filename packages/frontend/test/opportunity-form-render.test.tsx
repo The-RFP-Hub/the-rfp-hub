@@ -779,6 +779,29 @@ describe("when problems appear", () => {
     expect(technical).not.toBeNull();
     for (const line of lines) expect(within(technical as HTMLElement).getByText(line)).toBeTruthy();
   });
+
+  it("clears a server issue as soon as its field changes", async () => {
+    mount(
+      {},
+      {
+        result: new ApiError(400, "validation_failed", "Invalid listing", {
+          errors: ["/title must pass the server title rule"],
+          issues: [{ path: "/title", message: "The server rejected this title." }],
+        }),
+      },
+    );
+    submit();
+
+    const title = screen.getByLabelText("Title");
+    await waitFor(() => expect(title.getAttribute("aria-invalid")).toBe("true"));
+    expect(screen.getAllByText("The server rejected this title.").length).toBeGreaterThan(0);
+
+    fireEvent.change(title, { target: { value: "A corrected title" } });
+
+    expect(title.getAttribute("aria-invalid")).toBeNull();
+    expect(screen.queryByText("The server rejected this title.")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
 
 describe("drafts and dirty navigation", () => {
@@ -865,6 +888,23 @@ describe("drafts and dirty navigation", () => {
 
     await waitFor(() => expect(api.replace).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("link", { name: "View it as applicants see it" }));
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("uses the successful replacement as the new dirty baseline", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const api = mount({}, { mode: "edit", initial: fill(), result: outcome({ created: false }) });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Saved title" } });
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+
+    await waitFor(() => expect(api.replace).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Continue editing" }));
+    expect(valueIn(screen.getByLabelText("Title"))).toBe("Saved title");
+
+    const unload = new Event("beforeunload", { cancelable: true });
+    expect(window.dispatchEvent(unload)).toBe(true);
+    fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
     expect(confirm).not.toHaveBeenCalled();
     confirm.mockRestore();
   });

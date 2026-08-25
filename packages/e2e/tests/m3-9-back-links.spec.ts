@@ -133,7 +133,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
       (url) => decodeURIComponent(url.pathname) === `/organisations/${slug}`,
     );
     await expect(
-      page.getByRole("heading", { name: /Awaiting review in this namespace/ }),
+      page.getByRole("heading", { name: /Awaiting review for this organisation/ }),
     ).toBeVisible();
     await expect(page.locator("tr").filter({ hasText: id })).toHaveCount(1);
   });

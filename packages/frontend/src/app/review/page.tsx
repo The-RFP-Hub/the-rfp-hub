@@ -377,7 +377,8 @@ function SubmissionRow({
           ) : null}
         </td>
         <td>
-          <ReviewStatusBadge status={item.reviewStatus} /> <ListedBadge isListed={item.isListed} />
+          <ReviewStatusBadge status={item.reviewStatus} />{" "}
+          <ListedBadge isListed={item.isListed} reviewStatus={item.reviewStatus} />
         </td>
         <td>
           <div className="row">
@@ -1045,34 +1046,34 @@ function PairCard({
           {comparing ? "Hide comparison" : "Compare descriptions"}
         </button>
         {pair.status === "suspected" ? (
-          <>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  const next = await api.review.confirmDuplicate(pair.id);
-                  onDecision(next);
-                  return "Recorded as the same programme. Neither listing was touched.";
-                })
-              }
-            >
-              Confirm
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  const next = await api.review.dismissDuplicate(pair.id);
-                  onDecision(next);
-                  return "Dismissed. You can undo this decision while this row remains on the page.";
-                })
-              }
-            >
-              Dismiss
-            </button>
-          </>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const next = await api.review.confirmDuplicate(pair.id);
+                onDecision(next);
+                return "Recorded as the same programme. Neither listing was touched.";
+              })
+            }
+          >
+            Confirm
+          </button>
+        ) : null}
+        {canMerge ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const next = await api.review.dismissDuplicate(pair.id);
+                onDecision(next);
+                return "Dismissed. You can undo this decision while this row remains on the page.";
+              })
+            }
+          >
+            Dismiss
+          </button>
         ) : null}
         {canMerge ? (
           <button type="button" disabled={busy} onClick={() => setConfirming(!confirming)}>
@@ -1305,7 +1306,8 @@ function Side({
       <p className="muted">
         <code>{side.id}</code>
         <br />
-        <ReviewStatusBadge status={side.reviewStatus} /> <ListedBadge isListed={side.isListed} />
+        <ReviewStatusBadge status={side.reviewStatus} />{" "}
+        <ListedBadge isListed={side.isListed} reviewStatus={side.reviewStatus} />
         {side.namespace ? (
           <>
             {" "}

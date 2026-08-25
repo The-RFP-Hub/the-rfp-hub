@@ -270,10 +270,10 @@ test.describe("M3-7 the public entry page", () => {
       const history = page.locator("details", { has: page.getByText("Change history") });
       await history.getByText("Change history").click();
 
-      await expect(history.getByRole("cell", { name: "update", exact: true })).toBeVisible();
-      await expect(history.getByRole("cell", { name: "create", exact: true })).toBeVisible();
+      await expect(history.getByRole("cell", { name: "Updated", exact: true })).toBeVisible();
+      await expect(history.getByRole("cell", { name: "Submitted", exact: true })).toBeVisible();
       // A time for each, and the changed FIELD NAME.
-      await expect(history.getByText("title", { exact: false }).first()).toBeVisible();
+      await expect(history.getByText("Title", { exact: false }).first()).toBeVisible();
 
       // The redaction itself: an anonymous reader gets the field names and never the values, so the
       // superseded title — a value — must appear nowhere in the trail.

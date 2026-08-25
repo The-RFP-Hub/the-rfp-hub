@@ -154,7 +154,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     // Matched loosely rather than exactly: the section NUMBER is a stylesheet counter on the
     // legend, and generated content counts towards an accessible name.
     await expect(page.getByRole("group", { name: /Funding information/ })).toBeVisible();
-    await expect(page.getByRole("group", { name: /Funding details — grant/ })).toBeVisible();
+    await expect(page.getByRole("group", { name: /Funding details — Grant/ })).toBeVisible();
 
     // SUBMIT IS ALWAYS LIVE, and that is the criterion rather than a relaxation of it. A disabled
     // button that does not say why cannot be told apart from a broken page, so pressing it on an

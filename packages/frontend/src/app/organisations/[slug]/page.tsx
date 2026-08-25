@@ -427,7 +427,7 @@ function Published({
                         {item.isListed ? null : (
                           <>
                             {" "}
-                            <ListedBadge isListed={false} />
+                            <ListedBadge isListed={false} reviewStatus={item.reviewStatus} />
                             <div className="cell-note muted">
                               Approved but hidden from the public directory — a Hub reviewer
                               controls listing.

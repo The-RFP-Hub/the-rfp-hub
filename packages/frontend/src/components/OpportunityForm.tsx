@@ -512,6 +512,15 @@ export function OpportunityForm({
     ]),
   ];
 
+  const clearServerIssue = (path: string) => {
+    const clearedLines = new Set(
+      serverIssues.filter((issue) => issue.path === path).map((issue) => issue.raw),
+    );
+    if (clearedLines.size === 0) return;
+    setServerIssues((current) => current.filter((issue) => issue.path !== path));
+    setServerValidationLines((current) => current.filter((line) => !clearedLines.has(line)));
+  };
+
   useEffect(() => {
     if (focusSummary === 0) return;
     errorSummaryRef.current?.focus();
@@ -532,6 +541,7 @@ export function OpportunityForm({
         if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
         removeOpportunityDraft(accountId);
       }
+      if (mode === "edit") initialSnapshot.current = canonicalForm(form);
       setResult(response);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -576,6 +586,12 @@ export function OpportunityForm({
     <form
       className={styles.form}
       noValidate
+      onChangeCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const path = target.closest<HTMLElement>("[data-field-path]")?.dataset.fieldPath;
+        if (path) clearServerIssue(path);
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);

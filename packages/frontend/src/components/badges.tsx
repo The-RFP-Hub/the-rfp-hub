@@ -89,17 +89,40 @@ export function StatusBadge({ status }: { status: string }) {
  * Listing is a separate axis from approval: an approved entry can be unlisted, and then it is not
  * in the public reads either. Showing only the review status would misreport that.
  */
-export function ListedBadge({ isListed }: { isListed: boolean }) {
+export function ListedBadge({
+  isListed,
+  reviewStatus,
+}: {
+  isListed: boolean;
+  reviewStatus: string;
+}) {
+  const visible = reviewStatus === "approved" && isListed;
+  const label = visible
+    ? "Visible in the public directory"
+    : reviewStatus === "pending" && isListed
+      ? "Will appear once approved"
+      : reviewStatus === "approved"
+        ? "Hidden from the public directory"
+        : isListed
+          ? "Listing preference: public"
+          : "Listing preference: hidden";
+  const explanation = visible
+    ? "Approved and visible in the public directory"
+    : reviewStatus === "pending" && isListed
+      ? "Hidden while it waits for review; it will appear in the public directory once approved"
+      : reviewStatus === "approved"
+        ? "Approved, but hidden from the public directory"
+        : isListed
+          ? "The listing preference is public, but this listing is hidden because it is not approved"
+          : "The listing preference is hidden; approval will not make it public";
   return (
     <span
-      className={isListed ? "badge badge-listed" : "badge badge-unlisted"}
-      title={
-        isListed
-          ? "Visible in the public directory"
-          : "Hidden from the public directory, whatever its review decision"
+      className={
+        visible ? "badge badge-listed" : isListed ? "badge badge-pending" : "badge badge-unlisted"
       }
+      title={explanation}
     >
-      {isListed ? "Visible in the public directory" : "Hidden from the public directory"}
+      {label}
     </span>
   );
 }

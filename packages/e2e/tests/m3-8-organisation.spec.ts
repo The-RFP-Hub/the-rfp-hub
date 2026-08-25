@@ -94,7 +94,7 @@ test.describe("M3-8 the organisation's own page", () => {
     await expect(page.getByRole("heading", { name: slug, exact: true }).first()).toBeVisible();
     await expect(page.getByText("You publish directly.")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: /Awaiting review in this namespace/ }),
+      page.getByRole("heading", { name: /Awaiting review for this organisation/ }),
     ).toBeVisible();
 
     const row = page.locator("tr").filter({ hasText: id });
@@ -126,7 +126,9 @@ test.describe("M3-8 the organisation's own page", () => {
     // decision came out of is refreshed in place), so this asks for it the way a member would.
     // A row here carries no decision controls, which is what tells the two tables apart.
     await page.reload();
-    await expect(page.getByRole("heading", { name: /Published in this namespace/ })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Published for this organisation/ }),
+    ).toBeVisible();
     const published = page.locator("tr").filter({ hasText: id });
     await expect(published).toHaveCount(1);
     await expect(published.getByRole("button")).toHaveCount(0);
