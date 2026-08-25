@@ -915,7 +915,8 @@ function PairCard({
               <UntrustedText value={loser.title} />
             </strong>{" "}
             — is <strong>rejected, unlisted, archived and pointed at the survivor</strong>. It
-            leaves the public directory. This is not undone by merging the other way afterwards.
+            leaves the public directory and its public link forwards to the survivor. This is not
+            undone by merging the other way afterwards.
           </p>
         </ConfirmPanel>
       ) : null}

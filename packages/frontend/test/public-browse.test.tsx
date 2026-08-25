@@ -490,9 +490,34 @@ describe("the public opportunity page", () => {
 
     await waitFor(() =>
       expect(navigation.replace).toHaveBeenCalledWith(
-        "/opportunities/acme%3Around%205?back=%2Freview%3Fpage%3D2",
+        "/opportunities/acme%3Around%205?back=%2Freview%3Fpage%3D2&mergedRedirect=1",
       ),
     );
+  });
+
+  it("shows a dismissible one-shot notice on the merge survivor", async () => {
+    navigation.params = new URLSearchParams("back=%2Freview%3Fpage%3D2&mergedRedirect=1");
+    const { client } = stub();
+    const view = mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    const notice = await screen.findByText(
+      "You were redirected here: the listing you followed was merged into this one.",
+    );
+    expect(notice.closest("output")).toBeTruthy();
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith(
+        "/opportunities/acme%3Around-4?back=%2Freview%3Fpage%3D2",
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/You were redirected here/)).toBeNull();
+
+    view.unmount();
+    navigation.params = new URLSearchParams("back=%2Freview%3Fpage%3D2");
+    mount(stub().client, <PublicOpportunity id="acme:round-4" />);
+    await screen.findByRole("heading", { name: HOSTILE_TITLE });
+    expect(screen.queryByText(/You were redirected here/)).toBeNull();
   });
 
   it("says it is loading before it says anything else", () => {
@@ -595,8 +620,8 @@ describe("the public opportunity page", () => {
 
     mount(client, <PublicOpportunity id="legacy:round-4" />);
 
-    fireEvent.click(await screen.findByText("Claim this listing for an organisation"));
-    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+    fireEvent.click(await screen.findByText("This is my programme — claim it"));
+    fireEvent.click(await screen.findByRole("button", { name: "File the claim" }));
     await waitFor(() =>
       expect(claim).toHaveBeenCalledWith("acme:round-4", {
         organizationSlug: "acme",

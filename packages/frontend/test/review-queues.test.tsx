@@ -18,7 +18,7 @@ import ReviewPage from "@/app/review/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { Me, OrganizationSummary } from "@/lib/types";
+import type { DuplicatePair, Me, OrganizationSummary } from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -91,6 +91,31 @@ const verifiedOrg = org({
   memberCount: 2,
 });
 const stub = org({ slug: "0g", name: "0G", memberCount: 0 });
+const duplicatePair: DuplicatePair = {
+  id: 17,
+  status: "suspected",
+  similarity: 0.92,
+  detectedAt: "2026-08-24T00:00:00Z",
+  reviewedAt: null,
+  left: {
+    id: "acme:survivor",
+    title: "Acme Grants",
+    reviewStatus: "approved",
+    isListed: true,
+    namespace: "acme",
+    mergedInto: null,
+    updatedAt: "2026-08-24T00:00:00Z",
+  },
+  right: {
+    id: "legacy:loser",
+    title: "Legacy Acme Grants",
+    reviewStatus: "approved",
+    isListed: true,
+    namespace: "legacy",
+    mergedInto: null,
+    updatedAt: "2026-08-24T00:00:00Z",
+  },
+};
 
 const approve = vi.fn(async () => ({ id: "x", reviewStatus: "approved", isListed: true }));
 const reject = vi.fn(async () => ({ id: "x", reviewStatus: "rejected", isListed: false }));
@@ -355,6 +380,25 @@ describe("the way back", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: /Duplicates/ }));
     expect(replace).toHaveBeenCalledWith("/review?tab=duplicates");
+  });
+});
+
+describe("merging duplicates", () => {
+  it("says the loser's public link will forward to the survivor", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    api.review.duplicates = async () => ({ items: [duplicatePair] });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Merge…" }));
+    const panel = screen.getByRole("group", { name: "Merge these two listings?" });
+    expect(panel.textContent).toContain(
+      "leaves the public directory and its public link forwards to the survivor",
+    );
   });
 });
 

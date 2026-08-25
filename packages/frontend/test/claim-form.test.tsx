@@ -96,7 +96,7 @@ function renderForm(client: ApiClient, me = account()) {
       <ClaimForm id="acme:round-4" me={me} />
     </ApiClientProvider>,
   );
-  fireEvent.click(screen.getByText("Claim this listing for an organisation"));
+  fireEvent.click(screen.getByText("This is my programme — claim it"));
 }
 
 beforeEach(() => {
@@ -146,11 +146,36 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    expect(await screen.findByText("Claim this listing for an organisation")).toBeTruthy();
-    fireEvent.click(screen.getByText("Claim this listing for an organisation"));
+    expect(await screen.findByText("This is my programme — claim it")).toBeTruthy();
+    fireEvent.click(screen.getByText("This is my programme — claim it"));
     expect(screen.getByText(/A reviewer grants membership\./)).toBeTruthy();
     expect(client.me.get).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
+  });
+
+  it("keeps the same disclosure open while sign-in loads the claim form", async () => {
+    const client = clientFor();
+    const view = render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    const summary = screen.getByText("This is my programme — claim it");
+    const disclosure = summary.closest("details") as HTMLDetailsElement;
+    fireEvent.click(summary);
+    expect(disclosure.open).toBe(true);
+
+    authSession.data = { user: { id: "user_7" } };
+    view.rerender(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByRole("button", { name: "File the claim" })).toBeTruthy();
+    expect(screen.getByText("This is my programme — claim it")).toBe(summary);
+    expect(disclosure.open).toBe(true);
   });
 });
 
@@ -235,6 +260,6 @@ describe("the extracted claim form", () => {
 
     expect(source).not.toContain("ClaimForm");
     expect(source).not.toContain("opportunities.claim");
-    expect(source).not.toContain("Claim this listing for an organisation");
+    expect(source).not.toContain("This is my programme — claim it");
   });
 });

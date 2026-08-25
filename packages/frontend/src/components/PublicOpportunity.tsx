@@ -32,19 +32,35 @@ import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+
+const MERGED_REDIRECT_PARAM = "mergedRedirect";
 
 export function PublicOpportunity({ id }: { id: string }) {
   const api = useApi();
   const { replace } = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.toString();
+  const [showMergedRedirect, setShowMergedRedirect] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(query);
+    if (params.get(MERGED_REDIRECT_PARAM) !== "1") return;
+
+    setShowMergedRedirect(true);
+    params.delete(MERGED_REDIRECT_PARAM);
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    replace(`/opportunities/${encodeURIComponent(id)}${suffix}`);
+  }, [id, query, replace]);
+
   const load = useCallback(async () => {
     try {
       return await api.directory.find(id);
     } catch (error) {
       if (error instanceof ApiError && error.code === "opportunity_merged" && error.mergedInto) {
-        const suffix = query ? `?${query}` : "";
+        const params = new URLSearchParams(query);
+        params.set(MERGED_REDIRECT_PARAM, "1");
+        const suffix = `?${params.toString()}`;
         replace(`/opportunities/${encodeURIComponent(error.mergedInto.id)}${suffix}`);
         // Navigation unmounts this tree. Keeping the resource pending prevents the expected 404
         // from flashing as an error while the canonical survivor route loads.
@@ -57,6 +73,14 @@ export function PublicOpportunity({ id }: { id: string }) {
 
   return (
     <section>
+      {showMergedRedirect ? (
+        <output className="note row">
+          <span>You were redirected here: the listing you followed was merged into this one.</span>
+          <button type="button" onClick={() => setShowMergedRedirect(false)}>
+            Dismiss
+          </button>
+        </output>
+      ) : null}
       <ResourceView resource={state} what="this opportunity" onRetry={reload}>
         {(entry) => (
           <>

@@ -52,7 +52,14 @@ function Keys() {
   const [createBusy, setCreateBusy] = useState(false);
   const [confirmingKeyId, setConfirmingKeyId] = useState<number | null>(null);
   const [revokingKeyId, setRevokingKeyId] = useState<number | null>(null);
-  const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const [createNote, setCreateNote] = useState<{
+    kind: "ok" | "error";
+    message: string;
+  } | null>(null);
+  const [revokeResult, setRevokeResult] = useState<{
+    keyId: number;
+    note: { kind: "ok" | "error"; message: string };
+  } | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [copyResult, setCopyResult] = useState<{
     kind: "ok" | "error";
@@ -66,16 +73,16 @@ function Keys() {
 
   const create = async () => {
     setCreateBusy(true);
-    setNote(null);
+    setCreateNote(null);
     try {
       const created = await api.keys.create({ name: name || null, scopes });
       setSecret(created.token);
       setCopyResult(null);
       setName("");
-      setNote({ kind: "ok", message: "Key created. The secret below is shown once." });
+      setCreateNote({ kind: "ok", message: "Key created. The secret below is shown once." });
       reload();
     } catch (error) {
-      setNote({
+      setCreateNote({
         kind: "error",
         message:
           error instanceof ApiError ? `${error.message} (${error.code})` : "Could not mint a key.",
@@ -85,19 +92,28 @@ function Keys() {
     }
   };
 
-  const revoke = async (id: number) => {
+  const revoke = async (id: number, keyName: string) => {
     setRevokingKeyId(id);
-    setNote(null);
+    setRevokeResult(null);
     try {
       await api.keys.revoke(id);
-      setNote({ kind: "ok", message: `Key ${id} revoked. Audit rows naming it still resolve.` });
+      setRevokeResult({
+        keyId: id,
+        note: {
+          kind: "ok",
+          message: `Key ${keyName} revoked. Audit rows naming it still resolve.`,
+        },
+      });
       setConfirmingKeyId(null);
       reload();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError ? `${error.message} (${error.code})` : "Could not revoke.",
+      setRevokeResult({
+        keyId: id,
+        note: {
+          kind: "error",
+          message:
+            error instanceof ApiError ? `${error.message} (${error.code})` : "Could not revoke.",
+        },
       });
     } finally {
       setRevokingKeyId(null);
@@ -191,7 +207,7 @@ function Keys() {
         >
           {createBusy ? "Minting…" : "Mint"}
         </button>
-        <ActionNote note={note} />
+        <ActionNote note={createNote} />
       </div>
 
       <ResourceView resource={state} what="your keys" onRetry={reload}>
@@ -249,30 +265,38 @@ function Keys() {
                               <button
                                 type="button"
                                 disabled={revokingKeyId !== null}
-                                onClick={() => setConfirmingKeyId(key.id)}
+                                onClick={() => {
+                                  setRevokeResult(null);
+                                  setConfirmingKeyId(key.id);
+                                }}
                               >
                                 Revoke…
                               </button>
                             )}
                           </td>
                         </tr>
-                        {confirmingKeyId === key.id ? (
+                        {confirmingKeyId === key.id || revokeResult?.keyId === key.id ? (
                           <tr>
                             <td colSpan={5}>
-                              <ConfirmPanel
-                                title={`Revoke ${keyName}?`}
-                                confirmLabel="Revoke key"
-                                busyLabel="Revoking…"
-                                busy={revokingKeyId === key.id}
-                                onCancel={() => setConfirmingKeyId(null)}
-                                onConfirm={() => void revoke(key.id)}
-                              >
-                                <p>
-                                  Integrations using this key stop authenticating immediately.
-                                  Revocation cannot be undone. To rotate without an outage: create
-                                  the replacement, deploy it, then revoke this key.
-                                </p>
-                              </ConfirmPanel>
+                              {confirmingKeyId === key.id ? (
+                                <ConfirmPanel
+                                  title={`Revoke ${keyName}?`}
+                                  confirmLabel="Revoke key"
+                                  busyLabel="Revoking…"
+                                  busy={revokingKeyId === key.id}
+                                  onCancel={() => setConfirmingKeyId(null)}
+                                  onConfirm={() => void revoke(key.id, keyName)}
+                                >
+                                  <p>
+                                    Integrations using this key stop authenticating immediately.
+                                    Revocation cannot be undone. To rotate without an outage: create
+                                    the replacement, deploy it, then revoke this key.
+                                  </p>
+                                </ConfirmPanel>
+                              ) : null}
+                              <ActionNote
+                                note={revokeResult?.keyId === key.id ? revokeResult.note : null}
+                              />
                             </td>
                           </tr>
                         ) : null}

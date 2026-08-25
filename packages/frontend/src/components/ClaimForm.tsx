@@ -12,9 +12,20 @@ import { ActionNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+
+const CLAIM_SUMMARY = "This is my programme — claim it";
 
 export function ClaimForm({ id, me }: { id: string; me: Me }) {
+  return (
+    <details className="card">
+      <summary>{CLAIM_SUMMARY}</summary>
+      <ClaimFields id={id} me={me} />
+    </details>
+  );
+}
+
+function ClaimFields({ id, me }: { id: string; me: Me }) {
   const api = useApi();
   const [slug, setSlug] = useState(me.memberships[0]?.slug ?? "");
   const [note, setNote] = useState("");
@@ -23,13 +34,10 @@ export function ClaimForm({ id, me }: { id: string; me: Me }) {
 
   if (me.memberships.length === 0) {
     return (
-      <details className="card">
-        <summary>Claim this listing for an organisation</summary>
-        <p className="muted">
-          This account is not a member of any organisation, so there is nothing to claim on behalf
-          of. A reviewer grants membership.
-        </p>
-      </details>
+      <p className="muted">
+        This account is not a member of any organisation, so there is nothing to claim on behalf of.
+        A reviewer grants membership.
+      </p>
     );
   }
 
@@ -53,8 +61,7 @@ export function ClaimForm({ id, me }: { id: string; me: Me }) {
   };
 
   return (
-    <details className="card">
-      <summary>Claim this listing for an organisation</summary>
+    <>
       <p className="muted footnote">
         Granted immediately when the organisation is verified <em>and</em> appears among the
         listing&rsquo;s operating organisations. Sponsorship is not operation, so a sponsor&rsquo;s
@@ -83,7 +90,7 @@ export function ClaimForm({ id, me }: { id: string; me: Me }) {
         {busy ? "Filing…" : "File the claim"}
       </button>
       <ActionNote note={result} />
-    </details>
+    </>
   );
 }
 
@@ -94,61 +101,47 @@ export function ClaimForm({ id, me }: { id: string; me: Me }) {
  */
 export function PublicClaimControl({ id }: { id: string }) {
   const session = useSession();
+  const [open, setOpen] = useState(false);
+  let content: ReactNode;
 
   if (session.error) {
-    return (
-      <details className="card">
-        <summary>This is my programme — claim it</summary>
-        <ActionNote
-          note={{ kind: "error", message: `Sign-in is unavailable: ${session.error.message}` }}
-        />
-      </details>
+    content = (
+      <ActionNote
+        note={{ kind: "error", message: `Sign-in is unavailable: ${session.error.message}` }}
+      />
     );
-  }
-
-  if (!session.ready) {
-    return (
-      <details className="card">
-        <summary>This is my programme — claim it</summary>
-        <p className="muted footnote">Restoring your session…</p>
-      </details>
-    );
-  }
-
-  if (!session.authenticated) {
-    return (
-      <details className="card">
-        <summary>This is my programme — claim it</summary>
+  } else if (!session.ready) {
+    content = <p className="muted footnote">Restoring your session…</p>;
+  } else if (!session.authenticated) {
+    content = (
+      <>
         <p className="muted footnote">
           Sign in with the account that belongs to the organisation running this programme.
         </p>
         <button type="button" onClick={session.login}>
           Sign in to claim
         </button>
-      </details>
+      </>
     );
-  }
-
-  if (session.me.status === "idle" || session.me.status === "loading") {
-    return (
-      <details className="card">
-        <summary>This is my programme — claim it</summary>
-        <p className="muted footnote">Loading your organisations…</p>
-      </details>
-    );
-  }
-
-  if (session.me.status === "error") {
-    return (
-      <details className="card">
-        <summary>This is my programme — claim it</summary>
+  } else if (session.me.status === "idle" || session.me.status === "loading") {
+    content = <p className="muted footnote">Loading your organisations…</p>;
+  } else if (session.me.status === "error") {
+    content = (
+      <>
         <ActionNote note={{ kind: "error", message: session.me.error.message }} />
         <button type="button" onClick={session.reloadMe}>
           Try again
         </button>
-      </details>
+      </>
     );
+  } else {
+    content = <ClaimFields id={id} me={session.me.data} />;
   }
 
-  return <ClaimForm id={id} me={session.me.data} />;
+  return (
+    <details className="card" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>{CLAIM_SUMMARY}</summary>
+      {content}
+    </details>
+  );
 }

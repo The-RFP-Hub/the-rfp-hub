@@ -117,10 +117,29 @@ describe("revoking a key", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Revoke key" }));
 
     await waitFor(() => expect(revoke).toHaveBeenCalledWith(22));
-    expect(
-      await screen.findByText("Key 22 revoked. Audit rows naming it still resolve."),
-    ).toBeTruthy();
+    const result = await screen.findByText(
+      "Key rfp_backup… revoked. Audit rows naming it still resolve.",
+    );
+    expect(result.closest("tr")?.previousElementSibling).toBe(unlabelledRow);
     expect(screen.queryByRole("group", { name: "Revoke rfp_backup…?" })).toBeNull();
+  });
+
+  it("keeps a labelled revoke result by its row without overwriting the mint result", async () => {
+    mount();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
+    expect(await screen.findByText("Key created. The secret below is shown once.")).toBeTruthy();
+
+    const row = await productionRow();
+    fireEvent.click(within(row).getByRole("button", { name: "Revoke…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Revoke key" }));
+
+    const result = await screen.findByText(
+      "Key Production ingest revoked. Audit rows naming it still resolve.",
+    );
+    expect(result.closest("tr")?.previousElementSibling).toBe(row);
+    expect(screen.getByText("Key created. The secret below is shown once.")).toBeTruthy();
+    expect(screen.queryByText(/Key 11 revoked/)).toBeNull();
   });
 
   it("shows and disables the busy confirmation while revocation is in flight", async () => {
