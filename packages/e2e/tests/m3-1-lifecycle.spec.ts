@@ -277,7 +277,10 @@ test.describe("M3-1 how many submissions may wait at once", () => {
         ),
       "the form shows what the API said, including the number it enforced",
     ).toBeVisible();
-    await expect(page.getByText(/pending_limit_reached/)).toBeVisible();
+    await expect(
+      page.getByText(/pending_limit_reached/),
+      "the machine code remains available in the collapsed technical details",
+    ).toHaveCount(1);
     await expect(
       page.getByRole("heading", { name: "Submitted." }),
       "and nothing was stored",
