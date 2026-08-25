@@ -130,7 +130,10 @@ export type MutationId = "M0" | "M1" | "M2" | "M3" | "M4" | "M5";
  */
 export const MUTATIONS: Record<MutationId, { label: string; apply: (text: string) => string }> = {
   M0: { label: "paraphrase (synonyms + drop 1-in-6)", apply: paraphrase },
-  M1: { label: "heavy synonyms, nothing dropped", apply: (t) => substitute(t, SUBSTITUTIONS_HEAVY) },
+  M1: {
+    label: "heavy synonyms, nothing dropped",
+    apply: (t) => substitute(t, SUBSTITUTIONS_HEAVY),
+  },
   M2: { label: "word order scrambled in triples", apply: reverseTriples },
   M3: { label: "truncated to the leading 40%", apply: (t) => truncateTo(t, 0.4) },
   M4: {
