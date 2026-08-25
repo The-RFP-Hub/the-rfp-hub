@@ -81,7 +81,7 @@ function explainOneOf(errors: readonly ErrorObject[], data: unknown): string[] |
       e.keyword === "additionalProperties"
         ? `unknown field '${(e.params as { additionalProperty: string }).additionalProperty}'`
         : describe(e);
-    return `/fundingDetails${e.instancePath} ${tag} details: ${msg}`;
+    return `/fundingDetails${errorPointer(e)} ${tag} details: ${msg}`;
   });
 }
 
@@ -115,7 +115,7 @@ function explainOneOfIssues(
   const validate = branchValidator(tag);
   if (!validate || validate(data.fundingDetails)) return undefined;
   return (validate.errors ?? []).map((error) => ({
-    path: `/fundingDetails${error.instancePath}`,
+    path: `/fundingDetails${errorPointer(error)}`,
     message:
       error.keyword === "additionalProperties"
         ? `unknown field '${(error.params as { additionalProperty: string }).additionalProperty}'`
@@ -168,12 +168,20 @@ function pointerToken(value: string): string {
   return value.replaceAll("~", "~0").replaceAll("/", "~1");
 }
 
+function errorPointer(error: ErrorObject): string {
+  if (error.keyword === "required") {
+    const missing = (error.params as { missingProperty?: string }).missingProperty;
+    if (missing) return `${error.instancePath}/${pointerToken(missing)}`;
+  }
+  return error.instancePath;
+}
+
 function issueFor(error: ErrorObject): ValidationIssue {
   if (error.keyword === "required") {
     const missing = (error.params as { missingProperty?: string }).missingProperty;
     if (missing) {
       return {
-        path: `${error.instancePath}/${pointerToken(missing)}` || `/${pointerToken(missing)}`,
+        path: errorPointer(error),
         message: "is required",
       };
     }
