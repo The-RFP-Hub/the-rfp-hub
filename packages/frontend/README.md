@@ -68,11 +68,15 @@ pnpm --filter @the-rfp-hub/frontend dev  # http://localhost:3005
 
 Signing in locally needs the API running with a mail transport that does not send mail: set
 `EMAIL_TRANSPORT=stdout` and the six-digit code is printed to the API's console. Nothing else about
-sign-in differs from production.
+sign-in differs from production. It also needs the API's `TRUSTED_ORIGINS` to list this frontend's
+origin (uncomment `TRUSTED_ORIGINS=http://localhost:3005` in `packages/api/.env`) — without it the
+browser's preflight for the sign-in calls is refused, which shows up as a CORS error in the console
+rather than anything the sign-in form itself explains.
 
 The API has to be running for anything past the login screen to have data — see
-`packages/api/README.md`. `pnpm --filter @the-rfp-hub/frontend... build` (note the `...`) builds the
-workspace dependencies first, which is what a clean checkout needs.
+[`packages/api/README.md`](../api/README.md#local-development). `pnpm --filter
+@the-rfp-hub/frontend... build` (note the `...`) builds the workspace dependencies first, which is
+what a clean checkout needs.
 
 ```bash
 pnpm --filter @the-rfp-hub/frontend test        # jsdom, offline, no database
