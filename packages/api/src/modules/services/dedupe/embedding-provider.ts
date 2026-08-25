@@ -58,8 +58,12 @@ function normalize(vector: number[]): number[] {
  * Deliberately the same shape as `field-diff.ts`'s tokenizer without its stop list: a stop list is
  * a ranking decision for comparing DIFFERENT records, and this is building a vector, where the
  * common words carry real signal about what kind of programme it is.
+ *
+ * EXPORTED because the document-frequency table is built from the committed corpus by
+ * `scripts/build-idf-table.ts`, and a df table produced by any other tokenization would weight a
+ * vocabulary the featurizer never sees. One tokenizer, two call sites, no drift.
  */
-function tokenize(text: string): string[] {
+export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
