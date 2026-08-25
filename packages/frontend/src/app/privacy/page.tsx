@@ -47,10 +47,10 @@ export default function PrivacyPage() {
         beyond that, the Hub does not read your Google data.
       </p>
       <p>
-        An account also carries what you create on it: an optional public handle, roles and
-        organisation memberships, API-key records (name, prefix, a hash of the key, scopes, last-use
-        — never the secret itself), your submissions, and an append-only history of changes and
-        decisions.
+        An account also carries what you create on it: an optional public handle (the byline shown
+        on listings), roles and organisation memberships, API-key records (name, prefix, a hash of
+        the key, scopes, last-use — never the secret itself), your submissions, and an append-only
+        history of changes and decisions.
       </p>
 
       <h2>Analytics without addresses</h2>

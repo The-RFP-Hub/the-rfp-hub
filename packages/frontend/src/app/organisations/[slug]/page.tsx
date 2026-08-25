@@ -1,5 +1,6 @@
 "use client";
 
+import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 /**
  * An organisation's own view of itself: what it has published, what is waiting in its name, and —
  * when it is verified — the decision on each of those.
@@ -30,6 +31,7 @@ import { ActionNote, EmptyState, ResourceView } from "@/components/states";
 import { ApiError, type OrganizationPatch } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { fundingTypeLabel, orgRoleLabel } from "@/lib/presentation";
 import { type ResourceHandle, useResource } from "@/lib/resource";
 import { detailHref } from "@/lib/return-to";
 import { useApi } from "@/lib/session";
@@ -95,7 +97,7 @@ function NotAMember({ slug, me }: { slug: string; me: Me }) {
         <p className="muted">
           This page shows what an organisation has published and what is waiting in its name, so it
           needs a membership — the API refuses it otherwise, and would refuse it just the same if
-          you typed the address directly. A reviewer grants memberships.
+          you typed the address directly. A Hub reviewer grants memberships.
         </p>
         <p className="row">
           {me.memberships.length > 0 ? (
@@ -112,7 +114,7 @@ function NotAMember({ slug, me }: { slug: string; me: Me }) {
       </div>
       {me.canReview ? (
         <p className="muted footnote">
-          You hold the reviewer capability, so you can see this organisation from{" "}
+          You have Hub reviewer access, so you can see this organisation from{" "}
           <Link href="/review?tab=organisations">Review queues → Organisations</Link>. That is a
           different view: it is the Hub deciding about an organisation, not the organisation acting
           on itself.
@@ -251,7 +253,7 @@ function Member({
             without review since then.{" "}
           </>
         ) : null}
-        You are {membership.role === "owner" ? "an" : "a"} <strong>{membership.role}</strong> here.
+        You are an <strong>{orgRoleLabel(membership.role).toLowerCase()}</strong> here.
       </p>
 
       {membership.verified ? (
@@ -360,14 +362,14 @@ function Published({
   return (
     <>
       <h2 className="section-head">
-        Published in this namespace
+        Published for this organisation
         {state.status === "ready" ? ` · ${state.data.total}` : null}
       </h2>
       <ResourceView resource={state} what="this organisation's listings" onRetry={reload}>
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState
-              title="Nothing published under this namespace yet."
+              title="Nothing published for this organisation yet."
               detail="Listings submitted with an id starting with this organisation's slug appear here once they are approved."
               action={
                 <Link className="button-primary" href="/listings/new">
@@ -401,7 +403,7 @@ function Published({
                           <code>{item.id}</code>
                         </div>
                       </th>
-                      <td className="muted">{item.fundingType}</td>
+                      <td className="muted">{fundingTypeLabel(item.fundingType)}</td>
                       <td>
                         <StatusBadge status={item.status} />
                         {/*
@@ -417,7 +419,7 @@ function Published({
                             {" "}
                             <ListedBadge isListed={false} />
                             <div className="cell-note muted">
-                              Approved but withheld from the public directory — a Hub reviewer
+                              Approved but hidden from the public directory — a Hub reviewer
                               controls listing.
                             </div>
                           </>
@@ -454,9 +456,9 @@ function Withheld({ list }: { list: ManagedOpportunityList }) {
   return (
     <p className="muted footnote">
       {count === 1 ? "One listing on this page is" : `${count} listings on this page are`} approved
-      but <strong>withheld from the public directory</strong>, so the public reads answer 404 for
-      {count === 1 ? " it" : " them"}. Listing is a reviewer&rsquo;s control, separate from
-      approval.
+      but <strong>hidden from the public directory</strong>, so{" "}
+      {count === 1 ? "it has" : "they have"}
+      no public detail page. Visibility is a Hub reviewer&rsquo;s control, separate from approval.
     </p>
   );
 }
@@ -495,12 +497,12 @@ function AwaitingReview({
   return (
     <>
       <h2 className="section-head">
-        Awaiting review in this namespace
+        Awaiting review for this organisation
         {state.status === "ready" ? ` · ${state.data.total}` : null}
       </h2>
       <p className="muted footnote">
-        Filed into the <code>{slug}:</code> namespace by people outside the organisation. You can
-        see them because they carry your organisation&rsquo;s name.{" "}
+        Filed with the <code>{slug}:</code> organisation prefix by people outside the organisation.
+        You can see them because they carry your organisation&rsquo;s name.{" "}
         {canDecide ? (
           <>
             Because <code>{slug}</code> is verified, you can decide them yourself — a Hub reviewer
@@ -515,7 +517,7 @@ function AwaitingReview({
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState
-              title="Nothing is waiting in this namespace."
+              title="Nothing is waiting for this organisation."
               detail="If somebody submits a listing under this organisation's slug, it appears here while it waits."
             />
           ) : (
@@ -627,7 +629,7 @@ function PendingRow({
             <code>{item.id}</code>
           </div>
         </th>
-        <td className="muted">{item.fundingType}</td>
+        <td className="muted">{fundingTypeLabel(item.fundingType)}</td>
         <td>
           <ReviewStatusBadge status={item.reviewStatus} />
         </td>
@@ -762,17 +764,14 @@ function History({ id }: { id: string }) {
                   {trail.entries.map((entry) => (
                     <tr key={`${entry.at}-${entry.action}`}>
                       <td className="muted numeric">{formatInstant(entry.at)}</td>
-                      <td>{entry.action}</td>
                       <td>
-                        <UntrustedText value={entry.actor} />{" "}
-                        <span className="muted">({entry.actorKind})</span>
+                        <AuditAction entry={entry} />
                       </td>
                       <td>
-                        {entry.changedFields.length === 0 ? (
-                          <span className="muted">—</span>
-                        ) : (
-                          <code>{entry.changedFields.join(", ")}</code>
-                        )}
+                        <AuditActor entry={entry} />
+                      </td>
+                      <td>
+                        <AuditFields fields={entry.changedFields} />
                       </td>
                     </tr>
                   ))}
@@ -905,9 +904,10 @@ function DirectoryEntry({
       </p>
       {!canEdit ? (
         <p className="muted">
-          Editing it needs the <strong>owner</strong> or <strong>admin</strong> role on this
-          organisation; you are a <strong>{membership.role}</strong>. An owner can change your role,
-          and a reviewer can change theirs.
+          Editing it needs the <strong>organisation owner</strong> or{" "}
+          <strong>organisation admin</strong> role; you are an{" "}
+          <strong>{orgRoleLabel(membership.role).toLowerCase()}</strong>. An organisation owner can
+          change your role, and a Hub reviewer can change theirs.
         </p>
       ) : !seedSettled ? (
         <p className="muted">Loading the current entry…</p>
@@ -942,7 +942,7 @@ function DirectoryEntry({
             <p className="hint">
               One or two sentences.{" "}
               {publisher
-                ? "The API does not echo this field after saving, so it is not re-read here."
+                ? "This value is not returned after saving, so it is not re-read here."
                 : "No public record exists for this organisation yet, so this box starts empty; leaving it empty changes nothing."}
             </p>
             <input

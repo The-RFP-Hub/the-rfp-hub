@@ -17,6 +17,7 @@ import { UntrustedText } from "@/components/UntrustedText";
 import { VerifiedBadge } from "@/components/badges";
 import { EmptyState } from "@/components/states";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { orgRoleLabel } from "@/lib/presentation";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
 
@@ -71,7 +72,7 @@ function Organisations({ me }: { me: Me }) {
                         <code>{membership.slug}</code>
                       </div>
                     </th>
-                    <td>{membership.role}</td>
+                    <td>{orgRoleLabel(membership.role)}</td>
                     <td>
                       <VerifiedBadge verified={membership.verified} gloss />
                     </td>

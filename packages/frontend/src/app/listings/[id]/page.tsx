@@ -13,6 +13,7 @@
  * would leave the apply and source counters at zero and make the Analytics tab quietly wrong.
  */
 import { AnalyticsTab } from "@/components/AnalyticsTab";
+import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 import { RequireSession } from "@/components/Chrome";
 import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
@@ -21,6 +22,7 @@ import { MatchBadge } from "@/components/badges";
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
 import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
+import { duplicateStatusLabel, fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
@@ -123,7 +125,8 @@ function Header({
         )}
       </div>
       <p className="muted">
-        <code>{entry.id}</code> · {entry.fundingType} · {entry.status}
+        <code>{entry.id}</code> · {fundingTypeLabel(entry.fundingType)} ·{" "}
+        {opportunityStatusLabel(entry.status)}
         {source.publisher ? (
           <>
             {" "}
@@ -149,9 +152,7 @@ function Header({
             Open the programme site
           </a>
         ) : null}
-        <span className="muted">
-          (both hops go through the API, which is what makes the click counters move)
-        </span>
+        <span className="muted">(these links record aggregate outbound clicks)</span>
       </div>
 
       <UntrustedBlock value={entry.description} />
@@ -190,25 +191,14 @@ function AuditTab({ id }: { id: string }) {
                   {trail.entries.map((entry) => (
                     <tr key={`${entry.at}-${entry.action}`}>
                       <td className="muted">{formatInstant(entry.at)}</td>
-                      <td>{entry.action}</td>
                       <td>
-                        <UntrustedText value={entry.actor} />{" "}
-                        <span className="muted">({entry.actorKind})</span>
+                        <AuditAction entry={entry} />
                       </td>
                       <td>
-                        {entry.changedFields.length === 0 ? (
-                          <span className="muted">—</span>
-                        ) : (
-                          <code>{entry.changedFields.join(", ")}</code>
-                        )}
-                        {entry.patch ? (
-                          <details>
-                            <summary className="muted">patch</summary>
-                            <pre className="untrusted-block">
-                              {JSON.stringify(entry.patch, null, 2)}
-                            </pre>
-                          </details>
-                        ) : null}
+                        <AuditActor entry={entry} />
+                      </td>
+                      <td>
+                        <AuditFields fields={entry.changedFields} />
                       </td>
                     </tr>
                   ))}
@@ -279,6 +269,16 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
                 <MatchBadge matched={run.matched} />{" "}
                 <span className="muted">checked {formatInstant(run.runAt)}</span>
               </p>
+              <p>
+                <strong>Source response:</strong>{" "}
+                {run.error
+                  ? "Check failed"
+                  : run.existsAtSource === true
+                    ? "Page found"
+                    : run.existsAtSource === false
+                      ? "Page not found"
+                      : "No result"}
+              </p>
               <dl className="grid-2">
                 <div>
                   <dt>Requested</dt>
@@ -293,17 +293,27 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
                   </dd>
                 </div>
                 <div>
-                  <dt>HTTP status</dt>
-                  <dd>{run.httpStatus ?? "—"}</dd>
-                </div>
-                <div>
                   <dt>Page exists</dt>
                   <dd>
                     {run.existsAtSource === null ? "unknown" : run.existsAtSource ? "yes" : "no"}
                   </dd>
                 </div>
               </dl>
-              {run.error ? <p className="note error">{run.error}</p> : null}
+              <details>
+                <summary>Technical details</summary>
+                <dl>
+                  <div>
+                    <dt>HTTP status</dt>
+                    <dd>{run.httpStatus ?? "—"}</dd>
+                  </div>
+                  {run.error ? (
+                    <div>
+                      <dt>Error</dt>
+                      <dd>{run.error}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </details>
               {run.fieldDiff ? (
                 <details>
                   <summary>What the page said about each field</summary>
@@ -383,7 +393,7 @@ function DuplicatesTab({
                         </div>
                       </th>
                       <td>{formatSimilarity(match.similarity)}</td>
-                      <td>{match.status}</td>
+                      <td>{duplicateStatusLabel(match.status)}</td>
                       <td className="muted">{formatInstant(match.detectedAt)}</td>
                     </tr>
                   ))}

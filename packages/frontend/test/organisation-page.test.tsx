@@ -473,9 +473,9 @@ describe("approved but withheld", () => {
     // The row is approved, so it belongs under "Published" — and the public reads 404 it, so it
     // cannot be presented as public.
     await waitFor(() => expect(screen.getByText("PropGF Batch 7")).toBeTruthy());
-    expect(screen.getByText("unlisted")).toBeTruthy();
+    expect(screen.getByText("Hidden from the public directory")).toBeTruthy();
     expect(
-      screen.getByText(/withheld from the public directory — a Hub reviewer controls listing/),
+      screen.getByText(/hidden from the public directory — a Hub reviewer controls listing/),
     ).toBeTruthy();
   });
 
@@ -483,7 +483,7 @@ describe("approved but withheld", () => {
     mount(me(), []);
 
     expect(await screen.findByText(/One listing on this page is/)).toBeTruthy();
-    expect(screen.getByText(/the public reads answer 404/)).toBeTruthy();
+    expect(screen.getByText(/no public detail page/)).toBeTruthy();
   });
 
   it("says nothing at all when every published row really is public", async () => {
@@ -491,8 +491,8 @@ describe("approved but withheld", () => {
     mount(me(), []);
 
     await waitFor(() => expect(screen.getByText("PropGF Batch 7")).toBeTruthy());
-    expect(screen.queryByText("unlisted")).toBeNull();
-    expect(screen.queryByText(/withheld from the public directory/)).toBeNull();
+    expect(screen.queryByText("Hidden from the public directory")).toBeNull();
+    expect(screen.queryByText(/hidden from the public directory/)).toBeNull();
   });
 });
 

@@ -16,6 +16,7 @@ import { VerifiedBadge } from "@/components/badges";
 import { ActionNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
+import { accountRoleLabel, orgRoleLabel } from "@/lib/presentation";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
@@ -60,9 +61,8 @@ function Account({ me }: { me: Me }) {
       <div className="card">
         <h2>Identity</h2>
         <p className="muted footnote">
-          The handle is what appears as <code>source.submittedBy</code> on everything you publish.
-          Changing it changes future attribution; entries already published keep the attribution
-          they were stored with.
+          Your handle is the byline shown on listings. Changing it changes future attribution;
+          entries already published keep the byline they were stored with.
         </p>
         <div className="field">
           <label htmlFor="handle">Handle</label>
@@ -84,7 +84,7 @@ function Account({ me }: { me: Me }) {
       </div>
 
       <div className="card">
-        <h2>What the API says this account may do</h2>
+        <h2>What this account may do</h2>
         <div className="table-scroll">
           <table>
             <tbody>
@@ -96,7 +96,7 @@ function Account({ me }: { me: Me }) {
               </tr>
               <tr>
                 <th scope="row">Global role</th>
-                <td>{me.role}</td>
+                <td>{accountRoleLabel(me.role)}</td>
               </tr>
               <tr>
                 <th scope="row">Credential in use</th>
@@ -168,7 +168,7 @@ function Account({ me }: { me: Me }) {
                         <code>{membership.slug}</code>
                       </div>
                     </th>
-                    <td>{membership.role}</td>
+                    <td>{orgRoleLabel(membership.role)}</td>
                     <td>
                       <VerifiedBadge verified={membership.verified} gloss />
                     </td>

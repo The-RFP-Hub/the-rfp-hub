@@ -19,6 +19,12 @@ import { ListedBadge, MatchBadge, MergedBadge, ReviewStatusBadge } from "@/compo
 import { EmptyState, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
+import {
+  fundingTypeLabel,
+  isOpenDuplicateStatus,
+  opportunityStatusLabel,
+  reviewStatusLabel,
+} from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { ManagedOpportunity, Me, ReviewStatus } from "@/lib/types";
@@ -72,6 +78,10 @@ function Listings({ me }: { me: Me }) {
 
   const loadDuplicates = useCallback(() => api.me.duplicates(), [api]);
   const duplicates = useResource(loadDuplicates);
+  const openDuplicateCount =
+    duplicates.state.status === "ready"
+      ? duplicates.state.data.items.filter((item) => isOpenDuplicateStatus(item.status)).length
+      : null;
 
   /*
    * THE SLOT COUNT IS ITS OWN READ, and a deliberately tiny one.
@@ -110,8 +120,8 @@ function Listings({ me }: { me: Me }) {
           </strong>{" "}
           <span className="muted">
             {pendingTotal >= PENDING_LIMIT
-              ? "You may not be able to submit another until one of them is decided — a slot frees as soon as a reviewer approves or refuses one, and the API says so exactly if you try."
-              : "A slot frees as soon as a reviewer approves or refuses one. The limit applies to accounts without a verified publisher membership."}
+              ? "You may not be able to submit another until one of them is decided — a slot frees as soon as a Hub reviewer approves or refuses one, and the submission explains the limit if you try."
+              : "A slot frees as soon as a Hub reviewer approves or refuses one. The limit applies to accounts without a membership in a verified organisation."}
           </span>
         </p>
       ) : null}
@@ -125,11 +135,11 @@ function Listings({ me }: { me: Me }) {
        * report is a page that cannot be reached to confirm there is nothing, and a reader who
        * remembers seeing the queue yesterday has no way back to it today.
        */}
-      {duplicates.state.status === "ready" && duplicates.state.data.items.length > 0 ? (
+      {openDuplicateCount !== null && openDuplicateCount > 0 ? (
         <p className="note">
           <Link href="/duplicates">
-            {duplicates.state.data.items.length} possible duplicate
-            {duplicates.state.data.items.length === 1 ? "" : "s"} touch your listings
+            {openDuplicateCount} possible duplicate
+            {openDuplicateCount === 1 ? "" : "s"} touch your listings
           </Link>{" "}
           <span className="muted">
             — see which of your listings was matched and what it resembles.
@@ -174,7 +184,7 @@ function Listings({ me }: { me: Me }) {
               detail={
                 filter === "all"
                   ? "Everything you submit shows up on this page — published or not — and stays visible to you while a reviewer looks at it."
-                  : `No listings with review status ${filter}. Other statuses may still have some.`
+                  : `No listings with the review decision “${reviewStatusLabel(filter)}”. Other decisions may still have some.`
               }
               action={
                 filter === "all" ? (
@@ -212,7 +222,8 @@ function Listings({ me }: { me: Me }) {
                             <UntrustedText value={item.title} />
                           </Link>
                           <div className="muted">
-                            <code>{item.id}</code> · {item.fundingType} · {item.status}
+                            <code>{item.id}</code> · {fundingTypeLabel(item.fundingType)} ·{" "}
+                            {opportunityStatusLabel(item.status)}
                             {item.namespace ? (
                               <>
                                 {" "}
@@ -332,7 +343,7 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
   if (decision?.reason === "verified_publisher_namespace") {
     return (
       <div className="cell-note muted">
-        Published without review — your organisation is a verified publisher in this namespace.
+        Published without review — your organisation is verified for this organisation prefix.
       </div>
     );
   }

@@ -24,6 +24,7 @@ import { UntrustedText } from "@/components/UntrustedText";
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
+import { ROUTE_GATE_COPY, accountRoleLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import type { AccountRole, AccountSummary, Me } from "@/lib/types";
@@ -38,14 +39,12 @@ const ROLE_MEANING: Record<AccountRole, string> = {
     "may submit listings and manage their own. No queues, no decisions about anybody else.",
   reviewer:
     "may approve, refuse and merge anybody's listings, decide claims, and verify organisations — which grants publishing rights over a whole namespace.",
-  admin: "everything a reviewer may do, plus changing roles and granting direct-create.",
+  admin: "everything a Hub reviewer may do, plus changing roles and granting direct-create.",
 };
 
 export default function AdminPage() {
   return (
-    <RequireSession
-      capability={{ needs: (me) => me.canAdmin, label: "the administrator capability" }}
-    >
+    <RequireSession capability={{ needs: (me) => me.canAdmin, label: ROUTE_GATE_COPY.admin.label }}>
       {(me) => (
         <section>
           <h1>Accounts &amp; roles</h1>
@@ -207,7 +206,7 @@ function AccountRow({
           >
             {ROLES.map((role) => (
               <option key={role} value={role}>
-                {role}
+                {accountRoleLabel(role)}
               </option>
             ))}
           </select>
@@ -224,8 +223,8 @@ function AccountRow({
         <tr>
           <td colSpan={3}>
             <ConfirmPanel
-              title={`Make ${name} ${proposed === "admin" ? "an" : "a"} ${proposed}?`}
-              confirmLabel={`Change the role to ${proposed}`}
+              title={`Make ${name} a ${accountRoleLabel(proposed)}?`}
+              confirmLabel={`Change the role to ${accountRoleLabel(proposed)}`}
               busyLabel="Changing…"
               busy={busy}
               onCancel={() => setProposed(null)}
@@ -237,26 +236,26 @@ function AccountRow({
                   // flags the navigation renders from came with the session. Re-reading them is what
                   // stops the UI insisting you still hold something the API has just taken away.
                   if (isSelf) session.reloadMe();
-                  return `${name} is now ${proposed}.`;
+                  return `${name} is now a ${accountRoleLabel(proposed)}.`;
                 })
               }
             >
               <p>
-                A <strong>{proposed}</strong> {ROLE_MEANING[proposed]}
+                A <strong>{accountRoleLabel(proposed)}</strong> {ROLE_MEANING[proposed]}
               </p>
               {selfDemotion ? (
                 <p>
                   <strong>
-                    This is your own account, and it takes your administrator rights away.
+                    This is your own account, and it takes your Hub admin rights away.
                   </strong>{" "}
-                  You will not be able to undo it from this page — nobody can change roles except an
-                  administrator, so another one has to change yours back. If you are the only
-                  administrator, nobody can.
+                  You will not be able to undo it from this page — nobody can change roles except a
+                  Hub admin, so another one has to change yours back. If you are the only Hub admin,
+                  nobody can.
                 </p>
               ) : null}
               {proposed === "admin" && !isSelf ? (
                 <p>
-                  An administrator can change any role, including yours, and can grant themselves
+                  A Hub admin can change any role, including yours, and can grant themselves
                   direct-create.
                 </p>
               ) : null}

@@ -618,7 +618,7 @@ export function idProblem(id: string): string | null {
   }
   const colon = trimmed.indexOf(":");
   if (colon <= 0 || colon === trimmed.length - 1) {
-    return "An id must be <namespace>:<local>, for example acme-foundation:2026-round-1.";
+    return "Start the id with the organisation slug and a colon, for example acme-foundation:2026-round-1.";
   }
   return null;
 }
@@ -677,7 +677,7 @@ export function describePublish(
   // it, and saying so would send a publisher off to edit an immutable field.
   const how =
     stored !== "" && stored !== namespaceOf(id)
-      ? `This listing is published under ${namespace}, which is what a replacement is authorised against — not the id.`
+      ? `This listing is published under the organisation prefix ${namespace}, which decides replacement access — not the id.`
       : "The part before the colon decides this.";
 
   if (!authority) {
@@ -686,15 +686,15 @@ export function describePublish(
       immediate: null,
       because:
         stored !== ""
-          ? `${namespace} is the namespace this listing is published under, and membership of it decides whether a replacement publishes immediately or waits for a reviewer.`
-          : "the part before the colon decides whether it publishes immediately or waits for a reviewer.",
+          ? `${namespace} is the organisation prefix this listing is published under, and membership of that organisation decides whether a replacement publishes immediately or waits for a Hub reviewer.`
+          : "the part before the colon decides whether it publishes immediately or waits for a Hub reviewer.",
     };
   }
   if (authority.directCreate) {
     return {
       id: shown,
       immediate: true,
-      because: "this account publishes directly, whichever namespace it publishes under.",
+      because: "this account publishes directly, whichever organisation prefix it uses.",
     };
   }
   if (authority.verifiedNamespaces.includes(namespace)) {

@@ -246,7 +246,7 @@ describe("the public directory list", () => {
 
     // Status is its own column now, as a word. Scoped to the badge, because "open" is also an
     // option in the Status control — which is exactly the point of that control being visible.
-    expect(screen.getAllByText("open", { selector: ".badge" })).toHaveLength(2);
+    expect(screen.getAllByText("Open", { selector: ".badge" })).toHaveLength(2);
 
     // The next FIXED deadline, derived from the array, not the last entry in it.
     expect(screen.getByText("30 Sep 23:59 UTC")).toBeTruthy();
@@ -267,7 +267,7 @@ describe("the public directory list", () => {
     const { client } = stub({ list: async () => closed });
     const { container } = mount(client, <DirectoryList />);
 
-    const badge = await screen.findByText("closed", { selector: ".badge" });
+    const badge = await screen.findByText("Closed", { selector: ".badge" });
     // The class is the whole carrier — the stylesheet turns it into a filled box, and a reader who
     // sees no colour at all reads the same word. No inline colour anywhere near it.
     expect(badge.className).toContain("badge-closed");
@@ -542,7 +542,7 @@ describe("the public opportunity page", () => {
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
     // The identity line: type as a word, status as a badge, the id in mono at the END of it — the
     // reader's questions in the order they ask them, with the join key last.
-    expect(screen.getByText("open", { selector: ".badge" }).className).toContain("badge-open");
+    expect(screen.getByText("Open", { selector: ".badge" }).className).toContain("badge-open");
     expect(screen.getByText("acme:round-4", { selector: "code" })).toBeTruthy();
     expect(screen.getByText(/Grants for public-goods infrastructure/)).toBeTruthy();
     expect(screen.getByText("Teams shipping open-source infrastructure.")).toBeTruthy();
@@ -639,7 +639,12 @@ describe("the public opportunity page", () => {
     const badge = screen.getByText("link looks right");
     expect(badge.getAttribute("title")).toMatch(/not a fact-check/);
     expect(screen.getByText(/last checked 10 Aug 09:00 UTC/)).toBeTruthy();
-    expect(screen.getByText("publisher_api")).toBeTruthy();
+    expect(screen.getByText("Submitted with an API key")).toBeTruthy();
+    const machineDetails = screen
+      .getByText("Machine-readable details (for developers)")
+      .closest("details");
+    expect(machineDetails?.open).toBe(false);
+    expect(machineDetails?.textContent).toContain('"ingestedVia": "publisher_api"');
     expect(screen.getByText("R4")).toBeTruthy();
     expect(screen.getByText("1.0.0")).toBeTruthy();
   });
@@ -700,11 +705,15 @@ describe("the public opportunity page", () => {
     const { client, audit } = stub();
     mount(client, <PublicOpportunity id="legacy:round-4" />);
 
-    await screen.findByText("replace");
+    await screen.findByText("Replace");
     // The route can be an alias. Subresources belong to the canonical id returned by the public
     // detail read, which is also the id shown on the page.
     expect(audit).toHaveBeenCalledWith("acme:round-4");
-    expect(screen.getByText("deadlines, fundingInfo")).toBeTruthy();
+    expect(screen.getByText("Deadlines / Funding")).toBeTruthy();
+    const technical = screen.getByText("Technical record").closest("details");
+    expect(technical?.open).toBe(false);
+    expect(technical?.textContent).toContain('"action": "replace"');
+    expect(technical?.textContent).toContain('"changedFields"');
   });
 
   it("reports a 404 as the API's own answer rather than an empty page", async () => {

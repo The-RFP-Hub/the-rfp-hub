@@ -472,7 +472,7 @@ test.describe("M3-8 a reviewer grants a membership", () => {
     // organisation is not verified, so the grant is permission to submit into the namespace and
     // nothing more — and the panel says exactly that before it is confirmed.
     const confirm = page.getByRole("group", {
-      name: `Make ${handle} a publisher of ${slug}?`,
+      name: `Make ${handle} an organisation publisher at ${slug}?`,
     });
     await expect(confirm).toBeVisible();
     await expect(confirm.getByText(/still wait for a reviewer/i)).toBeVisible();
@@ -489,7 +489,7 @@ test.describe("M3-8 a reviewer grants a membership", () => {
       "the panel closes once the grant is made",
     ).toHaveCount(0);
     await expect(
-      page.getByText(`${handle} is now publisher of ${slug}.`),
+      page.getByText(`${handle} is now an organisation publisher at ${slug}.`),
       "the API's confirmation outlives the panel that triggered it",
     ).toBeVisible();
     await expect(

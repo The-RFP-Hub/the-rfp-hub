@@ -28,6 +28,13 @@ import { ListedBadge, ReviewStatusBadge, VerifiedBadge } from "@/components/badg
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
+import {
+  ROUTE_GATE_COPY,
+  accountRoleLabel,
+  duplicateStatusLabel,
+  fundingTypeLabel,
+  orgRoleLabel,
+} from "@/lib/presentation";
 import { type ResourceHandle, useResource } from "@/lib/resource";
 import { detailHref } from "@/lib/return-to";
 import { useApi } from "@/lib/session";
@@ -39,6 +46,7 @@ import type {
   DuplicateSide,
   ManagedOpportunity,
   ManagedOpportunityList,
+  OrgRole,
   OrganizationSummary,
 } from "@/lib/types";
 import Link from "next/link";
@@ -69,7 +77,9 @@ const submissionHref = (page: number): string => (page > 1 ? `/review?page=${pag
 
 export default function ReviewPage() {
   return (
-    <RequireSession capability={{ needs: (me) => me.canReview, label: "the reviewer capability" }}>
+    <RequireSession
+      capability={{ needs: (me) => me.canReview, label: ROUTE_GATE_COPY.reviewer.label }}
+    >
       {() => <Review />}
     </RequireSession>
   );
@@ -313,7 +323,8 @@ function SubmissionRow({
             <UntrustedText value={item.title} />
           </Link>
           <div className="muted">
-            <code>{item.id}</code> · {item.fundingType} · {formatInstant(item.createdAt)}
+            <code>{item.id}</code> · {fundingTypeLabel(item.fundingType)} ·{" "}
+            {formatInstant(item.createdAt)}
           </div>
         </th>
         <td>
@@ -507,7 +518,15 @@ function SubmissionDetails({ item, origin }: { item: ManagedOpportunity; origin:
                   : result.matched
                     ? "the linked page looks like this programme"
                     : "the linked page did not match"
-              } (HTTP ${result.httpStatus ?? "—"}).`;
+              }. Source response: ${
+                result.error
+                  ? "check failed"
+                  : result.existsAtSource === true
+                    ? "page found"
+                    : result.existsAtSource === false
+                      ? "page not found"
+                      : "no result"
+              }.`;
             })
           }
         >
@@ -845,7 +864,8 @@ function PairCard({
       <div className="row-between">
         <strong>{formatSimilarity(pair.similarity)}</strong>
         <span className="muted">
-          pair {pair.id} · {pair.status} · detected {formatInstant(pair.detectedAt)}
+          pair {pair.id} · {duplicateStatusLabel(pair.status)} · detected{" "}
+          {formatInstant(pair.detectedAt)}
         </span>
       </div>
       <div className="grid-2">
@@ -1112,9 +1132,9 @@ function Organisations() {
               <OrgTable orgs={peopled} busy={busy} run={run} reload={reloadAll} />
               {list.items.length >= 100 ? (
                 <p className="muted footnote">
-                  The API returns the first 100 unverified organisations by slug and there are at
-                  least that many, so this list may be incomplete — search for a specific one rather
-                  than assuming it is absent.
+                  Showing the first 100 unverified organisations by slug. There are at least that
+                  many, so this list may be incomplete — search for a specific one rather than
+                  assuming it is absent.
                 </p>
               ) : null}
             </>
@@ -1395,7 +1415,7 @@ function GrantMembership({
    */
   const lookup = useAction();
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState("publisher");
+  const [role, setRole] = useState<OrgRole>("publisher");
   const [candidates, setCandidates] = useState<AccountSummary[] | null>(null);
   const [chosen, setChosen] = useState<AccountSummary | null>(null);
 
@@ -1461,11 +1481,11 @@ function GrantMembership({
           <select
             id={`grant-role-${org.slug}`}
             value={role}
-            onChange={(event) => setRole(event.target.value)}
+            onChange={(event) => setRole(event.target.value as OrgRole)}
           >
-            <option value="publisher">publisher</option>
-            <option value="admin">admin</option>
-            <option value="owner">owner</option>
+            <option value="publisher">{orgRoleLabel("publisher")}</option>
+            <option value="admin">{orgRoleLabel("admin")}</option>
+            <option value="owner">{orgRoleLabel("owner")}</option>
           </select>
         </div>
         <button
@@ -1498,7 +1518,7 @@ function GrantMembership({
                       <code>#{account.id}</code>
                     </div>
                   </th>
-                  <td className="muted">{account.globalRole}</td>
+                  <td className="muted">{accountRoleLabel(account.globalRole)}</td>
                   <td>
                     <button type="button" onClick={() => setChosen(account)}>
                       Choose
@@ -1513,7 +1533,7 @@ function GrantMembership({
 
       {chosen ? (
         <ConfirmPanel
-          title={`Make ${name} ${role === "admin" || role === "owner" ? "an" : "a"} ${role} of ${org.name}?`}
+          title={`Make ${name} an ${orgRoleLabel(role).toLowerCase()} at ${org.name}?`}
           confirmLabel="Grant the membership"
           busyLabel="Granting…"
           busy={busy}
@@ -1525,7 +1545,7 @@ function GrantMembership({
                 role,
               });
               onDone();
-              return `${name} is now ${result.role ?? role} of ${org.slug}.`;
+              return `${name} is now an ${orgRoleLabel(result.role ?? role).toLowerCase()} at ${org.slug}.`;
             })
           }
         >
@@ -1546,8 +1566,10 @@ function GrantMembership({
             </p>
           )}
           <p className="muted footnote">
-            An <strong>owner</strong> or <strong>admin</strong> may also edit the
-            organisation&rsquo;s public directory entry; a <strong>publisher</strong> may not.
+            An <strong>{orgRoleLabel("owner").toLowerCase()}</strong> or{" "}
+            <strong>{orgRoleLabel("admin").toLowerCase()}</strong> may also edit the
+            organisation&rsquo;s public directory entry; an{" "}
+            <strong>{orgRoleLabel("publisher").toLowerCase()}</strong> may not.
           </p>
         </ConfirmPanel>
       ) : null}

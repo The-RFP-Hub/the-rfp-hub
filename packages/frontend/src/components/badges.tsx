@@ -16,11 +16,12 @@
  * somebody's work — the account page's organisation table above all — `gloss` puts the sentence on
  * screen beside it and the tooltip stays as the longer form.
  */
+import { opportunityStatusLabel, reviewStatusLabel } from "@/lib/presentation";
 
 export function ReviewStatusBadge({ status }: { status: string }) {
   const explanation =
     status === "pending"
-      ? "Stored, and invisible to the public reads until a reviewer approves it"
+      ? "Stored and hidden from the public directory until a Hub reviewer approves it"
       : status === "approved"
         ? "Approved by a reviewer, or auto-approved for a verified namespace"
         : status === "rejected"
@@ -28,7 +29,7 @@ export function ReviewStatusBadge({ status }: { status: string }) {
           : status;
   return (
     <span className={`badge badge-${status}`} title={explanation}>
-      {status}
+      {reviewStatusLabel(status)}
     </span>
   );
 }
@@ -55,7 +56,7 @@ export function StatusBadge({ status }: { status: string }) {
             : status;
   return (
     <span className={`badge badge-${status}`} title={explanation}>
-      {status}
+      {opportunityStatusLabel(status)}
     </span>
   );
 }
@@ -70,11 +71,11 @@ export function ListedBadge({ isListed }: { isListed: boolean }) {
       className={isListed ? "badge badge-listed" : "badge badge-unlisted"}
       title={
         isListed
-          ? "Included in the public list and detail reads"
-          : "Withheld from the public reads, whatever its review status"
+          ? "Visible in the public directory"
+          : "Hidden from the public directory, whatever its review decision"
       }
     >
-      {isListed ? "listed" : "unlisted"}
+      {isListed ? "Visible in the public directory" : "Hidden from the public directory"}
     </span>
   );
 }
@@ -86,7 +87,7 @@ export function MergedBadge() {
       className="badge badge-merged"
       title="Merged into another listing; this record is terminal"
     >
-      merged
+      Merged
     </span>
   );
 }
@@ -102,13 +103,13 @@ export function MergedBadge() {
 export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: boolean }) {
   const explanation = verified
     ? "Verified organisation — its members' listings publish without review"
-    : "Not verified — listings published under this namespace land pending";
+    : "Not verified — listings published under this organisation prefix wait for review";
   const badge = (
     <span
       className={verified ? "badge badge-verified" : "badge badge-unverified"}
       title={explanation}
     >
-      {verified ? "verified" : "unverified"}
+      {verified ? "Verified" : "Not verified"}
     </span>
   );
   if (!gloss) return badge;

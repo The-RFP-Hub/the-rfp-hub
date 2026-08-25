@@ -88,6 +88,7 @@ import {
   replaceRow,
   toDocument,
 } from "@/lib/opportunity-form";
+import { fundingTypeLabel, opportunityStatusLabel, reviewStatusLabel } from "@/lib/presentation";
 import { useApi } from "@/lib/session";
 import type { SubmissionResult } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
@@ -101,16 +102,8 @@ import { type ReactNode, useMemo, useState } from "react";
  * publisher to read the schema; the value stored is the token either way.
  */
 const LABELS: Readonly<Record<string, string>> = {
-  grant: "Grant",
-  hackathon: "Hackathon",
-  bounty: "Bounty",
-  accelerator: "Accelerator",
-  vc_fund: "VC fund",
-  rfp: "RFP",
-  upcoming: "Upcoming",
-  open: "Open",
-  closed: "Closed",
-  archived: "Archived",
+  ...Object.fromEntries(FUNDING_TYPES.map((value) => [value, fundingTypeLabel(value)])),
+  ...Object.fromEntries(STATUSES.map((value) => [value, opportunityStatusLabel(value)])),
   fixed: "Fixed date",
   rolling: "Rolling",
   task: "Task",
@@ -143,12 +136,12 @@ const LABELS: Readonly<Record<string, string>> = {
  * field and keep descriptive names.
  */
 const DETAILS_SUFFIX: Record<FundingType, string> = {
-  grant: "grant",
-  hackathon: "hackathon",
-  bounty: "bounty",
-  accelerator: "accelerator",
-  vc_fund: "VC fund",
-  rfp: "RFP",
+  grant: fundingTypeLabel("grant"),
+  hackathon: fundingTypeLabel("hackathon"),
+  bounty: fundingTypeLabel("bounty"),
+  accelerator: fundingTypeLabel("accelerator"),
+  vc_fund: fundingTypeLabel("vc_fund"),
+  rfp: fundingTypeLabel("rfp"),
 };
 
 const detailsTitle = (type: FundingType) => `Funding details — ${DETAILS_SUFFIX[type]}`;
@@ -345,7 +338,7 @@ export function OpportunityForm({
           <SelectField
             {...at("fundingType")}
             label="Funding type"
-            hint={`Decides the shape of the funding-details section below — currently ${DETAILS_SUFFIX[form.fundingType]}.`}
+            hint={`Decides the details requested for this funding type below — currently ${DETAILS_SUFFIX[form.fundingType]}.`}
             options={FUNDING_TYPES}
             labels={LABELS}
             value={form.fundingType}
@@ -999,7 +992,8 @@ export function OpportunityForm({
       {attempted && localErrors.length > 0 ? (
         <div className="state error" role="alert">
           <p>
-            <strong>Not conformant yet.</strong> Each of these is also marked next to its field.
+            <strong>Fix these fields before submitting.</strong> Each one is also marked next to its
+            field.
           </p>
           <ul>
             {localErrors.map((problem) => (
@@ -1012,8 +1006,7 @@ export function OpportunityForm({
       {advisories.length > 0 ? (
         <div className="state">
           <p>
-            <strong>Advisory warnings</strong> — the document is conformant with these, and they are
-            worth a look before it goes out.
+            <strong>Things to review</strong> — these notes do not block submission.
           </p>
           <ul>
             {advisories.map((warning) => (
@@ -1026,7 +1019,7 @@ export function OpportunityForm({
       {serverErrors.length > 0 ? (
         <div className="state error" role="alert">
           <p>
-            <strong>The API rejected this document:</strong>
+            <strong>We couldn&rsquo;t submit this listing:</strong>
           </p>
           <ul>
             {serverErrors.map((problem) => (
@@ -1684,10 +1677,10 @@ function SubmissionOutcome({
       <h2>{result.created ? "Submitted." : "Replaced."}</h2>
       <p>
         {published
-          ? "Published — it is in the public reads now."
+          ? "Published — it is in the public directory now."
           : result.reviewStatus === "pending"
-            ? "Stored as a pending submission. It is invisible to the public reads until a reviewer approves it; publishing immediately requires membership of a verified organisation for this namespace."
-            : `Stored with review status ${result.reviewStatus}.`}
+            ? "Stored as a pending submission. It is hidden from the public directory until a Hub reviewer approves it; publishing immediately requires membership of a verified organisation for this organisation prefix."
+            : `Stored with the review decision “${reviewStatusLabel(result.reviewStatus)}”.`}
       </p>
       <p>{describeDuplicateCheck(result.duplicateCheck, result.duplicates.length)}</p>
       {result.duplicates.length > 0 ? (
@@ -1703,7 +1696,7 @@ function SubmissionOutcome({
       {result.warnings.length > 0 ? (
         <>
           <p>
-            <strong>Advisory warnings from the API:</strong>
+            <strong>Things to review:</strong>
           </p>
           <ul>
             {result.warnings.map((warning) => (

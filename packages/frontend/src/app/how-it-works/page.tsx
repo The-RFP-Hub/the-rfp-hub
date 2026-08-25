@@ -24,15 +24,16 @@
  * a reader unable to work out which of the fifteen things below they may actually do.
  */
 import { REPOSITORY, STANDARD } from "@/lib/links";
+import { accountRoleLabel } from "@/lib/presentation";
 import Link from "next/link";
 
 /** The columns, narrowest capability first. Each role also holds everything to its left. */
 const ROLES = [
   { key: "visitor", label: "Visitor" },
-  { key: "submitter", label: "Submitter" },
+  { key: "submitter", label: accountRoleLabel("submitter") },
   { key: "member", label: "Verified org member" },
-  { key: "reviewer", label: "Hub reviewer" },
-  { key: "admin", label: "Admin" },
+  { key: "reviewer", label: accountRoleLabel("reviewer") },
+  { key: "admin", label: accountRoleLabel("admin") },
 ] as const;
 
 type RoleKey = (typeof ROLES)[number]["key"];
@@ -183,7 +184,7 @@ export default function HowItWorksPage() {
           </dd>
         </div>
         <div>
-          <dt>Admin</dt>
+          <dt>{accountRoleLabel("admin")}</dt>
           <dd>
             Everything a reviewer can do, plus the accounts themselves: who holds which role, who
             may create API keys, and the maintenance jobs.

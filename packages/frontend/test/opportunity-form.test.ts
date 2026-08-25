@@ -68,9 +68,9 @@ describe("splitList", () => {
 describe("idProblem", () => {
   it("requires the namespaced form the API derives the source system from", () => {
     expect(idProblem("")).toContain("required");
-    expect(idProblem("no-namespace")).toContain("<namespace>:<local>");
-    expect(idProblem(":leading")).toContain("<namespace>:<local>");
-    expect(idProblem("trailing:")).toContain("<namespace>:<local>");
+    expect(idProblem("no-namespace")).toContain("organisation slug and a colon");
+    expect(idProblem(":leading")).toContain("organisation slug and a colon");
+    expect(idProblem("trailing:")).toContain("organisation slug and a colon");
     expect(idProblem("acme-foundation:2026-round-1")).toBeNull();
   });
 

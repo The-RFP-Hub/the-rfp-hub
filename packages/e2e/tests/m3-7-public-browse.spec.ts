@@ -194,7 +194,13 @@ test.describe("M3-7 what the Hub explains about itself", () => {
       // draw. Names are matched loosely — a header may carry an inline note.
       const roles = page.getByRole("table").first();
       await expect(roles).toBeVisible();
-      for (const role of ["Visitor", "Submitter", "Verified org member", "Hub reviewer", "Admin"]) {
+      for (const role of [
+        "Visitor",
+        "Submitter",
+        "Verified org member",
+        "Hub reviewer",
+        "Hub admin",
+      ]) {
         await expect(roles.getByRole("columnheader", { name: role, exact: true })).toBeVisible();
       }
       // …and at least one row, so an empty `<tbody>` cannot pass as a rendered map.

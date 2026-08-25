@@ -100,7 +100,7 @@ describe("changing a role", () => {
     });
 
     expect(setRole).not.toHaveBeenCalled();
-    expect(screen.getByText("Make indie2 a reviewer?")).toBeTruthy();
+    expect(screen.getByText("Make indie2 a Hub reviewer?")).toBeTruthy();
   });
 
   it("says what the role grants, at the moment it is granted", async () => {
@@ -110,7 +110,7 @@ describe("changing a role", () => {
       target: { value: "reviewer" },
     });
 
-    const panel = screen.getByRole("group", { name: "Make indie2 a reviewer?" });
+    const panel = screen.getByRole("group", { name: "Make indie2 a Hub reviewer?" });
     expect(within(panel).getByText(/verify organisations/)).toBeTruthy();
     expect(within(panel).getByText(/grants publishing rights over a whole namespace/)).toBeTruthy();
   });
@@ -121,7 +121,7 @@ describe("changing a role", () => {
     fireEvent.change(await screen.findByLabelText("Global role for account 2"), {
       target: { value: "admin" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Change the role to admin" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change the role to Hub admin" }));
 
     await waitFor(() => expect(setRole).toHaveBeenCalledWith(2, "admin"));
   });
@@ -133,11 +133,9 @@ describe("changing a role", () => {
       target: { value: "reviewer" },
     });
 
-    const panel = screen.getByRole("group", { name: "Make root a reviewer?" });
+    const panel = screen.getByRole("group", { name: "Make root a Hub reviewer?" });
     expect(within(panel).getByText(/This is your own account/)).toBeTruthy();
-    expect(
-      within(panel).getByText(/If you are the only\s+administrator, nobody can\./),
-    ).toBeTruthy();
+    expect(within(panel).getByText(/If you are the only Hub admin, nobody can\./)).toBeTruthy();
   });
 
   it("does not warn about self-demotion when somebody else is demoted", async () => {

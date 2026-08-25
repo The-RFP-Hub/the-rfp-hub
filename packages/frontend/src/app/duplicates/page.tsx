@@ -12,6 +12,7 @@ import { RequireSession } from "@/components/Chrome";
 import { UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
 import { formatInstant, formatSimilarity } from "@/lib/format";
+import { duplicateStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import Link from "next/link";
@@ -40,7 +41,7 @@ function Duplicates() {
           list.items.length === 0 ? (
             <EmptyState
               title="Nothing flagged."
-              detail="Either nothing similar was found, or your listings have not been through detection yet — the API does not distinguish the two on this route, and neither will this page."
+              detail="Either nothing similar was found, or your listings have not been through detection yet — this view does not distinguish those cases."
               action={
                 <Link className="button-primary" href="/listings">
                   Your listings
@@ -81,7 +82,7 @@ function Duplicates() {
                         </div>
                       </th>
                       <td>{formatSimilarity(match.similarity)}</td>
-                      <td>{match.status}</td>
+                      <td>{duplicateStatusLabel(match.status)}</td>
                       <td className="muted">{formatInstant(match.detectedAt)}</td>
                     </tr>
                   ))}

@@ -283,8 +283,8 @@ export function SignIn({
       ) : null}
 
       <p className="muted footnote">
-        Signing in stores a session token in this browser and sends it to the API, which is the only
-        thing that decides what an account may do. Signing out removes it.
+        This browser stores a session so you can manage your account. Permissions are checked when
+        you submit or manage a listing. Signing out removes the session.
       </p>
     </div>
   );

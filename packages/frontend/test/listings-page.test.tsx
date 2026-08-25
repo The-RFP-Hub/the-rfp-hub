@@ -117,9 +117,11 @@ describe("the merged row on Your listings", () => {
 
     const survivor = await screen.findByRole("link", { name: "Current Round" });
     expect(survivor.getAttribute("href")).toBe("/opportunities/acme%3Anew%20round");
-    expect(screen.getByText("merged", { selector: ".badge" }).className).toContain("badge-merged");
-    expect(screen.queryByText("rejected", { selector: ".badge" })).toBeNull();
-    expect(screen.queryByText("unlisted", { selector: ".badge" })).toBeNull();
+    expect(screen.getByText("Merged", { selector: ".badge" }).className).toContain("badge-merged");
+    expect(screen.queryByText("Rejected", { selector: ".badge" })).toBeNull();
+    expect(
+      screen.queryByText("Hidden from the public directory", { selector: ".badge" }),
+    ).toBeNull();
     expect(screen.getByText(/This archived record now points to that listing/)).toBeTruthy();
     expect(screen.queryByText(/No reason was recorded/)).toBeNull();
     expect(screen.queryByText(/Editing it and saving resubmits/)).toBeNull();

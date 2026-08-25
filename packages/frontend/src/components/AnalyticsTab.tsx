@@ -135,10 +135,11 @@ export function SeriesView({
       </details>
 
       <p className="muted footnote">
-        Best-effort. These are API reads and link-outs, not page views: the project&rsquo;s own
-        automation is excluded by name, crawlers and <code>DNT: 1</code> are dropped, and capture is
-        buffered in memory, so a restart can lose the last couple of seconds. Days before today come
-        from the nightly rollup; today is aggregated live.
+        Best-effort. These are directory opens and outbound clicks; they are aggregate events, not
+        unique visitors or browser page views. The project&rsquo;s own automation is excluded by
+        name, crawlers and <code>DNT: 1</code> are dropped, and capture is buffered in memory, so a
+        restart can lose the last couple of seconds. Days before today come from the nightly rollup;
+        today is aggregated live.
       </p>
     </>
   );

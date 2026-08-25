@@ -88,9 +88,8 @@ function PublisherInvitation() {
           </p>
           <p className="muted footnote">
             Signing in is a one-time code emailed to you by this service. There is no password to
-            choose or lose and no key to hand over; the code is exchanged for a token kept in this
-            browser and sent to the API, which is the only thing that decides what an account may
-            do.
+            choose or lose and no key to hand over. This browser stores a session so you can manage
+            your account. Permissions are checked when you submit or manage a listing.
           </p>
         </>
       )}

@@ -479,7 +479,9 @@ describe("the organisations tab", () => {
      * unmounted tree. The grant worked and the feedback died — the worst shape for an action whose
      * only visible outcome is a member count going up by one.
      */
-    expect(await screen.findByText("fil-ops is now publisher of indie-collective.")).toBeTruthy();
+    expect(
+      await screen.findByText("fil-ops is now an organisation publisher at indie-collective."),
+    ).toBeTruthy();
     // The panel is gone; the note is not.
     expect(screen.queryByText("Grant a membership on")).toBeNull();
   });
@@ -493,7 +495,9 @@ describe("the organisations tab", () => {
     fireEvent.change(screen.getByLabelText("Account handle or id"), { target: { value: "42" } });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
 
-    const panel = await screen.findByRole("group", { name: /Make account 42 a publisher/ });
+    const panel = await screen.findByRole("group", {
+      name: /Make account 42 an organisation publisher/,
+    });
     // On a verified organisation the membership IS the grant — nothing else has to happen.
     expect(
       within(panel).getByText(/publish into the[\s\S]*immediately and without\s+review/),

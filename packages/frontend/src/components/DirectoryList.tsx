@@ -46,6 +46,7 @@ import {
 } from "@/lib/directory";
 import { describeDeadline, formatCount } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { OpportunitySummary } from "@/lib/types";
@@ -151,7 +152,7 @@ export function DirectoryList() {
               <option value="">Any type</option>
               {FUNDING_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {fundingTypeLabel(value)}
                 </option>
               ))}
             </select>
@@ -172,7 +173,7 @@ export function DirectoryList() {
               <option value="">Any status</option>
               {STATUSES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {opportunityStatusLabel(value)}
                 </option>
               ))}
             </select>
@@ -305,7 +306,7 @@ function ResultLine({
   stale: boolean;
 }) {
   const noun = total === 1 ? "opportunity" : "opportunities";
-  const status = applied.status ? `${applied.status} ` : "";
+  const status = applied.status ? `${opportunityStatusLabel(applied.status).toLowerCase()} ` : "";
   const narrowed = applied.status === DEFAULT_SELECTION.status;
 
   return (
@@ -370,7 +371,7 @@ export function DirectoryRow({ item }: { item: OpportunitySummary }) {
       <td className="muted">
         <UntrustedText value={operator?.name} />
       </td>
-      <td>{item.fundingType}</td>
+      <td>{fundingTypeLabel(item.fundingType)}</td>
       <td>
         <StatusBadge status={item.status} />
       </td>

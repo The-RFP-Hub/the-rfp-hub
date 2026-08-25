@@ -164,7 +164,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     await expect(submit, "the button stays live so that pressing it can answer").toBeEnabled();
     await submit.click();
     await expect(
-      page.getByRole("alert").filter({ hasText: "Not conformant yet." }),
+      page.getByRole("alert").filter({ hasText: "Fix these fields before submitting." }),
       "pressing Submit on an empty form answers, in the page's own words",
     ).toBeVisible();
     await expect(

@@ -127,13 +127,11 @@ describe("RequireSession", () => {
       clientFor(async () => me),
       {
         needs: (account) => account.canReview,
-        label: "the reviewer capability",
+        label: "Hub reviewer access",
       },
     );
 
-    await waitFor(() =>
-      expect(screen.getByText(/does not have the reviewer capability/)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(/does not have Hub reviewer access/)).toBeTruthy());
     expect(screen.queryByText(/Hello acme-programs/)).toBeNull();
   });
 });

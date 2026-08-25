@@ -1,5 +1,6 @@
 "use client";
 
+import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 /**
  * One published opportunity, as a visitor with no account reads it.
  *
@@ -28,6 +29,7 @@ import {
   formatAmount,
   formatInstant,
 } from "@/lib/format";
+import { fundingTypeLabel, ingestionMethodLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
@@ -122,7 +124,7 @@ export function OpportunityView({
         <UntrustedText value={entry.title} />
       </h1>
       <p className="muted">
-        {entry.fundingType} · <StatusBadge status={entry.status} />
+        {fundingTypeLabel(entry.fundingType)} · <StatusBadge status={entry.status} />
         {operator ? (
           <>
             {" "}
@@ -196,6 +198,10 @@ export function OpportunityView({
           per-type layout that could drop a field a publisher entered.
         </p>
         <pre className="untrusted-block">{JSON.stringify(entry.fundingDetails, null, 2)}</pre>
+        <p className="muted footnote">
+          Source record, including the wire value for how this listing arrived.
+        </p>
+        <pre className="untrusted-block">{JSON.stringify(source, null, 2)}</pre>
       </details>
 
       <section aria-labelledby="provenance-heading" className="card">
@@ -230,9 +236,7 @@ export function OpportunityView({
           </div>
           <div>
             <dt>How it arrived</dt>
-            <dd>
-              <UntrustedText value={source.ingestedVia} fallback="not stated" />
-            </dd>
+            <dd>{ingestionMethodLabel(source.ingestedVia)}</dd>
           </div>
           <div>
             <dt>Id at the source</dt>
@@ -633,17 +637,14 @@ export function PublicHistory({ id }: { id: string }) {
                   {trail.entries.map((audited) => (
                     <tr key={`${audited.at}-${audited.action}`}>
                       <td className="muted">{formatInstant(audited.at)}</td>
-                      <td>{audited.action}</td>
                       <td>
-                        <UntrustedText value={audited.actor} />{" "}
-                        <span className="muted">({audited.actorKind})</span>
+                        <AuditAction entry={audited} />
                       </td>
                       <td>
-                        {audited.changedFields.length === 0 ? (
-                          <span className="muted">—</span>
-                        ) : (
-                          <code>{audited.changedFields.join(", ")}</code>
-                        )}
+                        <AuditActor entry={audited} />
+                      </td>
+                      <td>
+                        <AuditFields fields={audited.changedFields} />
                       </td>
                     </tr>
                   ))}

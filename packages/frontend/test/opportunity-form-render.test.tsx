@@ -124,11 +124,11 @@ describe("switching funding type", () => {
 
   it("names the funding-details section after the schema field and the type", () => {
     mount();
-    expect(screen.getByText("Funding details — grant")).toBeTruthy();
+    expect(screen.getByText("Funding details — Grant")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Funding type"), { target: { value: "rfp" } });
-    expect(screen.getByText("Funding details — RFP")).toBeTruthy();
+    expect(screen.getByText("Funding details — Request for proposals")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Funding type"), { target: { value: "vc_fund" } });
-    expect(screen.getByText("Funding details — VC fund")).toBeTruthy();
+    expect(screen.getByText("Funding details — Venture fund")).toBeTruthy();
   });
 
   it("names the sections that map to a schema field after that field", () => {
@@ -569,7 +569,7 @@ describe("when problems appear", () => {
 
     expect(api.create).not.toHaveBeenCalled();
     const panel = screen.getByRole("alert");
-    expect(within(panel).getByText(/Not conformant yet/)).toBeTruthy();
+    expect(within(panel).getByText(/Fix these fields before submitting/)).toBeTruthy();
     expect(screen.getAllByText("A title is required.").length).toBeGreaterThan(0);
   });
 
@@ -744,7 +744,7 @@ describe("advisory warnings", () => {
     form.milestones = [{ key: "m1", title: "Ship it", amount: "50000", criteria: "", base: {} }];
     const api = mount({}, { initial: form });
 
-    const advisory = screen.getByText(/Advisory warnings/);
+    const advisory = screen.getByText(/Things to review/);
     expect(advisory).toBeTruthy();
     expect(advisory.closest(".state")?.classList.contains("error")).toBe(false);
 

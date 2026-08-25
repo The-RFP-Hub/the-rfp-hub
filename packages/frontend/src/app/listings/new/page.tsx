@@ -24,13 +24,15 @@ export default function NewListingPage() {
               <p className="muted footnote">
                 This account publishes into{" "}
                 {verified.map((membership) => membership.slug).join(", ")} without review. An id
-                whose namespace is one of those publishes immediately; anything else lands pending.
+                with one of those organisation prefixes publishes immediately; anything else waits
+                for review.
               </p>
             ) : (
               <p className="muted footnote">
                 This account is not a member of a verified organisation, so this submission will be
-                stored <strong>pending</strong> and stay invisible to the public reads until a
-                reviewer approves it. That is the normal path for a community submission.
+                stored <strong>waiting for review</strong> and stay hidden from the public directory
+                until a Hub reviewer approves it. That is the normal path for a community
+                submission.
               </p>
             )}
             <OpportunityForm

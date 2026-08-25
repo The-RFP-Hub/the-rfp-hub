@@ -221,7 +221,14 @@ describe("badges carry meaning without colour", () => {
 
     // The WORD is the primary carrier. A screenshot in greyscale, a printout and a colourblind
     // reader all get the same information as the screen.
-    for (const word of ["open", "closed", "pending", "rejected", "unlisted", "not checked"]) {
+    for (const word of [
+      "Open",
+      "Closed",
+      "Waiting for review",
+      "Rejected",
+      "Hidden from the public directory",
+      "not checked",
+    ]) {
       expect(screen.getByText(word)).toBeTruthy();
     }
     // The SHAPE is a class the stylesheet turns into an outline, a fill, a dash or a strike.
@@ -249,7 +256,7 @@ describe("badges carry meaning without colour", () => {
     // Without the flag it is the bare badge, for the dense tables that have no room for a sentence.
     rerender(<VerifiedBadge verified />);
     expect(screen.queryByText(/publish immediately/)).toBeNull();
-    expect(screen.getByText("verified").getAttribute("title")).toMatch(/without review/);
+    expect(screen.getByText("Verified").getAttribute("title")).toMatch(/without review/);
   });
 });
 
