@@ -29,7 +29,8 @@
  * real non-duplicates is not recall, it is noise with good numbers.
  */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEFAULT_SIMILARITY_THRESHOLD, type EmbeddingProvider } from "../src/config.js";
 import {
   LexicalEmbeddingProvider,
@@ -389,8 +390,16 @@ export function loadCorpus(path = CORPUS_PATH): CorpusDocument[] {
   return parsed.documents;
 }
 
-// CLI entry — skipped under Vitest so the test can import the derivations without a run.
-if (!process.env.VITEST) {
+/** True only when THIS file is the process entry — an import must never trigger the CLI. */
+const isCliEntry =
+  !process.env.VITEST &&
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+// CLI entry — never on import: `build-idf-table.ts` imports `loadCorpus` from here, and a table
+// regeneration that transitively ran the whole sweep (and inherited its exit code) would make a
+// successful regeneration report failure exactly when the old weighting no longer separates.
+if (isCliEntry) {
   const provider: EmbeddingProvider = "lexical";
   const threshold = DEFAULT_SIMILARITY_THRESHOLD[provider];
   const corpus = loadCorpus();
