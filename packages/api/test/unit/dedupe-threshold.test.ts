@@ -112,13 +112,16 @@ describe("the mutation ladder, at the configured threshold", () => {
   });
 
   /**
-   * THE ACKNOWLEDGED LIMITS, recorded rather than hidden. A body truncated to 40% of its length
-   * (M3), or truncated AND compressed AND reordered (M5), shares too little lexical mass for any
-   * bag-of-words method to recover; moving these rungs is the case for structural signals, which
-   * need their own labelled data first. A ladder that silently omitted the rungs we fail would be
-   * a test that lies.
+   * THE ACKNOWLEDGED LIMITS, recorded rather than hidden — and scoped honestly: at the CONFIGURED
+   * threshold, chosen mid-band for false-positive headroom, a body truncated to 40% (M3) or
+   * truncated AND compressed AND reordered (M5) is missed. The same featurizer recovers both at
+   * its zero-false-positive point (the report prints that column), so "missed" is a property of
+   * the conservative operating point, not an absolute bound of lexical methods — closing the gap
+   * without spending the headroom is the case for structural signals, which need their own
+   * labelled data first. A ladder that silently omitted the rungs we fail would be a test that
+   * lies.
    */
-  it("records M3 and M5 as out of reach for a lexical method", () => {
+  it("records M3 and M5 as missed at the configured threshold", () => {
     expect(recall("M3")).toBe(0);
     expect(recall("M5")).toBe(0);
   });
