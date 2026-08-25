@@ -298,6 +298,7 @@ describe("closed response components vs their producers", () => {
       "MeMembership",
       "MembershipResult",
       "MergeResult",
+      "MergedOpportunityErrorResponse",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
       "OrganizationList",
       "OrganizationSummary",
@@ -556,6 +557,7 @@ describe("M3 closed components vs their view types", () => {
     isListed: true,
     namespace: "example-org",
     submittedBy: null,
+    mergedInto: null,
     // Null is the state most entries are in — nobody has decided anything yet. The populated shape
     // is asserted end to end in review.test.ts, where a real decision produces it.
     lastDecision: null,
@@ -659,6 +661,10 @@ describe("M3 closed components vs their view types", () => {
       role: "publisher",
       member: true,
     } satisfies MembershipResultView,
+    MergedOpportunityErrorResponse: {
+      error: "opportunity_merged",
+      mergedInto: { id: "example-org:survivor", title: "The survivor" },
+    },
     // Not a view type: the error body is assembled by `HttpError.toBody()`.
     ValidationErrorResponse: { error: "validation_failed", message: "…", errors: ["…"] },
   };

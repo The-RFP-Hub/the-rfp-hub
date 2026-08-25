@@ -28,12 +28,15 @@ const verification = new VerificationService();
 export const reviewController = {
   listOpportunities: handled(async (request: FastifyRequest) => {
     const query = queryOf<{
+      id?: string;
       reviewStatus?: "pending" | "approved" | "rejected";
       page?: number;
       limit?: number;
     }>(request);
     // The queue's default is the only status a reviewer has to act on.
-    const page = await managed.listForReview({ reviewStatus: "pending", ...query });
+    const page = await managed.listForReview(
+      query.id !== undefined ? query : { reviewStatus: "pending", ...query },
+    );
     return page satisfies ManagedOpportunityListView;
   }),
 

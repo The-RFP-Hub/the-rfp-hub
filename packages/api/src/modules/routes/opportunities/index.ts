@@ -69,7 +69,9 @@ export const opportunities = async (router: FastifyInstance): Promise<void> => {
         },
         response: {
           200: { $ref: "Opportunity#" },
-          404: { $ref: "ErrorResponse#" },
+          404: {
+            oneOf: [{ $ref: "ErrorResponse#" }, { $ref: "MergedOpportunityErrorResponse#" }],
+          },
         },
       },
     },

@@ -615,7 +615,8 @@ caption {
 
 /* Finished, decided, closed: filled ink. The heaviest thing in the row, because it is terminal. */
 .badge-closed,
-.badge-archived {
+.badge-archived,
+.badge-merged {
   background: var(--ink);
   color: var(--paper);
 }

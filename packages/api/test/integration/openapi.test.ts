@@ -144,6 +144,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "ApiKey",
       "ApiKeyCreated",
       "ManagedOpportunityList",
+      "MergedOpportunityErrorResponse",
       "DuplicatePairList",
       "MergeResult",
       "InsightsSeries",
@@ -179,7 +180,17 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(doc.paths["/v1/publishers"].get.security).toBeUndefined();
     // the error contract is published, too
     expect(doc.paths["/v1/opportunities"].get.responses["400"]).toBeTruthy();
-    expect(doc.paths["/v1/opportunities/{id}"].get.responses["404"]).toBeTruthy();
+    const detail404 =
+      doc.paths["/v1/opportunities/{id}"].get.responses["404"].content["application/json"].schema;
+    expect(detail404.oneOf.map((variant: { $ref: string }) => variant.$ref)).toEqual([
+      "#/components/schemas/ErrorResponse",
+      "#/components/schemas/MergedOpportunityErrorResponse",
+    ]);
+    // The enriched variant is additive: the ordinary not-found contract remains one arm.
+    expect(doc.components.schemas.MergedOpportunityErrorResponse.required).toEqual([
+      "error",
+      "mergedInto",
+    ]);
     // no trailing-slash paths, and every operation carries a unique operationId
     const operationIds: string[] = [];
     for (const [path, ops] of Object.entries<Record<string, { operationId?: string }>>(doc.paths)) {

@@ -4,7 +4,13 @@
  * behaviour a page depends on: the token is attached, a failure is an `ApiError` carrying the API's
  * own code, and a body that is not JSON is not silently treated as one.
  */
-import { ApiError, createApiClient, linkOutUrl, loadOpportunity } from "@/lib/api";
+import {
+  ApiError,
+  createApiClient,
+  linkOutUrl,
+  loadManagedOpportunity,
+  loadOpportunity,
+} from "@/lib/api";
 import { describe, expect, it } from "vitest";
 
 interface Call {
@@ -287,6 +293,64 @@ describe("loadOpportunity", () => {
     const { api, calls } = client(() => json({ error: "unauthorized", message: "no." }, 401));
 
     await expect(loadOpportunity(api, "other:1", true)).rejects.toMatchObject({ status: 401 });
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("loadManagedOpportunity", () => {
+  const row = {
+    id: "acme:1",
+    title: "One",
+    fundingType: "grant",
+    status: "archived",
+    reviewStatus: "rejected",
+    isListed: false,
+    namespace: "acme",
+    submittedBy: "acme",
+    mergedInto: { id: "acme:2", title: "Two" },
+    lastDecision: null,
+    createdAt: "2026-08-01T00:00:00Z",
+    updatedAt: "2026-08-02T00:00:00Z",
+  };
+  const page = (items: (typeof row)[]) => ({
+    items,
+    page: 1,
+    limit: 1,
+    total: items.length,
+    totalPages: 1,
+  });
+
+  it("queries the owner list by exact id and stops when it finds the row", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json(page([row])));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(loadManagedOpportunity(api, "acme:1", true)).resolves.toMatchObject(row);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.com/v1/me/opportunities?id=acme%3A1&limit=1",
+    ]);
+  });
+
+  it("falls back to the reviewer list when the owner-scoped id lookup is empty", async () => {
+    const { fetchImpl, calls } = stubFetch((call) =>
+      call.url.includes("/v1/me/opportunities") ? json(page([])) : json(page([row])),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(loadManagedOpportunity(api, "acme:1", true)).resolves.toMatchObject(row);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.com/v1/me/opportunities?id=acme%3A1&limit=1",
+      "https://api.example.com/v1/review/opportunities?id=acme%3A1&limit=1",
+    ]);
+  });
+
+  it("does not probe the reviewer list for an account without that role", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json(page([])));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(loadManagedOpportunity(api, "acme:1", false)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
     expect(calls).toHaveLength(1);
   });
 });

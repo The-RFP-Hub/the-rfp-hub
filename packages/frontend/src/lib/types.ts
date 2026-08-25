@@ -52,6 +52,8 @@ export interface ApiErrorBody {
   errors?: string[];
   /** Present on `survivor_already_merged`: the entry that really survived. */
   survivorId?: string;
+  /** Present on the public detail route's enriched 404 for an id that used to be public. */
+  mergedInto?: { id: string; title: string };
 }
 
 // ── the public directory ────────────────────────────────────────────────────────
@@ -320,6 +322,8 @@ export interface ManagedOpportunity {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  /** The public listing this terminal record was merged into, with its current title. */
+  mergedInto: { id: string; title: string } | null;
   /** The newest decision on this listing, or null while nobody has decided anything. */
   lastDecision: ReviewDecisionSummary | null;
   createdAt: string;

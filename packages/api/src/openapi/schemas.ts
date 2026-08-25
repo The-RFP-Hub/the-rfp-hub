@@ -739,6 +739,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "isListed",
       "namespace",
       "submittedBy",
+      "mergedInto",
       "lastDecision",
       "createdAt",
       "updatedAt",
@@ -752,6 +753,17 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       isListed: { type: "boolean" },
       namespace: { type: ["string", "null"] },
       submittedBy: { type: ["string", "null"] },
+      mergedInto: {
+        type: ["object", "null"],
+        additionalProperties: false,
+        description:
+          "The survivor of a terminal merge, using its public id and current title; null for an active or ordinary managed row.",
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+        },
+      },
       lastDecision: {
         type: ["object", "null"],
         additionalProperties: false,
@@ -868,6 +880,26 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "object",
         additionalProperties: { type: "integer" },
         description: "Per-job counters. The members vary by job and are not part of the contract.",
+      },
+    },
+  },
+  {
+    $id: "MergedOpportunityErrorResponse",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A public id that resolved when it was merged. The response remains a 404; clients may load the currently public survivor named here.",
+    required: ["error", "mergedInto"],
+    properties: {
+      error: { type: "string", const: "opportunity_merged" },
+      mergedInto: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+        },
       },
     },
   },

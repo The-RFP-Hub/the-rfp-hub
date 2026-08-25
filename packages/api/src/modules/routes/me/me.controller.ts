@@ -65,6 +65,7 @@ export const meController = {
   listOpportunities: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const query = queryOf<{
+      id?: string;
       reviewStatus?: "pending" | "approved" | "rejected";
       page?: number;
       limit?: number;

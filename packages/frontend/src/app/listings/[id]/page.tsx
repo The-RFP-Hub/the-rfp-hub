@@ -14,15 +14,16 @@
  */
 import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { RequireSession } from "@/components/Chrome";
+import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge } from "@/components/badges";
 import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError, linkOutUrl, loadOpportunity } from "@/lib/api";
+import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { Me, Opportunity } from "@/lib/types";
+import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -49,14 +50,28 @@ function Listing({ id, me }: { id: string; me: Me }) {
   // Owner route first, reviewer route as the fallback — the entry a reviewer was linked to from
   // the queue, a claim or a duplicate pair is by definition not theirs. See `loadOpportunity`.
   const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
-  const { state, reload } = useResource(load);
+  const loadWithMetadata = useCallback(async () => {
+    const [entry, managed] = await Promise.all([
+      load(),
+      loadManagedOpportunity(api, id, me.canReview),
+    ]);
+    return { entry, managed };
+  }, [api, id, load, me.canReview]);
+  const { state, reload } = useResource(loadWithMetadata);
 
   return (
     <section>
       {/* Renders only when a review surface sent the reader here and said where from. */}
       <ReturnLink />
       <ResourceView resource={state} what="this listing" onRetry={reload}>
-        {(entry) => <Header entry={entry} id={id} />}
+        {({ entry, managed }) => (
+          <>
+            {managed.mergedInto ? (
+              <MergedOpportunityBanner mergedInto={managed.mergedInto} />
+            ) : null}
+            <Header entry={entry} id={id} managed={managed} />
+          </>
+        )}
       </ResourceView>
 
       <div className="tabs" role="tablist" aria-label="Listing detail">
@@ -82,7 +97,15 @@ function Listing({ id, me }: { id: string; me: Me }) {
   );
 }
 
-function Header({ entry, id }: { entry: Opportunity; id: string }) {
+function Header({
+  entry,
+  id,
+  managed,
+}: {
+  entry: Opportunity;
+  id: string;
+  managed: ManagedOpportunity;
+}) {
   const api = useApi();
   const source = entry.source ?? {};
   return (
@@ -91,9 +114,11 @@ function Header({ entry, id }: { entry: Opportunity; id: string }) {
         <h1>
           <UntrustedText value={entry.title} />
         </h1>
-        <Link href={`/listings/${encodeURIComponent(id)}/edit`}>
-          <button type="button">Edit</button>
-        </Link>
+        {managed.mergedInto ? null : (
+          <Link href={`/listings/${encodeURIComponent(id)}/edit`}>
+            <button type="button">Edit</button>
+          </Link>
+        )}
       </div>
       <p className="muted">
         <code>{entry.id}</code> · {entry.fundingType} · {entry.status}

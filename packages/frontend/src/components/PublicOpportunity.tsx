@@ -16,11 +16,11 @@
  * signed-in pages give, and it matters more here: this is the surface an anonymous visitor reaches
  * without ever having decided to trust anyone.
  */
-import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { PublicClaimControl } from "@/components/ClaimForm";
+import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
-import { linkOutUrl } from "@/lib/api";
+import { ApiError, linkOutUrl } from "@/lib/api";
 import {
   describeAward,
   describeDeadline,
@@ -31,11 +31,28 @@ import {
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useCallback, useState } from "react";
 
 export function PublicOpportunity({ id }: { id: string }) {
   const api = useApi();
-  const load = useCallback(() => api.directory.find(id), [api, id]);
+  const { replace } = useRouter();
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+  const load = useCallback(async () => {
+    try {
+      return await api.directory.find(id);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "opportunity_merged" && error.mergedInto) {
+        const suffix = query ? `?${query}` : "";
+        replace(`/opportunities/${encodeURIComponent(error.mergedInto.id)}${suffix}`);
+        // Navigation unmounts this tree. Keeping the resource pending prevents the expected 404
+        // from flashing as an error while the canonical survivor route loads.
+        return new Promise<Opportunity>(() => undefined);
+      }
+      throw error;
+    }
+  }, [api, id, query, replace]);
   const { state, reload } = useResource(load);
 
   return (

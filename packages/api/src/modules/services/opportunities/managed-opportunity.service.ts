@@ -12,6 +12,7 @@
  * follows the namespace, not the original typist.
  */
 import { type SQL, and, count, desc, eq, inArray, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type OpportunityRow, accounts, auditLog, opportunities } from "../../../db/schema.js";
 import type { ManagedOpportunityView, ReviewDecisionSummaryView } from "../../shared/api-views.js";
@@ -19,6 +20,7 @@ import type { Principal } from "../../shared/capabilities.js";
 import { paginate } from "../../shared/pagination.js";
 
 export interface ManagedQuery {
+  id?: string;
   reviewStatus?: "pending" | "approved" | "rejected";
   page?: number;
   limit?: number;
@@ -68,13 +70,21 @@ export class ManagedOpportunityService {
     const { page, limit, offset } = paginate(query.page ?? 1, query.limit ?? 20);
     const where = and(
       scope,
+      query.id !== undefined ? eq(opportunities.publicId, query.id) : undefined,
       query.reviewStatus ? eq(opportunities.reviewStatus, query.reviewStatus) : undefined,
     );
 
+    const survivor = alias(opportunities, "managed_survivor");
+
     const rows = await this.db
-      .select({ opportunity: opportunities, submitterHandle: accounts.handle })
+      .select({
+        opportunity: opportunities,
+        submitterHandle: accounts.handle,
+        survivor: { id: survivor.publicId, title: survivor.title },
+      })
       .from(opportunities)
       .leftJoin(accounts, eq(accounts.id, opportunities.submittedBy))
+      .leftJoin(survivor, eq(survivor.id, opportunities.mergedIntoId))
       .where(where)
       .orderBy(desc(opportunities.updatedAt), desc(opportunities.id))
       .limit(limit)
@@ -86,7 +96,12 @@ export class ManagedOpportunityService {
 
     return {
       items: rows.map((row) =>
-        toManagedView(row.opportunity, row.submitterHandle, decisions.get(row.opportunity.id)),
+        toManagedView(
+          row.opportunity,
+          row.submitterHandle,
+          row.survivor,
+          decisions.get(row.opportunity.id),
+        ),
       ),
       page,
       limit,
@@ -166,6 +181,7 @@ export class ManagedOpportunityService {
 export function toManagedView(
   row: OpportunityRow,
   submitterHandle: string | null,
+  mergedInto: { id: string; title: string } | null,
   lastDecision?: ReviewDecisionSummaryView,
 ): ManagedOpportunityView {
   return {
@@ -179,6 +195,7 @@ export function toManagedView(
     // The stored attribution string, falling back to the submitting account's handle: an entry
     // published as an organisation is credited to the organisation, and that is what belongs here.
     submittedBy: row.sourceSubmittedBy ?? submitterHandle,
+    mergedInto,
     lastDecision: lastDecision ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

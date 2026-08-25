@@ -225,6 +225,9 @@ export class OpportunityWriteService {
     if (options.mode === "replace" && !preview) {
       throw notFound(`no opportunity ${JSON.stringify(document.id)}.`);
     }
+    if (preview && preview.mergedIntoId !== null) {
+      throw opportunityMerged(preview.publicId);
+    }
     const namespace = this.authorizationNamespace(document, preview);
     const advisory = this.decide({
       principal,
@@ -550,6 +553,10 @@ export class OpportunityWriteService {
         .for("update")
         .limit(1);
       const existing = locked[0];
+
+      if (existing && existing.mergedIntoId !== null) {
+        throw opportunityMerged(existing.publicId);
+      }
 
       if (ctx.mode === "create" && existing) {
         // Created by somebody else between the fail-fast read and this lock. The same answer the
@@ -959,6 +966,7 @@ const NON_CONTENT = new Set([
   "approvedAt",
   "lastSeenAt",
   "mergedIntoId",
+  "mergedFromPublic",
   "sourceSubmittedAt",
   "verifiedAgainstSource",
   "verifiedAt",
@@ -966,6 +974,13 @@ const NON_CONTENT = new Set([
   "nextDeadlineAt",
   "sourceSystem",
 ]);
+
+function opportunityMerged(publicId: string): HttpError {
+  return conflict(
+    "opportunity_merged",
+    `opportunity ${JSON.stringify(publicId)} has been merged and cannot be changed.`,
+  );
+}
 
 function comparable(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};

@@ -15,7 +15,7 @@
  */
 import { RequireSession } from "@/components/Chrome";
 import { UntrustedText } from "@/components/UntrustedText";
-import { ListedBadge, MatchBadge, ReviewStatusBadge } from "@/components/badges";
+import { ListedBadge, MatchBadge, MergedBadge, ReviewStatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
@@ -224,8 +224,14 @@ function Listings({ me }: { me: Me }) {
                           <Outcome item={item} />
                         </th>
                         <td>
-                          <ReviewStatusBadge status={item.reviewStatus} />{" "}
-                          <ListedBadge isListed={item.isListed} />
+                          {item.mergedInto ? (
+                            <MergedBadge />
+                          ) : (
+                            <>
+                              <ReviewStatusBadge status={item.reviewStatus} />{" "}
+                              <ListedBadge isListed={item.isListed} />
+                            </>
+                          )}
                         </td>
                         <td>
                           <VerificationCell id={item.id} />
@@ -278,6 +284,18 @@ function Listings({ me }: { me: Me }) {
  */
 function Outcome({ item }: { item: ManagedOpportunity }) {
   const decision = item.lastDecision;
+
+  if (item.mergedInto) {
+    return (
+      <div className="cell-note">
+        Merged into{" "}
+        <Link href={`/opportunities/${encodeURIComponent(item.mergedInto.id)}`}>
+          <UntrustedText value={item.mergedInto.title} />
+        </Link>{" "}
+        by a reviewer. This archived record now points to that listing.
+      </div>
+    );
+  }
 
   if (item.reviewStatus === "rejected") {
     return (

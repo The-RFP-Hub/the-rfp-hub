@@ -487,8 +487,16 @@ run("M3DUP duplicate detection", () => {
     expect(merged.json().mergedId).toBe(`${NS}:beta-copy`);
     expect(merged.json().copiedFields).toEqual([]);
 
-    // The loser leaves the public reads; its row stays, pointed at the survivor.
-    expect((await app.inject({ url: `/v1/opportunities/${NS}:beta-copy` })).statusCode).toBe(404);
+    // The loser's old public id remains a 404, enriched only with its currently-public survivor.
+    const formerPublic = await app.inject({ url: `/v1/opportunities/${NS}:beta-copy` });
+    expect(formerPublic.statusCode).toBe(404);
+    expect(formerPublic.json()).toEqual({
+      error: "opportunity_merged",
+      mergedInto: {
+        id: `${NS}:beta`,
+        title: "Superchain Builders Fund Cohort",
+      },
+    });
     expect((await app.inject({ url: `/v1/opportunities/${NS}:beta` })).statusCode).toBe(200);
     const loser = (
       await db
@@ -501,6 +509,65 @@ run("M3DUP duplicate detection", () => {
     expect(loser?.isListed).toBe(false);
     expect(loser?.status).toBe("archived");
     expect(loser?.mergedIntoId).toBe(await rowIdOf(`${NS}:beta`));
+    expect(loser?.mergedFromPublic).toBe(true);
+
+    const mine = await app.inject({
+      url: `/v1/me/opportunities?id=${encodeURIComponent(`${NS}:beta-copy`)}`,
+      headers: bearer(publisherToken),
+    });
+    expect(mine.statusCode, mine.body).toBe(200);
+    expect(mine.json().items).toEqual([
+      expect.objectContaining({
+        id: `${NS}:beta-copy`,
+        mergedInto: {
+          id: `${NS}:beta`,
+          title: "Superchain Builders Fund Cohort",
+        },
+      }),
+    ]);
+
+    // A merge is terminal at the services that own every revival path: create/replace, both
+    // approval authorities, and the listing decision route all return the same stable conflict.
+    const loserDocument = entry(
+      `${NS}:beta-copy`,
+      "Superchain Builders Fund Cohort | Directory",
+      reword(ALPHA_BODY),
+    );
+    const revivalAttempts = [
+      await app.inject({
+        method: "PUT",
+        url: `/v1/opportunities/${NS}:beta-copy`,
+        headers: bearer(publisherToken),
+        payload: loserDocument,
+      }),
+      await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: bearer(publisherToken),
+        payload: loserDocument,
+      }),
+      await app.inject({
+        method: "POST",
+        url: `/v1/review/opportunities/${NS}:beta-copy/approve`,
+        headers: bearer(reviewerToken),
+        payload: {},
+      }),
+      await app.inject({
+        method: "POST",
+        url: `/v1/organizations/${NS}/opportunities/${NS}:beta-copy/approve`,
+        headers: bearer(publisherToken),
+      }),
+      await app.inject({
+        method: "PATCH",
+        url: `/v1/review/opportunities/${NS}:beta-copy`,
+        headers: bearer(reviewerToken),
+        payload: { isListed: true },
+      }),
+    ];
+    for (const attempt of revivalAttempts) {
+      expect(attempt.statusCode, attempt.body).toBe(409);
+      expect(attempt.json().error).toBe("opportunity_merged");
+    }
 
     // One audit row on EACH entry: "this absorbed that" and "this was absorbed" are different facts.
     for (const publicId of [`${NS}:beta`, `${NS}:beta-copy`]) {

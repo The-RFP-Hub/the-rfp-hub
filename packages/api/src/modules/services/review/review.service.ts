@@ -72,6 +72,7 @@ export class ReviewService {
   ): Promise<ReviewDecisionView> {
     return this.db.transaction(async (tx) => {
       const row = await lockOpportunity(tx, publicId);
+      assertNotMerged(row);
       const now = new Date();
       const target = approve ? "approved" : "rejected";
       if (row.reviewStatus === target) {
@@ -114,6 +115,7 @@ export class ReviewService {
   ): Promise<ReviewDecisionView> {
     return this.db.transaction(async (tx) => {
       const row = await lockOpportunity(tx, publicId);
+      assertNotMerged(row);
       if (row.isListed === isListed) {
         return { id: row.publicId, reviewStatus: row.reviewStatus, isListed: row.isListed };
       }
@@ -434,6 +436,8 @@ export class ReviewService {
         );
       }
 
+      assertNotMerged(row);
+
       if (row.reviewStatus !== "pending") {
         throw conflict(
           "not_pending",
@@ -563,6 +567,16 @@ async function lockOpportunity(tx: TxLike, publicId: string): Promise<Opportunit
   const row = rows[0];
   if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
   return row;
+}
+
+/** A merge is terminal: no review or listing decision may make its loser live again. */
+function assertNotMerged(row: OpportunityRow): void {
+  if (row.mergedIntoId !== null) {
+    throw conflict(
+      "opportunity_merged",
+      `opportunity ${JSON.stringify(row.publicId)} has been merged and cannot be changed.`,
+    );
+  }
 }
 
 /** The organisation row a metadata transaction is about to change, locked before membership. */

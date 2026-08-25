@@ -520,7 +520,8 @@ export class DedupeService {
    * Merge one pair: the loser is rejected, unlisted, archived and pointed at the survivor.
    *
    * The loser's row is KEPT rather than deleted — its public id may be in an export, a feed or
-   * somebody's bookmarks, and `merged_into_id` is what lets a future read redirect instead of 404.
+   * somebody's bookmarks, and `merged_into_id` is what lets a public read return a 404 that names
+   * the survivor without ever serving the loser's terminal row.
    *
    * THE SURVIVOR IS VALIDATED TWICE OVER. It must be publicly visible (merging into a pending entry
    * would take the public one away and leave nothing in its place), and it must not itself carry
@@ -614,6 +615,7 @@ export class DedupeService {
           isListed: false,
           status: "archived",
           mergedIntoId: survivor.id,
+          mergedFromPublic: loser.reviewStatus === "approved" && loser.isListed,
           updatedAt: now,
         })
         .where(eq(opportunities.id, loser.id));

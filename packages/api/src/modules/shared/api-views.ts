@@ -303,6 +303,8 @@ export interface ManagedOpportunityView {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  /** The public listing this archived record was merged into, with its current title. */
+  mergedInto: { id: string; title: string } | null;
   /** The newest approve/reject on this entry, or null while nobody has decided anything. */
   lastDecision: ReviewDecisionSummaryView | null;
   createdAt: string;

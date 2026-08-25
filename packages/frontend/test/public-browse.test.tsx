@@ -34,7 +34,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * shown, and what a control does is change the URL.
  */
 const { navigation, authSession } = vi.hoisted(() => ({
-  navigation: { params: new URLSearchParams(), push: vi.fn() },
+  navigation: { params: new URLSearchParams(), push: vi.fn(), replace: vi.fn() },
   authSession: {
     data: null as { user: { id: string } } | null,
     isPending: false,
@@ -54,7 +54,12 @@ vi.mock("@/lib/auth-client", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({
+    push: navigation.push,
+    replace: navigation.replace,
+    back: vi.fn(),
+    refresh: vi.fn(),
+  }),
   useSearchParams: () => navigation.params,
   usePathname: () => "/",
 }));
@@ -466,6 +471,28 @@ describe("the public opportunity page", () => {
     authSession.data = null;
     authSession.isPending = false;
     authSession.error = null;
+    navigation.params = new URLSearchParams();
+    navigation.replace.mockClear();
+  });
+
+  it("canonicalizes a merged public id and preserves return-navigation query parameters", async () => {
+    navigation.params = new URLSearchParams("back=%2Freview%3Fpage%3D2");
+    const mergedInto = { id: "acme:round 5", title: "Round Five" };
+    const { client } = stub({
+      find: async () => {
+        throw new ApiError(404, "opportunity_merged", "Request failed with status 404.", {
+          mergedInto,
+        });
+      },
+    });
+
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith(
+        "/opportunities/acme%3Around%205?back=%2Freview%3Fpage%3D2",
+      ),
+    );
   });
 
   it("says it is loading before it says anything else", () => {
@@ -546,9 +573,7 @@ describe("the public opportunity page", () => {
       directCreate: false,
       credentialKind: "session",
       scopes: [],
-      memberships: [
-        { slug: "acme", name: "Acme Foundation", role: "publisher", verified: true },
-      ],
+      memberships: [{ slug: "acme", name: "Acme Foundation", role: "publisher", verified: true }],
       canManageKeys: true,
       canReview: false,
       canAdmin: false,

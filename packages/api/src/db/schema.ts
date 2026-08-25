@@ -406,12 +406,21 @@ export const opportunities = pgTable(
      * Set on the LOSER of a merge, pointing at the survivor.
      *
      * The row is kept rather than deleted: its public id may already be in an export, a feed or
-     * someone's bookmarks, and a merge should redirect rather than 404. A survivor that itself
-     * carries this is refused as a merge target, which is what prevents chains and cycles.
+     * someone's bookmarks, and a public id that used to resolve may still tell a client where the
+     * listing went. A survivor that itself carries this is refused as a merge target, which is what
+     * prevents chains and cycles.
      */
     mergedIntoId: bigint({ mode: "number" }).references((): AnyPgColumn => opportunities.id, {
       onDelete: "set null",
     }),
+    /**
+     * Whether the LOSER was public at the instant it was merged.
+     *
+     * This is intentionally stored rather than reconstructed from the loser's terminal state: the
+     * merge itself rejects, unlists and archives that row. False by default means rows merged before
+     * this provenance bit existed reveal nothing conservatively.
+     */
+    mergedFromPublic: boolean().notNull().default(false),
 
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

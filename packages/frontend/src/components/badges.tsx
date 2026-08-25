@@ -79,6 +79,18 @@ export function ListedBadge({ isListed }: { isListed: boolean }) {
   );
 }
 
+/** A merge is a terminal editorial state, so it uses the badge system's filled-ink shape. */
+export function MergedBadge() {
+  return (
+    <span
+      className="badge badge-merged"
+      title="Merged into another listing; this record is terminal"
+    >
+      merged
+    </span>
+  );
+}
+
 /**
  * Organisation verification, which is what auto-approval hangs off: writes from a verified
  * namespace publish immediately, writes from an unverified one land pending.

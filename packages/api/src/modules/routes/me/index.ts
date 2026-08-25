@@ -80,6 +80,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
           type: "object",
           additionalProperties: false,
           properties: {
+            id: { type: "string", description: "Exact public id." },
             reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
             page: { type: "integer", minimum: 1, default: 1 },
             limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },

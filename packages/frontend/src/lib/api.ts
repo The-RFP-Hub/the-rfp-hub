@@ -35,6 +35,7 @@ import type {
   Health,
   InsightsSeries,
   InsightsSummary,
+  ManagedOpportunity,
   ManagedOpportunityList,
   Me,
   MembershipResult,
@@ -65,6 +66,8 @@ export class ApiError extends Error {
   readonly details: string[];
   /** Set on `survivor_already_merged`: the entry that really survived, for a link-out. */
   readonly survivorId: string | undefined;
+  /** Set on the public detail route's `opportunity_merged` 404. */
+  readonly mergedInto: { id: string; title: string } | undefined;
 
   constructor(status: number, code: string, message: string, extra?: Partial<ApiErrorBody>) {
     super(message);
@@ -73,6 +76,7 @@ export class ApiError extends Error {
     this.code = code;
     this.details = extra?.errors ?? [];
     this.survivorId = extra?.survivorId;
+    this.mergedInto = extra?.mergedInto;
   }
 
   /** The session is gone or was never presented. Pages offer a login rather than an error. */
@@ -256,8 +260,12 @@ export function createApiClient(options: ApiClientOptions) {
       get: () => request<Me>("GET", "/v1/me"),
       update: (body: { handle?: string | null; displayName?: string | null }) =>
         request<Me>("PATCH", "/v1/me", { body }),
-      opportunities: (query?: { reviewStatus?: ReviewStatus; page?: number; limit?: number }) =>
-        request<ManagedOpportunityList>("GET", "/v1/me/opportunities", { query }),
+      opportunities: (query?: {
+        id?: string;
+        reviewStatus?: ReviewStatus;
+        page?: number;
+        limit?: number;
+      }) => request<ManagedOpportunityList>("GET", "/v1/me/opportunities", { query }),
       /** The one route that serves an owner their own pending or rejected record in full. */
       opportunity: (id: string) =>
         request<Opportunity>("GET", `/v1/me/opportunities/${encodeURIComponent(id)}`),
@@ -301,8 +309,12 @@ export function createApiClient(options: ApiClientOptions) {
 
     // ── review (T3) ─────────────────────────────────────────────────────────────
     review: {
-      opportunities: (query?: { reviewStatus?: ReviewStatus; page?: number; limit?: number }) =>
-        request<ManagedOpportunityList>("GET", "/v1/review/opportunities", { query }),
+      opportunities: (query?: {
+        id?: string;
+        reviewStatus?: ReviewStatus;
+        page?: number;
+        limit?: number;
+      }) => request<ManagedOpportunityList>("GET", "/v1/review/opportunities", { query }),
       /** One entry in full, entitled by ROLE rather than by ownership. See `loadOpportunity`. */
       opportunity: (id: string) =>
         request<Opportunity>("GET", `/v1/review/opportunities/${encodeURIComponent(id)}`),
@@ -498,4 +510,30 @@ export async function loadOpportunity(
     if (!canReview || !(error instanceof ApiError) || !error.isNotFound) throw error;
     return api.review.opportunity(id);
   }
+}
+
+/**
+ * The editorial row beside `loadOpportunity`'s full Standard document.
+ *
+ * The owner list is queried first with the exact id. An empty page is its scoped equivalent of a
+ * 404, so a reviewer then tries the role-entitled list; every real request failure is passed through
+ * unchanged. This keeps merge state available to detail/edit pages without teaching public reads
+ * about editorial columns.
+ */
+export async function loadManagedOpportunity(
+  api: ApiClient,
+  id: string,
+  canReview: boolean,
+): Promise<ManagedOpportunity> {
+  const owned = await api.me.opportunities({ id, limit: 1 });
+  const mine = owned.items.find((item) => item.id === id);
+  if (mine) return mine;
+
+  if (canReview) {
+    const review = await api.review.opportunities({ id, limit: 1 });
+    const item = review.items.find((candidate) => candidate.id === id);
+    if (item) return item;
+  }
+
+  throw new ApiError(404, "not_found", `No managed opportunity ${JSON.stringify(id)} was found.`);
 }

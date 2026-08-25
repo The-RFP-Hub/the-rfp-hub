@@ -80,6 +80,7 @@ const listing = (over: Record<string, unknown> = {}) => ({
   isListed: listedFixture.current,
   namespace: "filecoin",
   submittedBy: "fil-maintainer",
+  mergedInto: null,
   lastDecision: null,
   createdAt: "2026-08-01T00:00:00Z",
   updatedAt: "2026-08-10T00:00:00Z",

@@ -66,6 +66,7 @@ const pending = {
   isListed: false,
   namespace: "indie-collective",
   submittedBy: "indie2",
+  mergedInto: null,
   lastDecision: null,
   createdAt: "2026-08-01T00:00:00Z",
   updatedAt: "2026-08-01T00:00:00Z",

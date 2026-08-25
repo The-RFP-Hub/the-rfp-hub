@@ -43,6 +43,10 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           type: "object",
           additionalProperties: false,
           properties: {
+            id: {
+              type: "string",
+              description: "Exact public id; bypasses the default pending queue.",
+            },
             reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
             page: { type: "integer", minimum: 1, default: 1 },
             limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
@@ -87,7 +91,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { reason: { type: ["string", "null"] } },
         },
-        response: { 200: { $ref: "ReviewDecision#" }, ...errors },
+        response: {
+          200: { $ref: "ReviewDecision#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.approve,
@@ -108,7 +116,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { reason: { type: ["string", "null"] } },
         },
-        response: { 200: { $ref: "ReviewDecision#" }, ...errors },
+        response: {
+          200: { $ref: "ReviewDecision#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.reject,
@@ -130,7 +142,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { isListed: { type: "boolean" } },
         },
-        response: { 200: { $ref: "ReviewDecision#" }, ...errors },
+        response: {
+          200: { $ref: "ReviewDecision#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.setListed,
@@ -235,7 +251,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         tags: ["review"],
         summary: "Keep one entry of a pair and retire the other into it",
         description:
-          "The loser is rejected, unlisted, archived and pointed at the survivor; its row is kept so a future read can redirect rather than 404. The survivor must be approved AND listed, and must not itself have been merged — that check is what prevents chains and cycles (409 naming the real survivor). `fields` copies a whitelist from the loser; the result is re-validated against the Standard inside the transaction and the whole merge rolls back if it would no longer conform.",
+          "The loser is rejected, unlisted, archived and pointed at the survivor; when its id was public at merge time, a future public read remains a 404 but may name the currently-public survivor in its body. The survivor must be approved AND listed, and must not itself have been merged — that check is what prevents chains and cycles (409 naming the real survivor). `fields` copies a whitelist from the loser; the result is re-validated against the Standard inside the transaction and the whole merge rolls back if it would no longer conform.",
         security: [{ bearerAuth: [] }],
         params: pairParams,
         body: {
