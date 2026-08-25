@@ -21,6 +21,7 @@ import {
   fromDocument,
   fromIsoUtc,
   idProblem,
+  localTimeZoneDescription,
   moveRow,
   namespaceAuthority,
   namespaceOf,
@@ -30,6 +31,7 @@ import {
   splitList,
   toDocument,
   toIsoUtc,
+  utcPreview,
   validationPointerToFormPath,
 } from "@/lib/opportunity-form";
 import type { Opportunity } from "@/lib/types";
@@ -360,9 +362,9 @@ describe("describePublish", () => {
 });
 
 describe("timestamps", () => {
-  it("emits the trailing-Z RFC 3339 form the schema pins", () => {
-    expect(toIsoUtc("2026-09-30T23:59")).toBe("2026-09-30T23:59:00.000Z");
-    expect(toIsoUtc("2026-09-30T23:59:59")).toBe("2026-09-30T23:59:59.000Z");
+  it("converts the publisher's local wall time to the trailing-Z instant the schema pins", () => {
+    expect(toIsoUtc("2026-09-30T23:59")).toBe("2026-10-01T02:59:00.000Z");
+    expect(toIsoUtc("2026-09-30T23:59:59")).toBe("2026-10-01T02:59:59.000Z");
   });
 
   it("round-trips a stored instant through the widget unchanged", () => {
@@ -370,15 +372,26 @@ describe("timestamps", () => {
     expect(toIsoUtc(fromIsoUtc(stored))).toBe(stored);
   });
 
-  it("reads the entered value AS UTC, not as the browser's zone", () => {
-    // The assertion that matters is that no `Date` is involved: the same input produces the same
-    // output in every timezone this suite could run in.
-    expect(toIsoUtc("2026-01-01T00:00")).toBe("2026-01-01T00:00:00.000Z");
+  it("uses the suite's pinned non-UTC browser zone", () => {
+    expect(toIsoUtc("2026-01-01T00:00")).toBe("2026-01-01T03:00:00.000Z");
+    expect(localTimeZoneDescription("2026-01-01T00:00")).toBe("America/Sao_Paulo, UTC−03:00");
+  });
+
+  it("previews the UTC clock and includes its date when conversion crosses midnight", () => {
+    expect(utcPreview("2026-01-01T10:00")).toBe("= 13:00 UTC");
+    expect(utcPreview("2026-09-30T23:59")).toBe("= 2026-10-01 02:59 UTC");
+  });
+
+  it("chooses the earlier instant in a repeated fall-back hour", () => {
+    // São Paulo repeated 23:00–23:59 when DST ended in 2018. JavaScript chooses the first copy,
+    // still at UTC−02:00; the later instant would have been 02:30Z at UTC−03:00.
+    expect(toIsoUtc("2018-02-17T23:30")).toBe("2018-02-18T01:30:00.000Z");
   });
 
   it("treats an empty box as absence, and a half-typed one as no value yet", () => {
     expect(toIsoUtc("")).toBeUndefined();
     expect(toIsoUtc("2026-09")).toBeUndefined();
+    expect(toIsoUtc("not a date")).toBeUndefined();
   });
 });
 
@@ -446,7 +459,7 @@ describe("the deadline conditional", () => {
     const built = toDocument(withDeadline("fixed", "2026-09-30T23:59"));
     expect(built.problems).toEqual([]);
     expect(built.document.deadlines).toEqual([
-      { deadlineType: "fixed", date: "2026-09-30T23:59:00.000Z", label: "application" },
+      { deadlineType: "fixed", date: "2026-10-01T02:59:00.000Z", label: "application" },
     ]);
   });
 

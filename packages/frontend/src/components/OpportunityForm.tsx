@@ -92,12 +92,14 @@ import {
   emptyPrize,
   emptyRewardTier,
   emptySocialLink,
+  localTimeZoneDescription,
   moveRow,
   namespaceAuthority,
   parseValidationIssueLine,
   removeRow,
   replaceRow,
   toDocument,
+  utcPreview,
   validationPointerToFormPath,
 } from "@/lib/opportunity-form";
 import { fundingTypeLabel, opportunityStatusLabel, publisherStatus } from "@/lib/presentation";
@@ -1959,24 +1961,44 @@ function NumberField(
   return <TextField {...props} inputMode="decimal" className={props.className} />;
 }
 
-/** A UTC instant. The Standard's timestamps are all UTC with a trailing `Z`. */
-function MomentField(
-  props: FieldChrome & {
-    value: string;
-    onBlur?: () => void;
-    onChange: (value: string) => void;
-  },
-) {
+/** A local wall time, with the exact UTC instant visible before submission. */
+function MomentField({
+  value,
+  onChange,
+  onBlur,
+  hint,
+  ...chrome
+}: FieldChrome & {
+  value: string;
+  onBlur?: () => void;
+  onChange: (value: string) => void;
+}) {
+  const preview = utcPreview(value);
+  const zone = localTimeZoneDescription(value);
   return (
-    <TextField
-      {...props}
-      type="datetime-local"
-      label={
+    <Field
+      {...chrome}
+      hint={
         <>
-          {props.label} <span className="muted">— UTC</span>
+          {hint ? <>{hint} </> : null}
+          Enter local time ({zone}).
         </>
       }
-    />
+    >
+      {(control) => (
+        <div className={styles.momentControl}>
+          <input
+            {...control}
+            type="datetime-local"
+            step={1}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+          />
+          {preview ? <span className={styles.utcPreview}>{preview}</span> : null}
+        </div>
+      )}
+    </Field>
   );
 }
 

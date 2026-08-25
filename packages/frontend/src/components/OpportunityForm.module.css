@@ -93,6 +93,24 @@
   margin-top: auto;
 }
 
+.momentControl {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.momentControl input {
+  flex: 1 1 13rem;
+}
+
+.utcPreview {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .cols > * {
   flex: 1 1 12rem;
   min-width: 0;

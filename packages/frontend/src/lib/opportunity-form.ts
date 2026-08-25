@@ -688,10 +688,13 @@ function showText(value: unknown): string {
  *
  * `<input type="datetime-local">` hands back a naive `YYYY-MM-DDTHH:mm[:ss]` with no zone. Every
  * timestamp in the Standard is UTC with a literal trailing `Z` (the schema pins `pattern: "Z$"`),
- * so the value is read AS UTC rather than converted from the browser's zone: converting would make
- * the same document round-trip differently in two cities, and a deadline that moves when you open
- * the form in a different country is worse than one you have to enter in UTC on purpose. Every
- * date input on the form is labelled UTC for that reason.
+ * so the publisher's local wall time is converted to the corresponding UTC instant. The form shows
+ * that conversion beside the input; read surfaces continue to render the stored instant in UTC.
+ *
+ * DST follows JavaScript `Date` semantics deliberately. A repeated fall-back hour resolves to the
+ * EARLIER of its two instants; a spring-forward gap is normalized forward by the runtime. Both are
+ * the platform behavior a native local-time control feeds, and the preview makes the resulting UTC
+ * instant visible before submission.
  *
  * NORMALISATION IS DELIBERATE and slightly lossy: a stored `…:59.500Z` comes back as `…:59.000Z`,
  * because the widget has no field for a fraction of a second. Nothing in the Standard gives
@@ -703,22 +706,44 @@ const LOCAL_DATE_TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 export function toIsoUtc(local: string): string | undefined {
   const trimmed = local.trim();
   if (trimmed === "") return undefined;
-  const match = LOCAL_DATE_TIME.exec(trimmed);
-  if (!match) return undefined;
-  const [, date, hours, minutes, seconds] = match;
-  return `${date}T${hours}:${minutes}:${seconds ?? "00"}.000Z`;
+  if (!LOCAL_DATE_TIME.test(trimmed)) return undefined;
+  const instant = new Date(trimmed);
+  return Number.isNaN(instant.getTime()) ? undefined : instant.toISOString();
 }
 
 export function fromIsoUtc(iso: unknown): string {
   if (typeof iso !== "string") return "";
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(iso.trim());
-  if (!match) return "";
-  const [, date, hours, minutes, seconds] = match;
-  return `${date}T${hours}:${minutes}:${seconds}`;
+  const instant = new Date(iso.trim());
+  if (Number.isNaN(instant.getTime())) return "";
+  const two = (value: number) => String(value).padStart(2, "0");
+  return `${instant.getFullYear()}-${two(instant.getMonth() + 1)}-${two(instant.getDate())}T${two(instant.getHours())}:${two(instant.getMinutes())}:${two(instant.getSeconds())}`;
+}
+
+/** The local input's instant in the read surfaces' UTC vocabulary. */
+export function utcPreview(local: string): string | undefined {
+  const iso = toIsoUtc(local);
+  const match = LOCAL_DATE_TIME.exec(local.trim());
+  if (!iso || !match) return undefined;
+  const localDate = match[1];
+  const utcDate = iso.slice(0, 10);
+  const utcTime = iso.slice(11, 16);
+  return localDate === utcDate ? `= ${utcTime} UTC` : `= ${utcDate} ${utcTime} UTC`;
+}
+
+/** IANA zone plus the offset at this entered wall time, when the browser exposes a zone name. */
+export function localTimeZoneDescription(local: string): string {
+  const entered = LOCAL_DATE_TIME.test(local.trim()) ? new Date(local.trim()) : new Date();
+  const instant = Number.isNaN(entered.getTime()) ? new Date() : entered;
+  const offsetMinutes = -instant.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "−";
+  const absolute = Math.abs(offsetMinutes);
+  const offset = `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return zone ? `${zone}, ${offset}` : offset;
 }
 
 function isDateTimeShaped(local: string): boolean {
-  return local.trim() === "" || LOCAL_DATE_TIME.test(local.trim());
+  return local.trim() === "" || toIsoUtc(local) !== undefined;
 }
 
 // ── the id, derived ─────────────────────────────────────────────────────────────

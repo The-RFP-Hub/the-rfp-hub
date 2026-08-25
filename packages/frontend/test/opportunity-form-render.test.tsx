@@ -343,6 +343,17 @@ describe("a deadline", () => {
     expect(api.create).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/^Date/).getAttribute("aria-invalid")).toBe("true");
   });
+
+  it("takes local time and previews the stored UTC instant beside it", () => {
+    mount({ opensAt: "2026-09-30T23:59" });
+
+    expect(screen.getByLabelText("Applications open", { exact: true })).toBeTruthy();
+    expect(screen.queryByLabelText(/Applications open.*UTC/)).toBeNull();
+    expect(screen.getByText("= 2026-10-01 02:59 UTC")).toBeTruthy();
+    expect(screen.getAllByText(/Enter local time \(America\/Sao_Paulo, UTC−03:00\)/)).toHaveLength(
+      2,
+    );
+  });
 });
 
 describe("the fully-online checkbox", () => {
@@ -635,9 +646,9 @@ describe("required fields and intrinsic alignment", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /\+ Add a deadline/ }));
     expectRequired(screen.getByLabelText("Deadline kind"));
-    expectRequired(screen.getByLabelText("Date — UTC"));
+    expectRequired(screen.getByLabelText("Date"));
     fireEvent.change(screen.getByLabelText("Deadline kind"), { target: { value: "rolling" } });
-    expect(screen.queryByLabelText("Date — UTC")).toBeNull();
+    expect(screen.queryByLabelText("Date")).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Funding type"), { target: { value: "hackathon" } });
     fireEvent.click(screen.getByRole("button", { name: /\+ Add a prize/ }));
