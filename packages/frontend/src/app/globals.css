@@ -10,12 +10,10 @@
  * this origin — so `font-src` stays `'self'` and no reader's address reaches a font CDN. See that
  * module for the whole argument.
  *
- * THE PALETTE IS NEAR-COLOURLESS AND THE ONE EXCEPTION IS RATIONED. Near-black ink on warm
- * near-white paper, warm grays, and a single olive accent — "Oliva cadastral" — which exists to
- * mark WHERE YOU CAN ACT and nowhere else. Status, emphasis and hierarchy stay typographic: weight,
- * size, case, border style. That is what keeps every state on this site legible to a colourblind
- * reader by construction rather than by audit, and it is why the accent is forbidden from carrying
- * information (see the discipline below).
+ * THE PALETTE IS NEAR-COLOURLESS AND ACTION COLOUR IS RATIONED. Near-black ink on warm near-white
+ * paper, warm grays, and one olive action accent — "Oliva cadastral". Reserved red/amber tokens
+ * reinforce form errors and warnings, while status badges, emphasis and hierarchy stay typographic:
+ * weight, size, case, border style. No state depends on hue alone.
  *
  * THE ACCENT DISCIPLINE, in full, because a token with no rule attached becomes a decoration:
  *
@@ -57,15 +55,16 @@
   --accent-soft: #eef1de;
   --accent-soft: oklch(95% 0.025 112);
 
-  /*
-   * Editorial state, still HUELESS. These three are consumed by the submit form's own stylesheet
-   * for validity and result styling; they resolve to ink weights rather than a red/amber/green
-   * ramp, because the accent is barred from carrying state and no other hue is allowed to either.
-   * The form pairs each with a border or a weight, which is what actually distinguishes them.
-   */
+  /* Editorial state. Badges remain hueless; form errors and warnings also retain words/weight. */
   --ok: var(--ink);
-  --warn: var(--ink-soft);
-  --bad: var(--ink);
+  --warn: #865700;
+  --warn: oklch(48% 0.105 75);
+  --warn-soft: #f8edd6;
+  --warn-soft: oklch(94% 0.035 80);
+  --bad: #a12d31;
+  --bad: oklch(48% 0.16 25);
+  --bad-soft: #fae9e7;
+  --bad-soft: oklch(94% 0.025 25);
 
   --radius: 6px;
 
@@ -538,15 +537,12 @@ caption {
   display: block;
 }
 
-/*
- * AN ERROR IS A HEAVIER RULE, NOT A RED ONE. It has to read as consequential without hue: two solid
- * ink pixels down the leading edge is louder than a pink panel and survives greyscale, print and a
- * colourblind reader.
- */
+/* Error hue reinforces — but never replaces — the heavier border and explicit error copy. */
 .state.error {
-  background: var(--paper);
-  border-color: var(--line);
-  border-left: 3px solid var(--ink);
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-color: var(--bad);
+  border-left: 3px solid var(--bad);
 }
 
 /*
@@ -577,8 +573,10 @@ caption {
 }
 
 .note.error {
+  color: var(--bad);
+  background: var(--bad-soft);
   font-weight: 600;
-  border-left: 3px solid var(--ink);
+  border-left: 3px solid var(--bad);
   padding-left: 0.6rem;
 }
 

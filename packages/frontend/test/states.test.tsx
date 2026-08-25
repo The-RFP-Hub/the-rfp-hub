@@ -382,12 +382,14 @@ describe("the accent never carries state", () => {
     }
   });
 
-  it("still resolves the hueless state tokens the submit form's stylesheet consumes", () => {
-    // `--ok`, `--warn` and `--bad` are referenced by `OpportunityForm.module.css`. They resolve to
-    // ink weights rather than a red/amber/green ramp: the accent is barred from state, and so is
-    // every other hue.
-    for (const token of ["--ok", "--warn", "--bad"]) {
-      expect(css).toMatch(new RegExp(`${token}:\\s*var\\(--ink`));
+  it("gives form errors and warnings fallback-backed hues while badges stay hueless", () => {
+    expect(css).toMatch(/--ok:\s*var\(--ink/);
+    for (const token of ["--warn", "--warn-soft", "--bad", "--bad-soft"]) {
+      const hex = new RegExp(`${token}:\\s*#[0-9a-f]{6};`);
+      const oklch = new RegExp(`${token}:\\s*oklch\\(`);
+      expect(css).toMatch(hex);
+      expect(css).toMatch(oklch);
+      expect(css.indexOf(`${token}: #`)).toBeLessThan(css.indexOf(`${token}: oklch`));
     }
     const form = readFileSync(
       join(process.cwd(), "src", "components", "OpportunityForm.module.css"),

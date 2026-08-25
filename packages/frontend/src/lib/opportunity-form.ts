@@ -307,6 +307,160 @@ export interface OpportunityFormState {
   details: DetailsState;
 }
 
+export interface ParsedValidationIssue {
+  /** JSON Pointer, `(root)`, or null when the producer supplied no usable location. */
+  path: string | null;
+  message: string;
+  /** The complete server/validator line retained for technical disclosure. */
+  raw: string;
+}
+
+const FUNDING_DETAIL_INFIX = new RegExp(`^(?:${FUNDING_TYPES.join("|")}) details:\\s*`);
+
+/** Parse legacy humanized lines, including the API's two pointer-less validation classes. */
+export function parseValidationIssueLine(line: string): ParsedValidationIssue {
+  const raw = line.trim();
+  if (raw.startsWith("(root)")) {
+    return { path: "(root)", message: raw.slice("(root)".length).trim(), raw };
+  }
+  if (raw.startsWith("fundingDetails.fundingType ")) {
+    return { path: "/fundingType", message: raw, raw };
+  }
+  const bareField = /^`([^`]+)`\s+(.+)$/.exec(raw);
+  if (bareField) {
+    const [, field, message] = bareField;
+    return {
+      path: `/${(field ?? "").replaceAll("~", "~0").replaceAll("/", "~1")}`,
+      message: message ?? raw,
+      raw,
+    };
+  }
+  if (raw.startsWith("/")) {
+    const separator = raw.search(/\s/);
+    const path = separator === -1 ? raw : raw.slice(0, separator);
+    let message = separator === -1 ? "is invalid" : raw.slice(separator).trim();
+    if (path === "/fundingDetails" || path.startsWith("/fundingDetails/")) {
+      message = message.replace(FUNDING_DETAIL_INFIX, "");
+    }
+    return { path, message, raw };
+  }
+  return { path: null, message: raw, raw };
+}
+
+function pointerSegments(pointer: string): string[] | null {
+  if (!pointer.startsWith("/")) return null;
+  return pointer
+    .slice(1)
+    .split("/")
+    .map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"));
+}
+
+const DIRECT_FORM_FIELDS = new Set([
+  "id",
+  "fundingType",
+  "title",
+  "summary",
+  "description",
+  "status",
+  "ecosystems",
+  "categories",
+  "eligibility",
+  "prerequisites",
+  "additionalReferences",
+  "serviceAgreement",
+  "applicationUrl",
+  "website",
+  "logoUrl",
+  "bannerUrl",
+  "currency",
+  "budget",
+  "allocated",
+  "minAward",
+  "maxAward",
+  "opensAt",
+  "postedAt",
+]);
+
+const ROW_FIELDS: Record<string, ReadonlySet<string>> = {
+  operatingOrganizations: new Set(["name", "slug", "orgType", "website"]),
+  sponsoringOrganizations: new Set(["name", "slug", "orgType", "website"]),
+  socialLinks: new Set(["platform", "url"]),
+  milestones: new Set(["title", "amount", "criteria"]),
+  deadlines: new Set(["deadlineType", "date", "label"]),
+};
+
+const DETAIL_ROOT_FIELDS: Record<FundingType, ReadonlySet<string>> = {
+  grant: new Set(["fundingMechanisms", "programModel", "milestoneBased", "recurring"]),
+  hackathon: new Set(["location", "online", "tracks", "prizes", "teamSize"]),
+  bounty: new Set([
+    "bountyKind",
+    "reward",
+    "rewardTiers",
+    "severityScheme",
+    "rewardPoolStatus",
+    "difficulty",
+    "skills",
+    "platform",
+  ]),
+  accelerator: new Set([
+    "programDurationWeeks",
+    "batchSize",
+    "equity",
+    "funding",
+    "stage",
+    "location",
+    "online",
+  ]),
+  vc_fund: new Set([
+    "checkSize",
+    "stages",
+    "thesis",
+    "portfolio",
+    "contactMethod",
+    "activelyInvesting",
+  ]),
+  rfp: new Set(["scope", "requirements"]),
+};
+
+/** JSON Pointer → the path used to derive the corresponding control id. */
+export function validationPointerToFormPath(
+  pointer: string,
+  currentFundingType: FundingType,
+): string | null {
+  if (pointer === "(root)") return "(root)";
+  const segments = pointerSegments(pointer);
+  if (!segments || segments.length === 0) return null;
+  const [root, second, third, ...rest] = segments;
+
+  if (root === "fundingInfo") {
+    return second && DIRECT_FORM_FIELDS.has(second) ? second : null;
+  }
+  if (root === "fundingDetails") {
+    if (!second || second === "fundingType") return "fundingType";
+    if (!DETAIL_ROOT_FIELDS[currentFundingType].has(second)) return null;
+    const detail = ["details", currentFundingType, second, third, ...rest].filter(
+      (part): part is string => part !== undefined,
+    );
+    if (currentFundingType === "hackathon" && second === "teamSize") {
+      return third === "max" ? "details.hackathon.teamMax" : "details.hackathon.teamMin";
+    }
+    if (currentFundingType === "vc_fund" && second === "checkSize") {
+      return third === "max" ? "details.vc_fund.checkMax" : "details.vc_fund.checkMin";
+    }
+    return detail.join(".");
+  }
+  if (root && DIRECT_FORM_FIELDS.has(root)) return root;
+
+  const rowFields = root ? ROW_FIELDS[root] : undefined;
+  if (root && rowFields && second && /^\d+$/.test(second)) {
+    if (third && rowFields.has(third)) return `${root}.${second}.${third}`;
+    const fallback = root === "deadlines" ? "deadlineType" : [...rowFields][0];
+    return fallback ? `${root}.${second}.${fallback}` : null;
+  }
+  if (root === "operatingOrganizations" && !second) return "operatingOrganizations.0.name";
+  return null;
+}
+
 // ── constructors ────────────────────────────────────────────────────────────────
 
 export function emptyOrganization(): OrganizationRow {

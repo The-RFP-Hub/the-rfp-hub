@@ -24,11 +24,13 @@ import {
   moveRow,
   namespaceAuthority,
   namespaceOf,
+  parseValidationIssueLine,
   slugifyTitle,
   splitLines,
   splitList,
   toDocument,
   toIsoUtc,
+  validationPointerToFormPath,
 } from "@/lib/opportunity-form";
 import type { Opportunity } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
@@ -46,6 +48,55 @@ function usable(over: Partial<OpportunityFormState> = {}): OpportunityFormState 
     ...over,
   };
 }
+
+describe("validation issue mapping", () => {
+  it("maps root, array and funding envelope pointers to form controls", () => {
+    expect(validationPointerToFormPath("(root)", "grant")).toBe("(root)");
+    expect(validationPointerToFormPath("/operatingOrganizations/0/slug", "grant")).toBe(
+      "operatingOrganizations.0.slug",
+    );
+    expect(validationPointerToFormPath("/fundingInfo/budget", "grant")).toBe("budget");
+    expect(validationPointerToFormPath("/fundingDetails/programModel", "grant")).toBe(
+      "details.grant.programModel",
+    );
+    expect(validationPointerToFormPath("/fundingDetails/checkSize/max", "vc_fund")).toBe(
+      "details.vc_fund.checkMax",
+    );
+  });
+
+  it("unescapes JSON Pointer tokens and leaves server-owned paths unlinked", () => {
+    expect(validationPointerToFormPath("/fundingInfo/bud~1get", "grant")).toBeNull();
+    expect(validationPointerToFormPath("/source/submittedBy", "grant")).toBeNull();
+    expect(validationPointerToFormPath("/specVersion", "grant")).toBeNull();
+  });
+
+  it("parses every non-standard error line shape", () => {
+    expect(parseValidationIssueLine("(root) must be an object")).toMatchObject({
+      path: "(root)",
+      message: "must be an object",
+    });
+    expect(
+      parseValidationIssueLine(
+        "/fundingDetails/programModel grant details: must be a registered value",
+      ),
+    ).toMatchObject({
+      path: "/fundingDetails/programModel",
+      message: "must be a registered value",
+    });
+    expect(
+      parseValidationIssueLine(
+        "fundingDetails.fundingType 'grant' does not match the opportunity's fundingType 'rfp'",
+      ),
+    ).toMatchObject({ path: "/fundingType" });
+    expect(
+      parseValidationIssueLine("`title` must be at most 256 characters (got 300)."),
+    ).toMatchObject({ path: "/title", message: "must be at most 256 characters (got 300)." });
+    expect(parseValidationIssueLine("An unclassified server validation failure")).toMatchObject({
+      path: null,
+      message: "An unclassified server validation failure",
+    });
+  });
+});
 
 describe("splitList", () => {
   it("trims, drops blanks and never produces an empty string entry", () => {

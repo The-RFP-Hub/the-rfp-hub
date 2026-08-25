@@ -93,13 +93,15 @@ import {
   emptySocialLink,
   moveRow,
   namespaceAuthority,
+  parseValidationIssueLine,
   removeRow,
   replaceRow,
   toDocument,
+  validationPointerToFormPath,
 } from "@/lib/opportunity-form";
 import { fundingTypeLabel, opportunityStatusLabel, publisherStatus } from "@/lib/presentation";
 import { useApi } from "@/lib/session";
-import type { SubmissionResult } from "@/lib/types";
+import type { SubmissionResult, ValidationIssue } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
 import {
   type ReactNode,
@@ -162,6 +164,91 @@ const DETAILS_SUFFIX: Record<FundingType, string> = {
 
 const detailsTitle = (type: FundingType) => `Funding details — ${DETAILS_SUFFIX[type]}`;
 
+const ERROR_SUMMARY_ID = "form-error-summary";
+
+interface FormIssue {
+  /** Form path, `(root)`, or null when the issue cannot safely target a control. */
+  path: string | null;
+  message: string;
+  raw: string;
+}
+
+function mapValidationIssue(
+  issue: ValidationIssue,
+  raw: string,
+  fundingType: FundingType,
+): FormIssue {
+  return {
+    path: validationPointerToFormPath(issue.path, fundingType),
+    message: issue.message,
+    raw,
+  };
+}
+
+function issuesFromApi(error: ApiError, fundingType: FundingType): FormIssue[] {
+  if (error.issues.length === 0) {
+    return error.details.map((line) => {
+      const parsed = parseValidationIssueLine(line);
+      return {
+        ...parsed,
+        path: parsed.path ? validationPointerToFormPath(parsed.path, fundingType) : null,
+      };
+    });
+  }
+  const structured = error.issues.map((issue, index) =>
+    mapValidationIssue(
+      issue,
+      error.details[index] ?? `${issue.path} ${issue.message}`,
+      fundingType,
+    ),
+  );
+  const residue = error.details.slice(error.issues.length).map((line) => {
+    const parsed = parseValidationIssueLine(line);
+    return {
+      ...parsed,
+      path: parsed.path ? validationPointerToFormPath(parsed.path, fundingType) : null,
+    };
+  });
+  return [...structured, ...residue];
+}
+
+const FIELD_LABELS: Readonly<Record<string, string>> = {
+  id: "Listing id",
+  fundingType: "Funding type",
+  title: "Title",
+  summary: "Summary",
+  description: "Description",
+  status: "Application stage",
+  budget: "Budget",
+  allocated: "Allocated",
+  minAward: "Minimum award",
+  maxAward: "Maximum award",
+  opensAt: "Opens at",
+  postedAt: "Posted at",
+};
+
+function issueLabel(path: string | null): string | null {
+  if (!path) return null;
+  if (path === "(root)") return "Whole form";
+  const parts = path.split(".");
+  const leaf = parts.at(-1) ?? path;
+  const plain = FIELD_LABELS[path] ?? leaf.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  const index = parts.findIndex((part) => /^\d+$/.test(part));
+  if (index > 0) {
+    const row = Number(parts[index]) + 1;
+    const group = parts[index - 1];
+    if (group === "operatingOrganizations" || group === "sponsoringOrganizations") {
+      return `Organisation ${row} — ${plain}`;
+    }
+    if (group === "deadlines") return `Deadline ${row} — ${plain}`;
+    if (group === "socialLinks") return `Social link ${row} — ${plain}`;
+    if (group === "milestones") return `Milestone ${row} — ${plain}`;
+    if (group === "prizes") return `Prize ${row} — ${plain}`;
+    if (group === "rewardTiers") return `Reward tier ${row} — ${plain}`;
+  }
+  return FIELD_LABELS[path] ?? plain.charAt(0).toUpperCase() + plain.slice(1);
+}
+
 export function OpportunityForm({
   initial,
   mode,
@@ -192,7 +279,10 @@ export function OpportunityForm({
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [serverErrors, setServerErrors] = useState<string[]>([]);
+  const [serverIssues, setServerIssues] = useState<FormIssue[]>([]);
+  const [serverValidationLines, setServerValidationLines] = useState<string[]>([]);
+  const [focusSummary, setFocusSummary] = useState(0);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [result, setResult] = useState<SubmissionResult | null>(null);
   const [draftPrompt, setDraftPrompt] = useState<{
@@ -300,13 +390,43 @@ export function OpportunityForm({
   const document = built.document;
   const validation = useMemo(() => validateDocument(document), [document]);
 
+  const friendlyIssues: FormIssue[] = Object.entries(built.fieldProblems).map(
+    ([path, message]) => ({ path, message, raw: message }),
+  );
+  const friendlyPaths = new Set(Object.keys(built.fieldProblems));
+  const standardIssues: FormIssue[] = validation.available
+    ? validation.issues
+        .map((issue, index) =>
+          mapValidationIssue(
+            issue,
+            validation.errors[index] ?? `${issue.path} ${issue.message}`,
+            form.fundingType,
+          ),
+        )
+        // Prefer the form's direct, task-specific wording when both validators found the same field.
+        .filter((issue) => issue.path === null || !friendlyPaths.has(issue.path))
+    : [];
+  const localIssues = [...friendlyIssues, ...standardIssues];
+  const localProblems = new Map(
+    [...friendlyIssues, ...standardIssues]
+      .filter((issue): issue is FormIssue & { path: string } => Boolean(issue.path))
+      .map((issue) => [issue.path, issue.message]),
+  );
+  const serverProblems = new Map(
+    serverIssues
+      .filter((issue): issue is FormIssue & { path: string } => Boolean(issue.path))
+      .map((issue) => [issue.path, issue.message]),
+  );
+
   const touch = (path: string) =>
     setTouched((current) => (current.has(path) ? current : new Set(current).add(path)));
 
   /** The chrome every field shares: its path, its problem if that problem is due, its blur. */
   const at = (path: string) => ({
     path,
-    problem: attempted || touched.has(path) ? built.fieldProblems[path] : undefined,
+    problem:
+      serverProblems.get(path) ??
+      (attempted || touched.has(path) ? localProblems.get(path) : undefined),
     // Advice is not gated on having pressed anything. A problem shown early is a scolding; a
     // consequence shown early is the only version of it that can still change the answer.
     advisory: built.fieldAdvisories[path],
@@ -379,12 +499,24 @@ export function OpportunityForm({
    */
   const advisories = [...built.advisories, ...(validation.available ? validation.warnings : [])];
 
-  const localErrors = [...built.problems, ...(validation.available ? validation.errors : [])];
+  const visibleIssues = [...(attempted ? localIssues : []), ...serverIssues];
+  const technicalValidationLines = [
+    ...new Set([
+      ...(attempted && validation.available ? validation.errors : []),
+      ...serverValidationLines,
+    ]),
+  ];
+
+  useEffect(() => {
+    if (focusSummary === 0) return;
+    errorSummaryRef.current?.focus();
+  }, [focusSummary]);
 
   const send = async () => {
     setBusy(true);
     setNote(null);
-    setServerErrors([]);
+    setServerIssues([]);
+    setServerValidationLines([]);
     try {
       const response =
         mode === "create"
@@ -398,11 +530,13 @@ export function OpportunityForm({
       setResult(response);
     } catch (error) {
       if (error instanceof ApiError) {
-        setServerErrors(error.details);
+        setServerIssues(issuesFromApi(error, form.fundingType));
+        setServerValidationLines(error.details);
         setNote(actionErrorNote(error, "The submission could not be sent."));
       } else {
         setNote(actionErrorNote(error, "The submission could not be sent."));
       }
+      setFocusSummary((current) => current + 1);
     } finally {
       setBusy(false);
     }
@@ -418,7 +552,8 @@ export function OpportunityForm({
         onAgain={() => {
           setResult(null);
           setNote(null);
-          setServerErrors([]);
+          setServerIssues([]);
+          setServerValidationLines([]);
           setAttempted(false);
           setTouched(new Set());
           if (mode === "create") {
@@ -440,7 +575,10 @@ export function OpportunityForm({
         event.preventDefault();
         setAttempted(true);
         // Pressing Submit is how a publisher asks what is wrong. It answers, and does not send.
-        if (localErrors.length > 0) return;
+        if (localIssues.length > 0) {
+          setFocusSummary((current) => current + 1);
+          return;
+        }
         void send();
       }}
     >
@@ -1146,16 +1284,38 @@ export function OpportunityForm({
 
       {!validation.available ? <p className="note error">{validation.reason}</p> : null}
 
-      {attempted && localErrors.length > 0 ? (
-        <div className="state error" role="alert">
+      {visibleIssues.length > 0 ? (
+        <div
+          className="state error"
+          role="alert"
+          id={ERROR_SUMMARY_ID}
+          ref={errorSummaryRef}
+          tabIndex={-1}
+        >
           <p>
-            <strong>Fix these fields before submitting.</strong> Each one is also marked next to its
-            field.
+            <strong>
+              {serverIssues.length > 0
+                ? "We couldn’t submit this listing."
+                : "Fix these fields before submitting."}
+            </strong>{" "}
+            Linked items go to their field.
           </p>
           <ul>
-            {localErrors.map((problem) => (
-              <li key={problem}>{problem}</li>
-            ))}
+            {visibleIssues.map((issue, index) => {
+              const label = issueLabel(issue.path);
+              const target =
+                issue.path === "(root)"
+                  ? ERROR_SUMMARY_ID
+                  : issue.path
+                    ? fieldId(issue.path)
+                    : null;
+              const copy = label ? `${label}: ${issue.message}` : issue.message;
+              return (
+                <li key={`${issue.raw}-${index}`}>
+                  {target ? <a href={`#${target}`}>{copy}</a> : copy}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}
@@ -1173,17 +1333,17 @@ export function OpportunityForm({
         </div>
       ) : null}
 
-      {serverErrors.length > 0 ? (
-        <div className="state error" role="alert">
-          <p>
-            <strong>We couldn&rsquo;t submit this listing:</strong>
-          </p>
+      {technicalValidationLines.length > 0 ? (
+        <details>
+          <summary>Technical validation details</summary>
           <ul>
-            {serverErrors.map((problem) => (
-              <li key={problem}>{problem}</li>
+            {technicalValidationLines.map((line) => (
+              <li key={line}>
+                <code>{line}</code>
+              </li>
             ))}
           </ul>
-        </div>
+        </details>
       ) : null}
 
       <div className={styles.submitBar}>

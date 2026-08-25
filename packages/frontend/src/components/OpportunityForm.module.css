@@ -95,14 +95,7 @@
 .problem {
   display: block;
   color: var(--bad);
-  /*
-   * WEIGHT, not hue, is what makes this a failure.
-   *
-   * No colour on this site carries state, so `--bad` resolves to plain `--ink` — which is also the
-   * colour of ordinary prose. Left on colour alone this message rendered exactly like the body text
-   * around it. The weight is therefore load-bearing rather than decorative: it is the only thing
-   * separating "you must fix this" from "here is some text".
-   */
+  /* Weight and explicit copy remain load-bearing when the error hue is unavailable. */
   font-weight: 600;
   font-size: 0.88em;
   margin: 0.15rem 0 0;
@@ -113,18 +106,16 @@
  * submission is not blocked, so it reads as the advisory tier the validator's own warnings use
  * rather than as a failure.
  *
- * THE RULE IN THE MARGIN IS THE SIGNAL, for the same reason the weight above is. `--warn` resolves
- * to `--ink-soft` at 0.88em, which is precisely a `.hint` — so on colour alone a consequence a
- * publisher should weigh was indistinguishable from helper text telling them what a field is for.
- * The marginal rule says "this one is about what you have entered" without borrowing a hue.
+ * The rule in the margin remains the signal in greyscale; the warning tint reinforces it.
  */
 .advisory {
   display: block;
   color: var(--warn);
+  background: var(--warn-soft);
   font-size: 0.88em;
   margin: 0.3rem 0 0;
   padding-left: 0.5rem;
-  border-left: 2px solid var(--line);
+  border-left: 2px solid var(--warn);
   max-width: 60ch;
 }
 
@@ -136,12 +127,9 @@
 /*
  * The live "publishes as …" line under the id, in its three states.
  *
- * WIDTH AND STYLE CARRY THE STATE, not shade. `--ok` and `--warn` both resolve into the ink family,
- * so three solid rules at three greys left the single most consequential distinction on this form —
- * "this goes live now" against "this waits for a reviewer" — resting on a shade a publisher would
- * have to compare side by side to notice. A dashed rule reads as provisional, which is what pending
- * IS; a thick solid one reads as settled. Neither needs a hue, and each of the three differs from
- * the other two in more than one property.
+ * WIDTH AND STYLE CARRY THE STATE, not shade alone. A dashed rule reads as provisional, which is
+ * what pending IS; a thick solid one reads as settled. Each state differs from the other two in
+ * more than hue, so it survives greyscale and colour-vision differences.
  */
 .consequence {
   margin: 0.4rem 0 0;

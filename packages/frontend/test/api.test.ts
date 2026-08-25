@@ -106,6 +106,10 @@ describe("createApiClient", () => {
           error: "validation_failed",
           message: "The document is not conformant.",
           errors: ["/title must be a string", "/fundingDetails must have fundingType"],
+          issues: [
+            { path: "/title", message: "must be a string" },
+            { path: "/fundingDetails", message: "must have fundingType" },
+          ],
         },
         400,
       ),
@@ -119,6 +123,10 @@ describe("createApiClient", () => {
     expect(error.status).toBe(400);
     expect(error.code).toBe("validation_failed");
     expect(error.details).toHaveLength(2);
+    expect(error.issues).toEqual([
+      { path: "/title", message: "must be a string" },
+      { path: "/fundingDetails", message: "must have fundingType" },
+    ]);
   });
 
   it("flags a 401 as unauthenticated so a page can offer a login instead of an error", async () => {

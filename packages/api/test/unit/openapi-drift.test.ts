@@ -677,7 +677,12 @@ describe("M3 closed components vs their view types", () => {
       mergedInto: { id: "example-org:survivor", title: "The survivor" },
     },
     // Not a view type: the error body is assembled by `HttpError.toBody()`.
-    ValidationErrorResponse: { error: "validation_failed", message: "…", errors: ["…"] },
+    ValidationErrorResponse: {
+      error: "validation_failed",
+      message: "…",
+      errors: ["…"],
+      issues: [{ path: "/title", message: "is required" }],
+    },
   };
 
   for (const [id, sample] of Object.entries(samples)) {

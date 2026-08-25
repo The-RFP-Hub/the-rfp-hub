@@ -243,6 +243,22 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         items: { type: "string" },
         description: "One human-readable sentence per violation, naming the field and the rule.",
       },
+      issues: {
+        type: "array",
+        description: "Structured field locations and messages corresponding to validation errors.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["path", "message"],
+          properties: {
+            path: {
+              type: "string",
+              description: "A JSON Pointer, or the literal `(root)` for the whole document.",
+            },
+            message: { type: "string" },
+          },
+        },
+      },
     },
   },
   {

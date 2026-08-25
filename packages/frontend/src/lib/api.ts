@@ -66,6 +66,8 @@ export class ApiError extends Error {
   readonly code: string;
   /** The humanized, field-by-field report from a Standard validation failure. Empty otherwise. */
   readonly details: string[];
+  /** Structured field locations from a validation failure. Empty on older/error-only responses. */
+  readonly issues: NonNullable<ApiErrorBody["issues"]>;
   /** Set on `survivor_already_merged`: the entry that really survived, for a link-out. */
   readonly survivorId: string | undefined;
   /** Set on the public detail route's `opportunity_merged` 404. */
@@ -77,6 +79,7 @@ export class ApiError extends Error {
     this.status = status;
     this.code = code;
     this.details = extra?.errors ?? [];
+    this.issues = extra?.issues ?? [];
     this.survivorId = extra?.survivorId;
     this.mergedInto = extra?.mergedInto;
   }

@@ -55,7 +55,7 @@
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { and, count, eq } from "drizzle-orm";
-import { humanizeErrors, validateOpportunity } from "rfphub-validate";
+import { humanizeErrors, humanizeIssues, validateOpportunity } from "rfphub-validate";
 import { config as defaultConfig } from "../../../config.js";
 import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
 import {
@@ -193,7 +193,10 @@ export class OpportunityWriteService {
         400,
         "validation_failed",
         "the submission is not a valid RFP Hub Standard opportunity.",
-        { errors: humanizeErrors(errors, record) },
+        {
+          errors: humanizeErrors(errors, record),
+          issues: humanizeIssues(errors, record),
+        },
       );
     }
     const document = record as unknown as Opportunity;
@@ -870,6 +873,7 @@ function asDocument(body: unknown): Record<string, unknown> {
 /** Field caps, checked before validation so an oversized body is cheap to refuse. */
 export function assertWithinCaps(record: Record<string, unknown>): void {
   const problems: string[] = [];
+  const issues: { path: string; message: string }[] = [];
   for (const [field, cap] of [
     ["title", FIELD_CAPS.title],
     ["summary", FIELD_CAPS.summary],
@@ -878,6 +882,10 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
     const value = record[field];
     if (typeof value === "string" && value.length > cap) {
       problems.push(`\`${field}\` must be at most ${cap} characters (got ${value.length}).`);
+      issues.push({
+        path: `/${field}`,
+        message: `must be at most ${cap} characters (got ${value.length}).`,
+      });
     }
   }
   for (const [field, value] of Object.entries(record)) {
@@ -885,11 +893,16 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
       problems.push(
         `\`${field}\` must have at most ${FIELD_CAPS.arrayEntries} entries (got ${value.length}).`,
       );
+      issues.push({
+        path: `/${field}`,
+        message: `must have at most ${FIELD_CAPS.arrayEntries} entries (got ${value.length}).`,
+      });
     }
   }
   if (problems.length > 0) {
     throw new HttpError(400, "validation_failed", "the submission exceeds the size limits.", {
       errors: problems,
+      issues,
     });
   }
 }

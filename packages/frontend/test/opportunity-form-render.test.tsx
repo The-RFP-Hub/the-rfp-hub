@@ -16,7 +16,7 @@ import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
  */
 import { OpportunityForm } from "@/components/OpportunityForm";
 import styles from "@/components/OpportunityForm.module.css";
-import type { ApiClient } from "@/lib/api";
+import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import {
   opportunityDraftKey,
@@ -69,9 +69,13 @@ function outcome(over: Partial<SubmissionResult> = {}): SubmissionResult {
   } as SubmissionResult;
 }
 
-function stub(result: SubmissionResult = outcome()) {
-  const create = vi.fn(async () => result);
-  const replace = vi.fn(async () => result);
+function stub(result: SubmissionResult | Error = outcome()) {
+  const respond = async () => {
+    if (result instanceof Error) throw result;
+    return result;
+  };
+  const create = vi.fn(respond);
+  const replace = vi.fn(respond);
   return {
     create,
     replace,
@@ -85,9 +89,14 @@ function stub(result: SubmissionResult = outcome()) {
 /** The form, filled in far enough to be conformant, so a test can break exactly one thing. */
 function mount(
   over: Parameters<typeof fill>[0] = {},
-  options: { mode?: "create" | "edit"; initial?: OpportunityFormState; accountId?: number } = {},
+  options: {
+    mode?: "create" | "edit";
+    initial?: OpportunityFormState;
+    accountId?: number;
+    result?: SubmissionResult | Error;
+  } = {},
 ) {
-  const api = stub();
+  const api = stub(options.result);
   const initial = options.initial ?? fill(over);
   const view = render(
     <ApiClientProvider value={api.client}>
@@ -523,12 +532,11 @@ describe("replacing a claimed listing", () => {
 });
 
 /**
- * NO HUE CARRIES STATE on this site, so `--ok` and `--bad` resolve to plain `--ink` and `--warn` to
- * `--ink-soft`. That makes every state distinction on this form structural — weight, a rule in the
- * margin, a border style — and structural distinctions are the kind a component can lose silently
- * by handing two states the same class.
+ * Every state distinction remains structural — weight, a rule in the margin, a border style — so
+ * warning/error hues reinforce rather than carry meaning. Structural distinctions are the kind a
+ * component can lose silently by handing two states the same class.
  */
-describe("the states are told apart without a hue", () => {
+describe("the states remain distinct without relying on hue", () => {
   const consequenceClass = () => document.querySelector(`.${styles.consequence}`)?.className ?? "";
 
   it("gives publishes-now, publishes-later and not-knowable three different treatments", () => {
@@ -600,6 +608,12 @@ describe("when problems appear", () => {
     expect(api.create).not.toHaveBeenCalled();
     const panel = screen.getByRole("alert");
     expect(within(panel).getByText(/Fix these fields before submitting/)).toBeTruthy();
+    expect(document.activeElement).toBe(panel);
+    expect(
+      within(panel)
+        .getByRole("link", { name: /Title: A title is required/ })
+        .getAttribute("href"),
+    ).toBe("#f-title");
     expect(screen.getAllByText("A title is required.").length).toBeGreaterThan(0);
   });
 
@@ -619,6 +633,51 @@ describe("when problems appear", () => {
     expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+
+  it("links every known API shape and leaves unmapped residue visibly unlinked", async () => {
+    const lines = [
+      "(root) must be a Standard opportunity",
+      "/fundingDetails/programModel grant details: must be a registered value",
+      "fundingDetails.fundingType 'hackathon' does not match the opportunity's fundingType 'grant'",
+      "`title` must be at most 256 characters (got 300).",
+      "An unclassified server validation failure",
+    ];
+    mount(
+      {},
+      {
+        result: new ApiError(400, "validation_failed", "Invalid listing", { errors: lines }),
+      },
+    );
+    submit();
+
+    const summary = await screen.findByRole("alert");
+    expect(document.activeElement).toBe(summary);
+    expect(
+      within(summary)
+        .getByRole("link", { name: /Whole form/ })
+        .getAttribute("href"),
+    ).toBe("#form-error-summary");
+    expect(
+      within(summary)
+        .getByRole("link", { name: /Program model/ })
+        .getAttribute("href"),
+    ).toBe("#f-details-grant-programModel");
+    expect(
+      within(summary)
+        .getByRole("link", { name: /Funding type/ })
+        .getAttribute("href"),
+    ).toBe("#f-fundingType");
+    expect(within(summary).getByRole("link", { name: /Title/ }).getAttribute("href")).toBe(
+      "#f-title",
+    );
+    const residue = within(summary).getByText("An unclassified server validation failure");
+    expect(residue.closest("a")).toBeNull();
+    expect(screen.getByLabelText("Funding type").getAttribute("aria-invalid")).toBe("true");
+
+    const technical = screen.getByText("Technical validation details").closest("details");
+    expect(technical).not.toBeNull();
+    for (const line of lines) expect(within(technical as HTMLElement).getByText(line)).toBeTruthy();
   });
 });
 

@@ -44,12 +44,20 @@ export type DuplicateStatus = "suspected" | "confirmed" | "dismissed" | "merged"
 export type ClaimStatus = "pending" | "approved" | "rejected" | "withdrawn";
 export type OrgRole = "owner" | "admin" | "publisher";
 
+export interface ValidationIssue {
+  /** JSON Pointer, or `(root)` for a whole-document issue. */
+  path: string;
+  message: string;
+}
+
 /** `ErrorResponse` / `ValidationErrorResponse` — one shape, `errors` present only on the latter. */
 export interface ApiErrorBody {
   error: string;
   message: string;
   /** One human-readable sentence per violation, produced by the Standard's own humanizer. */
   errors?: string[];
+  /** Structured companions to `errors`, when the rejection can identify a field. */
+  issues?: ValidationIssue[];
   /** Present on `survivor_already_merged`: the entry that really survived. */
   survivorId?: string;
   /** Present on the public detail route's enriched 404 for an id that used to be public. */
