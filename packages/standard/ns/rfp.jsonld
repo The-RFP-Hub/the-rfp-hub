@@ -1,0 +1,203 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "label": "rdfs:label",
+    "comment": "rdfs:comment",
+    "isDefinedBy": {
+      "@id": "rdfs:isDefinedBy",
+      "@type": "@id"
+    },
+    "seeAlso": {
+      "@id": "rdfs:seeAlso",
+      "@type": "@id"
+    }
+  },
+  "@graph": [
+    {
+      "@id": "https://ethrfps.app/ns/rfp#",
+      "@type": "rdfs:Resource",
+      "label": "RFP Hub vocabulary",
+      "comment": "The RFP Hub Standard's own term namespace: every term here is one the standard defines itself, as opposed to one it borrows from schema.org or DAOIP-5. The namespace is canonical and versionless — term IRIs are versioned by the JSON-LD context document that maps them, never by the term. Term semantics are exactly the schema's own field definitions, quoted below; this document asserts no formal axioms and no cross-vocabulary equivalences — a formal RDFS/OWL serialization remains a planned artifact on its stated trigger (see ARTIFACTS.md in the standard package).",
+      "seeAlso": [
+        "https://ethrfps.app/schemas/v1.0.0/context.jsonld",
+        "https://ethrfps.app/schemas/v1.0.0/opportunity.schema.json",
+        "https://ethrfps.app/registries/index.json"
+      ]
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#allocated",
+      "label": "allocated",
+      "comment": "Amount committed to date in major units — committed, not necessarily disbursed. Disbursement and delivery are not modelled.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#bountyKind",
+      "label": "bountyKind",
+      "comment": "Which kind of bounty this is, and the discriminator for what the payout looks like. 'task' = one scoped piece of work paying a single reward; 'security' = a standing vulnerability-disclosure program paying against a tier table. This is about payout shape, not about how long the bounty stays open: intake duration lives in the top-level deadlines array, and either kind may be rolling.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#criteria",
+      "label": "criteria",
+      "comment": "Free-text acceptance criteria, including any due date.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#deadlines",
+      "label": "deadlines",
+      "comment": "All deadlines and event boundaries for the opportunity, each either a fixed date or rolling, distinguished by label. Consumers should select by label rather than by array position: the first entry may be a hackathon's start date rather than its application deadline. Conventional labels are published in registries/deadline-labels.json. (Selection-by-label is a consumer convention, not schema-enforceable; see FIELDS.md.)",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#ecosystems",
+      "label": "ecosystems",
+      "comment": "Ethereum-family ecosystems this opportunity targets. The RFP Hub is ETH-scoped, but this is an open, extensible list — not a closed enum, and deliberately not registry-governed either — so L2s and ETH-adjacent ecosystems are first-class and a newly launched one needs no process. In another position of the schema: Ethereum-family ecosystems the organisation operates in. Same open list as the top-level field.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#fundingDetails",
+      "label": "fundingDetails",
+      "comment": "The type-specific details for this opportunity: exactly one of the six detail shapes, self-described by its own required `fundingType` tag, which names the shape and equals the top-level `fundingType` (the binding allOf below keeps the two in step).",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#ingestedVia",
+      "label": "ingestedVia",
+      "comment": "How this entry entered the Hub. 'outbox' is a one-way push from an upstream source system's outbox; 'import' is a backfill or seed import. Always set server-side by the ingestion layer.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#maxAward",
+      "label": "maxAward",
+      "comment": "Maximum individual award in major units.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#milestoneBased",
+      "label": "milestoneBased",
+      "comment": "Whether disbursement is tied to milestones. Pairs with the top-level milestones array.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#milestones",
+      "label": "milestones",
+      "comment": "Optional milestone sequence, valid on any fundingType. Array order is the milestone sequence — there is no order or index field. Milestone-based payment is expressed by this array together with grant.milestoneBased; there is no separate payment-schedule concept.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#minAward",
+      "label": "minAward",
+      "comment": "Minimum individual award in major units.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#portfolio",
+      "label": "portfolio",
+      "comment": "Named portfolio companies, where the fund publishes them.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#prizes",
+      "label": "prizes",
+      "comment": "The prize pool, one entry per prize, denominated in the document-wide fundingInfo.currency.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#programModel",
+      "label": "programModel",
+      "comment": "The operating model of the program, as distinct from the funding instrument. An open list rather than a closed enum — conventional values are published in registries/program-models.json, and a publisher's own vocabulary is valid without a schema change.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#provenance",
+      "label": "provenance",
+      "comment": "Provenance of this entry. Required as an object, but every field inside it is optional, so `\"source\": {}` validates. Provenance completeness is a data-quality and ingestion-policy concern rather than a schema constraint.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#recurring",
+      "label": "recurring",
+      "comment": "Whether the program runs in recurring rounds or seasons.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#requirements",
+      "label": "requirements",
+      "comment": "Free-text statements of what the work must deliver. RFP-only, and deliberately not split into hard and soft. What a proposal must contain goes in the top-level prerequisites instead.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#rewardPoolStatus",
+      "label": "rewardPoolStatus",
+      "comment": "Whether the money behind the advertised amounts is actually held. 'funded' = escrowed or otherwise verifiably reserved; 'unfunded' = advertised as an intent to pay, with nothing set aside; 'unknown' = not published, which is the honest value where the program says nothing and the reason absent does not read as 'unfunded'. Separate from fundingInfo.budget, which carries the amount: a program can name a large maximum and hold nothing against it.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#rewardTiers",
+      "label": "rewardTiers",
+      "comment": "The payout table, one entry per tier. The payout table, one entry per tier. Required when bountyKind is 'security', and the alternative to reward on a task bounty that grades its payout — a placement ladder, for instance — rather than paying one flat amount. Exactly one of this and reward is present, enforced by the if/then/else below. Array order carries no meaning; select by the tier's own severity, assetType or label.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#scope",
+      "label": "scope",
+      "comment": "Scope of work, as one free-text field. In-scope and out-of-scope prose both live here.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#serviceAgreement",
+      "label": "serviceAgreement",
+      "comment": "Free text describing how a service-agreement arrangement works. Valid on any fundingType — an rfp or grant carrying it reads as a long-term service engagement. Presence of the field is the signal; duration and renewal live in the text if they matter. Not filterable or facetable, by design.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#severityScheme",
+      "label": "severityScheme",
+      "comment": "The published classification the tier severities are drawn from, named so a consumer can tell whose definition of 'critical' is in play. Free text, because these schemes are documents rather than a vocabulary worth governing.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#skills",
+      "label": "skills",
+      "comment": "Skills the task calls for. Free text.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#socialLinks",
+      "label": "socialLinks",
+      "comment": "Social and community links for the opportunity or program, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected. In another position of the schema: Social and community links for the organisation, one entry per link. The same platform may appear in more than one entry when it has more than one URL; only whole-entry duplicates are rejected.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#socialPlatform",
+      "label": "socialPlatform",
+      "comment": "Which service the link points at. 'twitter' covers X/Twitter; 'forum' is the governance or community forum; 'blog' is the blog or announcements feed. In another position of the schema: Platform hosting the bounty.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#stages",
+      "label": "stages",
+      "comment": "Investment stages the fund participates in.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#tracks",
+      "label": "tracks",
+      "comment": "Named tracks or themes participants can build against.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#verifiedAgainstSource",
+      "label": "verifiedAgainstSource",
+      "comment": "Whether the entry's fields were verified against the live opportunity by the verification-assist job. null means not yet checked.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    },
+    {
+      "@id": "https://ethrfps.app/ns/rfp#verifiedAt",
+      "label": "verifiedAt",
+      "comment": "RFC 3339 timestamp in UTC (trailing 'Z') for the last verification. Record-level only — there is no per-field freshness. null means unknown.",
+      "isDefinedBy": "https://ethrfps.app/ns/rfp#"
+    }
+  ]
+}
