@@ -1,5 +1,6 @@
 "use client";
 
+import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
  * The submit / replace form.
  *
@@ -43,6 +44,13 @@ import {
 import { ActionNote, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { describeDuplicateCheck } from "@/lib/format";
+import {
+  BEFORE_DRAFTS_CLEARED_EVENT,
+  canonicalForm,
+  readOpportunityDraft,
+  removeOpportunityDraft,
+  writeOpportunityDraft,
+} from "@/lib/opportunity-draft";
 import {
   ACCELERATOR_STAGES,
   BOUNTY_ASSET_TYPES,
@@ -93,8 +101,15 @@ import { fundingTypeLabel, opportunityStatusLabel, publisherStatus } from "@/lib
 import { useApi } from "@/lib/session";
 import type { SubmissionResult } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
-import Link from "next/link";
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 /**
  * What to SHOW for the schema's tokens.
@@ -150,6 +165,7 @@ const detailsTitle = (type: FundingType) => `Funding details — ${DETAILS_SUFFI
 export function OpportunityForm({
   initial,
   mode,
+  accountId,
   /** The stored record a replace is layered over. Empty on a create. */
   carried = {},
   /**
@@ -161,17 +177,111 @@ export function OpportunityForm({
 }: {
   initial: OpportunityFormState;
   mode: "create" | "edit";
+  /** Create drafts are isolated by the API account id; edit mode never persists a draft. */
+  accountId?: number;
   carried?: Record<string, unknown>;
   authority?: PublishAuthority;
 }) {
   const api = useApi();
   const [form, setForm] = useState<OpportunityFormState>(initial);
+  // `fromDocument(entry)` creates new row keys every time it is called. Capture the canonical
+  // initial state exactly once so a parent render cannot manufacture a dirty edit.
+  const initialSnapshot = useRef(canonicalForm(initial));
+  const latestForm = useRef(form);
+  latestForm.current = form;
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [result, setResult] = useState<SubmissionResult | null>(null);
+  const [draftPrompt, setDraftPrompt] = useState<{
+    form: OpportunityFormState;
+    savedAt: string;
+  } | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<
+    { kind: "saved"; savedAt: string } | { kind: "error" } | null
+  >(null);
+  const draftReadyRef = useRef(false);
+  const skipDraftCleanup = useRef(false);
+  const draftTimer = useRef<number | undefined>(undefined);
+  const { setBlocked } = useNavigationBlocker();
+
+  const dirty = canonicalForm(form) !== initialSnapshot.current;
+
+  const persistDraft = useCallback(
+    (report: boolean, current = latestForm.current) => {
+      if (mode !== "create" || accountId === undefined || !draftReadyRef.current) return;
+      if (canonicalForm(current) === initialSnapshot.current) {
+        removeOpportunityDraft(accountId);
+        if (report) setDraftStatus(null);
+        return;
+      }
+      const saved = writeOpportunityDraft(accountId, current);
+      if (report) {
+        setDraftStatus(saved.ok ? { kind: "saved", savedAt: saved.savedAt } : { kind: "error" });
+      }
+    },
+    [accountId, mode],
+  );
+
+  useLayoutEffect(() => {
+    if (mode !== "create" || accountId === undefined) return;
+
+    const stored = readOpportunityDraft(accountId);
+    if (stored.kind === "draft") {
+      setDraftPrompt(stored);
+      setDraftStatus({ kind: "saved", savedAt: stored.savedAt });
+    } else {
+      draftReadyRef.current = true;
+      setDraftReady(true);
+      if (stored.kind === "error") setDraftStatus({ kind: "error" });
+    }
+
+    const beforeClear = () => {
+      if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+      persistDraft(false);
+      // `clearAllOpportunityDrafts()` now removes the just-flushed key. The form unmount cleanup
+      // must not recreate it after logout invalidates the session.
+      skipDraftCleanup.current = true;
+    };
+    window.addEventListener(BEFORE_DRAFTS_CLEARED_EVENT, beforeClear);
+
+    return () => {
+      window.removeEventListener(BEFORE_DRAFTS_CLEARED_EVENT, beforeClear);
+      if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+      // Layout cleanup is synchronous: a normal route unmount cannot outrun the debounce and lose
+      // the publisher's last keystrokes.
+      if (!skipDraftCleanup.current) persistDraft(false);
+    };
+  }, [accountId, mode, persistDraft]);
+
+  useEffect(() => {
+    if (mode !== "create" || accountId === undefined || !draftReady) return;
+    if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+    draftTimer.current = window.setTimeout(() => persistDraft(true, form), 500);
+    return () => {
+      if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+    };
+  }, [accountId, draftReady, form, mode, persistDraft]);
+
+  useLayoutEffect(() => {
+    setBlocked(dirty && result === null);
+    return () => setBlocked(false);
+  }, [dirty, result, setBlocked]);
+
+  useEffect(() => {
+    if (!dirty || result) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+    // Browser Back/Forward is intentionally not trapped: App Router has no complete supported
+    // blocker for it, and a popstate/history trap is brittle. Links and unloads are covered here.
+  }, [dirty, result]);
 
   // The stored record is the BASE the edited fields are written over, not a set of leftovers
   // merged after the fact: a shallow merge cannot preserve the members of a container this form
@@ -280,6 +390,11 @@ export function OpportunityForm({
         mode === "create"
           ? await api.opportunities.create(document)
           : await api.opportunities.replace(form.id, document);
+      if (mode === "create" && accountId !== undefined) {
+        skipDraftCleanup.current = true;
+        if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+        removeOpportunityDraft(accountId);
+      }
       setResult(response);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -306,7 +421,10 @@ export function OpportunityForm({
           setServerErrors([]);
           setAttempted(false);
           setTouched(new Set());
-          if (mode === "create") setForm(emptyForm());
+          if (mode === "create") {
+            skipDraftCleanup.current = false;
+            setForm(emptyForm());
+          }
         }}
       />
     );
@@ -326,6 +444,44 @@ export function OpportunityForm({
         void send();
       }}
     >
+      {draftPrompt ? (
+        <div className="state">
+          <p>
+            <strong>Draft saved on this device</strong> on{" "}
+            {new Date(draftPrompt.savedAt).toLocaleString()}.
+          </p>
+          <p className="row">
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => {
+                setForm(draftPrompt.form);
+                setDraftPrompt(null);
+                draftReadyRef.current = true;
+                setDraftReady(true);
+              }}
+            >
+              Restore draft
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (accountId !== undefined && !removeOpportunityDraft(accountId)) {
+                  setDraftStatus({ kind: "error" });
+                } else {
+                  setDraftStatus(null);
+                }
+                setDraftPrompt(null);
+                draftReadyRef.current = true;
+                setDraftReady(true);
+              }}
+            >
+              Discard draft
+            </button>
+          </p>
+        </div>
+      ) : null}
+
       <Section title="What is it">
         <TextField
           {...at("title")}
@@ -1039,9 +1195,22 @@ export function OpportunityForm({
         <button type="submit" className="button-primary" disabled={busy}>
           {busy ? "Sending…" : mode === "create" ? "Submit" : "Replace"}
         </button>
+        {mode === "edit" ? (
+          <GuardedLink href={`/listings/${encodeURIComponent(form.id)}`}>Cancel</GuardedLink>
+        ) : null}
         <span className="muted footnote">
           Conformance is checked as you type; problems appear next to their field.
         </span>
+        {mode === "create" && !draftPrompt && draftStatus?.kind === "saved" ? (
+          <span className="muted footnote">
+            Draft saved on this device · {new Date(draftStatus.savedAt).toLocaleString()}
+          </span>
+        ) : null}
+        {mode === "create" && draftStatus?.kind === "error" ? (
+          <span className="note error">
+            Draft saving is unavailable in this browser. Keep this page open until you submit.
+          </span>
+        ) : null}
         <ActionNote note={note} />
       </div>
     </form>
@@ -1696,7 +1865,9 @@ function SubmissionOutcome({
         <ul>
           {result.duplicates.map((match) => (
             <li key={match.id}>
-              <Link href={`/listings/${encodeURIComponent(match.id)}`}>{match.title}</Link>{" "}
+              <GuardedLink href={`/listings/${encodeURIComponent(match.id)}`}>
+                {match.title}
+              </GuardedLink>{" "}
               <code>{match.id}</code>
             </li>
           ))}
@@ -1715,9 +1886,9 @@ function SubmissionOutcome({
         </>
       ) : null}
       <p className="row">
-        <Link href={`/listings/${encodeURIComponent(result.opportunity.id)}`}>
+        <GuardedLink href={`/listings/${encodeURIComponent(result.opportunity.id)}`}>
           Open this listing
-        </Link>
+        </GuardedLink>
         <button type="button" onClick={onAgain}>
           {mode === "create" ? "Submit another" : "Keep editing"}
         </button>

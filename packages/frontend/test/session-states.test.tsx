@@ -13,13 +13,16 @@
  * the swap verbatim, which is the evidence that `SessionState` really did keep its contract:
  * `RequireSession` runs its real logic and calls the real `GET /v1/me` through an injected client.
  */
-import { RequireSession } from "@/components/Chrome";
+import { Chrome, RequireSession } from "@/components/Chrome";
+import { NavigationBlockerProvider, useNavigationBlocker } from "@/components/NavigationBlocker";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
+import { opportunityDraftKey } from "@/lib/opportunity-draft";
 import { ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -175,6 +178,9 @@ describe("logout", () => {
   });
 
   it("clears the token and invalidates the session on the happy path", async () => {
+    localStorage.setItem(opportunityDraftKey(7), "draft one");
+    localStorage.setItem(opportunityDraftKey(8), "draft two");
+    localStorage.setItem("rfphub.preference", "kept");
     render(
       <ApiClientProvider value={client as unknown as ApiClient}>
         <LogoutHarness />
@@ -185,6 +191,9 @@ describe("logout", () => {
 
     await waitFor(() => expect(clearSessionToken).toHaveBeenCalledTimes(1));
     expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(opportunityDraftKey(7))).toBeNull();
+    expect(localStorage.getItem(opportunityDraftKey(8))).toBeNull();
+    expect(localStorage.getItem("rfphub.preference")).toBe("kept");
   });
 
   it("still clears and invalidates when the sign-out REQUEST fails, and does not reject", async () => {
@@ -224,5 +233,43 @@ describe("logout", () => {
     expect(signOut.mock.invocationCallOrder[0]).toBeLessThan(
       clearSessionToken.mock.invocationCallOrder[0] as number,
     );
+  });
+});
+
+function DirtyPage() {
+  const { setBlocked } = useNavigationBlocker();
+  useEffect(() => {
+    setBlocked(true);
+    return () => setBlocked(false);
+  }, [setBlocked]);
+  return <p>Dirty form</p>;
+}
+
+describe("the header logout guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    signOut.mockResolvedValue(undefined);
+  });
+
+  it("does not log out when a dirty form's leave confirmation is declined", async () => {
+    session.data = { user: { id: "user_1" } };
+    session.isPending = false;
+    session.error = null;
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(
+      <ApiClientProvider value={clientFor(async () => me)}>
+        <NavigationBlockerProvider>
+          <Chrome>
+            <DirtyPage />
+          </Chrome>
+        </NavigationBlockerProvider>
+      </ApiClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("Dirty form")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(signOut).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 });

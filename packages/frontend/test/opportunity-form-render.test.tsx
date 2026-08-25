@@ -1,3 +1,4 @@
+import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
 /**
  * THE FORM AS A PUBLISHER MEETS IT.
  *
@@ -18,6 +19,11 @@ import styles from "@/components/OpportunityForm.module.css";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import {
+  opportunityDraftKey,
+  readOpportunityDraft,
+  writeOpportunityDraft,
+} from "@/lib/opportunity-draft";
+import {
   type OpportunityFormState,
   emptyForm,
   emptyOrganization,
@@ -25,7 +31,28 @@ import {
 } from "@/lib/opportunity-form";
 import type { Opportunity, SubmissionResult } from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { AnchorHTMLAttributes } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+// Next's real Link only emits `onNavigate` inside an App Router. This focused component suite does
+// not mount a router, so the test double translates an anchor click into that documented event.
+vi.mock("next/link", () => ({
+  default: ({
+    onNavigate,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    onNavigate?: (event: { preventDefault: () => void }) => void;
+  }) => (
+    <a
+      {...props}
+      href={props.href ?? "/"}
+      onClick={(event) => {
+        onNavigate?.({ preventDefault: () => event.preventDefault() });
+        event.preventDefault();
+      }}
+    />
+  ),
+}));
 
 const BASE_URL = "https://api.example.com";
 
@@ -58,20 +85,23 @@ function stub(result: SubmissionResult = outcome()) {
 /** The form, filled in far enough to be conformant, so a test can break exactly one thing. */
 function mount(
   over: Parameters<typeof fill>[0] = {},
-  options: { mode?: "create" | "edit"; initial?: OpportunityFormState } = {},
+  options: { mode?: "create" | "edit"; initial?: OpportunityFormState; accountId?: number } = {},
 ) {
   const api = stub();
   const initial = options.initial ?? fill(over);
-  render(
+  const view = render(
     <ApiClientProvider value={api.client}>
-      <OpportunityForm
-        mode={options.mode ?? "create"}
-        initial={initial}
-        authority={{ verifiedNamespaces: ["acme"], directCreate: false }}
-      />
+      <NavigationBlockerProvider>
+        <OpportunityForm
+          mode={options.mode ?? "create"}
+          accountId={options.accountId}
+          initial={initial}
+          authority={{ verifiedNamespaces: ["acme"], directCreate: false }}
+        />
+      </NavigationBlockerProvider>
     </ApiClientProvider>,
   );
-  return api;
+  return Object.assign(api, { unmount: view.unmount });
 }
 
 function fill(over: Partial<OpportunityFormState> = {}): OpportunityFormState {
@@ -589,6 +619,95 @@ describe("when problems appear", () => {
     expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
+  });
+});
+
+describe("drafts and dirty navigation", () => {
+  it("offers an account's stored draft without silently replacing the blank form", () => {
+    localStorage.clear();
+    writeOpportunityDraft(7, fill({ title: "Restored title" }));
+
+    mount({}, { initial: emptyForm(), accountId: 7 });
+
+    expect(valueIn(screen.getByLabelText("Title"))).toBe("");
+    expect(screen.getByText(/Draft saved on this device/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
+    expect(valueIn(screen.getByLabelText("Title"))).toBe("Restored title");
+    localStorage.clear();
+  });
+
+  it("discards a stored draft and never offers another account's draft", () => {
+    localStorage.clear();
+    writeOpportunityDraft(8, fill({ title: "Another account" }));
+    const isolated = mount({}, { initial: emptyForm(), accountId: 7 });
+    expect(screen.queryByRole("button", { name: "Restore draft" })).toBeNull();
+    isolated.unmount();
+    localStorage.clear();
+
+    writeOpportunityDraft(7, fill({ title: "Discard me" }));
+    const view = mount({}, { initial: emptyForm(), accountId: 7 });
+    fireEvent.click(screen.getByRole("button", { name: "Discard draft" }));
+    expect(localStorage.getItem(opportunityDraftKey(7))).toBeNull();
+    expect(valueIn(screen.getByLabelText("Title"))).toBe("");
+    view.unmount();
+    localStorage.clear();
+  });
+
+  it("shows a storage fallback instead of throwing", () => {
+    localStorage.clear();
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Storage blocked");
+    });
+    mount({}, { initial: emptyForm(), accountId: 7 });
+    expect(screen.getByText(/Draft saving is unavailable/)).toBeTruthy();
+    getItem.mockRestore();
+  });
+
+  it("flushes the last keystroke synchronously when the form unmounts", () => {
+    localStorage.clear();
+    const view = mount({}, { initial: emptyForm(), accountId: 7 });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Last keystroke" } });
+    view.unmount();
+
+    const restored = readOpportunityDraft(7);
+    expect(restored.kind).toBe("draft");
+    if (restored.kind === "draft") expect(restored.form.title).toBe("Last keystroke");
+    localStorage.clear();
+  });
+
+  it("clears the create draft only after a successful submission", async () => {
+    localStorage.clear();
+    writeOpportunityDraft(7, fill({ title: "Ready to send" }));
+    mount({}, { initial: emptyForm(), accountId: 7 });
+    fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
+    submit();
+
+    await waitFor(() => expect(screen.getByText("Submitted.")).toBeTruthy());
+    expect(localStorage.getItem(opportunityDraftKey(7))).toBeNull();
+  });
+
+  it("guards a dirty edit's Cancel link and its unload boundary", () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    mount({}, { mode: "edit", initial: fill() });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Changed" } });
+
+    const unload = new Event("beforeunload", { cancelable: true });
+    expect(window.dispatchEvent(unload)).toBe(false);
+    fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    confirm.mockRestore();
+  });
+
+  it("unblocks internal links after a successful replacement", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const api = mount({}, { mode: "edit", initial: fill() });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Changed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+
+    await waitFor(() => expect(api.replace).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("link", { name: "Open this listing" }));
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 });
 

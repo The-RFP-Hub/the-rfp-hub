@@ -1,5 +1,6 @@
 "use client";
 
+import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
  * The application shell: navigation, session state, and the one place a page's access is gated.
  *
@@ -21,7 +22,6 @@ import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { HOW_IT_WORKS, HOW_IT_WORKS_ROLES, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -106,13 +106,13 @@ function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string;
   return (
     <span className="shell-nav-group">
       {visible.map((item) => (
-        <Link
+        <GuardedLink
           key={item.href}
           href={item.href}
           aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
         >
           {item.label}
-        </Link>
+        </GuardedLink>
       ))}
     </span>
   );
@@ -123,14 +123,15 @@ export function Chrome({ children }: { children: ReactNode }) {
   const api = useApi();
   const pathname = usePathname() ?? "/";
   const me = session.me.status === "ready" ? session.me.data : null;
+  const { confirmNavigation } = useNavigationBlocker();
 
   return (
     <div className="shell">
       <header className="shell-header">
-        <Link href="/" className="brand">
+        <GuardedLink href="/" className="brand">
           RFP Hub
           <span className="brand-tagline">an open index of funding opportunities</span>
-        </Link>
+        </GuardedLink>
 
         <nav className="shell-nav" aria-label="Sections">
           <NavGroup items={PUBLIC_NAV} pathname={pathname} me={me} />
@@ -146,7 +147,12 @@ export function Chrome({ children }: { children: ReactNode }) {
           ) : session.authenticated ? (
             <>
               <span className="muted">{me ? (me.handle ?? `account ${me.accountId}`) : "…"}</span>
-              <button type="button" onClick={() => void session.logout()}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmNavigation()) void session.logout();
+                }}
+              >
                 Log out
               </button>
             </>
@@ -161,7 +167,7 @@ export function Chrome({ children }: { children: ReactNode }) {
       <main className="shell-main">{children}</main>
 
       <footer className="shell-footer">
-        <Link href={HOW_IT_WORKS}>About</Link>
+        <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
         <a href={STANDARD} target="_blank" rel="noopener noreferrer">
           The Standard
         </a>
@@ -176,8 +182,8 @@ export function Chrome({ children }: { children: ReactNode }) {
         <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
           GitHub
         </a>
-        <Link href="/privacy">Privacy</Link>
-        <Link href="/terms">Terms</Link>
+        <GuardedLink href="/privacy">Privacy</GuardedLink>
+        <GuardedLink href="/terms">Terms</GuardedLink>
         <span className="shell-footer-note">Open data · CC0 exports · MIT code</span>
       </footer>
     </div>
@@ -219,7 +225,7 @@ export function RequireSession({
           <button type="button" className="button-primary" onClick={session.login}>
             Log in
           </button>
-          <Link href={HOW_IT_WORKS}>What an account is for</Link>
+          <GuardedLink href={HOW_IT_WORKS}>What an account is for</GuardedLink>
         </p>
       </div>
     );
@@ -250,8 +256,8 @@ export function RequireSession({
           compare the roles to see which access you have.
         </p>
         <p className="row">
-          <Link href="/account">Check your account</Link>
-          <Link href={HOW_IT_WORKS_ROLES}>See who can do what</Link>
+          <GuardedLink href="/account">Check your account</GuardedLink>
+          <GuardedLink href={HOW_IT_WORKS_ROLES}>See who can do what</GuardedLink>
         </p>
       </div>
     );

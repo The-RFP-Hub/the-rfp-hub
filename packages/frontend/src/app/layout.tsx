@@ -1,4 +1,5 @@
 import { Chrome } from "@/components/Chrome";
+import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
 import { fontVariables } from "@/lib/fonts";
 import { AppProviders } from "@/lib/session";
 import type { Metadata } from "next";
@@ -50,7 +51,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={fontVariables}>
       <body>
         <AppProviders>
-          <Chrome>{children}</Chrome>
+          <NavigationBlockerProvider>
+            <Chrome>{children}</Chrome>
+          </NavigationBlockerProvider>
         </AppProviders>
       </body>
     </html>

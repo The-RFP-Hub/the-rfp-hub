@@ -37,6 +37,7 @@ export default function NewListingPage() {
             )}
             <OpportunityForm
               mode="create"
+              accountId={me.accountId}
               initial={emptyForm()}
               // What the API is going to decide, handed to the form so the id field can say it
               // live rather than after a round trip.
