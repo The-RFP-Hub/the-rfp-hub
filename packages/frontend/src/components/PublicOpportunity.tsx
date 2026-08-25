@@ -17,6 +17,7 @@
  * without ever having decided to trust anyone.
  */
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
+import { PublicClaimControl } from "@/components/ClaimForm";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { linkOutUrl } from "@/lib/api";
@@ -30,7 +31,7 @@ import {
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
-import { useCallback, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 
 export function PublicOpportunity({ id }: { id: string }) {
   const api = useApi();
@@ -42,8 +43,12 @@ export function PublicOpportunity({ id }: { id: string }) {
       <ResourceView resource={state} what="this opportunity" onRetry={reload}>
         {(entry) => (
           <>
-            <OpportunityView entry={entry} baseUrl={api.baseUrl} />
-            <PublicHistory id={id} />
+            <OpportunityView
+              entry={entry}
+              baseUrl={api.baseUrl}
+              claimControl={<PublicClaimControl id={entry.id} />}
+            />
+            <PublicHistory id={entry.id} />
           </>
         )}
       </ResourceView>
@@ -56,7 +61,15 @@ export function PublicOpportunity({ id }: { id: string }) {
  * payload is a Standard object, and what has to be provable is that each of its fields reaches the
  * page as text rather than as markup.
  */
-export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
+export function OpportunityView({
+  entry,
+  baseUrl,
+  claimControl,
+}: {
+  entry: Opportunity;
+  baseUrl: string;
+  claimControl?: ReactNode;
+}) {
   const source = entry.source ?? {};
   const funding = entry.fundingInfo;
   const award = describeAward(funding);
@@ -81,6 +94,8 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
       {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
 
       <ApplyAction entry={entry} baseUrl={baseUrl} />
+
+      {claimControl}
 
       <dl className="grid-2 card">
         <div>

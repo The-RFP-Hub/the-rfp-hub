@@ -56,7 +56,7 @@ function Listing({ id, me }: { id: string; me: Me }) {
       {/* Renders only when a review surface sent the reader here and said where from. */}
       <ReturnLink />
       <ResourceView resource={state} what="this listing" onRetry={reload}>
-        {(entry) => <Header entry={entry} id={id} me={me} />}
+        {(entry) => <Header entry={entry} id={id} />}
       </ResourceView>
 
       <div className="tabs" role="tablist" aria-label="Listing detail">
@@ -82,7 +82,7 @@ function Listing({ id, me }: { id: string; me: Me }) {
   );
 }
 
-function Header({ entry, id, me }: { entry: Opportunity; id: string; me: Me }) {
+function Header({ entry, id }: { entry: Opportunity; id: string }) {
   const api = useApi();
   const source = entry.source ?? {};
   return (
@@ -128,89 +128,7 @@ function Header({ entry, id, me }: { entry: Opportunity; id: string; me: Me }) {
       </div>
 
       <UntrustedBlock value={entry.description} />
-      <ClaimForm id={id} me={me} />
     </>
-  );
-}
-
-/**
- * Claiming publisher ownership on an organisation's behalf.
- *
- * The API answers 200 (granted) or 202 (queued) and returns a `message` saying what the outcome
- * means for FUTURE writes — an approval on an unverified organisation transfers ownership without
- * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
- * paraphrase is exactly where a dashboard would start promising something the API did not.
- */
-function ClaimForm({ id, me }: { id: string; me: Me }) {
-  const api = useApi();
-  const [slug, setSlug] = useState(me.memberships[0]?.slug ?? "");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-
-  if (me.memberships.length === 0) {
-    return (
-      <details className="card">
-        <summary>Claim this listing for an organisation</summary>
-        <p className="muted">
-          This account is not a member of any organisation, so there is nothing to claim on behalf
-          of. A reviewer grants membership.
-        </p>
-      </details>
-    );
-  }
-
-  const submit = async () => {
-    setBusy(true);
-    setResult(null);
-    try {
-      const claim = await api.opportunities.claim(id, {
-        organizationSlug: slug,
-        note: note || null,
-      });
-      setResult({ kind: "ok", message: `${claim.outcome}: ${claim.message}` });
-    } catch (error) {
-      setResult({
-        kind: "error",
-        message: error instanceof ApiError ? error.message : "The claim could not be filed.",
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <details className="card">
-      <summary>Claim this listing for an organisation</summary>
-      <p className="muted footnote">
-        Granted immediately when the organisation is verified <em>and</em> appears among the
-        listing&rsquo;s operating organisations. Sponsorship is not operation, so a sponsor&rsquo;s
-        claim is queued for a reviewer instead.
-      </p>
-      <div className="field">
-        <label htmlFor="claim-org">Organisation</label>
-        <select id="claim-org" value={slug} onChange={(event) => setSlug(event.target.value)}>
-          {me.memberships.map((membership) => (
-            <option key={membership.slug} value={membership.slug}>
-              {membership.slug} {membership.verified ? "(verified)" : "(unverified)"}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="claim-note">Note for the reviewer (optional)</label>
-        <input
-          id="claim-note"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder="Anything that helps a reviewer confirm the connection"
-        />
-      </div>
-      <button type="button" onClick={() => void submit()} disabled={busy || !slug}>
-        {busy ? "Filing…" : "File the claim"}
-      </button>
-      <ActionNote note={result} />
-    </details>
   );
 }
 

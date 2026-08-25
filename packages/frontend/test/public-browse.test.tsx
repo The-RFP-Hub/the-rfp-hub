@@ -21,7 +21,7 @@ import { DirectoryList } from "@/components/DirectoryList";
 import { PublicOpportunity } from "@/components/PublicOpportunity";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { AuditTrail, Opportunity, PaginatedOpportunities } from "@/lib/types";
+import type { AuditTrail, Me, Opportunity, PaginatedOpportunities } from "@/lib/types";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,8 +33,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * the browser to navigate to. Together they are the whole contract: what the URL says is what is
  * shown, and what a control does is change the URL.
  */
-const { navigation } = vi.hoisted(() => ({
+const { navigation, authSession } = vi.hoisted(() => ({
   navigation: { params: new URLSearchParams(), push: vi.fn() },
+  authSession: {
+    data: null as { user: { id: string } } | null,
+    isPending: false,
+    error: null as { status?: number; message?: string } | null,
+  },
+}));
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: {
+    useSession: () => authSession,
+    signOut: vi.fn(),
+    getSession: vi.fn(),
+  },
+  clearSessionToken: vi.fn(),
+  refreshSession: vi.fn(),
+  readSessionToken: () => null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -446,6 +462,12 @@ describe("the directory's filters", () => {
 });
 
 describe("the public opportunity page", () => {
+  beforeEach(() => {
+    authSession.data = null;
+    authSession.isPending = false;
+    authSession.error = null;
+  });
+
   it("says it is loading before it says anything else", () => {
     const { client } = stub({ find: () => new Promise(() => {}) });
     mount(client, <PublicOpportunity id="acme:round-4" />);
@@ -490,6 +512,72 @@ describe("the public opportunity page", () => {
     // The milestone sequence, denominated in the document-wide currency.
     expect(screen.getByText("Testnet launch")).toBeTruthy();
     expect(screen.getByText("25,000 USD")).toBeTruthy();
+  });
+
+  it("keeps the public content visible while signed out and offers the claim control", async () => {
+    const { client } = stub();
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
+    const claim = screen.getByText("This is my programme — claim it");
+    expect(claim).toBeTruthy();
+    fireEvent.click(claim);
+    expect(screen.getByRole("button", { name: "Sign in to claim" })).toBeTruthy();
+  });
+
+  it("keeps the public content visible while the session is being restored", async () => {
+    authSession.isPending = true;
+    const { client } = stub();
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
+    fireEvent.click(screen.getByText("This is my programme — claim it"));
+    expect(screen.getByText("Restoring your session…")).toBeTruthy();
+  });
+
+  it("claims the canonical id returned by the public detail read, not an aliased route id", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    const me: Me = {
+      accountId: 7,
+      handle: "acme-programmes",
+      displayName: null,
+      email: "programmes@acme.example.org",
+      role: "submitter",
+      directCreate: false,
+      credentialKind: "session",
+      scopes: [],
+      memberships: [
+        { slug: "acme", name: "Acme Foundation", role: "publisher", verified: true },
+      ],
+      canManageKeys: true,
+      canReview: false,
+      canAdmin: false,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const claim = vi.fn(async () => ({
+      outcome: "granted" as const,
+      claimId: 19,
+      opportunityId: entry.id,
+      organizationSlug: "acme",
+      message: "Future writes will publish under acme.",
+    }));
+    const { client: publicClient } = stub();
+    const client = {
+      ...publicClient,
+      me: { get: vi.fn(async () => me) },
+      opportunities: { ...publicClient.opportunities, claim },
+    } as unknown as ApiClient;
+
+    mount(client, <PublicOpportunity id="legacy:round-4" />);
+
+    fireEvent.click(await screen.findByText("Claim this listing for an organisation"));
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+    await waitFor(() =>
+      expect(claim).toHaveBeenCalledWith("acme:round-4", {
+        organizationSlug: "acme",
+        note: null,
+      }),
+    );
   });
 
   it("shows the provenance the public payload exposes, including the source check", async () => {
@@ -560,9 +648,11 @@ describe("the public opportunity page", () => {
 
   it("surfaces the public, redacted change history", async () => {
     const { client, audit } = stub();
-    mount(client, <PublicOpportunity id="acme:round-4" />);
+    mount(client, <PublicOpportunity id="legacy:round-4" />);
 
     await screen.findByText("replace");
+    // The route can be an alias. Subresources belong to the canonical id returned by the public
+    // detail read, which is also the id shown on the page.
     expect(audit).toHaveBeenCalledWith("acme:round-4");
     expect(screen.getByText("deadlines, fundingInfo")).toBeTruthy();
   });

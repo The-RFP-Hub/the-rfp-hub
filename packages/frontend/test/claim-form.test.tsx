@@ -1,0 +1,242 @@
+/**
+ * CLAIMING FROM THE PUBLIC PAGE, including the session boundary around the extracted form.
+ *
+ * The form itself still speaks the API's outcome message verbatim. The public wrapper adds only
+ * the states that a page anybody can read needs: restoring a session, opening sign-in, loading the
+ * authenticated account and explaining why an account with no organisation cannot file a claim.
+ */
+import { ClaimForm, PublicClaimControl } from "@/components/ClaimForm";
+import { type ApiClient, ApiError } from "@/lib/api";
+import { ApiClientProvider } from "@/lib/api-context";
+import { AuthRoot } from "@/lib/auth-root";
+import type { ClaimResult, Me, MeMembership } from "@/lib/types";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { authSession } = vi.hoisted(() => ({
+  authSession: {
+    data: null as { user: { id: string } } | null,
+    isPending: false,
+    error: null as { status?: number; message?: string } | null,
+  },
+}));
+
+vi.mock("@/lib/auth-client", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/auth-client")>("@/lib/auth-client");
+  return {
+    ...actual,
+    authClient: {
+      ...actual.authClient,
+      useSession: () => authSession,
+      signOut: vi.fn(),
+      getSession: vi.fn(),
+    },
+    clearSessionToken: vi.fn(),
+    refreshSession: vi.fn(),
+    readSessionToken: () => null,
+  };
+});
+
+const memberships: MeMembership[] = [
+  { slug: "acme", name: "Acme Foundation", role: "publisher", verified: true },
+  { slug: "beta", name: "Beta Collective", role: "publisher", verified: false },
+];
+
+const account = (memberOf: MeMembership[] = memberships): Me => ({
+  accountId: 7,
+  handle: "programme-operator",
+  displayName: "Programme Operator",
+  email: "operator@acme.example.org",
+  role: "submitter",
+  directCreate: false,
+  credentialKind: "session",
+  scopes: [],
+  memberships: memberOf,
+  canManageKeys: true,
+  canReview: false,
+  canAdmin: false,
+  createdAt: "2026-08-01T00:00:00Z",
+});
+
+const result = (
+  outcome: ClaimResult["outcome"],
+  message: string,
+  claimId: number | null = 19,
+): ClaimResult => ({
+  outcome,
+  message,
+  claimId,
+  opportunityId: "acme:round-4",
+  organizationSlug: "acme",
+});
+
+function clientFor(options?: {
+  me?: Me;
+  claim?: (
+    id: string,
+    body: { organizationSlug: string; note?: string | null },
+  ) => Promise<ClaimResult>;
+}): ApiClient {
+  return {
+    baseUrl: "https://api.example.com",
+    me: { get: vi.fn(async () => options?.me ?? account()) },
+    opportunities: {
+      claim:
+        options?.claim ??
+        vi.fn(async () => result("granted", "Future writes will publish under acme.")),
+    },
+  } as unknown as ApiClient;
+}
+
+function renderForm(client: ApiClient, me = account()) {
+  render(
+    <ApiClientProvider value={client}>
+      <ClaimForm id="acme:round-4" me={me} />
+    </ApiClientProvider>,
+  );
+  fireEvent.click(screen.getByText("Claim this listing for an organisation"));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  authSession.data = null;
+  authSession.isPending = false;
+  authSession.error = null;
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("the public claim control", () => {
+  it("opens the existing sign-in overlay from the signed-out CTA without requesting /v1/me", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({ status: "ok", db: "up", auth: { google: false } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+
+    render(
+      <AuthRoot apiBaseUrl="https://api.example.com">
+        <PublicClaimControl id="acme:round-4" />
+      </AuthRoot>,
+    );
+
+    fireEvent.click(screen.getByText("This is my programme — claim it"));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to claim" }));
+
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(fetch.mock.calls.every(([url]) => !String(url).includes("/v1/me"))).toBe(true);
+  });
+
+  it("waits for the signed-in account and explains that claims require an organisation", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    const client = clientFor({ me: account([]) });
+
+    render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("Claim this listing for an organisation")).toBeTruthy();
+    fireEvent.click(screen.getByText("Claim this listing for an organisation"));
+    expect(screen.getByText(/A reviewer grants membership\./)).toBeTruthy();
+    expect(client.me.get).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
+  });
+});
+
+describe("the extracted claim form", () => {
+  it("shows every membership and selects the first one by default", () => {
+    renderForm(clientFor());
+
+    const select = screen.getByLabelText("Organisation") as HTMLSelectElement;
+    expect(select.value).toBe("acme");
+    expect(screen.getByRole("option", { name: "acme (verified)" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "beta (unverified)" })).toBeTruthy();
+  });
+
+  it("posts exactly the selected organisation and reviewer note", async () => {
+    const claim = vi.fn(async () => result("queued", "A reviewer will decide this claim."));
+    renderForm(clientFor({ claim }));
+
+    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
+      target: { value: "I operate this programme for Beta." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+
+    await waitFor(() =>
+      expect(claim).toHaveBeenCalledWith("acme:round-4", {
+        organizationSlug: "beta",
+        note: "I operate this programme for Beta.",
+      }),
+    );
+    expect(claim).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    result("granted", "Future writes will publish under acme."),
+    result("queued", "A reviewer will decide this claim."),
+    result("unchanged", "Acme already publishes this opportunity.", null),
+  ])("renders the API's $outcome outcome message verbatim", async (answer) => {
+    const claim = vi.fn(async () => answer);
+    renderForm(clientFor({ claim }));
+
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+
+    expect(await screen.findByText(`${answer.outcome}: ${answer.message}`)).toBeTruthy();
+  });
+
+  it("surfaces a conflict with a different verified publisher legibly", async () => {
+    const claim = vi.fn(async (): Promise<ClaimResult> => {
+      throw new ApiError(
+        409,
+        "verified_publisher_conflict",
+        "This opportunity already has a different verified publisher.",
+      );
+    });
+    renderForm(clientFor({ claim }));
+
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+
+    const message = await screen.findByText(
+      "This opportunity already has a different verified publisher.",
+    );
+    expect(message.tagName).toBe("OUTPUT");
+    expect(message.className).toContain("error");
+  });
+
+  it("shows the API's error feedback and allows another attempt", async () => {
+    const claim = vi.fn(async (): Promise<ClaimResult> => {
+      throw new ApiError(503, "unavailable", "Claims are temporarily unavailable.");
+    });
+    renderForm(clientFor({ claim }));
+
+    fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
+
+    expect(await screen.findByText("Claims are temporarily unavailable.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "File the claim" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+  });
+
+  it("keeps the private listing page free of claim UI and claim calls", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/listings/[id]/page.tsx"),
+      "utf8",
+    );
+
+    expect(source).not.toContain("ClaimForm");
+    expect(source).not.toContain("opportunities.claim");
+    expect(source).not.toContain("Claim this listing for an organisation");
+  });
+});
