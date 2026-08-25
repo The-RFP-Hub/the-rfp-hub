@@ -469,10 +469,10 @@ export class ClaimService {
         .limit(1);
       const entry = entryRows[0];
       if (!entry) throw notFound(`no opportunity for claim ${claimId}.`);
-      if (entry.mergedIntoId !== null) {
+      if (decision.approve && entry.mergedIntoId !== null) {
         throw conflict(
           "opportunity_merged",
-          `opportunity ${JSON.stringify(entry.publicId)} has been merged and its claims cannot be decided.`,
+          `opportunity ${JSON.stringify(entry.publicId)} has been merged and its claims cannot be approved.`,
         );
       }
 

@@ -29,15 +29,23 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     403: { $ref: "ErrorResponse#" },
     404: { $ref: "ErrorResponse#" },
   };
-  const claimDecisionConflict = {
+  const claimDecidedConflict = {
     type: "object",
     additionalProperties: false,
-    description:
-      "`claim_decided` when the claim is no longer pending; `opportunity_merged` when its listing has become a terminal merge loser.",
+    description: "`claim_decided` when the claim is no longer pending.",
     required: ["error", "message"],
     properties: {
-      error: { type: "string", enum: ["claim_decided", "opportunity_merged"] },
+      error: { type: "string", enum: ["claim_decided"] },
       message: { type: "string" },
+    },
+  };
+  const claimApprovalConflict = {
+    ...claimDecidedConflict,
+    description:
+      "`claim_decided` when the claim is no longer pending; `opportunity_merged` when approval would transfer ownership from a terminal merge loser.",
+    properties: {
+      ...claimDecidedConflict.properties,
+      error: { type: "string", enum: ["claim_decided", "opportunity_merged"] },
     },
   };
 
@@ -327,7 +335,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { verifyOrganization: { type: "boolean" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecisionConflict, ...errors },
+        response: { 200: { $ref: "ClaimResult#" }, 409: claimApprovalConflict, ...errors },
       },
     },
     reviewController.approveClaim,
@@ -347,7 +355,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           required: ["id"],
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecisionConflict, ...errors },
+        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecidedConflict, ...errors },
       },
     },
     reviewController.rejectClaim,

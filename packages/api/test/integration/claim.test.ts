@@ -372,7 +372,7 @@ run("M3CLAIM ownership claims", () => {
     expect(res.json().error).toBe("already_claimed");
   });
 
-  it("refuses to decide a pending claim after its opportunity is merged", async () => {
+  it("refuses to approve but allows rejecting a pending claim after its opportunity is merged", async () => {
     const survivorId = await seedEntry("claim-merge-survivor", [HOST], []);
     const loserId = await seedEntry("claim-merge-loser", [HOST], [SPONSOR]);
     const queued = await claim(sponsorToken, loserId, SPONSOR);
@@ -424,14 +424,14 @@ run("M3CLAIM ownership claims", () => {
     )[0];
     expect(before?.mergedIntoId).toBe(ids.get(survivorId));
 
-    const decision = await app.inject({
+    const approval = await app.inject({
       method: "POST",
       url: `/v1/review/claims/${queued.json().claimId}/approve`,
       headers: bearer(reviewerToken),
       payload: { verifyOrganization: false },
     });
-    expect(decision.statusCode, decision.body).toBe(409);
-    expect(decision.json().error).toBe("opportunity_merged");
+    expect(approval.statusCode, approval.body).toBe(409);
+    expect(approval.json().error).toBe("opportunity_merged");
 
     const after = (
       await db.select().from(opportunities).where(eq(opportunities.publicId, loserId)).limit(1)
@@ -445,6 +445,38 @@ run("M3CLAIM ownership claims", () => {
         .limit(1)
     )[0];
     expect(pendingClaim?.status).toBe("pending");
+
+    const rejection = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/reject`,
+      headers: bearer(reviewerToken),
+    });
+    expect(rejection.statusCode, rejection.body).toBe(200);
+    expect(rejection.json()).toMatchObject({
+      outcome: "unchanged",
+      claimId: queued.json().claimId,
+      opportunityId: loserId,
+      organizationSlug: SPONSOR,
+    });
+
+    const queue = await app.inject({
+      method: "GET",
+      url: "/v1/review/claims?status=pending",
+      headers: bearer(reviewerToken),
+    });
+    expect(queue.statusCode, queue.body).toBe(200);
+    expect(queue.json().items).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: queued.json().claimId })]),
+    );
+
+    const rejectedClaim = (
+      await db
+        .select({ status: opportunityClaims.status })
+        .from(opportunityClaims)
+        .where(eq(opportunityClaims.id, queued.json().claimId))
+        .limit(1)
+    )[0];
+    expect(rejectedClaim?.status).toBe("rejected");
   });
 
   it("transfers ownership on approval WITHOUT unlocking auto-approval when the org stays unverified", async () => {
