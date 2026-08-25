@@ -2,7 +2,10 @@ import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
 import { AccountService } from "../../services/auth/account.service.js";
-import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
+import {
+  ManagedOpportunityService,
+  type PublisherStatus,
+} from "../../services/opportunities/managed-opportunity.service.js";
 import { OpportunityMetaService } from "../../services/opportunities/opportunity-meta.service.js";
 import type {
   ManagedOpportunityListView,
@@ -67,6 +70,7 @@ export const meController = {
     const query = queryOf<{
       id?: string;
       reviewStatus?: "pending" | "approved" | "rejected";
+      publisherStatus?: PublisherStatus;
       page?: number;
       limit?: number;
     }>(request);

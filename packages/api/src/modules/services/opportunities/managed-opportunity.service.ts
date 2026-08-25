@@ -11,7 +11,7 @@
  * namespace this account publishes for. The second is what a granted claim transfers — ownership
  * follows the namespace, not the original typist.
  */
-import { type SQL, and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type OpportunityRow, accounts, auditLog, opportunities } from "../../../db/schema.js";
@@ -19,9 +19,12 @@ import type { ManagedOpportunityView, ReviewDecisionSummaryView } from "../../sh
 import type { Principal } from "../../shared/capabilities.js";
 import { paginate } from "../../shared/pagination.js";
 
+export type PublisherStatus = "merged" | "rejected" | "pending" | "hidden" | "live";
+
 export interface ManagedQuery {
   id?: string;
   reviewStatus?: "pending" | "approved" | "rejected";
+  publisherStatus?: PublisherStatus;
   page?: number;
   limit?: number;
 }
@@ -72,6 +75,7 @@ export class ManagedOpportunityService {
       scope,
       query.id !== undefined ? eq(opportunities.publicId, query.id) : undefined,
       query.reviewStatus ? eq(opportunities.reviewStatus, query.reviewStatus) : undefined,
+      publisherStatusPredicate(query.publisherStatus),
     );
 
     const survivor = alias(opportunities, "managed_survivor");
@@ -184,6 +188,31 @@ export class ManagedOpportunityService {
       .where(eq(opportunities.publicId, publicId))
       .limit(1);
     return rows[0];
+  }
+}
+
+/** The five mutually exclusive publisher states. Merged and rejected facts take precedence. */
+function publisherStatusPredicate(status: PublisherStatus | undefined): SQL | undefined {
+  if (status === undefined) return undefined;
+  switch (status) {
+    case "merged":
+      return isNotNull(opportunities.mergedIntoId);
+    case "rejected":
+      return and(isNull(opportunities.mergedIntoId), eq(opportunities.reviewStatus, "rejected"));
+    case "pending":
+      return and(isNull(opportunities.mergedIntoId), eq(opportunities.reviewStatus, "pending"));
+    case "hidden":
+      return and(
+        isNull(opportunities.mergedIntoId),
+        eq(opportunities.reviewStatus, "approved"),
+        eq(opportunities.isListed, false),
+      );
+    case "live":
+      return and(
+        isNull(opportunities.mergedIntoId),
+        eq(opportunities.reviewStatus, "approved"),
+        eq(opportunities.isListed, true),
+      );
   }
 }
 

@@ -78,9 +78,16 @@ describe("createApiClient", () => {
     const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
     const api = createApiClient({ baseUrl: "https://api.example.com/", fetchImpl });
 
-    await api.me.opportunities({ reviewStatus: undefined, page: 2, limit: 20 });
+    await api.me.opportunities({
+      reviewStatus: undefined,
+      publisherStatus: "hidden",
+      page: 2,
+      limit: 20,
+    });
 
-    expect(calls[0]?.url).toBe("https://api.example.com/v1/me/opportunities?page=2&limit=20");
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/me/opportunities?publisherStatus=hidden&page=2&limit=20",
+    );
   });
 
   it("percent-encodes an id that contains the namespace separator", async () => {

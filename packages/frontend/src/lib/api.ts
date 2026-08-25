@@ -1,3 +1,4 @@
+import type { PublisherStatus } from "./presentation";
 /**
  * THE ONLY MODULE THAT KNOWS THE API EXISTS.
  *
@@ -264,6 +265,7 @@ export function createApiClient(options: ApiClientOptions) {
       opportunities: (query?: {
         id?: string;
         reviewStatus?: ReviewStatus;
+        publisherStatus?: PublisherStatus;
         page?: number;
         limit?: number;
       }) => request<ManagedOpportunityList>("GET", "/v1/me/opportunities", { query }),
