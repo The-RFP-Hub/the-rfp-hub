@@ -118,7 +118,17 @@ export function tokenize(text: string): string[] {
  */
 export class LexicalEmbeddingProvider implements EmbeddingProvider {
   readonly id = "lexical";
-  readonly model = "tfidf-hashed-v1";
+  /**
+   * The weighting scheme PLUS a digest of the exact table (and exponent) the weights came from.
+   *
+   * The docs call refreshing the idf table "a deliberate release event alongside a model-string
+   * bump" — this makes the bump impossible to forget rather than something to remember: a
+   * regenerated table changes the digest, the digest changes the model, the model changes every
+   * `content_hash`, and the backfill re-embeds. A manual constant here would let old rows keep
+   * matching hashes while new rows used different weights under the same identity — two
+   * incomparable spaces silently sharing one index.
+   */
+  readonly model: string;
   readonly dimensions = EMBEDDING_DIMENSIONS;
 
   private readonly exponent: number;
@@ -128,6 +138,11 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
   constructor(options: { idfExponent?: number; table?: IdfTable } = {}) {
     this.exponent = options.idfExponent ?? IDF_EXPONENT;
     const table = options.table ?? (committedIdfTable as IdfTable);
+    const digest = createHash("sha256")
+      .update(JSON.stringify({ n: table.documentCount, df: table.df, e: this.exponent }), "utf8")
+      .digest("hex")
+      .slice(0, 12);
+    this.model = `tfidf-hashed-v1+${digest}`;
     this.documentCount = table.documentCount;
     // A Map, never the raw JSON object: `df["constructor"]` on a plain object answers
     // `Object.prototype.constructor` — a function — and one hostile-looking but perfectly

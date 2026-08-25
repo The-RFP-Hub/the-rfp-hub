@@ -251,11 +251,18 @@ const FULL_SCAN_LIMIT = 2000;
  * programmes with really overlapping vocabulary, and the pair that overlaps MOST is the exact
  * thing the threshold must clear.
  */
-export function hardestNegatives(
+export interface CorpusScan {
+  top: ScoredPair[];
+  /** Counted during the FULL scan, never from the truncated top list. */
+  atOrAboveThreshold: number;
+}
+
+export function scanCorpusPairs(
   documents: CorpusDocument[],
   provider: { embedSync(text: string): number[] },
+  threshold: number,
   top = 20,
-): ScoredPair[] {
+): CorpusScan {
   const vectors = documents.map((doc) => ({
     id: doc.id,
     vector: provider.embedSync(embeddingText(doc)),
@@ -265,6 +272,7 @@ export function hardestNegatives(
   const step = total > (FULL_SCAN_LIMIT * (FULL_SCAN_LIMIT - 1)) / 2 ? 7 : 1;
 
   const scored: ScoredPair[] = [];
+  let atOrAboveThreshold = 0;
   let ordinal = 0;
   for (let i = 0; i < vectors.length; i++) {
     for (let j = i + 1; j < vectors.length; j++) {
@@ -273,14 +281,22 @@ export function hardestNegatives(
       const left = vectors[i];
       const right = vectors[j];
       if (!left || !right) continue;
-      scored.push({
-        label: `${left.id} ↔ ${right.id}`,
-        similarity: round3(cosineSimilarity(left.vector, right.vector)),
-      });
+      const similarity = round3(cosineSimilarity(left.vector, right.vector));
+      if (similarity >= threshold) atOrAboveThreshold++;
+      scored.push({ label: `${left.id} ↔ ${right.id}`, similarity });
     }
   }
   scored.sort((a, b) => b.similarity - a.similarity);
-  return scored.slice(0, top);
+  return { top: scored.slice(0, top), atOrAboveThreshold };
+}
+
+/** The hardest negatives alone — the shape the held-out test wants. */
+export function hardestNegatives(
+  documents: CorpusDocument[],
+  provider: { embedSync(text: string): number[] },
+  top = 20,
+): ScoredPair[] {
+  return scanCorpusPairs(documents, provider, Number.POSITIVE_INFINITY, top).top;
 }
 
 export interface MutationReport {
@@ -338,7 +354,8 @@ export function sweep(
   const pairs = derivePairs(documents);
   const positives = pairs.positive.map(score);
   const negatives = pairs.negative.map(score);
-  const hardest = hardestNegatives(documents, provider);
+  const scan = scanCorpusPairs(documents, provider, threshold);
+  const hardest = scan.top;
 
   const worstPositive = Math.min(...positives.map((p) => p.similarity));
   const bestNegative = Math.max(
@@ -379,7 +396,7 @@ export function sweep(
     margin: round3(worstPositive - bestNegative),
     positivesAbove: positives.filter((p) => p.similarity >= threshold).length,
     negativesBelow: negatives.filter((n) => n.similarity < threshold).length,
-    corpusPairsAtOrAboveThreshold: hardest.filter((n) => n.similarity >= threshold).length,
+    corpusPairsAtOrAboveThreshold: scan.atOrAboveThreshold,
     zeroFpPoint,
     mutations,
   };
