@@ -32,7 +32,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_SIMILARITY_THRESHOLD, type EmbeddingProvider } from "../src/config.js";
 import {
-  DeterministicEmbeddingProvider,
+  LexicalEmbeddingProvider,
   cosineSimilarity,
 } from "../src/modules/services/dedupe/embedding-provider.js";
 import { type EmbeddableOpportunity, embeddingText } from "../src/modules/shared/embedding-text.js";
@@ -319,7 +319,7 @@ interface SyncProvider {
 export function sweep(
   documents: CorpusDocument[],
   threshold: number,
-  provider: SyncProvider = new DeterministicEmbeddingProvider(),
+  provider: SyncProvider = new LexicalEmbeddingProvider(),
 ): SweepResult {
   const score = (pair: DerivedPair): ScoredPair => ({
     label: pair.label,
@@ -388,9 +388,10 @@ export function loadCorpus(path = CORPUS_PATH): CorpusDocument[] {
 
 // CLI entry — skipped under Vitest so the test can import the derivations without a run.
 if (!process.env.VITEST) {
-  const provider: EmbeddingProvider = "deterministic";
+  const provider: EmbeddingProvider = "lexical";
   const threshold = DEFAULT_SIMILARITY_THRESHOLD[provider];
-  const result = sweep(loadCorpus(), threshold);
+  const corpus = loadCorpus();
+  const result = sweep(corpus, threshold);
 
   console.log(
     `provider: ${result.provider} (${result.model})   configured threshold: ${result.threshold}`,
@@ -417,6 +418,16 @@ if (!process.env.VITEST) {
         `${m.recallAtThreshold}/${m.count} / ${m.recallAtZeroFp}/${m.count}  ${m.label}`,
     );
   }
+  // The exponent the model pins is a point on a curve, and the curve is printed so the choice
+  // stays inspectable: 0 is the historical unweighted bag, 2 is what ships.
+  console.log("\nidf exponent sweep (worst positive / hardest negative / band):");
+  for (const exponent of [0, 1, 1.5, 2, 2.5]) {
+    const swept = sweep(corpus, threshold, new LexicalEmbeddingProvider({ idfExponent: exponent }));
+    console.log(
+      `  idf^${exponent}  ${swept.worstPositive.toFixed(3)} / ${swept.bestNegative.toFixed(3)} / ${swept.margin.toFixed(3)}`,
+    );
+  }
+
   if (result.margin <= 0) {
     console.error(
       "\n✗ the classes OVERLAP — no single threshold separates them, and the operating point cannot be settled from this corpus.",
