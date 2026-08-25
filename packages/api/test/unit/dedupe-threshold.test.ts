@@ -178,3 +178,20 @@ describe("the idf exponent", () => {
     expect(bestNegative).toBe(0.571);
   });
 });
+
+describe("hostile-looking but ordinary vocabulary", () => {
+  /**
+   * `df["constructor"]` on a plain object answers `Object.prototype.constructor` — a function —
+   * and the idf of one such token would turn NaN and poison every coordinate through
+   * normalisation. The provider stores its table as a Map for exactly this reason; this pins it.
+   */
+  it("embeds prototype-chain property names to a finite, self-similar vector", () => {
+    const provider = new LexicalEmbeddingProvider();
+    const vector = provider.embedSync(
+      "constructor prototype toString hasOwnProperty valueOf grants",
+    );
+    expect(vector).toHaveLength(1536);
+    expect(vector.every(Number.isFinite)).toBe(true);
+    expect(cosineSimilarity(vector, vector)).toBeCloseTo(1, 6);
+  });
+});

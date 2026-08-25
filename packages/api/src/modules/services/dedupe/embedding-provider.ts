@@ -123,13 +123,18 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
 
   private readonly exponent: number;
   private readonly documentCount: number;
-  private readonly df: Record<string, number>;
+  private readonly df: Map<string, number>;
 
   constructor(options: { idfExponent?: number; table?: IdfTable } = {}) {
     this.exponent = options.idfExponent ?? IDF_EXPONENT;
     const table = options.table ?? (committedIdfTable as IdfTable);
     this.documentCount = table.documentCount;
-    this.df = table.df;
+    // A Map, never the raw JSON object: `df["constructor"]` on a plain object answers
+    // `Object.prototype.constructor` — a function — and one hostile-looking but perfectly
+    // ordinary token ("constructor" appears in real developer-tooling listings) would turn its
+    // idf into NaN, poison every coordinate through normalisation, and leave that entry's
+    // detection permanently failing. A Map has no prototype chain to fall through.
+    this.df = new Map(Object.entries(table.df));
   }
 
   async embed(text: string): Promise<number[]> {
@@ -138,7 +143,7 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
 
   /** `log((N + 1) / (df + 1)) + 1` — smoothed, floor 1, so no committed token is zeroed out. */
   private idf(token: string): number {
-    const df = this.df[token] ?? 0;
+    const df = this.df.get(token) ?? 0;
     return Math.log((this.documentCount + 1) / (df + 1)) + 1;
   }
 

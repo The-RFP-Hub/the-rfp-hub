@@ -18,7 +18,8 @@
  * an unchanged corpus is byte-identical — which is what the regenerability test asserts.
  */
 import { writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { tokenize } from "../src/modules/services/dedupe/embedding-provider.js";
 import { embeddingText } from "../src/modules/shared/embedding-text.js";
 import { type CorpusDocument, loadCorpus } from "./dedupe-threshold-report.js";
@@ -51,7 +52,12 @@ export function renderIdfTable(table: IdfTable): string {
   return `${JSON.stringify(table, null, 2)}\n`;
 }
 
-if (!process.env.VITEST) {
+const isCliEntry =
+  !process.env.VITEST &&
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (isCliEntry) {
   const table = buildIdfTable(loadCorpus());
   writeFileSync(OUT_PATH, renderIdfTable(table));
   console.log(
