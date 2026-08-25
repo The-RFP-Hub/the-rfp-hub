@@ -164,7 +164,9 @@ function Listings({ me }: { me: Me }) {
            * one that failed — is the page inventing an answer it does not have.
            */}
           {duplicates.state.status === "ready"
-            ? " — nothing of yours has been flagged as similar to another published listing."
+            ? duplicates.state.data.items.length > 0
+              ? " — no matches need review; resolved history is available."
+              : " — nothing of yours has been flagged as similar to another published listing."
             : null}
         </p>
       )}

@@ -196,6 +196,74 @@ describe("the merged row on Your listings", () => {
     expect(screen.queryByText(/not which of yours/i)).toBeNull();
   });
 
+  it("counts only open duplicate pairs and points resolved-only accounts to their history", async () => {
+    const openApi = client();
+    openApi.me.duplicates = async () => ({
+      items: [
+        {
+          id: "acme:suspected",
+          title: "Suspected",
+          isPublic: true,
+          similarity: 0.9,
+          status: "suspected",
+          detectedAt: "2026-08-20T00:00:00Z",
+          yourListing: { id: "acme:mine", title: "Mine" },
+        },
+        {
+          id: "acme:confirmed",
+          title: "Confirmed",
+          isPublic: true,
+          similarity: 0.89,
+          status: "confirmed",
+          detectedAt: "2026-08-20T00:00:00Z",
+          yourListing: { id: "acme:mine", title: "Mine" },
+        },
+        {
+          id: "acme:dismissed",
+          title: "Dismissed",
+          isPublic: true,
+          similarity: 0.88,
+          status: "dismissed",
+          detectedAt: "2026-08-20T00:00:00Z",
+          yourListing: { id: "acme:mine", title: "Mine" },
+        },
+      ],
+    });
+    const openView = render(
+      <ApiClientProvider value={openApi}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText(/2 possible duplicates touch your listings/)).toBeTruthy();
+    openView.unmount();
+
+    const resolvedApi = client();
+    resolvedApi.me.duplicates = async () => ({
+      items: [
+        {
+          id: "acme:dismissed",
+          title: "Dismissed",
+          isPublic: true,
+          similarity: 0.88,
+          status: "dismissed",
+          detectedAt: "2026-08-20T00:00:00Z",
+          yourListing: { id: "acme:mine", title: "Mine" },
+        },
+      ],
+    });
+    render(
+      <ApiClientProvider value={resolvedApi}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    expect(
+      await screen.findByText(/No matches need review; resolved history is available/i),
+    ).toBeTruthy();
+    expect(screen.queryByText(/1 possible duplicate touches/)).toBeNull();
+  });
+
   it("links to the survivor and replaces rejection actions with one terminal badge", async () => {
     render(
       <ApiClientProvider value={client()}>

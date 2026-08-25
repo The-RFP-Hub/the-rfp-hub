@@ -110,6 +110,22 @@ function client(managedOpportunity: ManagedOpportunity = managed, currentMe: Me 
             status: "confirmed",
             detectedAt: "2026-08-22T00:00:00Z",
           },
+          {
+            id: "public:dismissed round",
+            title: "Dismissed Round",
+            isPublic: true,
+            similarity: 0.8,
+            status: "dismissed",
+            detectedAt: "2026-08-23T00:00:00Z",
+          },
+          {
+            id: "public:merged round",
+            title: "Merged Round",
+            isPublic: true,
+            similarity: 0.79,
+            status: "merged",
+            detectedAt: "2026-08-24T00:00:00Z",
+          },
         ],
       }),
     },
@@ -207,7 +223,7 @@ describe("merged listing detail and edit routes", () => {
   it("names the loaded listing in its duplicate rows and routes counterparts by publicity", async () => {
     mount(<ListingPage />);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Duplicates" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Duplicates · 2" }));
 
     expect(await screen.findByRole("columnheader", { name: "Your listing" })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Matched against" })).toBeTruthy();
@@ -220,6 +236,21 @@ describe("merged listing detail and edit routes", () => {
     expect(screen.getByRole("link", { name: "Private Queued Round" }).getAttribute("href")).toBe(
       "/listings/private%3Aqueued%20round",
     );
+  });
+
+  it("loads duplicate history once and badges only the open pairs before the tab is opened", async () => {
+    const api = client();
+    const duplicates = vi.fn(api.opportunities.duplicates);
+    api.opportunities.duplicates = duplicates;
+    mount(<ListingPage />, api);
+
+    expect(await screen.findByRole("tab", { name: "Duplicates · 2" })).toBeTruthy();
+    expect(duplicates).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Duplicates · 2" }));
+    expect(await screen.findByText("Dismissed Round")).toBeTruthy();
+    expect(screen.getByText("Merged Round")).toBeTruthy();
+    expect(duplicates).toHaveBeenCalledTimes(1);
   });
 
   it("renders no detail tabs when the full listing fails to load", async () => {

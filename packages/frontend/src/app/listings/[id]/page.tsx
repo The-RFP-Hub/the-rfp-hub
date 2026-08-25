@@ -28,10 +28,15 @@ import {
 import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
-import { ROUTE_GATE_COPY, duplicateStatusLabel, fundingTypeLabel } from "@/lib/presentation";
-import { useResource } from "@/lib/resource";
+import {
+  ROUTE_GATE_COPY,
+  duplicateStatusLabel,
+  fundingTypeLabel,
+  isOpenDuplicateStatus,
+} from "@/lib/presentation";
+import { type ResourceHandle, useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
+import type { DuplicateList, ManagedOpportunity, Me, Opportunity } from "@/lib/types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -70,6 +75,12 @@ function Listing({ id, me }: { id: string; me: Me }) {
     return { entry, managed };
   }, [api, id, load, me.canReview]);
   const { state, reload } = useResource(loadWithMetadata);
+  const loadDuplicates = useCallback(() => api.opportunities.duplicates(id), [api, id]);
+  const duplicates = useResource(loadDuplicates);
+  const openDuplicateCount =
+    duplicates.state.status === "ready"
+      ? duplicates.state.data.items.filter((match) => isOpenDuplicateStatus(match.status)).length
+      : null;
 
   return (
     <section>
@@ -94,6 +105,9 @@ function Listing({ id, me }: { id: string; me: Me }) {
                   onClick={() => setTab(name)}
                 >
                   {TAB_LABELS[name]}
+                  {name === "duplicates" && openDuplicateCount !== null
+                    ? ` · ${openDuplicateCount}`
+                    : null}
                 </button>
               ))}
             </div>
@@ -102,7 +116,10 @@ function Listing({ id, me }: { id: string; me: Me }) {
             {tab === "audit" ? <AuditTab id={id} /> : null}
             {tab === "verification" ? <VerificationTab id={id} canTrigger={me.canReview} /> : null}
             {tab === "duplicates" ? (
-              <DuplicatesTab yourListing={{ id: entry.id, title: entry.title }} />
+              <DuplicatesTab
+                yourListing={{ id: entry.id, title: entry.title }}
+                duplicates={duplicates}
+              />
             ) : null}
           </>
         )}
@@ -359,16 +376,11 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
 
 function DuplicatesTab({
   yourListing,
+  duplicates,
 }: {
   yourListing: Pick<Opportunity, "id" | "title">;
+  duplicates: ResourceHandle<DuplicateList>;
 }) {
-  const api = useApi();
-  const load = useCallback(
-    () => api.opportunities.duplicates(yourListing.id),
-    [api, yourListing.id],
-  );
-  const { state, reload } = useResource(load);
-
   return (
     <section aria-labelledby="dupes-heading">
       <h2 id="dupes-heading">Possible duplicates</h2>
@@ -378,7 +390,11 @@ function DuplicatesTab({
         found <em>if</em> the check has run — a deployment with detection switched off has nothing
         to show either.
       </p>
-      <ResourceView resource={state} what="possible duplicates" onRetry={reload}>
+      <ResourceView
+        resource={duplicates.state}
+        what="possible duplicates"
+        onRetry={duplicates.reload}
+      >
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState title="No suspected duplicates recorded for this listing." />
