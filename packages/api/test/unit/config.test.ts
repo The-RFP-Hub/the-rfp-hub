@@ -214,44 +214,57 @@ describe("readPem", () => {
 
 describe("readEmbeddingProvider", () => {
   it("takes an explicit provider", () => {
-    expect(readEmbeddingProvider("deterministic", undefined)).toBe("deterministic");
-    expect(readEmbeddingProvider(" OpenAI ", undefined)).toBe("openai");
-    expect(readEmbeddingProvider("disabled", "sk-test")).toBe("disabled");
+    expect(readEmbeddingProvider("lexical")).toBe("lexical");
+    expect(readEmbeddingProvider(" Lexical ")).toBe("lexical");
+    expect(readEmbeddingProvider("disabled")).toBe("disabled");
   });
 
-  // Falling back to `deterministic` would leave a deployment reporting duplicate checks it is not
-  // really performing, which is worse than reporting none.
-  it("defaults to openai with a key and disabled without one — never deterministic", () => {
-    expect(readEmbeddingProvider(undefined, "sk-test")).toBe("openai");
-    expect(readEmbeddingProvider("", undefined)).toBe("disabled");
+  // The in-process featurizer needs no key and no network, so ABSENCE of configuration means
+  // detection on — `disabled` is asked for, never inferred.
+  it("defaults to lexical when nothing is configured", () => {
+    expect(readEmbeddingProvider(undefined)).toBe("lexical");
+    expect(readEmbeddingProvider("")).toBe("lexical");
+  });
+
+  // An ALIAS, not a distinct provider: it names the same computation family, so a deployment
+  // still carrying the old value keeps detecting — for one release, after which it is rejected
+  // like any other unknown value.
+  it("accepts `deterministic` as a deprecated alias for lexical", () => {
+    expect(readEmbeddingProvider("deterministic")).toBe("lexical");
+  });
+
+  // A deployment that asked for a hosted semantic model must not silently receive a different
+  // detector — or silently detect nothing. The refusal names the one-line fix.
+  it("refuses `openai` by name, pointing at the replacement", () => {
+    expect(() => readEmbeddingProvider("openai")).toThrow(/lexical/);
+    expect(() => readEmbeddingProvider("openai")).toThrow(/no longer supported/);
   });
 
   it("rejects an unknown provider rather than silently picking one", () => {
-    expect(() => readEmbeddingProvider("word2vec", undefined)).toThrow(/EMBEDDING_PROVIDER/);
+    expect(() => readEmbeddingProvider("word2vec")).toThrow(/EMBEDDING_PROVIDER/);
   });
 });
 
 describe("readSimilarityThreshold", () => {
-  // A threshold is a property of an embedding space, so one shared default would be wrong for at
-  // least one provider.
+  // A threshold is a property of an embedding space, so the default stays keyed by provider even
+  // with one real provider today — the shape is where that insight is recorded, and a future
+  // second space slots in without re-deriving the rule.
   it("defaults per provider", () => {
-    expect(readSimilarityThreshold(undefined, "openai")).toBe(DEFAULT_SIMILARITY_THRESHOLD.openai);
-    expect(readSimilarityThreshold("", "deterministic")).toBe(
-      DEFAULT_SIMILARITY_THRESHOLD.deterministic,
+    expect(readSimilarityThreshold(undefined, "lexical")).toBe(
+      DEFAULT_SIMILARITY_THRESHOLD.lexical,
     );
-    expect(DEFAULT_SIMILARITY_THRESHOLD.openai).not.toBe(
-      DEFAULT_SIMILARITY_THRESHOLD.deterministic,
-    );
+    expect(readSimilarityThreshold("", "disabled")).toBe(DEFAULT_SIMILARITY_THRESHOLD.disabled);
+    expect(DEFAULT_SIMILARITY_THRESHOLD.lexical).not.toBe(DEFAULT_SIMILARITY_THRESHOLD.disabled);
   });
 
   it("takes a value in range", () => {
-    expect(readSimilarityThreshold("0.9", "openai")).toBe(0.9);
-    expect(readSimilarityThreshold("0", "openai")).toBe(0);
+    expect(readSimilarityThreshold("0.9", "lexical")).toBe(0.9);
+    expect(readSimilarityThreshold("0", "lexical")).toBe(0);
   });
 
   it("rejects a value that is not a cosine similarity", () => {
     for (const raw of ["-0.1", "1.5", "86%", "high"]) {
-      expect(() => readSimilarityThreshold(raw, "openai"), raw).toThrow(/DEDUPE_SIMILARITY/);
+      expect(() => readSimilarityThreshold(raw, "lexical"), raw).toThrow(/DEDUPE_SIMILARITY/);
     }
   });
 });

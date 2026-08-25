@@ -80,13 +80,10 @@ export interface EmailConfig {
   mailgunApiBase: string;
 }
 
-export type EmbeddingProvider = "openai" | "deterministic" | "disabled";
+export type EmbeddingProvider = "lexical" | "disabled";
 
 export interface EmbeddingConfig {
   provider: EmbeddingProvider;
-  apiKey: string | undefined;
-  model: string;
-  timeoutMs: number;
 }
 
 export interface DedupeConfig {
@@ -319,47 +316,53 @@ export function readPem(raw: string | undefined): string | undefined {
   return value === undefined ? undefined : value.replace(/\\n/g, "\n");
 }
 
-const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ["openai", "deterministic", "disabled"];
+const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ["lexical", "disabled"];
 
 /**
- * Which embedding provider backs duplicate detection.
+ * Which duplicate detector backs the dedupe pass.
  *
- * The default is deliberately conservative in both directions: with an API key present, `openai`;
- * without one, `disabled` — never `deterministic`. The deterministic provider is a hashed token
- * bag: it is exactly right for CI, where dedupe tests must run without a credential, and it is not
- * a semantic model. Falling back to it silently would leave a deployment reporting duplicate
- * checks it is not really performing, which is worse than reporting none.
+ * `lexical` is the in-process TF-IDF featurizer — no key, no network, nothing to be absent — and
+ * it is the default when nothing is configured: the silent-fallback rule this reader used to
+ * enforce existed because the credential-free provider was once a CI stand-in rather than the
+ * detector, and both halves of that sentence have stopped being true. `disabled` stays available
+ * for a deployment that wants detection off, and it must be ASKED for.
+ *
+ * `openai` is REFUSED BY NAME rather than ignored: a deployment still carrying the old value
+ * asked for a hosted semantic model, and silently handing it a different detector — or silently
+ * detecting nothing — are both worse than a boot error with a one-line fix. `deterministic` is
+ * accepted as a deprecated alias for one release: it names the same computation family, so no
+ * deployment is harmed by the mapping, and the alias goes away next release.
  */
-export function readEmbeddingProvider(
-  raw: string | undefined,
-  apiKey: string | undefined,
-): EmbeddingProvider {
+export function readEmbeddingProvider(raw: string | undefined): EmbeddingProvider {
   const value = (raw ?? "").trim().toLowerCase();
   if ((EMBEDDING_PROVIDERS as string[]).includes(value)) return value as EmbeddingProvider;
+  if (value === "deterministic") return "lexical";
+  if (value === "openai") {
+    throw new Error(
+      "EMBEDDING_PROVIDER=openai is no longer supported: duplicate detection runs on the in-process lexical featurizer and sends nothing to any AI vendor. Set EMBEDDING_PROVIDER=lexical (or unset it — lexical is the default), and remove OPENAI_API_KEY from the environment.",
+    );
+  }
   if (value !== "") {
     throw new Error(
       `EMBEDDING_PROVIDER must be one of ${EMBEDDING_PROVIDERS.join(", ")}, got ${JSON.stringify(raw)}.`,
     );
   }
-  return apiKey === undefined ? "disabled" : "openai";
+  return "lexical";
 }
 
 /**
  * Per-provider similarity defaults. A threshold is a property of an embedding space, not a
- * universal constant: the same number means different things to a 1536-dimension model and to a
- * hashed token bag, so one shared default would be wrong for at least one of them.
+ * universal constant — one provider today does not mean one provider forever, and this shape is
+ * where that insight is recorded.
  *
- * `deterministic` is SETTLED at 0.74 — the midpoint of the separating band measured by
- * `scripts/dedupe-threshold-report.ts` over the committed corpus (worst positive 0.911, best
- * negative 0.571). `test/unit/dedupe-threshold.test.ts` asserts that band in CI, so a corpus change
- * that closes it fails the build rather than silently degrading detection.
- *
- * `openai` remains PROVISIONAL: settling it needs a key, which CI does not have and must not have,
- * so the number is a documented starting point rather than a measured one. See docs/data-model.md.
+ * `lexical` is SETTLED at 0.75 — the midpoint of the separating band measured by
+ * `scripts/dedupe-threshold-report.ts` over EVERY distinct pair of the committed corpus (worst
+ * positive 0.913, hardest of 12 720 corpus negatives 0.592). `test/unit/dedupe-threshold.test.ts`
+ * asserts that band in CI, so a corpus change that closes it fails the build rather than silently
+ * degrading detection.
  */
 export const DEFAULT_SIMILARITY_THRESHOLD: Record<EmbeddingProvider, number> = {
-  openai: 0.86,
-  deterministic: 0.74,
+  lexical: 0.75,
   disabled: 1,
 };
 
@@ -646,8 +649,7 @@ export function mailgunCredentialWarning(email: {
   return `EMAIL_TRANSPORT=mailgun without ${missing.join(" and ")} — the transport is configured but cannot authenticate, so sign-in code delivery is DISABLED: the code-sending routes answer 503 until the missing key(s) reach the environment, and everything that does not send email keeps serving. Supply them through the task definition's secrets (packages/api/docs/deploy.md).`;
 }
 
-const embeddingApiKey = readOptional(process.env.OPENAI_API_KEY);
-const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER, embeddingApiKey);
+const embeddingProvider = readEmbeddingProvider(process.env.EMBEDDING_PROVIDER);
 const analyticsHmac = readAnalyticsHmacKey(process.env.ANALYTICS_HMAC_KEY);
 const betterAuthSecret = readBetterAuthSecret(process.env.BETTER_AUTH_SECRET, isProduction);
 const emailTransport = readEmailTransport(process.env.EMAIL_TRANSPORT, isProduction);
@@ -689,9 +691,6 @@ export const config: AppConfig = {
 
   embedding: {
     provider: embeddingProvider,
-    apiKey: embeddingApiKey,
-    model: readOptional(process.env.EMBEDDING_MODEL) ?? "text-embedding-3-small",
-    timeoutMs: readPositiveInt(process.env.EMBEDDING_TIMEOUT_MS, 5_000),
   },
 
   dedupe: {
