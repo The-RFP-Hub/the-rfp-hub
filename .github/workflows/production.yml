@@ -7,7 +7,7 @@ on:
       - 'prod-*'
   workflow_dispatch:
 
-name: Production RFP Hub API
+name: Production API
 
 # Mirrors staging.yml — pulls `.env` from `production/rfp-hub`,
 # bakes into the image, deploys to the production ECS cluster.

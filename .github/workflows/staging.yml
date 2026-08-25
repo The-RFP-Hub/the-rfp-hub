@@ -12,7 +12,7 @@ on:
       - 'stage-*'
   workflow_dispatch:
 
-name: Staging RFP Hub API
+name: Staging API
 
 # Mirrors the operator's existing service deployment: pull `.env` from
 # AWS Secrets Manager into the build context, bake it into the Docker
