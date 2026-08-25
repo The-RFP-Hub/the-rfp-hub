@@ -65,6 +65,13 @@ jobs:
           ref: ${{ inputs.tag }}
           persist-credentials: false
 
+      # Same reason as frontend-staging.yml: `vercel build` runs here and shells out to pnpm.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       # Pinned, not @latest — same reasoning and same version as frontend-staging.yml; upgrade the
       # two together.
       - name: Install Vercel CLI
