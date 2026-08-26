@@ -13,8 +13,6 @@ import { randomBytes } from "node:crypto";
  *   TRUST_PROXY                 changes which address analytics attributes a request to
  *   DATABASE_URL                would point the API at the developer's own database — the single
  *                               most damaging thing this suite could do
- *   OPENAI_API_KEY              flips embeddings from deterministic to a paid, non-deterministic
- *                               provider, and sends fixture text to a third party
  *   PORT / NODE_ENV             collide with the run-scoped values below
  *
  * None of those can be "remembered to unset". Building from `{}` means the only way a variable
@@ -99,9 +97,6 @@ export interface ApiEnvInput {
    * tests fetch is itself on 127.0.0.1.
    */
   allowPrivateHosts: boolean;
-  /** `openai` only in the optional extra run; the key is threaded in only then. */
-  embeddingProvider?: "deterministic" | "openai";
-  openaiApiKey?: string;
   verifyMaxBytes?: number;
 }
 
@@ -142,13 +137,9 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   // configuration, and nothing in the product can revoke it — so there is deliberately nothing to
   // set here.
 
-  env.EMBEDDING_PROVIDER = input.embeddingProvider ?? "deterministic";
-  if (input.embeddingProvider === "openai") {
-    if (!input.openaiApiKey) {
-      throw new Error("env: EMBEDDING_PROVIDER=openai was requested without an OPENAI_API_KEY");
-    }
-    env.OPENAI_API_KEY = input.openaiApiKey;
-  }
+  // The lexical featurizer is in-process and deterministic — same detector as production, no
+  // extra run, nothing threaded in.
+  env.EMBEDDING_PROVIDER = "lexical";
 
   env.ANALYTICS_ENABLED = "true";
   env.ANALYTICS_HMAC_KEY = input.analyticsHmacKey;

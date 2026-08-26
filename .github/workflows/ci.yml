@@ -35,15 +35,6 @@ jobs:
 
     env:
       DATABASE_URL: postgres://rfphub:rfphub@localhost:5432/rfphub
-      # Duplicate detection needs an embedding provider, and the real one needs a credential this
-      # public repository does not have and must not have. Without this line `EMBEDDING_PROVIDER`
-      # resolves to `disabled` (config.ts never falls back to `deterministic` silently, because a
-      # deployment reporting duplicate checks it is not really performing is worse than one
-      # reporting none) — and the dedupe suites would skip themselves on every commit, which is the
-      # same as not having them. The deterministic provider is a pure hashed token bag: no key, no
-      # network, and its operating point is asserted against the committed corpus in
-      # test/unit/dedupe-threshold.test.ts.
-      EMBEDDING_PROVIDER: deterministic
 
     steps:
       - uses: actions/checkout@v4
