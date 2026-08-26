@@ -4,16 +4,20 @@ name: Nightly maintenance jobs
 # OPERATOR'S PATH ONLY: this workflow has no cron and starts nothing by itself.
 #
 # THE NIGHTLY CHAIN IS SCHEDULED OUTSIDE THIS REPOSITORY. An external scheduler runs the whole
-# chain — analytics-rollup, retention, embedding-backfill, verification-backfill,
-# notification-dispatch, then staleness — SERIALLY at 01:05 UTC, against the same entry point this
-# workflow starts (`node packages/api/dist/jobs.js <job> --json`). One scheduler owns the ordering,
-# which is the point: per-job advisory locks exclude a job from ITSELF, never one job from another,
-# so two schedulers whose windows overlap interleave and silently lose work while every run reports
-# success. The contract that external caller relies on is packages/api/docs/jobs.md section 4d.
+# chain at 01:05 UTC against the same entry point this workflow starts
+# (`node packages/api/dist/jobs.js <job> --json`). The ordering it owes is exactly one rule:
+# analytics-rollup, retention, embedding-backfill, verification-backfill and notification-dispatch
+# are INDEPENDENT of each other and may run in any order or in parallel, and STALENESS RUNS AFTER
+# ALL OF THEM — running it earlier closes entries a source check was about to prove active.
+# Running the six serially is one way to satisfy that, not the requirement.
 #
-# WHAT IS LEFT HERE IS A DISPATCH. An operator runs the chain (`job` = `all`, in the same order) or
-# one job by name — a recovery after a failed external run, or a check that the wiring works. Every
-# step is guarded by that choice, so a dispatch starts exactly what was asked for and nothing else.
+# ONE CALLER OWNS THAT ORDERING, because nothing else can: per-job advisory locks exclude a job from
+# ITSELF, never one job from another, so two callers whose windows overlap interleave and silently
+# lose work while every run reports success. The contract is packages/api/docs/jobs.md section 4d.
+#
+# WHAT IS LEFT HERE IS A DISPATCH. An operator runs the chain (`job` = `all`) or one job by name —
+# a recovery after a failed external run, or a check that the wiring works. Every step is guarded
+# by that choice, so a dispatch starts exactly what was asked for and nothing else.
 #
 # WHY A CONTAINER TASK AND NOT AN ENDPOINT. Starting a job needs a credential. A public endpoint
 # would need one that lives somewhere a workflow can read — a shared token, in repository secrets,
@@ -104,16 +108,16 @@ env:
   SELECTED: ${{ inputs.job || 'all' }}
 
 jobs:
-  # The five jobs before staleness, in the chain's order. `max-parallel: 1` runs them one at a time,
-  # so a `job=all` dispatch reproduces the order the external scheduler uses rather than a faster
-  # order nobody documented; `fail-fast: false` so one failing does not cancel the rest mid-write.
+  # The five jobs that depend on nothing and on each other: the two analytics sweeps, two backfills,
+  # and the notification-delivery backstop. They run in parallel, each with its own advisory lock,
+  # and `fail-fast: false` so one failing does not cancel the others mid-write. Nothing here orders
+  # them, deliberately — the only ordering the chain has is staleness after all of them, below.
   maintenance:
     name: ${{ matrix.job }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         job:
           - analytics-rollup
@@ -157,10 +161,11 @@ jobs:
           DISPATCHED: "true"
         run: .github/scripts/run-ecs-job.sh
 
-  # Staleness runs LAST, which is what `needs: [maintenance]` is for: a successful source check
-  # writes `lastSeenAt` and resets the staleness clock, so staleness reading that state before
-  # verification finished closes entries a check was about to prove active — with both runs green
-  # (packages/api/docs/jobs.md section 4d). The external chain preserves the same order.
+  # Staleness runs AFTER ALL FIVE, which is what `needs: [maintenance]` is for and is the whole of
+  # the chain's ordering: a successful source check writes `lastSeenAt` and resets the staleness
+  # clock, so staleness reading that state before verification finished closes entries a check was
+  # about to prove active — with both runs green (packages/api/docs/jobs.md section 4d). The
+  # external scheduler owes the same rule and nothing more.
   staleness:
     name: staleness
     needs: [maintenance]

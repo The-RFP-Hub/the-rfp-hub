@@ -66,32 +66,38 @@ collapsed them would report a permanently unconfigured job as healthy contention
 ## 2. The schedule, and the ordering it exists to guarantee
 
 **One schedule owns the whole chain, and it is not in this repository.** An external scheduler runs
-the six jobs at **01:05 UTC**, serially, in one order:
+the six jobs at **01:05 UTC**. They carry **one ordering rule** between them: the five below are
+independent and may run in any order or in parallel; `staleness` runs **after all of them**.
 
 ```
 UTC
-01:05  external scheduler ──> analytics-rollup
-                              retention
-                              embedding-backfill
-                              verification-backfill
-                              notification-dispatch
-                              staleness              ← last, always
+01:05  external scheduler ──┬─ analytics-rollup ──────┐
+                            ├─ retention ─────────────┤
+                            ├─ embedding-backfill ────┤  independent of each other:
+                            ├─ verification-backfill ─┤  any order, or in parallel
+                            └─ notification-dispatch ─┘
+                                       │
+                                       └──> staleness   ← after ALL five, always
 
 03:17  nightly-export.yml     publishes the dataset — its OWN cron, not chained (see below)
 ```
 
-`.github/workflows/jobs-nightly.yml` has **no cron**. It is the manual path: a `workflow_dispatch`
-runs the same chain in the same order (`job` = `all`) or a single job by name — a recovery after a
-failed external run, or a check that the wiring works. §4d states the contract the external
-scheduler relies on.
+Running the six one at a time satisfies that rule; so does running the five together and
+`staleness` when the last of them exits. The rule is the contract (§4d); serialising is one way to
+meet it.
 
-**Why serial, and why one scheduler.** The advisory lock each job takes excludes a job from
-**itself**, never one job from another (§3). So two callers whose windows overlap do not
+`.github/workflows/jobs-nightly.yml` has **no cron**. It is the manual path: a `workflow_dispatch`
+runs the same six under the same rule (`job` = `all`) or a single job by name — a recovery after a
+failed external run, or a check that the wiring works.
+
+**Why `staleness` is last, and why one caller.** The advisory lock each job takes excludes a job
+from **itself**, never one job from another (§3). So two callers whose windows overlap do not
 double-write — but they do interleave, and `staleness` running while `verification-backfill` is
 still going closes entries that a successful check was about to keep open, with **both runs
-reporting success** (§4d has the walk-through). One serial chain with `staleness` last is what
-prevents that: a successful check writes `lastSeenAt`, and staleness reads that state after it has
-settled instead of underneath it.
+reporting success** (§4d has the walk-through). Putting `staleness` after everything, under a single
+caller, is what prevents that: a successful check writes `lastSeenAt`, and staleness reads that
+state after it has settled instead of underneath it. The other five write nothing each other reads,
+which is why they carry no ordering at all.
 
 There is no notification-only cron or workflow. Normal delivery starts immediately after the
 notification transaction commits; the chain's `notification-dispatch` node is the daily backstop,
@@ -244,7 +250,9 @@ carries the time of the change, which is where that fact belongs.
 
 `.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
 own task definition**, using the AWS credentials the deploy workflows already hold. It runs only
-when dispatched. **Two calls**: read the service to learn where it runs, then start that task
+when dispatched. A `job=all` dispatch runs the five independent jobs as a parallel matrix and
+`staleness` afterwards — `needs: [maintenance]`, the same one rule the external scheduler holds
+(§2). **Two calls** per job: read the service to learn where it runs, then start that task
 definition there with a different command.
 
 ```sh
@@ -380,19 +388,20 @@ therefore interleave, and the interleaving loses work while every single run rep
 
 **So the ordering is the caller's to hold, and the lock will not arbitrate it.** As deployed:
 
-> **One scheduler runs the whole chain, SERIALLY, waiting for each job to exit before starting the
-> next: `analytics-rollup`, `retention`, `embedding-backfill`, `verification-backfill`,
-> `notification-dispatch`, then `staleness` LAST. It must finish before 03:17 UTC, when the
+> **One scheduler runs the whole chain. `analytics-rollup`, `retention`, `embedding-backfill`,
+> `verification-backfill` and `notification-dispatch` are INDEPENDENT — any order, or in parallel.
+> `staleness` runs AFTER ALL FIVE HAVE EXITED. The chain must finish before 03:17 UTC, when the
 > open-data export publishes, so the snapshot is a closed dataset rather than a half-maintained
 > one.**
 
 Each clause carries weight:
 
-* **Serial, and waiting.** Exit code, not elapsed time, is what says a job is done: a caller that
-  starts the next job on a timer is a second chain overlapping the first, with the consequence
-  above.
-* **`staleness` last.** It reads what `verification-backfill` writes. Any earlier position closes
-  entries a check was about to keep open.
+* **The five are independent.** They write nothing the others read, so nothing is bought by
+  ordering them and a caller is free to run them concurrently. Serialising the whole chain is a
+  valid way to satisfy the rule below, not the rule.
+* **`staleness` after all five, by EXIT.** It reads what `verification-backfill` writes, and exit
+  code — not elapsed time — is what says a job is done: a caller that starts `staleness` on a timer
+  is racing the pass it depends on, and the race is silent (the walk-through above).
 * **Finished before 03:17.** `nightly-export.yml` publishes on its own cron and waits for nothing
   (§2). A chain still running at 03:17 publishes a dataset maintained halfway.
 * **One caller.** Dispatching `jobs-nightly.yml` while the external chain is in flight is the one
