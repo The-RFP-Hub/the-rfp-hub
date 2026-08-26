@@ -211,6 +211,13 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   consequence is that a dispatcher that dies mid-send **burns one of the row's three attempts**
   rather than leaving it in flight forever; the payload records that attempt as `in_flight`, meaning
   nothing ever observed how it ended.
+  The lease also carries an **owner token**, because a deadline on its own is a promise the sender
+  cannot keep: rows are sent serially, so a long batch — or one hung provider call — can outlive the
+  five-minute floor while the dispatcher is still holding the row. The token is renewed immediately
+  before each send and is a condition of every stamp, so a dispatcher that has lost the row finds
+  out by matching no rows, sends nothing and writes nothing (reported as `leaseLost`). The
+  complementary half is on the transports: `ses` and `resend` now abandon a single call after 30
+  seconds, as `mailgun` already did, so no one send can outlive the floor to begin with.
 
 **Concurrency is excluded by `pg_try_advisory_lock`, taken on a dedicated connection.** Three
 decisions, each closing something real:

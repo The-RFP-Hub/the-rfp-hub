@@ -110,8 +110,12 @@ state, not thrown as workflow failures.
   is now narrow on purpose rather than by luck.** A dispatcher leases its rows in the statement
   that selects them (`UPDATE … FOR UPDATE SKIP LOCKED`, attempt counted and `email_failed_at`
   stamped before the send), so concurrent dispatchers — the in-process queue and the nightly job —
-  can no longer both claim one row. What remains is exactly the crash-in-the-gap case named above,
-  and a lost dispatcher now spends one of the three attempts instead of holding the row forever.
+  can no longer both claim one row. The claim is an OWNERSHIP TOKEN as well as a deadline, renewed
+  immediately before each send and required by every stamp, because a batch that sends serially can
+  outlive its own five-minute floor; and `ses` and `resend` abandon a single call after 30 seconds,
+  as `mailgun` already did, so one hung provider cannot be what makes it happen. What remains is
+  exactly the crash-in-the-gap case named above, and a lost dispatcher now spends one of the three
+  attempts instead of holding the row forever.
 - **Bad:** retry metadata is internal JSON rather than a query-friendly column. A future delivery
   analytics product should introduce a dedicated attempt table instead of growing that object.
 - **Neutral:** dispatch timestamps remain operational telemetry and do not add an audit enum value.

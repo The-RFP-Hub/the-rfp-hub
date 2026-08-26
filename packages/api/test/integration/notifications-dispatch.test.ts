@@ -7,7 +7,7 @@
  *
  * Isolation tag: `M3MAIL` / `m3mail-*@rfphub.invalid`.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import type { EmailConfig } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
@@ -87,6 +87,25 @@ async function rowOf(id: number) {
   const row = rows[0];
   if (!row) throw new Error(`notification ${id} disappeared`);
   return row;
+}
+
+/** The lease's own record: attempt count, last outcome, and the owner token while one is held. */
+function deliveryStateOf(payload: Record<string, unknown>): {
+  attempts?: number;
+  failure?: string;
+  leaseToken?: string;
+} {
+  const raw = payload.emailDelivery;
+  if (typeof raw !== "object" || raw === null) throw new Error("no emailDelivery state on the row");
+  return raw as { attempts?: number; failure?: string; leaseToken?: string };
+}
+
+/** Age a held lease past its retry floor without waiting five real minutes for it. */
+async function expireLease(notificationId: number): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ emailFailedAt: sql`now() - interval '1 hour'` })
+    .where(eq(notifications.id, notificationId));
 }
 
 function jobOptions(
@@ -507,7 +526,8 @@ describeWithDb("M3MAIL notification dispatch", () => {
     const inFlight = await rowOf(notification.id);
     expect(inFlight.emailDispatchedAt).toBeNull();
     expect(inFlight.emailFailedAt).not.toBeNull();
-    expect(inFlight.payload.emailDelivery).toEqual({ attempts: 1, failure: "in_flight" });
+    expect(inFlight.payload.emailDelivery).toMatchObject({ attempts: 1, failure: "in_flight" });
+    expect(deliveryStateOf(inFlight.payload).leaseToken).toEqual(expect.any(String));
 
     const leasedAt = inFlight.emailFailedAt as Date;
     const tooSoon = await runJob(
@@ -566,6 +586,77 @@ describeWithDb("M3MAIL notification dispatch", () => {
 
     expect(blocking.attempts).toBe(1);
     expect(transport.drain?.(RACE_EMAIL)).toHaveLength(1);
+    expect((await rowOf(notification.id)).emailDispatchedAt).not.toBeNull();
+  });
+
+  it("does not send a row whose lease expired mid-batch and was taken by another dispatcher", async () => {
+    const held = await insertNotification(raceAccountId, "duplicate_suspected", 7124);
+    const stolen = await insertNotification(raceAccountId, "duplicate_confirmed", 7125);
+    const transport: EmailTransport = createEmailTransport(emailConfig);
+    const shared = new EmailService({ config: emailConfig, transport });
+    const blocking = new BlockingRelay(shared);
+    const dispatcher = (email: OutboundEmailPort) =>
+      new NotificationDispatchService(db, {
+        email,
+        enabled: true,
+        appBaseUrl: APP_BASE_URL,
+        accountId: raceAccountId,
+      });
+
+    // One batch, two rows, sent serially — the first send hangs. A lease that were only a deadline
+    // would quietly expire on the SECOND row while this dispatcher still held it in memory.
+    const slow = dispatcher(blocking).runBatch({ limit: 10, now: new Date() });
+    await blocking.started;
+    await expireLease(stolen.id);
+
+    // A second dispatcher now legitimately re-leases the row the first one is about to reach.
+    const rival = await dispatcher(shared).runBatch({ limit: 10, now: new Date() });
+    expect(rival).toMatchObject({ processed: 1, details: { sent: 1 } });
+    expect((await rowOf(stolen.id)).emailDispatchedAt).not.toBeNull();
+
+    blocking.unblock();
+    const overrun = await slow;
+
+    // The renewal before the send is what turns "expired" into "lost": the row is skipped, not
+    // mailed a second time, and the outcome the rival recorded is left alone.
+    expect(overrun).toMatchObject({ details: { sent: 1, leaseLost: 1 } });
+    expect(blocking.attempts).toBe(1);
+    expect(transport.drain?.(RACE_EMAIL)).toHaveLength(2);
+    expect((await rowOf(held.id)).emailDispatchedAt).not.toBeNull();
+  });
+
+  it("makes a stale owner's success and failure stamps no-ops", async () => {
+    const notification = await insertNotification(raceAccountId, "duplicate_dismissed", 7126);
+    const repo = repositories(db).notifications;
+    const lease = async () =>
+      (
+        await repo.selectForDispatch({
+          accountId: raceAccountId,
+          notificationIds: [notification.id],
+          retryBefore: new Date(),
+          maxAttempts: NOTIFICATION_EMAIL_MAX_ATTEMPTS,
+          limit: 1,
+        })
+      )[0];
+
+    const first = await lease();
+    const staleToken = deliveryStateOf(first?.payload ?? {}).leaseToken as string;
+    await expireLease(notification.id);
+    const second = await lease();
+    const liveToken = deliveryStateOf(second?.payload ?? {}).leaseToken as string;
+    expect(liveToken).not.toBe(staleToken);
+
+    // The first owner comes back from a send it should never have made. Both of its stamps are
+    // conditional on a token the row no longer carries, so both match nothing.
+    await repo.markDispatched(notification.id, {}, new Date(), staleToken);
+    expect((await rowOf(notification.id)).emailDispatchedAt).toBeNull();
+    await repo.markDispatchFailure(notification.id, {}, new Date(), staleToken);
+    expect(deliveryStateOf((await rowOf(notification.id)).payload).leaseToken).toBe(liveToken);
+    expect(await repo.renewLease(notification.id, staleToken)).toBe(false);
+
+    // The live owner still writes.
+    expect(await repo.renewLease(notification.id, liveToken)).toBe(true);
+    await repo.markDispatched(notification.id, {}, new Date(), liveToken);
     expect((await rowOf(notification.id)).emailDispatchedAt).not.toBeNull();
   });
 });

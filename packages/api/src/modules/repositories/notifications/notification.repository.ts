@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import { type NotificationRow, notifications } from "../../../db/schema.js";
@@ -115,9 +116,18 @@ export class NotificationRepository {
    *    dispatcher lost between the lease and the stamp BURNS one of its three attempts instead of
    *    leaving a row that is retried forever. The payload says `in_flight` precisely because
    *    nothing observed how that attempt ended — the caller overwrites it with the real outcome.
+   * 4. **The lease carries an owner, not only a deadline.** A time-based lease alone is a promise
+   *    the sender cannot keep: a batch that sends serially, or one provider call that hangs, can
+   *    outlive the retry floor, and then the stamp expires while this dispatcher is still holding
+   *    the row in memory. So the lease mints a `leaseToken`, and every later write about this row —
+   *    the renewal before each send, the success stamp, the failure stamp — is conditional on it.
+   *    An expired owner does not discover its loss by being lucky; it discovers it because its
+   *    UPDATE matches no rows. `randomUUID` is a fresh token per lease, so a re-lease always
+   *    revokes the previous holder.
    *
-   * No new column is needed for any of it: `email_failed_at` plus `payload.emailDelivery.attempts`
-   * already carry both halves of a lease, so there is no migration behind this change.
+   * No new column is needed for any of it: `email_failed_at` plus `payload.emailDelivery` already
+   * carry the deadline, the attempt count and now the owner, so there is no migration behind this
+   * change.
    */
   async selectForDispatch(selection: NotificationDispatchSelection): Promise<NotificationRow[]> {
     const claimable = this.exec
@@ -146,11 +156,12 @@ export class NotificationRepository {
       .limit(selection.limit)
       .for("update", { skipLocked: true });
 
+    const leaseToken = randomUUID();
     const leased = await this.exec
       .update(notifications)
       .set({
         emailFailedAt: sql`now()`,
-        payload: sql`jsonb_set(${notifications.payload}, '{emailDelivery}', jsonb_build_object('attempts', ${deliveryAttemptsSql()} + 1, 'failure', 'in_flight'::text))`,
+        payload: sql`jsonb_set(${notifications.payload}, '{emailDelivery}', jsonb_build_object('attempts', ${deliveryAttemptsSql()} + 1, 'failure', 'in_flight'::text, 'leaseToken', ${leaseToken}::text))`,
       })
       .where(inArray(notifications.id, sql`(${claimable})`))
       .returning();
@@ -181,27 +192,74 @@ export class NotificationRepository {
     return rows[0]?.value ?? 0;
   }
 
+  /**
+   * Re-stamp the deadline for the holder of `leaseToken`, and say whether it is still the holder.
+   *
+   * Called immediately before each send, which is what turns a lease that can EXPIRE into one that
+   * can be LOST SAFELY. `false` means somebody else re-leased this row while this dispatcher was
+   * working through the rest of its batch: the correct response is to send nothing and write
+   * nothing, because the new owner is already responsible for the mail.
+   */
+  async renewLease(notificationId: number, leaseToken: string): Promise<boolean> {
+    const renewed = await this.exec
+      .update(notifications)
+      .set({ emailFailedAt: sql`now()` })
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          isNull(notifications.emailDispatchedAt),
+          eq(leaseTokenSql(), leaseToken),
+        ),
+      )
+      .returning({ id: notifications.id });
+    return renewed.length === 1;
+  }
+
+  /**
+   * Both stamps are conditional on the lease token for the same reason the renewal is: a dispatcher
+   * that lost the row must not be able to overwrite the outcome of the send that replaced its own.
+   * A stale stamp is a silent no-op, which is exactly what it should be — it describes an attempt
+   * nobody is entitled to record.
+   */
   async markDispatched(
     notificationId: number,
     payload: Record<string, unknown>,
     completedAt: Date,
+    leaseToken: string,
   ): Promise<void> {
     await this.exec
       .update(notifications)
       .set({ emailDispatchedAt: completedAt, emailFailedAt: null, payload })
-      .where(and(eq(notifications.id, notificationId), isNull(notifications.emailDispatchedAt)));
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          isNull(notifications.emailDispatchedAt),
+          eq(leaseTokenSql(), leaseToken),
+        ),
+      );
   }
 
   async markDispatchFailure(
     notificationId: number,
     payload: Record<string, unknown>,
     failedAt: Date,
+    leaseToken: string,
   ): Promise<void> {
     await this.exec
       .update(notifications)
       .set({ emailFailedAt: failedAt, payload })
-      .where(and(eq(notifications.id, notificationId), isNull(notifications.emailDispatchedAt)));
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          isNull(notifications.emailDispatchedAt),
+          eq(leaseTokenSql(), leaseToken),
+        ),
+      );
   }
+}
+
+function leaseTokenSql() {
+  return sql<string>`(${notifications.payload} -> 'emailDelivery' ->> 'leaseToken')`;
 }
 
 function deliveryAttemptsSql() {

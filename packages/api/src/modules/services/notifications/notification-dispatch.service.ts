@@ -29,6 +29,8 @@ type FailureReason =
 interface DeliveryState {
   attempts: number;
   failure: FailureReason;
+  /** Present only while a dispatcher holds the row. Written by the lease, cleared by success. */
+  leaseToken?: string;
 }
 
 export interface NotificationDispatchLogger {
@@ -125,9 +127,18 @@ export class NotificationDispatchService {
       retried: 0,
       recipientUnavailable: 0,
       invalidNotification: 0,
+      /** Rows this run leased and then lost to another dispatcher before it could send them. */
+      leaseLost: 0,
     };
 
     for (const notification of candidates) {
+      // Our proof of ownership for this row, minted by the lease. Every write below is conditional
+      // on it, and its absence means the row was never ours to send.
+      const leaseToken = deliveryLeaseToken(notification.payload);
+      if (leaseToken === undefined) {
+        details.leaseLost++;
+        continue;
+      }
       const recipientEmail = recipients.get(notification.accountId) ?? null;
       // The lease already incremented this, so it counts THIS attempt, not the ones before it —
       // hence `> 1` for "we have been here before" and no `+ 1` at the failure stamp below.
@@ -142,9 +153,29 @@ export class NotificationDispatchService {
           NOTIFICATION_EMAIL_MAX_ATTEMPTS,
           "recipient_unavailable",
           attemptCompletedAt,
+          leaseToken,
         );
         details.failed++;
         details.recipientUnavailable++;
+        continue;
+      }
+
+      /*
+       * Renew the lease IMMEDIATELY BEFORE the send, and treat a refusal as a decision.
+       *
+       * The rows were all leased at the top of the batch, but they are sent one at a time: with a
+       * long enough batch, or one provider call that hangs, the deadline stamped back then can
+       * expire while this loop is still walking. A time-based lease has no way to notice — it
+       * would send anyway, into a row a second dispatcher has already re-leased and mailed. So the
+       * deadline is pushed forward here, conditionally on the token, and losing that race is
+       * reported rather than survived: send nothing, write nothing, leave the row to its new owner.
+       */
+      if (!(await this.repos.notifications.renewLease(notification.id, leaseToken))) {
+        details.leaseLost++;
+        this.logger.error(
+          { notificationId: notification.id, attempts },
+          "notification email lease expired before its send and was taken by another dispatcher",
+        );
         continue;
       }
 
@@ -159,6 +190,7 @@ export class NotificationDispatchService {
           NOTIFICATION_EMAIL_MAX_ATTEMPTS,
           "invalid_notification",
           attemptCompletedAt,
+          leaseToken,
         );
         details.failed++;
         details.invalidNotification++;
@@ -181,6 +213,7 @@ export class NotificationDispatchService {
           attempts,
           "transport_failure",
           attemptCompletedAt,
+          leaseToken,
         );
         details.failed++;
         this.logger.error(
@@ -199,6 +232,7 @@ export class NotificationDispatchService {
         notification.id,
         withoutDeliveryState(notification.payload),
         completedAt(),
+        leaseToken,
       );
       details.sent++;
     }
@@ -224,11 +258,15 @@ export class NotificationDispatchService {
     attempts: number,
     failure: FailureReason,
     now: Date,
+    leaseToken: string,
   ): Promise<void> {
+    // The stored state drops the token: the attempt is over, and the row is nobody's until the
+    // next lease mints a new one.
     await this.repos.notifications.markDispatchFailure(
       notificationId,
       { ...withoutDeliveryState(payload), emailDelivery: { attempts, failure } },
       now,
+      leaseToken,
     );
   }
 }
@@ -243,6 +281,13 @@ function deliveryAttempts(payload: Record<string, unknown>): number {
   if (typeof raw !== "object" || raw === null) return 0;
   const attempts = (raw as Partial<DeliveryState>).attempts;
   return typeof attempts === "number" && Number.isInteger(attempts) && attempts >= 0 ? attempts : 0;
+}
+
+function deliveryLeaseToken(payload: Record<string, unknown>): string | undefined {
+  const raw = payload.emailDelivery;
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const token = (raw as Partial<DeliveryState>).leaseToken;
+  return typeof token === "string" && token.length > 0 ? token : undefined;
 }
 
 function withoutDeliveryState(payload: Record<string, unknown>): Record<string, unknown> {
