@@ -139,8 +139,11 @@ describe("HostPacer", () => {
     const PLATFORM = "https://platform.example.net/apply";
     const page = "<!doctype html><html><head><title>Apply</title></head><body>Hi.</body></html>";
 
-    const transport: SourceTransport = async (url) =>
-      url === PLATFORM
+    const transport: SourceTransport = async (url, options) => {
+      // The real transport pauses here, once an address has passed its checks and just before the
+      // socket. A fixture that skipped it would pass this test without pacing anything.
+      await options.onHop?.(url);
+      return url === PLATFORM
         ? {
             status: 200,
             headers: { "content-type": "text/html" },
@@ -153,6 +156,7 @@ describe("HostPacer", () => {
             bytes: Buffer.alloc(0),
             truncated: false,
           };
+    };
 
     for (const vanity of ["a", "b", "c"]) {
       await fetchSource(`https://grants-${vanity}.example.org/`, {
@@ -166,6 +170,39 @@ describe("HostPacer", () => {
     // Three distinct vanity hosts: never spaced, one request each. The platform behind them: three
     // requests, so two gaps. Without per-hop pacing this would have been no gaps at all.
     expect(clock.slept).toEqual([1_000, 1_000]);
+  });
+
+  /**
+   * A HOST THAT IS REFUSED IS OWED NOTHING. The pacer is called by the TRANSPORT, once an address
+   * has been resolved, classified and pinned and immediately before the socket — not by
+   * `fetchSource` before all of that. So a batch of entries pointing at loopback, the metadata
+   * endpoint, or a name that does not resolve costs the run no time at all: there is no stranger's
+   * server on the other end to be polite to, and sleeping between refusals would spend the batch's
+   * budget on the entries that cannot succeed.
+   *
+   * Driven against the REAL transport, because the refusal being tested is a fact about a resolved
+   * address and the fixture transport is exactly the layer that does not have one.
+   */
+  it("costs a batch nothing when the hosts are refused before any socket", async () => {
+    const clock = fakeClock();
+    const pacer = new HostPacer(1_000, clock);
+    const onHop = async (target: string) => {
+      await pacer.wait(target);
+    };
+
+    for (const url of [
+      "http://127.0.0.1:9/",
+      "http://169.254.169.254/latest/meta-data/",
+      "http://127.0.0.1:9/again",
+    ]) {
+      await expect(
+        fetchSource(url, { allowPrivateHosts: false, onHop }),
+        url,
+      ).rejects.toMatchObject({ category: expect.stringContaining("address_refused") });
+    }
+
+    expect(clock.slept, "three refusals, and not one second spent on them").toEqual([]);
+    expect(clock.elapsed).toBe(0);
   });
 
   /** Time really does pass between fetches, and the gap already elapsed is not waited out again. */

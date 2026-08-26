@@ -335,13 +335,22 @@ three consequences worth stating:
 * **The selection no longer drains, so the cap bounds the INVOCATION rather than the pass.** It
   refills on a rolling schedule, so `remaining` is not "work still owed tonight" — and `remaining`
   is what the runner loops on (`processed > 0 && remaining > 0`, up to `--passes`, **20 by
-  default**). Reporting the honest count there would have turned a 500 cap into an authorisation
-  for ten thousand outbound fetches a night. So **a pass whose selection filled the cap reports
-  `remaining: 0`** and moves the true figure to `details.deferred`: zero means "do not come round
-  again tonight", and the count is demoted rather than lost. When the cap did not bite, `remaining`
-  is the ordinary honest count and a second pass may still pick up rows the first left unsettled.
-  `VERIFY_NIGHTLY_LIMIT` (500) is the budget; `--limit` overrides it for an operator draining a
-  backlog by hand.
+  default**). So `verification-backfill` **always reports `remaining: 0`** and puts what its
+  predicate still matches in `details.deferred`. Two mechanisms hold the budget, because neither
+  covers the other's case:
+
+  * the service keeps a **fetch budget** — set from the first batch's effective limit, decremented
+    per fetch *attempt* — so several batches on one instance share one budget;
+  * the unconditional `remaining: 0`, because `registry.ts` builds a **new service for every pass**,
+    which would reset that counter. What stops the loop in a deployment is the report.
+
+  The rule is unconditional rather than "zero once the cap bit" because a pass coming in *under*
+  the limit leaked just as surely: 499 selected against a 500 limit, some settled and some left owed
+  by a transient failure, is `processed > 0` and `remaining > 0` — and the next pass gets a fresh
+  full budget, so a 500 cap bought 997 fetches without ever appearing to bite.
+
+  `VERIFY_NIGHTLY_LIMIT` (500) is the budget. **To drain a backlog, raise `--limit`, not
+  `--passes`** — the first is the budget and the second can no longer multiply it.
 * **Never-checked entries come first.** The order is `verified_at ASC NULLS FIRST, id`, so when the
   cap bites it drops a month-old re-check rather than an entry nobody has ever fetched.
 * **A failed fetch is not a check.** A run that never reached the source — `timeout`,
@@ -351,8 +360,12 @@ three consequences worth stating:
   are precisely the ninety days after which `staleness` closes it: a resolver hiccup would close
   live listings. Everything else **is** a verdict and does stamp — any HTTP response at all
   (a 404 is an answer, not an outage), and the refusals `scheme_not_allowed`, `address_refused:*`,
-  `content_type_not_allowed` and the redirect failures, which are facts about the URL a submitter
-  supplied and would learn nothing from being re-fetched nightly.
+  `content_type_not_allowed`, `too_many_redirects`, `redirect_without_location` and
+  `redirect_malformed`, which are facts about the URL a submitter supplied or about a server that
+  will still be answering the same way tomorrow, and would learn nothing from being re-fetched
+  nightly. `redirect_malformed` — a `Location` that is not a URL — exists as its own category for
+  exactly that reason: as an unclassified `TypeError` it surfaced as `transport_failure`, landed in
+  the transient bucket, and had the entry re-fetched every night forever.
 
 The cost of that last rule, stated plainly: a domain that has genuinely stopped resolving stays in
 the selection, at the head of it, indefinitely. The nightly cap bounds what that costs, and
@@ -370,10 +383,16 @@ The pacer is handed to the fetcher as its `onHop` hook rather than applied to th
 because **a redirect is a request to a different server**. A corpus is full of vanity domains that
 all redirect to one grants platform; spacing only the requested host would space thirty vanity
 hosts perfectly and land thirty requests on the platform behind them in the same second — the exact
-burst this exists to prevent, aimed at the one host that actually serves the pages. Nothing that is
-not `http(s)`, and nothing with an empty host, is paced at all: `file:`, `mailto:` and `data:` all
-parse to an empty host, and pacing them would make a batch sleep between refusals that never open a
-socket.
+burst this exists to prevent, aimed at the one host that actually serves the pages.
+
+**The wait happens inside the transport, after the address is resolved, classified and pinned, and
+immediately before the socket.** Everything upstream of that can refuse the request outright — a
+scheme that is not `http(s)`, a name that does not resolve, an address that is loopback, link-local
+or otherwise private — and none of those open a socket, so none of them owe anyone a pause. Pacing
+earlier made a batch of ten refused entries sleep nine seconds between refusals, spending the run's
+time on the entries that cannot succeed. Nothing with an empty host is paced either: `file:`,
+`mailto:` and `data:` all parse to one. The pin is unaffected by the wait — the address is fixed for
+that connection, so nothing re-resolves while the pacer holds.
 
 A reviewer's own `POST .../verify` is **not** paced: one request is not a crawl, and making it queue
 behind a batch would charge politeness to the wrong person.
@@ -615,7 +634,7 @@ Each clause carries weight:
   selection no longer drains is `verification-backfill`, and what keeps it inside that window is
   `VERIFY_NIGHTLY_LIMIT`: the cap, not the predicate, is what bounds its runtime, so raising it
   (or passing a larger `--limit`) is a decision about how long the chain may take. **The cap bounds
-  the whole invocation, not one pass** — a capped pass reports `remaining: 0` precisely so
+  the whole invocation, not one pass** — the job always reports `remaining: 0` precisely so
   `--passes 20` cannot multiply it — so the ceiling on a night's outbound fetches is
   `VERIFY_NIGHTLY_LIMIT`, whatever `--passes` says, and `details.deferred` is where the work left
   for tomorrow is counted.

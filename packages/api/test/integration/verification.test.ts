@@ -632,6 +632,31 @@ run("M3VER verification", () => {
     expect(after.lastSeenAt?.getTime()).toBe(before.lastSeenAt?.getTime());
   });
 
+  /**
+   * A server answering `302` with a `Location` of `http://` is broken in a way that will still be
+   * broken tomorrow. Before it had a category of its own it surfaced as `transport_failure` — the
+   * bucket verification treats as transient — so the entry was never stamped and was re-fetched
+   * every single night, forever, on the strength of a header that is never going to change.
+   */
+  it("treats a redirect to a malformed Location as a verdict, not as a network failure", async () => {
+    const BROKEN = "https://programmes.example.org/broken-redirect";
+    const id = await seedEntry("redirect-malformed", BROKEN);
+    const view = await serviceWith(
+      fixtureTransport({ ...PAGES, [BROKEN]: { status: 302, headers: { location: "http://" } } }),
+      { recheckDays: 30 },
+    ).verify(id);
+
+    expect(view.error).toMatch(/redirect_malformed/);
+    expect(view.error, "not the transient bucket").not.toMatch(/not_a_verdict/);
+
+    const row = await load(id);
+    expect(row.verifiedAt, "stamped, so it waits for the TTL like any other verdict").toBeTruthy();
+    expect(row.verifiedAgainstSource).toBe(false);
+    expect(
+      await serviceWith(fixtureTransport(PAGES), { recheckDays: 30 }).pendingIds(10_000),
+    ).not.toContain(id);
+  });
+
   it("still retires an entry whose URL is refused, because that IS an answer about the URL", async () => {
     // The contrast that makes the rule above a rule rather than "failures are ignored":
     // `scheme_not_allowed` is a fact about what the submitter typed, and re-fetching it nightly
@@ -897,6 +922,65 @@ run("M3VER verification", () => {
    * while fetching nothing at all, and an unscoped batch with a real limit would fetch and stamp
    * whichever entry sorts first in a database shared with every other suite.
    */
+  /**
+   * THE BUDGET IS THE INVOCATION'S. `runner.ts` will call a cursor job up to twenty times while it
+   * is making progress, so a limit that resets per pass is not a limit — 500 becomes 10,000, and a
+   * pass that comes in UNDER its limit leaks just as surely as one that fills it.
+   *
+   * The SELECTION is scoped here and nothing else is: `pendingIds` is overridden so this test
+   * fetches its own five entries instead of whichever rows sort first in a database shared with
+   * every other suite. Everything under test is real — the budget arithmetic, the decrement per
+   * attempt, the loop, `verifyOnce`, the run rows — and the selection has its own tests above.
+   */
+  it("spends one budget across every batch on the service, not one per batch", async () => {
+    const ids: number[] = [];
+    for (const local of ["budget-1", "budget-2", "budget-3", "budget-4", "budget-5"]) {
+      ids.push(await seedEntry(local, MATCH_URL));
+    }
+
+    let fetches = 0;
+    const counting: SourceTransport = async (url, options) => {
+      fetches++;
+      return fixtureTransport(PAGES)(url, options);
+    };
+
+    class ScopedService extends VerificationService {
+      override async pendingIds(limit: number): Promise<number[]> {
+        return ids.slice(0, limit);
+      }
+    }
+    const service = new ScopedService(db, {
+      transport: counting,
+      config: verifyConfig({ recheckDays: 30 }),
+    });
+
+    const first = await service.runBatch({ limit: 3 });
+    expect(first.processed).toBe(3);
+    expect(fetches).toBe(3);
+    // All three entries share a host, so the real pacer really did hold the batch between them —
+    // which is also the only place the whole wiring (service → `fetchSource` → transport → pacer)
+    // is exercised end to end. The spacing's own edge cases are unit-tested against a fake clock.
+    //
+    // A FLOOR, NOT A FIGURE. The gap is measured from the last reservation, so the time this run
+    // spends fetching and committing counts toward it: two gaps against a 1 s spacing come to a
+    // little under 2 s, by however long the work in between took. Asserting 2 s exactly is
+    // asserting that the database was instant.
+    expect(
+      first.details?.pacedMs,
+      "more than one full gap, so the batch really was held between hosts it shares",
+    ).toBeGreaterThan(1_000);
+
+    // The same instance, asked again exactly as the runner's second pass would ask.
+    const second = await service.runBatch({ limit: 3 });
+    expect(second.processed, "the budget was spent by the first batch").toBe(0);
+    expect(second.details?.selected).toBe(0);
+    expect(fetches, "three fetches for the invocation, not three per pass").toBe(3);
+
+    // Two of the five were never touched, and the report says so rather than hiding it.
+    for (const id of ids.slice(3)) expect((await load(id)).verifiedAt).toBeNull();
+    expect(second.remaining, "and it still does not ask to be looped").toBe(0);
+  });
+
   it("reports a spent budget as `remaining: 0`, with what is still owed deferred", async () => {
     await seedEntry("budget", MATCH_URL);
     const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });

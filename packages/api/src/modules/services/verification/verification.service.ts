@@ -99,6 +99,12 @@ export class VerificationService {
   /** Ids waiting for a submit-time check. Bounded by `VERIFY_QUEUE_MAX`; overflow drops to cron. */
   private readonly queue: number[] = [];
   private active = 0;
+  /**
+   * Fetch attempts left before this service stops selecting work. Set by the first `runBatch` from
+   * its effective limit and decremented per attempt, so several batches on ONE instance share one
+   * budget instead of each getting a fresh one.
+   */
+  private fetchBudget: number | undefined;
 
   constructor(
     private readonly db: DB = defaultDb,
@@ -371,21 +377,18 @@ export class VerificationService {
    * Check the entries owed a look — never checked, edited since, or checked longer ago than
    * `VERIFY_RECHECK_DAYS` — up to `limit`, then prune the run log of the ones it touched.
    *
-   * `limit` IS A CAP ON THE WHOLE INVOCATION, not on one pass — and making that true is why this
-   * job reports `remaining` the way it does.
+   * `limit` IS A CAP ON THE WHOLE INVOCATION, not on one pass, and it takes two mechanisms to make
+   * that true because the runner may or may not reuse this object:
    *
-   * The runner loops a cursor job while `processed > 0 && remaining > 0`, and `run-job.ts` allows
-   * twenty passes by default. Under the old contract — `remaining` = "what the predicate still
-   * matches" — a 500 cap therefore authorised up to TEN THOUSAND outbound fetches a night, which is
-   * not a cap at all, and the TTL made it worse: the predicate now refills on a rolling schedule
-   * instead of draining, so `remaining` stays positive by design and the loop runs until the pass
-   * budget, not the work, is exhausted.
+   *   - `fetchBudget`, a counter on THIS INSTANCE, set from the first batch's effective limit and
+   *     decremented per fetch attempt. Several batches on one service share one budget, so the
+   *     second finds it spent and selects nothing.
+   *   - `remaining: 0`, ALWAYS, from `batchReport`. `registry.ts` builds a NEW service for every
+   *     pass, so the counter alone would be reset each time; what actually stops the loop in a
+   *     deployment is the report. See `batchReport` for why no honest value works there.
    *
-   * So when the selection FILLED the cap, this reports `remaining: 0` and moves the true figure to
-   * `details.deferred`. Zero here means "do not come round again tonight", which is exactly what
-   * the runner reads it as; the count of what is still owed is not lost, it is just no longer
-   * pretending to be a reason to keep fetching. When the cap did not bite, `remaining` is the
-   * honest count, and a second pass can still pick up rows the first left unsettled.
+   * Neither covers the other's case, and both are cheap. `details.deferred` carries what is still
+   * owed, and an operator draining a backlog raises `--limit` rather than `--passes`.
    *
    * `processed` counts entries this pass SETTLED. A run whose fetch failed transiently, and a run
    * whose entry was edited underneath it, are both recorded and both deliberately excluded — the
@@ -395,8 +398,12 @@ export class VerificationService {
     if (!this.config.verification.enabled) {
       return { processed: 0, remaining: 0, skipped: "verification is disabled" };
     }
+    // THE BUDGET IS THE INVOCATION'S, NOT THE PASS'S. Set once from the first batch's effective
+    // limit; every later batch on this instance draws from what is left rather than starting again.
     const limit = options.limit ?? this.config.verification.nightlyLimit;
-    const ids = await this.pendingIds(limit);
+    this.fetchBudget ??= limit;
+    const ids =
+      this.fetchBudget > 0 ? await this.pendingIds(Math.min(limit, this.fetchBudget)) : [];
     // ONE PACER FOR THE WHOLE PASS, so the spacing is between this run's fetches rather than
     // between each entry and itself. A seeded corpus clusters by host, and that clustering is the
     // only reason this exists.
@@ -405,6 +412,10 @@ export class VerificationService {
     let unsettled = 0;
     let pacedMs = 0;
     for (const id of ids) {
+      // Spent on the ATTEMPT, not on the outcome. A fetch that timed out cost a connection and a
+      // stranger's attention exactly like one that answered, and a budget that only counted
+      // successes would be spent slowest by whatever is going worst.
+      this.fetchBudget--;
       try {
         const outcome = await this.verifyOnce(id, SYSTEM_ACTOR, pacer);
         pacedMs += outcome.pacedMs;
@@ -417,7 +428,6 @@ export class VerificationService {
     }
     return batchReport({
       selected: ids.length,
-      limit,
       processed,
       unsettled,
       owed: await this.pendingCount(),
@@ -475,10 +485,8 @@ export class VerificationService {
 }
 
 export interface BatchOutcome {
-  /** Entries the predicate handed this pass — capped at `limit`. */
+  /** Entries the predicate handed this pass — capped by what was left of the budget. */
   selected: number;
-  /** The invocation's budget: `VERIFY_NIGHTLY_LIMIT`, or an operator's `--limit`. */
-  limit: number;
   processed: number;
   unsettled: number;
   /** What the predicate still matches now the pass is over. */
@@ -488,31 +496,39 @@ export interface BatchOutcome {
 }
 
 /**
- * How a pass reports itself — and the one place the budget rule lives, so it can be read and tested
- * without a database or a socket.
+ * How a pass reports itself. `remaining` IS ALWAYS ZERO, and that is the second half of the budget.
  *
- * THE RULE: when the selection filled the cap, the budget for this INVOCATION is spent, and
- * `remaining` is reported as `0` with the true figure moved to `details.deferred`.
+ * `remaining` is not a statistic, it is an instruction: `runner.ts` loops a cursor job while
+ * `processed > 0 && remaining > 0`, and `run-job.ts` allows twenty passes by default. Every honest
+ * value this job could report there multiplies its own cap:
  *
- * `remaining` is not a statistic, it is an instruction: the runner loops a cursor job while
- * `processed > 0 && remaining > 0`, and `run-job.ts` allows twenty passes by default. Reporting the
- * honest count there turned a 500 cap into an authorisation for ten thousand outbound fetches — and
- * the re-check TTL makes that permanent rather than occasional, because the predicate now refills on
- * a rolling schedule instead of draining, so `remaining` stays positive by design. Zero means "do
- * not come round again tonight"; `deferred` keeps the number that was going to be misread as a
- * reason to keep going.
+ *   - the obvious case is a pass that filled its selection — the predicate still matches thousands,
+ *     so the runner asks for another 500, twenty times over;
+ *   - the subtle one, and the reason "report zero only when the cap bit" was not enough, is a pass
+ *     that did NOT fill it. 499 selected against a 500 limit, some settled and some left owed by a
+ *     transient failure, is `processed > 0` and `remaining > 0` — and the next pass is a fresh full
+ *     budget, so a 500 cap bought 997 fetches without the cap ever appearing to bite.
+ *
+ * And the re-check TTL makes both permanent rather than occasional: the predicate refills on a
+ * rolling schedule instead of draining, so `remaining` is positive BY DESIGN and the loop ends when
+ * the pass budget is exhausted rather than the work.
+ *
+ * So this job never asks to be looped. One invocation is one batch, bounded by the fetch budget the
+ * service holds; `details.deferred` carries what the predicate still matches, which is the number
+ * that was being misread as a reason to keep fetching. AN OPERATOR DRAINING A BACKLOG RAISES
+ * `--limit`, NOT `--passes` — the first is the budget, the second can no longer multiply it.
+ *
+ * Kept as a pure function so the rule can be read, and tested, without a database or a socket.
  */
 export function batchReport(outcome: BatchOutcome): JobResult {
-  const capped = outcome.selected >= outcome.limit;
   return {
     processed: outcome.processed,
-    remaining: capped ? 0 : outcome.owed,
+    remaining: 0,
     details: {
       selected: outcome.selected,
       unsettled: outcome.unsettled,
-      // What is still owed and was deliberately left for the next invocation. Zero whenever the cap
-      // did not bite, in which case `remaining` already carries the same number.
-      deferred: capped ? outcome.owed : 0,
+      // What the predicate still matches, deliberately left for the next invocation.
+      deferred: outcome.owed,
       // What the politeness cost, so a pass that took an hour can be attributed to the spacing or
       // to the sites rather than guessed at.
       pacedMs: outcome.pacedMs,

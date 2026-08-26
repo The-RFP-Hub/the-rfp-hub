@@ -25,9 +25,17 @@ export interface FixturePage {
  *
  * An unmapped URL is a 404 rather than a throw: "the page is not there" is a real outcome the
  * verifier has to record, and a thrown fixture error would test the wrong branch.
+ *
+ * The ADDRESS check is not modelled here — it belongs to the real transport, and the fixture is
+ * reached only by URLs a test chose — so this calls `onHop` unconditionally, which is what the real
+ * transport does once an address has passed.
  */
 export function fixtureTransport(pages: Record<string, FixturePage>): SourceTransport {
-  return async (url: string): Promise<HopResponse> => {
+  return async (url: string, options): Promise<HopResponse> => {
+    // A fixture stands in for a transport that got as far as the socket, so it honours the pacing
+    // hook the real one calls at that point. Skipping it would make every fixture-driven test agree
+    // that politeness works by never exercising it.
+    await options.onHop?.(url);
     const page = pages[url];
     if (!page) {
       return {

@@ -53,6 +53,11 @@ export interface TransportOptions {
   maxBytes: number;
   headers: Record<string, string>;
   allowPrivateHosts: boolean;
+  /**
+   * Awaited immediately before the socket request, and AFTER the address has been resolved,
+   * classified and pinned. See `onHop` on `FetchSourceOptions` for why it lives down here.
+   */
+  onHop?: (url: string) => Promise<void>;
 }
 
 /** One HTTP round trip, with redirects NOT followed. The seam the fixture tests replace. */
@@ -114,13 +119,18 @@ export interface FetchSourceOptions {
   /** Injected by the fixture suites. A deployment always uses the pinning transport. */
   transport?: SourceTransport;
   /**
-   * Called with each hop's URL immediately before that hop is requested, and awaited.
+   * Awaited immediately before each hop's socket request. The politeness seam.
    *
-   * The politeness seam. A redirect is a request to a DIFFERENT server, and a corpus full of vanity
+   * EVERY HOP, because a redirect is a request to a DIFFERENT server: a corpus full of vanity
    * domains pointing at one grants platform would otherwise space thirty requests to thirty vanity
-   * hosts and burst thirty onto the platform behind them — so the caller's per-host pacer has to see
-   * every hop, not just the one stored on the entry. Called AFTER the scheme check, so a URL this
-   * fetcher will never open is never waited on.
+   * hosts and burst thirty onto the platform behind them.
+   *
+   * AND ONLY WHERE A REQUEST IS ACTUALLY ABOUT TO BE MADE. This is handed down to the TRANSPORT
+   * rather than called out here, because between "the URL parsed" and "a packet leaves" sit the
+   * scheme check, the DNS resolution and the address classification — and a host that is refused,
+   * private, or does not resolve gets no request at all. Pacing before those would make a batch of
+   * ten refused entries sleep nine seconds between refusals that never open a socket, which is
+   * politeness owed to nobody paid for out of the entries that can succeed.
    */
   onHop?: (url: string) => Promise<void>;
 }
@@ -130,11 +140,10 @@ const DEFAULT_MAX_REDIRECTS = 3;
 /**
  * Fetch one source page, following at most `maxRedirects` hops by hand.
  *
- * Every hop goes back through the scheme check, back through `onHop` (the caller's politeness
- * pacer), and back through the transport, which is where the address is resolved, validated and
- * pinned — so "a public host that redirects to loopback" is refused at hop 2 with the same
- * machinery that refuses loopback at hop 1, and hop 2's server is spaced from the last request to
- * that same server whoever sent it.
+ * Every hop goes back through the scheme check and back through the transport, which is where the
+ * address is resolved, validated, pinned and — only then — paced. So "a public host that redirects
+ * to loopback" is refused at hop 2 with the same machinery that refuses loopback at hop 1, and
+ * hop 2's server is spaced from the last request to that same server whoever sent it.
  */
 export async function fetchSource(
   url: string,
@@ -153,11 +162,11 @@ export async function fetchSource(
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
     const target = parseTarget(current);
-    await options.onHop?.(target.href);
     const response = await transport(target.href, {
       timeoutMs,
       maxBytes,
       allowPrivateHosts,
+      onHop: options.onHop,
       // Everything the request carries, in one literal. No cookie jar, no `Authorization`, no
       // `Referer` — a verifier that forwarded a credential would be handing it to whoever the
       // submitter pointed it at.
@@ -186,7 +195,24 @@ export async function fetchSource(
           response.status,
         );
       }
-      current = new URL(location, target.href).href;
+      // A `Location` THAT IS NOT A URL IS THE SERVER'S FAULT, NOT THE NETWORK'S. `new URL` throws a
+      // native `TypeError` for `http://`, `//` and friends, and an unclassified throw is caught by
+      // the caller's generic handler as `transport_failure` — which verification treats as
+      // TRANSIENT, so the entry is never stamped and is re-fetched every night for as long as that
+      // server keeps answering with the same broken header. It is a permanent property of the
+      // redirect, so it gets its own category and is a verdict like any other refusal.
+      let next: URL;
+      try {
+        next = new URL(location, target.href);
+      } catch {
+        throw new SourceFetchError(
+          `HTTP ${response.status} to ${JSON.stringify(location)}, which is not a URL`,
+          "redirect_malformed",
+          target.href,
+          response.status,
+        );
+      }
+      current = next.href;
       redirects.push(current);
       continue;
     }
@@ -324,6 +350,16 @@ async function resolvePinned(
 export const undiciTransport: SourceTransport = async (url, options) => {
   const target = new URL(url);
   const pinned = await resolvePinned(target.hostname, options.allowPrivateHosts);
+
+  // POLITENESS, HERE AND NOT EARLIER. Everything above this line can refuse the request outright —
+  // a hostname that does not resolve, one that resolves to loopback, to the metadata endpoint, to
+  // anything private — and none of those open a socket, so none of them owe a stranger's server a
+  // pause. Waiting before the pin would charge a batch a second for each of them.
+  //
+  // The pin is unaffected by the wait: the address was validated once and is fixed for this
+  // connection, so nothing re-resolves while the pacer holds. The wait delays the connection, it
+  // does not reopen the check-to-socket gap this transport exists to close.
+  await options.onHop?.(target.href);
 
   const proxy = defaultConfig.verification.egressProxy;
   const dispatcher = proxy

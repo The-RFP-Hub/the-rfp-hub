@@ -17,7 +17,6 @@ import { batchReport } from "../../src/modules/services/verification/verificatio
 
 const outcome = {
   selected: 0,
-  limit: 500,
   processed: 0,
   unsettled: 0,
   owed: 0,
@@ -26,7 +25,7 @@ const outcome = {
 };
 
 describe("the verification backfill's budget report", () => {
-  it("reports remaining: 0 when the selection filled the cap, and defers the true figure", () => {
+  it("never asks to be looped, and defers the true figure instead", () => {
     const report = batchReport({ ...outcome, selected: 500, processed: 500, owed: 1_200 });
     // Zero here means "do not come round again tonight" — the twenty-pass loop stops at one.
     expect(report.remaining).toBe(0);
@@ -34,13 +33,25 @@ describe("the verification backfill's budget report", () => {
     expect(report.processed).toBe(500);
   });
 
-  it("reports the honest count when the cap did not bite", () => {
-    const report = batchReport({ ...outcome, selected: 12, processed: 9, unsettled: 3, owed: 3 });
-    expect(report.remaining).toBe(3);
-    expect(report.details?.deferred).toBe(0);
+  /**
+   * THE CASE THAT "report zero only when the cap bit" MISSED, and the reason the rule is
+   * unconditional. 499 selected against a 500 limit is a cap that never appears to bite; some rows
+   * settled and some left owed by a transient failure is `processed > 0` and `remaining > 0`; and
+   * the pass after it is a fresh full budget. A 500 cap bought 997 fetches.
+   */
+  it("reports zero even when the selection came in UNDER the limit", () => {
+    const report = batchReport({
+      ...outcome,
+      selected: 499,
+      processed: 300,
+      unsettled: 199,
+      owed: 199,
+    });
+    expect(report.remaining).toBe(0);
+    expect(report.details?.deferred).toBe(199);
   });
 
-  it("treats a selection that exactly filled the cap as spent, however little is left", () => {
+  it("still says so when nothing at all is left owed", () => {
     const report = batchReport({ ...outcome, selected: 500, processed: 500, owed: 0 });
     expect(report.remaining).toBe(0);
     expect(report.details?.deferred).toBe(0);
@@ -52,14 +63,14 @@ describe("the verification backfill's budget report", () => {
       selected: 40,
       processed: 37,
       unsettled: 3,
-      owed: 0,
+      owed: 5,
       pacedMs: 39_000,
       pruned: 12,
     });
     expect(report.details).toEqual({
       selected: 40,
       unsettled: 3,
-      deferred: 0,
+      deferred: 5,
       pacedMs: 39_000,
       pruned: 12,
     });
