@@ -787,6 +787,7 @@ export function OpportunityForm({
         {consequence ? (
           <p
             className={[
+              "callout",
               styles.consequence,
               consequence.immediate === true ? styles.consequenceNow : undefined,
               consequence.immediate === false ? styles.consequenceLater : undefined,
@@ -818,12 +819,13 @@ export function OpportunityForm({
       </Section>
 
       <Section title="Funding information">
-        <div className={styles.cols}>
+        <div className={`${styles.cols} ${styles.fundingGrid}`}>
           <TextField
             {...at("currency")}
             className={styles.narrow}
             label="Currency"
             optional
+            hint="One currency for the whole listing — the reward table, milestones and prizes below all read it from here."
             maxLength={16}
             placeholder="USD"
             value={form.currency}
@@ -840,9 +842,12 @@ export function OpportunityForm({
             {...at("allocated")}
             label="Committed"
             optional
+            hint="What has been promised to date, not what has been paid."
             value={form.allocated}
             onChange={(value) => set("allocated", value)}
           />
+        </div>
+        <div className={`${styles.cols} ${styles.fundingGrid}`}>
           <NumberField
             {...at("minAward")}
             label="Min award"
@@ -858,11 +863,6 @@ export function OpportunityForm({
             onChange={(value) => set("maxAward", value)}
           />
         </div>
-        <p className="hint">
-          One currency for the whole listing — the reward table, milestones and prizes below all
-          read it from here. &lsquo;Committed&rsquo; is what has been promised to date, not what has
-          been paid.
-        </p>
 
         <p className="hint">
           Milestones, in sequence. Their order is the only thing that orders them.
@@ -1329,11 +1329,11 @@ export function OpportunityForm({
         ) : null}
       </Section>
 
-      {!validation.available ? <p className="note error">{validation.reason}</p> : null}
+      {!validation.available ? <p className="callout note error">{validation.reason}</p> : null}
 
       {visibleIssues.length > 0 ? (
         <div
-          className="state error"
+          className="callout state error"
           role="alert"
           id={ERROR_SUMMARY_ID}
           ref={errorSummaryRef}
@@ -1414,7 +1414,7 @@ export function OpportunityForm({
           </span>
         ) : null}
         {mode === "create" && draftStatus?.kind === "error" ? (
-          <span className="note error">
+          <span className="callout note error">
             Draft saving is unavailable in this browser. Keep this page open until you submit.
           </span>
         ) : null}

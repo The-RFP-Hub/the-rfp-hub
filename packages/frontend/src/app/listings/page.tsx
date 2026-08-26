@@ -200,9 +200,7 @@ function Listings({ me }: { me: Me }) {
               }
               action={
                 filter === "all" ? (
-                  <Link className="button-primary" href="/listings/new">
-                    Submit an opportunity
-                  </Link>
+                  <Link href="/listings/new">Submit an opportunity</Link>
                 ) : (
                   <button type="button" onClick={() => setFilter("all")}>
                     Show every status

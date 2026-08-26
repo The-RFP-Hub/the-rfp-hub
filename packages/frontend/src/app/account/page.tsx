@@ -72,7 +72,12 @@ function Account({ me }: { me: Me }) {
             onChange={(event) => setDisplayName(event.target.value)}
           />
         </div>
-        <button type="button" onClick={() => void save()} disabled={busy}>
+        <button
+          type="button"
+          className="button-primary"
+          onClick={() => void save()}
+          disabled={busy}
+        >
           {busy ? "Saving…" : "Save"}
         </button>
         <ActionNote note={note} />

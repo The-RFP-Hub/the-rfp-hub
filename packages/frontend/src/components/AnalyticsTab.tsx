@@ -119,15 +119,21 @@ export function SeriesView({
           <caption>{METRIC_LABELS[metric]} per day, UTC</caption>
           <thead>
             <tr>
-              <th scope="col">Day</th>
-              <th scope="col">{METRIC_LABELS[metric]}</th>
+              <th scope="col" className="numeric">
+                Day
+              </th>
+              <th scope="col" className="numeric">
+                {METRIC_LABELS[metric]}
+              </th>
             </tr>
           </thead>
           <tbody>
             {points.map((point) => (
               <tr key={point.day}>
-                <th scope="row">{formatDay(point.day)}</th>
-                <td>{formatCount(point.value)}</td>
+                <th scope="row" className="numeric">
+                  {formatDay(point.day)}
+                </th>
+                <td className="numeric">{formatCount(point.value)}</td>
               </tr>
             ))}
           </tbody>

@@ -84,6 +84,28 @@ beforeEach(() => {
   });
 });
 
+describe("the key page's action hierarchy", () => {
+  it("makes the actual Mint control primary and uses a shared checkbox row", async () => {
+    mount();
+
+    expect((await screen.findByRole("button", { name: "Mint" })).className).toContain(
+      "button-primary",
+    );
+    expect(screen.getByRole("checkbox", { name: /read/ }).closest("label")?.className).toContain(
+      "choice-row",
+    );
+  });
+
+  it("keeps the empty-state jump link secondary", async () => {
+    list.mockResolvedValueOnce({ items: [] });
+    mount();
+
+    expect(
+      (await screen.findByRole("link", { name: "Mint your first key" })).className,
+    ).not.toContain("button-primary");
+  });
+});
+
 describe("revoking a key", () => {
   it("stages the consequence on the first click without revoking", async () => {
     mount();

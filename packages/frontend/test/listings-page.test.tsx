@@ -83,6 +83,21 @@ beforeEach(() => {
 });
 
 describe("the merged row on Your listings", () => {
+  it("keeps the duplicate submit action in the empty state secondary", async () => {
+    render(
+      <ApiClientProvider value={client([])}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByRole("link", { name: "Submit an opportunity" })).toHaveLength(2),
+    );
+    const links = screen.getAllByRole("link", { name: "Submit an opportunity" });
+    expect(links).toHaveLength(2);
+    expect(links.filter((link) => link.className.includes("button-primary"))).toHaveLength(1);
+  });
+
   it("renders exactly one derived badge for every reachable publisher state", async () => {
     const row = (
       status: PublisherStatus,

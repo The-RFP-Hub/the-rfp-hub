@@ -44,7 +44,7 @@ export class AuthBoundary extends Component<Props, State> {
 
     return (
       <main className="shell-main">
-        <div className="state error" role="alert">
+        <div className="callout state error" role="alert">
           <h1>This deployment cannot reach its service.</h1>
           <p>The application could not start. Try again after the deployment is fixed.</p>
           <TechnicalDetails error={error}>

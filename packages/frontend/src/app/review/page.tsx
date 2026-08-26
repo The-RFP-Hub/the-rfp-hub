@@ -707,7 +707,6 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                           <div className="row">
                             <button
                               type="button"
-                              className="button-primary"
                               disabled={busy}
                               onClick={() =>
                                 void run(async () => {
@@ -1335,14 +1334,8 @@ function Side({
   return (
     <div>
       {selectable ? (
-        <label className="row">
-          <input
-            type="radio"
-            name={group}
-            checked={selected}
-            onChange={() => onSelect(side.id)}
-            style={{ width: "auto" }}
-          />
+        <label className="choice-row">
+          <input type="radio" name={group} checked={selected} onChange={() => onSelect(side.id)} />
           <span>keep this one</span>
         </label>
       ) : null}
@@ -1437,9 +1430,7 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search organisations by name or slug…"
         />
-        <button type="submit" className="button-primary">
-          Search
-        </button>
+        <button type="submit">Search</button>
         {search !== "" ? (
           <button
             type="button"
@@ -1717,7 +1708,6 @@ function OrgRow({
                 <p className="row">
                   <button
                     type="button"
-                    className="button-primary"
                     onClick={() => {
                       setConfirming(false);
                       setGranting(true);

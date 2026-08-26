@@ -116,7 +116,7 @@ export function Field({
         </span>
       ) : null}
       {advisory ? (
-        <span className={styles.advisory} id={advisoryId}>
+        <span className={`callout ${styles.advisory}`} id={advisoryId}>
           {advisory}
         </span>
       ) : null}

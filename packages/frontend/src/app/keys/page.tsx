@@ -182,12 +182,11 @@ function Keys() {
           <legend>Scopes</legend>
           {SCOPES.map((scope) => (
             <p key={scope.value}>
-              <label>
+              <label className="choice-row">
                 <input
                   type="checkbox"
                   checked={scopes.includes(scope.value)}
                   onChange={() => toggle(scope.value)}
-                  style={{ width: "auto", marginRight: "0.5rem" }}
                 />
                 <code>{scope.label}</code>
               </label>
@@ -197,6 +196,7 @@ function Keys() {
         </fieldset>
         <button
           type="button"
+          className="button-primary"
           onClick={() => void create()}
           disabled={createBusy || scopes.length === 0}
         >
@@ -211,11 +211,7 @@ function Keys() {
             <EmptyState
               title="No keys yet."
               detail="Nothing is broken — an account that only uses this frontend never needs one. A key is for scripts and integrations that submit on your behalf."
-              action={
-                <a href="#mint-key" className="button-primary">
-                  Mint your first key
-                </a>
-              }
+              action={<a href="#mint-key">Mint your first key</a>}
             />
           ) : (
             <div className="table-scroll">

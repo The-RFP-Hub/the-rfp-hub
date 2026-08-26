@@ -241,8 +241,8 @@ function Member({
 
   return (
     <section>
-      <div className="row" style={{ alignItems: "baseline" }}>
-        <h1 style={{ margin: 0 }}>
+      <div className="row row-baseline">
+        <h1 className="flush-heading">
           <UntrustedText value={membership.name} />
         </h1>
         <code>{slug}</code>

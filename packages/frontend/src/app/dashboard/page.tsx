@@ -41,7 +41,7 @@ export default function DashboardPage() {
           <Link href={HOW_IT_WORKS}>who can do what</Link> sets out the whole of it.
         </p>
         <p>
-          <button type="button" onClick={session.login}>
+          <button type="button" className="button-primary" onClick={session.login}>
             Log in
           </button>
         </p>
@@ -79,7 +79,7 @@ function Overview() {
             <p className="muted">
               {formatDay(summary.from)} to {formatDay(summary.to)} · best-effort, server-side counts
             </p>
-            <ul className="tiles">
+            <ul className="kpi-grid">
               {(["listViews", "detailViews", "sourceClicks", "applyClicks"] as const).map((key) => (
                 <li key={key} className="tile card">
                   <span className="tile-value">{formatCount(summary.totals[key])}</span>
@@ -95,9 +95,7 @@ function Overview() {
                   There is no traffic to report until something of yours is in the directory.
                 </p>
                 <p className="row">
-                  <Link className="button-primary" href="/listings/new">
-                    Submit an opportunity
-                  </Link>
+                  <Link href="/listings/new">Submit an opportunity</Link>
                   <span className="muted">
                     It lands pending unless your account publishes into a verified namespace.
                   </span>
@@ -110,8 +108,12 @@ function Overview() {
                   <thead>
                     <tr>
                       <th scope="col">Listing</th>
-                      <th scope="col">Detail views</th>
-                      <th scope="col">Apply clicks</th>
+                      <th scope="col" className="numeric">
+                        Detail views
+                      </th>
+                      <th scope="col" className="numeric">
+                        Apply clicks
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -125,8 +127,8 @@ function Overview() {
                             <code>{entry.opportunityId}</code>
                           </div>
                         </th>
-                        <td>{formatCount(entry.detailViews)}</td>
-                        <td>{formatCount(entry.applyClicks)}</td>
+                        <td className="numeric">{formatCount(entry.detailViews)}</td>
+                        <td className="numeric">{formatCount(entry.applyClicks)}</td>
                       </tr>
                     ))}
                   </tbody>

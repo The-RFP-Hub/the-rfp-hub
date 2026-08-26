@@ -116,6 +116,10 @@
   min-width: 0;
 }
 
+.fundingGrid > * {
+  min-width: 0;
+}
+
 .grow {
   flex: 3 1 18rem;
 }
@@ -160,7 +164,7 @@
  * submission is not blocked, so it reads as the advisory tier the validator's own warnings use
  * rather than as a failure.
  *
- * The rule in the margin remains the signal in greyscale; the warning tint reinforces it.
+ * The dashed full border remains the signal in greyscale; the warning tint reinforces it.
  */
 .advisory {
   display: block;
@@ -168,8 +172,9 @@
   background: var(--warn-soft);
   font-size: var(--text-sm);
   margin: var(--space-1) 0 0;
-  padding-left: var(--space-2);
-  border-left: 2px solid var(--warn);
+  padding: var(--space-1) var(--space-2);
+  border-color: var(--warn);
+  border-style: dashed;
   max-width: 60ch;
 }
 
@@ -181,28 +186,30 @@
 /*
  * The live "publishes as …" line under the id, in its three states.
  *
- * WIDTH AND STYLE CARRY THE STATE, not shade alone. A dashed rule reads as provisional, which is
- * what pending IS; a thick solid one reads as settled. Each state differs from the other two in
- * more than hue, so it survives greyscale and colour-vision differences.
+ * BORDER STYLE CARRIES THE STATE, not shade alone. Dotted is not yet knowable, solid is settled,
+ * and dashed is provisional. Each state differs from the other two without hue, so the distinction
+ * survives greyscale and colour-vision differences.
  */
 .consequence {
   margin: var(--space-2) 0 0;
   padding: var(--space-2) var(--space-3);
   background: var(--bg-soft);
-  border-radius: var(--radius);
-  /* Not knowable: thin, pale, solid. */
-  border-left: 3px solid var(--line);
+  /* Not knowable. */
+  border-style: dotted;
+  border-color: var(--line);
   font-size: var(--text-md);
 }
 
 /* Settled — it publishes on submit. */
 .consequenceNow {
-  border-left: 5px solid var(--ok);
+  border-style: solid;
+  border-color: var(--ok);
 }
 
 /* Provisional — it waits in the queue. */
 .consequenceLater {
-  border-left: 5px dashed var(--warn);
+  border-style: dashed;
+  border-color: var(--warn);
 }
 
 /* An id that cannot be changed, shown as the fact it is rather than as a live input. */

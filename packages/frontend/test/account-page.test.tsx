@@ -51,6 +51,14 @@ beforeEach(() => {
 });
 
 describe("account organisation links", () => {
+  it("makes Save the account page's primary action", async () => {
+    mount(account);
+
+    expect((await screen.findByRole("button", { name: "Save" })).className).toContain(
+      "button-primary",
+    );
+  });
+
   it("links the organisation index beside the heading and from the empty state", async () => {
     mount(account);
 

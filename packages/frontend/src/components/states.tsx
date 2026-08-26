@@ -79,7 +79,7 @@ export function ErrorState({
 }) {
   if (error.isUnauthenticated) {
     return (
-      <div className="state error" role="alert">
+      <div className="callout state error" role="alert">
         <p className="empty-title">Your sign-in has ended.</p>
         <p className="muted">
           Sign in again to continue to {what}. Nothing was lost, and you can pick up where you were.
@@ -98,7 +98,7 @@ export function ErrorState({
 
   if (error.isForbidden) {
     return (
-      <div className="state error" role="alert">
+      <div className="callout state error" role="alert">
         <p className="empty-title">You don&rsquo;t have access to {what}.</p>
         <p className="muted">
           Your account is signed in, but its role does not include this access.
@@ -114,7 +114,7 @@ export function ErrorState({
 
   if (error.isNotFound) {
     return (
-      <div className="state error" role="alert">
+      <div className="callout state error" role="alert">
         <p className="empty-title">We couldn&rsquo;t find {what}.</p>
         <p className="muted">It may have moved, been merged, or no longer be available.</p>
         <p className="row">
@@ -126,7 +126,7 @@ export function ErrorState({
   }
 
   return (
-    <div className="state error" role="alert">
+    <div className="callout state error" role="alert">
       <p className="empty-title">We couldn&rsquo;t load {what}.</p>
       <p className="muted">Try again. If the problem continues, the technical details can help.</p>
       {onRetry ? (
@@ -209,7 +209,7 @@ export function ResourceView<T>({
  */
 export function AuthUnavailable({ error }: { error: Error }) {
   return (
-    <div className="state error" role="alert">
+    <div className="callout state error" role="alert">
       <p className="empty-title">This deployment cannot reach its service.</p>
       <p className="muted">Sign-in is unavailable right now. Nothing is wrong with your account.</p>
       <TechnicalDetails error={error}>
@@ -243,7 +243,9 @@ export function ActionNote({ note }: { note: ActionNoteValue | null }) {
   if (!note) return null;
   return (
     <>
-      <output className={note.kind === "ok" ? "note ok" : "note error"}>{note.message}</output>
+      <output className={note.kind === "ok" ? "note ok" : "callout note error"}>
+        {note.message}
+      </output>
       {note.error ? <TechnicalDetails error={note.error} /> : null}
       {note.technical ? (
         <details>

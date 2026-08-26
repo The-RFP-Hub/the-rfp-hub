@@ -555,6 +555,24 @@ caption {
   flex-wrap: wrap;
 }
 
+.row-baseline {
+  align-items: baseline;
+}
+
+.flush-heading {
+  margin: 0;
+}
+
+.choice-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.choice-row input {
+  width: auto;
+}
+
 .row > *,
 .row-between > *,
 .grid-2 > *,
@@ -667,12 +685,17 @@ caption {
   display: block;
 }
 
+/* One full-border callout shape; modifiers carry urgency with words, weight and border style. */
+.callout {
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+}
+
 /* Error hue reinforces — but never replaces — the heavier border and explicit error copy. */
 .state.error {
   color: var(--bad);
   background: var(--bad-soft);
   border-color: var(--bad);
-  border-left: 3px solid var(--bad);
 }
 
 .state.error a {
@@ -711,8 +734,8 @@ caption {
   color: var(--bad);
   background: var(--bad-soft);
   font-weight: 600;
-  border-left: 3px solid var(--bad);
-  padding-left: var(--space-3);
+  border-color: var(--bad);
+  padding: var(--space-2) var(--space-3);
 }
 
 /* -------------------------------------------------------------------- badges --- */
@@ -801,6 +824,19 @@ caption {
 }
 
 /* --------------------------------------------------------------------- tiles --- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin: var(--space-4) 0;
+}
+
+.kpi-grid > * {
+  min-width: 0;
+}
 
 .tiles {
   display: flex;
@@ -897,6 +933,10 @@ caption {
   border-radius: var(--radius);
   padding: var(--space-4);
   margin: var(--space-3) 0;
+}
+
+.card > h2:first-child {
+  margin-top: 0;
 }
 
 /* The one card that is an instruction rather than a container: two solid pixels, per the mock. */
@@ -1069,6 +1109,20 @@ ul.plain {
   margin: 0;
   flex: 1 1 11rem;
   max-width: 20rem;
+  display: grid;
+  grid-template-rows: max-content 1fr;
+  row-gap: var(--space-1);
+}
+
+.filters .field label {
+  margin: 0;
+}
+
+.filters input,
+.filters select,
+.filters button {
+  min-block-size: calc(var(--space-8) + var(--space-2));
+  line-height: 1.25;
 }
 
 /*
@@ -1086,6 +1140,7 @@ ul.plain {
 /* The submit button sizes to its text rather than stretching across a column of its own. */
 .filters .field-action {
   flex: 0 0 auto;
+  display: block;
 }
 
 /*
@@ -1097,6 +1152,13 @@ ul.plain {
 .filters .is-set input {
   border-color: var(--ink);
   font-weight: 600;
+}
+
+/* A hueless dot makes the active state visible before the control value is read. */
+.filters .is-set label::after {
+  content: " •";
+  color: var(--ink);
+  font-weight: 800;
 }
 
 .result-line {
@@ -1258,5 +1320,17 @@ pre.untrusted-block {
 
   h1 {
     font-size: var(--text-metric);
+  }
+}
+
+@media (max-width: 56rem) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 30rem) {
+  .kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -584,7 +584,7 @@ describe("the states remain distinct without relying on hue", () => {
   });
 
   it("keeps a blocking problem and a non-blocking advisory on different classes", () => {
-    // Both resolve to the ink family; the module separates them by weight and by a marginal rule.
+    // Both resolve to the ink family; the module separates them by weight and a full-border shape.
     mount({ title: "", applicationUrl: "" });
     submit();
 
@@ -707,6 +707,25 @@ describe("required fields and intrinsic alignment", () => {
     expect(css).toMatch(/\.fieldLayout\s*{[^}]*flex-direction:\s*column;/s);
     expect(css).toMatch(/\.control\s*{[^}]*margin-top:\s*auto;/s);
     expect(css).not.toContain("@media");
+  });
+
+  it("groups funding as three totals and two award bounds with field-linked explanations", () => {
+    mount();
+
+    const currency = screen.getByLabelText("Currency — optional");
+    const committed = screen.getByLabelText("Committed — optional");
+    const totals = currency.closest(`.${styles.fundingGrid}`) as HTMLElement;
+    const awards = screen
+      .getByLabelText("Min award — optional")
+      .closest(`.${styles.fundingGrid}`) as HTMLElement;
+
+    expect(totals.querySelectorAll("[data-field-path]")).toHaveLength(3);
+    expect(awards.querySelectorAll("[data-field-path]")).toHaveLength(2);
+    expect(totals.contains(committed)).toBe(true);
+    expect(currency.getAttribute("aria-describedby")).toContain("f-currency-hint");
+    expect(committed.getAttribute("aria-describedby")).toContain("f-allocated-hint");
+    expect(screen.getByText(/One currency for the whole listing/).id).toBe("f-currency-hint");
+    expect(screen.getByText(/What has been promised to date/).id).toBe("f-allocated-hint");
   });
 });
 

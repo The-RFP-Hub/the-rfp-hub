@@ -195,9 +195,7 @@ export function DirectoryList() {
           </div>
 
           <div className="field field-action">
-            <button type="submit" className="button-primary">
-              Search
-            </button>
+            <button type="submit">Search</button>
           </div>
         </form>
       </search>

@@ -384,6 +384,10 @@ describe("the directory's filters", () => {
     expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("zk");
     expect((screen.getByLabelText("Ecosystem") as HTMLInputElement).value).toBe("Optimism");
     expect((screen.getByLabelText("Funding type") as HTMLSelectElement).value).toBe("grant");
+    expect(screen.getByLabelText("Funding type").closest(".field")?.className).toContain("is-set");
+    expect(screen.getByRole("button", { name: "Search" }).className).not.toContain(
+      "button-primary",
+    );
   });
 
   it("CARRIES EVERY LIVE CONTROL ON EVERY APPLY — the silently-discarded-draft bug", async () => {

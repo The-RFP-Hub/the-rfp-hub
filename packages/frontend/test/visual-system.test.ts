@@ -83,4 +83,37 @@ describe("the visual-system token boundary", () => {
       expect(css).toContain("scrollbar-gutter: stable;");
     }
   });
+
+  it("uses full-border callouts and keeps publish consequences distinct without hue", () => {
+    const [globalCss, formCss] = stylesheets.map(([, path]) =>
+      readFileSync(path, "utf8").replace(/\/\*[\s\S]*?\*\//g, ""),
+    );
+    expect(`${globalCss}\n${formCss}`).not.toMatch(/border-(?:left|right):\s*[2-9]/);
+    expect(globalCss).toMatch(/\.callout\s*\{[^}]*border:\s*2px solid var\(--line\);/s);
+    expect(formCss).toMatch(/\.consequence\s*\{[^}]*border-style:\s*dotted;/s);
+    expect(formCss).toMatch(/\.consequenceNow\s*\{[^}]*border-style:\s*solid;/s);
+    expect(formCss).toMatch(/\.consequenceLater\s*\{[^}]*border-style:\s*dashed;/s);
+  });
+
+  it("marks active filters with ink, weight and a hueless glyph", () => {
+    const css = readFileSync(stylesheets[0][1], "utf8");
+    const controls = css.match(/\.filters \.is-set select,[\s\S]*?\}/)?.[0] ?? "";
+    const marker = css.match(/\.filters \.is-set label::after\s*\{[^}]*\}/s)?.[0] ?? "";
+    expect(controls).toContain("border-color: var(--ink)");
+    expect(controls).toContain("font-weight: 600");
+    expect(marker).toContain('content: " •"');
+    expect(`${controls}${marker}`).not.toContain("--accent");
+  });
+
+  it("keeps the sign-in heading reset while removing the remaining inline visual exceptions", () => {
+    const css = readFileSync(stylesheets[0][1], "utf8");
+    expect(css).toMatch(/\.signin h2\s*\{[^}]*margin-top:\s*0;/s);
+    for (const path of [
+      join(process.cwd(), "src", "app", "keys", "page.tsx"),
+      join(process.cwd(), "src", "app", "review", "page.tsx"),
+      join(process.cwd(), "src", "app", "organisations", "[slug]", "page.tsx"),
+    ]) {
+      expect(readFileSync(path, "utf8")).not.toContain("style={{");
+    }
+  });
 });

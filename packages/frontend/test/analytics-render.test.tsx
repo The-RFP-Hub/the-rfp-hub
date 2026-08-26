@@ -20,7 +20,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const { session } = vi.hoisted(() => ({
-  session: { data: { user: { id: "u1" } }, isPending: false, error: null },
+  session: {
+    data: { user: { id: "u1" } } as { user: { id: string } } | null,
+    isPending: false,
+    error: null,
+  },
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -97,6 +101,8 @@ describe("the analytics tab", () => {
     // The title of the entry, and the promise the whole surface has to keep.
     expect(screen.getByText(/Acme Ecosystem Round One/)).toBeTruthy();
     expect(screen.getByText(/Best-effort/)).toBeTruthy();
+    expect(container.querySelectorAll("details th.numeric")).toHaveLength(series.days.length + 2);
+    expect(container.querySelectorAll("details td.numeric")).toHaveLength(series.days.length);
   });
 
   it("draws the flat floor rather than dividing by zero when nothing has happened yet", async () => {
@@ -174,7 +180,7 @@ describe("the dashboard", () => {
       insights: { summary: vi.fn(async () => summary) },
     } as unknown as ApiClient;
 
-    render(
+    const { container } = render(
       <ApiClientProvider value={client}>
         <DashboardPage />
       </ApiClientProvider>,
@@ -183,5 +189,22 @@ describe("the dashboard", () => {
     const link = await screen.findByRole("link", { name: "Submit an opportunity" });
     expect(link.getAttribute("href")).toBe("/listings/new");
     expect(await screen.findByText("Acme Round One")).toBeTruthy();
+    expect(container.querySelector("ul.kpi-grid")).toBeTruthy();
+    expect(container.querySelectorAll(".kpi-grid .tile-value")).toHaveLength(4);
+    expect(container.querySelectorAll("table th.numeric")).toHaveLength(2);
+    expect(container.querySelectorAll("table td.numeric")).toHaveLength(2);
+  });
+
+  it("makes login primary when the dashboard is signed out", () => {
+    session.data = null;
+    const client = { baseUrl: "https://api.example.com" } as unknown as ApiClient;
+
+    render(
+      <ApiClientProvider value={client}>
+        <DashboardPage />
+      </ApiClientProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Log in" }).className).toContain("button-primary");
   });
 });

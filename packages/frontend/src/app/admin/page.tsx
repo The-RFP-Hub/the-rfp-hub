@@ -102,9 +102,7 @@ function Accounts({ me }: { me: Me }) {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="handle, display name or provider subject"
         />
-        <button type="submit" className="button-primary">
-          Search
-        </button>
+        <button type="submit">Search</button>
       </form>
       <ActionNote note={note} />
 
