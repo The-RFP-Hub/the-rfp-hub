@@ -773,8 +773,11 @@ re-shape a third of the corpus.
 
 Layered, module-per-folder — full pattern in [`docs/architecture.md`](./docs/architecture.md):
 `routes/<module>/<entity>.controller.ts` (HTTP handlers) → `services/<module>/<name>.service.ts`
-(logic + data over Drizzle) → `mappers/<entity>.mapper.ts` (pure row ↔ Standard). Route
-registration lives in `routes/<module>/index.ts`.
+(business logic) → `repositories/<domain>.repository.ts` (all database access) → `db`. Route
+registration lives in `routes/<module>/index.ts`; mappers remain pure row ↔ Standard helpers.
+Services never import Drizzle or schema tables: the filesystem guard pins that rule and its
+temporary migration debt in `test/unit/data-access-boundary.test.ts`; see
+[`ADR-0011`](../../adr/0011-repositories-own-all-database-access.md).
 
 - **DB**: Drizzle ORM over node-postgres; schema in `src/db/schema.ts`, migrations in
   `src/db/migrations`. The schema is the **M2 subset** of the full design in
