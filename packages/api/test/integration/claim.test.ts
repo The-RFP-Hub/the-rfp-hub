@@ -47,6 +47,8 @@ const UNVERIFIED = "m3claim-unverified";
  * on the T2 arm whatever the submitter arm said, and the test would prove nothing.
  */
 const CLAIMED = "m3claim-claimed";
+/** The publisher of the legacy-shaped row whose id prefix disagrees with it WITHOUT any claim. */
+const LEGACY_PUB = "m3claim-legacypub";
 const EMAILS = {
   host: "m3claim-host@rfphub.invalid",
   rival: "m3claim-rival@rfphub.invalid",
@@ -59,6 +61,8 @@ const EMAILS = {
   submitter: "m3claim-submitter@rfphub.invalid",
   /** A member of `CLAIMED`: the submitter whose own organisation later claims their entry. */
   insider: "m3claim-insider@rfphub.invalid",
+  /** A member of the aggregator namespace `HOST`, so an entry can be claimed BACK to it. */
+  hostMember: "m3claim-hostmember@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -74,6 +78,8 @@ run("M3CLAIM ownership claims", () => {
   let reviewerToken: string;
   let submitterToken: string;
   let insiderToken: string;
+  let hostMemberToken: string;
+  let submitterId: number;
   let operatorId: number;
   let sponsorId: number;
   let unverifiedId: number;
@@ -129,6 +135,8 @@ run("M3CLAIM ownership claims", () => {
     });
     const submitter = await seedIdentity(EMAILS.submitter, { handle: "m3claim-submitter" });
     const insider = await seedIdentity(EMAILS.insider, { handle: "m3claim-insider" });
+    const hostMember = await seedIdentity(EMAILS.hostMember, { handle: "m3claim-hostmember" });
+    submitterId = submitter.account.id;
     operatorId = operator.account.id;
     sponsorId = sponsor.account.id;
     unverifiedId = unverified.account.id;
@@ -141,9 +149,11 @@ run("M3CLAIM ownership claims", () => {
       reviewer.userId,
       submitter.userId,
       insider.userId,
+      hostMember.userId,
     );
 
-    await seedOrganization({ slug: HOST, verified: false });
+    const hostOrg = await seedOrganization({ slug: HOST, verified: false });
+    await seedOrganization({ slug: LEGACY_PUB, verified: false });
     const rivalOrg = await seedOrganization({ slug: RIVAL, verified: true });
     const operatorOrg = await seedOrganization({ slug: OPERATOR, verified: true });
     const sponsorOrg = await seedOrganization({ slug: SPONSOR, verified: true });
@@ -157,6 +167,7 @@ run("M3CLAIM ownership claims", () => {
     await grantMembership(sponsor.account.id, sponsorOrg.id, "owner");
     await grantMembership(unverified.account.id, unverifiedOrg.id, "owner");
     await grantMembership(insider.account.id, claimedOrg.id, "owner");
+    await grantMembership(hostMember.account.id, hostOrg.id, "owner");
 
     rivalToken = rival.token;
     operatorToken = operator.token;
@@ -166,12 +177,13 @@ run("M3CLAIM ownership claims", () => {
     reviewerToken = reviewer.token;
     submitterToken = submitter.token;
     insiderToken = insider.token;
+    hostMemberToken = hostMember.token;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3claim-",
-      organizationSlugs: [HOST, OPERATOR, SPONSOR, RIVAL, UNVERIFIED, CLAIMED],
+      organizationSlugs: [HOST, OPERATOR, SPONSOR, RIVAL, UNVERIFIED, CLAIMED, LEGACY_PUB],
       userIds,
       emails: Object.values(EMAILS),
     });
@@ -695,6 +707,131 @@ run("M3CLAIM ownership claims", () => {
     const res = await replace(insiderToken, id, "Still mine after the claim");
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json().opportunity.title).toBe("Still mine after the claim");
+  });
+
+  it("does not restore the submitter's PUT when the entry is claimed BACK to its own namespace", async () => {
+    // THE REASON THIS RULE CANNOT BE INFERRED FROM THE ID. An entry claimed away and then claimed
+    // back converges again — publisher equals the id prefix, exactly as it did on the day it was
+    // filed — while ownership has genuinely changed hands twice and now belongs to `HOST` rather
+    // than to whoever typed it in. Anything that reads the id instead of the record of the
+    // transfers hands PUT straight back to the former owner here.
+    const id = `${HOST}:reclaimed`;
+    const filed = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(submitterToken),
+      payload: submission(id, HOST, {
+        operatingOrganizations: [
+          { name: HOST, slug: HOST },
+          { name: OPERATOR, slug: OPERATOR },
+        ],
+      } as Record<string, unknown>),
+    });
+    expect(filed.statusCode, filed.body).toBe(201);
+    const published = await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${id}/approve`,
+      headers: bearer(reviewerToken),
+      payload: {},
+    });
+    expect(published.statusCode, published.body).toBe(200);
+
+    // AWAY: `OPERATOR` is verified and operates it, so this grants immediately.
+    const away = await claim(operatorToken, id, OPERATOR);
+    expect(away.statusCode, away.body).toBe(200);
+    expect(away.json().outcome).toBe("granted");
+
+    // BACK: `HOST` is unverified, so its member's claim queues and a reviewer returns it.
+    const back = await claim(hostMemberToken, id, HOST);
+    expect(back.statusCode, back.body).toBe(202);
+    const returned = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${back.json().claimId}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { verifyOrganization: false },
+    });
+    expect(returned.statusCode, returned.body).toBe(200);
+
+    const row = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    // The publisher now agrees with the id prefix again — and means nothing by it.
+    expect(row?.sourcePublisher).toBe(HOST);
+
+    const res = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(submitterToken),
+      payload: submission(id, HOST, {
+        title: "Edited by the account that filed it",
+        operatingOrganizations: [
+          { name: HOST, slug: HOST },
+          { name: OPERATOR, slug: OPERATOR },
+        ],
+      } as Record<string, unknown>),
+    });
+    expect(res.statusCode, res.body).toBe(403);
+    expect(res.json().error).toBe("not_your_entry");
+    // A claim really did take it, twice, so the claim sentence is the honest one here.
+    expect(res.json().message).toMatch(/ownership has since moved/);
+
+    // Not frozen, just not theirs: a reviewer still corrects it. (A member of `HOST` cannot,
+    // because `HOST` is unverified and the namespace arm wants a VERIFIED membership — existing
+    // behaviour of the T2 arm, unrelated to the claim rule under test.)
+    const editorial = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(reviewerToken),
+      payload: submission(id, HOST, {
+        title: "Corrected after the round trip",
+        operatingOrganizations: [
+          { name: HOST, slug: HOST },
+          { name: OPERATOR, slug: OPERATOR },
+        ],
+      } as Record<string, unknown>),
+    });
+    expect(editorial.statusCode, editorial.body).toBe(200);
+  });
+
+  it("leaves a LEGACY divergent row editable by its submitter — divergence is not a claim", async () => {
+    // The corpus shape: `fundingmap:1042` is published under `optimism` and always was, with no
+    // claim anywhere in its history (see legacy-publisher-edit.test.ts). Treating publisher ≠ id
+    // prefix as evidence of a transfer locks the submitter of a row like this out of ordinary
+    // corrections AND tells them a claim took it, which never happened.
+    const id = "m3claim-aggregator:1042";
+    await ingest.upsertFromStandard(
+      {
+        specVersion: "1.0.0",
+        id,
+        fundingType: "grant",
+        title: "Legacy divergent",
+        description: "Published under a namespace its id does not name.",
+        status: "open",
+        operatingOrganizations: [{ name: LEGACY_PUB, slug: LEGACY_PUB }],
+        source: { publisher: LEGACY_PUB, ingestedVia: "import", verifiedAgainstSource: null },
+        ecosystems: ["M3CLAIM"],
+        fundingDetails: { fundingType: "grant" },
+      },
+      { reviewStatus: "approved", isListed: true, sourceSystem: LEGACY_PUB },
+    );
+    // The one thing the ingest path does not set, and the only reason this row is interesting: a
+    // human account owns it.
+    await db
+      .update(opportunities)
+      .set({ submittedBy: submitterId })
+      .where(eq(opportunities.publicId, id));
+
+    const res = await app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(submitterToken),
+      payload: submission(id, LEGACY_PUB, {
+        title: "Corrected by the account that filed it",
+        operatingOrganizations: [{ name: LEGACY_PUB, slug: LEGACY_PUB }],
+      } as Record<string, unknown>),
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().opportunity.title).toBe("Corrected by the account that filed it");
   });
 
   it("unlocks auto-approval when the reviewer verifies the organisation as part of the approval", async () => {

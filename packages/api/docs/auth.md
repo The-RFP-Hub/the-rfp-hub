@@ -285,7 +285,7 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | Route | Credential | Notes |
 |---|---|---|
 | `POST /v1/opportunities` | T1 + `write` | auto-approves only via `canPublishImmediately` |
-| `PUT /v1/opportunities/:id` | the submitter *while the entry is still theirs*, or T2 of the namespace, + `write` | `body.id` must equal the path id. The submitter keeps `PUT` while the entry is still published under the namespace its **id** was created in; once a granted claim has moved `source.publisher` elsewhere, only a member of the new publisher — or T3+ — may replace it |
+| `PUT /v1/opportunities/:id` | the submitter *while the entry is still theirs*, or T2 of the namespace, + `write` | `body.id` must equal the path id. Once publisher ownership has been **granted** away by a claim, the submitter keeps `PUT` only as a member of the organisation that publishes it now; otherwise it takes T2 of that namespace, or T3+ |
 | `POST /v1/opportunities/:id/claim` | membership on the claiming org, + `write` | filing needs `write` on a key; an **immediate grant** needs `publish`. Either absence is a 403 naming the scope, never a silent queue |
 | `GET /v1/me`, `/v1/me/opportunities`, `/v1/me/opportunities/:id`, `/v1/me/duplicates` | T1 | `/me/opportunities/:id` is the owner-visible full detail for a pending or rejected entry the public route 404s |
 | `GET /v1/insights/opportunities/:id` | owner or T3+ | 403 for anyone else — a publisher's numbers are not public |
@@ -488,10 +488,13 @@ somebody submitting on their own organisation's behalf and then claiming. A refu
 the same `403 not_your_entry`, with a message saying ownership moved by claim rather than the
 misleading "submitted by another account".
 
-*Which entries this bites* is decided by the **id**, not by a flag: a create pins the id to
-`<namespace>:<local>` and ids are immutable, so `source.publisher` disagreeing with the id's own
-prefix is exactly the set of entries a claim has reassigned. An ordinary submission filed into a
-namespace you hold no membership on is untouched — you may still edit what you filed.
+*Which entries this bites* is decided by the **trail**, not by the id: the check is whether a
+`grant_publisher` action was ever recorded against the entry (`audit_log` is append-only and both
+grant paths write it). Two shapes make the cheaper guesses wrong, and both are real — a legacy
+import whose publisher never matched its id prefix and never involved a claim, and an entry claimed
+away and later claimed back, whose id and publisher agree again while ownership has moved twice. An
+ordinary submission filed into a namespace you hold no membership on is untouched: you may still
+edit what you filed.
 
 ### Reviewing, as T3
 
