@@ -19,9 +19,11 @@ import {
   type SendResult,
 } from "../../src/modules/services/email/email.service.js";
 import { runJob } from "../../src/modules/services/jobs/runner.js";
+import { NotificationDispatchQueue } from "../../src/modules/services/notifications/notification-dispatch.queue.js";
 import {
   NOTIFICATION_EMAIL_MAX_ATTEMPTS,
   NOTIFICATION_EMAIL_RETRY_DELAY_MS,
+  NotificationDispatchService,
 } from "../../src/modules/services/notifications/notification-dispatch.service.js";
 import type { NotificationKind } from "../../src/modules/services/notifications/notification.service.js";
 import { seedIdentity } from "../helpers/auth.js";
@@ -80,12 +82,17 @@ async function rowOf(id: number) {
   return row;
 }
 
-function jobOptions(accountId: number, email: OutboundEmailPort, now: Date) {
+function jobOptions(
+  accountId: number,
+  email: OutboundEmailPort,
+  now: Date,
+  clock: () => Date = () => now,
+) {
   return {
     now,
     maxPasses: 1,
     lockConnectionString: LOCK_URL,
-    notificationDispatch: { email, enabled: true, appBaseUrl: APP_BASE_URL, accountId },
+    notificationDispatch: { email, enabled: true, appBaseUrl: APP_BASE_URL, accountId, clock },
   };
 }
 
@@ -109,6 +116,42 @@ class AlwaysFailEmail implements OutboundEmailPort {
   async send(): Promise<SendResult> {
     this.attempts++;
     return { status: "failed", error: "transport_failure", reason: "persistent test refusal" };
+  }
+}
+
+class BlockingEmail implements OutboundEmailPort {
+  readonly sent: OutboundEmail[] = [];
+  private releaseAttempt: (() => void) | undefined;
+  private releaseSend: (() => void) | undefined;
+  readonly started: Promise<void>;
+  private readonly released: Promise<void>;
+
+  constructor() {
+    this.started = new Promise<void>((resolve) => {
+      this.releaseAttempt = resolve;
+    });
+    this.released = new Promise<void>((resolve) => {
+      this.releaseSend = resolve;
+    });
+  }
+
+  unblock(): void {
+    this.releaseSend?.();
+  }
+
+  async send(message: OutboundEmail): Promise<SendResult> {
+    this.releaseAttempt?.();
+    await this.released;
+    this.sent.push(message);
+    return { status: "sent" };
+  }
+}
+
+async function waitForQueue(queue: NotificationDispatchQueue): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (queue.queueDepth > 0) {
+    if (Date.now() >= deadline) throw new Error("notification dispatch queue did not drain");
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
 
@@ -171,11 +214,15 @@ describeWithDb("M3MAIL notification dispatch", () => {
   it("stamps a failure, waits for the retry floor, then retries and clears the failure state", async () => {
     const notification = await insertNotification(accountId, "duplicate_confirmed", 7102);
     const email = new FailOnceEmail();
-    const failed = await runJob("notification-dispatch", jobOptions(accountId, email, START));
+    const completedAt = new Date(START.getTime() + NOTIFICATION_EMAIL_RETRY_DELAY_MS + 30_000);
+    const failed = await runJob(
+      "notification-dispatch",
+      jobOptions(accountId, email, START, () => completedAt),
+    );
     expect(failed).toMatchObject({ processed: 1, remaining: 1, details: { failed: 1 } });
     const afterFailure = await rowOf(notification.id);
     expect(afterFailure.emailDispatchedAt).toBeNull();
-    expect(afterFailure.emailFailedAt?.toISOString()).toBe(START.toISOString());
+    expect(afterFailure.emailFailedAt?.toISOString()).toBe(completedAt.toISOString());
     expect(afterFailure.payload.emailDelivery).toEqual({
       attempts: 1,
       failure: "transport_failure",
@@ -186,13 +233,13 @@ describeWithDb("M3MAIL notification dispatch", () => {
       jobOptions(
         accountId,
         email,
-        new Date(START.getTime() + NOTIFICATION_EMAIL_RETRY_DELAY_MS - 1),
+        new Date(completedAt.getTime() + NOTIFICATION_EMAIL_RETRY_DELAY_MS - 1),
       ),
     );
     expect(tooSoon.processed).toBe(0);
     expect(email.attempts).toBe(1);
 
-    const retriedAt = new Date(START.getTime() + NOTIFICATION_EMAIL_RETRY_DELAY_MS);
+    const retriedAt = new Date(completedAt.getTime() + NOTIFICATION_EMAIL_RETRY_DELAY_MS);
     const retried = await runJob("notification-dispatch", jobOptions(accountId, email, retriedAt));
     expect(retried).toMatchObject({ processed: 1, details: { sent: 1, retried: 1 } });
     expect(email.sent).toHaveLength(1);
@@ -254,5 +301,82 @@ describeWithDb("M3MAIL notification dispatch", () => {
     );
     expect(fourth).toMatchObject({ processed: 0, remaining: 0 });
     expect(email.attempts).toBe(NOTIFICATION_EMAIL_MAX_ATTEMPTS);
+  });
+
+  it("rejects newest ids when the immediate queue is full and leaves them untouched for the sweep", async () => {
+    const first = await insertNotification(accountId, "duplicate_suspected", 7110);
+    const second = await insertNotification(accountId, "duplicate_suspected", 7111);
+    const rejected = await insertNotification(accountId, "duplicate_suspected", 7112);
+    const email = new BlockingEmail();
+    const dispatcher = new NotificationDispatchService(db, {
+      email,
+      enabled: true,
+      appBaseUrl: APP_BASE_URL,
+      accountId,
+    });
+    const queue = new NotificationDispatchQueue({ queueMax: 1, dispatcher });
+
+    queue.enqueue([first.id, second.id, rejected.id]);
+    await email.started;
+    expect(queue.queueDepth).toBe(2);
+    email.unblock();
+    await waitForQueue(queue);
+
+    expect((await rowOf(first.id)).emailDispatchedAt).not.toBeNull();
+    expect((await rowOf(second.id)).emailDispatchedAt).not.toBeNull();
+    const pending = await rowOf(rejected.id);
+    expect(pending.emailDispatchedAt).toBeNull();
+    expect(pending.emailFailedAt).toBeNull();
+    expect(pending.payload).not.toHaveProperty("emailDelivery");
+
+    const sweepTransport = createEmailTransport(emailConfig);
+    const sweepEmail = new EmailService({ config: emailConfig, transport: sweepTransport });
+    const swept = await runJob(
+      "notification-dispatch",
+      jobOptions(accountId, sweepEmail, new Date(START.getTime() + 86_400_000)),
+    );
+    expect(swept).toMatchObject({ processed: 1, details: { sent: 1 } });
+    expect((await rowOf(rejected.id)).emailDispatchedAt).not.toBeNull();
+    expect(sweepTransport.drain?.(EMAIL)).toHaveLength(1);
+  });
+
+  it("contains an immediate transport failure and leaves the row retryable by the sweep", async () => {
+    const notification = await insertNotification(accountId, "duplicate_confirmed", 7113);
+    const email = new AlwaysFailEmail();
+    const queue = new NotificationDispatchQueue({
+      queueMax: 1,
+      dispatcher: new NotificationDispatchService(db, {
+        email,
+        enabled: true,
+        appBaseUrl: APP_BASE_URL,
+        accountId,
+      }),
+    });
+
+    expect(() => queue.enqueue([notification.id])).not.toThrow();
+    await waitForQueue(queue);
+
+    const pending = await rowOf(notification.id);
+    expect(pending.emailDispatchedAt).toBeNull();
+    expect(pending.emailFailedAt).not.toBeNull();
+    expect(pending.payload.emailDelivery).toEqual({
+      attempts: 1,
+      failure: "transport_failure",
+    });
+  });
+
+  it("uses the dispatcher's skipped no-op when immediate email delivery is not configured", async () => {
+    const notification = await insertNotification(accountId, "duplicate_dismissed", 7114);
+    const queue = new NotificationDispatchQueue({
+      queueMax: 1,
+      dispatcher: new NotificationDispatchService(db, { enabled: false, accountId }),
+    });
+
+    queue.enqueue([notification.id]);
+    await waitForQueue(queue);
+
+    const untouched = await rowOf(notification.id);
+    expect(untouched.emailDispatchedAt).toBeNull();
+    expect(untouched.emailFailedAt).toBeNull();
   });
 });

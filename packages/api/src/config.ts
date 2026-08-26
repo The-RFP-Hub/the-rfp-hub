@@ -103,6 +103,11 @@ export interface VerificationConfig {
   egressProxy: string | undefined;
 }
 
+export interface NotificationConfig {
+  /** Waiting email attempts retained by the post-commit, in-process dispatcher. */
+  queueMax: number;
+}
+
 export interface AnalyticsConfig {
   enabled: boolean;
   /** HMAC key for the session/IP hashes. */
@@ -155,6 +160,7 @@ export interface AppConfig {
   embedding: EmbeddingConfig;
   dedupe: DedupeConfig;
   verification: VerificationConfig;
+  notifications: NotificationConfig;
   analytics: AnalyticsConfig;
   /** Days of no publisher touch after which a deadline-less open entry is closed as inactive. */
   stalenessInactiveDays: number;
@@ -764,6 +770,10 @@ export const config: AppConfig = {
     queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
     allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
     egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
+  },
+
+  notifications: {
+    queueMax: readPositiveInt(process.env.NOTIFICATION_QUEUE_MAX, 100),
   },
 
   analytics: {

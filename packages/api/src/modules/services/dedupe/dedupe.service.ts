@@ -50,6 +50,10 @@ import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
+import {
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
 import { NotificationService } from "../notifications/notification.service.js";
 import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
@@ -108,6 +112,8 @@ export interface DedupeOptions {
   /** Injected by the tests; a deployment takes the configured provider. */
   provider?: EmbeddingProvider;
   config?: AppConfig;
+  /** Post-commit immediate email seam. Production uses the process-wide bounded queue. */
+  notificationQueue?: NotificationDispatchEnqueuer;
 }
 
 /** What a search may see. `all` is the reviewer scope; `public` is everyone else's. */
@@ -118,6 +124,7 @@ export class DedupeService {
   private readonly config: AppConfig;
   private readonly audit: AuditService;
   private readonly notifications: NotificationService;
+  private readonly notificationQueue: NotificationDispatchEnqueuer;
 
   constructor(
     private readonly db: DB = defaultDb,
@@ -126,7 +133,8 @@ export class DedupeService {
     this.config = options.config ?? defaultConfig;
     this.provider = options.provider ?? createEmbeddingProvider(this.config.embedding);
     this.audit = new AuditService(db);
-    this.notifications = new NotificationService();
+    this.notifications = new NotificationService(db);
+    this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
   }
 
   /** Whether this deployment can detect duplicates at all. */
@@ -306,7 +314,8 @@ export class DedupeService {
     matches: { id: number; similarity: number }[],
   ): Promise<void> {
     if (matches.length === 0) return;
-    await this.db.transaction(async (tx) => {
+    const notificationIds = await this.db.transaction(async (tx) => {
+      const insertedNotificationIds: number[] = [];
       for (const match of matches) {
         // Canonical ordering, matching `ux_dup_pair`'s (least, greatest) expression index, so the
         // mirrored pair is the same key rather than a second row with its own status.
@@ -338,18 +347,22 @@ export class DedupeService {
             loadRowById(tx, pair.opportunityId),
             loadRowById(tx, pair.duplicateOfId),
           ]);
-          await this.notifications.recordDuplicate(tx, {
-            pair,
-            left,
-            right,
-            events: [
-              { kind: "duplicate_suspected", ownerOpportunityId: left.id },
-              { kind: "duplicate_suspected", ownerOpportunityId: right.id },
-            ],
-          });
+          insertedNotificationIds.push(
+            ...(await this.notifications.recordDuplicate(tx, {
+              pair,
+              left,
+              right,
+              events: [
+                { kind: "duplicate_suspected", ownerOpportunityId: left.id },
+                { kind: "duplicate_suspected", ownerOpportunityId: right.id },
+              ],
+            })),
+          );
         }
       }
+      return insertedNotificationIds;
     });
+    this.enqueueNotifications(notificationIds);
   }
 
   /**
@@ -527,7 +540,7 @@ export class DedupeService {
     decision: "confirm" | "dismiss",
   ): Promise<DuplicatePairView> {
     const status = decision === "confirm" ? "confirmed" : "dismissed";
-    return this.db.transaction(async (tx) => {
+    const committed = await this.db.transaction(async (tx) => {
       const pair = await lockPair(tx, pairId);
       if (pair.status === "merged") {
         throw conflict(
@@ -554,7 +567,7 @@ export class DedupeService {
         loadRowById(tx, next.opportunityId),
         loadRowById(tx, next.duplicateOfId),
       ]);
-      await this.notifications.recordDuplicate(tx, {
+      const notificationIds = await this.notifications.recordDuplicate(tx, {
         pair: next,
         left,
         right,
@@ -565,13 +578,15 @@ export class DedupeService {
         decidedBy: "reviewer",
       });
       const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
-      return toPairView(next, left, right, survivors);
+      return { result: toPairView(next, left, right, survivors), notificationIds };
     });
+    this.enqueueNotifications(committed.notificationIds);
+    return committed.result;
   }
 
   /** Undo a dismissal by returning the pair to the suspected queue. */
   async reopen(reviewerId: number, pairId: number): Promise<DuplicatePairView> {
-    return this.db.transaction(async (tx) => {
+    const committed = await this.db.transaction(async (tx) => {
       const pair = await lockPair(tx, pairId);
       const transition = duplicateReopenTransition(pair.status);
       let next = pair;
@@ -598,21 +613,24 @@ export class DedupeService {
         loadRowById(tx, next.opportunityId),
         loadRowById(tx, next.duplicateOfId),
       ]);
-      if (transition === "reopen") {
-        await this.notifications.recordDuplicate(tx, {
-          pair: next,
-          left,
-          right,
-          events: [
-            { kind: "duplicate_reopened", ownerOpportunityId: left.id },
-            { kind: "duplicate_reopened", ownerOpportunityId: right.id },
-          ],
-          decidedBy: "reviewer",
-        });
-      }
+      const notificationIds =
+        transition === "reopen"
+          ? await this.notifications.recordDuplicate(tx, {
+              pair: next,
+              left,
+              right,
+              events: [
+                { kind: "duplicate_reopened", ownerOpportunityId: left.id },
+                { kind: "duplicate_reopened", ownerOpportunityId: right.id },
+              ],
+              decidedBy: "reviewer",
+            })
+          : [];
       const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
-      return toPairView(next, left, right, survivors);
+      return { result: toPairView(next, left, right, survivors), notificationIds };
     });
+    this.enqueueNotifications(committed.notificationIds);
+    return committed.result;
   }
 
   /**
@@ -634,7 +652,7 @@ export class DedupeService {
     options: { survivorId: string; fields?: string[] },
   ): Promise<MergeResultView> {
     const fields = normalizeFields(options.fields);
-    return this.db.transaction(async (tx) => {
+    const committed = await this.db.transaction(async (tx) => {
       const pair = await lockPair(tx, pairId);
       if (pair.status === "merged") {
         throw conflict("already_merged", "that pair has already been merged.");
@@ -756,7 +774,7 @@ export class DedupeService {
         loadRowById(tx, pairRow.opportunityId),
         loadRowById(tx, pairRow.duplicateOfId),
       ]);
-      await this.notifications.recordDuplicate(tx, {
+      const notificationIds = await this.notifications.recordDuplicate(tx, {
         pair: pairRow,
         left,
         right,
@@ -768,12 +786,26 @@ export class DedupeService {
       });
       const survivors = new Map([[survivor.id, survivor.publicId]]);
       return {
-        pair: toPairView(pairRow, left, right, survivors),
-        survivorId: survivor.publicId,
-        mergedId: loser.publicId,
-        copiedFields: copied.fields,
+        result: {
+          pair: toPairView(pairRow, left, right, survivors),
+          survivorId: survivor.publicId,
+          mergedId: loser.publicId,
+          copiedFields: copied.fields,
+        },
+        notificationIds,
       };
     });
+    this.enqueueNotifications(committed.notificationIds);
+    return committed.result;
+  }
+
+  /** The transaction is committed before this is called; queue failures cannot change its answer. */
+  private enqueueNotifications(notificationIds: readonly number[]): void {
+    try {
+      this.notificationQueue.enqueue(notificationIds);
+    } catch {
+      // A custom/test adapter gets the same best-effort contract as the production queue.
+    }
   }
 
   private async loadRow(opportunityId: number): Promise<OpportunityRow> {

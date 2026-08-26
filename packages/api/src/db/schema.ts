@@ -723,8 +723,9 @@ export const opportunityDuplicates = pgTable(
  * The payload is structured data, never presentation copy. `subject_kind` remains text because it
  * is a polymorphic extension seam; this first slice writes only `duplicate`. The four-column
  * unique key is the final idempotency guard when a detector re-runs or a reviewer repeats an
- * action. Email timestamps are written by the independent notification-dispatch job; no request
- * path performs provider I/O.
+ * action. After commit, a bounded in-process queue attempts email without making the request wait;
+ * the nightly notification-dispatch job sweeps anything it misses. These timestamps remain the
+ * source of truth for both paths.
  */
 export const notifications = pgTable(
   "notifications",

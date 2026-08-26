@@ -67,7 +67,7 @@ export class NotificationService {
    * a rolled-back pair mutation cannot leave a notification claiming it happened. The unique
    * constraint remains the backstop, while the map makes recipient deduplication explicit.
    */
-  async recordDuplicate(tx: DbLike, input: RecordDuplicateNotificationsInput): Promise<void> {
+  async recordDuplicate(tx: DbLike, input: RecordDuplicateNotificationsInput): Promise<number[]> {
     const sides = new Map([
       [input.left.id, input.left],
       [input.right.id, input.right],
@@ -92,8 +92,8 @@ export class NotificationService {
       }
     }
 
-    if (recipients.size === 0) return;
-    await tx
+    if (recipients.size === 0) return [];
+    const inserted = await tx
       .insert(notifications)
       .values(
         [...recipients.values()].map(({ accountId, kind, yours, other }) => ({
@@ -107,7 +107,9 @@ export class NotificationService {
           >,
         })),
       )
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: notifications.id });
+    return inserted.map(({ id }) => id);
   }
 
   /** Account-scoped inbox, newest first, plus a count the chrome can render without a second API. */

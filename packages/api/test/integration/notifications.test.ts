@@ -8,6 +8,10 @@
  */
 process.env.EMBEDDING_PROVIDER = "lexical";
 
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -15,12 +19,20 @@ import { ALPHA_BODY, reword } from "../helpers/dedupe-text.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
+const OUTBOX_DIR = await mkdtemp(join(tmpdir(), "rfphub-notification-email-"));
+process.env.EMAIL_TRANSPORT = "file";
+process.env.EMAIL_OUTBOX_DIR = OUTBOX_DIR;
+process.env.APP_BASE_URL = "https://app.example.org";
+
 const { buildApp } = await import("../../src/app.js");
 const { db, pool } = await import("../../src/db/client.js");
 const { notifications, opportunities, opportunityDuplicates } = await import(
   "../../src/db/schema.js"
 );
 const { DedupeService } = await import("../../src/modules/services/dedupe/dedupe.service.js");
+const { notificationDispatchQueue } = await import(
+  "../../src/modules/services/notifications/notification-dispatch.queue.js"
+);
 const { bearer, grantMembership, mintApiKeyFor, seedIdentity, seedOrganization, testAuth } =
   await import("../helpers/auth.js");
 const { cleanupFixtures } = await import("../helpers/cleanup.js");
@@ -92,6 +104,21 @@ run("M3NOTE duplicate notifications", () => {
         ),
       );
 
+  const waitForDispatch = async (ids: number[]) => {
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      const rows = await db
+        .select()
+        .from(notifications)
+        .where(or(...ids.map((id) => eq(notifications.id, id))));
+      if (rows.length === ids.length && rows.every((row) => row.emailDispatchedAt !== null)) {
+        return rows;
+      }
+      if (Date.now() >= deadline) throw new Error("immediate notification email did not dispatch");
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  };
+
   beforeAll(async () => {
     app = await buildApp({ auth: { auth: await testAuth() } });
     await app.ready();
@@ -139,6 +166,10 @@ run("M3NOTE duplicate notifications", () => {
   });
 
   afterAll(async () => {
+    const deadline = Date.now() + 5_000;
+    while (notificationDispatchQueue.queueDepth > 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
     await cleanupFixtures({
       opportunityPrefix: "m3note",
       organizationSlugs: [PUBLIC_NS, PRIVATE_NS],
@@ -147,6 +178,7 @@ run("M3NOTE duplicate notifications", () => {
     });
     await app.close();
     await pool.end();
+    await rm(OUTBOX_DIR, { recursive: true, force: true });
   });
 
   it("notifies both owner sets only for a newly-created suspected pair and keeps a private counterpart anonymous", async () => {
@@ -179,9 +211,16 @@ run("M3NOTE duplicate notifications", () => {
     expect(suspected.map((row) => row.accountId).sort((a, b) => a - b)).toEqual(
       [publicOwnerId, namespacePeerId, privateOwnerId, reviewerOwnerId].sort((a, b) => a - b),
     );
-    expect(
-      suspected.every((row) => row.emailDispatchedAt === null && row.emailFailedAt === null),
-    ).toBe(true);
+    const delivered = await waitForDispatch(suspected.map((row) => row.id));
+    expect(delivered.every((row) => row.emailFailedAt === null)).toBe(true);
+    const privateOutbox = join(
+      OUTBOX_DIR,
+      `${createHash("sha256").update(EMAILS.privateOwner).digest("hex")}.jsonl`,
+    );
+    const mail = await readFile(privateOutbox, "utf8");
+    expect(mail).toContain('"subject":"A possible duplicate was found"');
+    expect(mail).toContain("Superchain Builders Fund — community submission");
+    expect(mail).toContain("https://app.example.org/duplicates");
 
     const publicSide = suspected.find((row) => row.accountId === publicOwnerId);
     expect(publicSide?.payload).toMatchObject({

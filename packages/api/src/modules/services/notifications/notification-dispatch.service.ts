@@ -1,5 +1,5 @@
-/** Cursor job that delivers durable notifications without putting provider I/O on request paths. */
-import { and, asc, count, eq, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+/** Shared durable notification dispatcher for immediate attempts and the nightly cursor job. */
+import { and, asc, count, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { config } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { accounts, authUser, notifications } from "../../../db/schema.js";
@@ -42,6 +42,16 @@ export interface NotificationDispatchOptions {
   logger?: NotificationDispatchLogger;
   /** Integration-test scope; production leaves this unset and walks every account. */
   accountId?: number;
+  /** Per-attempt completion clock. Tests can advance it without waiting in real time. */
+  clock?: () => Date;
+}
+
+export interface NotificationDispatchBatchOptions {
+  limit?: number;
+  /** Batch-start clock used to decide which retry rows are eligible. */
+  now?: Date;
+  /** Immediate-dispatch scope. The nightly sweep leaves this unset. */
+  notificationIds?: readonly number[];
 }
 
 export class NotificationDispatchService {
@@ -49,6 +59,7 @@ export class NotificationDispatchService {
   private readonly enabled: boolean;
   private readonly logger: NotificationDispatchLogger;
   private readonly accountId: number | undefined;
+  private readonly clock: (() => Date) | undefined;
 
   constructor(
     private readonly db: DB = defaultDb,
@@ -57,13 +68,14 @@ export class NotificationDispatchService {
     this.enabled = options.enabled ?? deliversEmail(config.email);
     this.logger = options.logger ?? consoleLogger;
     this.accountId = options.accountId;
+    this.clock = options.clock;
     this.composer = new DuplicateNotificationEmailComposer(
       options.email ?? new EmailService(),
       options.appBaseUrl ?? config.appBaseUrl,
     );
   }
 
-  async runBatch(options: { limit?: number; now?: Date } = {}): Promise<JobResult> {
+  async runBatch(options: NotificationDispatchBatchOptions = {}): Promise<JobResult> {
     if (!this.enabled) {
       return {
         processed: 0,
@@ -72,15 +84,20 @@ export class NotificationDispatchService {
       };
     }
 
-    const now = options.now ?? new Date();
+    const now = options.now ?? this.clock?.() ?? new Date();
+    const completedAt = () => this.clock?.() ?? (options.now === undefined ? new Date() : now);
     const limit = Math.min(MAX_LIMIT, Math.max(1, options.limit ?? DEFAULT_LIMIT));
     const retryBefore = new Date(now.getTime() - NOTIFICATION_EMAIL_RETRY_DELAY_MS);
+    const notificationIds = normalizedIds(options.notificationIds);
+    if (notificationIds !== undefined && notificationIds.length === 0) {
+      return { processed: 0, remaining: 0 };
+    }
     const candidates = await this.db
       .select({ notification: notifications, recipientEmail: authUser.email })
       .from(notifications)
       .innerJoin(accounts, eq(notifications.accountId, accounts.id))
       .leftJoin(authUser, eq(accounts.authUserId, authUser.id))
-      .where(this.eligible(retryBefore))
+      .where(this.eligible(retryBefore, notificationIds))
       .orderBy(asc(notifications.id))
       .limit(limit);
 
@@ -97,12 +114,13 @@ export class NotificationDispatchService {
       if (priorAttempts > 0) details.retried++;
 
       if (!recipientEmail) {
+        const attemptCompletedAt = completedAt();
         await this.markFailure(
           notification.id,
           notification.payload,
           NOTIFICATION_EMAIL_MAX_ATTEMPTS,
           "recipient_unavailable",
-          now,
+          attemptCompletedAt,
         );
         details.failed++;
         details.recipientUnavailable++;
@@ -113,12 +131,13 @@ export class NotificationDispatchService {
       try {
         result = await this.composer.send(notification, recipientEmail);
       } catch (error) {
+        const attemptCompletedAt = completedAt();
         await this.markFailure(
           notification.id,
           notification.payload,
           NOTIFICATION_EMAIL_MAX_ATTEMPTS,
           "invalid_notification",
-          now,
+          attemptCompletedAt,
         );
         details.failed++;
         details.invalidNotification++;
@@ -134,12 +153,13 @@ export class NotificationDispatchService {
       }
 
       if (result.status === "failed") {
+        const attemptCompletedAt = completedAt();
         await this.markFailure(
           notification.id,
           notification.payload,
           priorAttempts + 1,
           "transport_failure",
-          now,
+          attemptCompletedAt,
         );
         details.failed++;
         this.logger.error(
@@ -157,7 +177,7 @@ export class NotificationDispatchService {
       await this.db
         .update(notifications)
         .set({
-          emailDispatchedAt: now,
+          emailDispatchedAt: completedAt(),
           emailFailedAt: null,
           payload: withoutDeliveryState(notification.payload),
         })
@@ -167,14 +187,15 @@ export class NotificationDispatchService {
 
     return {
       processed: candidates.length,
-      remaining: await this.remainingCount(),
+      remaining: await this.remainingCount(notificationIds),
       details,
     };
   }
 
-  private eligible(retryBefore: Date) {
+  private eligible(retryBefore: Date, notificationIds?: number[]) {
     return and(
       this.accountId === undefined ? undefined : eq(notifications.accountId, this.accountId),
+      notificationIds === undefined ? undefined : inArray(notifications.id, notificationIds),
       isNull(notifications.emailDispatchedAt),
       or(
         isNull(notifications.emailFailedAt),
@@ -187,13 +208,14 @@ export class NotificationDispatchService {
     );
   }
 
-  private async remainingCount(): Promise<number> {
+  private async remainingCount(notificationIds?: number[]): Promise<number> {
     const rows = await this.db
       .select({ value: count() })
       .from(notifications)
       .where(
         and(
           this.accountId === undefined ? undefined : eq(notifications.accountId, this.accountId),
+          notificationIds === undefined ? undefined : inArray(notifications.id, notificationIds),
           isNull(notifications.emailDispatchedAt),
           or(
             isNull(notifications.emailFailedAt),
@@ -219,6 +241,11 @@ export class NotificationDispatchService {
       })
       .where(and(eq(notifications.id, notificationId), isNull(notifications.emailDispatchedAt)));
   }
+}
+
+function normalizedIds(ids: readonly number[] | undefined): number[] | undefined {
+  if (ids === undefined) return undefined;
+  return [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
 }
 
 function deliveryAttemptsSql() {

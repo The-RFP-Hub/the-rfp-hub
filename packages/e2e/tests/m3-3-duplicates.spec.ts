@@ -6,11 +6,12 @@
  * there is no "real provider" variant because the lexical detector IS the real provider.
  * If a fixture pair sits under the threshold, the fixture TEXT is what changes — never the threshold.
  *
- * A duplicate submission now has TWO observable answers: immediate match feedback in the create
- * response, and a durable in-app notification for every account that owns either side. Both are
- * asserted below; email delivery remains outside this milestone.
+ * A duplicate submission now has three observable answers: immediate match feedback in the create
+ * response, a durable in-app notification for every account that owns either side, and immediate
+ * email from the API's post-commit queue. All three are asserted without invoking the nightly job.
  */
 import { expect, skipUnlessActor, test } from "../src/fixtures.js";
+import { waitForEmail } from "../src/identity/outbox.js";
 
 test.describe.configure({ mode: "serial" });
 
@@ -84,6 +85,20 @@ test.describe("@dedupe M3-3 detection", () => {
     // The response gives immediate feedback to the submitter. The durable notification below is a
     // separate account-scoped record, so leaving this request does not make the event disappear.
     expect(copy.body.duplicates.map((match) => match.id)).toContain(originalId);
+
+    const submitterActor = stack.actors.submitter;
+    if (!submitterActor) {
+      throw new Error("the submitter actor disappeared after the acceptance gate");
+    }
+    const email = await waitForEmail(
+      stack.outboxDir,
+      submitterActor.email,
+      "A possible duplicate was found",
+      { textIncludes: [copyId, originalId] },
+    );
+    expect(email.text).toContain(copyId);
+    expect(email.text).toContain(originalId);
+    expect(email.text).toContain(`${stack.urls.frontend}/duplicates`);
 
     const pair = await db.query<{ id: number; status: string }>(
       `SELECT d.id, d.status FROM opportunity_duplicates d

@@ -116,6 +116,24 @@ function listing(raw: unknown): { id: string; title: string } | undefined {
   if (typeof raw !== "object" || raw === null) return undefined;
   const value = raw as Record<string, unknown>;
   return typeof value.id === "string" && typeof value.title === "string"
-    ? { id: value.id, title: value.title }
+    ? { id: value.id, title: safeTitle(value.title) }
     : undefined;
+}
+
+/** Keep API-controlled titles from creating new, official-looking lines in outbound text mail. */
+function safeTitle(title: string): string {
+  const withoutControls = [...title]
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f ||
+        (codePoint >= 0x7f && codePoint <= 0x9f) ||
+        codePoint === 0x2028 ||
+        codePoint === 0x2029
+        ? " "
+        : character;
+    })
+    .join("");
+  const collapsed = withoutControls.replace(/\s+/gu, " ").trim();
+  const capped = [...collapsed].slice(0, 200).join("");
+  return capped || "Untitled listing";
 }

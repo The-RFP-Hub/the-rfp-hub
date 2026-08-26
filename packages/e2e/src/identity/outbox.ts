@@ -57,6 +57,17 @@ export interface WaitForOtpOptions {
   timeoutMs?: number;
 }
 
+export interface OutboxEmail {
+  to: string;
+  subject: string;
+  text: string;
+}
+
+export interface WaitForEmailOptions extends WaitForOtpOptions {
+  /** All fragments must occur in the body; lets a shared outbox distinguish same-subject events. */
+  textIncludes?: readonly string[];
+}
+
 /**
  * Waits for the newest code sent to `email`, returns it, and consumes OTP messages only.
  *
@@ -74,12 +85,62 @@ export async function waitForOtp(
   for (;;) {
     const found = readNewestCode(path);
     if (found) {
-      preserveNonOtp(path, found.remaining);
+      preserveLines(path, found.remaining);
       return found.code;
     }
     if (Date.now() >= deadline) {
       throw new Error(
         `outbox: no sign-in code arrived for ${email} within ${options.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms. Expected a line in ${path}. The API is booted with EMAIL_TRANSPORT=file and EMAIL_OUTBOX_DIR pointing at this directory; if that is not so, no code can ever appear here.`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+}
+
+/** Wait for and consume one non-OTP message with the exact subject. */
+export async function waitForEmail(
+  dir: string,
+  email: string,
+  subject: string,
+  options: WaitForEmailOptions = {},
+): Promise<OutboxEmail> {
+  const path = outboxFileFor(dir, email);
+  const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+  for (;;) {
+    let lines: string[] = [];
+    try {
+      lines = readFileSync(path, "utf8")
+        .split("\n")
+        .filter((line) => line.trim() !== "");
+    } catch {
+      // The immediate dispatcher has not written this address's outbox yet.
+    }
+
+    for (let index = 0; index < lines.length; index++) {
+      let message: Partial<OutboxEmail>;
+      try {
+        message = JSON.parse(lines[index] as string) as Partial<OutboxEmail>;
+      } catch {
+        continue;
+      }
+      if (
+        message.to === email &&
+        message.subject === subject &&
+        typeof message.text === "string" &&
+        (options.textIncludes ?? []).every((fragment) => message.text?.includes(fragment))
+      ) {
+        preserveLines(
+          path,
+          lines.filter((_, lineIndex) => lineIndex !== index),
+        );
+        return { to: email, subject, text: message.text };
+      }
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `outbox: no ${JSON.stringify(subject)} email arrived for ${email} within ${options.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`,
       );
     }
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
@@ -138,10 +199,10 @@ function readNewestCode(path: string): ReadCode | undefined {
 export function discardOtp(dir: string, email: string): void {
   const path = outboxFileFor(dir, email);
   const found = readNewestCode(path);
-  if (found) preserveNonOtp(path, found.remaining);
+  if (found) preserveLines(path, found.remaining);
 }
 
-function preserveNonOtp(path: string, lines: string[]): void {
+function preserveLines(path: string, lines: string[]): void {
   if (lines.length === 0) {
     rmSync(path, { force: true });
   } else {
