@@ -89,6 +89,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `EMBEDDING_PROVIDER` | `lexical` \| `disabled` | Needs no key and no network — the in-process lexical featurizer is the default and the detector everywhere, CI included |
 | `DEDUPE_SIMILARITY_THRESHOLD` | per-provider default | Thresholds are **not** comparable between providers |
 | `DEDUPE_MAX_MATCHES` | `5` | |
+| `NOTIFICATION_QUEUE_MAX` | `100` | Waiting immediate email ids; full → reject the newest id to the nightly durable sweep |
 | `VERIFICATION_ENABLED` | `true` | |
 | `VERIFY_ON_SUBMIT` | `true` | Off in tests |
 | `VERIFY_TIMEOUT_MS` | `10000` | |
@@ -146,9 +147,11 @@ and DMARC records. Then, whichever one you run:
 
 All senders go through the central outbound-email port. Better-Auth composes OTP content in its
 adapter; the duplicate domain composes notification content; neither selects a provider or controls
-the envelope sender. `notification-dispatch` runs hourly in its own workflow, joins `auth_user` for
-the address at send time, and retries temporary failures three times with a five-minute floor. It is
-separate from the nightly maintenance workflow so mail availability cannot gate dataset export.
+the envelope sender. Newly committed duplicate notifications enter a bounded, best-effort
+in-process queue, which joins `auth_user` for the address and attempts delivery immediately without
+making the request wait. `notification-dispatch` is the daily backstop in `jobs-nightly.yml`; it
+retries temporary failures three times with a five-minute floor. Provider refusals are recorded on
+the durable row rather than thrown through either the request or nightly workflow.
 
 ---
 

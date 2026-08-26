@@ -54,9 +54,9 @@ function dbOf(options: JobRunOptions): DB {
 
 /**
  * Maintenance definitions are in chain order: rollup and prune settle yesterday's traffic, the
- * backfills catch up, and `staleness` runs last because the nightly export is chained to its
- * success. `notification-dispatch` is catalogued here for the shared runner/admin route but has an
- * independent schedule, outside that export gate.
+ * backfills and notification delivery catch up, and `staleness` runs last because the nightly
+ * export is chained to its success. Provider refusals are durable row state rather than thrown job
+ * errors, so the notification backstop does not fail the chain merely because mail is unavailable.
  */
 export const JOBS: JobDefinition[] = [
   {

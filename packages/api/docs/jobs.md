@@ -1,12 +1,13 @@
 # Scheduled jobs — schedule, guarantees and runbook
 
-The background work the request path deliberately does not do: settling yesterday's analytics,
-catching up on embeddings and source checks, closing stale listings, and dispatching durable
-notification email.
+The background work the request path deliberately does not wait for: settling yesterday's
+analytics, catching up on embeddings and source checks, closing stale listings, and sweeping
+durable notification email that the API's immediate in-process trigger missed.
 
 Everything here is implemented in `src/modules/services/jobs/*`, started by
 `scripts/jobs/run-job.ts` (built as `dist/jobs.js`) and scheduled by
-`.github/workflows/jobs-nightly.yml` and `.github/workflows/notifications-dispatch.yml`.
+`.github/workflows/jobs-nightly.yml`. Notification email also has a bounded post-commit trigger in
+the API process; it calls the same dispatcher for the newly inserted row ids without invoking a job.
 
 ---
 
@@ -63,8 +64,8 @@ collapsed them would report a permanently unconfigured job as healthy contention
 
 ## 2. The schedule, and the ordering it exists to guarantee
 
-**The five jobs run on two schedules, in two places.** `.github/workflows/jobs-nightly.yml` runs the
-four maintenance jobs on one cron, `5 1 * * *`, in parallel. **`staleness` is not among them**: it
+**The six jobs run on two schedules, in two places.** `.github/workflows/jobs-nightly.yml` runs the
+five maintenance jobs on one cron, `5 1 * * *`, in parallel. **`staleness` is not among them**: it
 runs daily at **22:00 UTC from an external scheduler**, outside this repository (§4d), and this
 workflow's `staleness` job is **dispatch-only** — its steps are skipped unless an operator asked for
 `job` = `staleness` or `all`.
@@ -72,18 +73,21 @@ workflow's `staleness` job is **dispatch-only** — its steps are skipped unless
 ```
 UTC
 01:05  jobs-nightly.yml ──┬─ analytics-rollup ──────┐
-                          ├─ retention ─────────────┤  in parallel,
-                          ├─ embedding-backfill ────┤  fail-fast: false
-                          └─ verification-backfill ─┘
+                          ├─ retention ─────────────┤
+                          ├─ embedding-backfill ────┤  in parallel,
+                          ├─ verification-backfill ─┤  fail-fast: false
+                          └─ notification-dispatch ─┘
 
 03:17  nightly-export.yml    publishes the dataset — its OWN cron, not chained (see below)
 
 22:00  staleness             external scheduler, outside this repository
 ```
 
-`notification-dispatch` is intentionally **not a node in that graph**. Its own workflow runs hourly
-at minute 17 and may be dispatched independently, so an email-provider outage can fail notification
-delivery without holding the nightly maintenance chain — or the open-data snapshot — hostage.
+There is no notification-only cron or workflow. Normal delivery starts immediately after the
+notification transaction commits; the nightly `notification-dispatch` node is the daily backstop.
+It uses the same 30-minute workflow bound and per-name advisory lock as every other independent
+nightly matrix entry. An expected email-provider refusal is stamped on the notification and returned
+as a successful job result, so provider availability alone does not fail the maintenance chain.
 
 **Why staleness sits alone, and why 22:00 is before 01:05 rather than after.** The advisory lock
 each job takes excludes a job from **itself**, never one job from another (§3). So two schedulers
@@ -187,8 +191,9 @@ secret list to keep in step with the service's.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
-  sooner than five minutes after the last attempt; an account with no identity email is a terminal
-  `recipient_unavailable` failure rather than a poison row retried forever.
+  sooner than five minutes after the completion of the last attempt — including retries within one
+  long sweep run; an account with no identity email is a terminal `recipient_unavailable` failure
+  rather than a poison row retried forever.
 
 **Concurrency is excluded by `pg_try_advisory_lock`, taken on a dedicated connection.** Three
 decisions, each closing something real:
@@ -204,6 +209,20 @@ decisions, each closing something real:
 The key is derived from the job's **name**, so `staleness` excludes another `staleness` across
 processes, hosts and container tasks, and two different jobs run concurrently quite happily.
 
+### Immediate notification trigger
+
+Duplicate detection and review mutations insert notifications inside their own database
+transactions. Only after such a transaction commits, its newly inserted notification ids are handed
+to the API process's fire-and-forget dispatcher. The queue is serial, retains at most
+`NOTIFICATION_QUEUE_MAX` waiting ids (100 by default), and rejects the newest id when full. Enqueue
+never waits for email and worker errors never propagate to the response.
+
+The worker calls `NotificationDispatchService` with exactly one queued id. It makes one best-effort
+attempt; it does not run the job loop or retry in memory. A transport failure stamps durable retry
+state, while queue overflow or process loss leaves the row unstamped. If the configured transport
+does not deliver, the service returns the same `email delivery is not configured` skip as the job.
+All of those states remain visible to the nightly unscoped sweep.
+
 ### What staleness deliberately does not touch
 
 `updated_at`. Two things read it, and both break if a maintenance pass moves it: this job's own
@@ -214,14 +233,14 @@ carries the time of the change, which is where that fact belongs.
 
 ---
 
-## 4. Triggers — the three ways a job starts
+## 4. Triggers — the four ways a job starts
 
 ### a. The schedule (how it actually runs)
 
-`.github/workflows/jobs-nightly.yml` and the independent notification workflow start each job as a
-**one-off ECS task on the API service's own task definition**, using the AWS credentials the deploy
-workflows already hold. **Two calls**: read the service to learn where it runs, then start that task
-definition there with a different command.
+`.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
+own task definition**, using the AWS credentials the deploy workflows already hold. **Two calls**:
+read the service to learn where it runs, then start that task definition there with a different
+command.
 
 ```sh
 # where the API runs — its own placement, reused verbatim
@@ -293,7 +312,7 @@ and so it does not quietly stop being true.
 node packages/api/dist/jobs.js <job> --json
 ```
 
-`<job>` is one of the five names in §1 — the catalogue in
+`<job>` is one of the six names in §1 — the catalogue in
 `src/modules/services/jobs/registry.ts` is the one place a name is spelled, and a name that is not
 in it exits `2` rather than doing nothing. `--limit` and `--passes` are available and job-specific;
 neither is required.
@@ -360,7 +379,7 @@ reports success:
 the lock.** As deployed:
 
 > **The external scheduler owns `staleness` and nothing else. It runs at 22:00 UTC and must FINISH
-> before the 01:05 UTC chain starts. The GitHub chain owns the other four and must NOT include
+> before the 01:05 UTC chain starts. The GitHub chain owns the other five and must NOT include
 > `staleness`.**
 
 Both halves are load-bearing, and each fails differently:
@@ -376,7 +395,7 @@ Both halves are load-bearing, and each fails differently:
   grows long enough to threaten that margin, move it earlier — do not rely on the lock to arbitrate.
 
 An operator dispatching `job=all` deliberately runs all five in the documented order — `needs:
-[maintenance]` keeps `staleness` after the other four — and that is a hand-run recovery, not a
+[maintenance]` keeps `staleness` after the other five — and that is a hand-run recovery, not a
 schedule. Dispatching it while the external run is in flight is the one overlap the rule does not
 cover, and the lock will merely make it a no-op rather than a correct run.
 
@@ -416,12 +435,12 @@ Before the first M3 job run on any deployment, in order:
    **runtime** credential inside the container, not a DDL one.
 5. Set `<ENV>_APP_BASE_URL` to the canonical frontend origin, then deploy once so the API workflow
    writes it into the service task definition inherited by background tasks.
-6. Prove both schedules with one `workflow_dispatch` each of *Nightly maintenance jobs* and
-   *Notification email dispatch* per environment. Either fails loudly if the cluster variable is
-   unset or the service cannot be described. Nothing here triggers the export — it runs on its own
-   cron (§2) — so confirm it separately, either by waiting for its 03:17 run or by dispatching
-   *Nightly open-data export* directly. A `job=all` dispatch also runs `staleness`, which the
-   schedule does not (§2, §4d).
+6. Prove the schedule with one `workflow_dispatch` of *Nightly maintenance jobs* per environment,
+   once with `job=notification-dispatch` and once with the full chain. Either fails loudly if the
+   cluster variable is unset or the service cannot be described. Nothing here triggers the export —
+   it runs on its own cron (§2) — so confirm it separately, either by waiting for its 03:17 run or
+   by dispatching *Nightly open-data export* directly. A `job=all` dispatch also runs `staleness`,
+   which the schedule does not (§2, §4d).
 
 ---
 
@@ -434,7 +453,7 @@ Before the first M3 job run on any deployment, in order:
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
-| `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM` |
+| `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
 
 After a **model-string change** (a new featurizer weighting or a refreshed idf table), every stored
 vector is stale by content-hash design and `embedding-backfill`'s first pass selects the whole
