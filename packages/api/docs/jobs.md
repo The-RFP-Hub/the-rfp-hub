@@ -369,11 +369,30 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   such a pass systemic the moment one unrelated row went bad. Judging by "did every attempt fail"
   asks the question the counters can answer. One bad row among writes that succeeded stays a
   counter, which is what catching per row is for.
-* `embedding-backfill` selects on the absence of the thing it produces. `verification-backfill`
-  selects on that **or on a check having expired**, so its selection refills on a rolling schedule
-  rather than draining to nothing — see "The re-check TTL" below. Its prune step is idempotent
-  too: it keeps the newest `VERIFICATION_RUNS_KEEP` runs of the entries the pass touched, so a
-  second run deletes nothing — as is the prune every run insertion does for its own entry.
+* `embedding-backfill` selects on the absence of the thing it produces, and it has **two arms**,
+  both of which retire what they select. The first is the embedding cursor: an entry with no row, a
+  row from another model or provider, a row whose `content_hash` no longer matches its text, **or a
+  row missing `norm` / `token_count`** — the fourth predicate arm, which the overlap detection arm
+  decides on and which is gated on the provider declaring it can supply them
+  (`EmbeddingProvider.suppliesNorm`), so a provider that cannot never selects rows it could never
+  fix. The second arm runs only once the first has drained: suspected pairs whose
+  `rules_version` differs from the current rule are re-judged against both stored vectors and either
+  deleted or re-stamped. That is what makes `DEDUPE_OVERLAP_ENABLED=false` a real rollback — and it
+  fixes the same latent bug for `DEDUPE_SIMILARITY_THRESHOLD`, where a threshold change used to
+  strand every pair the old value wrote, because pruning only runs for entries the backfill selects
+  and a drained backfill selects nothing.
+
+  **After deploying the overlap arm**, the first run selects the whole table on the norm predicate.
+  It does **not** re-embed in the model sense — the vectors, the `content_hash`es and the model
+  string are unchanged — it recomputes two scalars the featurizer was already producing and writes
+  them. Run it to `remaining: 0` in the same maintenance step as the deploy; until it drains, the
+  overlap arm simply does not fire for the rows it has not reached, which is degraded detection and
+  never wrong detection.
+* `verification-backfill` selects on the absence of a check **or on a check having expired**, so
+  its selection refills on a rolling schedule rather than draining to nothing — see "The re-check
+  TTL" below. Its prune step is idempotent too: it keeps the newest `VERIFICATION_RUNS_KEEP` runs of
+  the entries the pass touched, so a second run deletes nothing — as is the prune every run
+  insertion does for its own entry.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
   sooner than five minutes after the completion of the last attempt — including retries within one
@@ -829,7 +848,7 @@ Before the first M3 job run on any deployment, in order:
 |---|---|
 | `analytics-rollup` | `ANALYTICS_RETENTION_DAYS` (default 180), for the prune it ends with. The rollup half reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
 | `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
-| `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
+| `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES`, `DEDUPE_OVERLAP_ENABLED`, `DEDUPE_OVERLAP_THRESHOLD`, `DEDUPE_OVERLAP_MIN_TOKENS`, `DEDUPE_OVERLAP_MIN_SIMILARITY` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFY_HOST_MIN_GAP_MS` (default 1000), `VERIFICATION_RUNS_KEEP` (default 5) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 | `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
