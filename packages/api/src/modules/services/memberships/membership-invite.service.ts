@@ -1,14 +1,9 @@
 /** Reviewer-created organisation memberships that wait for ownership of an email to be proved. */
-import { and, eq, isNull } from "drizzle-orm";
-import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
-import {
-  type OrgMembershipInviteRow,
-  orgMembershipInvites,
-  organizations,
-} from "../../../db/schema.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import type { OrgMembershipInviteRow } from "../../../db/schema.js";
+import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import type { MembershipInviteView } from "../../shared/api-views.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
 import { isUniqueViolation, violatedConstraint } from "../auth/account.service.js";
 
 export type InviteRole = "owner" | "admin" | "publisher";
@@ -18,10 +13,10 @@ const EMAIL_MAX = 320;
 const PENDING_UNIQUE = "ux_org_membership_invite_pending";
 
 export class MembershipInviteService {
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(private readonly db: DB = defaultDb) {
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   async create(
@@ -33,15 +28,16 @@ export class MembershipInviteService {
     const email = normalizeInviteEmail(rawEmail);
     const role = normalizeInviteRole(rawRole);
     try {
-      return await this.db.transaction(async (tx) => {
-        const org = await findOrganization(tx, slug);
-        const rows = await tx
-          .insert(orgMembershipInvites)
-          .values({ organizationId: org.id, email, role, invitedBy })
-          .returning();
-        const invite = rows[0];
+      return await withTransaction(this.db, async (repos) => {
+        const org = await findOrganization(repos, slug);
+        const invite = await repos.membershipInvites.create({
+          organizationId: org.id,
+          email,
+          role,
+          invitedBy,
+        });
         if (!invite) throw new Error("membership invite vanished during creation");
-        await this.audit.record(tx, {
+        await repos.audit.record({
           subjectKind: "organization",
           subjectId: org.id,
           actorKind: "user",
@@ -63,36 +59,17 @@ export class MembershipInviteService {
   }
 
   async listPending(slug: string): Promise<MembershipInviteView[]> {
-    const org = await findOrganization(this.db, slug);
-    const rows = await this.db
-      .select()
-      .from(orgMembershipInvites)
-      .where(
-        and(
-          eq(orgMembershipInvites.organizationId, org.id),
-          isNull(orgMembershipInvites.acceptedAt),
-        ),
-      )
-      .orderBy(orgMembershipInvites.createdAt, orgMembershipInvites.id);
+    const org = await findOrganization(this.repos, slug);
+    const rows = await this.repos.membershipInvites.listPending(org.id);
     return rows.map((row) => toView(row, org.slug));
   }
 
   async revoke(invitedBy: number, slug: string, inviteId: number): Promise<MembershipInviteView> {
-    return this.db.transaction(async (tx) => {
-      const org = await findOrganization(tx, slug);
-      const rows = await tx
-        .delete(orgMembershipInvites)
-        .where(
-          and(
-            eq(orgMembershipInvites.id, inviteId),
-            eq(orgMembershipInvites.organizationId, org.id),
-            isNull(orgMembershipInvites.acceptedAt),
-          ),
-        )
-        .returning();
-      const invite = rows[0];
+    return withTransaction(this.db, async (repos) => {
+      const org = await findOrganization(repos, slug);
+      const invite = await repos.membershipInvites.revokePending(org.id, inviteId);
       if (!invite) throw notFound(`no pending membership invite ${inviteId} on ${slug}.`);
-      await this.audit.record(tx, {
+      await repos.audit.record({
         subjectKind: "organization",
         subjectId: org.id,
         actorKind: "user",
@@ -105,15 +82,8 @@ export class MembershipInviteService {
   }
 }
 
-type InviteDb = Pick<DbLike, "select">;
-
-async function findOrganization(db: InviteDb, slug: string) {
-  const rows = await db
-    .select({ id: organizations.id, slug: organizations.slug })
-    .from(organizations)
-    .where(eq(organizations.slug, slug))
-    .limit(1);
-  const org = rows[0];
+async function findOrganization(repos: Repositories, slug: string) {
+  const org = await repos.organizations.findBySlug(slug);
   if (!org) throw notFound(`no organization ${JSON.stringify(slug)}.`);
   return org;
 }

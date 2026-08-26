@@ -66,6 +66,7 @@ import {
   organizations,
 } from "../../../db/schema.js";
 import { fromStandard, organizationInserts, toStandard } from "../../mappers/opportunity.mapper.js";
+import { repositories } from "../../repositories/index.js";
 import {
   type Capabilities,
   type Principal,
@@ -369,7 +370,7 @@ export class OpportunityWriteService {
     principal: RequestPrincipal,
     namespace: string,
   ): Promise<RequestPrincipal> {
-    const authority = await this.publishAuthority(tx, principal.accountId, namespace);
+    const authority = await this.publishAuthority(repositories(tx), principal.accountId, namespace);
     return {
       ...principal,
       directCreate: authority.directCreate,
@@ -798,7 +799,7 @@ export class OpportunityWriteService {
    */
   private async assertPendingHeadroom(tx: Tx, accountId: number): Promise<void> {
     const limit = defaultConfig.pendingSubmissionLimit;
-    if (await hasAnyVerifiedMembership(tx, accountId)) return;
+    if (await hasAnyVerifiedMembership(repositories(tx), accountId)) return;
 
     const counted = await tx
       .select({ value: count() })

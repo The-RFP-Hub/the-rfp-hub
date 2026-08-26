@@ -14,6 +14,7 @@ import {
   type notificationKind,
   notifications,
 } from "../../../db/schema.js";
+import { repositories } from "../../repositories/index.js";
 import type {
   DuplicateNotificationPayloadView,
   NotificationListView,
@@ -22,7 +23,7 @@ import type {
 } from "../../shared/api-views.js";
 import { notFound } from "../../shared/http-error.js";
 import { paginate } from "../../shared/pagination.js";
-import { opportunityOwnerAccountIds } from "../opportunities/opportunity-ownership.js";
+import { mergeOpportunityOwnerAccountIds } from "../opportunities/opportunity-ownership.js";
 
 export type NotificationKind = (typeof notificationKind.enumValues)[number];
 export type DuplicateNotificationAction = "review_match" | "view_match" | "view_survivor";
@@ -68,6 +69,7 @@ export class NotificationService {
    * constraint remains the backstop, while the map makes recipient deduplication explicit.
    */
   async recordDuplicate(tx: DbLike, input: RecordDuplicateNotificationsInput): Promise<number[]> {
+    const repos = repositories(tx);
     const sides = new Map([
       [input.left.id, input.left],
       [input.right.id, input.right],
@@ -85,7 +87,11 @@ export class NotificationService {
         );
       }
       const other = yours.id === input.left.id ? input.right : input.left;
-      for (const accountId of await opportunityOwnerAccountIds(tx, yours)) {
+      const memberAccountIds =
+        yours.sourcePublisher === null
+          ? []
+          : await repos.memberships.accountIdsForOrgSlug(yours.sourcePublisher);
+      for (const accountId of mergeOpportunityOwnerAccountIds(yours, memberAccountIds)) {
         const key = `${accountId}:${event.kind}`;
         if (!recipients.has(key))
           recipients.set(key, { accountId, kind: event.kind, yours, other });

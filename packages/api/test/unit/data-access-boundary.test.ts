@@ -43,7 +43,6 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "src/modules/services/admin/admin.service.ts",
   "src/modules/services/auth/account.service.ts",
   "src/modules/services/auth/api-key.service.ts",
-  "src/modules/services/auth/publish-authority.ts",
   "src/modules/services/claims/claim.service.ts",
   "src/modules/services/dedupe/dedupe.service.ts",
   "src/modules/services/health/health.service.ts",
@@ -51,20 +50,17 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "src/modules/services/insights/insights.service.ts",
   "src/modules/services/insights/rollup.service.ts",
   "src/modules/services/jobs/staleness.service.ts",
-  "src/modules/services/memberships/membership-invite.service.ts",
   "src/modules/services/notifications/notification-dispatch.service.ts",
   "src/modules/services/notifications/notification.service.ts",
   "src/modules/services/opportunities/managed-opportunity.service.ts",
   "src/modules/services/opportunities/opportunity-meta.service.ts",
-  "src/modules/services/opportunities/opportunity-ownership.ts",
   "src/modules/services/opportunities/opportunity-write.service.ts",
   "src/modules/services/opportunities/opportunity.service.ts",
-  "src/modules/services/publishers/publisher.service.ts",
   "src/modules/services/review/review.service.ts",
   "src/modules/services/stats/stats.service.ts",
   "src/modules/services/verification/verification.service.ts",
 ];
-const TEMPORARY_CEILING = 27;
+const TEMPORARY_CEILING = 23;
 
 type Violation = "drizzle-import" | "schema-value-import" | "transaction";
 

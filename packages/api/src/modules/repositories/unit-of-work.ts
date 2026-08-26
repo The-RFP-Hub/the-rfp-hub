@@ -1,38 +1,47 @@
 import type { DB, DbLike } from "../../db/client.js";
 import { AuditRepository } from "./audit/audit.repository.js";
-
-/**
- * The first repository seam. Domain query methods arrive here as services are migrated; until then
- * it has no query surface and keeps its executor private from service callers.
- */
-export class OpportunityRepository {
-  constructor(private readonly exec: DbLike) {}
-
-  /** Keeps the executor owned by the repository without exposing it to service callers. */
-  protected executor(): DbLike {
-    return this.exec;
-  }
-}
+import { MembershipInviteRepository } from "./membership-invites/membership-invite.repository.js";
+import { MembershipRepository } from "./memberships/membership.repository.js";
+import { OpportunityRepository } from "./opportunities/opportunity.repository.js";
+import { OrganizationRepository } from "./organizations/organization.repository.js";
 
 /** The repositories a service may compose. Add domain repositories here as migrations land. */
 export interface Repositories {
   readonly audit: AuditRepository;
+  readonly membershipInvites: MembershipInviteRepository;
+  readonly memberships: MembershipRepository;
   readonly opportunities: OpportunityRepository;
+  readonly organizations: OrganizationRepository;
 }
 
 /** Build one executor-bound bundle. Repositories are constructed only when first requested. */
 export function repositories(exec: DbLike): Repositories {
   let audit: AuditRepository | undefined;
+  let membershipInvites: MembershipInviteRepository | undefined;
+  let memberships: MembershipRepository | undefined;
   let opportunities: OpportunityRepository | undefined;
+  let organizations: OrganizationRepository | undefined;
 
   return {
     get audit() {
       audit ??= new AuditRepository(exec);
       return audit;
     },
+    get membershipInvites() {
+      membershipInvites ??= new MembershipInviteRepository(exec);
+      return membershipInvites;
+    },
+    get memberships() {
+      memberships ??= new MembershipRepository(exec);
+      return memberships;
+    },
     get opportunities() {
       opportunities ??= new OpportunityRepository(exec);
       return opportunities;
+    },
+    get organizations() {
+      organizations ??= new OrganizationRepository(exec);
+      return organizations;
     },
   };
 }

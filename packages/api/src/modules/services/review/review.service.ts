@@ -25,6 +25,7 @@ import {
   orgMemberships,
   organizations,
 } from "../../../db/schema.js";
+import { repositories } from "../../repositories/index.js";
 import type {
   MembershipResultView,
   OrganizationSummaryView,
@@ -428,7 +429,7 @@ export class ReviewService {
         throw notFound(`no opportunity ${JSON.stringify(publicId)} published under \`${slug}\`.`);
       }
 
-      const authority = await resolvePublishAuthority(tx, accountId, slug);
+      const authority = await resolvePublishAuthority(repositories(tx), accountId, slug);
       if (!authority.member || !authority.verified) {
         throw forbidden(
           "not_a_verified_member",
