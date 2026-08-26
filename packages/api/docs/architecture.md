@@ -43,6 +43,9 @@ packages/api/src/
     services/
       opportunities/
         opportunity.service.ts       class OpportunityService (logic + data)
+        opportunity-ownership.ts     shared submission-or-namespace owner rule
+      notifications/
+        notification.service.ts      transactional emission + account inbox state
       stats/    { stats.service.ts }
       health/   { health.service.ts }
     mappers/

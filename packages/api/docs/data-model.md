@@ -43,6 +43,7 @@ here so deferred work remains discoverable. The implemented slice lives in
 | `verification_runs` (+ `snapshot_text`, `snapshot_sha256`) | ✅ M3 |
 | `opportunity_embeddings` — `vector(1536)` + HNSW cosine index | ✅ M3 |
 | `opportunity_duplicates` (+ self-pair CHECK + canonical-pair unique index) | ✅ M3 |
+| `notifications` — account inbox for duplicate events; email delivery state pre-provisioned | ✅ M3 |
 | `opportunity_events` (**plain**, not partitioned) + `opportunity_stats_daily` | ✅ M3 |
 | `opportunities.search_tsv` generated `tsvector` column + `gin_opp_search` | ⏳ M4 — `ILIKE`/`pg_trgm` is adequate at this dataset size; add when volume warrants |
 | `gin_opp_typedata` (GIN on `type_data`) | ⏳ M4 — nothing filters inside `type_data` yet |
@@ -129,6 +130,7 @@ erDiagram
     organizations ||--o{ opportunity_claims : "claimed by"
     accounts      ||--o{ org_memberships : holds
     accounts      ||--o{ api_keys : owns
+    accounts      ||--o{ notifications : receives
     accounts      ||--o{ opportunities : "submitted_by / approved_by"
     opportunities ||--o{ opportunity_claims : "claimed"
     opportunities ||--o| opportunity_embeddings : has
@@ -160,6 +162,9 @@ CREATE TYPE audit_action       AS ENUM (
   'assign_role','grant_direct_create','revoke_direct_create','create_api_key','revoke_api_key');
 CREATE TYPE claim_status       AS ENUM ('pending','approved','rejected','withdrawn');
 CREATE TYPE dup_status         AS ENUM ('suspected','confirmed','dismissed','merged');
+CREATE TYPE notification_kind  AS ENUM (
+  'duplicate_suspected','duplicate_confirmed','duplicate_dismissed',
+  'duplicate_merged_away','duplicate_absorbed','duplicate_reopened');
 CREATE TYPE analytics_event    AS ENUM ('list_view','detail_view','source_click','apply_click');
 ```
 
@@ -575,6 +580,26 @@ CREATE UNIQUE INDEX ux_dup_pair ON opportunity_duplicates
   (least(opportunity_id, duplicate_of_id), greatest(opportunity_id, duplicate_of_id));
 CREATE INDEX ix_dup_status ON opportunity_duplicates (status, detected_at DESC);
 
+-- ✅ M3 durable owner inbox. `subject_kind` is an extension seam; this slice writes `duplicate`.
+CREATE TABLE notifications (
+  id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id          BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  kind                notification_kind NOT NULL,
+  subject_kind        TEXT NOT NULL,
+  subject_id          BIGINT NOT NULL,       -- opportunity_duplicates.id when subject_kind=duplicate
+  payload             JSONB NOT NULL,        -- structured facts, never rendered prose
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at             TIMESTAMPTZ,
+  email_dispatched_at TIMESTAMPTZ,           -- reserved for the separate email-delivery decision
+  email_failed_at     TIMESTAMPTZ            -- reserved; no dispatcher writes either field yet
+);
+CREATE UNIQUE INDEX ux_notification_event ON notifications
+  (account_id, kind, subject_kind, subject_id);
+CREATE INDEX ix_notification_account_created ON notifications
+  (account_id, created_at DESC, id DESC);
+CREATE INDEX ix_notification_account_unread ON notifications
+  (account_id, created_at DESC) WHERE read_at IS NULL;
+
 -- ⏳ M4 — upstream → Hub outbox idempotency
 CREATE TABLE ingestion_events (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -776,8 +801,14 @@ held to containment on replace — a foreign-operated one is still rejected.
   Selection predicate, no queue table: `application_url IS NOT NULL AND (verified_at IS NULL OR
   verified_at < updated_at)`. `matched` is a **low-bar anti-spam signal, not a fact-check**: the page
   exists and its title is about the same programme. An admin still approves.
-- **Dedup (M3):** after commit and outside the transaction, embed the entry, ANN-search
-  `opportunity_embeddings`, record matches in `opportunity_duplicates`. A submitter's candidate
+- **Dedup (M3):** after commit and outside the submission transaction, embed the entry, ANN-search
+  `opportunity_embeddings`, and record matches in `opportunity_duplicates`. Each new pair and its
+  owner notifications share one transaction; `RETURNING` prevents re-detection from emitting again,
+  and the inbox unique key is the backstop. Decisions, merges, and reopens likewise notify owners in
+  the same transaction as their mutation. Ownership means direct submission or membership in the
+  stored publisher namespace; reviewer access alone is never a subscription. Notification payloads
+  identify the other side only when it is approved and listed at emission time, and represent the
+  acting person only as `reviewer`. A submitter's candidate
   search runs over **`approved AND is_listed` rows only**, so a suspected-match response can never
   disclose another user's pending or unlisted title; reviewers searching from `/v1/review/duplicates`
   see all rows. A failed or absent provider yields `duplicateCheck: "unavailable" | "disabled"` and
