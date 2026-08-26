@@ -103,6 +103,17 @@ function Accounts({ me }: { me: Me }) {
           placeholder="handle, display name or provider subject"
         />
         <button type="submit">Search</button>
+        {search !== "" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setSearch("");
+            }}
+          >
+            Clear
+          </button>
+        ) : null}
       </form>
       <ActionNote note={note} />
 

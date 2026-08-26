@@ -256,7 +256,7 @@ function Listings({ me }: { me: Me }) {
                 </table>
               </div>
 
-              <div className="row">
+              <div className="pagination">
                 <button
                   type="button"
                   disabled={list.page <= 1}

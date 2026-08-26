@@ -91,6 +91,28 @@ describe("the page's scope", () => {
     // It says where verification went, rather than leaving a reviewer to guess.
     expect(screen.getByRole("link", { name: /Review queues/ })).toBeTruthy();
   });
+
+  it("clears an applied account search from beside the Search button", async () => {
+    const api = client([account()]);
+    const accounts = vi.fn(async () => ({ items: [account()] }));
+    api.review.accounts = accounts;
+    render(
+      <ApiClientProvider value={api}>
+        <AdminPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Search accounts"), {
+      target: { value: "indie" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: "indie", limit: 25 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    expect(screen.getByLabelText("Search accounts")).toHaveProperty("value", "");
+    await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: undefined, limit: 25 }));
+  });
 });
 
 describe("changing a role", () => {

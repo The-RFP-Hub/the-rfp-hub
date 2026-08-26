@@ -68,6 +68,13 @@ describe("the visual-system token boundary", () => {
   it("keeps navigation, pagination and repeater targets usable with touch", () => {
     const [globalCss, formCss] = stylesheets.map(([, path]) => readFileSync(path, "utf8"));
     expect(globalCss).toMatch(
+      /\.button-primary\s*\{[^}]*min-block-size:\s*var\(--control-touch\);/s,
+    );
+    expect(globalCss).toMatch(/\.segmented\s*\{[^}]*flex-wrap:\s*wrap;/s);
+    expect(globalCss).toMatch(
+      /\.segmented button\s*\{[^}]*flex:\s*0 0 auto;[^}]*min-block-size:\s*var\(--control-touch\);/s,
+    );
+    expect(globalCss).toMatch(
       /\.section-nav a\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*min-inline-size:\s*var\(--control-touch\);/s,
     );
     expect(globalCss).toMatch(/\.pagination\s*\{[^}]*flex-wrap:\s*wrap;/s);
@@ -76,6 +83,9 @@ describe("the visual-system token boundary", () => {
     );
     expect(globalCss).toMatch(
       /@media \(pointer: coarse\)\s*\{[\s\S]*?button,[\s\S]*?summary\s*\{[^}]*min-block-size:\s*var\(--control-touch\);/s,
+    );
+    expect(globalCss).toMatch(
+      /\.duplicate-actions button\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*white-space:\s*nowrap;/s,
     );
     expect(formCss).toMatch(/\.itemHead\s*\{[^}]*flex-wrap:\s*wrap;/s);
     expect(formCss).toMatch(

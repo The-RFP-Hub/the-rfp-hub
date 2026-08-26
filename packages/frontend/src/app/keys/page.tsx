@@ -100,7 +100,7 @@ function Keys() {
         keyId: id,
         note: {
           kind: "ok",
-          message: `Key ${keyName} revoked. Audit rows naming it still resolve.`,
+          message: `Revoked ${keyName}. Audit rows naming it still resolve.`,
         },
       });
       setConfirmingKeyId(null);

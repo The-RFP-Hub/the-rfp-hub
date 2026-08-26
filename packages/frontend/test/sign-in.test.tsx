@@ -92,7 +92,7 @@ describe("signing in with an email code", () => {
     expect(screen.queryByLabelText(/6-digit code/)).toBeNull();
   });
 
-  it("sends the code, then asks for it — naming the address and stating expiry once", async () => {
+  it("sends the code, then names the address and expiry once", async () => {
     const { container } = mount();
     await reachCodeStep();
 
@@ -100,7 +100,15 @@ describe("signing in with an email code", () => {
       email: "programs@acme.example.org",
       type: "sign-in",
     });
-    expect(screen.getByText(/Code sent to programs@acme\.example\.org/)).toBeTruthy();
+    expect(
+      screen.getByText((_, node) =>
+        Boolean(
+          node?.tagName === "P" &&
+            node.textContent?.startsWith("Sent to programs@acme.example.org."),
+        ),
+      ),
+    ).toBeTruthy();
+    expect(container.textContent?.match(/programs@acme\.example\.org/g)).toHaveLength(1);
     expect(container.textContent?.match(/expires five minutes after it was sent/g)).toHaveLength(1);
     expect(screen.queryByLabelText("Email address")).toBeNull();
   });

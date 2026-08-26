@@ -248,6 +248,54 @@ describe("the dashboard", () => {
     ).toBeTruthy();
   });
 
+  it("explains an all-zero period even when published listings exist", async () => {
+    const me: Me = {
+      accountId: 1,
+      handle: "publisher",
+      displayName: null,
+      email: null,
+      role: "submitter",
+      directCreate: false,
+      credentialKind: "session",
+      scopes: [],
+      memberships: [],
+      canManageKeys: true,
+      canReview: false,
+      canAdmin: false,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const summary: InsightsSummary = {
+      from: "2026-07-26",
+      to: "2026-08-25",
+      totals: { listViews: 0, detailViews: 0, sourceClicks: 0, applyClicks: 0 },
+      opportunities: [
+        {
+          opportunityId: "acme:quiet-round",
+          title: "Quiet Round",
+          listViews: 0,
+          detailViews: 0,
+          sourceClicks: 0,
+          applyClicks: 0,
+        },
+      ],
+    };
+    const client = {
+      baseUrl: "https://api.example.com",
+      me: { get: async () => me },
+      insights: { summary: vi.fn(async () => summary) },
+    } as unknown as ApiClient;
+
+    render(
+      <ApiClientProvider value={client}>
+        <DashboardPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("No traffic recorded in this period yet.")).toBeTruthy();
+    expect(screen.getByText("Quiet Round")).toBeTruthy();
+    expect(screen.getByText("Most-read listings first")).toBeTruthy();
+  });
+
   it("makes login primary when the dashboard is signed out", () => {
     session.data = null;
     const client = { baseUrl: "https://api.example.com" } as unknown as ApiClient;

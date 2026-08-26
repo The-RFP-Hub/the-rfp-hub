@@ -207,7 +207,7 @@ describe("merged listing detail and edit routes", () => {
 
     const navigation = await screen.findByRole("navigation", { name: "Listing detail" });
     const analytics = within(navigation).getByRole("link", { name: "Analytics" });
-    const duplicates = within(navigation).getByRole("link", { name: "Duplicates · 2" });
+    const duplicates = within(navigation).getByRole("link", { name: "Duplicates · 2 open" });
     expect(analytics.getAttribute("aria-current")).toBe("page");
     expect(duplicates.hasAttribute("aria-current")).toBe(false);
 
@@ -274,7 +274,7 @@ describe("merged listing detail and edit routes", () => {
     mount(<ListingPage />, api);
 
     expect(
-      await screen.findByRole("link", { name: "Duplicates · 2", current: "page" }),
+      await screen.findByRole("link", { name: "Duplicates · 2 open", current: "page" }),
     ).toBeTruthy();
     expect(duplicates).toHaveBeenCalledTimes(1);
 

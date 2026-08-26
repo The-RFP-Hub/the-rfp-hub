@@ -83,6 +83,20 @@ beforeEach(() => {
 });
 
 describe("the merged row on Your listings", () => {
+  it("uses the shared 44px pagination controls", async () => {
+    render(
+      <ApiClientProvider value={client()}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+
+    const previous = await screen.findByRole("button", { name: "Previous" });
+    expect(previous.closest(".pagination")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next" }).closest(".pagination")).toBe(
+      previous.closest(".pagination"),
+    );
+  });
+
   it("keeps the duplicate submit action in the empty state secondary", async () => {
     render(
       <ApiClientProvider value={client([])}>

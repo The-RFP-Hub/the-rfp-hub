@@ -236,7 +236,10 @@ button:disabled {
   font-weight: 700;
   padding: var(--space-2) var(--space-4);
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--control-touch);
 }
 
 .button-primary:hover {
@@ -687,11 +690,19 @@ caption {
 }
 
 .segmented {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-1);
   border: 0;
   padding: 0;
   margin: 0;
+}
+
+.segmented button {
+  flex: 0 0 auto;
+  max-inline-size: 100%;
+  min-block-size: var(--control-touch);
+  line-height: 1.25;
 }
 
 /*
@@ -1025,7 +1036,7 @@ caption {
 
 /*
  * A duplicate decision must not put a different action under the pointer. Every state keeps the
- * same four slots, and each slot is sized for its longest label (including the checked state).
+ * same four slots. Labels stay on one line and every slot shares the control-height token.
  */
 .duplicate-actions {
   min-inline-size: 0;
@@ -1034,8 +1045,13 @@ caption {
   margin: 0;
 }
 
+.duplicate-actions button {
+  min-block-size: var(--control-touch);
+  white-space: nowrap;
+}
+
 .duplicate-actions .duplicate-compare-control {
-  inline-size: 10.75rem;
+  inline-size: 6.25rem;
 }
 
 .duplicate-actions .duplicate-confirm-control,

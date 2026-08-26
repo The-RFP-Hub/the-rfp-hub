@@ -99,10 +99,6 @@ export function SignIn({
         return;
       }
       setStep("code");
-      setNote({
-        kind: "ok",
-        message: `Code sent to ${email.trim()}.`,
-      });
     } catch (cause) {
       setNote({ kind: "error", message: describeTransportFailure(cause) });
     } finally {

@@ -243,7 +243,7 @@ describe("the section navigation", () => {
 
     expect(await screen.findByRole("link", { name: "Submissions · 7" })).toBeTruthy();
     await waitFor(() => expect(screen.getByRole("link", { name: "Claims · 0" })).toBeTruthy());
-    expect(screen.getByRole("link", { name: "Duplicates · 0" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 0 open" })).toBeTruthy();
   });
 
   it("reads the open tab from the URL, so a link to one lands on it", async () => {
@@ -450,6 +450,8 @@ describe("merging duplicates", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Merge…" }));
     const panel = screen.getByRole("group", { name: "Merge these two listings?" });
+    expect(panel.textContent).toContain("Acme Grants — acme:survivor survives");
+    expect(panel.textContent).toContain("Legacy Acme Grants — legacy:loser is rejected");
     expect(panel.textContent).toContain(
       "leaves the public directory and its public link forwards to the survivor",
     );
@@ -546,7 +548,7 @@ describe("merging duplicates", () => {
       </ApiClientProvider>,
     );
 
-    const compare = await screen.findByRole("button", { name: "Compare descriptions" });
+    const compare = await screen.findByRole("button", { name: "Compare" });
     expect(fetchOpportunity).not.toHaveBeenCalled();
     fireEvent.click(compare);
 
@@ -591,12 +593,14 @@ describe("merging duplicates", () => {
 
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Duplicates · 0", current: "page" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 0 open", current: "page" })).toBeTruthy();
+    expect(screen.getByText("Decision saved.")).toBeTruthy();
+    expect(screen.queryByText(/undo it from Recently resolved/i)).toBeNull();
     expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByRole("button", { name: "Confirm" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Duplicates · 1", current: "page" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1 open", current: "page" })).toBeTruthy();
     expect(reopen).toHaveBeenCalledWith(duplicatePair.id);
   });
 
@@ -632,21 +636,21 @@ describe("merging duplicates", () => {
         .getAllByRole("button")
         .map((button) => button.textContent);
 
-    expect(actionLabels()).toEqual(["Compare descriptions", "Confirm", "Dismiss", "Merge…"]);
+    expect(actionLabels()).toEqual(["Compare", "Confirm", "Dismiss", "Merge…"]);
     fireEvent.click(within(actionGroup).getByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByText("Confirmed", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
-    expect(actionLabels()).toEqual(["Compare descriptions", "Confirmed", "Dismiss", "Merge…"]);
+    expect(actionLabels()).toEqual(["Compare", "Confirmed", "Dismiss", "Merge…"]);
     expect(within(actionGroup).getByRole("button", { name: "Confirmed" })).toHaveProperty(
       "disabled",
       true,
     );
-    expect(screen.getByRole("link", { name: "Duplicates · 1", current: "page" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1 open", current: "page" })).toBeTruthy();
 
     fireEvent.click(within(actionGroup).getByRole("button", { name: "Dismiss" }));
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
-    expect(actionLabels()).toEqual(["Compare descriptions", "Confirm", "Dismiss", "Merge…"]);
+    expect(actionLabels()).toEqual(["Compare", "Confirm", "Dismiss", "Merge…"]);
     expect(within(actionGroup).getByRole("button", { name: "Dismiss" })).toHaveProperty(
       "disabled",
       true,
@@ -702,10 +706,7 @@ describe("merging duplicates", () => {
     fireEvent.click(screen.getByRole("button", { name: "Merge them" }));
 
     expect(screen.getByRole("button", { name: "Merging…" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "Compare descriptions" })).toHaveProperty(
-      "disabled",
-      true,
-    );
+    expect(screen.getByRole("button", { name: "Compare" })).toHaveProperty("disabled", true);
 
     await act(async () => {
       finishMerge({
@@ -727,7 +728,7 @@ describe("merging duplicates", () => {
     expect(screen.getByRole("link", { name: "view" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
     expect(screen.queryByText(/Copied fields: none/)).toBeNull();
-    expect(screen.getByRole("link", { name: "Duplicates · 0", current: "page" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 0 open", current: "page" })).toBeTruthy();
   });
 
   it("restores dismissed and merged receipts from the explicitly bounded resolved page", async () => {
@@ -772,7 +773,7 @@ describe("merging duplicates", () => {
     expect(screen.getByText("Dismissed Acme Grants")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByText(/pair 18 · Needs review/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Duplicates · 1", current: "page" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1 open", current: "page" })).toBeTruthy();
     expect(reopen).toHaveBeenCalledWith(dismissedPair.id);
     expect(requested).toContainEqual({ status: "dismissed", limit: 200 });
     expect(requested).toContainEqual({ status: "merged", limit: 200 });

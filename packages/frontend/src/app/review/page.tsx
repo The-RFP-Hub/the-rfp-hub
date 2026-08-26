@@ -203,7 +203,13 @@ function Review({ me }: { me: Me }) {
         items={TABS.map((item) => ({
           current: tab === item,
           href: tabHref(item),
-          label: `${LABELS[item]}${counts[item] !== null ? ` · ${counts[item]}` : ""}`,
+          label: `${LABELS[item]}${
+            counts[item] !== null
+              ? item === "duplicates"
+                ? ` · ${counts[item]} open`
+                : ` · ${counts[item]}`
+              : ""
+          }`,
         }))}
       />
 
@@ -1014,6 +1020,7 @@ function PairCard({
   const [comparing, setComparing] = useState(false);
   const [survivorElsewhere, setSurvivorElsewhere] = useState<string | null>(null);
 
+  const survivorListing = survivor === pair.left.id ? pair.left : pair.right;
   const loser = survivor === pair.left.id ? pair.right : pair.left;
 
   const merge = () =>
@@ -1070,7 +1077,7 @@ function PairCard({
           disabled={busy}
           onClick={() => setComparing((value) => !value)}
         >
-          {comparing ? "Hide comparison" : "Compare descriptions"}
+          {comparing ? "Hide" : "Compare"}
         </button>
         <button
           className="duplicate-confirm-control"
@@ -1099,7 +1106,7 @@ function PairCard({
               onDecision(next);
               return wasConfirmed
                 ? "Decision saved. Undo returns this pair to Needs review, not to Confirmed."
-                : "Decision saved. You can undo it from Recently resolved.";
+                : "Decision saved.";
             })
           }
         >
@@ -1171,17 +1178,20 @@ function PairCard({
           onConfirm={merge}
         >
           <p>
-            <code>{survivor}</code> survives and stays as it is — nothing is copied into it unless
-            you say so, and this screen does not offer to.
+            <strong>
+              <UntrustedText value={survivorListing.title} />
+            </strong>{" "}
+            — <code>{survivorListing.id}</code> survives and stays as it is — nothing is copied into
+            it unless you say so, and this screen does not offer to.
           </p>
           <p>
-            <code>{loser.id}</code> —{" "}
             <strong>
               <UntrustedText value={loser.title} />
             </strong>{" "}
-            — is <strong>rejected, unlisted, archived and pointed at the survivor</strong>. It
-            leaves the public directory and its public link forwards to the survivor. This is not
-            undone by merging the other way afterwards.
+            — <code>{loser.id}</code> is{" "}
+            <strong>rejected, unlisted, archived and pointed at the survivor</strong>. It leaves the
+            public directory and its public link forwards to the survivor. This is not undone by
+            merging the other way afterwards.
           </p>
         </ConfirmPanel>
       ) : null}

@@ -111,7 +111,7 @@ function Listing({ id, me }: { id: string; me: Me }) {
                 href: tabHref(name),
                 label: `${TAB_LABELS[name]}${
                   name === "duplicates" && openDuplicateCount !== null
-                    ? ` · ${openDuplicateCount}`
+                    ? ` · ${openDuplicateCount} open`
                     : ""
                 }`,
               }))}

@@ -89,6 +89,17 @@ function Overview() {
               ))}
             </ul>
 
+            {summary.opportunities.length > 0 &&
+            Object.values(summary.totals).every((count) => count === 0) ? (
+              <div className="state">
+                <p className="empty-title">No traffic recorded in this period yet.</p>
+                <p className="muted">
+                  Published listings remain below. Counts move after directory views, detail views
+                  or tracked link clicks are recorded in this period.
+                </p>
+              </div>
+            ) : null}
+
             {summary.opportunities.length === 0 ? (
               <div className="state empty">
                 <p className="empty-title">No published listings to measure yet.</p>
