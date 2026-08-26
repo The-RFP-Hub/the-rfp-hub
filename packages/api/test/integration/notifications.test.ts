@@ -327,15 +327,62 @@ run("M3NOTE duplicate notifications", () => {
     expect(repeated.statusCode, repeated.body).toBe(200);
     expect(repeated.json().readAt).toBe(originalReadAt);
 
+    const total = firstPage.json().total as number;
+    const unreadTotal = total - 1;
+    const pageLimit = 2;
+
     const unread = await app.inject({
       method: "GET",
-      url: "/v1/me/notifications?unread=true&limit=100",
+      url: `/v1/me/notifications?unread=true&page=1&limit=${pageLimit}`,
       headers: bearer(privateOwnerReadKey),
     });
     expect(unread.statusCode, unread.body).toBe(200);
+    expect(unread.json()).toMatchObject({
+      page: 1,
+      limit: pageLimit,
+      total: unreadTotal,
+      totalPages: Math.max(1, Math.ceil(unreadTotal / pageLimit)),
+      unreadCount: unreadTotal,
+    });
+    expect(unread.json().items).toHaveLength(Math.min(pageLimit, unreadTotal));
     expect(unread.json().items.every((item: { readAt: null }) => item.readAt === null)).toBe(true);
     expect(unread.json().items.map((item: { id: number }) => item.id)).not.toContain(target.id);
-    expect(unread.json().unreadCount).toBe(firstPage.json().unreadCount - 1);
+
+    const read = await app.inject({
+      method: "GET",
+      url: "/v1/me/notifications?unread=false&page=1&limit=1",
+      headers: bearer(privateOwnerReadKey),
+    });
+    expect(read.statusCode, read.body).toBe(200);
+    expect(read.json()).toMatchObject({
+      page: 1,
+      limit: 1,
+      total: 1,
+      totalPages: 1,
+      unreadCount: unreadTotal,
+    });
+    expect(read.json().items).toEqual([
+      expect.objectContaining({ id: target.id, readAt: originalReadAt }),
+    ]);
+
+    const unfiltered = await app.inject({
+      method: "GET",
+      url: `/v1/me/notifications?page=1&limit=${pageLimit}`,
+      headers: bearer(privateOwnerReadKey),
+    });
+    expect(unfiltered.statusCode, unfiltered.body).toBe(200);
+    expect(unfiltered.json()).toMatchObject({
+      page: 1,
+      limit: pageLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+      unreadCount: unreadTotal,
+    });
+    expect(unfiltered.json().items).toHaveLength(Math.min(pageLimit, total));
+    expect(unfiltered.json().items.map((item: { id: number }) => item.id)).toContain(target.id);
+    expect(unfiltered.json().items.map((item: { readAt: string | null }) => item.readAt)).toEqual(
+      expect.arrayContaining([originalReadAt, null]),
+    );
 
     const somebodyElses = (
       await db
@@ -358,7 +405,7 @@ run("M3NOTE duplicate notifications", () => {
       headers: bearer(privateOwnerReadKey),
     });
     expect(all.statusCode, all.body).toBe(200);
-    expect(all.json()).toEqual({ markedRead: unread.json().unreadCount, unreadCount: 0 });
+    expect(all.json()).toEqual({ markedRead: unreadTotal, unreadCount: 0 });
 
     const settled = await app.inject({
       method: "GET",
