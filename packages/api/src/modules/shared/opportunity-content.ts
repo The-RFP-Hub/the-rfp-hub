@@ -52,3 +52,31 @@ export function comparableOpportunity(row: Record<string, unknown>): Record<stri
   }
   return out;
 }
+
+/**
+ * Columns that are the SUBMISSION path's bookkeeping but the IMPORT path's own decisions.
+ *
+ * `NON_CONTENT` excludes all three for a good reason on the submission path: a review decision, a
+ * visibility flip and the cross-system key are each made by a route of their own, and each of those
+ * routes appends its own audit row saying so. Comparing on them there would double-record what one
+ * of those rows already says.
+ *
+ * The import path has no such routes. `upsertOpportunityFromStandard` sets `review_status`,
+ * `is_listed` and `source_system` itself on every upsert, and nothing else will ever record that it
+ * did. So on that path they are not bookkeeping — they ARE the write. Leaving them out meant a
+ * re-import that approved a pending entry, relisted a hidden one, or moved an entry to a different
+ * source system wrote no history at all, because the document's own text had not changed.
+ */
+export const IMPORT_OWNED = ["reviewStatus", "isListed", "sourceSystem"] as const;
+
+/**
+ * The comparable projection for the import path: the document's content, plus the three decisions
+ * the import makes about it and nobody else records.
+ */
+export function comparableImportedOpportunity(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = comparableOpportunity(row);
+  for (const key of IMPORT_OWNED) out[key] = row[key] === undefined ? null : row[key];
+  return out;
+}

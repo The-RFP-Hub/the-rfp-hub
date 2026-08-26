@@ -1,7 +1,7 @@
 -- CUSTOM migration (drizzle-kit generate --custom --name audit_backfill_import).
 --
--- BACKFILL: give every opportunity that has no history at all the row its ingest should have
--- written.
+-- BACKFILL: give every opportunity whose appearance was never recorded the row its ingest should
+-- have written.
 --
 -- The seed/import path upserted `opportunities` without appending to `audit_log` until the change
 -- that ships alongside this migration. The milestone promises "an audit trail for any entry showing
@@ -27,10 +27,17 @@
 -- is the same shape the staleness job already uses for its own rows (`patch->>'job' = 'staleness'`).
 --
 -- ── Idempotent, and insert-only ─────────────────────────────────────────────────────────────────
--- The `NOT EXISTS` predicate is the idempotency: a second run sees the rows this run wrote and
--- selects nothing. It is scoped to "no opportunity history AT ALL" rather than "no import row", so
--- an entry that was already audited by the write path, the review path or a claim is left alone —
--- inventing an origin story for a row that has one would be worse than leaving it as it is.
+-- The predicate is NO `create` ROW, not "no history at all". Those are different sets, and the
+-- second one is wrong: an entry imported before this fix and then approved, edited, closed or
+-- verified DOES have history — rows describing what happened to it afterwards — while still having
+-- nothing that says where it came from. Scoping to "no history at all" would skip exactly the
+-- entries active enough for somebody to go and read their trail, which is the whole audience.
+--
+-- `create` is the right marker because it is the one action nothing but a first write emits: the
+-- submission path writes it on insert and never again, and no review, claim, merge, verification or
+-- staleness path writes it at all. "No `create` row" therefore means "nobody ever recorded this
+-- entry appearing", which is precisely the gap being filled — and it is also the idempotency, since
+-- a second run sees the `create` rows the first one wrote and selects nothing.
 --
 -- Nothing here updates or deletes, so the append-only triggers from 0004 are never reached. That is
 -- required, not incidental: `audit_log_no_update_delete` would abort this migration outright.
@@ -56,5 +63,5 @@ SELECT
 FROM opportunities o
 WHERE NOT EXISTS (
   SELECT 1 FROM audit_log a
-  WHERE a.subject_kind = 'opportunity' AND a.subject_id = o.id
+  WHERE a.subject_kind = 'opportunity' AND a.subject_id = o.id AND a.action = 'create'
 );

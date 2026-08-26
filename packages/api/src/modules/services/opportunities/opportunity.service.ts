@@ -12,8 +12,9 @@ import {
   type PublicOpportunityQuery,
   type Repositories,
   repositories,
+  withTransaction,
 } from "../../repositories/index.js";
-import { comparableOpportunity } from "../../shared/opportunity-content.js";
+import { comparableImportedOpportunity } from "../../shared/opportunity-content.js";
 import { paginate } from "../../shared/pagination.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
 import { SYSTEM_ACTOR } from "../audit/audit.service.js";
@@ -45,8 +46,15 @@ export { escapeLike } from "../../repositories/index.js";
 /** Data + business logic for opportunities. Public reads are always approved + listed. */
 export class OpportunityService {
   private readonly repos: Repositories;
+  /**
+   * Kept alongside the pool-bound bundle because the write path needs to OPEN a transaction, which
+   * `repositories(db)` deliberately cannot do — `withTransaction` is the only way to get an
+   * executor-bound bundle, and it needs the client. Reads stay on `this.repos`.
+   */
+  private readonly db: DB;
 
   constructor(db: DB = defaultDb) {
+    this.db = db;
     this.repos = repositories(db);
   }
 
@@ -113,6 +121,12 @@ export class OpportunityService {
    * ingest), keeps the organization directory in sync, derives `next_deadline_at` from
    * `deadlines[]` on the way in, and APPENDS AN AUDIT ROW when the write actually changed
    * something. Callers validate upstream (the seed's `gateForSeed`).
+   *
+   * ATOMIC, like the seed's batch form. The pre-image lock, the organization upserts, the
+   * opportunity upsert and the history row are one decision or none: on the pool-bound bundle they
+   * would commit independently, so a failure between the upsert and the audit insert would leave
+   * exactly the unaudited row this whole change exists to prevent — and the `FOR UPDATE` taken to
+   * make the diff trustworthy would be released before the write it was guarding.
    */
   async upsertFromStandard(
     std: Opportunity,
@@ -122,7 +136,7 @@ export class OpportunityService {
       sourceSystem?: string;
     } = {},
   ): Promise<void> {
-    await upsertOpportunityFromStandard(this.repos, std, opts);
+    await withTransaction(this.db, (repos) => upsertOpportunityFromStandard(repos, std, opts));
   }
 }
 
@@ -139,7 +153,7 @@ export class OpportunityService {
  */
 const IMPORT_JOB = "import";
 
-/** Repository-bundle form used by the atomic seed batch and the pool-bound service method. */
+/** Repository-bundle form. Both callers hold a transaction: the seed batch, and the method above. */
 export async function upsertOpportunityFromStandard(
   repos: Repositories,
   std: Opportunity,
@@ -182,14 +196,17 @@ export async function upsertOpportunityFromStandard(
    * rows saying nothing happened — and `audit_log` is append-only, so that is not a mistake anyone
    * can tidy up afterwards.
    *
-   * "Changed" is the same content projection the submission path uses, so the two paths cannot
-   * disagree about whether a document was edited. It deliberately excludes `next_deadline_at`, which
-   * this upsert recomputes from `now()` on every run and which would otherwise report the whole
-   * corpus as edited every time a deadline elapsed.
+   * "Changed" is the submission path's content projection PLUS the three fields this path decides
+   * for itself (`review_status`, `is_listed`, `source_system`) — see `IMPORT_OWNED`. Sharing the
+   * content half keeps the two paths from disagreeing about whether a document was edited; adding
+   * the other three is required because no route audits them on this path, so a re-import that
+   * approved or relisted an entry would otherwise pass as a no-op. What stays excluded is what
+   * genuinely moves on every run regardless: `updated_at`, `last_seen_at`, and the
+   * `next_deadline_at` this upsert recomputes from `now()`.
    */
   const patch = diffFields(
-    before ? comparableOpportunity(before) : {},
-    comparableOpportunity(stored),
+    before ? comparableImportedOpportunity(before) : {},
+    comparableImportedOpportunity(stored),
   );
   if (before && isEmptyPatch(patch)) return;
 
@@ -202,10 +219,11 @@ export async function upsertOpportunityFromStandard(
     // `create` for the first sighting, `update` for a content-changing re-import — the verbs the
     // closed enum already has. `IMPORT_JOB` above says why there is no `import` verb.
     action: before ? "update" : "create",
-    // `sourceSystem` is deliberately restated here even though it is excluded from the content
-    // diff: it is the origin of the document, which is the first thing a reader of an unattributed
-    // machine-written row wants to know.
-    patch: { ...patch, job: IMPORT_JOB, sourceSystem },
+    // `job` names the writer; the diff carries everything else. `sourceSystem` is IN the diff now
+    // rather than restated beside it as a bare string: restating it would either clobber the
+    // before/after pair on the run that actually moved an entry between source systems, or leave
+    // one key holding two different shapes and `patch->>'sourceSystem'` meaning two things.
+    patch: { ...patch, job: IMPORT_JOB },
   });
 }
 

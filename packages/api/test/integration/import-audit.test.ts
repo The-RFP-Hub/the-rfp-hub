@@ -7,17 +7,21 @@
  * `GET /v1/opportunities/:id/audit` with an empty trail while `docs/data-model.md` promised that
  * every write is audited.
  *
- * Three properties, and all three matter:
+ * Four properties, and all four matter:
  *
  *   1. a first import leaves a `create` row attributed to the SYSTEM, naming the path and the
  *      source system it came from;
  *   2. re-importing the SAME document leaves nothing — the seed re-runs whenever the corpus file
  *      moves, and `audit_log` is append-only, so a no-op row per entry per run is a mess nobody can
  *      clean up afterwards;
- *   3. re-importing a CHANGED document leaves an `update` row that names the fields that moved.
+ *   3. re-importing a CHANGED document leaves an `update` row that names the fields that moved;
+ *   4. and "changed" includes the three things the IMPORT decides and no route audits for it —
+ *      `review_status`, `is_listed`, `source_system`. Unpublishing the whole corpus by re-importing
+ *      it as pending must not pass as a no-op just because the documents' text was untouched.
  *
- * The fourth case is migration `0010`, which gives the same row to the entries imported before any
- * of this existed. It is asserted from the migration file itself rather than from a transcription,
+ * Then migration `0010`, which gives the create row to the entries imported before any of this
+ * existed — including the ones that were approved or edited afterwards and so have history without
+ * having an origin. It is asserted from the migration file itself rather than from a transcription,
  * and inside a transaction that is rolled back — the statement is corpus-wide by design, and a test
  * running beside other suites against a shared database has no business committing it.
  *
@@ -52,11 +56,15 @@ function corpusDocument(id: string, over: Record<string, unknown> = {}): Opportu
   return submission(id, NS, over as never) as unknown as Opportunity;
 }
 
-function importOf(std: Opportunity): Promise<void> {
+function importOf(
+  std: Opportunity,
+  over: { reviewStatus?: "pending" | "approved" | "rejected"; isListed?: boolean } = {},
+): Promise<void> {
   return ingest.upsertFromStandard(std, {
     reviewStatus: "approved",
     isListed: true,
     sourceSystem: NS,
+    ...over,
   });
 }
 
@@ -101,8 +109,33 @@ async function backfillStatements(): Promise<string[]> {
     .filter((chunk) => chunk.length > 0);
 }
 
-/** Thrown to roll the migration case back; caught by name so a real failure still propagates. */
+/** Thrown to roll the migration cases back; caught by name so a real failure still propagates. */
 class Rollback extends Error {}
+
+/**
+ * An opportunity row of exactly the pre-fix shape: written by the import path, carrying no history.
+ *
+ * Inserted through the repository's plain `insert` rather than through the service, because the
+ * service is the thing that now writes the audit row — the fixture has to be what the OLD code
+ * produced, not what the new code produces.
+ */
+async function insertUnaudited(exec: Executor, publicId: string) {
+  const { opp } = fromStandard(corpusDocument(publicId));
+  const rows = await exec
+    .insert(opportunities)
+    .values({
+      ...opp,
+      sourceSystem: NS,
+      reviewStatus: "approved",
+      isListed: true,
+      updatedAt: new Date(),
+    })
+    .returning();
+  const row = rows[0];
+  expect(row, `the ${publicId} fixture was not inserted`).toBeDefined();
+  if (!row) throw new Rollback();
+  return row;
+}
 
 run("M3IMPORT the corpus import writes history", () => {
   beforeAll(async () => {
@@ -126,7 +159,9 @@ run("M3IMPORT the corpus import writes history", () => {
     expect(row?.actorKind).toBe("job");
     expect(row?.actorAccountId).toBeNull();
     expect(row?.actorApiKeyId).toBeNull();
-    expect(row?.patch).toMatchObject({ job: "import", sourceSystem: NS });
+    // `job` is the only bare value; everything else, `sourceSystem` included, is a before/after
+    // pair, so one key never has to mean two shapes.
+    expect(row?.patch).toMatchObject({ job: "import", sourceSystem: { after: NS } });
     // A create diffs against nothing, so the document itself is in the patch.
     expect(row?.patch).toHaveProperty("title");
   });
@@ -156,12 +191,81 @@ run("M3IMPORT the corpus import writes history", () => {
     expect(latest?.actorKind).toBe("job");
     expect(latest?.patch).toMatchObject({
       job: "import",
-      sourceSystem: NS,
       title: { before: `Fixture ${SEEDED}`, after: "Renamed by the corpus" },
     });
+    // Unchanged fields stay out, `source_system` included — it is only in the patch when it moved.
+    expect(latest?.patch).not.toHaveProperty("sourceSystem");
   });
 
-  it("backfills exactly the entries with no history at all, idempotently (migration 0010)", async () => {
+  it("records a re-import that only changed a decision the import path itself makes", async () => {
+    const id = await rowIdOf(SEEDED);
+    const before = await trailOf(db, id);
+
+    // The document is byte-identical; only `review_status` and `is_listed` move. Nothing else
+    // audits those on this path — there is no reviewer and no route behind a corpus file — so if
+    // the import's own diff ignored them, unpublishing the whole corpus would leave no trace.
+    await importOf(corpusDocument(SEEDED, { title: "Renamed by the corpus" }), {
+      reviewStatus: "pending",
+      isListed: false,
+    });
+
+    const rows = await trailOf(db, id);
+    expect(rows).toHaveLength(before.length + 1);
+    const latest = rows.at(-1);
+    expect(latest?.action).toBe("update");
+    expect(latest?.patch).toMatchObject({
+      job: "import",
+      reviewStatus: { before: "approved", after: "pending" },
+      isListed: { before: true, after: false },
+    });
+    // …and only those: an unchanged document must not drag its own text into the patch.
+    expect(latest?.patch).not.toHaveProperty("title");
+
+    // Put it back, and that is a second change with a second row.
+    await importOf(corpusDocument(SEEDED, { title: "Renamed by the corpus" }));
+    expect(await trailOf(db, id)).toHaveLength(before.length + 2);
+  });
+
+  it("backfills an entry whose only history is what happened to it AFTER the import", async () => {
+    const statements = await backfillStatements();
+
+    try {
+      await db.transaction(async (tx) => {
+        const orphan = await insertUnaudited(tx, `${NS}:approved-only`);
+        // Exactly the shape the first predicate missed: imported before the fix, then approved by a
+        // reviewer. It HAS history — it just has nothing saying where it came from, and it is the
+        // entry somebody is most likely to open the trail of.
+        await tx.insert(auditLog).values({
+          subjectKind: "opportunity",
+          subjectId: orphan.id,
+          actorKind: "job",
+          action: "approve",
+          patch: { reviewStatus: { before: "pending", after: "approved" } },
+        });
+        expect(await trailOf(tx, orphan.id)).toHaveLength(1);
+
+        for (const statement of statements) await tx.execute(sql.raw(statement));
+
+        const rows = await trailOf(tx, orphan.id);
+        expect(rows.map((row) => row.action).sort()).toEqual(["approve", "create"]);
+        expect(rows.find((row) => row.action === "create")?.patch).toMatchObject({
+          backfill: true,
+          job: "import",
+          sourceSystem: NS,
+        });
+
+        // Still idempotent now that the marker is `create` rather than "any row".
+        for (const statement of statements) await tx.execute(sql.raw(statement));
+        expect(await trailOf(tx, orphan.id)).toHaveLength(2);
+
+        throw new Rollback();
+      });
+    } catch (error) {
+      if (!(error instanceof Rollback)) throw error;
+    }
+  });
+
+  it("backfills exactly the entries whose appearance was never recorded, idempotently (migration 0010)", async () => {
     const statements = await backfillStatements();
     expect(statements).toHaveLength(1);
 
@@ -170,21 +274,7 @@ run("M3IMPORT the corpus import writes history", () => {
 
     try {
       await db.transaction(async (tx) => {
-        // An entry of exactly the pre-fix shape: a row written by the import path, no history.
-        const { opp } = fromStandard(corpusDocument(ORPHAN));
-        const inserted = await tx
-          .insert(opportunities)
-          .values({
-            ...opp,
-            sourceSystem: NS,
-            reviewStatus: "approved",
-            isListed: true,
-            updatedAt: new Date(),
-          })
-          .returning();
-        const orphan = inserted[0];
-        expect(orphan, "the orphan fixture was not inserted").toBeDefined();
-        if (!orphan) throw new Rollback();
+        const orphan = await insertUnaudited(tx, ORPHAN);
         expect(await trailOf(tx, orphan.id)).toHaveLength(0);
 
         for (const statement of statements) await tx.execute(sql.raw(statement));
@@ -204,8 +294,8 @@ run("M3IMPORT the corpus import writes history", () => {
         for (const statement of statements) await tx.execute(sql.raw(statement));
         expect(await trailOf(tx, orphan.id)).toHaveLength(1);
 
-        // And an entry that already has history keeps exactly the history it had — inventing an
-        // origin story for a row that has one is worse than leaving it alone.
+        // And an entry that already recorded its own appearance keeps exactly the history it had —
+        // inventing a second origin for a row that has one is worse than leaving it alone.
         expect(await trailOf(tx, audited)).toHaveLength(auditedBefore);
 
         throw new Rollback();

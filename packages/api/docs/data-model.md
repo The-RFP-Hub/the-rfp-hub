@@ -685,9 +685,11 @@ Three properties are load-bearing:
 **The import path is audited too, and it is the reason the trail is complete.** The seed loader
 (`upsertOpportunityFromStandard`) writes most of the corpus and used to write no history at all, so
 "every write is audited" was true of every path except the one that produced the majority of rows.
-It now appends its row inside the same transaction as the upsert, attributed to the SYSTEM
-(`actor_kind='job'`, no account), with `patch.job='import'` naming the path and `patch.sourceSystem`
-naming the origin. Three rules:
+It now appends its row inside the same transaction as the upsert — on both callers: the seed's batch
+already held one, and `OpportunityService.upsertFromStandard` opens one, so the pre-image lock, the
+organization upserts, the row and its history commit together or not at all. The row is attributed
+to the SYSTEM (`actor_kind='job'`, no account), with `patch.job='import'` naming the path. Three
+rules:
 
 * **`create` on the first sighting, `update` on a content-changing re-import.** No new
   `audit_action` value: the enum is closed (see above), and adding one is not just convention —
@@ -696,15 +698,23 @@ naming the origin. Three rules:
   backfill below fail on every already-migrated deployment. The job is named in the patch instead,
   exactly as the staleness job names itself.
 * **A re-import that changed nothing writes nothing.** The seed re-runs whenever the corpus file
-  moves. "Changed" is the same content projection the submission path uses
-  (`modules/shared/opportunity-content.ts`), which excludes server bookkeeping — `updated_at`,
-  `last_seen_at` and the recomputed `next_deadline_at` above all move on every upsert, and counting
-  them would mark the whole corpus as edited on every run, in a table nothing can delete from.
+  moves, so "changed" has to exclude what moves on every upsert regardless — `updated_at`,
+  `last_seen_at`, and the recomputed `next_deadline_at` above — or the whole corpus would be marked
+  as edited on every run, in a table nothing can delete from. It is the submission path's content
+  projection **plus `review_status`, `is_listed` and `source_system`**
+  (`modules/shared/opportunity-content.ts`). Those three are bookkeeping on the submission path,
+  where a review route, a visibility route and a claim each audit their own change — and they are
+  the *decision* on the import path, where no route will ever record it. Sharing the content half
+  keeps the two paths from disagreeing about whether a document was edited; adding the other three
+  is what stops a re-import that unpublishes the corpus from passing as a no-op.
 * **Entries imported before this existed were backfilled** by migration
-  `0010_audit_backfill_import`, which inserts one `create` row per opportunity that has *no*
-  `subject_kind='opportunity'` history, stamped with the row's own `created_at` and carrying
-  `patch.backfill=true`. It is insert-only (so the 0004 triggers never fire) and idempotent (its
-  `NOT EXISTS` predicate sees what it wrote). An entry that already had history is left alone.
+  `0010_audit_backfill_import`, which inserts one `create` row per opportunity that has no
+  `create` row of its own, stamped with the row's own `created_at` and carrying `patch.backfill=true`.
+  The marker is `create` rather than "no history at all" on purpose: an entry imported before the fix
+  and approved, edited or closed afterwards **has** history, and none of it says where the entry came
+  from — those are the entries whose trail somebody is most likely to open. `create` is the one action
+  only a first write emits, so its absence means the appearance was never recorded. Insert-only (the
+  0004 triggers never fire) and idempotent (a second run sees the rows the first one wrote).
 
 **Visibility.** `GET /v1/opportunities/:id/audit` reads `subject_kind='opportunity'`. Public callers
 get `{action, at, actorKind, actor, changedFields[]}` — field **names** only, since a pending entry's
