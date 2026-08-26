@@ -22,15 +22,20 @@
  * selection, because a page checked once in the week it was imported says nothing about whether the
  * programme is still running today — and because a matched check is the ONLY thing that refreshes
  * `last_seen_at` for an entry with no future deadline, without which `staleness` closes it after
- * ninety quiet days. The selection is capped per invocation (`VERIFY_NIGHTLY_LIMIT`) and ordered
- * never-checked first, so a corpus larger than the cap is worked through rather than half-ignored.
+ * ninety quiet days. The selection is capped per INVOCATION (`VERIFY_NIGHTLY_LIMIT`) — not per
+ * pass, which a runner willing to go round twenty times would have multiplied by twenty — and
+ * ordered never-checked first, so a corpus larger than the cap is worked through rather than
+ * half-ignored.
  *
  * THE RUN LOG IS APPEND-ONLY BUT NOT UNBOUNDED. Each row carries up to 200 KB of `snapshot_text`,
  * and an entry re-checked on a schedule accumulates one per check forever — megabytes a year, for a
- * history nobody reads past the most recent few. So the backfill prunes to the newest
- * `VERIFICATION_RUNS_KEEP` runs per entry it touched. The trail an audit needs is `audit_log`, which
- * is immutable in the database and is never pruned; this table is evidence for a reviewer looking at
- * a page NOW, and the retention bound says so.
+ * history nobody reads past the most recent few. So EVERY insertion prunes its own entry to the
+ * newest `VERIFICATION_RUNS_KEEP` runs, whichever path wrote it — the backfill, a reviewer's manual
+ * check, or the submit-time queue — and the backfill prunes its whole selection again afterwards.
+ * Pruning only in the batch would have missed the two paths that append most often to a single
+ * entry. The trail an audit needs is `audit_log`, which is immutable in the database and is never
+ * pruned; this table is evidence for a reviewer looking at a page NOW, and the retention bound
+ * says so.
  *
  * THE BACKFILL IS PACED PER HOST (`host-pacer.ts`). A corpus clusters by publisher, so a serial
  * pass over 500 entries is fifty requests to one foundation's domain in the two seconds it takes
@@ -182,7 +187,17 @@ export class VerificationService {
     // that domain can answer. A reviewer pressing "verify" passes none — making one interactive
     // check wait on an unrelated batch's reservations would be politeness charged to the wrong
     // person, and one request is not a crawl.
-    const pacedMs = pacer ? await pacer.wait(url) : 0;
+    //
+    // HANDED TO `fetchSource` RATHER THAN APPLIED HERE, because the entry's URL is only the FIRST
+    // request. Redirects are requests to other servers, and a corpus of vanity domains pointing at
+    // one grants platform would otherwise be spaced perfectly across thirty vanity hosts and burst
+    // thirty times onto the platform behind them.
+    let pacedMs = 0;
+    const onHop = pacer
+      ? async (target: string): Promise<void> => {
+          pacedMs += await pacer.wait(target);
+        }
+      : undefined;
 
     // OUTSIDE any transaction. A source fetch is a network round trip to a stranger's server and
     // must never be what holds a database transaction open.
@@ -194,6 +209,7 @@ export class VerificationService {
         maxBytes: this.config.verification.maxBytes,
         allowPrivateHosts: this.config.verification.allowPrivateHosts,
         transport: this.transport,
+        onHop,
       });
     } catch (error) {
       failure =
@@ -237,6 +253,13 @@ export class VerificationService {
       // page did not, and the diff is against both — but the run is marked as carrying nothing new,
       // which is what a reviewer comparing two checks actually wants to know.
       //
+      // NOT WHEN EITHER FETCH WAS TRUNCATED. The digest is over the bytes that were RETAINED, and
+      // `VERIFY_MAX_BYTES` stops the stream at 2 MiB — so two genuinely different versions of a
+      // long page that share their first 2 MiB produce the same digest, and "unchanged" would be a
+      // claim about a prefix dressed up as a claim about the page. Both sides have to be complete
+      // for equal digests to mean equal pages; when either is not, this falls through to the
+      // ordinary path and stores the fresh extraction.
+      //
       // The snapshot text is COPIED FORWARD rather than left null. Retention deletes older runs
       // (`pruneToLatest`), so a run whose text lived only on a pruned ancestor would carry a digest
       // of bytes nobody stores any more — the snapshot of record has to be on the row that claims
@@ -244,8 +267,10 @@ export class VerificationService {
       const previous = fetched ? await repos.verificationRuns.latest(row.id) : undefined;
       const unchanged =
         fetched !== undefined &&
+        fetched.truncated === false &&
         previous?.snapshotSha256 != null &&
-        previous.snapshotSha256 === fetched.sha256;
+        previous.snapshotSha256 === fetched.sha256 &&
+        wasComplete(previous.extracted);
 
       const failureText = failure ? `${failure.category}: ${failure.message}` : null;
       const transientText = transient
@@ -281,6 +306,14 @@ export class VerificationService {
           null,
       });
       if (!run) throw new Error(`failed to record a verification run for ${row.publicId}`);
+
+      // RETENTION AT THE POINT OF INSERTION, not only in the batch. The backfill's prune covers the
+      // ids IT selected, and this is not the only path that appends: a reviewer's manual verify and
+      // the submit-time queue both land here, and an often-edited entry can be checked many times
+      // between two backfill selections — or, once `verified_at` is fresh, never be selected by one
+      // at all. One ranked delete for one id, on the index the read path already uses, is cheap
+      // enough to pay on every run and is what actually makes the bound hold.
+      await repos.verificationRuns.pruneToLatest([row.id], this.config.verification.runsKeep);
 
       const matched = assessed?.matched ?? false;
       const applied = !stale && !transient;
@@ -338,11 +371,21 @@ export class VerificationService {
    * Check the entries owed a look — never checked, edited since, or checked longer ago than
    * `VERIFY_RECHECK_DAYS` — up to `limit`, then prune the run log of the ones it touched.
    *
-   * `limit` IS A NIGHTLY CAP, not a page size. The TTL clause means the predicate now matches the
-   * whole corpus on a rolling schedule rather than draining to nothing, so something has to bound
-   * one invocation's wall clock and its outbound traffic; `VERIFY_NIGHTLY_LIMIT` (500) is it, and
-   * `--limit` overrides it for an operator draining a backlog by hand. The selection is ordered
-   * never-checked first, so the cap drops re-checks before it drops anything unexamined.
+   * `limit` IS A CAP ON THE WHOLE INVOCATION, not on one pass — and making that true is why this
+   * job reports `remaining` the way it does.
+   *
+   * The runner loops a cursor job while `processed > 0 && remaining > 0`, and `run-job.ts` allows
+   * twenty passes by default. Under the old contract — `remaining` = "what the predicate still
+   * matches" — a 500 cap therefore authorised up to TEN THOUSAND outbound fetches a night, which is
+   * not a cap at all, and the TTL made it worse: the predicate now refills on a rolling schedule
+   * instead of draining, so `remaining` stays positive by design and the loop runs until the pass
+   * budget, not the work, is exhausted.
+   *
+   * So when the selection FILLED the cap, this reports `remaining: 0` and moves the true figure to
+   * `details.deferred`. Zero here means "do not come round again tonight", which is exactly what
+   * the runner reads it as; the count of what is still owed is not lost, it is just no longer
+   * pretending to be a reason to keep fetching. When the cap did not bite, `remaining` is the
+   * honest count, and a second pass can still pick up rows the first left unsettled.
    *
    * `processed` counts entries this pass SETTLED. A run whose fetch failed transiently, and a run
    * whose entry was edited underneath it, are both recorded and both deliberately excluded — the
@@ -372,18 +415,15 @@ export class VerificationService {
         unsettled++;
       }
     }
-    return {
+    return batchReport({
+      selected: ids.length,
+      limit,
       processed,
-      remaining: await this.pendingCount(),
-      details: {
-        selected: ids.length,
-        unsettled,
-        // What the politeness cost, so a pass that took an hour can be attributed to the spacing
-        // or to the sites rather than guessed at.
-        pacedMs,
-        pruned: await this.pruneRuns(ids),
-      },
-    };
+      unsettled,
+      owed: await this.pendingCount(),
+      pacedMs,
+      pruned: await this.pruneRuns(ids),
+    });
   }
 
   /**
@@ -434,6 +474,53 @@ export class VerificationService {
   }
 }
 
+export interface BatchOutcome {
+  /** Entries the predicate handed this pass — capped at `limit`. */
+  selected: number;
+  /** The invocation's budget: `VERIFY_NIGHTLY_LIMIT`, or an operator's `--limit`. */
+  limit: number;
+  processed: number;
+  unsettled: number;
+  /** What the predicate still matches now the pass is over. */
+  owed: number;
+  pacedMs: number;
+  pruned: number;
+}
+
+/**
+ * How a pass reports itself — and the one place the budget rule lives, so it can be read and tested
+ * without a database or a socket.
+ *
+ * THE RULE: when the selection filled the cap, the budget for this INVOCATION is spent, and
+ * `remaining` is reported as `0` with the true figure moved to `details.deferred`.
+ *
+ * `remaining` is not a statistic, it is an instruction: the runner loops a cursor job while
+ * `processed > 0 && remaining > 0`, and `run-job.ts` allows twenty passes by default. Reporting the
+ * honest count there turned a 500 cap into an authorisation for ten thousand outbound fetches — and
+ * the re-check TTL makes that permanent rather than occasional, because the predicate now refills on
+ * a rolling schedule instead of draining, so `remaining` stays positive by design. Zero means "do
+ * not come round again tonight"; `deferred` keeps the number that was going to be misread as a
+ * reason to keep going.
+ */
+export function batchReport(outcome: BatchOutcome): JobResult {
+  const capped = outcome.selected >= outcome.limit;
+  return {
+    processed: outcome.processed,
+    remaining: capped ? 0 : outcome.owed,
+    details: {
+      selected: outcome.selected,
+      unsettled: outcome.unsettled,
+      // What is still owed and was deliberately left for the next invocation. Zero whenever the cap
+      // did not bite, in which case `remaining` already carries the same number.
+      deferred: capped ? outcome.owed : 0,
+      // What the politeness cost, so a pass that took an hour can be attributed to the spacing or
+      // to the sites rather than guessed at.
+      pacedMs: outcome.pacedMs,
+      pruned: outcome.pruned,
+    },
+  };
+}
+
 /**
  * Fetch failures that say something about the NETWORK rather than about the entry.
  *
@@ -456,6 +543,18 @@ export class VerificationService {
  * `last_seen_at`. Retrying a dead host is the price of not retiring a live one during an outage.
  */
 const TRANSIENT_FETCH_FAILURES = new Set(["timeout", "transport_failure", "dns_failure"]);
+
+/**
+ * Whether a stored run's snapshot covers the WHOLE page rather than the prefix the byte cap kept.
+ *
+ * `assess` always records `truncated`, so a complete run says so explicitly; anything else — a
+ * failed run with no `extracted` at all, or a row from before this field was written — is treated
+ * as unknown and therefore not complete. Erring that way costs one re-stored snapshot; erring the
+ * other way claims a page is unchanged on the strength of its first two megabytes.
+ */
+function wasComplete(extracted: Record<string, unknown> | null): boolean {
+  return extracted?.truncated === false;
+}
 
 function isTransientFailure(failure: SourceFetchError | undefined): boolean {
   return failure !== undefined && TRANSIENT_FETCH_FAILURES.has(failure.category);

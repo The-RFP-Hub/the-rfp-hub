@@ -736,6 +736,49 @@ run("M3VER verification", () => {
     expect(await service.pendingIds(10_000), "and the entry is settled again").not.toContain(id);
   });
 
+  /**
+   * THE PREFIX TRAP. `snapshot_sha256` is a digest of the bytes that were RETAINED, and
+   * `VERIFY_MAX_BYTES` stops the stream at 2 MiB — so two genuinely different versions of a long
+   * page that happen to share their first 2 MiB hash identically. Calling that "unchanged" is a
+   * claim about a prefix wearing the clothes of a claim about the page, and it would then refresh
+   * `verified_at` and `last_seen_at` on the strength of it.
+   *
+   * Both directions matter and both are asserted: the CURRENT fetch being truncated is not enough
+   * to trust, and neither is the PREVIOUS one, because the comparison needs two complete sides.
+   */
+  it("never calls a page unchanged when either fetch stopped at the byte cap", async () => {
+    const capped = fixtureTransport({
+      ...PAGES,
+      [MATCH_URL]: { body: PAGES[MATCH_URL]?.body, truncated: true },
+    });
+    const whole = fixtureTransport(PAGES);
+
+    // Truncated, then truncated again: identical digests over identical prefixes, and no claim.
+    const both = await seedEntry("truncated-both", MATCH_URL);
+    const first = await serviceWith(capped, { recheckDays: 30 }).verify(both);
+    expect((first.extracted as Record<string, unknown>).truncated).toBe(true);
+    const second = await serviceWith(capped, { recheckDays: 30 }).verify(both);
+    expect(second.snapshotSha256, "the digests DO match — that is the trap").toBe(
+      first.snapshotSha256,
+    );
+    expect(
+      (second.extracted as Record<string, unknown>).snapshotUnchanged,
+      "equal prefixes are not equal pages",
+    ).toBeUndefined();
+
+    // A complete fetch after a truncated one: the stored side is a prefix, so there is still
+    // nothing to compare against.
+    const after = await seedEntry("truncated-then-whole", MATCH_URL);
+    await serviceWith(capped, { recheckDays: 30 }).verify(after);
+    const complete = await serviceWith(whole, { recheckDays: 30 }).verify(after);
+    expect((complete.extracted as Record<string, unknown>).snapshotUnchanged).toBeUndefined();
+
+    // …and once both sides are complete, the claim is made again. The rule is "both complete", not
+    // "this entry was truncated once and is now suspect forever".
+    const settled = await serviceWith(whole, { recheckDays: 30 }).verify(after);
+    expect((settled.extracted as Record<string, unknown>).snapshotUnchanged).toBe(true);
+  });
+
   it("does not call a page unchanged when its bytes moved", async () => {
     const id = await seedEntry("changed", MATCH_URL);
     const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
@@ -767,43 +810,108 @@ run("M3VER verification", () => {
    * whole table, and a test that ran it would verify — and stamp — entries belonging to every other
    * suite sharing this database.
    */
-  it("keeps the newest N runs per entry, prunes the rest, and still serves the latest", async () => {
+  /**
+   * THE PATH THAT ACTUALLY APPENDS MOST. A reviewer's manual verify and the submit-time queue both
+   * write runs without ever going through the backfill, and an entry that is checked often is
+   * precisely the one whose `verified_at` is always fresh — so the batch prune, which only ever
+   * sees what the backfill SELECTED, would never have covered it. The bound therefore lives at the
+   * point of insertion: N + 3 checks leave N runs, not N + 3.
+   */
+  it("holds every entry to N runs however the runs were written", async () => {
     const id = await seedEntry("retention", MATCH_URL);
+    const keep = 3;
+    const service = serviceWith(fixtureTransport(PAGES), { runsKeep: keep });
+
+    for (let i = 0; i < keep + 3; i++) await service.verify(id);
+
+    const runs = await runsFor(id);
+    expect(runs.length, "N + 3 checks, N runs").toBe(keep);
+
+    // The property the retention bound must never break: the endpoint still answers with the most
+    // recent run, and it is the newest of the survivors.
+    const res = await app.inject({
+      method: "GET",
+      url: `/v1/opportunities/${NS}:retention/verification`,
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().runAt).toBe(runs[0]?.runAt.toISOString());
+    expect(res.json().matched).toBe(true);
+  });
+
+  /**
+   * The batch prune is still there, and still does something: it is the backstop for rows written
+   * before this bound existed, and for a keep value an operator has just lowered. Driven against
+   * rows inserted directly, because the service path can no longer produce an over-long log.
+   *
+   * Driven through `pruneRuns` rather than `runBatch` on purpose: `runBatch`'s selection is the
+   * whole table, and a test that ran it would verify — and stamp — entries belonging to every other
+   * suite sharing this database.
+   */
+  it("prunes a backlog down to the newest N, and leaves ids it was not given alone", async () => {
+    const id = await seedEntry("retention-backlog", MATCH_URL);
     const neighbour = await seedEntry("retention-neighbour", MATCH_URL);
     const keep = 3;
 
-    // Eight checks of the same entry, plus two of a neighbour that must not be touched: the prune
-    // is scoped to the ids it was given, not to "every entry with too many runs".
-    const service = serviceWith(fixtureTransport(PAGES), { runsKeep: keep });
-    for (let i = 0; i < 8; i++) await service.verify(id);
-    for (let i = 0; i < 2; i++) await service.verify(neighbour);
+    // Eight runs apiece, written straight to the table the way a deployment predating the bound
+    // would have accumulated them.
+    for (const opportunityId of [id, neighbour]) {
+      for (let i = 0; i < 8; i++) {
+        await db.insert(verificationRuns).values({
+          opportunityId,
+          runAt: new Date(Date.now() - (8 - i) * 60_000),
+          requestedUrl: MATCH_URL,
+          existsAtSource: true,
+          matched: true,
+          snapshotText: `run ${i}`,
+          snapshotSha256: "0".repeat(64),
+        });
+      }
+    }
 
     const before = await runsFor(id);
-    expect(before.length, "eight checks, eight rows — the log really is append-only").toBe(8);
+    expect(before.length).toBe(8);
     const newest = before.slice(0, keep).map((row) => row.id);
 
-    const pruned = await service.pruneRuns([id]);
-    expect(pruned).toBe(8 - keep);
+    const service = serviceWith(fixtureTransport(PAGES), { runsKeep: keep });
+    expect(await service.pruneRuns([id])).toBe(8 - keep);
 
     const after = await runsFor(id);
     expect(
       after.map((row) => row.id),
       "the newest N survive, in order",
     ).toEqual(newest);
-    expect((await runsFor(neighbour)).length, "an id the prune was not given is untouched").toBe(2);
-
-    // The property the retention bound must never break: the endpoint still answers with the most
-    // recent run, and it is the same row the service just kept.
-    const res = await app.inject({
-      method: "GET",
-      url: `/v1/opportunities/${NS}:retention/verification`,
-    });
-    expect(res.statusCode, res.body).toBe(200);
-    expect(res.json().runAt).toBe(after[0]?.runAt.toISOString());
-    expect(res.json().matched).toBe(true);
+    expect((await runsFor(neighbour)).length, "an id the prune was not given is untouched").toBe(8);
 
     // Pruning twice is not an error and removes nothing further.
     expect(await service.pruneRuns([id])).toBe(0);
+  });
+
+  // ── the nightly budget, end to end ─────────────────────────────────────────────
+  /**
+   * `remaining` is what the runner loops on, so a capped pass has to report `0` or a 500 cap
+   * becomes twenty of them. The arithmetic is unit-tested in `test/unit/verification-budget.test.ts`;
+   * what is proved here is that `runBatch` really is wired to it and really does read
+   * `pendingCount` for the deferred figure.
+   *
+   * A SPENT BUDGET rather than a filled one, deliberately: `limit: 0` exercises the same branch
+   * while fetching nothing at all, and an unscoped batch with a real limit would fetch and stamp
+   * whichever entry sorts first in a database shared with every other suite.
+   */
+  it("reports a spent budget as `remaining: 0`, with what is still owed deferred", async () => {
+    await seedEntry("budget", MATCH_URL);
+    const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
+
+    const owed = await service.pendingCount();
+    expect(
+      owed,
+      "the entry just seeded is owed a check, so there is something to defer",
+    ).toBeGreaterThan(0);
+
+    const report = await service.runBatch({ limit: 0 });
+    expect(report.processed).toBe(0);
+    expect(report.remaining, "zero means: do not come round again tonight").toBe(0);
+    expect(report.details?.deferred).toBe(owed);
+    expect(report.details?.selected).toBe(0);
   });
 
   // ── who may ask ────────────────────────────────────────────────────────────────

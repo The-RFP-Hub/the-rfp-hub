@@ -21,7 +21,7 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 | **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
-| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` a night — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. |
+| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` per invocation — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. |
 | `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
 
@@ -266,7 +266,7 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   selects on that **or on a check having expired**, so its selection refills on a rolling schedule
   rather than draining to nothing — see "The re-check TTL" below. Its prune step is idempotent
   too: it keeps the newest `VERIFICATION_RUNS_KEEP` runs of the entries the pass touched, so a
-  second run deletes nothing.
+  second run deletes nothing — as is the prune every run insertion does for its own entry.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
   sooner than five minutes after the completion of the last attempt — including retries within one
@@ -332,10 +332,16 @@ no-deadline half of the corpus auto-closing ninety days after it was seeded.
 So the predicate gains a third clause — `verified_at < now() - VERIFY_RECHECK_DAYS` — and with it
 three consequences worth stating:
 
-* **The selection no longer drains.** It refills on a rolling schedule, so `remaining` is not
-  "work still owed tonight". `limit` is therefore a **nightly cap** rather than a page size:
-  `VERIFY_NIGHTLY_LIMIT` (500) bounds one invocation's wall clock and its outbound traffic, and
-  `--limit` overrides it for an operator draining a backlog by hand.
+* **The selection no longer drains, so the cap bounds the INVOCATION rather than the pass.** It
+  refills on a rolling schedule, so `remaining` is not "work still owed tonight" — and `remaining`
+  is what the runner loops on (`processed > 0 && remaining > 0`, up to `--passes`, **20 by
+  default**). Reporting the honest count there would have turned a 500 cap into an authorisation
+  for ten thousand outbound fetches a night. So **a pass whose selection filled the cap reports
+  `remaining: 0`** and moves the true figure to `details.deferred`: zero means "do not come round
+  again tonight", and the count is demoted rather than lost. When the cap did not bite, `remaining`
+  is the ordinary honest count and a second pass may still pick up rows the first left unsettled.
+  `VERIFY_NIGHTLY_LIMIT` (500) is the budget; `--limit` overrides it for an operator draining a
+  backlog by hand.
 * **Never-checked entries come first.** The order is `verified_at ASC NULLS FIRST, id`, so when the
   cap bites it drops a month-old re-check rather than an entry nobody has ever fetched.
 * **A failed fetch is not a check.** A run that never reached the source — `timeout`,
@@ -353,17 +359,32 @@ the selection, at the head of it, indefinitely. The nightly cap bounds what that
 `staleness` closes such an entry at ninety days on its own, since nothing is refreshing its
 `last_seen_at`. Retrying a dead host is the price of not retiring a live one during an outage.
 
-**The pass is paced per host.** A corpus clusters by publisher, so a serial walk over 500 entries is
-fifty requests to one foundation's domain in the two seconds that domain takes to answer them —
-indistinguishable from a scraper, and a block reads back here as "every entry from this publisher
-stopped matching". The backfill therefore holds at least **one second between fetches to the same
-host**, in process, for the duration of one pass, and reports what that cost as `details.pacedMs`.
+**The pass is paced per host, and per HOP.** A corpus clusters by publisher, so a serial walk over
+500 entries is fifty requests to one foundation's domain in the two seconds that domain takes to
+answer them — indistinguishable from a scraper, and a block reads back here as "every entry from
+this publisher stopped matching". The backfill therefore holds at least **one second between
+fetches to the same host**, in process, for the duration of one pass, and reports what that cost as
+`details.pacedMs`.
+
+The pacer is handed to the fetcher as its `onHop` hook rather than applied to the entry's own URL,
+because **a redirect is a request to a different server**. A corpus is full of vanity domains that
+all redirect to one grants platform; spacing only the requested host would space thirty vanity
+hosts perfectly and land thirty requests on the platform behind them in the same second — the exact
+burst this exists to prevent, aimed at the one host that actually serves the pages. Nothing that is
+not `http(s)`, and nothing with an empty host, is paced at all: `file:`, `mailto:` and `data:` all
+parse to an empty host, and pacing them would make a batch sleep between refusals that never open a
+socket.
+
 A reviewer's own `POST .../verify` is **not** paced: one request is not a crawl, and making it queue
 behind a batch would charge politeness to the wrong person.
 
 **A re-check that finds the page unmoved says so.** The stored digest is over the raw bytes, so an
 equal digest is proof nothing changed since the last check — which is what a monthly re-check finds
-almost every time. The run is still written and the assessment still recomputed (the *record* may
+almost every time. **Unless either fetch stopped at `VERIFY_MAX_BYTES`**: the digest then covers
+only the retained prefix, so two genuinely different versions of a long page that share their first
+2 MiB hash identically, and "unchanged" would be a claim about a prefix dressed as a claim about the
+page. Both sides have to be complete for equal digests to mean equal pages; when either is not, the
+run takes the ordinary path and stores the fresh extraction. The run is still written and the assessment still recomputed (the *record* may
 have moved even though the page did not), but it is flagged `extracted.snapshotUnchanged` and
 carries the previous run's snapshot text forward rather than a second extraction of identical bytes.
 It still refreshes `verified_at` and `last_seen_at` on a match: "unmoved and still matching" is a
@@ -593,7 +614,11 @@ Each clause carries weight:
   (§2). A chain still running at 03:17 publishes a dataset maintained halfway. The one job whose
   selection no longer drains is `verification-backfill`, and what keeps it inside that window is
   `VERIFY_NIGHTLY_LIMIT`: the cap, not the predicate, is what bounds its runtime, so raising it
-  (or passing a larger `--limit`) is a decision about how long the chain may take.
+  (or passing a larger `--limit`) is a decision about how long the chain may take. **The cap bounds
+  the whole invocation, not one pass** — a capped pass reports `remaining: 0` precisely so
+  `--passes 20` cannot multiply it — so the ceiling on a night's outbound fetches is
+  `VERIFY_NIGHTLY_LIMIT`, whatever `--passes` says, and `details.deferred` is where the work left
+  for tomorrow is counted.
 * **One caller.** Starting a job by hand (§4a) while the external chain is in flight is the one
   overlap nothing prevents; the lock will merely make the collided jobs no-ops rather than correct
   runs. Moving to `all` shrinks this to a single task an operator can see is running, but does not

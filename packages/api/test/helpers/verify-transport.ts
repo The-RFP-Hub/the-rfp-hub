@@ -16,6 +16,8 @@ export interface FixturePage {
   status?: number;
   headers?: Record<string, string>;
   body?: string;
+  /** The byte cap stopped the stream: the body is a PREFIX of what the server was serving. */
+  truncated?: boolean;
 }
 
 /**
@@ -39,7 +41,7 @@ export function fixtureTransport(pages: Record<string, FixturePage>): SourceTran
       status: page.status ?? 200,
       headers: { "content-type": "text/html; charset=utf-8", ...(page.headers ?? {}) },
       bytes: Buffer.from(page.body ?? ""),
-      truncated: false,
+      truncated: page.truncated ?? false,
     };
   };
 }

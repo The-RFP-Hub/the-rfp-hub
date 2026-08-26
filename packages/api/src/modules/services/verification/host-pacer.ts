@@ -8,6 +8,13 @@
  * two seconds, which is indistinguishable from a scraper at the other end and is how a verifier
  * earns a block that then reads back as "every entry from this publisher stopped matching".
  *
+ * EVERY HOP IS PACED, NOT EVERY ENTRY. `fetchSource` follows redirects by hand, and a corpus is
+ * full of vanity domains that redirect to one grants platform. Pacing only the URL stored on the
+ * entry would space thirty requests to thirty vanity hosts perfectly and land thirty requests on
+ * the platform behind them in the same second — the exact burst this exists to prevent, aimed at
+ * the one host that actually serves the pages. So the pacer is handed to `fetchSource` as its
+ * `onHop` hook and consulted before EACH hop.
+ *
  * IN-PROCESS AND PER-RUN, deliberately. A shared token bucket in the database would be a second
  * piece of distributed state to keep correct for a job that already runs one at a time under an
  * advisory lock (`jobs/lock.ts`), and the thing being defended against is one pass hammering one
@@ -76,16 +83,24 @@ export class HostPacer {
 }
 
 /**
- * The host to space against — lowercased, port included.
+ * The host to space against — lowercased, port included — or `undefined` for anything this verifier
+ * will never open a connection to.
  *
- * A port is part of the identity because two services on one machine are two servers; a URL that
- * does not parse is not spaced at all, because it will fail in the fetcher a moment later and
- * making the batch sleep for it would only slow down the entries that can succeed.
+ * A port is part of the identity because two services on one machine are two servers.
+ *
+ * NOTHING THAT IS NOT `http(s)` IS PACED, and neither is a URL with no host at all. `file:`,
+ * `mailto:` and `data:` all parse, and all yield an EMPTY host — so pacing them would file every
+ * one of them under the same `""` slot and make a batch of ten such entries sleep nine seconds
+ * before the fetcher refuses all ten without a packet leaving the process. Politeness is owed to
+ * servers that are about to be asked for something; there is no server here.
  */
 function hostOf(url: string): string | undefined {
+  let parsed: URL;
   try {
-    return new URL(url).host.toLowerCase();
+    parsed = new URL(url);
   } catch {
     return undefined;
   }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
+  return parsed.host === "" ? undefined : parsed.host.toLowerCase();
 }

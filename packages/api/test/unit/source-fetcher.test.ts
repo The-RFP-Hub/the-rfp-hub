@@ -98,6 +98,43 @@ describe("source fetcher", () => {
     ).rejects.toMatchObject({ category: "too_many_redirects" });
   });
 
+  /**
+   * THE POLITENESS SEAM. A redirect is a request to a DIFFERENT server, so a caller pacing itself
+   * on the entry's own URL alone would space thirty vanity domains perfectly and burst thirty
+   * requests onto the one platform they all redirect to. `onHop` is how the verification service
+   * hands its per-host pacer every hop; it fires after the scheme check, so a URL this fetcher
+   * would never open is never waited on.
+   */
+  it("announces every hop before requesting it, and none it refuses outright", async () => {
+    const seen: string[] = [];
+    const onHop = async (url: string) => {
+      seen.push(url);
+    };
+
+    await fetchSource("https://example.org/one", {
+      transport: transport({
+        "https://example.org/one": { status: 302, headers: { location: "https://b.example/two" } },
+        "https://b.example/two": { status: 302, headers: { location: "https://c.example/three" } },
+        "https://c.example/three": { body: PAGE },
+      }),
+      onHop,
+    });
+    expect(seen).toEqual([
+      "https://example.org/one",
+      "https://b.example/two",
+      "https://c.example/three",
+    ]);
+
+    seen.length = 0;
+    await expect(fetchSource("file:///etc/passwd", { ...options, onHop })).rejects.toBeInstanceOf(
+      SourceFetchError,
+    );
+    expect(
+      seen,
+      "a scheme that is refused never reaches a server, so it is never waited on",
+    ).toEqual([]);
+  });
+
   it("refuses a redirect that names nowhere to go", async () => {
     const headless = transport({ "https://example.org/z": { status: 302 } });
     await expect(

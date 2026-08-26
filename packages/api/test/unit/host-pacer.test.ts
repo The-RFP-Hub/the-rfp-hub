@@ -6,6 +6,10 @@
  * test runner rather than about the pacer. The clock seam answers it exactly.
  */
 import { describe, expect, it } from "vitest";
+import {
+  type SourceTransport,
+  fetchSource,
+} from "../../src/modules/services/verification/fetcher.service.js";
 import { HostPacer, type PacerClock } from "../../src/modules/services/verification/host-pacer.js";
 
 /**
@@ -99,6 +103,69 @@ describe("HostPacer", () => {
     // A URL that does not parse fails in the fetcher a moment later; sleeping for it would only
     // slow down the entries that can succeed.
     expect(await pacer.wait("not a url")).toBe(0);
+  });
+
+  /**
+   * `file:`, `mailto:` and `data:` all PARSE, and all have an empty host — so a pacer that keyed on
+   * `url.host` alone filed every one of them under the same `""` slot. Ten such entries in a batch
+   * then slept nine seconds between refusals that never open a socket at all. Politeness is owed to
+   * a server that is about to be asked for something, and there is no server in any of these.
+   */
+  it("never paces a scheme it will not fetch, or a URL with no host", async () => {
+    const clock = fakeClock();
+    const pacer = new HostPacer(1_000, clock);
+    for (const url of [
+      "file:///etc/passwd",
+      "file:///etc/shadow",
+      "mailto:grants@example.org",
+      "data:text/html,<h1>hi</h1>",
+      "gopher://example.org/1",
+    ]) {
+      expect(await pacer.wait(url), url).toBe(0);
+    }
+    expect(clock.slept, "not one of them may cost the batch a second").toEqual([]);
+  });
+
+  /**
+   * THE REDIRECT CASE, which pacing the entry's own URL alone gets exactly wrong. A corpus is full
+   * of vanity domains — `grants-a.example.org`, `grants-b.example.org` — that all redirect to one
+   * grants platform. Spacing only the requested host spaces the vanity hosts perfectly, one request
+   * each, and lands every one of the redirected requests on the platform in the same instant.
+   * Driven through `fetchSource`'s `onHop` seam, which is how the service wires the pacer in.
+   */
+  it("spaces the host a redirect lands on, not just the one the entry names", async () => {
+    const clock = fakeClock();
+    const pacer = new HostPacer(1_000, clock);
+    const PLATFORM = "https://platform.example.net/apply";
+    const page = "<!doctype html><html><head><title>Apply</title></head><body>Hi.</body></html>";
+
+    const transport: SourceTransport = async (url) =>
+      url === PLATFORM
+        ? {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            bytes: Buffer.from(page),
+            truncated: false,
+          }
+        : {
+            status: 302,
+            headers: { location: PLATFORM },
+            bytes: Buffer.alloc(0),
+            truncated: false,
+          };
+
+    for (const vanity of ["a", "b", "c"]) {
+      await fetchSource(`https://grants-${vanity}.example.org/`, {
+        transport,
+        onHop: async (target) => {
+          await pacer.wait(target);
+        },
+      });
+    }
+
+    // Three distinct vanity hosts: never spaced, one request each. The platform behind them: three
+    // requests, so two gaps. Without per-hop pacing this would have been no gaps at all.
+    expect(clock.slept).toEqual([1_000, 1_000]);
   });
 
   /** Time really does pass between fetches, and the gap already elapsed is not waited out again. */

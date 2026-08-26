@@ -113,6 +113,16 @@ export interface FetchSourceOptions {
   allowPrivateHosts?: boolean;
   /** Injected by the fixture suites. A deployment always uses the pinning transport. */
   transport?: SourceTransport;
+  /**
+   * Called with each hop's URL immediately before that hop is requested, and awaited.
+   *
+   * The politeness seam. A redirect is a request to a DIFFERENT server, and a corpus full of vanity
+   * domains pointing at one grants platform would otherwise space thirty requests to thirty vanity
+   * hosts and burst thirty onto the platform behind them — so the caller's per-host pacer has to see
+   * every hop, not just the one stored on the entry. Called AFTER the scheme check, so a URL this
+   * fetcher will never open is never waited on.
+   */
+  onHop?: (url: string) => Promise<void>;
 }
 
 const DEFAULT_MAX_REDIRECTS = 3;
@@ -120,9 +130,11 @@ const DEFAULT_MAX_REDIRECTS = 3;
 /**
  * Fetch one source page, following at most `maxRedirects` hops by hand.
  *
- * Every hop goes back through the scheme check and back through the transport, which is where the
- * address is resolved, validated and pinned — so "a public host that redirects to loopback" is
- * refused at hop 2 with the same machinery that refuses loopback at hop 1.
+ * Every hop goes back through the scheme check, back through `onHop` (the caller's politeness
+ * pacer), and back through the transport, which is where the address is resolved, validated and
+ * pinned — so "a public host that redirects to loopback" is refused at hop 2 with the same
+ * machinery that refuses loopback at hop 1, and hop 2's server is spaced from the last request to
+ * that same server whoever sent it.
  */
 export async function fetchSource(
   url: string,
@@ -141,6 +153,7 @@ export async function fetchSource(
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
     const target = parseTarget(current);
+    await options.onHop?.(target.href);
     const response = await transport(target.href, {
       timeoutMs,
       maxBytes,

@@ -518,7 +518,7 @@ CREATE TABLE verification_runs (
   snapshot_url     TEXT,              -- ⏳ M4: optional external archive URL (IPFS/archive pinning)
   error            TEXT,              -- why a run produced no page (refused address, timeout, …)
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);  -- INSERT-only; never UPDATEd. Pruned to the newest VERIFICATION_RUNS_KEEP per entry.
+);  -- INSERT-only; never UPDATEd. Each insert prunes its entry to the newest VERIFICATION_RUNS_KEEP.
 CREATE INDEX ix_verification_opp ON verification_runs (opportunity_id, run_at DESC);
 
 -- ✅ M3 append-only audit trail of every mutation, whatever it is about
@@ -705,7 +705,8 @@ Raw HTML is deliberately not stored: it is large, it is not what a reviewer read
 an XSS liability the moment any future surface rendered it.
 
 **A re-check of an unmoved page copies its snapshot forward.** `snapshot_sha256` is over the raw
-bytes, so an equal digest means the page has not changed; the new run is flagged
+bytes *that were retained*, so an equal digest means the page has not changed **provided neither
+fetch was truncated by the byte cap** — over a prefix it would only mean the first 2 MiB match; the new run is flagged
 `extracted.snapshotUnchanged` and stores the previous run's `snapshot_text` verbatim rather than a
 second extraction of identical bytes. It is copied rather than left NULL *because* of the retention
 rule below — a run whose text lived only on a pruned ancestor would carry a digest of bytes nobody
@@ -713,9 +714,13 @@ stores any more, and the snapshot of record has to be on the row that claims it.
 
 **And the log is bounded.** 200 KB per run is small once and expensive forever: an entry re-checked
 on a schedule appends one row per check for as long as it exists, which is megabytes a year each for
-a history nobody reads past the most recent few. `verification-backfill` therefore prunes each entry
-it touches down to its newest `VERIFICATION_RUNS_KEEP` runs (5 by default), ordered exactly as the
-read path orders them (`run_at DESC, id DESC`) so **the latest run — the one
+a history nobody reads past the most recent few. **Every insertion** therefore prunes its own entry down to the
+newest `VERIFICATION_RUNS_KEEP` runs (5 by default) — whichever path wrote it, the backfill, a
+reviewer's manual check or the submit-time queue — and the backfill prunes its whole selection again
+afterwards. The bound lives at the point of insertion because the two paths that append most often
+to a single entry never go through the backfill at all, and an often-checked entry is precisely the
+one whose `verified_at` is always too fresh to be selected by it. The prune orders exactly as the
+read path does (`run_at DESC, id DESC`) so **the latest run — the one
 `GET /v1/opportunities/{id}/verification` serves — is always among the survivors**. This is a
 retention rule on *evidence*, not a hole in the audit trail: every check also appends a
 `verify_source` row to `audit_log`, which is immutable in the database and is never pruned.
