@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DB, DbLike } from "../../src/db/client.js";
 import {
+  AccountRepository,
+  ApiKeyRepository,
   AuditRepository,
   MembershipInviteRepository,
   MembershipRepository,
@@ -16,6 +18,10 @@ describe("repository unit of work", () => {
     const descriptor = Object.getOwnPropertyDescriptor(bundle, "opportunities");
 
     expect(descriptor?.get).toBeTypeOf("function");
+    expect(bundle.accounts).toBeInstanceOf(AccountRepository);
+    expect(bundle.accounts).toBe(bundle.accounts);
+    expect(bundle.apiKeys).toBeInstanceOf(ApiKeyRepository);
+    expect(bundle.apiKeys).toBe(bundle.apiKeys);
     expect(bundle.audit).toBeInstanceOf(AuditRepository);
     expect(bundle.audit).toBe(bundle.audit);
     expect(bundle.membershipInvites).toBeInstanceOf(MembershipInviteRepository);
@@ -35,6 +41,8 @@ describe("repository unit of work", () => {
 
     const result = await withTransaction(db, async (bundle) => {
       expect(Object.keys(bundle)).toEqual([
+        "accounts",
+        "apiKeys",
         "audit",
         "membershipInvites",
         "memberships",

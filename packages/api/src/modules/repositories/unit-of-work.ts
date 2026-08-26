@@ -1,4 +1,6 @@
 import type { DB, DbLike } from "../../db/client.js";
+import { AccountRepository } from "./accounts/account.repository.js";
+import { ApiKeyRepository } from "./api-keys/api-key.repository.js";
 import { AuditRepository } from "./audit/audit.repository.js";
 import { MembershipInviteRepository } from "./membership-invites/membership-invite.repository.js";
 import { MembershipRepository } from "./memberships/membership.repository.js";
@@ -7,6 +9,8 @@ import { OrganizationRepository } from "./organizations/organization.repository.
 
 /** The repositories a service may compose. Add domain repositories here as migrations land. */
 export interface Repositories {
+  readonly accounts: AccountRepository;
+  readonly apiKeys: ApiKeyRepository;
   readonly audit: AuditRepository;
   readonly membershipInvites: MembershipInviteRepository;
   readonly memberships: MembershipRepository;
@@ -16,6 +20,8 @@ export interface Repositories {
 
 /** Build one executor-bound bundle. Repositories are constructed only when first requested. */
 export function repositories(exec: DbLike): Repositories {
+  let accounts: AccountRepository | undefined;
+  let apiKeys: ApiKeyRepository | undefined;
   let audit: AuditRepository | undefined;
   let membershipInvites: MembershipInviteRepository | undefined;
   let memberships: MembershipRepository | undefined;
@@ -23,6 +29,14 @@ export function repositories(exec: DbLike): Repositories {
   let organizations: OrganizationRepository | undefined;
 
   return {
+    get accounts() {
+      accounts ??= new AccountRepository(exec);
+      return accounts;
+    },
+    get apiKeys() {
+      apiKeys ??= new ApiKeyRepository(exec);
+      return apiKeys;
+    },
     get audit() {
       audit ??= new AuditRepository(exec);
       return audit;

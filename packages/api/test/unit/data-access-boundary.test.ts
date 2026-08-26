@@ -40,9 +40,6 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "scripts/grant-admin.ts",
   "scripts/seed.ts",
   "src/modules/routes/redirects/redirect.controller.ts",
-  "src/modules/services/admin/admin.service.ts",
-  "src/modules/services/auth/account.service.ts",
-  "src/modules/services/auth/api-key.service.ts",
   "src/modules/services/claims/claim.service.ts",
   "src/modules/services/dedupe/dedupe.service.ts",
   "src/modules/services/health/health.service.ts",
@@ -60,7 +57,7 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "src/modules/services/stats/stats.service.ts",
   "src/modules/services/verification/verification.service.ts",
 ];
-const TEMPORARY_CEILING = 23;
+const TEMPORARY_CEILING = 20;
 
 type Violation = "drizzle-import" | "schema-value-import" | "transaction";
 

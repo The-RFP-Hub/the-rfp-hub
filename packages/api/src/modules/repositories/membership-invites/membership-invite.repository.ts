@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import { type OrgMembershipInviteRow, orgMembershipInvites } from "../../../db/schema.js";
 
@@ -28,6 +28,27 @@ export class MembershipInviteRepository {
         ),
       )
       .orderBy(orgMembershipInvites.createdAt, orgMembershipInvites.id);
+  }
+
+  async lockPendingForEmail(email: string): Promise<OrgMembershipInviteRow[]> {
+    return this.exec
+      .select()
+      .from(orgMembershipInvites)
+      .where(
+        and(
+          isNull(orgMembershipInvites.acceptedAt),
+          sql`lower(${orgMembershipInvites.email}) = ${email}`,
+        ),
+      )
+      .orderBy(orgMembershipInvites.id)
+      .for("update");
+  }
+
+  async accept(inviteId: number, accountId: number, acceptedAt: Date): Promise<void> {
+    await this.exec
+      .update(orgMembershipInvites)
+      .set({ acceptedAt, acceptedAccountId: accountId })
+      .where(and(eq(orgMembershipInvites.id, inviteId), isNull(orgMembershipInvites.acceptedAt)));
   }
 
   async revokePending(

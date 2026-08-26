@@ -1,4 +1,13 @@
 export {
+  AccountRepository,
+  type AccountSearchRow,
+  type AccountUpdate,
+} from "./accounts/account.repository.js";
+export {
+  ApiKeyRepository,
+  type VerifiedApiKeyRecord,
+} from "./api-keys/api-key.repository.js";
+export {
   type ActorKind,
   type AuditAction,
   type AuditActor,

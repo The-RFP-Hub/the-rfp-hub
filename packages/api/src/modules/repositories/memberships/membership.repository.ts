@@ -36,7 +36,13 @@
  */
 import { and, eq } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
-import { accounts, orgMemberships, organizations } from "../../../db/schema.js";
+import {
+  type OrgMembershipRow,
+  accounts,
+  orgMemberships,
+  organizations,
+} from "../../../db/schema.js";
+import type { Membership } from "../../shared/capabilities.js";
 
 export interface PublishAuthority {
   /** Whether the account still holds a membership on the namespace's organisation, at all. */
@@ -105,5 +111,84 @@ export class MembershipRepository {
       .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
       .where(eq(organizations.slug, slug));
     return members.map((member) => member.accountId);
+  }
+
+  async lockForAccountAndOrganization(
+    accountId: number,
+    organizationId: number,
+  ): Promise<Pick<OrgMembershipRow, "id" | "role"> | undefined> {
+    const rows = await this.exec
+      .select({ id: orgMemberships.id, role: orgMemberships.role })
+      .from(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.accountId, accountId),
+          eq(orgMemberships.organizationId, organizationId),
+        ),
+      )
+      .for("update")
+      .limit(1);
+    return rows[0];
+  }
+
+  async updateRole(
+    id: number,
+    role: OrgMembershipRow["role"],
+  ): Promise<OrgMembershipRow["role"] | null> {
+    const settled = await this.exec
+      .update(orgMemberships)
+      .set({ role })
+      .where(eq(orgMemberships.id, id))
+      .returning({ role: orgMemberships.role });
+    return settled[0]?.role ?? null;
+  }
+
+  async upsertRole(
+    accountId: number,
+    organizationId: number,
+    role: OrgMembershipRow["role"],
+  ): Promise<OrgMembershipRow["role"] | null> {
+    const settled = await this.exec
+      .insert(orgMemberships)
+      .values({ accountId, organizationId, role })
+      .onConflictDoUpdate({
+        target: [orgMemberships.accountId, orgMemberships.organizationId],
+        set: { role },
+      })
+      .returning({ role: orgMemberships.role });
+    return settled[0]?.role ?? null;
+  }
+
+  /**
+   * The organizations this account publishes for, with each one's verified state.
+   *
+   * Both halves are needed together: the membership says which namespace, the verified flag says
+   * whether a write into it auto-approves. Reading them separately is how the two answers drift.
+   */
+  async forAccount(accountId: number): Promise<Membership[]> {
+    return this.exec
+      .select({ slug: organizations.slug, verified: organizations.verified })
+      .from(orgMemberships)
+      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
+      .where(eq(orgMemberships.accountId, accountId));
+  }
+
+  /**
+   * The same memberships, with the organization's name and the account's role in it — what `/v1/me`
+   * shows a human. The authorization path deliberately does NOT use this: it needs the slug and the
+   * verified flag and nothing else, and a wider read on a hot path is a wider read.
+   */
+  async detailedForAccount(accountId: number) {
+    return this.exec
+      .select({
+        slug: organizations.slug,
+        name: organizations.name,
+        verified: organizations.verified,
+        role: orgMemberships.role,
+      })
+      .from(orgMemberships)
+      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
+      .where(eq(orgMemberships.accountId, accountId))
+      .orderBy(organizations.slug);
   }
 }
