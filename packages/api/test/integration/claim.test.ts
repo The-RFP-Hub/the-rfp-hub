@@ -61,6 +61,7 @@ run("M3CLAIM ownership claims", () => {
   let unverifiedToken: string;
   let reviewerToken: string;
   let operatorId: number;
+  let sponsorId: number;
   let operatorOrgId: number;
   const userIds: string[] = [];
 
@@ -112,6 +113,7 @@ run("M3CLAIM ownership claims", () => {
       role: "reviewer",
     });
     operatorId = operator.account.id;
+    sponsorId = sponsor.account.id;
     userIds.push(
       rival.userId,
       operator.userId,
@@ -377,6 +379,16 @@ run("M3CLAIM ownership claims", () => {
     const loserId = await seedEntry("claim-merge-loser", [HOST], [SPONSOR]);
     const queued = await claim(sponsorToken, loserId, SPONSOR);
     expect(queued.statusCode, queued.body).toBe(202);
+
+    const claimQueue = await app.inject({
+      method: "GET",
+      url: "/v1/review/claims?status=pending",
+      headers: bearer(reviewerToken),
+    });
+    const queuedClaim = claimQueue
+      .json()
+      .items.find((item: { id: number }) => item.id === queued.json().claimId);
+    expect(queuedClaim.claimedByAccountId).toBe(sponsorId);
 
     const entries = await db
       .select({ id: opportunities.id, publicId: opportunities.publicId })

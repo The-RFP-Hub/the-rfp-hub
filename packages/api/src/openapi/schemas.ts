@@ -610,6 +610,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "organizationSlug",
       "organizationVerified",
       "claimedBy",
+      "claimedByAccountId",
       "status",
       "note",
       "createdAt",
@@ -622,6 +623,10 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       organizationSlug: { type: "string" },
       organizationVerified: { type: "boolean" },
       claimedBy: { type: "string" },
+      claimedByAccountId: {
+        type: ["integer", "null"],
+        description: "The stable claimant identity used to disclose self-review.",
+      },
       status: { type: "string", enum: ["pending", "approved", "rejected", "withdrawn"] },
       note: { type: ["string", "null"] },
       createdAt: { type: "string", format: "date-time" },
@@ -796,6 +801,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "isListed",
       "namespace",
       "submittedBy",
+      "submittedByAccountId",
       "mergedInto",
       "lastDecision",
       "createdAt",
@@ -810,6 +816,10 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       isListed: { type: "boolean" },
       namespace: { type: ["string", "null"] },
       submittedBy: { type: ["string", "null"] },
+      submittedByAccountId: {
+        type: ["integer", "null"],
+        description: "The stable submitting-account identity used to disclose self-review.",
+      },
       mergedInto: {
         type: ["object", "null"],
         additionalProperties: false,

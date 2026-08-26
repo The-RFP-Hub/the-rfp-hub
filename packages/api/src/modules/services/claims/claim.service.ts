@@ -421,6 +421,7 @@ export class ClaimService {
         organizationSlug: organization.slug,
         organizationVerified: organization.verified,
         claimedBy: handle ?? "community",
+        claimedByAccountId: claim.accountId,
         status: claim.status,
         note: claim.note,
         createdAt: claim.createdAt.toISOString(),

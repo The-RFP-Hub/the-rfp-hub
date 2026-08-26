@@ -253,6 +253,7 @@ export interface ClaimSummary {
   organizationSlug: string;
   organizationVerified: boolean;
   claimedBy: string;
+  claimedByAccountId: number | null;
   status: ClaimStatus;
   note: string | null;
   createdAt: string;
@@ -340,6 +341,7 @@ export interface ManagedOpportunity {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  submittedByAccountId: number | null;
   /** The merge survivor; its title is withheld while that survivor is not publicly visible. */
   mergedInto: { id: string; title: string | null } | null;
   /** The newest decision on this listing, or null while nobody has decided anything. */

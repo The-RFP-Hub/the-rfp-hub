@@ -252,6 +252,46 @@ describe("deciding as a verified member", () => {
     expect(within(panel).getByText("@fil-ops")).toBeTruthy();
   });
 
+  it("discloses a member deciding their own submission in the row and confirmation", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    mount(me(), [
+      listing({
+        id: "filecoin:self-review",
+        title: "Our own grants round",
+        reviewStatus: "pending",
+        isListed: false,
+        submittedBy: "fil-ops",
+        submittedByAccountId: 7,
+      }),
+    ]);
+
+    expect(await screen.findByText(notice)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(
+      within(screen.getByRole("group", { name: "Publish “Our own grants round”?" })).getByText(
+        notice,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("does not show the self-review notice for somebody else's submission", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    mount(me(), [
+      listing({
+        id: "filecoin:other-review",
+        title: "Somebody else's round",
+        reviewStatus: "pending",
+        isListed: false,
+        submittedByAccountId: 99,
+      }),
+    ]);
+
+    await screen.findByText("Somebody else's round");
+    expect(screen.queryByText(notice)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(screen.queryByText(notice)).toBeNull();
+  });
+
   it("publishes only after the confirmation", async () => {
     mount(me(), pending);
 

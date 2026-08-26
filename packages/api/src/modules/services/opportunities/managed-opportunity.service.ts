@@ -233,6 +233,8 @@ export function toManagedView(
     // The stored attribution string, falling back to the submitting account's handle: an entry
     // published as an organisation is credited to the organisation, and that is what belongs here.
     submittedBy: row.sourceSubmittedBy ?? submitterHandle,
+    // Attribution text is not identity: an organisation slug can replace the account handle above.
+    submittedByAccountId: row.submittedBy,
     mergedInto,
     lastDecision: lastDecision ?? null,
     createdAt: row.createdAt.toISOString(),

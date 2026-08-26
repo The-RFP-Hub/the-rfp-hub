@@ -222,6 +222,8 @@ export interface ClaimSummaryView {
   organizationSlug: string;
   organizationVerified: boolean;
   claimedBy: string;
+  /** Stable identity for disclosing when the current reviewer is also the claimant. */
+  claimedByAccountId: number | null;
   status: "pending" | "approved" | "rejected" | "withdrawn";
   note: string | null;
   createdAt: string;
@@ -323,6 +325,8 @@ export interface ManagedOpportunityView {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  /** Stable identity for disclosing when the current decider is also the submitter. */
+  submittedByAccountId: number | null;
   /** The survivor, whose title is present only while it is currently public. */
   mergedInto: { id: string; title: string | null } | null;
   /** The newest approve/reject on this entry, or null while nobody has decided anything. */

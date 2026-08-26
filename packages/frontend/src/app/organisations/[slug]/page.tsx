@@ -25,6 +25,7 @@ import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresenta
  */
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
+import { SelfReviewNotice } from "@/components/SelfReviewNotice";
 import { UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, StatusBadge, VerifiedBadge } from "@/components/badges";
 import {
@@ -601,6 +602,7 @@ function PendingRow({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const api = useApi();
+  const isSelfReview = canDecide && item.submittedByAccountId === me.accountId;
 
   /** How the decision will be attributed. The API records the handle, never a coarse "reviewer". */
   const attribution = me.handle ? `@${me.handle}` : `account ${me.accountId}`;
@@ -642,6 +644,7 @@ function PendingRow({
         <td className="muted">
           <UntrustedText value={item.submittedBy} fallback="community" />
           <div className="muted">{formatInstant(item.createdAt)}</div>
+          {isSelfReview ? <SelfReviewNotice kind="listing" compact /> : null}
         </td>
         <td>
           <div className="row">
@@ -684,6 +687,7 @@ function PendingRow({
                 onConfirm={() => void decide("approve")}
                 onCancel={() => setPanel("none")}
               >
+                {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It publishes into the public directory immediately, in{" "}
                   <strong>
@@ -704,6 +708,7 @@ function PendingRow({
                 onConfirm={() => void decide("reject")}
                 onCancel={() => setPanel("none")}
               >
+                {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It stays out of the public directory and is unlisted.{" "}
                   <strong>A reason is required</strong> — anyone may submit a listing about an

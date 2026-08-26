@@ -24,6 +24,7 @@
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
 import { SectionNav } from "@/components/SectionNav";
+import { SelfReviewNotice } from "@/components/SelfReviewNotice";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, VerifiedBadge } from "@/components/badges";
 import {
@@ -215,9 +216,9 @@ function Review({ me }: { me: Me }) {
       />
 
       {tab === "submissions" ? (
-        <Submissions queue={queue} origin={returnHere} onPage={selectQueuePage} />
+        <Submissions queue={queue} me={me} origin={returnHere} onPage={selectQueuePage} />
       ) : null}
-      {tab === "claims" ? <Claims claims={claims} origin={returnHere} /> : null}
+      {tab === "claims" ? <Claims claims={claims} me={me} origin={returnHere} /> : null}
       {tab === "duplicates" ? (
         <Duplicates
           duplicates={duplicates}
@@ -255,10 +256,12 @@ function useAction() {
 
 function Submissions({
   queue,
+  me,
   origin,
   onPage,
 }: {
   queue: ResourceHandle<ManagedOpportunityList>;
+  me: Me;
   origin: string;
   onPage: (page: number) => void;
 }) {
@@ -300,6 +303,7 @@ function Submissions({
                       <SubmissionRow
                         key={item.id}
                         item={item}
+                        me={me}
                         busy={busy}
                         run={run}
                         reload={queue.reload}
@@ -349,12 +353,14 @@ type SubmissionPanel = "none" | "details" | "approve" | "reject";
  */
 function SubmissionRow({
   item,
+  me,
   busy,
   run,
   reload,
   origin,
 }: {
   item: ManagedOpportunity;
+  me: Me;
   busy: boolean;
   run: (work: () => Promise<string>) => Promise<void>;
   reload: () => void;
@@ -363,6 +369,7 @@ function SubmissionRow({
   const api = useApi();
   const [panel, setPanel] = useState<SubmissionPanel>("none");
   const [reason, setReason] = useState("");
+  const isSelfReview = item.submittedByAccountId === me.accountId;
 
   return (
     <>
@@ -378,6 +385,7 @@ function SubmissionRow({
         </th>
         <td>
           <UntrustedText value={item.submittedBy} fallback="community" />
+          {isSelfReview ? <SelfReviewNotice kind="listing" compact /> : null}
           {item.namespace ? (
             <div className="muted">
               namespace <UntrustedText value={item.namespace} />
@@ -430,6 +438,7 @@ function SubmissionRow({
                   })
                 }
               >
+                {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It becomes visible to everyone in the public directory and in the open-data
                   exports, immediately. Publishing is not an endorsement of the programme — it is a
@@ -456,6 +465,7 @@ function SubmissionRow({
                   })
                 }
               >
+                {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It stays out of the public directory and is unlisted.{" "}
                   <strong>The reason is shown to whoever submitted it</strong> and is the only thing
@@ -637,7 +647,15 @@ function LastDecision({
  * later gains. Two buttons side by side said those were comparable choices, and the more dangerous
  * one was the easier click because it came first.
  */
-function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin: string }) {
+function Claims({
+  claims,
+  me,
+  origin,
+}: {
+  claims: ResourceHandle<ClaimList>;
+  me: Me;
+  origin: string;
+}) {
   const api = useApi();
   const { note, busy, run } = useAction();
   const [panel, setPanel] = useState<{ id: number; kind: "verify" | "reject" } | null>(null);
@@ -688,6 +706,9 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                             {formatInstant(claim.createdAt)} by{" "}
                             <UntrustedText value={claim.claimedBy} />
                           </div>
+                          {claim.claimedByAccountId === me.accountId ? (
+                            <SelfReviewNotice kind="claim" compact />
+                          ) : null}
                         </th>
                         <td>
                           <UntrustedText value={claim.organizationSlug} />{" "}
@@ -763,6 +784,9 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                                   })
                                 }
                               >
+                                {claim.claimedByAccountId === me.accountId ? (
+                                  <SelfReviewNotice kind="claim" />
+                                ) : null}
                                 <p>
                                   Every member of{" "}
                                   <strong>
@@ -795,6 +819,9 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                                   })
                                 }
                               >
+                                {claim.claimedByAccountId === me.accountId ? (
+                                  <SelfReviewNotice kind="claim" />
+                                ) : null}
                                 <p>
                                   Ownership stays where it is. The claimant is told the claim was
                                   refused.

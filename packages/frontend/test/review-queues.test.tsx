@@ -73,6 +73,7 @@ const pending = {
   isListed: false,
   namespace: "indie-collective",
   submittedBy: "indie2",
+  submittedByAccountId: 2,
   mergedInto: null,
   lastDecision: null,
   createdAt: "2026-08-01T00:00:00Z",
@@ -268,6 +269,39 @@ describe("the section navigation", () => {
 });
 
 describe("deciding a submission", () => {
+  it("discloses a reviewer deciding their own submission in the row and confirmation", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    const api = client();
+    api.review.opportunities = async () => ({
+      items: [{ ...pending, submittedBy: "hub-reviewer", submittedByAccountId: me.accountId }],
+      page: 1,
+      limit: 50,
+      total: 1,
+      totalPages: 1,
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText(notice)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(
+      within(screen.getByRole("group", { name: "Publish “Indie Dev Grants”?" })).getByText(notice),
+    ).toBeTruthy();
+  });
+
+  it("does not show the self-review notice for another submitter", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    mount();
+
+    await screen.findByText("Indie Dev Grants");
+    expect(screen.queryByText(notice)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(screen.queryByText(notice)).toBeNull();
+  });
+
   it("can reach submissions after the first fifty rows", async () => {
     const requestedPages: number[] = [];
     const api = client();
@@ -403,6 +437,62 @@ describe("deciding a submission", () => {
       expect(reject).toHaveBeenCalledWith("indie:grant-1", "the application link 404s"),
     );
     expect(await screen.findByText("“Indie Dev Grants” was refused and unlisted.")).toBeTruthy();
+  });
+});
+
+describe("deciding a claim", () => {
+  const claimNotice = "You filed this claim. The decision will be recorded under your handle.";
+  const claim = {
+    id: 12,
+    opportunityId: "indie:grant-1",
+    opportunityTitle: "Indie Dev Grants",
+    organizationSlug: "indie-collective",
+    organizationVerified: false,
+    claimedBy: "hub-reviewer",
+    claimedByAccountId: me.accountId,
+    status: "pending" as const,
+    note: "This is our programme.",
+    createdAt: "2026-08-20T00:00:00Z",
+    decidedAt: null,
+  };
+
+  it("discloses a reviewer deciding their own claim in the row and confirmation", async () => {
+    tab.current = "claims";
+    const api = client();
+    api.review.claims = async () => ({ items: [claim] });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText(claimNotice)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve and verify…" }));
+    expect(
+      within(
+        screen.getByRole("group", {
+          name: "Approve the claim and verify indie-collective?",
+        }),
+      ).getByText(claimNotice),
+    ).toBeTruthy();
+  });
+
+  it("does not show the self-review notice for another claimant", async () => {
+    tab.current = "claims";
+    const api = client();
+    api.review.claims = async () => ({
+      items: [{ ...claim, claimedBy: "someone-else", claimedByAccountId: 99 }],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    await screen.findByText("someone-else");
+    expect(screen.queryByText(claimNotice)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve and verify…" }));
+    expect(screen.queryByText(claimNotice)).toBeNull();
   });
 });
 

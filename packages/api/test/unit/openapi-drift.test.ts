@@ -500,6 +500,7 @@ describe("M3 closed components vs their view types", () => {
     organizationSlug: "example-org",
     organizationVerified: true,
     claimedBy: "someone",
+    claimedByAccountId: 1,
     status: "pending",
     note: null,
     createdAt: "2026-08-14T00:00:00.000Z",
@@ -566,6 +567,7 @@ describe("M3 closed components vs their view types", () => {
     isListed: true,
     namespace: "example-org",
     submittedBy: null,
+    submittedByAccountId: 1,
     mergedInto: null,
     // Null is the state most entries are in — nobody has decided anything yet. The populated shape
     // is asserted end to end in review.test.ts, where a real decision produces it.

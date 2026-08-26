@@ -47,6 +47,7 @@ const merged: ManagedOpportunity = {
   isListed: false,
   namespace: "acme",
   submittedBy: "publisher",
+  submittedByAccountId: 1,
   mergedInto: { id: "acme:new round", title: "Current Round" },
   lastDecision: { action: "reject", reason: null, at: "2026-08-20T00:00:00Z" },
   createdAt: "2026-08-01T00:00:00Z",

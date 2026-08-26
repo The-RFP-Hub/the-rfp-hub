@@ -45,6 +45,7 @@ run("M3REV review and administration", () => {
   let memberToken: string;
   let reviewerToken: string;
   let adminToken: string;
+  let submitterId: number;
   let memberId: number;
   let candidateOrgId: number;
   const userIds: string[] = [];
@@ -60,6 +61,7 @@ run("M3REV review and administration", () => {
       role: "reviewer",
     });
     const admin = await seedIdentity(EMAILS.admin, { handle: "m3rev-admin", role: "admin" });
+    submitterId = submitter.account.id;
     memberId = member.account.id;
     userIds.push(submitter.userId, member.userId, reviewer.userId, admin.userId);
 
@@ -110,6 +112,7 @@ run("M3REV review and administration", () => {
     expect(queue.statusCode).toBe(200);
     const queued = queue.json().items.find((i: { id: string }) => i.id === id);
     expect(queued).toBeTruthy();
+    expect(queued.submittedByAccountId).toBe(submitterId);
     expect(queued.mergedInto).toBeNull();
   });
 
