@@ -302,9 +302,15 @@ node packages/api/dist/jobs.js <job> --json      # inside the image, as a contai
 A job is the deployed image with a different command, so it inherits everything already assembled
 in the service's task definition — the image, the runtime `DATABASE_URL`, every secret in
 `secrets:` (§2), the execution and task roles — and the deploy workflows keep it current
-automatically; there is no second copy of that list to fall out of step. Subnets, security groups
-and launch type are not configured either: `run-ecs-job.sh` reads them off the running service with
-`aws ecs describe-services` at task-start time, so the job lands exactly where the API lands.
+automatically; there is no second copy of that list to fall out of step. Placement is not configured
+either: `run-ecs-job.sh` reads the launch type (or capacity provider strategy) off the running
+service with `aws ecs describe-services` at task-start time, so the job lands exactly where the API
+lands. **An `awsvpc` deployment is not required.** The runner also describes the task definition,
+and `networkMode` decides the call: `awsvpc` reuses the service's subnets, security groups and
+`assignPublicIp` verbatim, while `bridge` or `host` — the ordinary shape of an EC2 launch type —
+has none to reuse and the task starts without a `--network-configuration`, which ECS would reject
+for it. Only an `awsvpc` task definition whose service states no network configuration is treated
+as "not deployed yet".
 
 There is **no public job endpoint and no shared job token**, deliberately: a credential that can
 start a job has to live somewhere, and a token in repository secrets that the internet-facing API
