@@ -24,7 +24,7 @@ monitor.
 | # | Criterion | What is actually asserted |
 |---|---|---|
 | 1 | **API liveness** | `GET {base}/v1/health` is `200` **and** the body reports `status: ok`, `db: up` — the service's own definition of healthy, so a `200` that says `degraded` is a failure. TLS certificate validity, issuer and remaining lifetime are probed and reported (a certificate under three weeks from expiry is a warning). Round trip timed over three samples. |
-| 2 | **OpenAPI conformance** | The document served at `{base}/v1/docs/json` is the input. Every operation it declares is executed against the live URL and held to *its own* declared status, media type and response schema (ajv, draft 2020-12) — or, where the declared media type is not JSON (the Atom and RSS feeds), to the documented status, the declared content type, a non-empty body and, for XML, that the document is well-formed, with the report saying that the schema half did not apply. Then the negative half: an undocumented query parameter, and a value violating every documented enum, pattern, format and numeric bound, must each be a `400` whose body validates against the declared error schema; a path template documenting a `404` must answer `404`. |
+| 2 | **OpenAPI conformance** | The document served at `{base}/v1/docs/json` is the input. Every operation it declares is executed against the live URL and held to *its own* declared status, media type and response schema (ajv, draft 2020-12) — or, where the declared media type is not JSON (the Atom and RSS feeds), to the documented status, the declared content type, a non-empty body and, for XML, that the document is well-formed, with the report saying that the schema half did not apply. Where the document declares a **security requirement** for an operation, the credential-less checker is held to the promise addressed to it instead: a `401`, in a declared media type, whose body validates against the error schema declared for that status (a secured operation that documents no `401` is reported as a documentation defect). Then the negative half: an undocumented query parameter, and a value violating every documented enum, pattern, format and numeric bound, must each be a `400` whose body validates against the declared error schema; a path template documenting a `404` must answer `404` — all three deferred, by name, on a secured operation. |
 | 3 | **Dataset** | `/v1/stats` total is at or above the floor; the list endpoint pages through the whole dataset with a stable total and no repeats; every list item conforms to the published `OpportunitySummary`; **every** listed document is then fetched from the detail endpoint and validated against the Standard with `packages/validate`; and filtered counts agree with `/v1/stats`, partition the dataset, and OR correctly when combined. |
 | 4 | **Export freshness** | `latest.json` and `latest.csv` download and parse; the envelope is CC0-marked and its `generatedAt` is inside the freshness window; a CC0 rights notice sits at the export root; a sample of the exported documents validates against the Standard (`--export-sample`, default 25; pass `--export-sample 0` to validate all); and the two aliases describe the same **dataset** — same record count, same id set, and identical field values on a sample. Where the export publishes `latest.manifest.json`, the same **run** as well: the manifest is resolved once, every artifact it names is verified against the full sha256 it records, and the alias bytes are hashed against those digests. A *split* pair — one alias on the manifest's run and one not — is reported as a **warning**, not a failure: the aliases and the manifest are fetched in separate requests, so a run promoting between them is the ordinary cause, and the manifest's own artifacts still verify. Without a manifest, run identity cannot be established at all — no run identifier is served, so two same-day runs carrying the same records are indistinguishable — and the check says so rather than inferring it. |
 
@@ -52,7 +52,24 @@ never describes.
 ## What it deliberately does not do
 
 - **It issues read-only requests.** A published non-`GET` operation is reported as `skip` with that
-  reason, never as a pass. The `/v1/` surface is read-only today, so nothing is skipped in practice.
+  reason, never as a pass.
+- **It carries no credential, and does not pretend the authenticated surface is unverified by
+  accident.** The document says who may call each operation, so an operation with a non-empty
+  effective `security` (its own, or the document's — an operation-level `security: []` opts back
+  out, and so does a single empty alternative such as `[{}, {bearerAuth: []}]`, since the entries
+  of a requirement are alternatives rather than conjuncts) is not probed for its documented `200`,
+  which is not on offer to an anonymous caller.
+  It is held to the refusal the document publishes instead — a probe that needs no representative
+  path or query value, because the refusal is issued in the `onRequest` hook before the route's own
+  parameters are read, so a route-shaped placeholder reaches it — and its **strict-query probes are
+  skipped, one named skip per operation** regardless of whether its path could be resolved, with
+  the reason: this API authenticates in an
+  `onRequest` hook, ahead of query validation, so an anonymous `?page=0` is a `401` rather than a
+  `400` — deliberately, so that a caller without a credential learns nothing about the shape of the
+  query. Reading that as a missing `400` would be the checker reporting a security property as a
+  defect, which is what it did the night the authenticated surface first reached production. Those
+  contracts are real and have to be verified with a credential; that is `check:m3`'s job, not this
+  one's.
 - **It does not schema-validate an XML response, and does not pretend to.** A JSON Schema describes
   a JSON value, and Atom and RSS are defined by RFC 4287 and the RSS 2.0 specification rather than
   by anything this API publishes. Those responses are held to everything that still applies —

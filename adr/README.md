@@ -21,6 +21,9 @@ total, not one per commit.
 | [0006](./0006-document-wide-single-currency.md) | Denominate every monetary amount in the single document-wide `fundingInfo.currency` | accepted — supersedes 0002 #17 | 2026-08-05 |
 | [0007](./0007-canonical-domain-and-spec-identity.md) | Adopt `ethrfps.app` as the canonical domain, and mint spec v1.0.0's identity on it | accepted | 2026-08-10 |
 | [0008](./0008-security-bounty-payout-tiers.md) | Split `bounty` into task and security kinds, and give the security kind a payout table | accepted | 2026-08-10 |
+| [0009](./0009-land-duplicate-notifications-in-app-first.md) | Land duplicate notifications in-app first | accepted | 2026-08-26 |
+| [0010](./0010-centralize-and-dispatch-notification-email.md) | Centralize outbound email and dispatch duplicate notifications | accepted | 2026-08-26 |
+| [0011](./0011-repositories-own-all-database-access.md) | Make repositories own all database access | accepted | 2026-08-26 |
 
 ## When to write one
 

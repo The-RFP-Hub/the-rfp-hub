@@ -38,12 +38,12 @@
  *     every closed entry for an outbound fetch, every night, forever.
  * The audit row carries the timestamp of the change, which is where that fact belongs anyway.
  */
-import { and, asc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type OpportunityRow, opportunities } from "../../../db/schema.js";
+import type { OpportunityRow } from "../../../db/schema.js";
+import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import { isPastDue, nextDeadlineAt } from "../../shared/deadlines.js";
-import { AuditService, SYSTEM_ACTOR } from "../audit/audit.service.js";
+import { SYSTEM_ACTOR } from "../audit/audit.service.js";
 import type { JobResult } from "./types.js";
 
 /** Why an entry was closed. Recorded verbatim in the audit patch. */
@@ -64,14 +64,14 @@ export interface StalenessOptions {
 
 export class StalenessService {
   private readonly config: AppConfig;
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(
     private readonly db: DB = defaultDb,
     options: { config?: AppConfig } = {},
   ) {
     this.config = options.config ?? defaultConfig;
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   /**
@@ -139,23 +139,14 @@ export class StalenessService {
       // derived key with an obsolete one, and every deadline filter and sort would read it until
       // the row happened to become a candidate again. The lock makes the publisher's write the one
       // that stands.
-      return this.db.transaction(async (tx) => {
-        const locked = await tx
-          .select()
-          .from(opportunities)
-          .where(eq(opportunities.id, row.id))
-          .for("update")
-          .limit(1);
-        const current = locked[0];
+      return withTransaction(this.db, async (repos) => {
+        const current = await repos.opportunities.lockById(row.id);
         if (!current) return "unchanged";
         const currentNext = nextDeadlineAt(current.deadlines, now);
         if ((currentNext?.getTime() ?? null) === (current.nextDeadlineAt?.getTime() ?? null)) {
           return "unchanged";
         }
-        await tx
-          .update(opportunities)
-          .set({ nextDeadlineAt: currentNext })
-          .where(eq(opportunities.id, row.id));
+        await repos.opportunities.updateNextDeadline(row.id, currentNext);
         return "recomputed";
       });
     }
@@ -165,27 +156,17 @@ export class StalenessService {
     // the row out of contention (closed it themselves, or resolved the condition), the transaction
     // correctly does nothing — and the caller has to be told that, or it reports an entry as
     // processed and closed for a mutation that never happened.
-    return this.db.transaction(async (tx): Promise<"unchanged" | StalenessReason> => {
+    return withTransaction(this.db, async (repos): Promise<"unchanged" | StalenessReason> => {
       // Re-read under a row lock: a publisher editing this entry between the walk's SELECT and this
       // UPDATE must win, because their edit is the newer statement of fact.
-      const locked = await tx
-        .select()
-        .from(opportunities)
-        .where(eq(opportunities.id, row.id))
-        .for("update")
-        .limit(1);
-      const current = locked[0];
+      const current = await repos.opportunities.lockById(row.id);
       if (!current || current.status !== "open") return "unchanged";
       const currentNext = nextDeadlineAt(current.deadlines, now);
       const currentReason = this.closureReason(current, currentNext, now, inactiveBefore);
       if (currentReason === null) return "unchanged";
 
-      await tx
-        .update(opportunities)
-        // `updated_at` deliberately absent — see the header.
-        .set({ status: "closed", nextDeadlineAt: currentNext })
-        .where(eq(opportunities.id, row.id));
-      await this.audit.record(tx, {
+      await repos.opportunities.closeForStaleness(row.id, currentNext);
+      await repos.audit.record({
         ...SYSTEM_ACTOR,
         subjectKind: "opportunity",
         subjectId: row.id,
@@ -213,30 +194,11 @@ export class StalenessService {
     return touched.getTime() < inactiveBefore.getTime() ? "inactive" : null;
   }
 
-  /** The candidate predicate. See the header for why this one covers both passes exactly. */
-  private candidateFilter(now: Date, afterId: number) {
-    return and(
-      eq(opportunities.status, "open"),
-      isNull(opportunities.mergedIntoId),
-      or(isNull(opportunities.nextDeadlineAt), lte(opportunities.nextDeadlineAt, now)),
-      gt(opportunities.id, afterId),
-    );
-  }
-
   private async candidates(now: Date, afterId: number, limit: number): Promise<OpportunityRow[]> {
-    return this.db
-      .select()
-      .from(opportunities)
-      .where(this.candidateFilter(now, afterId))
-      .orderBy(asc(opportunities.id))
-      .limit(limit);
+    return this.repos.opportunities.listStalenessCandidates(now, afterId, limit);
   }
 
   private async candidateCount(now: Date, afterId: number): Promise<number> {
-    const rows = await this.db
-      .select({ value: sql<number>`count(*)::int` })
-      .from(opportunities)
-      .where(this.candidateFilter(now, afterId));
-    return rows[0]?.value ?? 0;
+    return this.repos.opportunities.countStalenessCandidates(now, afterId);
   }
 }

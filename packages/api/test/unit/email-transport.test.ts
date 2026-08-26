@@ -10,12 +10,12 @@
  * undelivered message in a deployment and nothing at all in a type checker.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { EmailConfig } from "../../src/config.js";
 import {
   createEmailTransport,
   deliversEmail,
   recipientFingerprint,
-} from "../../src/auth/email-transport.js";
-import type { EmailConfig } from "../../src/config.js";
+} from "../../src/modules/services/email/email-transport.js";
 
 /**
  * DELIBERATELY NOT SHAPED LIKE A REAL KEY. A Mailgun key is `key-` and 32 hex characters, which is

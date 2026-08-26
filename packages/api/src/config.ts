@@ -103,6 +103,11 @@ export interface VerificationConfig {
   egressProxy: string | undefined;
 }
 
+export interface NotificationConfig {
+  /** Waiting email attempts retained by the post-commit, in-process dispatcher. */
+  queueMax: number;
+}
+
 export interface AnalyticsConfig {
   enabled: boolean;
   /** HMAC key for the session/IP hashes. */
@@ -116,6 +121,8 @@ export interface AppConfig {
   databaseUrl: string;
   port: number;
   host: string;
+  /** The frontend origin used for absolute links in outbound email. */
+  appBaseUrl: string;
   /**
    * Base URL the OpenAPI document advertises as its `servers[0].url` (see plugins/swagger.ts).
    * Defaults to `/` — relative, and therefore correct wherever the server happens to be reachable,
@@ -153,6 +160,7 @@ export interface AppConfig {
   embedding: EmbeddingConfig;
   dedupe: DedupeConfig;
   verification: VerificationConfig;
+  notifications: NotificationConfig;
   analytics: AnalyticsConfig;
   /** Days of no publisher touch after which a deadline-less open entry is closed as inactive. */
   stalenessInactiveDays: number;
@@ -258,6 +266,56 @@ export function readPublicBaseUrl(raw: string | undefined, fallback = "/"): stri
   }
 
   return url.href.replace(/\/+$/, "");
+}
+
+/**
+ * APP_BASE_URL names the ONE frontend origin safe to publish in outbound email.
+ *
+ * It cannot be inferred from `PUBLIC_BASE_URL` (the API origin) or from `TRUSTED_ORIGINS` (an
+ * allowlist that may contain API, preview and local origins). Production therefore requires it;
+ * local development has the frontend's ordinary localhost origin as an explicit fallback.
+ */
+export function readAppBaseUrl(
+  raw: string | undefined,
+  production: boolean,
+  fallback = "http://localhost:3005",
+): string {
+  const value = readOptional(raw);
+  if (value === undefined) {
+    if (production) {
+      throw new Error(
+        "APP_BASE_URL is required under NODE_ENV=production so outbound email never guesses which frontend origin to publish.",
+      );
+    }
+    return fallback;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(
+      `APP_BASE_URL must be an absolute frontend origin (e.g. https://app.example.org), got ${JSON.stringify(raw)}.`,
+    );
+  }
+
+  if (url.protocol !== "https:" && (url.protocol !== "http:" || !isLoopbackHost(url.hostname))) {
+    throw new Error(
+      `APP_BASE_URL must use https:// for any host that is not loopback, got ${JSON.stringify(raw)}.`,
+    );
+  }
+  if (
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error(
+      `APP_BASE_URL must be an origin with no path, credentials, query or fragment, got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return url.origin;
 }
 
 // ── M3 readers ───────────────────────────────────────────────────────────────────────────────
@@ -658,6 +716,7 @@ export const config: AppConfig = {
   databaseUrl: process.env.DATABASE_URL ?? (isProduction ? "" : LOCAL_DATABASE_URL),
   port: readPort(process.env.PORT),
   host: process.env.HOST ?? "0.0.0.0",
+  appBaseUrl: readAppBaseUrl(process.env.APP_BASE_URL, isProduction),
   publicBaseUrl: readPublicBaseUrl(process.env.PUBLIC_BASE_URL),
   dbPoolMax: readDbPoolMax(process.env.DB_POOL_MAX),
   trustProxy: readTrustProxy(process.env.TRUST_PROXY),
@@ -711,6 +770,10 @@ export const config: AppConfig = {
     queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
     allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
     egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
+  },
+
+  notifications: {
+    queueMax: readPositiveInt(process.env.NOTIFICATION_QUEUE_MAX, 100),
   },
 
   analytics: {

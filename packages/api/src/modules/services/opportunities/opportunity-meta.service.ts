@@ -12,15 +12,9 @@
  * then an empty list and "no run yet" are the correct, honest answers, not placeholders: an entry
  * that has never been checked genuinely has no run.
  */
-import { and, desc, eq, inArray, or } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityRow,
-  opportunities,
-  opportunityDuplicates,
-  verificationRuns,
-} from "../../../db/schema.js";
+import type { OpportunityRow } from "../../../db/schema.js";
+import { type Repositories, repositories } from "../../repositories/unit-of-work.js";
 import type {
   DuplicateMatchView,
   OwnedDuplicateMatchView,
@@ -28,6 +22,7 @@ import type {
 } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
+import { isOpportunityOwnedBy } from "./opportunity-ownership.js";
 
 /** What a caller may see of one entry. */
 export interface ViewerScope {
@@ -46,7 +41,11 @@ export interface ViewerScope {
 }
 
 export class OpportunityMetaService {
-  constructor(private readonly db: DB = defaultDb) {}
+  private readonly repos: Repositories;
+
+  constructor(db: DB = defaultDb) {
+    this.repos = repositories(db);
+  }
 
   /**
    * The entry, if this caller may see it, plus whether they see the privileged half.
@@ -55,12 +54,7 @@ export class OpportunityMetaService {
    * pending entry as the detail route does: nothing.
    */
   async resolveForViewer(publicId: string, principal: Principal | null): Promise<ViewerScope> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(eq(opportunities.publicId, publicId))
-      .limit(1);
-    const row = rows[0];
+    const row = await this.repos.opportunities.findByPublicId(publicId);
     if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
 
     const privileged = isPrivileged(row, principal);
@@ -84,24 +78,7 @@ export class OpportunityMetaService {
    * hiding those hides nothing from anybody.
    */
   async duplicates(scope: ViewerScope): Promise<DuplicateMatchView[]> {
-    const other = opportunities;
-    const rows = await this.db
-      .select({ pair: opportunityDuplicates, other })
-      .from(opportunityDuplicates)
-      .innerJoin(
-        other,
-        or(
-          and(
-            eq(opportunityDuplicates.opportunityId, scope.row.id),
-            eq(other.id, opportunityDuplicates.duplicateOfId),
-          ),
-          and(
-            eq(opportunityDuplicates.duplicateOfId, scope.row.id),
-            eq(other.id, opportunityDuplicates.opportunityId),
-          ),
-        ),
-      )
-      .orderBy(desc(opportunityDuplicates.detectedAt));
+    const rows = await this.repos.duplicatePairs.listForOpportunity(scope.row.id);
 
     return rows
       .filter(({ other: match }) => maySee(match, scope.principal))
@@ -135,35 +112,13 @@ export class OpportunityMetaService {
    * Entitlement, not publicity, is the question.
    */
   async duplicatesForOwner(principal: Principal): Promise<OwnedDuplicateMatchView[]> {
-    const namespaces = principal.memberships.map((m) => m.slug);
-    const left = alias(opportunities, "owned_dup_left");
-    const right = alias(opportunities, "owned_dup_right");
-    const mineOnLeft =
-      namespaces.length === 0
-        ? eq(left.submittedBy, principal.accountId)
-        : or(eq(left.submittedBy, principal.accountId), inArray(left.sourcePublisher, namespaces));
-    const mineOnRight =
-      namespaces.length === 0
-        ? eq(right.submittedBy, principal.accountId)
-        : or(
-            eq(right.submittedBy, principal.accountId),
-            inArray(right.sourcePublisher, namespaces),
-          );
-
-    const rows = await this.db
-      .select({ pair: opportunityDuplicates, left, right })
-      .from(opportunityDuplicates)
-      .innerJoin(left, eq(left.id, opportunityDuplicates.opportunityId))
-      .innerJoin(right, eq(right.id, opportunityDuplicates.duplicateOfId))
-      .where(or(mineOnLeft, mineOnRight))
-      .orderBy(desc(opportunityDuplicates.detectedAt))
-      .limit(100);
+    const rows = await this.repos.duplicatePairs.listForOwner(principal, 100);
 
     return rows
       .map(({ pair, left: leftRow, right: rightRow }) => {
         // The stored pair is canonical (left id < right id). Prefer its left side when both entries
         // are owned so one pair produces one row with a stable account-side identity.
-        const yours = isOwnedBy(leftRow, principal) ? leftRow : rightRow;
+        const yours = isOpportunityOwnedBy(leftRow, principal) ? leftRow : rightRow;
         const match = yours === leftRow ? rightRow : leftRow;
         return { pair, match, yours };
       })
@@ -181,13 +136,7 @@ export class OpportunityMetaService {
 
   /** The most recent run, or undefined when the entry has never been checked. */
   async latestVerification(scope: ViewerScope): Promise<VerificationRunView | undefined> {
-    const rows = await this.db
-      .select()
-      .from(verificationRuns)
-      .where(eq(verificationRuns.opportunityId, scope.row.id))
-      .orderBy(desc(verificationRuns.runAt), desc(verificationRuns.id))
-      .limit(1);
-    const run = rows[0];
+    const run = await this.repos.duplicatePairs.latestVerification(scope.row.id);
     if (!run) return undefined;
     return {
       runAt: run.runAt.toISOString(),
@@ -228,16 +177,7 @@ function isPubliclyVisible(row: OpportunityRow): boolean {
 export function isPrivileged(row: OpportunityRow, principal: Principal | null): boolean {
   if (!principal) return false;
   if (isReviewer(principal)) return true;
-  return isOwnedBy(row, principal);
-}
-
-/** Ownership only — deliberately excludes reviewer privilege from account-scoped queries. */
-function isOwnedBy(row: OpportunityRow, principal: Principal): boolean {
-  if (row.submittedBy === principal.accountId) return true;
-  return (
-    row.sourcePublisher !== null &&
-    principal.memberships.some((m) => m.slug === row.sourcePublisher)
-  );
+  return isOpportunityOwnedBy(row, principal);
 }
 
 /**

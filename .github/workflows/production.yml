@@ -40,6 +40,7 @@ env:
   # variables -> Actions -> Variables. The deploy job below refuses to run while it is unset,
   # because an empty `cluster:` silently means ECS's `default` cluster.
   ECS_CLUSTER: ${{ vars.PRODUCTION_ECS_CLUSTER }}
+  APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL }}
   ECR_REPOSITORY_MAIN: production-rfp-hub
   ECS_CONTAINER: rfp-hub-production
 
@@ -139,6 +140,10 @@ jobs:
             echo "::error::Repository variable PRODUCTION_ECS_CLUSTER is unset (Settings -> Secrets and variables -> Actions -> Variables)."
             exit 1
           fi
+          if [ -z "${{ env.APP_BASE_URL }}" ]; then
+            echo "::error::Repository variable PRODUCTION_APP_BASE_URL is unset; notification email needs the canonical frontend origin."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         # The aws-actions/* steps are pinned by commit SHA, not by a moving tag: they hold the
@@ -201,6 +206,9 @@ jobs:
       # revision's values, which after a rotation are not the strings this run masked. One pass
       # here sets the image and the environment together, and no third-party action ever reads a
       # task definition with plaintext in it.
+      # APP_BASE_URL is the one setting the WORKFLOW owns rather than the secret: a repository
+      # variable (checked non-empty above), written on top of the secret's entries with `--set`.
+      # The notification dispatcher inherits it from this same task definition.
       - name: Render the task definition
         env:
           IMAGE: ${{ steps.download-task.outputs.image }}
@@ -213,6 +221,7 @@ jobs:
             --container "$ECS_CONTAINER" \
             --image "$IMAGE" \
             --env "$RUNNER_TEMP/container-env.json" \
+            --set "APP_BASE_URL=$APP_BASE_URL" \
             --out "$RUNNER_TEMP/task-definition.rendered.json"
 
       # The clean path's one hard prerequisite, checked where it bites: a container shipped without

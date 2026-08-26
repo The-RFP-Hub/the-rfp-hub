@@ -270,7 +270,7 @@ export function toContainerEnv(text, { skip = [], required = [], mask = () => {}
  */
 export function injectContainerEnv(
   taskDefinition,
-  { container, image, environment, mask = () => {} },
+  { container, image, environment, set = [], mask = () => {} },
 ) {
   const doc = structuredClone(taskDefinition);
   const definitions = doc.containerDefinitions;
@@ -320,6 +320,24 @@ export function injectContainerEnv(
       (entry) => !secretNames.has(entry?.name),
     );
   }
+
+  // `--set NAME=VALUE`: non-secret settings the WORKFLOW owns (repository variables such as
+  // APP_BASE_URL), written on top of whatever the secret supplied. Typed in the workflow on
+  // purpose, so it wins over a same-named entry from the secret — but a name that `secrets:`
+  // already resolves is the same coin flip as above, and fails the same way.
+  for (const { name, value } of set) {
+    if (!VALID_NAME.test(name))
+      throw new Error(`--set: invalid environment variable name: ${name}`);
+    if (secretNames.has(name)) {
+      throw new Error(
+        `--set ${name} collides with the container's secrets: array — it is already wired there.`,
+      );
+    }
+    target.environment = [
+      ...(target.environment ?? []).filter((entry) => entry?.name !== name),
+      { name, value },
+    ];
+  }
   for (const attribute of IGNORED_TASK_DEFINITION_ATTRIBUTES) delete doc[attribute];
 
   const json = JSON.stringify(doc);
@@ -358,6 +376,7 @@ function main() {
       container: { type: "string" },
       image: { type: "string" },
       env: { type: "string" },
+      set: { type: "string", multiple: true, default: [] },
     },
   });
 
@@ -382,17 +401,29 @@ function main() {
     // No --env is the post-migration shape: the values are in `secrets:` and this only sets the
     // image, leaving whatever `environment` the downloaded definition carries untouched.
     const environment = values.env ? JSON.parse(readFileSync(values.env, "utf8")) : undefined;
+    const set = values.set.map((pair) => {
+      const at = pair.indexOf("=");
+      if (at < 1) {
+        console.error(`--set expects NAME=VALUE, got ${JSON.stringify(pair)}`);
+        process.exit(2);
+      }
+      return { name: pair.slice(0, at), value: pair.slice(at + 1) };
+    });
     const { json, bytes } = injectContainerEnv(taskDefinition, {
       container: values.container,
       image: values.image,
       environment,
+      set,
       mask,
     });
     writePrivate(values.out, json);
     const wrote = environment
       ? `${environment.length} environment entr${environment.length === 1 ? "y" : "ies"}`
       : "environment left as it was";
-    console.log(`✓ rendered ${values.container}: image ${values.image}, ${wrote}, ${bytes} bytes`);
+    const setNames = set.length > 0 ? `, set ${set.map((entry) => entry.name).join(", ")}` : "";
+    console.log(
+      `✓ rendered ${values.container}: image ${values.image}, ${wrote}${setNames}, ${bytes} bytes`,
+    );
     return;
   }
 

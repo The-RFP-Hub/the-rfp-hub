@@ -18,13 +18,12 @@
  * human can spot a key nobody uses; writing it on every request would put a write on the hot path
  * of a read-only API for a field whose value nobody reads to the minute.
  */
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type AccountRow, type ApiKeyRow, accounts, apiKeys } from "../../../db/schema.js";
+import type { AccountRow, ApiKeyRow } from "../../../db/schema.js";
+import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import { mintApiKey, parseApiKey } from "../../shared/api-key-token.js";
 import type { ApiKeyScope } from "../../shared/capabilities.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
 
 /** How stale `last_used_at` may get before a request bothers to refresh it. */
 export const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
@@ -52,19 +51,15 @@ export interface VerifiedKey {
 }
 
 export class ApiKeyService {
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(private readonly db: DB = defaultDb) {
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   /** This account's keys, newest first. Revoked keys are included and say so. */
   async list(accountId: number): Promise<ApiKeyRow[]> {
-    return this.db
-      .select()
-      .from(apiKeys)
-      .where(eq(apiKeys.accountId, accountId))
-      .orderBy(desc(apiKeys.createdAt), desc(apiKeys.id));
+    return this.repos.apiKeys.listForAccount(accountId);
   }
 
   async create(accountId: number, input: CreateKeyInput): Promise<MintedKey> {
@@ -73,21 +68,14 @@ export class ApiKeyService {
     const expiresAt = normalizeExpiry(input.expiresAt);
 
     const minted = mintApiKey();
-    return this.db.transaction(async (tx) => {
+    return withTransaction(this.db, async (repos) => {
       // Locks the account row so two concurrent mints for the same account serialize here — the
       // count-then-insert below is otherwise a check-then-act race that lets both sides observe
       // 24 live keys and both insert a 25th. The account row is the natural per-account
       // serialization point; it needs no new advisory-lock namespace.
-      await tx
-        .select({ id: accounts.id })
-        .from(accounts)
-        .where(eq(accounts.id, accountId))
-        .for("update");
+      await repos.apiKeys.lockAccount(accountId);
 
-      const live = await tx
-        .select({ id: apiKeys.id })
-        .from(apiKeys)
-        .where(and(eq(apiKeys.accountId, accountId), isNull(apiKeys.revokedAt)));
+      const live = await repos.apiKeys.listLiveForAccount(accountId);
       if (live.length >= MAX_KEYS_PER_ACCOUNT) {
         throw badRequest(
           "too_many_keys",
@@ -95,20 +83,16 @@ export class ApiKeyService {
         );
       }
 
-      const rows = await tx
-        .insert(apiKeys)
-        .values({
-          accountId,
-          name,
-          keyPrefix: minted.prefix,
-          keyHash: minted.keyHash,
-          scopes,
-          expiresAt,
-        })
-        .returning();
-      const key = rows[0];
+      const key = await repos.apiKeys.create({
+        accountId,
+        name,
+        keyPrefix: minted.prefix,
+        keyHash: minted.keyHash,
+        scopes,
+        expiresAt,
+      });
       if (!key) throw new Error("failed to mint an api key");
-      await this.audit.record(tx, {
+      await repos.audit.record({
         subjectKind: "api_key",
         subjectId: key.id,
         actorKind: "user",
@@ -130,13 +114,8 @@ export class ApiKeyService {
    * a flaky client is not an error.
    */
   async revoke(accountId: number, keyId: number): Promise<ApiKeyRow> {
-    return this.db.transaction(async (tx) => {
-      const existing = await tx
-        .select()
-        .from(apiKeys)
-        .where(and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId)))
-        .limit(1);
-      const key = existing[0];
+    return withTransaction(this.db, async (repos) => {
+      const key = await repos.apiKeys.findForAccount(accountId, keyId);
       if (!key) throw notFound(`no api key ${keyId}.`);
       if (key.revokedAt !== null) return key;
 
@@ -147,25 +126,13 @@ export class ApiKeyService {
       // record one. The predicate is the compare-and-set (same idiom as `touchLastUsed` below):
       // only the WINNER's UPDATE matches a row; the loser's affects zero and falls through to the
       // documented re-revocation no-op.
-      const updated = await tx
-        .update(apiKeys)
-        .set({ revokedAt: new Date() })
-        .where(
-          and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId), isNull(apiKeys.revokedAt)),
-        )
-        .returning();
-      const row = updated[0];
+      const row = await repos.apiKeys.revokeIfLive(accountId, keyId, new Date());
       if (!row) {
-        const current = await tx
-          .select()
-          .from(apiKeys)
-          .where(and(eq(apiKeys.id, keyId), eq(apiKeys.accountId, accountId)))
-          .limit(1);
-        const winner = current[0];
+        const winner = await repos.apiKeys.findForAccount(accountId, keyId);
         if (!winner) throw notFound(`no api key ${keyId}.`);
         return winner;
       }
-      await this.audit.record(tx, {
+      await repos.audit.record({
         subjectKind: "api_key",
         subjectId: row.id,
         actorKind: "user",
@@ -187,13 +154,7 @@ export class ApiKeyService {
     const parsed = parseApiKey(token);
     if (!parsed) return undefined;
 
-    const rows = await this.db
-      .select({ key: apiKeys, account: accounts })
-      .from(apiKeys)
-      .innerJoin(accounts, eq(accounts.id, apiKeys.accountId))
-      .where(eq(apiKeys.keyHash, parsed.keyHash))
-      .limit(1);
-    const found = rows[0];
+    const found = await this.repos.apiKeys.findByHash(parsed.keyHash);
     if (!found) return undefined;
     if (found.key.revokedAt !== null) return undefined;
     if (found.key.expiresAt !== null && found.key.expiresAt.getTime() <= Date.now()) {
@@ -210,16 +171,10 @@ export class ApiKeyService {
    */
   touchLastUsed(keyId: number, now: Date = new Date()): void {
     const cutoff = new Date(now.getTime() - LAST_USED_THROTTLE_MS);
-    void this.db
-      .update(apiKeys)
-      .set({ lastUsedAt: now })
-      .where(
-        and(eq(apiKeys.id, keyId), or(isNull(apiKeys.lastUsedAt), lt(apiKeys.lastUsedAt, cutoff))),
-      )
-      .catch(() => {
-        // Best-effort by design: a failed bookkeeping write must never fail the request it was
-        // observing. Nothing reads this field on a decision path.
-      });
+    void this.repos.apiKeys.touchLastUsed(keyId, now, cutoff).catch(() => {
+      // Best-effort by design: a failed bookkeeping write must never fail the request it was
+      // observing. Nothing reads this field on a decision path.
+    });
   }
 }
 

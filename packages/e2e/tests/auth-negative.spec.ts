@@ -25,10 +25,11 @@
  *   credential WHICH of the six things is wrong with it, and therefore what to try next.
  */
 import { createHmac, randomBytes } from "node:crypto";
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { seedApiKey, seedIdentity } from "../src/db-seed.js";
 import { DESKTOP_UA, expect, test } from "../src/fixtures.js";
 import { ApiClient } from "../src/http.js";
-import { discardOtp, waitForOtp } from "../src/identity/outbox.js";
+import { discardOtp, outboxFileFor, waitForOtp } from "../src/identity/outbox.js";
 import { addressFor, identityFor, signOut } from "../src/identity/sessions.js";
 import { register } from "../src/redact.js";
 
@@ -119,6 +120,37 @@ test.describe("a bad session token is refused, and always the same way", () => {
 });
 
 test.describe("the one-time code is single-use and attempt-limited", () => {
+  test("reading a code preserves notification mail in the shared address outbox", async ({
+    stack,
+    anonApi,
+  }) => {
+    const email = address(stack, "notification-outbox");
+    const path = outboxFileFor(stack.outboxDir, email);
+    mkdirSync(stack.outboxDir, { recursive: true, mode: 0o700 });
+    // Six digits on purpose: subject filtering, not merely the body regex, must keep this line from
+    // being consumed as a sign-in code.
+    appendFileSync(
+      path,
+      `${JSON.stringify({
+        to: email,
+        subject: "A possible duplicate was found",
+        text: "Possible match 123456 is waiting for review.",
+      })}\n`,
+      { mode: 0o600 },
+    );
+
+    const requested = await anonApi.post("/api/auth/email-otp/send-verification-otp", {
+      email,
+      type: "sign-in",
+    });
+    expect(requested.status).toBe(200);
+    const otp = await waitForOtp(stack.outboxDir, email);
+    expect(readFileSync(path, "utf8")).toContain("A possible duplicate was found");
+
+    const signedIn = await anonApi.post("/api/auth/sign-in/email-otp", { email, otp });
+    expect(signedIn.status).toBe(200);
+  });
+
   test("a wrong code, tried past the allowance, invalidates the code entirely", async ({
     stack,
     anonApi,

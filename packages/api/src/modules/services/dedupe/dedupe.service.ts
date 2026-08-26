@@ -2,7 +2,7 @@
  * Semantic duplicate detection: embed an entry, find its neighbours, record the pairs, and give a
  * reviewer somewhere to decide.
  *
- * FIVE THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
+ * SIX THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
  *
  * 1. **The candidate scope is credential-dependent.** A submitter's check runs over `approved AND
  *    is_listed` rows only. Searching everything would turn a submission into a way to enumerate the
@@ -22,20 +22,21 @@
  * 5. **Failure never blocks a write.** The whole check is wrapped: a missing key, a timeout, a
  *    provider outage all resolve to `unavailable` with no embedding row, which is precisely the
  *    predicate the backfill job selects on. A submission that was accepted stays accepted.
+ * 6. **A newly inserted pair emits in the same transaction.** `returning()` distinguishes a real
+ *    creation from a re-detection, and the notification unique key is the final backstop. Decisions,
+ *    merges and reopens likewise record owner notifications beside their mutations and audit rows.
  */
 
-import { type SQL, and, asc, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import { validateOpportunity } from "rfphub-validate";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
-import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityRow,
-  opportunities,
-  opportunityDuplicates,
-  opportunityEmbeddings,
-} from "../../../db/schema.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import type { OpportunityDuplicateRow, OpportunityRow } from "../../../db/schema.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
+import {
+  type Repositories,
+  repositories,
+  withTransaction,
+} from "../../repositories/unit-of-work.js";
 import type {
   DuplicateCheckStatus,
   DuplicateMatchView,
@@ -46,19 +47,16 @@ import type {
 import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
-import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
-  type EmbeddingProvider,
-  createEmbeddingProvider,
-  toVectorLiteral,
-} from "./embedding-provider.js";
-
-/** How many neighbours the ANN index returns before the threshold is applied. */
-const ANN_CANDIDATES = 20;
-
-/** Rows read per pass while walking the corpus for entries whose embedding is not current. */
-const SCAN_PAGE = 500;
+  type NotificationDispatchEnqueuer,
+  notificationDispatchQueue,
+} from "../notifications/notification-dispatch.queue.js";
+import {
+  type RecordDuplicateNotificationsInput,
+  duplicateNotificationInserts,
+} from "../notifications/notification.service.js";
+import { duplicateReopenTransition } from "./duplicate-reopen.js";
+import { type EmbeddingProvider, createEmbeddingProvider } from "./embedding-provider.js";
 
 /**
  * The fields a merge may carry from the loser to the survivor.
@@ -100,10 +98,24 @@ export interface DuplicateCheckResult {
   duplicates: DuplicateMatchView[];
 }
 
+/** The structured subset needed for the one deployment-level corpus alarm. */
+export interface DedupeLogger {
+  warn(payload: Record<string, unknown>, message: string): void;
+}
+
+const consoleLogger: DedupeLogger = {
+  warn(payload, message) {
+    console.warn(message, payload);
+  },
+};
+
 export interface DedupeOptions {
   /** Injected by the tests; a deployment takes the configured provider. */
   provider?: EmbeddingProvider;
   config?: AppConfig;
+  logger?: DedupeLogger;
+  /** Post-commit immediate email seam. Production uses the process-wide bounded queue. */
+  notificationQueue?: NotificationDispatchEnqueuer;
 }
 
 /** What a search may see. `all` is the reviewer scope; `public` is everyone else's. */
@@ -112,7 +124,11 @@ export type CandidateScope = "public" | "all";
 export class DedupeService {
   private readonly provider: EmbeddingProvider | undefined;
   private readonly config: AppConfig;
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
+  private readonly notificationQueue: NotificationDispatchEnqueuer;
+  private readonly logger: DedupeLogger;
+  /** One provider/corpus mismatch is one operator incident, not one warning per submission. */
+  private corpusMismatchWarned = false;
 
   constructor(
     private readonly db: DB = defaultDb,
@@ -120,7 +136,9 @@ export class DedupeService {
   ) {
     this.config = options.config ?? defaultConfig;
     this.provider = options.provider ?? createEmbeddingProvider(this.config.embedding);
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
+    this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
+    this.logger = options.logger ?? consoleLogger;
   }
 
   /** Whether this deployment can detect duplicates at all. */
@@ -141,6 +159,9 @@ export class DedupeService {
   ): Promise<DuplicateCheckResult> {
     if (!this.provider) return { status: "disabled", duplicates: [] };
     try {
+      if (!(await this.hasSearchableCorpus(opportunityId, scope))) {
+        return { status: "unavailable", duplicates: [] };
+      }
       const matches = await this.embedAndDetect(opportunityId, scope);
       return { status: "ok", duplicates: matches };
     } catch {
@@ -148,6 +169,49 @@ export class DedupeService {
       // rows this leaves without a current embedding row.
       return { status: "unavailable", duplicates: [] };
     }
+  }
+
+  /**
+   * Refuse to call an empty provider-specific slice of a non-empty corpus a successful search.
+   *
+   * Exact zero is deliberately the heuristic. A partial backfill can search the rows it has reached
+   * and honestly return that result; choosing an arbitrary percentage would only turn availability
+   * on and off around a threshold with no semantic basis. Zero is different: when eligible entries
+   * exist but not one vector belongs to the live model/provider, `search()` is guaranteed to return
+   * nothing before similarity is even considered. That is an unavailable check, not "no matches".
+   *
+   * This guard belongs in `check()`, not `embedAndDetect()`: the latter is what the
+   * `embedding-backfill` job calls to repair this exact state and must never block its own remedy.
+   */
+  private async hasSearchableCorpus(
+    opportunityId: number,
+    scope: CandidateScope,
+  ): Promise<boolean> {
+    const provider = this.provider;
+    if (!provider) return false;
+
+    const { eligibleOpportunityCount, compatibleEmbeddingCount, searchable } =
+      await this.repos.embeddings.corpusAvailability(opportunityId, scope, {
+        model: provider.model,
+        providerId: provider.id,
+      });
+    if (searchable) return true;
+
+    if (!this.corpusMismatchWarned) {
+      this.corpusMismatchWarned = true;
+      this.logger.warn(
+        {
+          providerId: provider.id,
+          model: provider.model,
+          scope,
+          eligibleOpportunityCount,
+          compatibleEmbeddingCount,
+          remedy: "run the embedding-backfill job",
+        },
+        "DUPLICATE CHECK UNAVAILABLE: the live embedding model/provider has zero compatible rows in a non-empty opportunity corpus; run the embedding-backfill job",
+      );
+    }
+    return false;
   }
 
   /**
@@ -197,12 +261,7 @@ export class DedupeService {
     const text = embeddingTextFor(row);
     const hash = contentHash(text, provider.model, provider.id);
 
-    const stored = await this.db
-      .select()
-      .from(opportunityEmbeddings)
-      .where(eq(opportunityEmbeddings.opportunityId, row.id))
-      .limit(1);
-    const current = stored[0];
+    const current = await this.repos.embeddings.findByOpportunityId(row.id);
     if (current && current.contentHash === hash) return current.embedding;
 
     const vector = await provider.embed(text);
@@ -221,25 +280,13 @@ export class DedupeService {
       if (freshHash !== hash) return this.ensureEmbedding(fresh, provider, depth + 1);
     }
 
-    await this.db
-      .insert(opportunityEmbeddings)
-      .values({
-        opportunityId: row.id,
-        model: provider.model,
-        providerId: provider.id,
-        embedding: vector,
-        contentHash: hash,
-      })
-      .onConflictDoUpdate({
-        target: opportunityEmbeddings.opportunityId,
-        set: {
-          model: provider.model,
-          providerId: provider.id,
-          embedding: vector,
-          contentHash: hash,
-          createdAt: new Date(),
-        },
-      });
+    await this.repos.embeddings.upsert({
+      opportunityId: row.id,
+      model: provider.model,
+      providerId: provider.id,
+      embedding: vector,
+      contentHash: hash,
+    });
     return vector;
   }
 
@@ -257,41 +304,10 @@ export class DedupeService {
   > {
     const provider = this.provider;
     if (!provider) return [];
-    // pgvector's cosine-distance operator, written out rather than through Drizzle's
-    // `cosineDistance` helper: the helper binds an array, and this needs the vector as a single
-    // cast parameter so the planner still reaches the HNSW index.
-    const distance = cosineDistanceTo(vector);
-
-    const where: (SQL | undefined)[] = [
-      sql`${opportunityEmbeddings.opportunityId} <> ${options.exclude}`,
-      eq(opportunityEmbeddings.model, provider.model),
-      eq(opportunityEmbeddings.providerId, provider.id),
-      isNull(opportunities.mergedIntoId),
-    ];
-    if (options.scope === "public") {
-      where.push(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true));
-    }
-
-    const rows = await this.db
-      .select({
-        id: opportunities.id,
-        publicId: opportunities.publicId,
-        title: opportunities.title,
-        reviewStatus: opportunities.reviewStatus,
-        isListed: opportunities.isListed,
-        similarity: sql<number>`1 - (${distance})`,
-      })
-      .from(opportunityEmbeddings)
-      .innerJoin(opportunities, eq(opportunities.id, opportunityEmbeddings.opportunityId))
-      .where(and(...where))
-      .orderBy(asc(distance))
-      .limit(ANN_CANDIDATES);
-
-    return rows.map(({ reviewStatus, isListed, ...row }) => ({
-      ...row,
-      isPublic: reviewStatus === "approved" && isListed,
-      similarity: Number(row.similarity),
-    }));
+    return this.repos.embeddings.searchNearest(vector, {
+      ...options,
+      identity: { model: provider.model, providerId: provider.id },
+    });
   }
 
   /** Insert the pairs that are new; refresh the similarity of the ones already suspected. */
@@ -300,29 +316,42 @@ export class DedupeService {
     matches: { id: number; similarity: number }[],
   ): Promise<void> {
     if (matches.length === 0) return;
-    for (const match of matches) {
-      // Canonical ordering, matching `ux_dup_pair`'s (least, greatest) expression index, so the
-      // mirrored pair is the same key rather than a second row with its own status.
-      const [low, high] =
-        opportunityId < match.id ? [opportunityId, match.id] : [match.id, opportunityId];
-      const similarity = round(match.similarity).toString();
-      await this.db
-        .insert(opportunityDuplicates)
-        .values({ opportunityId: low, duplicateOfId: high, similarity, status: "suspected" })
-        .onConflictDoNothing();
-      // Only a suspected pair is refreshed. A dismissal is a judgement, and a re-run of the
-      // detector is not new information about it.
-      await this.db
-        .update(opportunityDuplicates)
-        .set({ similarity })
-        .where(
-          and(
-            eq(opportunityDuplicates.opportunityId, low),
-            eq(opportunityDuplicates.duplicateOfId, high),
-            eq(opportunityDuplicates.status, "suspected"),
-          ),
-        );
-    }
+    const notificationIds = await withTransaction(this.db, async (repos) => {
+      const insertedNotificationIds: number[] = [];
+      for (const match of matches) {
+        // Canonical ordering, matching `ux_dup_pair`'s (least, greatest) expression index, so the
+        // mirrored pair is the same key rather than a second row with its own status.
+        const [low, high] =
+          opportunityId < match.id ? [opportunityId, match.id] : [match.id, opportunityId];
+        const similarity = round(match.similarity).toString();
+        const inserted = await repos.duplicatePairs.insertSuspected(low, high, similarity);
+        // Only a suspected pair is refreshed. A dismissal is a judgement, and a re-run of the
+        // detector is not new information about it.
+        await repos.duplicatePairs.refreshSuspected(low, high, similarity);
+
+        // `returning()` is the intent guard: an existing pair is a refresh, not a new event.
+        const pair = inserted;
+        if (pair) {
+          const [left, right] = await Promise.all([
+            loadRowById(repos, pair.opportunityId),
+            loadRowById(repos, pair.duplicateOfId),
+          ]);
+          insertedNotificationIds.push(
+            ...(await recordDuplicateNotifications(repos, {
+              pair,
+              left,
+              right,
+              events: [
+                { kind: "duplicate_suspected", ownerOpportunityId: left.id },
+                { kind: "duplicate_suspected", ownerOpportunityId: right.id },
+              ],
+            })),
+          );
+        }
+      }
+      return insertedNotificationIds;
+    });
+    this.enqueueNotifications(notificationIds);
   }
 
   /**
@@ -347,35 +376,13 @@ export class DedupeService {
   ): Promise<void> {
     const provider = this.provider;
     if (!provider) return;
-    const counterpart = sql`case when ${opportunityDuplicates.opportunityId} = ${opportunityId} then ${opportunityDuplicates.duplicateOfId} else ${opportunityDuplicates.opportunityId} end`;
-
-    const rows = await this.db
-      .select({
-        id: opportunityDuplicates.id,
-        similarity: sql<number>`1 - (${cosineDistanceTo(vector)})`,
-      })
-      .from(opportunityDuplicates)
-      .innerJoin(
-        opportunityEmbeddings,
-        and(
-          sql`${opportunityEmbeddings.opportunityId} = ${counterpart}`,
-          eq(opportunityEmbeddings.model, provider.model),
-          eq(opportunityEmbeddings.providerId, provider.id),
-        ),
-      )
-      .where(
-        and(
-          eq(opportunityDuplicates.status, "suspected"),
-          or(
-            eq(opportunityDuplicates.opportunityId, opportunityId),
-            eq(opportunityDuplicates.duplicateOfId, opportunityId),
-          ),
-        ),
-      );
+    const rows = await this.repos.embeddings.pairSimilarities(opportunityId, vector, {
+      model: provider.model,
+      providerId: provider.id,
+    });
 
     const stale = rows.filter((row) => Number(row.similarity) < threshold).map((row) => row.id);
-    if (stale.length === 0) return;
-    await this.db.delete(opportunityDuplicates).where(inArray(opportunityDuplicates.id, stale));
+    await this.repos.duplicatePairs.deleteByIds(stale);
   }
 
   // ── the backfill job's entry point ─────────────────────────────────────────────
@@ -436,21 +443,10 @@ export class DedupeService {
     let afterId = 0;
 
     while (picked.length < limit) {
-      const page = await this.db
-        .select({
-          row: opportunities,
-          model: opportunityEmbeddings.model,
-          providerId: opportunityEmbeddings.providerId,
-          contentHash: opportunityEmbeddings.contentHash,
-        })
-        .from(opportunities)
-        .leftJoin(opportunityEmbeddings, eq(opportunityEmbeddings.opportunityId, opportunities.id))
-        .where(and(isNull(opportunities.mergedIntoId), gt(opportunities.id, afterId)))
-        .orderBy(asc(opportunities.id))
-        .limit(SCAN_PAGE);
-      if (page.length === 0) break;
+      const page = await this.repos.embeddings.pendingPage(afterId);
+      if (page.rows.length === 0) break;
 
-      for (const entry of page) {
+      for (const entry of page.rows) {
         afterId = entry.row.id;
         if (
           entry.contentHash === null ||
@@ -463,7 +459,7 @@ export class DedupeService {
           if (picked.length >= limit) break;
         }
       }
-      if (page.length < SCAN_PAGE) break;
+      if (!page.hasMore) break;
     }
     return picked;
   }
@@ -474,20 +470,10 @@ export class DedupeService {
     status: "suspected" | "confirmed" | "dismissed" | "merged" | undefined,
     limit = 50,
   ): Promise<DuplicatePairView[]> {
-    // Two distinct references to the same table: a pair names two entries, and Drizzle cannot join
-    // one table twice without an alias.
-    const left = alias(opportunities, "dup_left");
-    const right = alias(opportunities, "dup_right");
-    const rows = await this.db
-      .select({ pair: opportunityDuplicates, left, right })
-      .from(opportunityDuplicates)
-      .innerJoin(left, eq(left.id, opportunityDuplicates.opportunityId))
-      .innerJoin(right, eq(right.id, opportunityDuplicates.duplicateOfId))
-      .where(status === undefined ? undefined : eq(opportunityDuplicates.status, status))
-      .orderBy(desc(opportunityDuplicates.detectedAt), desc(opportunityDuplicates.id))
-      .limit(limit);
+    const rows = await this.repos.duplicatePairs.listForReview(status, limit);
 
     const survivors = await this.survivorIds(
+      this.repos,
       rows.flatMap(({ left: l, right: r }) => [l.mergedIntoId, r.mergedIntoId]),
     );
     return rows.map(({ pair, left: l, right: r }) => toPairView(pair, l, r, survivors));
@@ -500,8 +486,8 @@ export class DedupeService {
     decision: "confirm" | "dismiss",
   ): Promise<DuplicatePairView> {
     const status = decision === "confirm" ? "confirmed" : "dismissed";
-    return this.db.transaction(async (tx) => {
-      const pair = await lockPair(tx, pairId);
+    const committed = await withTransaction(this.db, async (repos) => {
+      const pair = await lockPair(repos, pairId);
       if (pair.status === "merged") {
         throw conflict(
           "already_merged",
@@ -509,13 +495,13 @@ export class DedupeService {
         );
       }
       const now = new Date();
-      const updated = await tx
-        .update(opportunityDuplicates)
-        .set({ status, reviewedBy: reviewerId, reviewedAt: now })
-        .where(eq(opportunityDuplicates.id, pairId))
-        .returning();
-      const next = updated[0] ?? pair;
-      await this.audit.record(tx, {
+      const next =
+        (await repos.duplicatePairs.updateReview(pairId, {
+          status,
+          reviewedBy: reviewerId,
+          reviewedAt: now,
+        })) ?? pair;
+      await repos.audit.record({
         subjectKind: "duplicate",
         subjectId: pairId,
         actorKind: "user",
@@ -524,30 +510,42 @@ export class DedupeService {
         patch: { status: { before: pair.status, after: status } },
       });
       const [left, right] = await Promise.all([
-        loadRowById(tx, next.opportunityId),
-        loadRowById(tx, next.duplicateOfId),
+        loadRowById(repos, next.opportunityId),
+        loadRowById(repos, next.duplicateOfId),
       ]);
-      const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
-      return toPairView(next, left, right, survivors);
+      const notificationIds = await recordDuplicateNotifications(repos, {
+        pair: next,
+        left,
+        right,
+        events: [
+          { kind: `duplicate_${status}`, ownerOpportunityId: left.id },
+          { kind: `duplicate_${status}`, ownerOpportunityId: right.id },
+        ],
+        decidedBy: "reviewer",
+      });
+      const survivors = await this.survivorIds(repos, [left.mergedIntoId, right.mergedIntoId]);
+      return { result: toPairView(next, left, right, survivors), notificationIds };
     });
+    this.enqueueNotifications(committed.notificationIds);
+    return committed.result;
   }
 
   /** Undo a dismissal by returning the pair to the suspected queue. */
   async reopen(reviewerId: number, pairId: number): Promise<DuplicatePairView> {
-    return this.db.transaction(async (tx) => {
-      const pair = await lockPair(tx, pairId);
+    const committed = await withTransaction(this.db, async (repos) => {
+      const pair = await lockPair(repos, pairId);
       const transition = duplicateReopenTransition(pair.status);
       let next = pair;
 
       if (transition === "reopen") {
         const now = new Date();
-        const updated = await tx
-          .update(opportunityDuplicates)
-          .set({ status: "suspected", reviewedBy: reviewerId, reviewedAt: now })
-          .where(eq(opportunityDuplicates.id, pairId))
-          .returning();
-        next = updated[0] ?? pair;
-        await this.audit.record(tx, {
+        next =
+          (await repos.duplicatePairs.updateReview(pairId, {
+            status: "suspected",
+            reviewedBy: reviewerId,
+            reviewedAt: now,
+          })) ?? pair;
+        await repos.audit.record({
           subjectKind: "duplicate",
           subjectId: pairId,
           actorKind: "user",
@@ -558,12 +556,27 @@ export class DedupeService {
       }
 
       const [left, right] = await Promise.all([
-        loadRowById(tx, next.opportunityId),
-        loadRowById(tx, next.duplicateOfId),
+        loadRowById(repos, next.opportunityId),
+        loadRowById(repos, next.duplicateOfId),
       ]);
-      const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
-      return toPairView(next, left, right, survivors);
+      const notificationIds =
+        transition === "reopen"
+          ? await recordDuplicateNotifications(repos, {
+              pair: next,
+              left,
+              right,
+              events: [
+                { kind: "duplicate_reopened", ownerOpportunityId: left.id },
+                { kind: "duplicate_reopened", ownerOpportunityId: right.id },
+              ],
+              decidedBy: "reviewer",
+            })
+          : [];
+      const survivors = await this.survivorIds(repos, [left.mergedIntoId, right.mergedIntoId]);
+      return { result: toPairView(next, left, right, survivors), notificationIds };
     });
+    this.enqueueNotifications(committed.notificationIds);
+    return committed.result;
   }
 
   /**
@@ -585,15 +598,15 @@ export class DedupeService {
     options: { survivorId: string; fields?: string[] },
   ): Promise<MergeResultView> {
     const fields = normalizeFields(options.fields);
-    return this.db.transaction(async (tx) => {
-      const pair = await lockPair(tx, pairId);
+    const committed = await withTransaction(this.db, async (repos) => {
+      const pair = await lockPair(repos, pairId);
       if (pair.status === "merged") {
         throw conflict("already_merged", "that pair has already been merged.");
       }
       // Locked in id order, always, so two reviewers merging overlapping pairs cannot deadlock.
       const ids = [pair.opportunityId, pair.duplicateOfId].sort((a, b) => a - b);
       const locked = new Map<number, OpportunityRow>();
-      for (const id of ids) locked.set(id, await lockOpportunityById(tx, id));
+      for (const id of ids) locked.set(id, await lockOpportunityById(repos, id));
 
       const survivor = [...locked.values()].find((row) => row.publicId === options.survivorId);
       if (!survivor) {
@@ -612,12 +625,7 @@ export class DedupeService {
       // locked above (it is one of `ids`), so nothing else can be mid-way through attaching a NEW
       // dependent to it: doing that requires locking THIS SAME ROW first, which blocks until this
       // transaction commits or rolls back.
-      const dependents = await tx
-        .select({ id: opportunities.id })
-        .from(opportunities)
-        .where(eq(opportunities.mergedIntoId, loser.id))
-        .limit(1);
-      if (dependents.length > 0) {
+      if (await repos.duplicatePairs.hasMergeDependent(loser.id)) {
         throw conflict(
           "loser_has_dependents",
           `${JSON.stringify(loser.publicId)} is itself the survivor of an earlier merge; merging it away would chain that earlier loser through it. Merge the earlier loser directly into ${JSON.stringify(survivor.publicId)} instead.`,
@@ -625,7 +633,7 @@ export class DedupeService {
       }
 
       if (survivor.mergedIntoId !== null) {
-        const real = await loadRowById(tx, survivor.mergedIntoId);
+        const real = await loadRowById(repos, survivor.mergedIntoId);
         throw conflict(
           "survivor_already_merged",
           `${JSON.stringify(survivor.publicId)} was itself merged into ${JSON.stringify(real.publicId)}; merge into that entry instead.`,
@@ -642,14 +650,13 @@ export class DedupeService {
       const now = new Date();
       const copied = copyFields(survivor, loser, fields);
       if (Object.keys(copied.set).length > 0) {
-        const updated = await tx
-          .update(opportunities)
-          .set({ ...copied.set, updatedAt: now })
-          .where(eq(opportunities.id, survivor.id))
-          .returning();
+        const updated = await repos.duplicatePairs.updateOpportunity(survivor.id, {
+          ...copied.set,
+          updatedAt: now,
+        });
         // Inside the transaction, so a merge that would leave the survivor non-conformant does not
         // happen at all rather than happening and being noticed later.
-        const { valid, errors } = validateOpportunity(toStandard(updated[0] ?? survivor));
+        const { valid, errors } = validateOpportunity(toStandard(updated ?? survivor));
         if (!valid) {
           throw conflict(
             "merge_would_invalidate_survivor",
@@ -658,23 +665,18 @@ export class DedupeService {
         }
       }
 
-      await tx
-        .update(opportunities)
-        .set({
-          reviewStatus: "rejected",
-          isListed: false,
-          status: "archived",
-          mergedIntoId: survivor.id,
-          mergedFromPublic: loser.reviewStatus === "approved" && loser.isListed,
-          updatedAt: now,
-        })
-        .where(eq(opportunities.id, loser.id));
+      await repos.duplicatePairs.markMergedAway(loser.id, {
+        survivorId: survivor.id,
+        mergedFromPublic: loser.reviewStatus === "approved" && loser.isListed,
+        updatedAt: now,
+      });
 
-      const updatedPair = await tx
-        .update(opportunityDuplicates)
-        .set({ status: "merged", reviewedBy: reviewerId, reviewedAt: now })
-        .where(eq(opportunityDuplicates.id, pairId))
-        .returning();
+      const pairRow =
+        (await repos.duplicatePairs.updateReview(pairId, {
+          status: "merged",
+          reviewedBy: reviewerId,
+          reviewedAt: now,
+        })) ?? pair;
 
       // One row on EACH entry. "This absorbed that" and "this was absorbed into that" are different
       // facts, and each trail is read on its own entry's page.
@@ -690,7 +692,7 @@ export class DedupeService {
           },
         ],
       ] as const) {
-        await this.audit.record(tx, {
+        await repos.audit.record({
           subjectKind: "opportunity",
           subjectId: subject,
           actorKind: "user",
@@ -700,82 +702,86 @@ export class DedupeService {
         });
       }
 
-      const pairRow = updatedPair[0] ?? pair;
       // Re-read both sides rather than reconstructing them: the loser's row was just rewritten, and
       // a view assembled from the pre-update copy would report the state the merge replaced.
       const [left, right] = await Promise.all([
-        loadRowById(tx, pairRow.opportunityId),
-        loadRowById(tx, pairRow.duplicateOfId),
+        loadRowById(repos, pairRow.opportunityId),
+        loadRowById(repos, pairRow.duplicateOfId),
       ]);
+      const notificationIds = await recordDuplicateNotifications(repos, {
+        pair: pairRow,
+        left,
+        right,
+        events: [
+          { kind: "duplicate_merged_away", ownerOpportunityId: loser.id },
+          { kind: "duplicate_absorbed", ownerOpportunityId: survivor.id },
+        ],
+        decidedBy: "reviewer",
+      });
       const survivors = new Map([[survivor.id, survivor.publicId]]);
       return {
-        pair: toPairView(pairRow, left, right, survivors),
-        survivorId: survivor.publicId,
-        mergedId: loser.publicId,
-        copiedFields: copied.fields,
+        result: {
+          pair: toPairView(pairRow, left, right, survivors),
+          survivorId: survivor.publicId,
+          mergedId: loser.publicId,
+          copiedFields: copied.fields,
+        },
+        notificationIds,
       };
     });
+    this.enqueueNotifications(committed.notificationIds);
+    return committed.result;
+  }
+
+  /** The transaction is committed before this is called; queue failures cannot change its answer. */
+  private enqueueNotifications(notificationIds: readonly number[]): void {
+    try {
+      this.notificationQueue.enqueue(notificationIds);
+    } catch {
+      // A custom/test adapter gets the same best-effort contract as the production queue.
+    }
   }
 
   private async loadRow(opportunityId: number): Promise<OpportunityRow> {
-    return loadRowById(this.db, opportunityId);
+    return loadRowById(this.repos, opportunityId);
   }
 
   /** Public ids for a set of `merged_into_id` values, so a side can name its survivor. */
-  private async survivorIds(ids: (number | null)[]): Promise<Map<number, string>> {
+  private async survivorIds(
+    repos: Repositories,
+    ids: (number | null)[],
+  ): Promise<Map<number, string>> {
     const wanted = [...new Set(ids.filter((id): id is number => id !== null))];
     if (wanted.length === 0) return new Map();
-    const rows = await this.db
-      .select({ id: opportunities.id, publicId: opportunities.publicId })
-      .from(opportunities)
-      .where(inArray(opportunities.id, wanted));
-    return new Map(rows.map((row) => [row.id, row.publicId]));
+    return repos.duplicatePairs.survivorPublicIds(wanted);
   }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────────
-type DbLike = DB | Tx;
+async function recordDuplicateNotifications(
+  repos: Repositories,
+  input: RecordDuplicateNotificationsInput,
+): Promise<number[]> {
+  const values = await duplicateNotificationInserts(repos, input);
+  return repos.notifications.recordDuplicate(values);
+}
 
-async function loadRowById(db: DbLike, id: number): Promise<OpportunityRow> {
-  const rows = await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1);
-  const row = rows[0];
+async function loadRowById(repos: Repositories, id: number): Promise<OpportunityRow> {
+  const row = await repos.opportunities.findById(id);
   if (!row) throw notFound(`no opportunity ${id}.`);
   return row;
 }
 
-async function lockOpportunityById(tx: Tx, id: number): Promise<OpportunityRow> {
-  const rows = await tx
-    .select()
-    .from(opportunities)
-    .where(eq(opportunities.id, id))
-    .for("update")
-    .limit(1);
-  const row = rows[0];
+async function lockOpportunityById(repos: Repositories, id: number): Promise<OpportunityRow> {
+  const row = await repos.opportunities.lockById(id);
   if (!row) throw notFound(`no opportunity ${id}.`);
   return row;
 }
 
-async function lockPair(tx: Tx, pairId: number) {
-  const rows = await tx
-    .select()
-    .from(opportunityDuplicates)
-    .where(eq(opportunityDuplicates.id, pairId))
-    .for("update")
-    .limit(1);
-  const row = rows[0];
+async function lockPair(repos: Repositories, pairId: number): Promise<OpportunityDuplicateRow> {
+  const row = await repos.duplicatePairs.lockById(pairId);
   if (!row) throw notFound(`no duplicate pair ${pairId}.`);
   return row;
-}
-
-/**
- * `embedding <=> $vector::vector` — pgvector's cosine distance, which the HNSW index answers.
- *
- * The vector is bound as ONE text parameter and cast, never interpolated: 1 536 inlined floats
- * would be a query the planner has to re-parse every time, and a bound parameter is what keeps the
- * index scan available.
- */
-function cosineDistanceTo(vector: number[]): SQL<number> {
-  return sql<number>`${opportunityEmbeddings.embedding} <=> ${toVectorLiteral(vector)}::vector`;
 }
 
 /** Three decimals. A similarity is read by a human and compared to a threshold, not accumulated. */

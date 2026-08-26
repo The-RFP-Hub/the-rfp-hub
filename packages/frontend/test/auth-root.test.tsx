@@ -1,7 +1,7 @@
 import { useSignInOpener } from "@/lib/auth-root";
 import { AuthRoot } from "@/lib/auth-root";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/SignIn", () => ({
@@ -10,7 +10,13 @@ vi.mock("@/components/SignIn", () => ({
       <h2 id="signin-heading">Log in</h2>
       <label htmlFor="signin-email">Email address</label>
       <input id="signin-email" />
-      <button type="button" onClick={onSignedIn}>
+      <button
+        type="button"
+        onClick={() => {
+          window.dispatchEvent(new Event("auth-root-test-complete"));
+          onSignedIn?.();
+        }}
+      >
         Complete sign-in
       </button>
     </div>
@@ -67,6 +73,25 @@ function RefreshingOpener() {
       }}
     >
       Log in here
+    </button>
+  );
+}
+
+function LogoutCycleOpener() {
+  const openSignIn = useSignInOpener();
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    const complete = () => setSignedIn(true);
+    window.addEventListener("auth-root-test-complete", complete);
+    return () => window.removeEventListener("auth-root-test-complete", complete);
+  }, []);
+  return signedIn ? (
+    <button type="button" onClick={() => setSignedIn(false)}>
+      Log out
+    </button>
+  ) : (
+    <button type="button" onClick={openSignIn}>
+      Log in after logout
     </button>
   );
 }
@@ -157,5 +182,29 @@ describe("the sign-in dialog", () => {
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog.hasAttribute("open")).toBe(true));
     expect(document.activeElement).toBe(screen.getByLabelText("Email address"));
+  });
+
+  it("opens again from a real handler after sign-in replaces the opener and logout restores it", async () => {
+    const showModal = vi.spyOn(HTMLDialogElement.prototype, "showModal");
+    render(
+      <AuthRoot apiBaseUrl="https://api.example.com">
+        <main id="main-content" tabIndex={-1}>
+          <LogoutCycleOpener />
+        </main>
+      </AuthRoot>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Log in after logout" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Complete sign-in" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Log out" }));
+    const login = await screen.findByRole("button", { name: "Log in after logout" });
+    // This dispatches through the real mounted handler. The Playwright companion covers browser
+    // hit-testing and native dialog inertness, which jsdom does not implement.
+    fireEvent.click(login);
+    const reopened = await screen.findByRole("dialog");
+    expect(reopened.hasAttribute("open")).toBe(true);
+    expect(showModal).toHaveBeenCalledTimes(2);
   });
 });

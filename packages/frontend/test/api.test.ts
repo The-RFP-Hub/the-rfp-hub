@@ -171,6 +171,23 @@ describe("createApiClient", () => {
     expect(calls[0]?.init.body).toBeUndefined();
   });
 
+  it("lists and settles notifications on the account routes without inventing request bodies", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ items: [], unreadCount: 0 }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.me.notifications({ unread: true, page: 2, limit: 20 });
+    await api.me.readNotification(17);
+    await api.me.readAllNotifications();
+
+    expect(calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["GET", "https://api.example.com/v1/me/notifications?unread=true&page=2&limit=20"],
+      ["POST", "https://api.example.com/v1/me/notifications/17/read"],
+      ["POST", "https://api.example.com/v1/me/notifications/read-all"],
+    ]);
+    expect(calls[1]?.init.body).toBeUndefined();
+    expect(calls[2]?.init.body).toBeUndefined();
+  });
+
   it("lists, creates and revokes membership invites on the reviewer organization route", async () => {
     const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
     const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });

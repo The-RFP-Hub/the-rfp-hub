@@ -351,6 +351,31 @@ describe("rendering the task definition", () => {
     expect(container.image).toBe("new-image");
   });
 
+  it("--set writes workflow-owned settings on top of the secret's, and refuses a secrets: name", () => {
+    const withSecret = () =>
+      taskDefinition({ secrets: [{ name: "DATABASE_URL", valueFrom: "arn:…" }] });
+    const { taskDefinition: out } = injectContainerEnv(withSecret(), {
+      container: "rfp-hub-staging",
+      image: "new-image",
+      environment: [
+        { name: "APP_BASE_URL", value: "https://from-the-secret" },
+        { name: "LOG_LEVEL", value: "info" },
+      ],
+      set: [{ name: "APP_BASE_URL", value: "https://app.example" }],
+    });
+    expect(out.containerDefinitions[0].environment).toEqual([
+      { name: "LOG_LEVEL", value: "info" },
+      { name: "APP_BASE_URL", value: "https://app.example" },
+    ]);
+    const base = { container: "rfp-hub-staging", image: "new-image" };
+    expect(() =>
+      injectContainerEnv(withSecret(), { ...base, set: [{ name: "DATABASE_URL", value: "x" }] }),
+    ).toThrow(/collides with the container's secrets: array/);
+    expect(() =>
+      injectContainerEnv(taskDefinition(), { ...base, set: [{ name: "1BAD", value: "x" }] }),
+    ).toThrow(/invalid environment variable name/);
+  });
+
   it("refuses a document ECS would reject for size", () => {
     const big = [{ name: "HUGE", value: "x".repeat(MAX_TASK_DEFINITION_BYTES) }];
     expect(() => render(taskDefinition(), big)).toThrow(/ECS accepts at most/);

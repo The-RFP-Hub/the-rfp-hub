@@ -117,7 +117,7 @@ export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; childre
     <SignInContext.Provider value={openSignIn}>
       <ApiClientProvider value={api}>
         {children}
-        {open ? <SignInDialog apiBaseUrl={apiBaseUrl} onClosed={closeSignIn} /> : null}
+        <SignInDialog apiBaseUrl={apiBaseUrl} open={open} onRequestClose={closeSignIn} />
       </ApiClientProvider>
     </SignInContext.Provider>
   );
@@ -142,51 +142,75 @@ function firstFocusableInside(scope: HTMLElement, exclude: HTMLElement | null): 
 
 function SignInDialog({
   apiBaseUrl,
-  onClosed,
+  open,
+  onRequestClose,
 }: {
   apiBaseUrl: string;
-  onClosed: (reason: "dismiss" | "signed-in") => void;
+  open: boolean;
+  onRequestClose: (reason: "dismiss" | "signed-in") => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const closeReason = useRef<"dismiss" | "signed-in">("dismiss");
 
+  /*
+   * KEEP THE DIALOG NODE MOUNTED AND MAKE REACT STATE AUTHORITATIVE.
+   *
+   * The former lifecycle mounted the node on `open=true`, called `dialog.close()`, and waited for
+   * the browser's later `close` event before changing React state. A sign-in refresh can replace the
+   * header opener in between those two authorities. In Chromium that left a detached/stale modal in
+   * the top layer: the visible panel was gone, but the page stayed inert, so a real pointer click on
+   * the post-logout Log in button never reached React (while `button.click()` still did).
+   *
+   * There is now one long-lived dialog shell. A requested close changes React state synchronously;
+   * this layout effect performs the matching top-layer transition before paint. The form itself is
+   * conditional below, so every new opening still starts with fresh sign-in state.
+   */
   useLayoutEffect(() => {
     const element = dialog.current;
     if (!element) return;
-    if (!element.open) element.showModal();
-    element.querySelector<HTMLInputElement>("#signin-email")?.focus();
+    if (open) {
+      if (!element.open) element.showModal();
+      element.querySelector<HTMLInputElement>("#signin-email")?.focus();
+    } else if (element.open) {
+      element.close();
+    }
+  }, [open]);
+
+  // AuthRoot normally lives for the page's lifetime. If that changes, never leave its modal in the
+  // browser top layer while React removes the node that owned it.
+  useLayoutEffect(() => {
+    const element = dialog.current;
     return () => {
-      if (element.open) element.close();
+      if (element?.open) element.close();
     };
   }, []);
-
-  const close = (reason: "dismiss" | "signed-in") => {
-    closeReason.current = reason;
-    dialog.current?.close();
-  };
 
   return (
     <dialog
       ref={dialog}
       className="card overlay-panel"
       aria-labelledby="signin-heading"
+      aria-hidden={open ? undefined : true}
       onCancel={(event) => {
         event.preventDefault();
-        close("dismiss");
+        onRequestClose("dismiss");
       }}
       onClose={() => {
-        // React Strict Mode replays layout effects in development. Its cleanup closes this dialog,
-        // but the browser queues that close event until after the replay has reopened it. Ignore
-        // that stale event; a real dismissal always reaches this handler with `open === false`.
-        if (!dialog.current?.open) onClosed(closeReason.current);
+        // Covers an unexpected native close without letting the delayed event become the primary
+        // state transition. A close performed by the `open=false` effect is already represented;
+        // if its queued event arrives after a fast reopen, the live dialog is open and must stay so.
+        if (open && !dialog.current?.open) onRequestClose("dismiss");
       }}
     >
-      <SignIn apiBaseUrl={apiBaseUrl} onSignedIn={() => close("signed-in")} />
-      <p>
-        <button type="button" onClick={() => close("dismiss")}>
-          Close
-        </button>
-      </p>
+      {open ? (
+        <>
+          <SignIn apiBaseUrl={apiBaseUrl} onSignedIn={() => onRequestClose("signed-in")} />
+          <p>
+            <button type="button" onClick={() => onRequestClose("dismiss")}>
+              Close
+            </button>
+          </p>
+        </>
+      ) : null}
     </dialog>
   );
 }

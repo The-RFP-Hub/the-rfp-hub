@@ -30,10 +30,10 @@ import { config as defaultConfig } from "../config.js";
 import { authAccount, authSession, authUser, authVerification } from "../db/auth-schema.js";
 import { type DB, db as defaultDb } from "../db/client.js";
 import {
-  type EmailTransport,
-  createEmailTransport,
+  EmailService,
+  type OutboundEmailPort,
   recipientFingerprint,
-} from "./email-transport.js";
+} from "../modules/services/email/email.service.js";
 
 /** Exactly the configuration this module reads — so a test can build one without the whole app's. */
 export interface AuthConfig {
@@ -68,11 +68,8 @@ const consoleLogger: AuthLogger = {
 export interface CreateAuthOptions {
   db?: DB;
   config?: AuthConfig;
-  /**
-   * The transport, when the caller needs to hold the same instance it injected — which is what
-   * makes the in-memory transport readable by an integration test.
-   */
-  transport?: EmailTransport;
+  /** Test/composition seam. Production uses the central email service from configuration. */
+  email?: OutboundEmailPort;
   /** Where a delivery failure is reported. Defaults to stderr, which is what the deployment reads. */
   logger?: AuthLogger;
   production?: boolean;
@@ -125,7 +122,7 @@ export function createAuth(options: CreateAuthOptions = {}) {
   const db = options.db ?? defaultDb;
   const cfg = options.config ?? defaultConfig;
   const production = options.production ?? process.env.NODE_ENV === "production";
-  const transport = options.transport ?? createEmailTransport(cfg.email, production);
+  const outboundEmail = options.email ?? new EmailService({ config: cfg.email, production });
   const logger = options.logger ?? consoleLogger;
   const google = googleConfigured(cfg.google);
 
@@ -212,13 +209,14 @@ export function createAuth(options: CreateAuthOptions = {}) {
           // NOT AWAITED, deliberately: awaiting the provider makes the response time a function of
           // whether the address exists and how the provider felt about it, which is an enumeration
           // oracle. A send that fails is a code that never arrives — the user asks for another.
-          void transport
+          void outboundEmail
             .send({
               to: email,
               subject: subjectFor(type),
               text: `Your RFP Hub code is ${otp}. It expires in ${OTP_EXPIRES_IN / 60} minutes.\n\nIf you did not ask for it, nothing has happened to your account and you can ignore this message.`,
             })
-            .catch((error: unknown) => {
+            .then((result) => {
+              if (result.status === "sent") return;
               // NOT SWALLOWED — reported. The response has already gone out (that is the point of
               // not awaiting), so this is the ONLY place a delivery failure can surface: a bad IAM
               // policy, an exhausted quota or a missing key would otherwise stop every sign-in in
@@ -231,11 +229,10 @@ export function createAuth(options: CreateAuthOptions = {}) {
               // the code itself never appears, here or anywhere else.
               logger.error(
                 {
-                  transport: transport.kind,
                   recipient: recipientFingerprint(email),
                   otpType: type,
-                  error: error instanceof Error ? error.name : typeof error,
-                  reason: error instanceof Error ? error.message : String(error),
+                  error: result.error,
+                  reason: result.reason,
                 },
                 "sign-in code could not be delivered",
               );

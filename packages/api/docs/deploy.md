@@ -69,6 +69,10 @@ Manager entry into JSON keys, write the `secrets` array, grant the execution rol
 `secretsmanager:GetSecretValue` on it. The repository's own alternative was leaving the values in a
 public repository's layer cache, so the interim was taken deliberately.
 
+One entry is the workflow's rather than the secret's: `APP_BASE_URL` comes from the
+`<ENV>_APP_BASE_URL` repository variable and is written on top of the secret's entries (`--set` in
+the render step), so the value in the task definition is always the one the variable holds.
+
 What it costs:
 
 * every value is readable by any principal that can call `ecs:DescribeTaskDefinition` in the
@@ -114,6 +118,7 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 |---|---|---|
 | `NODE_ENV` | `production` | Also what makes `VERIFY_ALLOW_PRIVATE_HOSTS` and the non-delivering email transports refuse to boot |
 | `BETTER_AUTH_URL` | the API's own origin | The base every auth route and OAuth callback is built from. **Not** `PUBLIC_BASE_URL`, which is the OpenAPI document's `servers[0].url` and may legitimately differ |
+| `APP_BASE_URL` | the frontend's canonical origin | Required in production. The one origin placed in notification-email links; never inferred from the API's `PUBLIC_BASE_URL` or the preview-capable `TRUSTED_ORIGINS` list. The deploy workflows read `<ENV>_APP_BASE_URL` from repository variables and write it into the ECS task definition, which the dispatcher task then inherits |
 | `TRUSTED_ORIGINS` | the frontend's origin(s) — `https://ethrfps.app` in production, `https://staging.ethrfps.app` in staging | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart. The production frontend is the **apex**: it is the spec's site, and it proxies `/schemas/`, `/meta/`, `/registries/` and `/ns/` back to this service ([`adr/0007`](../../../adr/0007-canonical-domain-and-spec-identity.md)) |
 | `PREVIEW_ORIGIN_PATTERN` | staging only | An **anchored** regular expression for preview origins, tied to our project *and* team slug. Never `*.vercel.app`. Unanchored → refuses to boot |
 | `EMAIL_TRANSPORT` | `ses` or `mailgun` | How sign-in codes are delivered. Those two are the delivering transports; `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
@@ -130,6 +135,7 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `EMBEDDING_PROVIDER` | `lexical` \| `disabled` | Needs no key and no network — the in-process lexical featurizer is the default and the detector everywhere, CI included |
 | `DEDUPE_SIMILARITY_THRESHOLD` | per-provider default | Thresholds are **not** comparable between providers |
 | `DEDUPE_MAX_MATCHES` | `5` | |
+| `NOTIFICATION_QUEUE_MAX` | `100` | Waiting immediate email ids; full → reject the newest id to the nightly durable sweep |
 | `VERIFICATION_ENABLED` | `true` | |
 | `VERIFY_ON_SUBMIT` | `true` | Off in tests |
 | `VERIFY_TIMEOUT_MS` | `10000` | |
@@ -184,6 +190,15 @@ and DMARC records. Then, whichever one you run:
   (`mg.ethrfps.app`), not `EMAIL_FROM`'s domain — an unverified or merely mistyped domain is a 401
   on every message. Set `MAILGUN_API_BASE` if the account is in the EU region; the endpoints are
   different hosts holding different accounts, and the default is the US one.
+
+All senders go through the central outbound-email port. Better-Auth composes OTP content in its
+adapter; the duplicate domain composes notification content; neither selects a provider or controls
+the envelope sender. Newly committed duplicate notifications enter a bounded, best-effort
+in-process queue, which joins `auth_user` for the address and attempts delivery immediately without
+making the request wait. `notification-dispatch` is the daily backstop in the nightly maintenance
+chain ([`jobs.md`](./jobs.md) §2); it retries temporary failures three times with a five-minute
+floor. Provider refusals are recorded on the durable row rather than thrown through either the
+request or the job.
 
 ---
 
@@ -334,8 +349,9 @@ nobody discovers it during an incident.
 ## 6. Running the maintenance jobs
 
 The nightly maintenance work runs as **one-off tasks on the API service's own task definition** —
-not a dedicated one — started by `.github/workflows/jobs-nightly.yml` with the credentials the
-deploy workflows already hold:
+not a dedicated one. The nightly chain is scheduled **outside this repository**
+([`jobs.md`](./jobs.md) §2 and §4d); `.github/workflows/jobs-nightly.yml` is the operator's
+dispatch path to the same tasks, with the credentials the deploy workflows already hold:
 
 ```sh
 node packages/api/dist/jobs.js <job> --json      # inside the image, as a container override
@@ -344,9 +360,12 @@ node packages/api/dist/jobs.js <job> --json      # inside the image, as a contai
 A job is the deployed image with a different command, so it inherits everything already assembled
 in the service's task definition — the image, the runtime `DATABASE_URL`, every secret in
 `secrets:` (§2), the execution and task roles — and the deploy workflows keep it current
-automatically; there is no second copy of that list to fall out of step. Subnets, security groups
-and launch type are not configured either: `run-ecs-job.sh` reads them off the running service with
-`aws ecs describe-services` at task-start time, so the job lands exactly where the API lands.
+automatically; there is no second copy of that list to fall out of step. Placement is not configured
+either: `run-ecs-job.sh` reads the launch type (or capacity provider strategy) and the placement
+constraints off the running service with `aws ecs describe-services` at task-start time, and passes
+them verbatim, so the job lands exactly where the API lands. **The deployment runs EC2 with `bridge`
+networking and the runner assumes that** — it passes no `--network-configuration`, because there is
+none to pass.
 
 There is **no public job endpoint and no shared job token**, deliberately: a credential that can
 start a job has to live somewhere, and a token in repository secrets that the internet-facing API
@@ -356,17 +375,19 @@ credential.
 
 ### Operator prerequisites
 
-One variable **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
-from its `environment` input — which is empty on the schedule and therefore `production`, matching
-the deployment the open-data export reads. The credentials are picked the same way
-(`<ENV>_AWS_ACCESS_KEY_ID` / `<ENV>_AWS_SECRET_ACCESS_KEY`), so a scheduled maintenance chain
-authenticates exactly as `production.yml` does.
+Two repository variables are configured **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
+from its `environment` input — which defaults to `production`, the deployment the open-data export
+reads. The credentials are picked the same way (`<ENV>_AWS_ACCESS_KEY_ID` /
+`<ENV>_AWS_SECRET_ACCESS_KEY`), so a maintenance run authenticates exactly as `production.yml`
+does.
 
 | Repository variable | What it names |
 |---|---|
 | `<ENV>_ECS_CLUSTER` | The cluster the one-off task runs in — the **same** variable `<env>.yml` already requires to deploy the service, so any deployed environment has already set it |
+| `<ENV>_APP_BASE_URL` | Canonical HTTPS frontend origin. The API deploy writes it into the service task definition; notification-dispatch reuses that definition |
 
-That is the only repository variable the chain needs. The task definition family
+The workflow reads only the cluster variable directly; `APP_BASE_URL` reaches it through the
+service task definition. The task definition family
 (`rfp-hub-<env>`), the container name and the service (`rfp-hub-<env>-service`) are the names the
 deploy workflows already hardcode; `run-ecs-job.sh` derives them from `<env>` rather than reading a
 second copy of them from configuration.
@@ -377,12 +398,11 @@ Registering a task definition and updating a service — which the deploy workfl
 does not imply the right to start a task from it. This is likely already granted, since the same
 user is the one registering the task definition being started.
 
-Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, the
-scheduled run announces a `::warning::` and stays green — the open-data export is chained to that
-workflow, and failing over a resource that has never existed would stop the dataset publishing. A
-**manual `workflow_dispatch` fails instead**, so an operator validating the wiring gets a real
-answer, and the message names what is missing. Prove it with one dispatch per environment before
-relying on the schedule.
+Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, a
+**dispatch fails** and the message names what is missing — an operator validating the wiring gets a
+real answer rather than a green run that did nothing. (`run-ecs-job.sh` keeps a warn-and-stay-green
+branch for a caller that is a schedule; this workflow never takes it.) Prove it with one dispatch
+per environment before pointing the external scheduler at the same tasks.
 
 ### A dedicated task definition is optional
 

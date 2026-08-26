@@ -1,0 +1,195 @@
+/**
+ * Durable in-app notifications, written with the transaction that produced the event.
+ *
+ * Duplicate payloads contain facts only. Human-facing sentences and action labels belong to the
+ * frontend presentation vocabulary, where copy can change without rewriting stored rows. A
+ * counterpart is named only while it is approved and listed at emission time; otherwise even an
+ * owner-visible pending row is coarsened to an unnamed "other submission" by presentation.
+ */
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import type {
+  NotificationRow,
+  OpportunityDuplicateRow,
+  OpportunityRow,
+  notificationKind,
+} from "../../../db/schema.js";
+import {
+  type NotificationInsert,
+  type Repositories,
+  repositories,
+} from "../../repositories/index.js";
+import type {
+  DuplicateNotificationPayloadView,
+  NotificationListView,
+  NotificationReadAllView,
+  NotificationView,
+} from "../../shared/api-views.js";
+import { notFound } from "../../shared/http-error.js";
+import { paginate } from "../../shared/pagination.js";
+import { mergeOpportunityOwnerAccountIds } from "../opportunities/opportunity-ownership.js";
+
+export type NotificationKind = (typeof notificationKind.enumValues)[number];
+export type DuplicateNotificationAction = "review_match" | "view_match" | "view_survivor";
+
+export interface DuplicateNotificationPayload {
+  pairId: number;
+  similarity: number | null;
+  yourListing: { id: string; title: string };
+  otherListing?: { id: string; title: string };
+  action: DuplicateNotificationAction;
+  link: string;
+  decidedBy: "reviewer" | null;
+}
+
+export interface DuplicateNotificationEvent {
+  kind: NotificationKind;
+  /** Owners of this side receive the event; duplicate account ids are collapsed before insert. */
+  ownerOpportunityId: number;
+}
+
+export interface RecordDuplicateNotificationsInput {
+  pair: OpportunityDuplicateRow;
+  left: OpportunityRow;
+  right: OpportunityRow;
+  events: DuplicateNotificationEvent[];
+  decidedBy?: "reviewer";
+}
+
+export interface NotificationListQuery {
+  unread?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+/**
+ * Build the owner-side notification rows for a duplicate event.
+ *
+ * Recipient discovery uses the caller's executor-bound bundle, so every membership read remains in
+ * the same transaction as the pair mutation. Persistence is deliberately left to the caller's
+ * `repos.notifications.recordDuplicate(...)` call.
+ */
+export async function duplicateNotificationInserts(
+  repos: Repositories,
+  input: RecordDuplicateNotificationsInput,
+): Promise<NotificationInsert[]> {
+  const sides = new Map([
+    [input.left.id, input.left],
+    [input.right.id, input.right],
+  ]);
+  const recipients = new Map<
+    string,
+    { accountId: number; kind: NotificationKind; yours: OpportunityRow; other: OpportunityRow }
+  >();
+
+  for (const event of input.events) {
+    const yours = sides.get(event.ownerOpportunityId);
+    if (!yours) {
+      throw new Error(
+        `notification event side ${event.ownerOpportunityId} is not in duplicate pair ${input.pair.id}`,
+      );
+    }
+    const other = yours.id === input.left.id ? input.right : input.left;
+    const memberAccountIds =
+      yours.sourcePublisher === null
+        ? []
+        : await repos.memberships.accountIdsForOrgSlug(yours.sourcePublisher);
+    for (const accountId of mergeOpportunityOwnerAccountIds(yours, memberAccountIds)) {
+      const key = `${accountId}:${event.kind}`;
+      if (!recipients.has(key)) recipients.set(key, { accountId, kind: event.kind, yours, other });
+    }
+  }
+
+  return [...recipients.values()].map(({ accountId, kind, yours, other }) => ({
+    accountId,
+    kind,
+    subjectKind: "duplicate",
+    subjectId: input.pair.id,
+    payload: duplicatePayload(input, kind, yours, other) as unknown as Record<string, unknown>,
+  }));
+}
+
+export class NotificationService {
+  private readonly repos: Repositories;
+
+  constructor(db: DB = defaultDb) {
+    this.repos = repositories(db);
+  }
+
+  /** Account-scoped inbox, newest first, plus a count the chrome can render without a second API. */
+  async listForAccount(
+    accountId: number,
+    query: NotificationListQuery = {},
+  ): Promise<NotificationListView> {
+    const { page, limit, offset } = paginate(query.page ?? 1, query.limit ?? 20);
+    const result = await this.repos.notifications.listForAccount(
+      accountId,
+      query.unread,
+      limit,
+      offset,
+    );
+    const total = result.total;
+    return {
+      items: result.rows.map(toNotificationView),
+      page,
+      limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      unreadCount: result.unread,
+    };
+  }
+
+  /** Idempotently mark one owned notification read without moving its original read timestamp. */
+  async markRead(accountId: number, notificationId: number): Promise<NotificationView> {
+    const row = await this.repos.notifications.markRead(accountId, notificationId);
+    if (!row) throw notFound(`no notification ${notificationId} of yours.`);
+    return toNotificationView(row);
+  }
+
+  /** Settle every currently unread row for this account in one statement. */
+  async markAllRead(accountId: number): Promise<NotificationReadAllView> {
+    const markedRead = await this.repos.notifications.markAllRead(accountId);
+    return { markedRead, unreadCount: 0 };
+  }
+}
+
+function toNotificationView(row: NotificationRow): NotificationView {
+  // Delivery attempts are operational state for the job, not part of the account-facing domain
+  // payload. Keep the API response stable even while a failed email is waiting for its retry.
+  const payload = Object.fromEntries(
+    Object.entries(row.payload).filter(([key]) => key !== "emailDelivery"),
+  );
+  return {
+    id: row.id,
+    kind: row.kind,
+    subjectKind: "duplicate",
+    subjectId: row.subjectId,
+    payload: payload as unknown as DuplicateNotificationPayloadView,
+    createdAt: row.createdAt.toISOString(),
+    readAt: row.readAt?.toISOString() ?? null,
+  };
+}
+
+function duplicatePayload(
+  input: RecordDuplicateNotificationsInput,
+  kind: NotificationKind,
+  yours: OpportunityRow,
+  other: OpportunityRow,
+): DuplicateNotificationPayload {
+  const publicOther = other.reviewStatus === "approved" && other.isListed;
+  const viewSurvivor = kind === "duplicate_merged_away" && publicOther;
+  const action: DuplicateNotificationAction = viewSurvivor
+    ? "view_survivor"
+    : kind === "duplicate_suspected" || kind === "duplicate_reopened"
+      ? "review_match"
+      : "view_match";
+
+  return {
+    pairId: input.pair.id,
+    similarity: input.pair.similarity === null ? null : Number(input.pair.similarity),
+    yourListing: { id: yours.publicId, title: yours.title },
+    ...(publicOther ? { otherListing: { id: other.publicId, title: other.title } } : {}),
+    action,
+    link: viewSurvivor ? `/opportunities/${encodeURIComponent(other.publicId)}` : "/duplicates",
+    decidedBy: input.decidedBy ?? null,
+  };
+}

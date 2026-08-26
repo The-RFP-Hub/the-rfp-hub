@@ -1,12 +1,14 @@
 # Scheduled jobs — schedule, guarantees and runbook
 
-The maintenance work the request path deliberately does not do: settling yesterday's analytics,
-catching up on embeddings and source checks, and closing listings that have stopped being
-opportunities.
+The background work the request path deliberately does not wait for: settling yesterday's
+analytics, catching up on embeddings and source checks, closing stale listings, and sweeping
+durable notification email that the API's immediate in-process trigger missed.
 
-Everything here is implemented in `src/modules/services/jobs/*`, started by
-`scripts/jobs/run-job.ts` (built as `dist/jobs.js`) and scheduled by
-`.github/workflows/jobs-nightly.yml`.
+Everything here is implemented in `src/modules/services/jobs/*` and started by
+`scripts/jobs/run-job.ts` (built as `dist/jobs.js`). The nightly chain is **scheduled outside this
+repository** (§2); `.github/workflows/jobs-nightly.yml` is the operator's dispatch path to the same
+entry point. Notification email also has a bounded post-commit trigger in the API process; it calls
+the same dispatcher for the newly inserted row ids without invoking a job.
 
 ---
 
@@ -19,10 +21,14 @@ Everything here is implemented in `src/modules/services/jobs/*`, started by
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. |
+| `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 
 The list lives in exactly one place — `src/modules/services/jobs/registry.ts` — which the runner,
 the admin route and this table all read. A name that is not in it is refused by both callers rather
 than starting a container task that quietly does nothing.
+
+These names, and the exit codes and `--json` shape that go with them, are what a caller outside this
+repository depends on; §4d states that contract in one place.
 
 ### Cursor vs sweep, and why the distinction is load-bearing
 
@@ -50,7 +56,7 @@ stop and let tomorrow's run try again.
 | Value | Means |
 |---|---|
 | `locked` | Another run of the **same** job holds the database advisory lock. Added by the runner. |
-| anything else | The job's **feature** is not configured — no embedding provider, `VERIFICATION_ENABLED=false`. Reported by the job itself. |
+| anything else | The job's **feature** is not configured — no embedding provider, `VERIFICATION_ENABLED=false`, or no delivering email transport. Reported by the job itself. |
 
 Both exit `0`. Only one of them is a statement about configuration, which is why a runner that
 collapsed them would report a permanently unconfigured job as healthy contention.
@@ -59,53 +65,76 @@ collapsed them would report a permanently unconfigured job as healthy contention
 
 ## 2. The schedule, and the ordering it exists to guarantee
 
-**One cron, `5 1 * * *`**, in `.github/workflows/jobs-nightly.yml`. The four independent jobs run in
-parallel; **`staleness` runs after them**; and the open-data export
-(`.github/workflows/nightly-export.yml`) is triggered by this workflow **completing successfully**.
+**One schedule owns the whole chain, and it is not in this repository.** An external scheduler runs
+the six jobs at **01:05 UTC**. They carry **one ordering rule** between them: the five below are
+independent and may run in any order or in parallel; `staleness` runs **after all of them**.
 
 ```
-              ┌─ analytics-rollup ──────┐
-              ├─ retention ─────────────┤
-5 1 * * * ────┼─ embedding-backfill ────┼──> staleness ──(workflow_run: success)──> nightly export
-              └─ verification-backfill ─┘
+UTC
+01:05  external scheduler ──┬─ analytics-rollup ──────┐
+                            ├─ retention ─────────────┤
+                            ├─ embedding-backfill ────┤  independent of each other:
+                            ├─ verification-backfill ─┤  any order, or in parallel
+                            └─ notification-dispatch ─┘
+                                       │
+                                       └──> staleness   ← after ALL five, always
+
+03:17  nightly-export.yml     publishes the dataset — its OWN cron, not chained (see below)
 ```
 
-**Ordering is a dependency, not a second cron expression.** The export used to run on its own cron
-at 03:17, seventeen minutes after staleness was meant to have finished. Scheduled workflows start
-late routinely — a busy queue, a maintenance window, a runner shortage — so seventeen minutes
-guarantees nothing, and a late maintenance run published a dataset still advertising programmes the
-API had already closed. `workflow_run` is the only form of "after" that is actually after.
+Running the six one at a time satisfies that rule; so does running the five together and
+`staleness` when the last of them exits. The rule is the contract (§4d); serialising is one way to
+meet it.
 
-**What that costs, stated plainly:** a failing job holds tonight's dataset publication, because the
-export is gated on the maintenance run succeeding. That is the deliberate trade — publishing a
-snapshot whose staleness pass did not run is worse than publishing a day late; the export is
-idempotent and the next night republishes; and `workflow_dispatch` on the export recovers it
-immediately.
+`.github/workflows/jobs-nightly.yml` has **no cron**. It is the manual path: a `workflow_dispatch`
+runs the same six under the same rule (`job` = `all`) or a single job by name — a recovery after a
+failed external run, or a check that the wiring works.
 
-**The export gate is "the SCHEDULED chain succeeded", not "a maintenance run went green".** A
-conclusion check alone would be satisfied by two runs that never touched the thing the export
-depends on:
+**Why `staleness` is last, and why one caller.** The advisory lock each job takes excludes a job
+from **itself**, never one job from another (§3). So two callers whose windows overlap do not
+double-write — but they do interleave, and `staleness` running while `verification-backfill` is
+still going closes entries that a successful check was about to keep open, with **both runs
+reporting success** (§4d has the walk-through). Putting `staleness` after everything, under a single
+caller, is what prevents that: a successful check writes `lastSeenAt`, and staleness reads that
+state after it has settled instead of underneath it. The other five write nothing each other reads,
+which is why they carry no ordering at all.
 
-* a single-job dispatch — `job=analytics-rollup` skips every staleness step and still concludes
-  successfully;
-* a `environment=staging` dispatch, which maintains a database the production export never reads.
+There is no notification-only cron or workflow. Normal delivery starts immediately after the
+notification transaction commits; the chain's `notification-dispatch` node is the daily backstop,
+under the same per-name advisory lock as every other job. An expected email-provider refusal is
+stamped on the notification and returned as a successful job result, so provider availability alone
+does not fail the chain.
 
-So `nightly-export.yml` additionally requires `github.event.workflow_run.event == 'schedule'`. The
-schedule is the one trigger that always runs the whole chain against production — it leaves `job`
-blank and takes the `production` default for `environment`. A partial or staging dispatch therefore
-publishes nothing, and `workflow_dispatch` on the export remains the operator's way to say "the
-prerequisite is met, publish now".
+**The open-data export is NOT chained to the maintenance work.** `nightly-export.yml` runs on its
+own cron, `17 3 * * *`. Nothing triggers it — not this repository, not the external scheduler — and
+a failed maintenance job does not hold it back. Ordering between the two is **by clock alone**,
+which is a weaker guarantee than a dependency and is written down plainly here because it is easy
+to assume otherwise: the chain has just over two hours of margin, and the export publishes at 03:17
+whatever state it is in.
+
+**What that costs, stated plainly:** a scheduled run can start late, run long or fail, and the
+clock cannot notice. A chain that fails or never starts is not observed by the export, which
+publishes on time regardless; the dataset then advertises programmes the API would have closed. The
+snapshot reflects the staleness pass from earlier the same night, so an entry that falls past-due
+after that pass is published as open and corrected the following night. The export is idempotent and
+`workflow_dispatch` on it republishes immediately once the cause is fixed. **Monitor the external
+run on its own** — nothing downstream will report its absence for you.
+
+> **Known gap.** Nothing enforces "the chain finished" before the export runs. A `workflow_run`
+> dependency cannot supply it: the chain is not a workflow in this repository. An actual "after"
+> would mean the external scheduler dispatching `nightly-export.yml` as its last step and that cron
+> coming off. It is **not wired**. Deciding it is an owner's call, not this document's.
 
 ### Which deployment a run maintains
 
-`environment` is a required `workflow_dispatch` input (`production` | `staging`) and is **empty on
-the schedule, which means `production`** — the deployment the open-data export reads. The AWS
-credential and the cluster are selected from that name:
+`environment` is a required `workflow_dispatch` input (`production` | `staging`) and defaults to
+**`production`** — the deployment the open-data export reads. The AWS credential and the cluster are
+selected from that name:
 
 | Environment | Credentials | Cluster |
 |---|---|---|
-| `production` (and every scheduled run) | `PRODUCTION_AWS_ACCESS_KEY_ID` / `PRODUCTION_AWS_SECRET_ACCESS_KEY` — the same pair `production.yml` deploys with | `PRODUCTION_ECS_CLUSTER` — the same variable |
-| `staging` (dispatch only) | `STAGING_AWS_ACCESS_KEY_ID` / `STAGING_AWS_SECRET_ACCESS_KEY` | `STAGING_ECS_CLUSTER` |
+| `production` (the default) | `PRODUCTION_AWS_ACCESS_KEY_ID` / `PRODUCTION_AWS_SECRET_ACCESS_KEY` — the same pair `production.yml` deploys with | `PRODUCTION_ECS_CLUSTER` — the same variable |
+| `staging` | `STAGING_AWS_ACCESS_KEY_ID` / `STAGING_AWS_SECRET_ACCESS_KEY` | `STAGING_ECS_CLUSTER` |
 
 The lookups are `secrets[format(...)]` / `vars[format(...)]` **index** expressions rather than the
 `&&`/`||` fallback idiom: a fallback treats an unset staging variable as false and silently reaches
@@ -124,15 +153,29 @@ run time:
 
 | What | Where it comes from |
 |---|---|
-| Cluster | `<ENV>_ECS_CLUSTER` — **the only repository variable**, and the deploy workflow for that environment already requires it |
+| Cluster | `<ENV>_ECS_CLUSTER` — the only repository variable the workflow reads directly; the deploy workflow already requires it |
 | Task definition family, container name | `rfp-hub-<env>`, derived in `run-ecs-job.sh` (overridable via `ECS_TASK_DEFINITION` / `ECS_CONTAINER`) |
 | Service | `rfp-hub-<env>-service`, likewise (`ECS_SERVICE`) |
-| Subnets, security groups, `assignPublicIp`, launch type | **read from the service** with `aws ecs describe-services … --query 'services[0].networkConfiguration.awsvpcConfiguration'`, and reused verbatim |
+| Launch type / capacity provider strategy | **read from the service** with `aws ecs describe-services`, and reused verbatim |
+| Placement constraints | **read from the service** and reused verbatim, so a job cannot land on capacity the API is deliberately kept off |
+| Network configuration | **none.** The deployment runs EC2 with `bridge` networking, and `run-ecs-job.sh` assumes that: no `--network-configuration` is passed, and none is needed |
 
-The network configuration is discovered rather than configured for the same reason the task
-definition is reused: restating the VPC layout in repository variables is asking an operator to
-keep a copy of it in sync by hand, and a stale copy starts the job in a subnet that cannot reach the
-database. Reading the service means **the job lands exactly where the API lands, by construction**.
+Placement is discovered rather than configured for the same reason the task definition is reused:
+restating it in repository variables is asking an operator to keep a copy in sync by hand, and a
+stale copy starts the job on capacity the API is deliberately kept off. Reading the service means
+**the job lands exactly where the API lands, by construction**.
+
+**One requirement comes with that, and it is the operator's to meet.** A job is a SECOND task from
+the service's own task definition, running while the service is up. With a **fixed** `hostPort`, the
+service already reserves that port on every instance it is eligible for, so a second task wanting
+the same port is unplaceable on all of them. Nothing in the runner can resolve it: the task
+definition is the service's, and the port is in it. So either the task definition uses a **dynamic
+host port** (`hostPort: 0`, the ordinary bridge-mode choice, which lets both tasks coexist), or
+there is **spare eligible capacity** the constraint expression still admits.
+
+The symptom when it is not met is a **placement** failure, not an application error, and it reads
+like an outage until somebody knows otherwise — so `run-ecs-job.sh` names this cause explicitly when
+a stopped task's `stoppedReason` mentions a resource or a port.
 
 There is consequently **no maintenance task definition to provision** and no second copy of the
 secret list to keep in step with the service's.
@@ -151,6 +194,11 @@ secret list to keep in step with the service's.
   transaction, so a publisher's edit racing the walk wins. A second run finds nothing to close and
   writes no second audit row.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
+* `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
+  so a normal second run sends nothing. Transport failures retry at most three total attempts, no
+  sooner than five minutes after the completion of the last attempt — including retries within one
+  long sweep run; an account with no identity email is a terminal `recipient_unavailable` failure
+  rather than a poison row retried forever.
 
 **Concurrency is excluded by `pg_try_advisory_lock`, taken on a dedicated connection.** Three
 decisions, each closing something real:
@@ -166,6 +214,20 @@ decisions, each closing something real:
 The key is derived from the job's **name**, so `staleness` excludes another `staleness` across
 processes, hosts and container tasks, and two different jobs run concurrently quite happily.
 
+### Immediate notification trigger
+
+Duplicate detection and review mutations insert notifications inside their own database
+transactions. Only after such a transaction commits, its newly inserted notification ids are handed
+to the API process's fire-and-forget dispatcher. The queue is serial, retains at most
+`NOTIFICATION_QUEUE_MAX` waiting ids (100 by default), and rejects the newest id when full. Enqueue
+never waits for email and worker errors never propagate to the response.
+
+The worker calls `NotificationDispatchService` with exactly one queued id. It makes one best-effort
+attempt; it does not run the job loop or retry in memory. A transport failure stamps durable retry
+state, while queue overflow or process loss leaves the row unstamped. If the configured transport
+does not deliver, the service returns the same `email delivery is not configured` skip as the job.
+All of those states remain visible to the nightly unscoped sweep.
+
 ### What staleness deliberately does not touch
 
 `updated_at`. Two things read it, and both break if a maintenance pass moves it: this job's own
@@ -176,36 +238,55 @@ carries the time of the change, which is where that fact belongs.
 
 ---
 
-## 4. Triggers — the three ways a job starts
+## 4. Triggers — the four ways a job starts
 
-### a. The schedule (how it actually runs)
+* **The external scheduler** — the primary one, and the only thing that runs nightly. The contract
+  it depends on is (d).
+* **`workflow_dispatch`** — an operator, running the chain or one job by hand (a).
+* **`POST /v1/admin/jobs/{job}/run`** — a reviewer, one pass, from the dashboard (c).
+* **The image or a checkout** — by hand, locally or inside the container (b).
+
+### a. `workflow_dispatch` (an operator, from Actions)
 
 `.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
-own task definition**, using the AWS credentials the deploy workflows already hold. Two calls: read
-the service to learn where it runs, then start the same task definition there with a different
-command.
+own task definition**, using the AWS credentials the deploy workflows already hold. It runs only
+when dispatched. A `job=all` dispatch runs the five independent jobs as a parallel matrix and
+`staleness` afterwards — `needs: [maintenance]`, the same one rule the external scheduler holds
+(§2). **Two calls** per job: read the service to learn where it runs, then start that task
+definition there with a different command.
 
 ```sh
-# where the API runs — subnets, security groups, assignPublicIp
-vpc=$(aws ecs describe-services --cluster "$CLUSTER" --services rfp-hub-<env>-service \
-        --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
+# where the API runs — its own placement, reused verbatim
+svc=$(aws ecs describe-services --cluster "$CLUSTER" --services rfp-hub-<env>-service)
 
-aws ecs run-task \
-  --cluster "$CLUSTER" --task-definition rfp-hub-<env> --launch-type FARGATE \
-  --network-configuration "$(jq -nc --argjson vpc "$vpc" '{awsvpcConfiguration: $vpc}')" \
+aws ecs run-task --cluster "$CLUSTER" --task-definition rfp-hub-<env> \
+  --launch-type "$(jq -r '.services[0].launchType' <<<"$svc")" \
   --overrides '{"containerOverrides":[{"name":"rfp-hub-<env>","command":["node","packages/api/dist/jobs.js","staleness","--json"]}]}'
 ```
+
+No `--network-configuration`: the deployment is EC2 with `bridge` networking, so there is none to
+pass and ECS would reject one anyway.
+
+That is the sketch. `run-ecs-job.sh` is the same two calls plus the cases a sketch omits: a service
+on a **capacity provider** reports no `launchType` and needs `--capacity-provider-strategy` instead,
+placement constraints are carried across too, and every branch that declines prints what it read
+first.
 
 **There is no public job endpoint and no shared job token.** A credential that can start a job has
 to live somewhere, and "a token in repository secrets that the internet-facing API accepts forever"
 is a worse somewhere than the deploy role that already exists.
 
-`.github/scripts/run-ecs-job.sh` is what does it, and it answers the *unprovisioned* case two ways
-on purpose. Two things can be absent — the cluster variable, and the service itself — and on the
-schedule either is a loud `::warning::` and a green job (the export is chained to this workflow, and
-failing over a resource that has never existed would stop the dataset publishing), while on a
-`workflow_dispatch` either **fails**, because an operator dispatching the run is asking whether the
-wiring works.
+`.github/scripts/run-ecs-job.sh` is what does it. Two things can be absent — the cluster variable,
+and the service itself — and either **fails the run**, because an operator dispatching it is asking
+whether the wiring works and a green run that did nothing answers the wrong question. The script
+keeps a second branch, a loud `::warning::` and a green job, for a caller that is a schedule; the
+workflow sets `DISPATCHED=true` unconditionally, so nothing in this repository takes it.
+
+Before it declines it **prints what it read** — the `failures` array, the service's ARN, status and
+task definition ARN, and its launch type, capacity provider strategy and placement constraints — and
+names the case in the message: *service missing (failures: …)*. An absent service and a cluster
+variable pointing at the wrong cluster look identical from outside and have completely different
+fixes, and the log is all an operator has a night later.
 
 ### b. The image, or a checkout (an operator, by hand)
 
@@ -216,6 +297,7 @@ node packages/api/dist/jobs.js staleness --json
 # locally, against a database you own
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs staleness
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs embedding-backfill --limit 100 --passes 5
+DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs notification-dispatch --limit 100 --passes 5
 pnpm --filter @the-rfp-hub/api jobs --help
 ```
 
@@ -228,6 +310,109 @@ because a global role never elevates an API key. It runs **exactly one pass**: a
 looped a cursor job to exhaustion would hold a connection and a socket for as long as the backlog
 took, and the thing allowed to take that long is the container task. It takes the same advisory
 lock, so pressing it while the scheduled run is in flight answers `skipped: "locked"`.
+
+### d. The external scheduler — the contract it depends on
+
+The nightly chain is started by **an external scheduler such as a workflow orchestrator**, outside
+this repository, as one-off container tasks on the deployed image (§2). Nothing about a job changes
+when it is; what that caller depends on is stated here so it does not have to be inferred from the
+runner, and so it does not quietly stop being true.
+
+**The entry point is the image's, and the argv is the whole interface.**
+
+```sh
+node packages/api/dist/jobs.js <job> --json
+```
+
+`<job>` is one of the six names in §1 — the catalogue in
+`src/modules/services/jobs/registry.ts` is the one place a name is spelled, and a name that is not
+in it exits `2` rather than doing nothing. `--limit` and `--passes` are available and job-specific;
+neither is required.
+
+**It runs on the API service's own task definition**, as a container command override and nothing
+else. The image, the runtime `DATABASE_URL`, every key of the `secrets:` array, the execution and
+task roles are already assembled there and the deploy workflows keep them current — so an external
+caller supplies **no additional environment**, and must not, because a second copy of that list is a
+copy that goes stale in exactly the way that matters.
+
+**Exit codes are the contract**, and they are the same for every caller:
+
+| Code | Means |
+|---|---|
+| `0` | The job ran, **or declined** — another run held the lock, or its feature is not configured |
+| `1` | The job threw |
+| `2` | The invocation was wrong — an unknown job name, or a bad flag |
+
+**A missing `DATABASE_URL` is `1`, not `2`.** `src/config.ts` refuses to load without one under
+`NODE_ENV=production` — it exits `1` at **module load**, before the entry point's own argument
+handling runs, precisely so a production process can never silently fall back to a localhost
+database. The entry point's `DATABASE_URL` check is therefore reached only off the production path,
+where an unset variable takes the announced localhost default rather than failing. A caller should
+read `1` as "this run did not do its work" without assuming the job itself was entered.
+
+A run that declined is deliberately a **zero**. A scheduled task that correctly did not start
+because the previous one is still going has not failed, and paging somebody about it teaches
+everybody to ignore the alert.
+
+**`--json` writes exactly one object to stdout**, on one line:
+
+```json
+{"job":"staleness","shape":"cursor","processed":12,"remaining":0,"passes":2,"elapsedMs":3410}
+```
+
+`skipped` is present **only** when the job did not do its work, and carries which of the two reasons
+it was — `"locked"`, or the name of the unconfigured feature (§1). `details` is a free-form object
+of per-job counters. Both keys are absent rather than null when they do not apply, so a caller
+should treat `job`, `shape`, `processed`, `remaining`, `passes` and `elapsedMs` as always present
+and the other two as optional.
+
+**The lock makes overlap safe against double writes. It does NOT make overlap safe.** Every job
+takes a `pg_try_advisory_lock` keyed on **its own name**, in the database — the only thing every
+runner shares — so exclusion holds across processes, hosts, container tasks and repositories, and
+the second run to arrive does not wait: it reports `{"skipped":"locked"}` and exits `0` immediately
+(§3). That is a guarantee about **data integrity within one job**, and it is the whole of what the
+lock provides.
+
+**It is not a guarantee about the chain**, because the locks are per job and the chain's ordering is
+between *different* jobs — which never exclude each other. Two chains running in overlapping windows
+therefore interleave, and the interleaving loses work while every single run reports success:
+
+> Chain A is partway through `verification-backfill`. Chain B starts, finds that job locked,
+> correctly reports `skipped: "locked"`, exits `0` — and moves on to `staleness`, which now runs
+> **before** A's verification pass has finished. A successful check is a "still real" signal that
+> **resets the staleness clock** (`verification.service.ts` writes `lastSeenAt` on a match), and
+> staleness's inactivity test is `coalesce(last_seen_at, updated_at)`. So entries A was about to
+> prove active are closed as long-inactive instead. A's verification finishes a minute later and
+> does **not** reopen them — it never writes `status`, and staleness only ever closes rows that are
+> still `open`. Both chains are green. The dataset is wrong.
+
+**So the ordering is the caller's to hold, and the lock will not arbitrate it.** As deployed:
+
+> **One scheduler runs the whole chain. `analytics-rollup`, `retention`, `embedding-backfill`,
+> `verification-backfill` and `notification-dispatch` are INDEPENDENT — any order, or in parallel.
+> `staleness` runs AFTER ALL FIVE HAVE EXITED. The chain must finish before 03:17 UTC, when the
+> open-data export publishes, so the snapshot is a closed dataset rather than a half-maintained
+> one.**
+
+Each clause carries weight:
+
+* **The five are independent.** They write nothing the others read, so nothing is bought by
+  ordering them and a caller is free to run them concurrently. Serialising the whole chain is a
+  valid way to satisfy the rule below, not the rule.
+* **`staleness` after all five, by EXIT.** It reads what `verification-backfill` writes, and exit
+  code — not elapsed time — is what says a job is done: a caller that starts `staleness` on a timer
+  is racing the pass it depends on, and the race is silent (the walk-through above).
+* **Finished before 03:17.** `nightly-export.yml` publishes on its own cron and waits for nothing
+  (§2). A chain still running at 03:17 publishes a dataset maintained halfway.
+* **One caller.** Dispatching `jobs-nightly.yml` while the external chain is in flight is the one
+  overlap nothing prevents; the lock will merely make the collided jobs no-ops rather than correct
+  runs.
+
+**Nothing about the chain publishes the open-data dataset.** `.github/workflows/nightly-export.yml`
+publishes on its **own cron**, `17 3 * * *` — nothing triggers it, from this repository or outside
+it (§2). So a failed chain has no effect on whether the day's snapshot appears, only on what it
+*says*, and a missed or failed external run is invisible to the export. **Monitor the external run
+on its own** — nothing downstream will report its absence for you.
 
 ---
 
@@ -248,16 +433,23 @@ Before the first M3 job run on any deployment, in order:
 3. Deploy the API to that environment at least once, so `rfp-hub-<env>` and
    `rfp-hub-<env>-service` exist and `<ENV>_ECS_CLUSTER` is set. Both are prerequisites of the
    deploy workflow itself, so this is nearly always already true; the runner reads the service for
-   its subnets and security groups, and says so plainly when the service is not there yet.
+   its placement and prints everything it read when the service is not there yet.
 4. Grant the deploy IAM user **`ecs:RunTask` on the task definition and `iam:PassRole` for the
    task's execution and task roles**. This is the one permission that may be missing: registering a
    task definition and updating a service — which the deploy workflow already does — does not imply
-   the right to start a task from it. Nothing else is needed; the maintenance chain uses the
+   the right to start a task from it. `ecs:DescribeServices` is already exercised by the deploy
+   workflow with the same credential. Nothing else is needed; the maintenance chain uses the
    **runtime** credential inside the container, not a DDL one.
-5. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
-   loudly if the cluster variable is unset or the service cannot be described. A dispatch does
-   **not** trigger the export (only the scheduled chain does), so confirm the export separately —
-   either wait for one scheduled run or dispatch *Nightly open-data export* directly.
+5. Set `<ENV>_APP_BASE_URL` to the canonical frontend origin, then deploy once so the API workflow
+   writes it into the service task definition inherited by background tasks.
+6. Prove the wiring with one `workflow_dispatch` of *Nightly maintenance jobs* per environment,
+   once with `job=notification-dispatch` and once with `job=all` — the full chain, `staleness`
+   included. Either fails loudly if the cluster variable is unset or the service cannot be
+   described.
+7. Point the **external scheduler** at the same entry point, with the ordering §4d requires, and
+   monitor it there: this repository schedules nothing and will not report its absence. Nothing
+   here triggers the export either — it runs on its own cron (§2) — so confirm it separately, by
+   waiting for its 03:17 run or by dispatching *Nightly open-data export* directly.
 
 ---
 
@@ -270,6 +462,7 @@ Before the first M3 job run on any deployment, in order:
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
+| `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
 
 After a **model-string change** (a new featurizer weighting or a refreshed idf table), every stored
 vector is stale by content-hash design and `embedding-backfill`'s first pass selects the whole
@@ -288,7 +481,7 @@ under `NODE_ENV=production`.
 
 ## 7. What a job writes to the audit trail
 
-Every mutation a job makes is an `audit_log` row with `actor_kind='job'`,
+Every authority-bearing data mutation a maintenance job makes is an `audit_log` row with `actor_kind='job'`,
 `actor_account_id = NULL` and `actor_api_key_id = NULL`, in the **same transaction** as the
 mutation. The patch names the job and its reason:
 
@@ -300,3 +493,8 @@ mutation. The patch names the job and its reason:
 has passed" and "nobody has re-asserted this listing in ninety days" — which are different things to
 tell a publisher. The public trail shows the changed field names and the actor `job`; the entry's
 submitter, its publisher and T3+ see the full patch.
+
+Notification delivery is operational telemetry, not an authority-bearing change, so it does not
+append an audit action. The notification row itself carries `email_dispatched_at` or
+`email_failed_at`; the payload's private `emailDelivery` member records a bounded attempt count and
+safe failure code while a retry is pending, and is stripped from account-facing API responses.

@@ -289,6 +289,7 @@ under [the converter's README](./tools/converter/README.md).
 | `DB_POOL_MAX` | `10` | Max size of the pg pool. Bound this on a shared database instance, where connection budget is split across services. Defaults to pg's own default. A set-but-unusable value falls back to the default. |
 | `NODE_ENV` | unset | Set to `production` to enable the `DATABASE_URL` fail-fast above. |
 | `PUBLIC_BASE_URL` | `/` | The OpenAPI document's `servers[0].url`. Relative by default — correct wherever the server is reachable. Set it to the API's **own** origin (never the apex, which is the specification's origin); a trailing slash is stripped. The scheme must be `https://` for **any host that is not loopback** (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`) — this value is what the published document tells every client to use, so a plaintext remote origin downgrades all of them at once. Unlike the two above, a malformed value is an error, not a fallback: `servers[0].url` is a published contract with no safe default to guess at. It also mints the feeds' entry identifiers and links — see [Feeds](#feeds-atom-10-and-rss-20). It is read by the apex reservation too, which uses it to tell a caller it refused where the API is; the `/` default names no host, so the message says so plainly instead. |
+| `APP_BASE_URL` | `http://localhost:3005` outside production | The frontend origin used for absolute notification-email links. Required in production; remote origins must use HTTPS. It is deliberately separate from `PUBLIC_BASE_URL` (the API) and `TRUSTED_ORIGINS` (a multi-origin allowlist that may include previews). |
 | `EXPORT_MIN_COUNT` | `100` | Floor below which an export writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 | `EXPORT_API_URL` | — | **Required by `pnpm export:api`**, ignored by everything else: the bare origin of the API to publish, e.g. `https://api.example.org`. Must be `https://` for any host that is not loopback — this value decides what gets published, so plaintext would let the network path choose the dataset. A path, query or fragment is an error rather than being trimmed off. |
 | `EXPORT_OUT_DIR` | `exports` | Where `pnpm export:api` writes its six files. Relative paths resolve against the working directory. |
@@ -774,8 +775,11 @@ re-shape a third of the corpus.
 
 Layered, module-per-folder — full pattern in [`docs/architecture.md`](./docs/architecture.md):
 `routes/<module>/<entity>.controller.ts` (HTTP handlers) → `services/<module>/<name>.service.ts`
-(logic + data over Drizzle) → `mappers/<entity>.mapper.ts` (pure row ↔ Standard). Route
-registration lives in `routes/<module>/index.ts`.
+(business logic) → `repositories/<domain>.repository.ts` (all database access) → `db`. Route
+registration lives in `routes/<module>/index.ts`; mappers remain pure row ↔ Standard helpers.
+Services never import Drizzle or schema tables: the filesystem guard pins that rule and its
+temporary migration debt in `test/unit/data-access-boundary.test.ts`; see
+[`ADR-0011`](../../adr/0011-repositories-own-all-database-access.md).
 
 - **DB**: Drizzle ORM over node-postgres; schema in `src/db/schema.ts`, migrations in
   `src/db/migrations`. The schema is the **M2 subset** of the full design in

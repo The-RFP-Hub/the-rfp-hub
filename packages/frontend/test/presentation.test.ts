@@ -8,6 +8,8 @@ import {
   fundingTypeLabel,
   ingestionMethodLabel,
   isOpenDuplicateStatus,
+  notificationActionLabel,
+  notificationCopy,
   opportunityStatusLabel,
   orgRoleLabel,
   publisherStatus,
@@ -67,6 +69,17 @@ describe("presentation vocabulary", () => {
     expect(isOpenDuplicateStatus("confirmed")).toBe(true);
     expect(isOpenDuplicateStatus("dismissed")).toBe(false);
     expect(isOpenDuplicateStatus("merged")).toBe(false);
+  });
+
+  it("keeps notification prose cautious and action tokens out of the interface", () => {
+    expect(notificationCopy("duplicate_suspected")).toMatchObject({
+      title: "Possible match found",
+      withoutOther: expect.stringContaining("another submission"),
+      detail: expect.stringContaining("not a verdict"),
+    });
+    expect(notificationCopy("duplicate_confirmed").title).not.toMatch(/confirmed duplicate/i);
+    expect(notificationActionLabel("review_match")).toBe("Review possible matches");
+    expect(notificationActionLabel("view_survivor")).toBe("Open surviving listing");
   });
 });
 

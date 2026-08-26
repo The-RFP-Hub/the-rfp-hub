@@ -20,29 +20,19 @@
  * is coarsened by is RECORDED WITH THE ROW rather than looked up when it is read, because a role is
  * revocable and the trail must say what was true when the action was taken.
  */
-import { and, desc, eq } from "drizzle-orm";
-import { type DbLike, db as defaultDb } from "../../../db/client.js";
-import { accounts, auditLog } from "../../../db/schema.js";
-import type { auditAction, auditSubjectKind } from "../../../db/schema.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import {
+  type ActorKind,
+  type AuditAction,
+  type AuditActor,
+  type AuditRecordInput,
+  type AuditSubjectKind,
+  type Repositories,
+  repositories,
+} from "../../repositories/index.js";
 import { type Patch, changedFields } from "../../shared/patch.js";
 
-export type AuditAction = (typeof auditAction.enumValues)[number];
-export type AuditSubjectKind = (typeof auditSubjectKind.enumValues)[number];
-export type ActorKind = "user" | "api_key" | "job" | "outbox";
-
-/** Who acted. `actorApiKeyId` is the question asked first when a key is suspected of leaking. */
-export interface AuditActor {
-  actorKind: ActorKind;
-  actorAccountId?: number | null;
-  actorApiKeyId?: number | null;
-}
-
-export interface AuditRecordInput extends AuditActor {
-  subjectKind: AuditSubjectKind;
-  subjectId: number;
-  action: AuditAction;
-  patch?: Patch | Record<string, unknown> | null;
-}
+export type { ActorKind, AuditAction, AuditActor, AuditRecordInput, AuditSubjectKind };
 
 /** The system acting on nobody's behalf — a job, or a boot-time rule such as the admin bootstrap. */
 export const SYSTEM_ACTOR: AuditActor = { actorKind: "job", actorAccountId: null };
@@ -65,20 +55,10 @@ export interface AuditEntryRecord {
 }
 
 export class AuditService {
-  constructor(private readonly db: DbLike = defaultDb) {}
+  private readonly repos: Repositories;
 
-  /** Append one row. Takes the writing handle so history commits with the mutation or not at all. */
-  async record(tx: DbLike, entry: AuditRecordInput): Promise<void> {
-    await tx.insert(auditLog).values({
-      subjectKind: entry.subjectKind,
-      subjectId: entry.subjectId,
-      actorKind: entry.actorKind,
-      actorAccountId: entry.actorAccountId ?? null,
-      actorApiKeyId: entry.actorApiKeyId ?? null,
-      actorRole: await actingRole(tx, entry.actorAccountId),
-      action: entry.action,
-      patch: (entry.patch ?? null) as Record<string, unknown> | null,
-    });
+  constructor(db: DB = defaultDb) {
+    this.repos = repositories(db);
   }
 
   /** The trail for one subject, newest first, projected for this viewer. */
@@ -88,25 +68,7 @@ export class AuditService {
     viewer: AuditViewer,
     limit = 100,
   ): Promise<AuditEntryRecord[]> {
-    const rows = await this.db
-      .select({
-        action: auditLog.action,
-        createdAt: auditLog.createdAt,
-        actorKind: auditLog.actorKind,
-        patch: auditLog.patch,
-        actorHandle: accounts.handle,
-        actorRole: auditLog.actorRole,
-        // ONLY the fallback for rows written before `audit_log.actor_role` existed, which cannot be
-        // backfilled (see the column's comment in `db/schema.ts`). For every row written since, the
-        // stored capacity wins and this is not consulted — which is the whole point: a role change
-        // must not reach backwards through the trail.
-        currentRole: accounts.globalRole,
-      })
-      .from(auditLog)
-      .leftJoin(accounts, eq(accounts.id, auditLog.actorAccountId))
-      .where(and(eq(auditLog.subjectKind, subjectKind), eq(auditLog.subjectId, subjectId)))
-      .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
-      .limit(limit);
+    const rows = await this.repos.audit.list(subjectKind, subjectId, limit);
 
     return rows.map((row) => {
       const patch = (row.patch ?? {}) as Patch;
@@ -136,32 +98,6 @@ export class AuditService {
  * one the public label is trying to answer.
  */
 export const OPERATING_ORG_CAPACITY = "operating_org";
-
-/**
- * The role the actor holds AS THIS MUTATION COMMITS, read with the writing handle.
- *
- * Read here rather than taken from the caller for two reasons. It needs no change at any of the
- * ~30 places that append a row — a signature that has to be threaded through a dozen services is a
- * signature somebody will forget, and a forgotten one silently degrades to the old leak. And it is
- * strictly MORE faithful than the caller's `principal.role`, which was resolved when the bearer was
- * exchanged and may already be stale: this read sits inside the same transaction as the mutation,
- * so it answers with the role that was true when the action landed.
- *
- * One primary-key lookup per audit row, on a row the writing transaction has usually already
- * touched.
- */
-async function actingRole(
-  tx: DbLike,
-  actorAccountId: number | null | undefined,
-): Promise<"submitter" | "reviewer" | "admin" | null> {
-  if (actorAccountId === null || actorAccountId === undefined) return null;
-  const rows = await tx
-    .select({ role: accounts.globalRole })
-    .from(accounts)
-    .where(eq(accounts.id, actorAccountId))
-    .limit(1);
-  return rows[0]?.role ?? null;
-}
 
 /**
  * The coarse actor label.

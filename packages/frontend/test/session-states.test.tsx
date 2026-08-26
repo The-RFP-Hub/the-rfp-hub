@@ -86,7 +86,20 @@ function renderGate(
 }
 
 const clientFor = (loader: () => Promise<Me>): ApiClient =>
-  ({ baseUrl: "https://api.example.com", me: { get: loader } }) as unknown as ApiClient;
+  ({
+    baseUrl: "https://api.example.com",
+    me: {
+      get: loader,
+      notifications: async () => ({
+        items: [],
+        page: 1,
+        limit: 1,
+        total: 0,
+        totalPages: 1,
+        unreadCount: 0,
+      }),
+    },
+  }) as unknown as ApiClient;
 
 describe("RequireSession", () => {
   beforeEach(() => {
@@ -158,6 +171,12 @@ describe("RequireSession", () => {
       ROUTE_GATE_COPY.duplicates,
       "Sign in to review matches involving your listings.",
       "These matches are private to listing owners and reviewers.",
+    ],
+    [
+      "/notifications",
+      ROUTE_GATE_COPY.notifications,
+      "Sign in to view your notifications.",
+      "See duplicate checks and reviewer actions involving listings you own.",
     ],
     [
       "/keys",
@@ -277,7 +296,7 @@ describe("organization navigation", () => {
     expect(screen.getByRole("main").getAttribute("tabindex")).toBe("-1");
   });
 
-  it("keeps all nine admin destinations in three semantic groups with a long organization name", async () => {
+  it("keeps all ten admin destinations in three semantic groups with a long organization name", async () => {
     const longName = "AnExtraordinarilyLongPublisherOrganizationNameWithoutConvenientBreaks";
     const admin: Me = {
       ...me,
@@ -298,7 +317,7 @@ describe("organization navigation", () => {
     const navigation = await screen.findByRole("navigation", { name: "Sections" });
     expect(navigation.querySelectorAll(":scope > ul")).toHaveLength(3);
     expect(within(navigation).getAllByRole("list")).toHaveLength(3);
-    expect(within(navigation).getAllByRole("link")).toHaveLength(9);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(10);
     expect(within(navigation).getByRole("link", { name: longName })).toBeTruthy();
   });
 });

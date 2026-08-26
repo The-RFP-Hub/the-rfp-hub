@@ -20,13 +20,9 @@
  * be registered AFTER the pool-closing hook to run BEFORE it — see `buildApp`, where both are
  * registered in one place precisely so the order is a decision rather than an accident.
  */
-import { inArray } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityEventInsert,
-  opportunities,
-  opportunityEvents,
-} from "../../../db/schema.js";
+import type { OpportunityEventInsert } from "../../../db/schema.js";
+import { type Repositories, repositories } from "../../repositories/index.js";
 
 export type AnalyticsEventType = "list_view" | "detail_view" | "source_click" | "apply_click";
 
@@ -59,6 +55,7 @@ const DEFAULT_FLUSH_SIZE = 100;
 const DEFAULT_MAX_PENDING = 10_000;
 
 export class AnalyticsEventBuffer {
+  private readonly repos: Repositories;
   private pending: AnalyticsEventInput[] = [];
   private timer: NodeJS.Timeout | undefined;
   private flushing: Promise<number> | undefined;
@@ -69,10 +66,8 @@ export class AnalyticsEventBuffer {
   /** Events dropped at the cap, so a health check can say the count is understated. */
   dropped = 0;
 
-  constructor(
-    private readonly db: DB = defaultDb,
-    options: EventBufferOptions = {},
-  ) {
+  constructor(db: DB = defaultDb, options: EventBufferOptions = {}) {
+    this.repos = repositories(db);
     this.flushIntervalMs = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
     this.flushSize = options.flushSize ?? DEFAULT_FLUSH_SIZE;
     this.maxPending = options.maxPending ?? DEFAULT_MAX_PENDING;
@@ -144,7 +139,7 @@ export class AnalyticsEventBuffer {
           });
         }
         if (rows.length === 0) return 0;
-        await this.db.insert(opportunityEvents).values(rows);
+        await this.repos.analytics.insertEvents(rows);
         return rows.length;
       } catch {
         // Best-effort, and labelled as such everywhere it is served.
@@ -182,10 +177,7 @@ export class AnalyticsEventBuffer {
   private async resolveIds(publicIds: string[]): Promise<Map<string, number>> {
     const unique = [...new Set(publicIds)];
     if (unique.length === 0) return new Map();
-    const rows = await this.db
-      .select({ id: opportunities.id, publicId: opportunities.publicId })
-      .from(opportunities)
-      .where(inArray(opportunities.publicId, unique));
+    const rows = await this.repos.analytics.resolveOpportunityIds(unique);
     return new Map(rows.map((row) => [row.publicId, row.id]));
   }
 

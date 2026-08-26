@@ -8,9 +8,10 @@
 import { eq } from "drizzle-orm";
 import { afterAll, expect, it } from "vitest";
 import { createAuth } from "../../src/auth/better-auth.js";
-import { createEmailTransport } from "../../src/auth/email-transport.js";
 import { db } from "../../src/db/client.js";
 import { authSession, authUser } from "../../src/db/schema.js";
+import { createEmailTransport } from "../../src/modules/services/email/email-transport.js";
+import { EmailService } from "../../src/modules/services/email/email.service.js";
 import { testAuthConfig } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
@@ -29,7 +30,11 @@ describeWithDb("session rows carry no network identity", () => {
     // every call with the headers the library would harvest, which `signIn()` deliberately omits.
     const config = testAuthConfig();
     const transport = createEmailTransport(config.email);
-    const auth = createAuth({ db, config, transport });
+    const auth = createAuth({
+      db,
+      config,
+      email: new EmailService({ config: config.email, transport }),
+    });
 
     const headers = new Headers({
       "x-forwarded-for": FORWARDED_IP,

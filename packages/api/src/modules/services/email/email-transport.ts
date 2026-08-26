@@ -1,13 +1,13 @@
 /**
- * How a one-time code reaches a person — the one seam between "the API decided to send a code" and
- * a third party.
+ * How an outbound email reaches a person — the low-level seam between the central email service
+ * and a third party.
  *
  * It is an interface with seven implementations rather than a call to an SDK because the same code
  * path has to serve four situations that have nothing in common: a deployment that must really send
  * mail, an E2E run that must read the code back from another process, an integration test that must
  * read it back in-process, and a developer who just wants to see it. Every one of those is a
- * different answer to "where did the message go", and none of them should be a branch inside the
- * auth instance.
+ * different answer to "where did the message go", and none of them should be a branch inside a
+ * domain composer or auth adapter.
  *
  * THE PRODUCTION SAFETY IS IN `config.ts`, NOT HERE. `readEmailTransport` refuses to boot under
  * `NODE_ENV=production` on any transport that does not actually deliver (`file`, `stdout`,
@@ -22,7 +22,7 @@
 import { createHash } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-import type { EmailConfig, EmailTransportKind } from "../config.js";
+import type { EmailConfig, EmailTransportKind } from "../../../config.js";
 
 export interface EmailMessage {
   to: string;
@@ -270,8 +270,8 @@ function mailgunTransport(cfg: EmailConfig): EmailTransport {
     kind: "mailgun",
     async send(message) {
       // The same four fields SES and Resend are given. There is no `html` part anywhere in this
-      // file: the message is a six-digit code and a sentence, and a text-only body is one fewer
-      // thing a mail client can render into something the recipient did not expect.
+      // file: a text-only body is one fewer thing a mail client can render into something the
+      // recipient did not expect.
       const form = new FormData();
       form.set("from", cfg.from);
       form.set("to", message.to);

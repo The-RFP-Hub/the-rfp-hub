@@ -35,7 +35,7 @@ import type { FastifyCorsOptions } from "@fastify/cors";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Auth } from "../auth/better-auth.js";
 import { type AuthConfig, isAllowedOrigin } from "../auth/better-auth.js";
-import { deliversEmail } from "../auth/email-transport.js";
+import { deliversEmail } from "../modules/services/email/email-transport.js";
 import { HttpError, badRequest, unauthorized } from "../modules/shared/http-error.js";
 
 export interface BetterAuthPluginOptions {

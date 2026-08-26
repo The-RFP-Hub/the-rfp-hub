@@ -48,6 +48,7 @@ import type {
   ClaimSummaryView,
   DuplicateListView,
   DuplicateMatchView,
+  DuplicateNotificationPayloadView,
   DuplicatePairListView,
   DuplicatePairView,
   DuplicateSideView,
@@ -65,6 +66,9 @@ import type {
   MembershipInviteView,
   MembershipResultView,
   MergeResultView,
+  NotificationListView,
+  NotificationReadAllView,
+  NotificationView,
   OrganizationListView,
   OrganizationSummaryView,
   OwnedDuplicateListView,
@@ -285,6 +289,7 @@ describe("closed response components vs their producers", () => {
       "DatasetExport",
       "DuplicateList",
       "DuplicateMatch",
+      "DuplicateNotificationPayload",
       "DuplicatePair",
       "DuplicatePairList",
       "DuplicateSide",
@@ -305,6 +310,9 @@ describe("closed response components vs their producers", () => {
       "MembershipResult",
       "MergeResult",
       "MergedOpportunityErrorResponse",
+      "Notification",
+      "NotificationList",
+      "NotificationReadAll",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
       "OrganizationList",
       "OrganizationSummary",
@@ -607,6 +615,24 @@ describe("M3 closed components vs their view types", () => {
     acceptedAt: null,
     acceptedAccountId: null,
   };
+  const duplicateNotificationPayload: DuplicateNotificationPayloadView = {
+    pairId: 7,
+    similarity: 0.91,
+    yourListing: { id: "example-org:one", title: "One" },
+    otherListing: { id: "example-org:two", title: "Two" },
+    action: "review_match",
+    link: "/duplicates",
+    decidedBy: null,
+  };
+  const notification: NotificationView = {
+    id: 1,
+    kind: "duplicate_suspected",
+    subjectKind: "duplicate",
+    subjectId: 7,
+    payload: duplicateNotificationPayload,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    readAt: null,
+  };
 
   const samples: Record<string, object> = {
     SubmissionResult: submissionResult,
@@ -691,6 +717,20 @@ describe("M3 closed components vs their view types", () => {
     } satisfies MembershipResultView,
     MembershipInvite: membershipInvite,
     MembershipInviteList: { items: [membershipInvite] } satisfies MembershipInviteListView,
+    DuplicateNotificationPayload: duplicateNotificationPayload,
+    Notification: notification,
+    NotificationList: {
+      items: [notification],
+      page: 1,
+      limit: 20,
+      total: 1,
+      totalPages: 1,
+      unreadCount: 1,
+    } satisfies NotificationListView,
+    NotificationReadAll: {
+      markedRead: 1,
+      unreadCount: 0,
+    } satisfies NotificationReadAllView,
     MergedOpportunityErrorResponse: {
       error: "opportunity_merged",
       mergedInto: { id: "example-org:survivor", title: "The survivor" },

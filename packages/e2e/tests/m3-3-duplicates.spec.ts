@@ -6,11 +6,12 @@
  * there is no "real provider" variant because the lexical detector IS the real provider.
  * If a fixture pair sits under the threshold, the fixture TEXT is what changes — never the threshold.
  *
- * One thing in this area is recorded rather than tested: "the submitter is notified" is the
- * SYNCHRONOUS response payload and nothing else. No asynchronous notification exists, so there is
- * nothing to wait for and nothing to assert beyond the response — which is asserted below.
+ * A duplicate submission now has three observable answers: immediate match feedback in the create
+ * response, a durable in-app notification for every account that owns either side, and immediate
+ * email from the API's post-commit queue. All three are asserted without invoking the nightly job.
  */
 import { expect, skipUnlessActor, test } from "../src/fixtures.js";
+import { waitForEmail } from "../src/identity/outbox.js";
 
 test.describe.configure({ mode: "serial" });
 
@@ -81,11 +82,25 @@ test.describe("@dedupe M3-3 detection", () => {
 
     expect(copy.status).toBe(201);
     expect(copy.body.duplicateCheck, "the detector ran").toBe("ok");
-    // The response payload IS the notification: the submitter is told, in the answer to their own
-    // request, that this looks like something already published, and which entry it looks like.
+    // The response gives immediate feedback to the submitter. The durable notification below is a
+    // separate account-scoped record, so leaving this request does not make the event disappear.
     expect(copy.body.duplicates.map((match) => match.id)).toContain(originalId);
 
-    const pair = await db.query(
+    const submitterActor = stack.actors.submitter;
+    if (!submitterActor) {
+      throw new Error("the submitter actor disappeared after the acceptance gate");
+    }
+    const email = await waitForEmail(
+      stack.outboxDir,
+      submitterActor.email,
+      "A possible duplicate was found",
+      { textIncludes: [copyId, originalId] },
+    );
+    expect(email.text).toContain(copyId);
+    expect(email.text).toContain(originalId);
+    expect(email.text).toContain(`${stack.urls.frontend}/duplicates`);
+
+    const pair = await db.query<{ id: number; status: string }>(
       `SELECT d.id, d.status FROM opportunity_duplicates d
          JOIN opportunities a ON a.id = d.opportunity_id
          JOIN opportunities b ON b.id = d.duplicate_of_id
@@ -95,7 +110,37 @@ test.describe("@dedupe M3-3 detection", () => {
     // Stored once, whichever way round. The unique index is on the canonical (least, greatest)
     // ordering precisely so the mirrored pair cannot become a second, independently-reviewable row.
     expect(pair.rowCount, "the pair is recorded exactly once").toBe(1);
-    expect(pair.rows[0].status).toBe("suspected");
+    const storedPair = pair.rows[0];
+    if (!storedPair) throw new Error("the recorded pair could not be read back");
+    expect(storedPair.status).toBe("suspected");
+
+    const inbox = await submitter.get<{
+      unreadCount: number;
+      items: Array<{
+        kind: string;
+        subjectId: number;
+        payload: {
+          pairId: number;
+          yourListing: { id: string; title: string };
+          otherListing?: { id: string; title: string };
+        };
+      }>;
+    }>("/v1/me/notifications?limit=100");
+    expect(inbox.status).toBe(200);
+    expect(inbox.body.unreadCount).toBeGreaterThan(0);
+    expect(inbox.body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "duplicate_suspected",
+          subjectId: Number(storedPair.id),
+          payload: expect.objectContaining({
+            pairId: Number(storedPair.id),
+            yourListing: expect.objectContaining({ id: copyId }),
+            otherListing: expect.objectContaining({ id: originalId }),
+          }),
+        }),
+      ]),
+    );
   });
 
   test("a pending entry is never disclosed through another entry's duplicate list", async ({

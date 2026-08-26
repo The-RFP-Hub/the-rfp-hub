@@ -5,7 +5,7 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  * The application shell: navigation, session state, and the one place a page's access is gated.
  *
  * THE NAVIGATION IS GROUPED, NOT LISTED. There are three kinds of destination here and a flat row
- * of seven links says they are peers: what anybody may read (the directory, and the page explaining
+ * of links says they are peers: what anybody may read (the directory, and the page explaining
  * who does what), what THIS ACCOUNT owns (its listings, its traffic, its keys), and what a HUB
  * STAFF ROLE may do (the review queues, accounts and roles). The last group grants power — a click
  * in it publishes somebody's listing or changes what an account may do — so it is separated by a
@@ -20,15 +20,20 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
 import { HOW_IT_WORKS, HOW_IT_WORKS_ROLES, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notification-events";
 import type { GateCopy } from "@/lib/presentation";
+import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useCallback, useEffect } from "react";
 
 interface NavItem {
   href: string;
   label: string;
+  /** Whole-account unread count. Zero/undefined renders no count marker. */
+  badge?: number;
   /** Which capability the API reported. `undefined` means "any signed-in account". */
   requires?: (me: Me) => boolean;
 }
@@ -47,11 +52,12 @@ const PUBLIC_NAV: NavItem[] = [
  * organization is a place this account can act, and it belongs beside its listings rather than
  * behind two clicks on the account page.
  */
-function accountNav(me: Me): NavItem[] {
+function accountNav(me: Me, unreadCount: number | null): NavItem[] {
   const organization = organizationNav(me);
   return [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/listings", label: "Your listings" },
+    { href: "/notifications", label: "Notifications", badge: unreadCount ?? undefined },
     organization,
     { href: "/account", label: "Account" },
     { href: "/keys", label: "API keys", requires: (item) => item.canManageKeys },
@@ -114,6 +120,14 @@ function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string;
             aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
           >
             {item.label}
+            {item.badge ? (
+              <span
+                className="shell-nav-count"
+                aria-label={`${item.badge} unread notification${item.badge === 1 ? "" : "s"}`}
+              >
+                {item.badge}
+              </span>
+            ) : null}
           </GuardedLink>
         </li>
       ))}
@@ -127,6 +141,21 @@ export function Chrome({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const me = session.me.status === "ready" ? session.me.data : null;
   const { confirmNavigation } = useNavigationBlocker();
+  // Mount + route changes only. This package deliberately has no polling layer; a mutation made in
+  // this tab dispatches the local event below so the count can settle immediately.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname intentionally invalidates the loader on navigation
+  const loadUnread = useCallback(
+    () => api.me.notifications({ unread: true, limit: 1 }),
+    [api, pathname],
+  );
+  const unread = useResource(loadUnread, { enabled: me !== null });
+  const unreadCount = unread.state.status === "ready" ? unread.state.data.unreadCount : null;
+
+  useEffect(() => {
+    const refresh = () => unread.reload();
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+  }, [unread.reload]);
 
   return (
     <div className="shell">
@@ -141,7 +170,7 @@ export function Chrome({ children }: { children: ReactNode }) {
 
         <nav className="shell-nav" aria-label="Sections">
           <NavGroup items={PUBLIC_NAV} pathname={pathname} me={me} />
-          {me ? <NavGroup items={accountNav(me)} pathname={pathname} me={me} /> : null}
+          {me ? <NavGroup items={accountNav(me, unreadCount)} pathname={pathname} me={me} /> : null}
           {me ? <NavGroup items={STAFF_NAV} pathname={pathname} me={me} /> : null}
         </nav>
 

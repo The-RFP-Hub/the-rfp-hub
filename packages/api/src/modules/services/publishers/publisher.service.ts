@@ -9,25 +9,20 @@
  * Only the directory fields are served. Contacts are not: the directory carries publisher contact
  * details for editorial use, and an unauthenticated endpoint is not where they belong.
  */
-import { count, eq } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { organizations } from "../../../db/schema.js";
+import { type Repositories, repositories } from "../../repositories/index.js";
 import type { PublisherListView } from "../../shared/api-views.js";
 
 export class PublisherService {
-  constructor(private readonly db: DB = defaultDb) {}
+  private readonly repos: Repositories;
+
+  constructor(private readonly db: DB = defaultDb) {
+    this.repos = repositories(db);
+  }
 
   async list(): Promise<PublisherListView> {
-    const rows = await this.db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.verified, true))
-      .orderBy(organizations.slug);
-
-    const counted = await this.db
-      .select({ value: count() })
-      .from(organizations)
-      .where(eq(organizations.verified, true));
+    const rows = await this.repos.organizations.listVerified();
+    const total = await this.repos.organizations.countVerified();
 
     return {
       items: rows.map((row) => ({
@@ -39,7 +34,7 @@ export class PublisherService {
         ecosystems: row.ecosystems,
         verifiedAt: row.verifiedAt?.toISOString() ?? null,
       })),
-      total: counted[0]?.value ?? 0,
+      total,
     };
   }
 }

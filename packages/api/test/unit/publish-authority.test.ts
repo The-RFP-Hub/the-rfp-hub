@@ -8,9 +8,9 @@
  * plain read of it would leave the revocation race open exactly as before.
  */
 import { describe, expect, it } from "vitest";
-import type { Tx } from "../../src/db/client.js";
+import type { DbLike } from "../../src/db/client.js";
 import { orgMemberships, organizations } from "../../src/db/schema.js";
-import { resolvePublishAuthority } from "../../src/modules/services/auth/publish-authority.js";
+import { MembershipRepository } from "../../src/modules/repositories/index.js";
 
 /** What one query asked to lock: the strength, and the tables named in `of` (empty = the query's). */
 interface Lock {
@@ -44,16 +44,16 @@ function fakeTx(...results: Record<string, unknown>[][]) {
       return node;
     },
   };
-  return { tx: tx as unknown as Tx, locks };
+  return { repository: new MembershipRepository(tx as unknown as DbLike), locks };
 }
 
 const membership = (verified: boolean) => [{ verified }];
 const account = (directCreate: boolean) => [{ directCreate }];
 
-describe("resolvePublishAuthority", () => {
+describe("MembershipRepository.resolvePublishAuthority", () => {
   it("reports a verified membership, and takes a share lock to read it", async () => {
-    const { tx, locks } = fakeTx(membership(true), account(false));
-    expect(await resolvePublishAuthority(tx, 1, "acme")).toEqual({
+    const { repository, locks } = fakeTx(membership(true), account(false));
+    expect(await repository.resolvePublishAuthority(1, "acme")).toEqual({
       member: true,
       verified: true,
       directCreate: false,
@@ -67,8 +67,8 @@ describe("resolvePublishAuthority", () => {
     // The gap this closes: locking the membership alone leaves `organizations.verified` and
     // `accounts.direct_create` free to be revoked and committed while the write is in flight, and
     // the write would still auto-publish on the values it read before that happened.
-    const { tx, locks } = fakeTx(membership(true), account(true));
-    await resolvePublishAuthority(tx, 1, "acme");
+    const { repository, locks } = fakeTx(membership(true), account(true));
+    await repository.resolvePublishAuthority(1, "acme");
     const [publishing, granted] = locks;
     expect(publishing?.of).toContain(orgMemberships);
     expect(publishing?.of).toContain(organizations);
@@ -77,8 +77,8 @@ describe("resolvePublishAuthority", () => {
   });
 
   it("reports a membership on an unverified organisation as a membership that cannot publish", async () => {
-    const { tx } = fakeTx(membership(false), account(false));
-    expect(await resolvePublishAuthority(tx, 1, "acme")).toEqual({
+    const { repository } = fakeTx(membership(false), account(false));
+    expect(await repository.resolvePublishAuthority(1, "acme")).toEqual({
       member: true,
       verified: false,
       directCreate: false,
@@ -86,8 +86,8 @@ describe("resolvePublishAuthority", () => {
   });
 
   it("reports no authority at all once the membership row is gone", async () => {
-    const { tx } = fakeTx([], account(false));
-    expect(await resolvePublishAuthority(tx, 1, "acme")).toEqual({
+    const { repository } = fakeTx([], account(false));
+    expect(await repository.resolvePublishAuthority(1, "acme")).toEqual({
       member: false,
       verified: false,
       directCreate: false,
@@ -95,8 +95,8 @@ describe("resolvePublishAuthority", () => {
   });
 
   it("carries direct-create independently of any membership", async () => {
-    const { tx } = fakeTx([], account(true));
-    expect(await resolvePublishAuthority(tx, 1, "acme")).toEqual({
+    const { repository } = fakeTx([], account(true));
+    expect(await repository.resolvePublishAuthority(1, "acme")).toEqual({
       member: false,
       verified: false,
       directCreate: true,
@@ -104,8 +104,8 @@ describe("resolvePublishAuthority", () => {
   });
 
   it("grants nothing when the account row cannot be read", async () => {
-    const { tx } = fakeTx(membership(true), []);
-    expect(await resolvePublishAuthority(tx, 1, "acme")).toEqual({
+    const { repository } = fakeTx(membership(true), []);
+    expect(await repository.resolvePublishAuthority(1, "acme")).toEqual({
       member: true,
       verified: true,
       directCreate: false,

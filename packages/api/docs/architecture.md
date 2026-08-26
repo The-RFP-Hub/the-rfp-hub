@@ -1,17 +1,19 @@
 # API architecture & organization
 
 The organizational pattern to adopt across `packages/api`. It is a **layered, module-per-folder**
-structure: horizontal layers (`routes`, `services`, `mappers`), each subdivided by **module**
+structure: horizontal layers (`routes`, `services`, `repositories`, `mappers`), each subdivided by **module**
 (a resource such as `opportunities`). A module can hold multiple files per layer.
 
-Dependency direction is one-way: **controller → service → mapper / db**.
+Dependency direction is one-way: **controller → service → repository → db**. Mappers stay pure and
+may be called wherever a database row crosses the application boundary.
 
 ## Layers
 
 | Layer | Lives in | Responsibility | Never does |
 |---|---|---|---|
 | **Controller** | `modules/routes/<module>/<entity>.controller.ts` | The HTTP boundary. Parse the request, call a service, shape the response, set status codes. | SQL, business rules |
-| **Service** | `modules/services/<module>/<name>.service.ts` | Business logic + data access over Drizzle. Enforces domain rules (e.g. public reads are always `approved + listed`). | Touch HTTP (no `req`/`res`) |
+| **Service** | `modules/services/<module>/<name>.service.ts` | Business logic. Composes repositories; enforces domain rules. | Touch HTTP. Import `drizzle-orm` or a schema table — repositories own **ALL** database access ([ADR-0011](../../../adr/0011-repositories-own-all-database-access.md)). |
+| **Repository** | `modules/repositories/<domain>.repository.ts` | Every database read and write for its owned aggregate, expressed over a pool or transaction executor supplied by the unit of work. | HTTP, business policy, or exposing its raw executor to a service. |
 | **Mapper** | `modules/mappers/<entity>.mapper.ts` | Pure functions: DB row ↔ Standard object, plus the ingest guards (one block per `fundingType`) and the write-time derivations. | Any I/O |
 | **Shared** | `modules/shared/*.ts` | Pure cross-cutting helpers used by more than one layer (pagination; the `deadlines[]` derivations that back `next_deadline_at` and auto-close). | Any I/O |
 
@@ -42,9 +44,16 @@ packages/api/src/
       health/   { index.ts, health.controller.ts }
     services/
       opportunities/
-        opportunity.service.ts       class OpportunityService (logic + data)
+        opportunity.service.ts       class OpportunityService (business logic over repositories)
+        opportunity-ownership.ts     shared submission-or-namespace owner rule
+      notifications/
+        notification.service.ts      notification domain rules
       stats/    { stats.service.ts }
       health/   { health.service.ts }
+    repositories/
+      index.ts                        public repository bundle + unit-of-work exports
+      unit-of-work.ts                 lazy executor-bound bundle; withTransaction(db, run)
+      <domain>.repository.ts          all queries for one aggregate (added as domains migrate)
     mappers/
       opportunity.mapper.ts          pure row ↔ Standard
     shared/
@@ -60,27 +69,44 @@ packages/api/src/
   (e.g. `opportunityController.getAll`). Handlers are thin: `const service = new OpportunityService();
   return res.send(await service.getAll(query))`.
 - **Service** — `<name>.service.ts`, exporting `class <Name>Service`. Plain class with
-  `constructor(private readonly db: DB = defaultDb) {}` — defaults to the shared client and is
-  injectable so unit tests can pass a fake `db`. **No abstract base** (the DB handle + a couple of
-  helpers don't warrant one; put shared helpers in `modules/shared/`).
+  a repository-bundle dependency. It composes repository calls and enforces policy, but never
+  imports `drizzle-orm`, `db/schema.js`, or `db/auth-schema.js`, and never starts a transaction.
+- **Repository** — `<domain>.repository.ts`, exporting `class <Domain>Repository`. It owns every
+  query for that aggregate and accepts the pool-or-transaction executor supplied by
+  `repositories(exec)`. Keep the executor private. Cross-aggregate joins belong to the repository
+  whose aggregate owns the result; when that is not obvious, decide and document the owner.
+- **Unit of work** — `repositories(db)` supplies the lazy non-transactional bundle.
+  `withTransaction(db, run)` supplies the same bundle bound to one transaction and gives `run`
+  only repositories, never the raw `tx`; this prevents a nested helper read from escaping to the
+  pool while the transaction holds a connection.
 - **Mapper** — `<entity>.mapper.ts`, only pure functions.
 - **Multiple per module** — need a second service/controller for a module? Add another
-  `*.service.ts` / `*.controller.ts` file in the same module folder. Need a new resource? Add a new
-  `<module>/` folder under `routes/` and `services/`, and register it in `modules/routes/index.ts`.
+  `*.service.ts` / `*.controller.ts` file in the same module folder. Need a new resource? Add its
+  route/service module and an owning repository when it persists data, then register it in
+  `modules/routes/index.ts`.
+- **Boundary guard** — `test/unit/data-access-boundary.test.ts` scans the API tree without a
+  database. Its temporary allowlist is migration debt with an exact two-way ratchet: both a new
+  offender and a stale migrated entry fail the test.
 
 ## Testing
 
 - **Unit** (no DB, always run): mappers vs the committed Standard examples, pure helpers
-  (query parsing, pagination, LIKE escaping), and services with an injected fake `db`.
+  (query parsing, pagination, LIKE escaping), repositories with a fake executor, and services with
+  injected fake repositories.
 - **Integration** (gated on `DATABASE_URL`): the full stack via `app.inject()` against Postgres,
   with self-cleaning fixtures (isolate by a unique ecosystem tag + public-id prefix, delete in
   `afterAll`).
 
 ## Adding a resource — checklist
 
-1. `modules/services/<module>/<entity>.service.ts` — the logic (`class <Entity>Service`).
-2. `modules/mappers/<entity>.mapper.ts` — if it maps to the Standard.
-3. `modules/routes/<module>/<entity>.controller.ts` — HTTP handlers calling the service.
-4. `modules/routes/<module>/index.ts` — register the routes (+ response `$ref`s from `openapi/schemas.ts`).
-5. Mount the module in `modules/routes/index.ts`.
-6. Tests: unit for the mapper/helpers + service (fake `db`), integration for the endpoints.
+1. `modules/repositories/<domain>.repository.ts` — every database read/write the resource needs;
+   add its lazy getter to the `Repositories` bundle.
+2. `modules/services/<module>/<entity>.service.ts` — domain logic over repositories
+   (`class <Entity>Service`), with no Drizzle or schema imports.
+3. `modules/mappers/<entity>.mapper.ts` — if it maps to the Standard.
+4. `modules/routes/<module>/<entity>.controller.ts` — HTTP handlers calling the service.
+5. `modules/routes/<module>/index.ts` — register the routes (+ response `$ref`s from
+   `openapi/schemas.ts`).
+6. Mount the module in `modules/routes/index.ts`.
+7. Tests: unit for repository queries (fake executor), mapper/helpers, and service policy (fake
+   repositories), plus integration coverage for the endpoints.
