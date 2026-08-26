@@ -16,7 +16,7 @@
  * not.
  */
 import { and, count, eq, ilike, or } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../../db/client.js";
+import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityRow,
   type OrganizationRow,
@@ -147,7 +147,7 @@ export class ReviewService {
       // The no-op check is part of the write. Lock first so two identical concurrent decisions do
       // not both read the old flag, both UPDATE it, and append two audit rows for one transition.
       const row = await lockOrganization(tx, slug);
-      if (row.verified === verified) return this.summarize(row);
+      if (row.verified === verified) return this.summarize(tx, row);
       const now = new Date();
       const updated = await tx
         .update(organizations)
@@ -163,7 +163,7 @@ export class ReviewService {
         action: verified ? "verify_organization" : "unverify_organization",
         patch: { verified: { before: row.verified, after: verified } },
       });
-      return this.summarize(next);
+      return this.summarize(tx, next);
     });
   }
 
@@ -233,7 +233,7 @@ export class ReviewService {
         patch.ecosystems = { before: row.ecosystems, after: metadata.ecosystems };
       }
 
-      if (Object.keys(patch).length === 0) return this.summarize(row);
+      if (Object.keys(patch).length === 0) return this.summarize(tx, row);
 
       const updated = await tx
         .update(organizations)
@@ -249,7 +249,7 @@ export class ReviewService {
         action: "update_organization",
         patch,
       });
-      return this.summarize(next);
+      return this.summarize(tx, next);
     });
   }
 
@@ -534,11 +534,11 @@ export class ReviewService {
       .where(where)
       .orderBy(organizations.slug)
       .limit(limit);
-    return Promise.all(rows.map((row) => this.summarize(row)));
+    return Promise.all(rows.map((row) => this.summarize(this.db, row)));
   }
 
-  private async summarize(row: OrganizationRow): Promise<OrganizationSummaryView> {
-    const counted = await this.db
+  private async summarize(exec: DbLike, row: OrganizationRow): Promise<OrganizationSummaryView> {
+    const counted = await exec
       .select({ value: count() })
       .from(orgMemberships)
       .where(eq(orgMemberships.organizationId, row.id));

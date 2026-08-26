@@ -607,6 +607,7 @@ export class DedupeService {
       .limit(limit);
 
     const survivors = await this.survivorIds(
+      this.db,
       rows.flatMap(({ left: l, right: r }) => [l.mergedIntoId, r.mergedIntoId]),
     );
     return rows.map(({ pair, left: l, right: r }) => toPairView(pair, l, r, survivors));
@@ -656,7 +657,7 @@ export class DedupeService {
         ],
         decidedBy: "reviewer",
       });
-      const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
+      const survivors = await this.survivorIds(tx, [left.mergedIntoId, right.mergedIntoId]);
       return { result: toPairView(next, left, right, survivors), notificationIds };
     });
     this.enqueueNotifications(committed.notificationIds);
@@ -705,7 +706,7 @@ export class DedupeService {
               decidedBy: "reviewer",
             })
           : [];
-      const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
+      const survivors = await this.survivorIds(tx, [left.mergedIntoId, right.mergedIntoId]);
       return { result: toPairView(next, left, right, survivors), notificationIds };
     });
     this.enqueueNotifications(committed.notificationIds);
@@ -892,10 +893,10 @@ export class DedupeService {
   }
 
   /** Public ids for a set of `merged_into_id` values, so a side can name its survivor. */
-  private async survivorIds(ids: (number | null)[]): Promise<Map<number, string>> {
+  private async survivorIds(exec: DbLike, ids: (number | null)[]): Promise<Map<number, string>> {
     const wanted = [...new Set(ids.filter((id): id is number => id !== null))];
     if (wanted.length === 0) return new Map();
-    const rows = await this.db
+    const rows = await exec
       .select({ id: opportunities.id, publicId: opportunities.publicId })
       .from(opportunities)
       .where(inArray(opportunities.id, wanted));
