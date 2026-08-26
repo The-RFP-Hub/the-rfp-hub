@@ -1,20 +1,4 @@
-import type { FundingType, Opportunity, OpportunityStatus } from "@the-rfp-hub/standard";
-import {
-  type SQL,
-  and,
-  arrayOverlaps,
-  asc,
-  count,
-  desc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  lte,
-  or,
-  sql,
-} from "drizzle-orm";
-import { type PgColumn, alias } from "drizzle-orm/pg-core";
+import type { Opportunity } from "@the-rfp-hub/standard";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityInsert,
@@ -29,33 +13,21 @@ import {
   toStandard,
   toSummary,
 } from "../../mappers/opportunity.mapper.js";
+import {
+  type PublicOpportunityQuery,
+  type Repositories,
+  repositories,
+} from "../../repositories/index.js";
 import { paginate } from "../../shared/pagination.js";
 
 /**
  * Sortable fields. `closesAt` is gone with the re-cut — `nextDeadlineAt` (the derived, denormalized
  * earliest FUTURE fixed deadline) replaces it and is the default.
  */
-export type SortField = "nextDeadlineAt" | "opensAt" | "postedAt" | "updatedAt" | "createdAt";
+export type { OpportunitySortField as SortField } from "../../repositories/index.js";
 
 /** Normalized query for the list endpoint (produced by routes/opportunities/types.ts). */
-export interface OpportunityQuery {
-  fundingType?: FundingType[];
-  status?: OpportunityStatus[];
-  ecosystem?: string[];
-  category?: string[];
-  /** Organization slug — matches ANY operating OR sponsoring organization, not only the primary one. */
-  organization?: string;
-  minAward?: number;
-  maxAward?: number;
-  /** Deadline window over `next_deadline_at` (ISO instants). Rolling-only records are excluded. */
-  deadlineAfter?: Date;
-  deadlineBefore?: Date;
-  q?: string;
-  sort: SortField;
-  order: "asc" | "desc";
-  page: number;
-  limit: number;
-}
+export type OpportunityQuery = PublicOpportunityQuery;
 
 export interface Page<T> {
   items: T[];
@@ -65,126 +37,29 @@ export interface Page<T> {
   totalPages: number;
 }
 
-const SORT_COLUMNS = {
-  nextDeadlineAt: opportunities.nextDeadlineAt,
-  opensAt: opportunities.opensAt,
-  postedAt: opportunities.postedAt,
-  updatedAt: opportunities.updatedAt,
-  createdAt: opportunities.createdAt,
-} as const;
-
 /**
  * Escape Postgres LIKE/ILIKE metacharacters (%, _, \) so user text matches literally.
  * Patterns are parameter-bound (no injection) — this is precision only. Backslash is Postgres's
  * default ILIKE escape char, so no explicit ESCAPE clause is required.
  */
-export function escapeLike(s: string): string {
-  return s.replace(/[\\%_]/g, "\\$&");
-}
-
-/**
- * "Does this text[] column contain any of these values, ignoring case?"
- *
- * THE INDEX TRADEOFF, stated rather than discovered later. `&&` (`arrayOverlaps`) is served by the
- * GIN index on these columns; `lower(x)` cannot be, because the index holds the values as written.
- * So this predicate is a scan over the row's own array — a few elements per row — and the planner
- * falls back to a sequential scan on the table where `&&` would have used the index.
- *
- * Accepted deliberately: the corpus is small (hundreds of rows, bounded by what a review queue can
- * pass), the arrays are short, and the alternative is a filter that quietly answers with a subset of
- * the matching rows. If this table ever grows enough for it to matter, the fix is an expression
- * index on `lower()` over the unnested values — a functional GIN index — not re-narrowing the query.
- */
-function arrayMatchesInsensitive(column: PgColumn, values: string[]): SQL {
-  const lowered = sql.join(
-    values.map((value) => sql`${value.trim().toLowerCase()}`),
-    sql`, `,
-  );
-  return sql`exists (select 1 from unnest(${column}) as candidate where lower(candidate) in (${lowered}))`;
-}
+export { escapeLike } from "../../repositories/index.js";
 
 /** Data + business logic for opportunities. Public reads are always approved + listed. */
 export class OpportunityService {
-  constructor(private readonly db: DB = defaultDb) {}
+  private readonly repos: Repositories;
 
-  /** Conditions shared by every public read. */
-  private liveFilters(q: OpportunityQuery): SQL[] {
-    const where: SQL[] = [
-      eq(opportunities.reviewStatus, "approved"),
-      eq(opportunities.isListed, true),
-    ];
-    if (q.fundingType?.length) where.push(inArray(opportunities.fundingType, q.fundingType));
-    if (q.status?.length) where.push(inArray(opportunities.status, q.status));
-    // CASE-INSENSITIVE, unlike the two filters around it, and the difference is not stylistic: an
-    // ecosystem name is free text a publisher types, so the corpus really does hold `Ethereum`,
-    // `ethereum` and `EVM`/`evm` side by side, and a case-sensitive `&&` answered a query for one of
-    // them with a fraction of the rows and no indication that it had. A filter that silently returns
-    // a subset is worse than one that returns nothing.
-    if (q.ecosystem?.length)
-      where.push(arrayMatchesInsensitive(opportunities.ecosystems, q.ecosystem));
-    // `category` stays case-SENSITIVE on purpose: it is a closed vocabulary defined by the Standard
-    // and validated on the way in, so its values are already canonical. Loosening it would only
-    // widen what an exact, checked value matches.
-    if (q.category?.length) where.push(arrayOverlaps(opportunities.categories, q.category));
-    // ANY operating OR sponsoring organization, via the denormalized slug array — also
-    // case-insensitively, because a slug arrives in a URL a human typed as often as from a link.
-    if (q.organization) {
-      where.push(arrayMatchesInsensitive(opportunities.orgSlugs, [q.organization]));
-    }
-    // Include the same-side bound so a row that sets only one of min/max/budget still matches.
-    if (q.minAward !== undefined) {
-      where.push(
-        sql`coalesce(${opportunities.maxAward}, ${opportunities.budget}, ${opportunities.minAward}) >= ${q.minAward}`,
-      );
-    }
-    if (q.maxAward !== undefined) {
-      where.push(
-        sql`coalesce(${opportunities.minAward}, ${opportunities.budget}, ${opportunities.maxAward}) <= ${q.maxAward}`,
-      );
-    }
-    // Deadline window. `next_deadline_at` is NULL for rolling-only / all-past / no-deadline
-    // records, so those are excluded by either bound — documented on the query params.
-    if (q.deadlineAfter) where.push(gte(opportunities.nextDeadlineAt, q.deadlineAfter));
-    if (q.deadlineBefore) where.push(lte(opportunities.nextDeadlineAt, q.deadlineBefore));
-    if (q.q) {
-      const like = `%${escapeLike(q.q)}%`;
-      const text = or(
-        ilike(opportunities.title, like),
-        ilike(opportunities.summary, like),
-        ilike(opportunities.description, like),
-      );
-      if (text) where.push(text);
-    }
-    return where;
-  }
-
-  /**
-   * Primary ORDER BY. NULLS LAST in BOTH directions so records with no next fixed deadline
-   * (rolling-only, all-past, or none at all) always sort after those that have one.
-   */
-  private orderBy(q: OpportunityQuery): SQL {
-    const col = SORT_COLUMNS[q.sort];
-    return q.order === "asc" ? sql`${col} asc nulls last` : sql`${col} desc nulls last`;
+  constructor(private readonly db: DB = defaultDb) {
+    this.repos = repositories(db);
   }
 
   /** List opportunities (thin projection) with filters, sort and pagination. */
   async getAll(q: OpportunityQuery): Promise<Page<OpportunitySummary>> {
     const { page, limit, offset } = paginate(q.page, q.limit);
-    const whereClause = and(...this.liveFilters(q));
-
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(whereClause)
-      .orderBy(this.orderBy(q), desc(opportunities.id))
-      .limit(limit)
-      .offset(offset);
-
-    const counted = await this.db.select({ value: count() }).from(opportunities).where(whereClause);
-    const total = counted[0]?.value ?? 0;
+    const result = await this.repos.opportunities.listPublic(q, limit, offset);
+    const total = result.total;
 
     return {
-      items: rows.map(toSummary),
+      items: result.rows.map(toSummary),
       page,
       limit,
       total,
@@ -206,29 +81,20 @@ export class OpportunityService {
    * the records afterwards, identically for every consumer (see modules/shared/export-format.ts).
    */
   async listAll(): Promise<Opportunity[]> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true)))
-      .orderBy(asc(opportunities.publicId));
+    const rows = await this.repos.opportunities.listAllPublic();
     return rows.map(toStandard);
   }
 
   /** Fetch one full opportunity by its public id; null if absent or not publicly visible. */
   async find(publicId: string): Promise<Opportunity | null> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(
-        and(
-          eq(opportunities.publicId, publicId),
-          eq(opportunities.reviewStatus, "approved"),
-          eq(opportunities.isListed, true),
-        ),
-      )
-      .limit(1);
-    const r = rows[0];
+    const r = await this.repos.opportunities.findPublicDetailByPublicId(publicId);
     return r ? toStandard(r) : null;
+  }
+
+  /** Public link-out value, still subject to protocol validation by the redirect controller. */
+  async findLink(publicId: string, kind: "apply" | "source"): Promise<string | null> {
+    const row = await this.repos.opportunities.findPublicDetailByPublicId(publicId);
+    return (kind === "apply" ? row?.applicationUrl : row?.website) ?? null;
   }
 
   /**
@@ -239,21 +105,7 @@ export class OpportunityService {
    * from an id that never existed.
    */
   async findMergedDestination(publicId: string): Promise<{ id: string; title: string } | null> {
-    const survivor = alias(opportunities, "public_merge_survivor");
-    const rows = await this.db
-      .select({ id: survivor.publicId, title: survivor.title })
-      .from(opportunities)
-      .innerJoin(survivor, eq(survivor.id, opportunities.mergedIntoId))
-      .where(
-        and(
-          eq(opportunities.publicId, publicId),
-          eq(opportunities.mergedFromPublic, true),
-          eq(survivor.reviewStatus, "approved"),
-          eq(survivor.isListed, true),
-        ),
-      )
-      .limit(1);
-    return rows[0] ?? null;
+    return this.repos.opportunities.findMergedDestinationByPublicId(publicId);
   }
 
   // ── write path (used by the seed loader, not exposed as a route in M2) ─────────────

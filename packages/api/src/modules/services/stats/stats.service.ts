@@ -1,6 +1,5 @@
-import { and, count, eq, max, sql } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { opportunities } from "../../../db/schema.js";
+import { type Repositories, repositories } from "../../repositories/index.js";
 
 export interface StatsSummary {
   /** Total publicly visible (approved + listed) opportunities. */
@@ -15,36 +14,15 @@ export interface StatsSummary {
 
 /** Aggregate counts for the `/v1/stats` endpoint (public dataset only). */
 export class StatsService {
-  constructor(private readonly db: DB = defaultDb) {}
+  private readonly repos: Repositories;
+
+  constructor(private readonly db: DB = defaultDb) {
+    this.repos = repositories(db);
+  }
 
   async summary(): Promise<StatsSummary> {
-    const live = and(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true));
-
-    const [totalRows, byFundingType, byStatus, ecoRes, updatedRows] = await Promise.all([
-      this.db.select({ value: count() }).from(opportunities).where(live),
-      this.db
-        .select({ key: opportunities.fundingType, value: count() })
-        .from(opportunities)
-        .where(live)
-        .groupBy(opportunities.fundingType),
-      this.db
-        .select({ key: opportunities.status, value: count() })
-        .from(opportunities)
-        .where(live)
-        .groupBy(opportunities.status),
-      this.db.execute(sql`
-        SELECT e AS ecosystem, count(*)::int AS count
-        FROM ${opportunities}, unnest(${opportunities.ecosystems}) AS e
-        WHERE ${live}
-        GROUP BY e
-        ORDER BY count DESC, e ASC
-        LIMIT 10
-      `),
-      this.db
-        .select({ value: max(opportunities.updatedAt) })
-        .from(opportunities)
-        .where(live),
-    ]);
+    const { totalRows, byFundingType, byStatus, ecosystemRows, updatedRows } =
+      await this.repos.opportunities.stats();
 
     const tally = (rows: { key: string; value: number }[]): Record<string, number> => {
       const out: Record<string, number> = {};
@@ -52,7 +30,7 @@ export class StatsService {
       return out;
     };
 
-    const topEcosystems = (ecoRes.rows as { ecosystem: string; count: number }[]).map((r) => ({
+    const topEcosystems = ecosystemRows.map((r) => ({
       ecosystem: r.ecosystem,
       count: Number(r.count),
     }));

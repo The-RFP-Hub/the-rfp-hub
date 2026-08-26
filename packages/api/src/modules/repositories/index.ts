@@ -32,9 +32,15 @@ export {
   type NotificationRemainingSelection,
 } from "./notifications/notification.repository.js";
 export {
+  escapeLike,
+  type ManagedOpportunityQuery,
+  type ManagedOpportunityScope,
+  type OpportunitySortField,
   type OwnershipColumns,
   ownedOpportunityPredicate,
   OpportunityRepository,
+  type PublicOpportunityQuery,
+  type PublisherStatus,
 } from "./opportunities/opportunity.repository.js";
 export { OrganizationRepository } from "./organizations/organization.repository.js";
 export {
