@@ -1297,6 +1297,21 @@ ul.plain {
   max-width: 46ch;
 }
 
+/* Matrix bands turn one long permission list into three stages without colouring any cell. */
+.matrix-band th {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--ink);
+  padding-top: var(--space-6);
+}
+
+tbody:first-of-type .matrix-band th {
+  padding-top: var(--space-3);
+}
+
 .pagination {
   display: flex;
   align-items: center;
