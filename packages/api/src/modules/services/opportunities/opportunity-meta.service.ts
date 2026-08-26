@@ -28,6 +28,7 @@ import type {
 } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
+import { isOpportunityOwnedBy, ownedOpportunityPredicate } from "./opportunity-ownership.js";
 
 /** What a caller may see of one entry. */
 export interface ViewerScope {
@@ -135,20 +136,10 @@ export class OpportunityMetaService {
    * Entitlement, not publicity, is the question.
    */
   async duplicatesForOwner(principal: Principal): Promise<OwnedDuplicateMatchView[]> {
-    const namespaces = principal.memberships.map((m) => m.slug);
     const left = alias(opportunities, "owned_dup_left");
     const right = alias(opportunities, "owned_dup_right");
-    const mineOnLeft =
-      namespaces.length === 0
-        ? eq(left.submittedBy, principal.accountId)
-        : or(eq(left.submittedBy, principal.accountId), inArray(left.sourcePublisher, namespaces));
-    const mineOnRight =
-      namespaces.length === 0
-        ? eq(right.submittedBy, principal.accountId)
-        : or(
-            eq(right.submittedBy, principal.accountId),
-            inArray(right.sourcePublisher, namespaces),
-          );
+    const mineOnLeft = ownedOpportunityPredicate(left, principal);
+    const mineOnRight = ownedOpportunityPredicate(right, principal);
 
     const rows = await this.db
       .select({ pair: opportunityDuplicates, left, right })
@@ -163,7 +154,7 @@ export class OpportunityMetaService {
       .map(({ pair, left: leftRow, right: rightRow }) => {
         // The stored pair is canonical (left id < right id). Prefer its left side when both entries
         // are owned so one pair produces one row with a stable account-side identity.
-        const yours = isOwnedBy(leftRow, principal) ? leftRow : rightRow;
+        const yours = isOpportunityOwnedBy(leftRow, principal) ? leftRow : rightRow;
         const match = yours === leftRow ? rightRow : leftRow;
         return { pair, match, yours };
       })
@@ -228,16 +219,7 @@ function isPubliclyVisible(row: OpportunityRow): boolean {
 export function isPrivileged(row: OpportunityRow, principal: Principal | null): boolean {
   if (!principal) return false;
   if (isReviewer(principal)) return true;
-  return isOwnedBy(row, principal);
-}
-
-/** Ownership only — deliberately excludes reviewer privilege from account-scoped queries. */
-function isOwnedBy(row: OpportunityRow, principal: Principal): boolean {
-  if (row.submittedBy === principal.accountId) return true;
-  return (
-    row.sourcePublisher !== null &&
-    principal.memberships.some((m) => m.slug === row.sourcePublisher)
-  );
+  return isOpportunityOwnedBy(row, principal);
 }
 
 /**

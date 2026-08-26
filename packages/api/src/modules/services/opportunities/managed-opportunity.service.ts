@@ -11,13 +11,14 @@
  * namespace this account publishes for. The second is what a granted claim transfers — ownership
  * follows the namespace, not the original typist.
  */
-import { type SQL, and, count, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type OpportunityRow, accounts, auditLog, opportunities } from "../../../db/schema.js";
 import type { ManagedOpportunityView, ReviewDecisionSummaryView } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { paginate } from "../../shared/pagination.js";
+import { ownedOpportunityPredicate } from "./opportunity-ownership.js";
 
 export type PublisherStatus = "merged" | "rejected" | "pending" | "hidden" | "live";
 
@@ -41,11 +42,8 @@ export class ManagedOpportunityService {
   constructor(private readonly db: DB = defaultDb) {}
 
   /** The predicate for "entries this principal owns". Undefined memberships narrow it, never widen. */
-  private ownership(principal: Principal): SQL | undefined {
-    const namespaces = principal.memberships.map((m) => m.slug);
-    const mine = eq(opportunities.submittedBy, principal.accountId);
-    if (namespaces.length === 0) return mine;
-    return or(mine, inArray(opportunities.sourcePublisher, namespaces));
+  private ownership(principal: Principal): SQL {
+    return ownedOpportunityPredicate(opportunities, principal);
   }
 
   async listOwned(principal: Principal, query: ManagedQuery): Promise<ManagedPage> {

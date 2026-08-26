@@ -2,7 +2,7 @@
  * Semantic duplicate detection: embed an entry, find its neighbours, record the pairs, and give a
  * reviewer somewhere to decide.
  *
- * FIVE THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
+ * SIX THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
  *
  * 1. **The candidate scope is credential-dependent.** A submitter's check runs over `approved AND
  *    is_listed` rows only. Searching everything would turn a submission into a way to enumerate the
@@ -22,6 +22,9 @@
  * 5. **Failure never blocks a write.** The whole check is wrapped: a missing key, a timeout, a
  *    provider outage all resolve to `unavailable` with no embedding row, which is precisely the
  *    predicate the backfill job selects on. A submission that was accepted stays accepted.
+ * 6. **A newly inserted pair emits in the same transaction.** `returning()` distinguishes a real
+ *    creation from a re-detection, and the notification unique key is the final backstop. Decisions,
+ *    merges and reopens likewise record owner notifications beside their mutations and audit rows.
  */
 
 import { type SQL, and, asc, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
@@ -47,6 +50,7 @@ import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
+import { NotificationService } from "../notifications/notification.service.js";
 import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
   type EmbeddingProvider,
@@ -113,6 +117,7 @@ export class DedupeService {
   private readonly provider: EmbeddingProvider | undefined;
   private readonly config: AppConfig;
   private readonly audit: AuditService;
+  private readonly notifications: NotificationService;
 
   constructor(
     private readonly db: DB = defaultDb,
@@ -121,6 +126,7 @@ export class DedupeService {
     this.config = options.config ?? defaultConfig;
     this.provider = options.provider ?? createEmbeddingProvider(this.config.embedding);
     this.audit = new AuditService(db);
+    this.notifications = new NotificationService();
   }
 
   /** Whether this deployment can detect duplicates at all. */
@@ -300,29 +306,50 @@ export class DedupeService {
     matches: { id: number; similarity: number }[],
   ): Promise<void> {
     if (matches.length === 0) return;
-    for (const match of matches) {
-      // Canonical ordering, matching `ux_dup_pair`'s (least, greatest) expression index, so the
-      // mirrored pair is the same key rather than a second row with its own status.
-      const [low, high] =
-        opportunityId < match.id ? [opportunityId, match.id] : [match.id, opportunityId];
-      const similarity = round(match.similarity).toString();
-      await this.db
-        .insert(opportunityDuplicates)
-        .values({ opportunityId: low, duplicateOfId: high, similarity, status: "suspected" })
-        .onConflictDoNothing();
-      // Only a suspected pair is refreshed. A dismissal is a judgement, and a re-run of the
-      // detector is not new information about it.
-      await this.db
-        .update(opportunityDuplicates)
-        .set({ similarity })
-        .where(
-          and(
-            eq(opportunityDuplicates.opportunityId, low),
-            eq(opportunityDuplicates.duplicateOfId, high),
-            eq(opportunityDuplicates.status, "suspected"),
-          ),
-        );
-    }
+    await this.db.transaction(async (tx) => {
+      for (const match of matches) {
+        // Canonical ordering, matching `ux_dup_pair`'s (least, greatest) expression index, so the
+        // mirrored pair is the same key rather than a second row with its own status.
+        const [low, high] =
+          opportunityId < match.id ? [opportunityId, match.id] : [match.id, opportunityId];
+        const similarity = round(match.similarity).toString();
+        const inserted = await tx
+          .insert(opportunityDuplicates)
+          .values({ opportunityId: low, duplicateOfId: high, similarity, status: "suspected" })
+          .onConflictDoNothing()
+          .returning();
+        // Only a suspected pair is refreshed. A dismissal is a judgement, and a re-run of the
+        // detector is not new information about it.
+        await tx
+          .update(opportunityDuplicates)
+          .set({ similarity })
+          .where(
+            and(
+              eq(opportunityDuplicates.opportunityId, low),
+              eq(opportunityDuplicates.duplicateOfId, high),
+              eq(opportunityDuplicates.status, "suspected"),
+            ),
+          );
+
+        // `returning()` is the intent guard: an existing pair is a refresh, not a new event.
+        const pair = inserted[0];
+        if (pair) {
+          const [left, right] = await Promise.all([
+            loadRowById(tx, pair.opportunityId),
+            loadRowById(tx, pair.duplicateOfId),
+          ]);
+          await this.notifications.recordDuplicate(tx, {
+            pair,
+            left,
+            right,
+            events: [
+              { kind: "duplicate_suspected", ownerOpportunityId: left.id },
+              { kind: "duplicate_suspected", ownerOpportunityId: right.id },
+            ],
+          });
+        }
+      }
+    });
   }
 
   /**
@@ -527,6 +554,16 @@ export class DedupeService {
         loadRowById(tx, next.opportunityId),
         loadRowById(tx, next.duplicateOfId),
       ]);
+      await this.notifications.recordDuplicate(tx, {
+        pair: next,
+        left,
+        right,
+        events: [
+          { kind: `duplicate_${status}`, ownerOpportunityId: left.id },
+          { kind: `duplicate_${status}`, ownerOpportunityId: right.id },
+        ],
+        decidedBy: "reviewer",
+      });
       const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
       return toPairView(next, left, right, survivors);
     });
@@ -561,6 +598,18 @@ export class DedupeService {
         loadRowById(tx, next.opportunityId),
         loadRowById(tx, next.duplicateOfId),
       ]);
+      if (transition === "reopen") {
+        await this.notifications.recordDuplicate(tx, {
+          pair: next,
+          left,
+          right,
+          events: [
+            { kind: "duplicate_reopened", ownerOpportunityId: left.id },
+            { kind: "duplicate_reopened", ownerOpportunityId: right.id },
+          ],
+          decidedBy: "reviewer",
+        });
+      }
       const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
       return toPairView(next, left, right, survivors);
     });
@@ -707,6 +756,16 @@ export class DedupeService {
         loadRowById(tx, pairRow.opportunityId),
         loadRowById(tx, pairRow.duplicateOfId),
       ]);
+      await this.notifications.recordDuplicate(tx, {
+        pair: pairRow,
+        left,
+        right,
+        events: [
+          { kind: "duplicate_merged_away", ownerOpportunityId: loser.id },
+          { kind: "duplicate_absorbed", ownerOpportunityId: survivor.id },
+        ],
+        decidedBy: "reviewer",
+      });
       const survivors = new Map([[survivor.id, survivor.publicId]]);
       return {
         pair: toPairView(pairRow, left, right, survivors),
