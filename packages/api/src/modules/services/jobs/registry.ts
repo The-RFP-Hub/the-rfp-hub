@@ -123,7 +123,7 @@ export const JOBS: JobDefinition[] = [
     name: "verification-backfill",
     shape: "cursor",
     describes:
-      "Fetch the applicationUrl of entries never checked or edited since their last check.",
+      "Fetch the applicationUrl of entries never checked, edited since, or checked longer ago than VERIFY_RECHECK_DAYS.",
     run: (options) => new VerificationService(dbOf(options)).runBatch({ limit: options.limit }),
   },
   {
