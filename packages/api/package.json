@@ -25,7 +25,8 @@
     "export:api": "tsx scripts/export-from-api.ts",
     "corpus:fetch": "tsx tools/converter/fetch-corpus.ts",
     "corpus:convert": "tsx tools/converter/convert.ts",
-    "dedupe:threshold": "tsx scripts/dedupe-threshold-report.ts"
+    "dedupe:threshold": "tsx scripts/dedupe-threshold-report.ts",
+    "build:idf": "tsx scripts/build-idf-table.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1113.0",

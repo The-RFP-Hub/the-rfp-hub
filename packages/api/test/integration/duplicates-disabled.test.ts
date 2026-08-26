@@ -15,7 +15,6 @@
  * read the second when the truth is the first.
  */
 process.env.EMBEDDING_PROVIDER = "disabled";
-process.env.OPENAI_API_KEY = "";
 
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -80,9 +79,10 @@ run("M3DUP duplicate detection, provider disabled", () => {
     await pool.end();
   });
 
-  it("resolves to `disabled` rather than falling back to the deterministic provider", () => {
-    // The fallback would be worse than nothing: a deployment reporting duplicate checks it is not
-    // really performing. `readEmbeddingProvider` never chooses `deterministic` on its own.
+  it("honours an explicit `disabled` — detection off is asked for, never inferred", () => {
+    // The complementary rule (an ABSENT setting yields `lexical`, the in-process default that
+    // needs no key and no network) is pinned in `config.test.ts`, where the reader is a pure
+    // function; this file exists to prove the wiring when the answer is genuinely off.
     expect(config.embedding.provider).toBe("disabled");
   });
 
