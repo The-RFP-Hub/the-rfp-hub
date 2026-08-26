@@ -64,6 +64,13 @@
       "when": 1787747816318,
       "tag": "0008_melted_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787754053624,
+      "tag": "0009_premium_boomer",
+      "breakpoints": true
     }
   ]
 }
