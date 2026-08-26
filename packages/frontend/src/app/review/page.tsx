@@ -1425,7 +1425,7 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
   return (
     <>
       <form
-        className="row"
+        className="search-row"
         onSubmit={(event) => {
           event.preventDefault();
           setSearch(query.trim());
@@ -1856,7 +1856,7 @@ function GrantMembership({
         )}
       </p>
 
-      <div className="row">
+      <div className="filters">
         <div className="field">
           <label htmlFor={`grant-who-${org.slug}`}>Account handle or id</label>
           <input

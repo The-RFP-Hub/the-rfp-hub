@@ -252,6 +252,31 @@ describe("organisation navigation", () => {
       expect(organisationNav({ ...me, memberships: [...memberships] })).toEqual({ href, label });
     },
   );
+
+  it("keeps all nine admin destinations in three semantic groups with a long organisation name", async () => {
+    const longName = "AnExtraordinarilyLongPublisherOrganisationNameWithoutConvenientBreaks";
+    const admin: Me = {
+      ...me,
+      role: "admin",
+      canReview: true,
+      canAdmin: true,
+      memberships: [{ ...acme, name: longName }],
+    };
+    session.data = { user: { id: "user_1" } };
+    render(
+      <ApiClientProvider value={clientFor(async () => admin)}>
+        <Chrome>
+          <p>Admin workbench</p>
+        </Chrome>
+      </ApiClientProvider>,
+    );
+
+    const navigation = await screen.findByRole("navigation", { name: "Sections" });
+    expect(navigation.querySelectorAll(":scope > ul")).toHaveLength(3);
+    expect(within(navigation).getAllByRole("list")).toHaveLength(3);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(9);
+    expect(within(navigation).getByRole("link", { name: longName })).toBeTruthy();
+  });
 });
 
 /**

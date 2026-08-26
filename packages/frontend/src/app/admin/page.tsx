@@ -90,7 +90,7 @@ function Accounts({ me }: { me: Me }) {
   return (
     <>
       <form
-        className="row"
+        className="search-row"
         onSubmit={(event) => {
           event.preventDefault();
           setSearch(query.trim());

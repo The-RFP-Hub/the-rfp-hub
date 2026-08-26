@@ -106,17 +106,18 @@ function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string;
   const visible = items.filter((item) => !item.requires || (me !== null && item.requires(me)));
   if (visible.length === 0) return null;
   return (
-    <span className="shell-nav-group">
+    <ul className="shell-nav-group">
       {visible.map((item) => (
-        <GuardedLink
-          key={item.href}
-          href={item.href}
-          aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
-        >
-          {item.label}
-        </GuardedLink>
+        <li key={item.href}>
+          <GuardedLink
+            href={item.href}
+            aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
+          >
+            {item.label}
+          </GuardedLink>
+        </li>
       ))}
-    </span>
+    </ul>
   );
 }
 

@@ -85,6 +85,7 @@ describe("the page's scope", () => {
     mount();
 
     expect(await screen.findByRole("heading", { name: "Accounts & roles" })).toBeTruthy();
+    expect(screen.getByLabelText("Search accounts").closest("form")?.className).toBe("search-row");
     expect(screen.queryByRole("columnheader", { name: "Members" })).toBeNull();
     // It says where verification went, rather than leaving a reviewer to guess.
     expect(screen.getByRole("link", { name: /Review queues/ })).toBeTruthy();

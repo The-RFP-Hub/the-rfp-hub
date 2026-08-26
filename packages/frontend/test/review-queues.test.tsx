@@ -793,6 +793,9 @@ describe("the organisations tab", () => {
     mount();
 
     await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    expect(screen.getByLabelText(/Search organisations/).closest("form")?.className).toBe(
+      "search-row",
+    );
     // The stub is in the corpus and the API would return it — it must not be on screen unasked.
     expect(screen.queryByText("0G")).toBeNull();
 
@@ -827,6 +830,7 @@ describe("the organisations tab", () => {
     // By ROW: the Verified section renders first, so "the first Grant button" is Filecoin's.
     const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+    expect(screen.getByLabelText("Account handle or id").closest(".filters")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Account handle or id"), {
       target: { value: "fil-ops" },
     });
