@@ -31,10 +31,11 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { db, pool } from "../../src/db/client.js";
-import { auditLog, opportunities } from "../../src/db/schema.js";
+import { auditLog, opportunities, organizations } from "../../src/db/schema.js";
 import { fromStandard } from "../../src/modules/mappers/opportunity.mapper.js";
+import { AuditRepository } from "../../src/modules/repositories/index.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { submission } from "../helpers/opportunity-fixture.js";
@@ -43,6 +44,8 @@ import { describeWithDb } from "./db-gate.js";
 const NS = "m3import";
 const SEEDED = `${NS}:seeded`;
 const ORPHAN = `${NS}:orphan`;
+const ATOMIC = `${NS}:atomic`;
+const ATOMIC_ORG = `${NS}-atomic-org`;
 
 const MIGRATION = fileURLToPath(
   new URL("../../src/db/migrations/0010_audit_backfill_import.sql", import.meta.url),
@@ -58,7 +61,11 @@ function corpusDocument(id: string, over: Record<string, unknown> = {}): Opportu
 
 function importOf(
   std: Opportunity,
-  over: { reviewStatus?: "pending" | "approved" | "rejected"; isListed?: boolean } = {},
+  over: {
+    reviewStatus?: "pending" | "approved" | "rejected";
+    isListed?: boolean;
+    sourceSystem?: string;
+  } = {},
 ): Promise<void> {
   return ingest.upsertFromStandard(std, {
     reviewStatus: "approved",
@@ -139,11 +146,11 @@ async function insertUnaudited(exec: Executor, publicId: string) {
 
 run("M3IMPORT the corpus import writes history", () => {
   beforeAll(async () => {
-    await cleanupFixtures({ opportunityPrefix: NS, organizationSlugs: [NS] });
+    await cleanupFixtures({ opportunityPrefix: NS, organizationSlugs: [NS, ATOMIC_ORG] });
   });
 
   afterAll(async () => {
-    await cleanupFixtures({ opportunityPrefix: NS, organizationSlugs: [NS] });
+    await cleanupFixtures({ opportunityPrefix: NS, organizationSlugs: [NS, ATOMIC_ORG] });
     await pool.end();
   });
 
@@ -222,6 +229,34 @@ run("M3IMPORT the corpus import writes history", () => {
     expect(latest?.patch).not.toHaveProperty("title");
 
     // Put it back, and that is a second change with a second row.
+    await importOf(corpusDocument(SEEDED, { title: "Renamed by the corpus" }));
+    expect(await trailOf(db, id)).toHaveLength(before.length + 2);
+  });
+
+  it("records a re-import that only moved the entry to another source system", async () => {
+    const id = await rowIdOf(SEEDED);
+    const before = await trailOf(db, id);
+
+    // Byte-identical document — same title, same review decision, same listing flag — with only
+    // the `sourceSystem` OPTION moved to a different importer.
+    await importOf(corpusDocument(SEEDED, { title: "Renamed by the corpus" }), {
+      sourceSystem: `${NS}-alt`,
+    });
+
+    const rows = await trailOf(db, id);
+    expect(rows).toHaveLength(before.length + 1);
+    const latest = rows.at(-1);
+    expect(latest?.action).toBe("update");
+    expect(latest?.actorKind).toBe("job");
+    expect(latest?.patch).toMatchObject({
+      job: "import",
+      sourceSystem: { before: NS, after: `${NS}-alt` },
+    });
+    // The document's own content never moved, so it must not ride along in the patch.
+    expect(latest?.patch).not.toHaveProperty("title");
+    expect(latest?.patch).not.toHaveProperty("description");
+
+    // Put the source system back so later assertions in this file see what they expect.
     await importOf(corpusDocument(SEEDED, { title: "Renamed by the corpus" }));
     expect(await trailOf(db, id)).toHaveLength(before.length + 2);
   });
@@ -310,5 +345,39 @@ run("M3IMPORT the corpus import writes history", () => {
       .from(opportunities)
       .where(eq(opportunities.publicId, ORPHAN));
     expect(survivors).toHaveLength(0);
+  });
+
+  it("rolls back the opportunity and organization writes when the audit insert fails", async () => {
+    // A NEW public id under a NEW organization slug — neither can already have a row from an
+    // earlier test in this file, so their absence afterwards can only mean the transaction rolled
+    // back cleanly rather than one of these tests having tidied up first.
+    const std = corpusDocument(ATOMIC, {
+      operatingOrganizations: [{ name: ATOMIC_ORG, slug: ATOMIC_ORG }],
+    });
+
+    const failure = new Error("m3import: injected audit insert failure");
+    const record = vi.spyOn(AuditRepository.prototype, "record").mockImplementationOnce(() => {
+      throw failure;
+    });
+
+    try {
+      await expect(importOf(std)).rejects.toBe(failure);
+    } finally {
+      record.mockRestore();
+    }
+
+    // The organization upsert and the opportunity upsert both ran, inside the same transaction as
+    // the audit insert that then failed — ATOMIC means neither survives without it.
+    const opportunityRows = await db
+      .select({ id: opportunities.id })
+      .from(opportunities)
+      .where(eq(opportunities.publicId, ATOMIC));
+    expect(opportunityRows).toHaveLength(0);
+
+    const organizationRows = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.slug, ATOMIC_ORG));
+    expect(organizationRows).toHaveLength(0);
   });
 });
