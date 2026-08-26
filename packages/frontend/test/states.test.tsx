@@ -377,6 +377,8 @@ describe("the accent never carries state", () => {
       ".button-primary:hover",
       'input[type="range"],\ninput[type="radio"],\ninput[type="checkbox"]',
       '.shell-nav a[aria-current="page"]',
+      ".section-nav a:hover",
+      '.section-nav a[aria-current="page"]',
       ".shell-footer a",
       "tbody tr:hover",
     ];

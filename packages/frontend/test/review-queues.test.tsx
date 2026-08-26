@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { DuplicatePair, Me, Opportunity, OrganizationSummary } from "@/lib/types";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session, tab, replace } = vi.hoisted(() => ({
@@ -39,6 +40,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
   useSearchParams: () => new URLSearchParams(tab.current ? `tab=${tab.current}` : ""),
   usePathname: () => "/review",
+}));
+
+vi.mock("next/link", () => ({
+  default: ({ replace: shouldReplace, ...props }: ComponentProps<"a"> & { replace?: boolean }) => (
+    <a {...props} data-replace={shouldReplace ? "true" : undefined} />
+  ),
 }));
 
 const me: Me = {
@@ -230,28 +237,33 @@ beforeEach(() => {
   tab.current = null;
 });
 
-describe("the tabs", () => {
+describe("the section navigation", () => {
   it("carries each queue's count, so a reviewer sees the backlog before opening it", async () => {
     mount();
 
-    expect(await screen.findByRole("tab", { name: "Submissions · 7" })).toBeTruthy();
-    await waitFor(() => expect(screen.getByRole("tab", { name: "Claims · 0" })).toBeTruthy());
-    expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Submissions · 7" })).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("link", { name: "Claims · 0" })).toBeTruthy());
+    expect(screen.getByRole("link", { name: "Duplicates · 0" })).toBeTruthy();
   });
 
   it("reads the open tab from the URL, so a link to one lands on it", async () => {
     tab.current = "organisations";
     mount();
 
-    expect(await screen.findByRole("tab", { name: "Organisations", selected: true })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Submissions/, selected: false })).toBeTruthy();
+    expect(
+      await screen.findByRole("link", { name: "Organisations", current: "page" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Submissions/ }).hasAttribute("aria-current")).toBe(
+      false,
+    );
   });
 
-  it("puts the tab in the address when one is chosen", async () => {
+  it("puts the section in the address and replaces rather than extending history", async () => {
     mount();
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Organisations" }));
-    expect(replace).toHaveBeenCalledWith("/review?tab=organisations");
+    const organisations = await screen.findByRole("link", { name: "Organisations" });
+    expect(organisations.getAttribute("href")).toBe("/review?tab=organisations");
+    expect(organisations.getAttribute("data-replace")).toBe("true");
   });
 });
 
@@ -410,11 +422,13 @@ describe("the way back", () => {
     tab.current = "claims";
     mount();
 
-    fireEvent.click(await screen.findByRole("tab", { name: /Submissions/ }));
-    expect(replace).toHaveBeenCalledWith("/review");
+    const submissions = await screen.findByRole("link", { name: /Submissions/ });
+    expect(submissions.getAttribute("href")).toBe("/review");
+    expect(submissions.getAttribute("data-replace")).toBe("true");
 
-    fireEvent.click(screen.getByRole("tab", { name: /Duplicates/ }));
-    expect(replace).toHaveBeenCalledWith("/review?tab=duplicates");
+    const duplicates = screen.getByRole("link", { name: /Duplicates/ });
+    expect(duplicates.getAttribute("href")).toBe("/review?tab=duplicates");
+    expect(duplicates.getAttribute("data-replace")).toBe("true");
   });
 });
 
@@ -574,12 +588,12 @@ describe("merging duplicates", () => {
 
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 0", current: "page" })).toBeTruthy();
     expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByRole("button", { name: "Confirm" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1", current: "page" })).toBeTruthy();
     expect(reopen).toHaveBeenCalledWith(duplicatePair.id);
   });
 
@@ -625,7 +639,7 @@ describe("merging duplicates", () => {
       "disabled",
       true,
     );
-    expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1", current: "page" })).toBeTruthy();
 
     fireEvent.click(within(actionGroup).getByRole("button", { name: "Dismiss" }));
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
@@ -710,7 +724,7 @@ describe("merging duplicates", () => {
     expect(screen.getByRole("link", { name: "view" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
     expect(screen.queryByText(/Copied fields: none/)).toBeNull();
-    expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 0", current: "page" })).toBeTruthy();
   });
 
   it("restores dismissed and merged receipts from the explicitly bounded resolved page", async () => {
@@ -755,7 +769,7 @@ describe("merging duplicates", () => {
     expect(screen.getByText("Dismissed Acme Grants")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByText(/pair 18 · Needs review/)).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1", current: "page" })).toBeTruthy();
     expect(reopen).toHaveBeenCalledWith(dismissedPair.id);
     expect(requested).toContainEqual({ status: "dismissed", limit: 200 });
     expect(requested).toContainEqual({ status: "merged", limit: 200 });

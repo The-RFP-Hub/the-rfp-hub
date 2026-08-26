@@ -110,9 +110,9 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const page = await context.newPage();
 
     await page.goto(`${stack.urls.frontend}/review?tab=claims`);
-    await expect(page.getByRole("tab", { name: /^Claims/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await expect(page.getByRole("link", { name: /^Claims/ })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
 
     const row = page.locator("tr").filter({ hasText: id });
@@ -132,9 +132,9 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     // THE ROUND TRIP CLOSES ON THE SAME SCREEN. Landing on `/review` with Submissions selected is
     // the bug; the tab has to come back too.
     await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "claims");
-    await expect(page.getByRole("tab", { name: /^Claims/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await expect(page.getByRole("link", { name: /^Claims/ })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
     await expect(page.locator("tr").filter({ hasText: id })).toHaveCount(1);
   });
@@ -220,5 +220,27 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
       page.getByRole("link", { name: /^← Back to/ }),
       "an attacker-supplied destination is never offered as a way back",
     ).toHaveCount(0);
+  });
+
+  test("a cold listing load changes section through its first visible navigation link", async ({
+    page,
+    stack,
+    api,
+    opportunityFixture,
+  }) => {
+    skipUnlessBrowserSession(stack, "publisher");
+    const publisher = await api("publisher");
+    const document = opportunityFixture(stack.namespaces.publisher, `cold-section-${Date.now()}`);
+    const id = document.id as string;
+    expect((await publisher.post("/v1/opportunities", document)).status).toBe(201);
+
+    await page.goto(`${stack.urls.frontend}/listings/${encodeURIComponent(id)}`);
+    await page
+      .getByRole("navigation", { name: "Listing detail" })
+      .getByRole("link", { name: "Audit" })
+      .click();
+
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "audit");
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
   });
 });

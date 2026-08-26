@@ -3,11 +3,12 @@ import ListingPage from "@/app/listings/[id]/page";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { session } = vi.hoisted(() => ({
+const { session, listingQuery } = vi.hoisted(() => ({
   session: { data: { user: { id: "u1" } }, isPending: false, error: null },
+  listingQuery: { current: "" },
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -20,7 +21,7 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "acme%3Aold" }),
   usePathname: () => "/listings/acme%3Aold",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(listingQuery.current),
 }));
 
 const me: Me = {
@@ -137,6 +138,7 @@ const mount = (node: React.ReactNode, api: ApiClient = client()) =>
 
 beforeEach(() => {
   session.data = { user: { id: "u1" } };
+  listingQuery.current = "";
 });
 
 describe("merged listing detail and edit routes", () => {
@@ -193,6 +195,25 @@ describe("merged listing detail and edit routes", () => {
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
 
+  it("uses URL-backed section links and preserves the listing's return parameters", async () => {
+    listingQuery.current =
+      "tab=not-a-section&back=%2Freview%3Ftab%3Dclaims&backLabel=Claims&mergedRedirect=1";
+    mount(<ListingPage />, client({ ...managed, mergedInto: null }));
+
+    const navigation = await screen.findByRole("navigation", { name: "Listing detail" });
+    const analytics = within(navigation).getByRole("link", { name: "Analytics" });
+    const duplicates = within(navigation).getByRole("link", { name: "Duplicates · 2" });
+    expect(analytics.getAttribute("aria-current")).toBe("page");
+    expect(duplicates.hasAttribute("aria-current")).toBe(false);
+
+    const href = new URL(duplicates.getAttribute("href") ?? "", "https://hub.example");
+    expect(href.pathname).toBe("/listings/acme%3Aold");
+    expect(href.searchParams.get("tab")).toBe("duplicates");
+    expect(href.searchParams.get("back")).toBe("/review?tab=claims");
+    expect(href.searchParams.get("backLabel")).toBe("Claims");
+    expect(href.searchParams.get("mergedRedirect")).toBe("1");
+  });
+
   it("shows the survivor banner instead of mounting the edit form", async () => {
     mount(<EditListingPage />);
 
@@ -221,9 +242,8 @@ describe("merged listing detail and edit routes", () => {
   });
 
   it("names the loaded listing in its duplicate rows and routes counterparts by publicity", async () => {
+    listingQuery.current = "tab=duplicates";
     mount(<ListingPage />);
-
-    fireEvent.click(await screen.findByRole("tab", { name: "Duplicates · 2" }));
 
     expect(await screen.findByRole("columnheader", { name: "Your listing" })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Matched against" })).toBeTruthy();
@@ -239,21 +259,23 @@ describe("merged listing detail and edit routes", () => {
   });
 
   it("loads duplicate history once and badges only the open pairs before the tab is opened", async () => {
+    listingQuery.current = "tab=duplicates";
     const api = client();
     const duplicates = vi.fn(api.opportunities.duplicates);
     api.opportunities.duplicates = duplicates;
     mount(<ListingPage />, api);
 
-    expect(await screen.findByRole("tab", { name: "Duplicates · 2" })).toBeTruthy();
+    expect(
+      await screen.findByRole("link", { name: "Duplicates · 2", current: "page" }),
+    ).toBeTruthy();
     expect(duplicates).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Duplicates · 2" }));
     expect(await screen.findByText("Dismissed Round")).toBeTruthy();
     expect(screen.getByText("Merged Round")).toBeTruthy();
     expect(duplicates).toHaveBeenCalledTimes(1);
   });
 
-  it("renders no detail tabs when the full listing fails to load", async () => {
+  it("renders no detail navigation when the full listing fails to load", async () => {
     const failing = client();
     failing.me.opportunity = async () => {
       throw new ApiError(500, "load_failed", "The full listing failed to load.");
@@ -262,6 +284,6 @@ describe("merged listing detail and edit routes", () => {
     mount(<ListingPage />, failing);
 
     expect(await screen.findByText(/We couldn’t load this listing/)).toBeTruthy();
-    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Listing detail" })).toBeNull();
   });
 });

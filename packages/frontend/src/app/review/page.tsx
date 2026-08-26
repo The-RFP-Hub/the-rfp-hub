@@ -23,6 +23,7 @@
  */
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
+import { SectionNav } from "@/components/SectionNav";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, VerifiedBadge } from "@/components/badges";
 import {
@@ -187,9 +188,6 @@ function Review({ me }: { me: Me }) {
     next === "submissions" ? submissionHref(queuePage) : `/review?tab=${next}`;
   const returnHere = tabHref(tab);
 
-  // `replace`, not `push`: switching tabs is not a navigation a reader wants to walk back through
-  // one at a time, but the address still has to name where they are.
-  const select = (next: Tab) => router.replace(tabHref(next));
   const selectQueuePage = (page: number) => {
     setQueuePage(page);
     router.replace(submissionHref(page));
@@ -198,21 +196,16 @@ function Review({ me }: { me: Me }) {
   return (
     <section>
       <h1>Review queues</h1>
-      <div className="tabs" role="tablist" aria-label="Review queues">
-        {TABS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            role="tab"
-            aria-selected={tab === item}
-            aria-pressed={tab === item}
-            onClick={() => select(item)}
-          >
-            {LABELS[item]}
-            {counts[item] !== null ? ` · ${counts[item]}` : null}
-          </button>
-        ))}
-      </div>
+      {/* Replace keeps queue switching out of browser history while retaining honest URL state. */}
+      <SectionNav
+        label="Review queues"
+        replace
+        items={TABS.map((item) => ({
+          current: tab === item,
+          href: tabHref(item),
+          label: `${LABELS[item]}${counts[item] !== null ? ` · ${counts[item]}` : ""}`,
+        }))}
+      />
 
       {tab === "submissions" ? (
         <Submissions queue={queue} origin={returnHere} onPage={selectQueuePage} />

@@ -17,6 +17,7 @@ import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresenta
 import { RequireSession } from "@/components/Chrome";
 import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
+import { SectionNav } from "@/components/SectionNav";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import {
   ListedBadge,
@@ -38,7 +39,7 @@ import { type ResourceHandle, useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { DuplicateList, ManagedOpportunity, Me, Opportunity } from "@/lib/types";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 const TABS = ["analytics", "audit", "verification", "duplicates"] as const;
@@ -63,7 +64,9 @@ export default function ListingPage() {
 
 function Listing({ id, me }: { id: string; me: Me }) {
   const api = useApi();
-  const [tab, setTab] = useState<Tab>("analytics");
+  const params = useSearchParams();
+  const requestedTab = params?.get("tab");
+  const tab: Tab = TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : "analytics";
   // Owner route first, reviewer route as the fallback — the entry a reviewer was linked to from
   // the queue, a claim or a duplicate pair is by definition not theirs. See `loadOpportunity`.
   const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
@@ -81,6 +84,11 @@ function Listing({ id, me }: { id: string; me: Me }) {
     duplicates.state.status === "ready"
       ? duplicates.state.data.items.filter((match) => isOpenDuplicateStatus(match.status)).length
       : null;
+  const tabHref = (next: Tab) => {
+    const nextParams = new URLSearchParams(params?.toString());
+    nextParams.set("tab", next);
+    return `/listings/${encodeURIComponent(id)}?${nextParams.toString()}`;
+  };
 
   return (
     <section>
@@ -94,23 +102,18 @@ function Listing({ id, me }: { id: string; me: Me }) {
             ) : null}
             <Header entry={entry} id={id} managed={managed} />
 
-            <div className="tabs" role="tablist" aria-label="Listing detail">
-              {TABS.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === name}
-                  aria-pressed={tab === name}
-                  onClick={() => setTab(name)}
-                >
-                  {TAB_LABELS[name]}
-                  {name === "duplicates" && openDuplicateCount !== null
+            <SectionNav
+              label="Listing detail"
+              items={TABS.map((name) => ({
+                current: tab === name,
+                href: tabHref(name),
+                label: `${TAB_LABELS[name]}${
+                  name === "duplicates" && openDuplicateCount !== null
                     ? ` · ${openDuplicateCount}`
-                    : null}
-                </button>
-              ))}
-            </div>
+                    : ""
+                }`,
+              }))}
+            />
 
             {tab === "analytics" ? <AnalyticsTab opportunityId={id} /> : null}
             {tab === "audit" ? <AuditTab id={id} /> : null}
