@@ -7,7 +7,7 @@
  * and it is wrong outright when the detail page was reached from a link somebody pasted. The origin
  * knows where it is, so the origin says so.
  *
- * WHY IT CARRIES THE ORIGIN'S QUERY. A reviewer on `/review?tab=organisations`, or an organisation
+ * WHY IT CARRIES THE ORIGIN'S QUERY. A reviewer on `/review?tab=organizations`, or an organization
  * page on page 3 of its queue, has state in the address. Returning to `/review` would be returning
  * to a different screen than the one they left, which is the specific failure this exists to fix.
  *
@@ -31,9 +31,15 @@ export const RETURN_LABEL_PARAM = "backLabel";
  * must never be a navigation target at all. An allowlist that has to be extended on purpose is the
  * point.
  */
-const ALLOWED_PREFIXES = ["/review", "/organisations", "/listings", "/duplicates"] as const;
+const ALLOWED_PREFIXES = [
+  "/review",
+  "/organizations",
+  "/organisations",
+  "/listings",
+  "/duplicates",
+] as const;
 
-/** A publisher-supplied organisation name could be any length; a nav label may not be. */
+/** A publisher-supplied organization name could be any length; a nav label may not be. */
 const MAX_LABEL = 60;
 
 /**
@@ -61,7 +67,7 @@ export function isSafeReturnPath(value: string): boolean {
   /*
    * AND IT HAS TO BE DECODABLE.
    *
-   * `/organisations/%E0%A4%A` passes every check above — it is a relative path under a route we own
+   * `/organizations/%E0%A4%A` passes every check above — it is a relative path under a route we own
    * — and then throws `URIError` the moment anything calls `decodeURIComponent` on it. That call
    * happens while deriving the link's label, i.e. DURING RENDER, from a parameter any stranger can
    * put in a link. A malformed escape was an attacker-controlled crash of the whole page.
@@ -88,7 +94,7 @@ function isDecodable(value: string): boolean {
  * The label for a return link.
  *
  * DERIVED FROM THE PATH WHEREVER IT CAN BE, and a supplied `label` is honoured for exactly one case:
- * an organisation, whose display name is not derivable from its slug. That keeps the amount of
+ * an organization, whose display name is not derivable from its slug. That keeps the amount of
  * attacker-controlled text on screen to a minimum — a misleading label over an allowlisted internal
  * destination is a small problem, but it is not zero, and there is no reason to accept it anywhere
  * the path already says what the place is.
@@ -99,18 +105,21 @@ export function returnLabel(value: string, label?: string | null): string {
   const [pathname = "", rawQuery = ""] = value.split("?");
   const query = new URLSearchParams(rawQuery);
 
-  if (pathname.startsWith("/organisations/")) {
+  const organizationPrefix = ["/organizations/", "/organisations/"].find((prefix) =>
+    pathname.startsWith(prefix),
+  );
+  if (organizationPrefix) {
     const supplied = label?.trim();
     if (supplied) return supplied.slice(0, MAX_LABEL);
-    const raw = pathname.slice("/organisations/".length);
+    const raw = pathname.slice(organizationPrefix.length);
     // Belt and braces: `isSafeReturnPath` already rejects an undecodable path, but this function is
     // exported and a throw here would be a render-time crash rather than a missing link.
     return isDecodable(raw) ? decodeURIComponent(raw) : raw;
   }
-  if (pathname === "/organisations") return "your organisations";
+  if (pathname === "/organizations" || pathname === "/organisations") return "your organizations";
   if (pathname.startsWith("/review")) {
     const tab = query.get("tab");
-    if (tab === "organisations") return "organisations";
+    if (tab === "organizations" || tab === "organisations") return "organizations";
     if (tab === "claims") return "the claims queue";
     if (tab === "duplicates") return "the duplicate queue";
     return "the review queue";
@@ -148,8 +157,8 @@ export function parseReturnLink(
 export function returnParams(from: string, label?: string | null): string {
   if (!isSafeReturnPath(from)) return "";
   const params = new URLSearchParams({ [RETURN_PARAM]: from });
-  // Only ever sent for an organisation, matching what `returnLabel` will consent to read back.
-  if (label && from.startsWith("/organisations/")) {
+  // Only ever sent for an organization, matching what `returnLabel` will consent to read back.
+  if (label && (from.startsWith("/organizations/") || from.startsWith("/organisations/"))) {
     params.set(RETURN_LABEL_PARAM, label.slice(0, MAX_LABEL));
   }
   return params.toString();

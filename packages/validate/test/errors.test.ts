@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { humanizeErrors, validateOpportunity } from "../src/index.js";
+import { humanizeErrors, humanizeIssues, validateOpportunity } from "../src/index.js";
 
 const base = {
   specVersion: "1.0.0",
@@ -67,6 +67,29 @@ describe("humanizeErrors", () => {
     expect(lines.some((l) => l.includes('must match "then" schema'))).toBe(false);
   });
 
+  it("points funding-detail required errors at the missing field", () => {
+    const missingKind = {
+      ...base,
+      fundingType: "bounty",
+      fundingDetails: {
+        fundingType: "bounty",
+        rewardTiers: [{ label: "Winner", payout: { model: "fixed", amount: 100 } }],
+      },
+    };
+    const missingTiers = {
+      ...base,
+      fundingType: "bounty",
+      fundingDetails: { fundingType: "bounty", bountyKind: "security" },
+    };
+
+    expect(humanizeErrors(validateOpportunity(missingKind).errors, missingKind)).toContain(
+      "/fundingDetails/bountyKind bounty details: must have required property 'bountyKind'",
+    );
+    expect(humanizeErrors(validateOpportunity(missingTiers).errors, missingTiers)).toContain(
+      "/fundingDetails/rewardTiers bounty details: must have required property 'rewardTiers'",
+    );
+  });
+
   it("never returns an empty list while there are errors", () => {
     const doc = { ...base, fundingType: "grant" };
     const { errors } = validateOpportunity(doc);
@@ -85,5 +108,83 @@ describe("humanizeErrors", () => {
     const lines = humanizeErrors(validateOpportunity(doc).errors, doc);
     expect(lines.some((l) => l.startsWith("/status") && l.includes("upcoming, open"))).toBe(true);
     expect(lines.some((l) => l.startsWith("/specVersion") && l.includes('"1.0.0"'))).toBe(true);
+  });
+});
+
+describe("humanizeIssues", () => {
+  it("normalizes a missing property onto the missing field's pointer", () => {
+    const doc = {
+      ...base,
+      fundingType: "grant",
+      fundingDetails: { fundingType: "grant" },
+      deadlines: [{ deadlineType: "fixed", label: "application" }],
+    };
+    const issues = humanizeIssues(validateOpportunity(doc).errors, doc);
+    expect(issues).toContainEqual({ path: "/deadlines/0/date", message: "is required" });
+  });
+
+  it("keeps missing bounty controls in the funding-detail pointer", () => {
+    const missingKind = {
+      ...base,
+      fundingType: "bounty",
+      fundingDetails: {
+        fundingType: "bounty",
+        rewardTiers: [{ label: "Winner", payout: { model: "fixed", amount: 100 } }],
+      },
+    };
+    const missingTiers = {
+      ...base,
+      fundingType: "bounty",
+      fundingDetails: { fundingType: "bounty", bountyKind: "security" },
+    };
+
+    expect(humanizeIssues(validateOpportunity(missingKind).errors, missingKind)).toContainEqual({
+      path: "/fundingDetails/bountyKind",
+      message: "must have required property 'bountyKind'",
+    });
+    expect(humanizeIssues(validateOpportunity(missingTiers).errors, missingTiers)).toContainEqual({
+      path: "/fundingDetails/rewardTiers",
+      message: "must have required property 'rewardTiers'",
+    });
+  });
+
+  it("strips the funding-details infix while retaining its pointer", () => {
+    const doc = {
+      ...base,
+      fundingType: "grant",
+      fundingDetails: { fundingType: "grant", recuring: true },
+    };
+    expect(humanizeIssues(validateOpportunity(doc).errors, doc)).toEqual([
+      { path: "/fundingDetails", message: "unknown field 'recuring'" },
+    ]);
+  });
+
+  it("anchors a tag mismatch to the opportunity funding-type field", () => {
+    const doc = {
+      ...base,
+      fundingType: "grant",
+      fundingDetails: { fundingType: "hackathon", location: "Berlin", online: false },
+    };
+    expect(humanizeIssues(validateOpportunity(doc).errors, doc)).toEqual([
+      {
+        path: "/fundingType",
+        message:
+          "fundingDetails.fundingType 'hackathon' does not match the opportunity's fundingType 'grant'",
+      },
+    ]);
+  });
+
+  it("uses the literal root token for whole-document failures", () => {
+    expect(
+      humanizeIssues([
+        {
+          instancePath: "",
+          schemaPath: "#/type",
+          keyword: "type",
+          params: { type: "object" },
+          message: "must be object",
+        },
+      ]),
+    ).toEqual([{ path: "(root)", message: "must be object" }]);
   });
 });

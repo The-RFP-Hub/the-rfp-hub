@@ -10,7 +10,13 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
-import { auditLog, opportunities, orgMemberships, organizations } from "../../src/db/schema.js";
+import {
+  accounts,
+  auditLog,
+  opportunities,
+  orgMemberships,
+  organizations,
+} from "../../src/db/schema.js";
 import {
   bearer,
   grantMembership,
@@ -45,6 +51,7 @@ run("M3REV review and administration", () => {
   let memberToken: string;
   let reviewerToken: string;
   let adminToken: string;
+  let submitterId: number;
   let memberId: number;
   let candidateOrgId: number;
   const userIds: string[] = [];
@@ -60,6 +67,7 @@ run("M3REV review and administration", () => {
       role: "reviewer",
     });
     const admin = await seedIdentity(EMAILS.admin, { handle: "m3rev-admin", role: "admin" });
+    submitterId = submitter.account.id;
     memberId = member.account.id;
     userIds.push(submitter.userId, member.userId, reviewer.userId, admin.userId);
 
@@ -67,6 +75,10 @@ run("M3REV review and administration", () => {
     const candidate = await seedOrganization({ slug: CANDIDATE, verified: false });
     await seedOrganization({ slug: VERIFY_RACE, verified: false });
     candidateOrgId = candidate.id;
+    await db
+      .update(accounts)
+      .set({ displayName: "Membership Search Person" })
+      .where(eq(accounts.id, member.account.id));
     await grantMembership(member.account.id, candidate.id, "owner");
 
     submitterToken = submitter.token;
@@ -108,7 +120,10 @@ run("M3REV review and administration", () => {
       headers: bearer(reviewerToken),
     });
     expect(queue.statusCode).toBe(200);
-    expect(queue.json().items.map((i: { id: string }) => i.id)).toContain(id);
+    const queued = queue.json().items.find((i: { id: string }) => i.id === id);
+    expect(queued).toBeTruthy();
+    expect(queued.submittedByAccountId).toBe(submitterId);
+    expect(queued.mergedInto).toBeNull();
   });
 
   it("makes an approved entry public and a rejected one both unlisted and invisible", async () => {
@@ -145,6 +160,26 @@ run("M3REV review and administration", () => {
     // longer true, and two flags that disagree are how a later query gets it wrong.
     expect(rejected.json().isListed).toBe(false);
     expect((await app.inject({ url: `/v1/opportunities/${rejectedId}` })).statusCode).toBe(404);
+
+    // An explicit id is a detail-page metadata lookup, not a pending-queue lookup. It therefore
+    // reaches decided rows on BOTH managed endpoints while retaining their ordinary null merge state.
+    for (const id of [approvedId, rejectedId]) {
+      const mine = await app.inject({
+        method: "GET",
+        url: `/v1/me/opportunities?id=${encodeURIComponent(id)}`,
+        headers: bearer(submitterToken),
+      });
+      expect(mine.statusCode, mine.body).toBe(200);
+      expect(mine.json().items).toEqual([expect.objectContaining({ id, mergedInto: null })]);
+
+      const editorial = await app.inject({
+        method: "GET",
+        url: `/v1/review/opportunities?id=${encodeURIComponent(id)}`,
+        headers: bearer(reviewerToken),
+      });
+      expect(editorial.statusCode, editorial.body).toBe(200);
+      expect(editorial.json().items).toEqual([expect.objectContaining({ id, mergedInto: null })]);
+    }
   });
 
   it("tells the submitter WHY, by surfacing the newest decision on their own listing", async () => {
@@ -606,6 +641,35 @@ run("M3REV review and administration", () => {
     expect(accounts.json().items.map((a: { handle: string }) => a.handle)).toContain(
       "m3rev-member",
     );
+
+    const byEmail = await app.inject({
+      method: "GET",
+      url: "/v1/review/accounts?q=M3REV-MEMBER%40RFPHUB",
+      headers: bearer(reviewerToken),
+    });
+    expect(byEmail.statusCode).toBe(200);
+    expect(byEmail.json().items).toEqual([
+      expect.objectContaining({
+        id: memberId,
+        handle: "m3rev-member",
+        email: EMAILS.member,
+      }),
+    ]);
+
+    // `/admin` uses this same staff directory route; an admin gets the same display-name search.
+    const byNameAsAdmin = await app.inject({
+      method: "GET",
+      url: "/v1/review/accounts?q=search%20person",
+      headers: bearer(adminToken),
+    });
+    expect(byNameAsAdmin.statusCode).toBe(200);
+    expect(byNameAsAdmin.json().items).toEqual([
+      expect.objectContaining({
+        id: memberId,
+        displayName: "Membership Search Person",
+        email: EMAILS.member,
+      }),
+    ]);
 
     const orgs = await app.inject({
       method: "GET",

@@ -243,6 +243,22 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         items: { type: "string" },
         description: "One human-readable sentence per violation, naming the field and the rule.",
       },
+      issues: {
+        type: "array",
+        description: "Structured field locations and messages corresponding to validation errors.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["path", "message"],
+          properties: {
+            path: {
+              type: "string",
+              description: "A JSON Pointer, or the literal `(root)` for the whole document.",
+            },
+            message: { type: "string" },
+          },
+        },
+      },
     },
   },
   {
@@ -285,7 +301,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "array",
         items: { $ref: "DuplicateMatch" },
         description:
-          "Suspected matches, searched over PUBLICLY VISIBLE entries only — a duplicate check must never disclose another account's pending or unlisted title and id.",
+          "Suspected matches, searched over PUBLICLY VISIBLE entries only — a duplicate check must never disclose another account's pending or unlisted title and id. `isPublic` is therefore deliberately always true in this SubmissionResult array, while the shared DuplicateMatch component also serves routes that can expose an owner-visible, non-public counterpart.",
       },
     },
   },
@@ -302,7 +318,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       actorKind: { type: "string", enum: ["user", "api_key", "job", "outbox"] },
       actor: {
         type: "string",
-        description: "A public handle, an organisation slug, `reviewer`, `job` or `community`.",
+        description: "A public handle, an organization slug, `reviewer`, `job` or `community`.",
       },
       changedFields: { type: "array", items: { type: "string" } },
       patch: {
@@ -324,11 +340,16 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "A suspected or decided duplicate pair, named by the OTHER entry. A submitter only ever sees pairs whose other side is publicly visible.",
-    required: ["id", "title", "similarity", "status", "detectedAt"],
+      "A suspected or decided duplicate pair, named by the OTHER entry. This published component retains that top-level meaning for compatibility with an external compliance checker; the account-specific OwnedDuplicateMatch adds `yourListing` instead of repurposing these fields.",
+    required: ["id", "title", "isPublic", "similarity", "status", "detectedAt"],
     properties: {
       id: { type: "string", description: "The other entry's public id." },
       title: { type: "string" },
+      isPublic: {
+        type: "boolean",
+        description:
+          "True when the other entry is approved and listed, so a client may use its public detail route; false means an entitled workbench route is required.",
+      },
       similarity: { type: ["number", "null"] },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       detectedAt: { type: "string", format: "date-time" },
@@ -340,6 +361,42 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     required: ["items"],
     properties: { items: { type: "array", items: { $ref: "DuplicateMatch" } } },
+  },
+  {
+    $id: "OwnedDuplicateMatch",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "An account-owned duplicate pair. `yourListing` identifies the side owned by the current account; all top-level match fields continue to name the OTHER entry. DuplicateMatch and DuplicateList are published public-API components documented that way and checked by an external compliance consumer, which is why this owner-specific component adds a field instead of changing their meaning.",
+    required: ["id", "title", "isPublic", "similarity", "status", "detectedAt", "yourListing"],
+    properties: {
+      id: { type: "string", description: "The other entry's public id." },
+      title: { type: "string" },
+      isPublic: {
+        type: "boolean",
+        description:
+          "True when the other entry is approved and listed; false when it is visible only through an entitled workbench route.",
+      },
+      similarity: { type: ["number", "null"] },
+      status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
+      detectedAt: { type: "string", format: "date-time" },
+      yourListing: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    $id: "OwnedDuplicateList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "OwnedDuplicateMatch" } } },
   },
   {
     $id: "DuplicateSide",
@@ -528,7 +585,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "The outcome of claiming publisher ownership. `granted` transferred it immediately (the organisation is verified and OPERATES the entry); `queued` filed a claim for review.",
+      "The outcome of claiming publisher ownership. `granted` transferred it immediately (the organization is verified and OPERATES the entry); `queued` filed a claim for review.",
     required: ["outcome", "claimId", "opportunityId", "organizationSlug", "message"],
     properties: {
       outcome: { type: "string", enum: ["granted", "queued", "unchanged"] },
@@ -538,7 +595,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       message: {
         type: "string",
         description:
-          "What the outcome means for future writes — in particular, a grant on an UNVERIFIED organisation transfers ownership without unlocking auto-approval.",
+          "What the outcome means for future writes — in particular, a grant on an UNVERIFIED organization transfers ownership without unlocking auto-approval.",
       },
     },
   },
@@ -553,6 +610,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "organizationSlug",
       "organizationVerified",
       "claimedBy",
+      "claimedByAccountId",
       "status",
       "note",
       "createdAt",
@@ -565,6 +623,10 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       organizationSlug: { type: "string" },
       organizationVerified: { type: "boolean" },
       claimedBy: { type: "string" },
+      claimedByAccountId: {
+        type: ["integer", "null"],
+        description: "The stable claimant identity used to disclose self-review.",
+      },
       status: { type: "string", enum: ["pending", "approved", "rejected", "withdrawn"] },
       note: { type: ["string", "null"] },
       createdAt: { type: "string", format: "date-time" },
@@ -583,7 +645,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "A VERIFIED organisation — the namespace a write can auto-approve into. Verification is a publishing relationship, not an attribute of the issuer, so the directory holds many organisations that are not here.",
+      "A VERIFIED organization — the namespace a write can auto-approve into. Verification is a publishing relationship, not an attribute of the issuer, so the directory holds many organizations that are not here.",
     required: ["slug", "name", "description", "website", "logoUrl", "ecosystems", "verifiedAt"],
     properties: {
       slug: {
@@ -619,7 +681,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       role: { type: "string", enum: ["owner", "admin", "publisher"] },
       verified: {
         type: "boolean",
-        description: "Only a membership on a VERIFIED organisation auto-approves a write.",
+        description: "Only a membership on a VERIFIED organization auto-approves a write.",
       },
     },
   },
@@ -739,6 +801,8 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       "isListed",
       "namespace",
       "submittedBy",
+      "submittedByAccountId",
+      "mergedInto",
       "lastDecision",
       "createdAt",
       "updatedAt",
@@ -752,6 +816,21 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       isListed: { type: "boolean" },
       namespace: { type: ["string", "null"] },
       submittedBy: { type: ["string", "null"] },
+      submittedByAccountId: {
+        type: ["integer", "null"],
+        description: "The stable submitting-account identity used to disclose self-review.",
+      },
+      mergedInto: {
+        type: ["object", "null"],
+        additionalProperties: false,
+        description:
+          "The survivor of a terminal merge. Its id remains visible to the owner through the merge audit; its current title is present only while the survivor is approved and listed. Null for an active or ordinary managed row.",
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string" },
+          title: { type: ["string", "null"] },
+        },
+      },
       lastDecision: {
         type: ["object", "null"],
         additionalProperties: false,
@@ -797,12 +876,13 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "An account as the review and admin screens see it. Never carries the DID or the email.",
+      "An account as the review and admin screens see it. Never carries the provider subject; privileged directory searches additionally carry email.",
     required: ["id", "handle", "displayName", "globalRole", "directCreate", "createdAt"],
     properties: {
       id: { type: "integer" },
       handle: { type: ["string", "null"] },
       displayName: { type: ["string", "null"] },
+      email: { type: ["string", "null"], format: "email" },
       globalRole: { type: "string", enum: ["submitter", "reviewer", "admin"] },
       directCreate: { type: "boolean" },
       createdAt: { type: "string", format: "date-time" },
@@ -850,6 +930,38 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     },
   },
   {
+    $id: "MembershipInvite",
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "id",
+      "organizationSlug",
+      "email",
+      "role",
+      "invitedBy",
+      "createdAt",
+      "acceptedAt",
+      "acceptedAccountId",
+    ],
+    properties: {
+      id: { type: "integer" },
+      organizationSlug: { type: "string" },
+      email: { type: "string", format: "email" },
+      role: { type: "string", enum: ["owner", "admin", "publisher"] },
+      invitedBy: { type: "integer" },
+      createdAt: { type: "string", format: "date-time" },
+      acceptedAt: { type: ["string", "null"], format: "date-time" },
+      acceptedAccountId: { type: ["integer", "null"] },
+    },
+  },
+  {
+    $id: "MembershipInviteList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: { items: { type: "array", items: { $ref: "MembershipInvite" } } },
+  },
+  {
     $id: "JobRunResult",
     type: "object",
     additionalProperties: false,
@@ -868,6 +980,26 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         type: "object",
         additionalProperties: { type: "integer" },
         description: "Per-job counters. The members vary by job and are not part of the contract.",
+      },
+    },
+  },
+  {
+    $id: "MergedOpportunityErrorResponse",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "A public id that resolved when it was merged. The response remains a 404; clients may load the currently public survivor named here.",
+    required: ["error", "mergedInto"],
+    properties: {
+      error: { type: "string", const: "opportunity_merged" },
+      mergedInto: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+        },
       },
     },
   },

@@ -13,18 +13,35 @@
  * would leave the apply and source counters at zero and make the Analytics tab quietly wrong.
  */
 import { AnalyticsTab } from "@/components/AnalyticsTab";
+import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 import { RequireSession } from "@/components/Chrome";
+import { DocumentTitle } from "@/components/DocumentTitle";
+import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
+import { SectionNav } from "@/components/SectionNav";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
-import { MatchBadge } from "@/components/badges";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError, linkOutUrl, loadOpportunity } from "@/lib/api";
+import {
+  ListedBadge,
+  MatchBadge,
+  PublisherStatusBadge,
+  ReviewStatusBadge,
+  StatusBadge,
+} from "@/components/badges";
+import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
+import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
-import { useResource } from "@/lib/resource";
+import {
+  ROUTE_GATE_COPY,
+  duplicateStatusLabel,
+  fundingTypeLabel,
+  isOpenDuplicateStatus,
+} from "@/lib/presentation";
+import { type ResourceHandle, useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { Me, Opportunity } from "@/lib/types";
+import type { DuplicateList, ManagedOpportunity, Me, Opportunity } from "@/lib/types";
+import { BOT_PROTECTION_NOTE, verificationPresentation } from "@/lib/verification";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 const TABS = ["analytics", "audit", "verification", "duplicates"] as const;
@@ -40,63 +57,111 @@ const TAB_LABELS: Record<Tab, string> = {
 export default function ListingPage() {
   const params = useParams<{ id: string }>();
   const id = decodeURIComponent(String(params.id ?? ""));
-  return <RequireSession>{(me) => <Listing id={id} me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.listing}>
+      {(me) => <Listing id={id} me={me} />}
+    </RequireSession>
+  );
 }
 
 function Listing({ id, me }: { id: string; me: Me }) {
   const api = useApi();
-  const [tab, setTab] = useState<Tab>("analytics");
+  const params = useSearchParams();
+  const requestedTab = params?.get("tab");
+  const tab: Tab = TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : "analytics";
   // Owner route first, reviewer route as the fallback — the entry a reviewer was linked to from
   // the queue, a claim or a duplicate pair is by definition not theirs. See `loadOpportunity`.
   const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
-  const { state, reload } = useResource(load);
+  const loadWithMetadata = useCallback(async () => {
+    const [entry, managed] = await Promise.all([
+      load(),
+      loadManagedOpportunity(api, id, me.canReview),
+    ]);
+    return { entry, managed };
+  }, [api, id, load, me.canReview]);
+  const { state, reload } = useResource(loadWithMetadata);
+  const loadDuplicates = useCallback(() => api.opportunities.duplicates(id), [api, id]);
+  const duplicates = useResource(loadDuplicates);
+  const openDuplicateCount =
+    duplicates.state.status === "ready"
+      ? duplicates.state.data.items.filter((match) => isOpenDuplicateStatus(match.status)).length
+      : null;
+  const tabHref = (next: Tab) => {
+    const nextParams = new URLSearchParams(params?.toString());
+    nextParams.set("tab", next);
+    return `/listings/${encodeURIComponent(id)}?${nextParams.toString()}`;
+  };
 
   return (
     <section>
       {/* Renders only when a review surface sent the reader here and said where from. */}
       <ReturnLink />
       <ResourceView resource={state} what="this listing" onRetry={reload}>
-        {(entry) => <Header entry={entry} id={id} me={me} />}
+        {({ entry, managed }) => (
+          <>
+            <DocumentTitle title={entry.title} fallback={id} />
+            {managed.mergedInto ? (
+              <MergedOpportunityBanner mergedInto={managed.mergedInto} />
+            ) : null}
+            <Header entry={entry} id={id} managed={managed} />
+
+            <SectionNav
+              label="Listing detail"
+              items={TABS.map((name) => ({
+                current: tab === name,
+                href: tabHref(name),
+                label: `${TAB_LABELS[name]}${
+                  name === "duplicates" && openDuplicateCount !== null
+                    ? ` · ${openDuplicateCount} open`
+                    : ""
+                }`,
+              }))}
+            />
+
+            {tab === "analytics" ? <AnalyticsTab opportunityId={id} /> : null}
+            {tab === "audit" ? <AuditTab id={id} /> : null}
+            {tab === "verification" ? <VerificationTab id={id} canTrigger={me.canReview} /> : null}
+            {tab === "duplicates" ? (
+              <DuplicatesTab
+                yourListing={{ id: entry.id, title: entry.title }}
+                duplicates={duplicates}
+              />
+            ) : null}
+          </>
+        )}
       </ResourceView>
-
-      <div className="tabs" role="tablist" aria-label="Listing detail">
-        {TABS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={tab === name}
-            aria-pressed={tab === name}
-            onClick={() => setTab(name)}
-          >
-            {TAB_LABELS[name]}
-          </button>
-        ))}
-      </div>
-
-      {tab === "analytics" ? <AnalyticsTab opportunityId={id} /> : null}
-      {tab === "audit" ? <AuditTab id={id} /> : null}
-      {tab === "verification" ? <VerificationTab id={id} canTrigger={me.canReview} /> : null}
-      {tab === "duplicates" ? <DuplicatesTab id={id} /> : null}
     </section>
   );
 }
 
-function Header({ entry, id, me }: { entry: Opportunity; id: string; me: Me }) {
+function Header({
+  entry,
+  id,
+  managed,
+}: {
+  entry: Opportunity;
+  id: string;
+  managed: ManagedOpportunity;
+}) {
   const api = useApi();
   const source = entry.source ?? {};
   return (
     <>
       <div className="row-between">
-        <h1>
-          <UntrustedText value={entry.title} />
-        </h1>
-        <Link href={`/listings/${encodeURIComponent(id)}/edit`}>
-          <button type="button">Edit</button>
-        </Link>
+        <div className="row">
+          <h1>
+            <UntrustedText value={entry.title} />
+          </h1>
+          <PublisherStatusBadge source={managed} />
+        </div>
+        {managed.mergedInto ? null : (
+          <Link className="button" href={`/listings/${encodeURIComponent(id)}/edit`}>
+            Edit
+          </Link>
+        )}
       </div>
       <p className="muted">
-        <code>{entry.id}</code> · {entry.fundingType} · {entry.status}
+        <code>{entry.id}</code> · {fundingTypeLabel(entry.fundingType)}
         {source.publisher ? (
           <>
             {" "}
@@ -111,6 +176,20 @@ function Header({ entry, id, me }: { entry: Opportunity; id: string; me: Me }) {
         ) : null}
       </p>
 
+      <div className="row" aria-label="Listing state details">
+        <span>
+          <span className="muted">Application stage</span> <StatusBadge status={entry.status} />
+        </span>
+        <span>
+          <span className="muted">Review decision</span>{" "}
+          <ReviewStatusBadge status={managed.reviewStatus} />
+        </span>
+        <span>
+          <span className="muted">Public visibility</span>{" "}
+          <ListedBadge isListed={managed.isListed} reviewStatus={managed.reviewStatus} />
+        </span>
+      </div>
+
       <div className="row">
         {entry.applicationUrl ? (
           <a href={linkOutUrl(api.baseUrl, id, "apply")} target="_blank" rel="noopener noreferrer">
@@ -122,95 +201,11 @@ function Header({ entry, id, me }: { entry: Opportunity; id: string; me: Me }) {
             Open the programme site
           </a>
         ) : null}
-        <span className="muted">
-          (both hops go through the API, which is what makes the click counters move)
-        </span>
+        <span className="muted">(these links record aggregate outbound clicks)</span>
       </div>
 
       <UntrustedBlock value={entry.description} />
-      <ClaimForm id={id} me={me} />
     </>
-  );
-}
-
-/**
- * Claiming publisher ownership on an organisation's behalf.
- *
- * The API answers 200 (granted) or 202 (queued) and returns a `message` saying what the outcome
- * means for FUTURE writes — an approval on an unverified organisation transfers ownership without
- * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
- * paraphrase is exactly where a dashboard would start promising something the API did not.
- */
-function ClaimForm({ id, me }: { id: string; me: Me }) {
-  const api = useApi();
-  const [slug, setSlug] = useState(me.memberships[0]?.slug ?? "");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-
-  if (me.memberships.length === 0) {
-    return (
-      <details className="card">
-        <summary>Claim this listing for an organisation</summary>
-        <p className="muted">
-          This account is not a member of any organisation, so there is nothing to claim on behalf
-          of. A reviewer grants membership.
-        </p>
-      </details>
-    );
-  }
-
-  const submit = async () => {
-    setBusy(true);
-    setResult(null);
-    try {
-      const claim = await api.opportunities.claim(id, {
-        organizationSlug: slug,
-        note: note || null,
-      });
-      setResult({ kind: "ok", message: `${claim.outcome}: ${claim.message}` });
-    } catch (error) {
-      setResult({
-        kind: "error",
-        message: error instanceof ApiError ? error.message : "The claim could not be filed.",
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <details className="card">
-      <summary>Claim this listing for an organisation</summary>
-      <p className="muted footnote">
-        Granted immediately when the organisation is verified <em>and</em> appears among the
-        listing&rsquo;s operating organisations. Sponsorship is not operation, so a sponsor&rsquo;s
-        claim is queued for a reviewer instead.
-      </p>
-      <div className="field">
-        <label htmlFor="claim-org">Organisation</label>
-        <select id="claim-org" value={slug} onChange={(event) => setSlug(event.target.value)}>
-          {me.memberships.map((membership) => (
-            <option key={membership.slug} value={membership.slug}>
-              {membership.slug} {membership.verified ? "(verified)" : "(unverified)"}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label htmlFor="claim-note">Note for the reviewer (optional)</label>
-        <input
-          id="claim-note"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder="Anything that helps a reviewer confirm the connection"
-        />
-      </div>
-      <button type="button" onClick={() => void submit()} disabled={busy || !slug}>
-        {busy ? "Filing…" : "File the claim"}
-      </button>
-      <ActionNote note={result} />
-    </details>
   );
 }
 
@@ -245,25 +240,14 @@ function AuditTab({ id }: { id: string }) {
                   {trail.entries.map((entry) => (
                     <tr key={`${entry.at}-${entry.action}`}>
                       <td className="muted">{formatInstant(entry.at)}</td>
-                      <td>{entry.action}</td>
                       <td>
-                        <UntrustedText value={entry.actor} />{" "}
-                        <span className="muted">({entry.actorKind})</span>
+                        <AuditAction entry={entry} />
                       </td>
                       <td>
-                        {entry.changedFields.length === 0 ? (
-                          <span className="muted">—</span>
-                        ) : (
-                          <code>{entry.changedFields.join(", ")}</code>
-                        )}
-                        {entry.patch ? (
-                          <details>
-                            <summary className="muted">patch</summary>
-                            <pre className="untrusted-block">
-                              {JSON.stringify(entry.patch, null, 2)}
-                            </pre>
-                          </details>
-                        ) : null}
+                        <AuditActor entry={entry} />
+                      </td>
+                      <td>
+                        <AuditFields fields={entry.changedFields} />
                       </td>
                     </tr>
                   ))}
@@ -292,10 +276,7 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
       setNote({ kind: "ok", message: "Checked. The run below is the result." });
       reload();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message: error instanceof ApiError ? error.message : "The check could not be run.",
-      });
+      setNote(actionErrorNote(error, "The check could not be run."));
     } finally {
       setBusy(false);
     }
@@ -328,72 +309,99 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
         />
       ) : (
         <ResourceView resource={state} what="the verification run" onRetry={reload}>
-          {(run) => (
-            <div className="card">
-              <p>
-                <MatchBadge matched={run.matched} />{" "}
-                <span className="muted">checked {formatInstant(run.runAt)}</span>
-              </p>
-              <dl className="grid-2">
-                <div>
-                  <dt>Requested</dt>
-                  <dd>
-                    <UntrustedLink href={run.requestedUrl} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Ended at</dt>
-                  <dd>
-                    <UntrustedLink href={run.finalUrl} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>HTTP status</dt>
-                  <dd>{run.httpStatus ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt>Page exists</dt>
-                  <dd>
-                    {run.existsAtSource === null ? "unknown" : run.existsAtSource ? "yes" : "no"}
-                  </dd>
-                </div>
-              </dl>
-              {run.error ? <p className="note error">{run.error}</p> : null}
-              {run.fieldDiff ? (
-                <details>
-                  <summary>What the page said about each field</summary>
-                  <pre className="untrusted-block">{JSON.stringify(run.fieldDiff, null, 2)}</pre>
-                </details>
-              ) : null}
-              {run.snapshotSha256 ? (
-                <p className="muted">
-                  Snapshot digest <code>{run.snapshotSha256.slice(0, 16)}…</code> — the extracted
-                  text is stored with the run; the original bytes are not.
+          {(run) => {
+            const presentation = verificationPresentation(run);
+            return (
+              <div className="card">
+                <p>
+                  <MatchBadge matched={run.matched} existsAtSource={presentation.pageExists} />{" "}
+                  <span className="muted">checked {formatInstant(run.runAt)}</span>
                 </p>
-              ) : null}
-            </div>
-          )}
+                <p>
+                  <strong>Source response:</strong> {presentation.response}
+                </p>
+                {presentation.uncertain ? <p className="muted">{BOT_PROTECTION_NOTE}</p> : null}
+                <dl className="grid-2">
+                  <div>
+                    <dt>Requested</dt>
+                    <dd>
+                      <UntrustedLink href={run.requestedUrl} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Ended at</dt>
+                    <dd>
+                      <UntrustedLink href={run.finalUrl} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Page exists</dt>
+                    <dd>
+                      {presentation.pageExists === null
+                        ? "unknown"
+                        : presentation.pageExists
+                          ? "yes"
+                          : "no"}
+                    </dd>
+                  </div>
+                </dl>
+                <details>
+                  <summary>Technical details</summary>
+                  <dl>
+                    <div>
+                      <dt>HTTP status</dt>
+                      <dd>{run.httpStatus ?? "—"}</dd>
+                    </div>
+                    {run.error ? (
+                      <div>
+                        <dt>Error</dt>
+                        <dd>{run.error}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </details>
+                {run.fieldDiff ? (
+                  <details>
+                    <summary>What the page said about each field</summary>
+                    <pre className="untrusted-block">{JSON.stringify(run.fieldDiff, null, 2)}</pre>
+                  </details>
+                ) : null}
+                {run.snapshotSha256 ? (
+                  <p className="muted">
+                    Snapshot digest <code>{run.snapshotSha256.slice(0, 16)}…</code> — the extracted
+                    text is stored with the run; the original bytes are not.
+                  </p>
+                ) : null}
+              </div>
+            );
+          }}
         </ResourceView>
       )}
     </section>
   );
 }
 
-function DuplicatesTab({ id }: { id: string }) {
-  const api = useApi();
-  const load = useCallback(() => api.opportunities.duplicates(id), [api, id]);
-  const { state, reload } = useResource(load);
-
+function DuplicatesTab({
+  yourListing,
+  duplicates,
+}: {
+  yourListing: Pick<Opportunity, "id" | "title">;
+  duplicates: ResourceHandle<DuplicateList>;
+}) {
   return (
     <section aria-labelledby="dupes-heading">
       <h2 id="dupes-heading">Possible duplicates</h2>
       <p className="muted footnote">
-        Detected by comparing this listing against <strong>published</strong> listings only, so
-        nothing here reveals another account&rsquo;s pending work. An empty list means nothing
-        similar was found <em>if</em> the check has run — a deployment with detection switched off
-        has nothing to show either.
+        The other side appears only when this session may see it. Public matches open in the
+        directory; non-public matches stay in the workbench. An empty list means nothing similar was
+        found <em>if</em> the check has run — a deployment with detection switched off has nothing
+        to show either.
       </p>
-      <ResourceView resource={state} what="possible duplicates" onRetry={reload}>
+      <ResourceView
+        resource={duplicates.state}
+        what="possible duplicates"
+        onRetry={duplicates.reload}
+      >
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState title="No suspected duplicates recorded for this listing." />
@@ -402,7 +410,8 @@ function DuplicatesTab({ id }: { id: string }) {
               <table>
                 <thead>
                   <tr>
-                    <th scope="col">Other listing</th>
+                    <th scope="col">Your listing</th>
+                    <th scope="col">Matched against</th>
                     <th scope="col">Similarity</th>
                     <th scope="col">State</th>
                     <th scope="col">Detected</th>
@@ -410,9 +419,19 @@ function DuplicatesTab({ id }: { id: string }) {
                 </thead>
                 <tbody>
                   {list.items.map((match) => (
-                    <tr key={`${match.id}-${match.detectedAt}`}>
+                    <tr key={`${yourListing.id}-${match.id}-${match.detectedAt}`}>
                       <th scope="row">
-                        <Link href={`/listings/${encodeURIComponent(match.id)}`}>
+                        <Link href={`/listings/${encodeURIComponent(yourListing.id)}`}>
+                          <UntrustedText value={yourListing.title} />
+                        </Link>
+                        <div className="muted">
+                          <code>{yourListing.id}</code>
+                        </div>
+                      </th>
+                      <th scope="row">
+                        <Link
+                          href={`${match.isPublic ? "/opportunities" : "/listings"}/${encodeURIComponent(match.id)}`}
+                        >
                           <UntrustedText value={match.title} />
                         </Link>
                         <div className="muted">
@@ -420,7 +439,7 @@ function DuplicatesTab({ id }: { id: string }) {
                         </div>
                       </th>
                       <td>{formatSimilarity(match.similarity)}</td>
-                      <td>{match.status}</td>
+                      <td>{duplicateStatusLabel(match.status)}</td>
                       <td className="muted">{formatInstant(match.detectedAt)}</td>
                     </tr>
                   ))}

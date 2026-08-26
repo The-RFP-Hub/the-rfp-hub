@@ -9,7 +9,7 @@
  * `undefined` on a page.
  *
  * EVERY STRING IN HERE IS UNTRUSTED unless the comment says otherwise. Titles, descriptions,
- * handles and organisation names are publisher-supplied; they are rendered as text nodes and never
+ * handles and organization names are publisher-supplied; they are rendered as text nodes and never
  * as markup. See `components/UntrustedText.tsx`.
  */
 import type {
@@ -44,14 +44,24 @@ export type DuplicateStatus = "suspected" | "confirmed" | "dismissed" | "merged"
 export type ClaimStatus = "pending" | "approved" | "rejected" | "withdrawn";
 export type OrgRole = "owner" | "admin" | "publisher";
 
+export interface ValidationIssue {
+  /** JSON Pointer, or `(root)` for a whole-document issue. */
+  path: string;
+  message: string;
+}
+
 /** `ErrorResponse` / `ValidationErrorResponse` — one shape, `errors` present only on the latter. */
 export interface ApiErrorBody {
   error: string;
   message: string;
   /** One human-readable sentence per violation, produced by the Standard's own humanizer. */
   errors?: string[];
+  /** Structured companions to `errors`, when the rejection can identify a field. */
+  issues?: ValidationIssue[];
   /** Present on `survivor_already_merged`: the entry that really survived. */
   survivorId?: string;
+  /** Present on the public detail route's enriched 404 for an id that used to be public. */
+  mergedInto?: { id: string; title: string };
 }
 
 // ── the public directory ────────────────────────────────────────────────────────
@@ -124,6 +134,8 @@ export interface DuplicateMatch {
   /** The OTHER entry's public id. */
   id: string;
   title: string;
+  /** Whether the other entry has a public detail page; otherwise use the entitled workbench. */
+  isPublic: boolean;
   similarity: number | null;
   status: DuplicateStatus;
   detectedAt: string;
@@ -131,6 +143,14 @@ export interface DuplicateMatch {
 
 export interface DuplicateList {
   items: DuplicateMatch[];
+}
+
+export interface OwnedDuplicateMatch extends DuplicateMatch {
+  yourListing: { id: string; title: string };
+}
+
+export interface OwnedDuplicateList {
+  items: OwnedDuplicateMatch[];
 }
 
 export interface DuplicateSide {
@@ -233,6 +253,7 @@ export interface ClaimSummary {
   organizationSlug: string;
   organizationVerified: boolean;
   claimedBy: string;
+  claimedByAccountId: number | null;
   status: ClaimStatus;
   note: string | null;
   createdAt: string;
@@ -320,6 +341,9 @@ export interface ManagedOpportunity {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  submittedByAccountId: number | null;
+  /** The merge survivor; its title is withheld while that survivor is not publicly visible. */
+  mergedInto: { id: string; title: string | null } | null;
   /** The newest decision on this listing, or null while nobody has decided anything. */
   lastDecision: ReviewDecisionSummary | null;
   createdAt: string;
@@ -344,6 +368,8 @@ export interface AccountSummary {
   id: number;
   handle: string | null;
   displayName: string | null;
+  /** Returned by privileged account-directory searches. */
+  email?: string | null;
   globalRole: AccountRole;
   directCreate: boolean;
   createdAt: string;
@@ -372,6 +398,21 @@ export interface MembershipResult {
   accountId: number;
   role: OrgRole | null;
   member: boolean;
+}
+
+export interface MembershipInvite {
+  id: number;
+  organizationSlug: string;
+  email: string;
+  role: OrgRole;
+  invitedBy: number;
+  createdAt: string;
+  acceptedAt: string | null;
+  acceptedAccountId: number | null;
+}
+
+export interface MembershipInviteList {
+  items: MembershipInvite[];
 }
 
 /**

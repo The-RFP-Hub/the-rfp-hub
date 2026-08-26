@@ -9,20 +9,27 @@
  * would silently delete milestones, social links and prizes that a publisher entered elsewhere.
  */
 import { RequireSession } from "@/components/Chrome";
+import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { OpportunityForm } from "@/components/OpportunityForm";
 import { ResourceView } from "@/components/states";
-import { loadOpportunity } from "@/lib/api";
+import { loadManagedOpportunity, loadOpportunity } from "@/lib/api";
 import { fromDocument } from "@/lib/opportunity-form";
+import { ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Me } from "@/lib/types";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
 
 export default function EditListingPage() {
   const params = useParams<{ id: string }>();
   const id = decodeURIComponent(String(params.id ?? ""));
-  return <RequireSession>{(me) => <EditForm id={id} me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.editListing}>
+      {(me) => <EditForm id={id} me={me} />}
+    </RequireSession>
+  );
 }
 
 function EditForm({ id, me }: { id: string; me: Me }) {
@@ -31,31 +38,51 @@ function EditForm({ id, me }: { id: string; me: Me }) {
   // entry (submitter, namespace member or T3+ may `PUT`), and the owner route 404s one that is
   // not theirs.
   const load = useCallback(() => loadOpportunity(api, id, me.canReview), [api, id, me.canReview]);
-  const { state, reload } = useResource(load);
+  const loadWithMetadata = useCallback(async () => {
+    const [entry, managed] = await Promise.all([
+      load(),
+      loadManagedOpportunity(api, id, me.canReview),
+    ]);
+    return { entry, managed };
+  }, [api, id, load, me.canReview]);
+  const { state, reload } = useResource(loadWithMetadata);
 
   return (
     <section>
-      <h1>Edit this listing</h1>
-      <p className="muted footnote">
-        A replace re-runs Standard validation and the duplicate check. An edit to a published
-        listing by a publisher who may publish stays approved; otherwise it returns to the review
-        queue — the result panel below the form says which happened.
+      <p>
+        <Link href={`/listings/${encodeURIComponent(id)}`}>← Back to listing</Link>
       </p>
       <ResourceView resource={state} what="this listing" onRetry={reload}>
-        {(entry) => {
+        {({ entry, managed }) => {
+          if (managed.mergedInto) {
+            return (
+              <>
+                <h1>Archived listing</h1>
+                <MergedOpportunityBanner mergedInto={managed.mergedInto} />
+              </>
+            );
+          }
           const { form, carried } = fromDocument(entry);
           return (
-            <OpportunityForm
-              mode="edit"
-              initial={form}
-              carried={carried}
-              authority={{
-                verifiedNamespaces: me.memberships
-                  .filter((membership) => membership.verified)
-                  .map((membership) => membership.slug),
-                directCreate: me.directCreate,
-              }}
-            />
+            <>
+              <h1>Edit this listing</h1>
+              <p className="muted footnote">
+                A replace re-runs Standard validation and the duplicate check. An edit to a
+                published listing by a publisher who may publish stays approved; otherwise it
+                returns to the review queue — the result panel below the form says which happened.
+              </p>
+              <OpportunityForm
+                mode="edit"
+                initial={form}
+                carried={carried}
+                authority={{
+                  verifiedNamespaces: me.memberships
+                    .filter((membership) => membership.verified)
+                    .map((membership) => membership.slug),
+                  directCreate: me.directCreate,
+                }}
+              />
+            </>
           );
         }}
       </ResourceView>

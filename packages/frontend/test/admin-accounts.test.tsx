@@ -10,7 +10,7 @@
  * demotes themselves cannot undo it, and if they are the only one nobody can. That warning is
  * asserted for its words.
  *
- * ORGANISATIONS ARE NOT ON THIS PAGE any more; verification is a reviewer capability. A read-only
+ * ORGANIZATIONS ARE NOT ON THIS PAGE any more; verification is a reviewer capability. A read-only
  * copy of the directory here taught that it was an administrator's job.
  */
 import AdminPage from "@/app/admin/page";
@@ -53,6 +53,7 @@ const account = (over: Partial<AccountSummary> = {}): AccountSummary => ({
   id: 2,
   handle: "indie2",
   displayName: null,
+  email: "indie2@example.org",
   globalRole: "submitter",
   directCreate: false,
   createdAt: "2026-02-01T00:00:00Z",
@@ -81,13 +82,51 @@ const mount = (accounts: AccountSummary[] = [account()]) =>
 beforeEach(() => vi.clearAllMocks());
 
 describe("the page's scope", () => {
-  it("does not carry an organisation directory — that lives with the reviewer who verifies them", async () => {
+  it("does not carry an organization directory — that lives with the reviewer who verifies them", async () => {
     mount();
 
     expect(await screen.findByRole("heading", { name: "Accounts & roles" })).toBeTruthy();
+    expect(await screen.findByRole("columnheader", { name: "Direct-create" })).toBeTruthy();
+    expect(screen.getByLabelText("Search accounts").closest("form")?.className).toBe("search-row");
     expect(screen.queryByRole("columnheader", { name: "Members" })).toBeNull();
     // It says where verification went, rather than leaving a reviewer to guess.
     expect(screen.getByRole("link", { name: /Review queues/ })).toBeTruthy();
+  });
+
+  it("clears an applied account search from beside the Search button", async () => {
+    const api = client([account()]);
+    const accounts = vi.fn(async () => ({ items: [account()] }));
+    api.review.accounts = accounts;
+    render(
+      <ApiClientProvider value={api}>
+        <AdminPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Search accounts"), {
+      target: { value: "indie" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: "indie", limit: 25 }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+    expect(screen.getByLabelText("Search accounts")).toHaveProperty("value", "");
+    await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: undefined, limit: 25 }));
+  });
+
+  it("searches every supported identifier and uses email as the no-handle identity", async () => {
+    mount([
+      account(),
+      account({ id: 61, handle: null, displayName: null, email: "new.person@example.org" }),
+    ]);
+
+    const search = await screen.findByLabelText("Search accounts");
+    expect(search).toHaveProperty("placeholder", "handle, name, email or id");
+    expect(await screen.findByText("indie2@example.org")).toBeTruthy();
+    const emailPrimary = await screen.findByText("new.person@example.org");
+    expect(emailPrimary.closest(".row-title")).toBeTruthy();
+    expect(screen.queryByText("account 61")).toBeNull();
   });
 });
 
@@ -100,7 +139,7 @@ describe("changing a role", () => {
     });
 
     expect(setRole).not.toHaveBeenCalled();
-    expect(screen.getByText("Make indie2 a reviewer?")).toBeTruthy();
+    expect(screen.getByText("Make indie2 a Hub reviewer?")).toBeTruthy();
   });
 
   it("says what the role grants, at the moment it is granted", async () => {
@@ -110,8 +149,8 @@ describe("changing a role", () => {
       target: { value: "reviewer" },
     });
 
-    const panel = screen.getByRole("group", { name: "Make indie2 a reviewer?" });
-    expect(within(panel).getByText(/verify organisations/)).toBeTruthy();
+    const panel = screen.getByRole("group", { name: "Make indie2 a Hub reviewer?" });
+    expect(within(panel).getByText(/verify organizations/)).toBeTruthy();
     expect(within(panel).getByText(/grants publishing rights over a whole namespace/)).toBeTruthy();
   });
 
@@ -121,7 +160,7 @@ describe("changing a role", () => {
     fireEvent.change(await screen.findByLabelText("Global role for account 2"), {
       target: { value: "admin" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Change the role to admin" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change the role to Hub admin" }));
 
     await waitFor(() => expect(setRole).toHaveBeenCalledWith(2, "admin"));
   });
@@ -133,11 +172,9 @@ describe("changing a role", () => {
       target: { value: "reviewer" },
     });
 
-    const panel = screen.getByRole("group", { name: "Make root a reviewer?" });
+    const panel = screen.getByRole("group", { name: "Make root a Hub reviewer?" });
     expect(within(panel).getByText(/This is your own account/)).toBeTruthy();
-    expect(
-      within(panel).getByText(/If you are the only\s+administrator, nobody can\./),
-    ).toBeTruthy();
+    expect(within(panel).getByText(/If you are the only Hub admin, nobody can\./)).toBeTruthy();
   });
 
   it("does not warn about self-demotion when somebody else is demoted", async () => {
@@ -160,10 +197,12 @@ describe("direct create", () => {
     const panel = screen.getByRole("group", { name: "Grant direct-create to indie2?" });
     expect(within(panel).getByText(/any namespace/)).toBeTruthy();
     expect(
-      within(panel).getByText(/A membership on a verified organisation is the narrower way/),
+      within(panel).getByText(/A membership on a verified organization is the narrower way/),
     ).toBeTruthy();
     // The thing people assume wrongly: that it makes their API key powerful too.
     expect(within(panel).getByText(/does not elevate an API key/)).toBeTruthy();
+    expect(within(panel).getByText("write", { selector: "code" })).toBeTruthy();
+    expect(panel.textContent).not.toContain("`write`");
     expect(setDirectCreate).not.toHaveBeenCalled();
 
     fireEvent.click(within(panel).getByRole("button", { name: "Grant it" }));

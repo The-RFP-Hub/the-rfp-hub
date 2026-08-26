@@ -70,7 +70,7 @@ function PublisherInvitation() {
       <p className="footnote">
         Submit your opportunities, keep them current, and see what they get read and applied for.
         Signing in creates an account the first time; publishing without review additionally
-        requires membership of a verified organisation, which a reviewer grants.{" "}
+        requires membership of a verified organization, which a reviewer grants.{" "}
         <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it.
       </p>
       {!session.ready ? (
@@ -88,9 +88,8 @@ function PublisherInvitation() {
           </p>
           <p className="muted footnote">
             Signing in is a one-time code emailed to you by this service. There is no password to
-            choose or lose and no key to hand over; the code is exchanged for a token kept in this
-            browser and sent to the API, which is the only thing that decides what an account may
-            do.
+            choose or lose and no key to hand over. This browser stores a session so you can manage
+            your account. Permissions are checked when you submit or manage a listing.
           </p>
         </>
       )}

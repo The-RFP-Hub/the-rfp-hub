@@ -71,6 +71,7 @@ test.describe("M3-7 the public directory", () => {
     const { context, page } = await anonymous(browser);
     try {
       await page.goto(stack.urls.frontend);
+      await expect(page).toHaveTitle("Directory | RFP Hub");
       await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
 
       // The filter is a parameter the endpoint declares — the list route validates its querystring
@@ -194,7 +195,13 @@ test.describe("M3-7 what the Hub explains about itself", () => {
       // draw. Names are matched loosely — a header may carry an inline note.
       const roles = page.getByRole("table").first();
       await expect(roles).toBeVisible();
-      for (const role of ["Visitor", "Submitter", "Verified org member", "Hub reviewer", "Admin"]) {
+      for (const role of [
+        "Visitor",
+        "Submitter",
+        "Verified org member",
+        "Hub reviewer",
+        "Hub admin",
+      ]) {
         await expect(roles.getByRole("columnheader", { name: role, exact: true })).toBeVisible();
       }
       // …and at least one row, so an empty `<tbody>` cannot pass as a rendered map.
@@ -244,6 +251,7 @@ test.describe("M3-7 the public entry page", () => {
     const { context, page } = await anonymous(browser);
     try {
       await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
+      await expect(page).toHaveTitle(`${replacedTitle} | RFP Hub`);
 
       await expect(page.getByRole("heading", { name: new RegExp(replacedTitle) })).toBeVisible();
       // The id and the description reach the page as text.
@@ -264,10 +272,10 @@ test.describe("M3-7 the public entry page", () => {
       const history = page.locator("details", { has: page.getByText("Change history") });
       await history.getByText("Change history").click();
 
-      await expect(history.getByRole("cell", { name: "update", exact: true })).toBeVisible();
-      await expect(history.getByRole("cell", { name: "create", exact: true })).toBeVisible();
+      await expect(history.getByRole("cell", { name: "Updated", exact: true })).toBeVisible();
+      await expect(history.getByRole("cell", { name: "Submitted", exact: true })).toBeVisible();
       // A time for each, and the changed FIELD NAME.
-      await expect(history.getByText("title", { exact: false }).first()).toBeVisible();
+      await expect(history.getByRole("cell", { name: "Title", exact: true })).toBeVisible();
 
       // The redaction itself: an anonymous reader gets the field names and never the values, so the
       // superseded title — a value — must appear nowhere in the trail.

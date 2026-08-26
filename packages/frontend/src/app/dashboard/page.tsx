@@ -15,6 +15,7 @@ import { UntrustedText } from "@/components/UntrustedText";
 import { AuthUnavailable, ResourceView } from "@/components/states";
 import { METRIC_LABELS, formatCount, formatDay } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { DASHBOARD_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import Link from "next/link";
@@ -31,22 +32,23 @@ export default function DashboardPage() {
   if (!session.authenticated) {
     return (
       <section>
-        <h1>Your listings&rsquo; traffic</h1>
+        <h1>{DASHBOARD_GATE_COPY.title}</h1>
+        <p className="lede">{DASHBOARD_GATE_COPY.detail}</p>
         <p className="footnote">
           Submit funding opportunities to the RFP Hub, keep them current, and see what they get read
           and applied for. Signing in creates an account the first time; publishing without review
-          additionally requires membership of a verified organisation, which a reviewer grants —{" "}
+          additionally requires membership of a verified organization, which a reviewer grants —{" "}
           <Link href={HOW_IT_WORKS}>who can do what</Link> sets out the whole of it.
         </p>
         <p>
-          <button type="button" onClick={session.login}>
+          <button type="button" className="button-primary" onClick={session.login}>
             Log in
           </button>
         </p>
         <p className="muted footnote">
           Signing in is a one-time code emailed to you by this service. There is no password to
-          choose or lose and no key to hand over; the code is exchanged for a token kept in this
-          browser and sent to the API, which is the only thing that decides what an account may do.
+          choose or lose and no key to hand over. This browser stores a session so you can manage
+          your account. Permissions are checked when you submit or manage a listing.
         </p>
         <p className="muted footnote">
           Nothing here is needed to read the Hub — <Link href="/">the directory</Link> is public.
@@ -65,14 +67,20 @@ function Overview() {
 
   return (
     <section>
-      <h1>Your listings&rsquo; traffic</h1>
+      <div className="row-between">
+        <h1>Dashboard</h1>
+        <Link className="button-primary" href="/listings/new">
+          Submit an opportunity
+        </Link>
+      </div>
+      <h2>Listings traffic</h2>
       <ResourceView resource={state} what="your traffic summary" onRetry={reload}>
         {(summary) => (
           <>
             <p className="muted">
               {formatDay(summary.from)} to {formatDay(summary.to)} · best-effort, server-side counts
             </p>
-            <ul className="tiles">
+            <ul className="kpi-grid">
               {(["listViews", "detailViews", "sourceClicks", "applyClicks"] as const).map((key) => (
                 <li key={key} className="tile card">
                   <span className="tile-value">{formatCount(summary.totals[key])}</span>
@@ -81,16 +89,26 @@ function Overview() {
               ))}
             </ul>
 
+            {summary.opportunities.length > 0 &&
+            Object.values(summary.totals).every((count) => count === 0) ? (
+              <div className="state">
+                <p className="empty-title">No traffic recorded in this period yet.</p>
+                <p className="muted">
+                  Published listings remain below. Counts move after directory views, detail views
+                  or tracked link clicks are recorded in this period.
+                </p>
+              </div>
+            ) : null}
+
             {summary.opportunities.length === 0 ? (
               <div className="state empty">
-                <p className="empty-title">Nothing published under this account yet.</p>
+                <p className="empty-title">No published listings to measure yet.</p>
                 <p className="muted">
-                  There is no traffic to report until something of yours is in the directory.
+                  Traffic starts after a listing reaches the public directory. Pending listings are
+                  not public and produce no traffic here.
                 </p>
                 <p className="row">
-                  <Link className="button-primary" href="/listings/new">
-                    Submit an opportunity
-                  </Link>
+                  <Link href="/listings/new">Submit an opportunity</Link>
                   <span className="muted">
                     It lands pending unless your account publishes into a verified namespace.
                   </span>
@@ -99,12 +117,16 @@ function Overview() {
             ) : (
               <div className="table-scroll">
                 <table>
-                  <caption>Most-read entries first</caption>
+                  <caption>Most-read listings first</caption>
                   <thead>
                     <tr>
                       <th scope="col">Listing</th>
-                      <th scope="col">Detail views</th>
-                      <th scope="col">Apply clicks</th>
+                      <th scope="col" className="numeric">
+                        Detail views
+                      </th>
+                      <th scope="col" className="numeric">
+                        Apply clicks
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -118,8 +140,8 @@ function Overview() {
                             <code>{entry.opportunityId}</code>
                           </div>
                         </th>
-                        <td>{formatCount(entry.detailViews)}</td>
-                        <td>{formatCount(entry.applyClicks)}</td>
+                        <td className="numeric">{formatCount(entry.detailViews)}</td>
+                        <td className="numeric">{formatCount(entry.applyClicks)}</td>
                       </tr>
                     ))}
                   </tbody>

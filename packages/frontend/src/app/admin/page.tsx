@@ -9,8 +9,8 @@
  * elevates an API key: a `write`-only key on a direct-create account still lands its submissions
  * pending.
  *
- * ORGANISATIONS ARE NOT HERE ANY MORE. This page used to carry a read-only copy of the organisation
- * directory, which taught the wrong thing twice over: it implied organisation management was an
+ * ORGANIZATIONS ARE NOT HERE ANY MORE. This page used to carry a read-only copy of the organization
+ * directory, which taught the wrong thing twice over: it implied organization management was an
  * administrator's job when verification is a REVIEWER capability, and a table with no controls on
  * the page named "administration" reads as a control somebody has forgotten to add. It lives on
  * Review, with the claims it usually accompanies.
@@ -21,9 +21,9 @@
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
 import { UntrustedText } from "@/components/UntrustedText";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
-import { ApiError } from "@/lib/api";
+import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
+import { CAPABILITY_DENIAL_COPY, ROUTE_GATE_COPY, accountRoleLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import type { AccountRole, AccountSummary, Me } from "@/lib/types";
@@ -37,22 +37,23 @@ const ROLE_MEANING: Record<AccountRole, string> = {
   submitter:
     "may submit listings and manage their own. No queues, no decisions about anybody else.",
   reviewer:
-    "may approve, refuse and merge anybody's listings, decide claims, and verify organisations — which grants publishing rights over a whole namespace.",
-  admin: "everything a reviewer may do, plus changing roles and granting direct-create.",
+    "may approve, refuse and merge anybody's listings, decide claims, and verify organizations — which grants publishing rights over a whole namespace.",
+  admin: "everything a Hub reviewer may do, plus changing roles and granting direct-create.",
 };
 
 export default function AdminPage() {
   return (
     <RequireSession
-      capability={{ needs: (me) => me.canAdmin, label: "the administrator capability" }}
+      gate={ROUTE_GATE_COPY.admin}
+      capability={{ needs: (me) => me.canAdmin, ...CAPABILITY_DENIAL_COPY.admin }}
     >
       {(me) => (
         <section>
           <h1>Accounts &amp; roles</h1>
           <p className="lede">
             Roles decide who may review. Direct-create decides who may publish without a membership.
-            Organisation verification is a reviewer capability and lives on{" "}
-            <Link href="/review?tab=organisations">Review queues → Organisations</Link>.
+            Organization verification is a reviewer capability and lives on{" "}
+            <Link href="/review?tab=organizations">Review queues → Organizations</Link>.
           </p>
           <Accounts me={me} />
         </section>
@@ -80,11 +81,7 @@ function Accounts({ me }: { me: Me }) {
       setNote({ kind: "ok", message: await work() });
       reload();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError ? `${error.message} (${error.code})` : "The change failed.",
-      });
+      setNote(actionErrorNote(error, "The change failed."));
     } finally {
       setBusy(false);
     }
@@ -93,7 +90,7 @@ function Accounts({ me }: { me: Me }) {
   return (
     <>
       <form
-        className="row"
+        className="search-row"
         onSubmit={(event) => {
           event.preventDefault();
           setSearch(query.trim());
@@ -103,11 +100,20 @@ function Accounts({ me }: { me: Me }) {
           aria-label="Search accounts"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="handle, display name or provider subject"
+          placeholder="handle, name, email or id"
         />
-        <button type="submit" className="button-primary">
-          Search
-        </button>
+        <button type="submit">Search</button>
+        {search !== "" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setSearch("");
+            }}
+          >
+            Clear
+          </button>
+        ) : null}
       </form>
       <ActionNote note={note} />
 
@@ -119,7 +125,7 @@ function Accounts({ me }: { me: Me }) {
               detail={
                 search === ""
                   ? "An account is created the first time somebody signs in."
-                  : "Handles, display names and provider subjects are all searched."
+                  : "Handles, names, emails and ids are all searched."
               }
               action={
                 search !== "" ? (
@@ -142,7 +148,7 @@ function Accounts({ me }: { me: Me }) {
                   <tr>
                     <th scope="col">Account</th>
                     <th scope="col">Global role</th>
-                    <th scope="col">Direct create</th>
+                    <th scope="col">Direct-create</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -179,17 +185,26 @@ function AccountRow({
   /** Demoting yourself out of `admin` is the one change that cannot be undone from this screen. */
   const selfDemotion = isSelf && account.globalRole === "admin" && proposed !== "admin";
 
-  const name = account.handle ?? `account ${account.id}`;
+  const name = account.handle ?? account.email ?? `account ${account.id}`;
 
   return (
     <>
       <tr>
         <th scope="row">
           <span className="row-title">
-            <UntrustedText value={account.handle} fallback={`account ${account.id}`} />
+            <UntrustedText
+              value={account.handle ?? account.email}
+              fallback={`account ${account.id}`}
+            />
           </span>
           {isSelf ? <span className="badge badge-pending">you</span> : null}
           <div className="muted">
+            {account.handle && account.email ? (
+              <>
+                <UntrustedText value={account.email} />
+                <br />
+              </>
+            ) : null}
             <code>#{account.id}</code> ·{" "}
             <UntrustedText value={account.displayName} fallback="no display name" /> · joined{" "}
             {formatInstant(account.createdAt)}
@@ -207,7 +222,7 @@ function AccountRow({
           >
             {ROLES.map((role) => (
               <option key={role} value={role}>
-                {role}
+                {accountRoleLabel(role)}
               </option>
             ))}
           </select>
@@ -224,8 +239,8 @@ function AccountRow({
         <tr>
           <td colSpan={3}>
             <ConfirmPanel
-              title={`Make ${name} ${proposed === "admin" ? "an" : "a"} ${proposed}?`}
-              confirmLabel={`Change the role to ${proposed}`}
+              title={`Make ${name} a ${accountRoleLabel(proposed)}?`}
+              confirmLabel={`Change the role to ${accountRoleLabel(proposed)}`}
               busyLabel="Changing…"
               busy={busy}
               onCancel={() => setProposed(null)}
@@ -237,26 +252,26 @@ function AccountRow({
                   // flags the navigation renders from came with the session. Re-reading them is what
                   // stops the UI insisting you still hold something the API has just taken away.
                   if (isSelf) session.reloadMe();
-                  return `${name} is now ${proposed}.`;
+                  return `${name} is now a ${accountRoleLabel(proposed)}.`;
                 })
               }
             >
               <p>
-                A <strong>{proposed}</strong> {ROLE_MEANING[proposed]}
+                A <strong>{accountRoleLabel(proposed)}</strong> {ROLE_MEANING[proposed]}
               </p>
               {selfDemotion ? (
                 <p>
                   <strong>
-                    This is your own account, and it takes your administrator rights away.
+                    This is your own account, and it takes your Hub admin rights away.
                   </strong>{" "}
-                  You will not be able to undo it from this page — nobody can change roles except an
-                  administrator, so another one has to change yours back. If you are the only
-                  administrator, nobody can.
+                  You will not be able to undo it from this page — nobody can change roles except a
+                  Hub admin, so another one has to change yours back. If you are the only Hub admin,
+                  nobody can.
                 </p>
               ) : null}
               {proposed === "admin" && !isSelf ? (
                 <p>
-                  An administrator can change any role, including yours, and can grant themselves
+                  A Hub admin can change any role, including yours, and can grant themselves
                   direct-create.
                 </p>
               ) : null}
@@ -291,24 +306,25 @@ function AccountRow({
               {account.directCreate ? (
                 <p>
                   Their submissions go back to landing pending, unless they hold a membership on a
-                  verified organisation. Listings they have already published stay published.
+                  verified organization. Listings they have already published stay published.
                 </p>
               ) : (
                 <p>
                   They will publish into <strong>any namespace</strong> — including one belonging to
-                  an organisation they are not a member of — immediately and without review, from a
+                  an organization they are not a member of — immediately and without review, from a
                   browser session. It is the widest grant on this page and it is not scoped to
                   anything.{" "}
                   <strong>
-                    A membership on a verified organisation is the narrower way to give somebody
+                    A membership on a verified organization is the narrower way to give somebody
                     publishing rights
                   </strong>{" "}
                   and is almost always the one that is meant.
                 </p>
               )}
               <p className="muted footnote">
-                It does not elevate an API key: a `write`-scoped key on this account still lands its
-                submissions pending. Publishing without review is a session-only power.
+                It does not elevate an API key: a <code>write</code>-scoped key on this account
+                still lands its submissions pending. Publishing without review is a session-only
+                power.
               </p>
             </ConfirmPanel>
           </td>

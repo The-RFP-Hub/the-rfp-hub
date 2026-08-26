@@ -51,7 +51,14 @@ describe("source fetcher", () => {
       transport: transport({ "https://example.org/a": { body: PAGE } }, seen),
     });
     const headers = seen[0]?.headers ?? {};
-    expect(headers["user-agent"]).toBe(VERIFIER_USER_AGENT);
+    expect(VERIFIER_USER_AGENT).toBe(
+      "RFPHubVerifier/1.0 (+https://github.com/The-RFP-Hub/the-rfp-hub)",
+    );
+    expect(headers).toMatchObject({
+      "user-agent": VERIFIER_USER_AGENT,
+      accept: "text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8",
+      "accept-language": "en",
+    });
     // A verifier that forwarded a credential would be handing it to whoever the submitter chose.
     for (const forbidden of ["authorization", "cookie", "referer"]) {
       expect(Object.keys(headers), forbidden).not.toContain(forbidden);

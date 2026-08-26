@@ -1,26 +1,51 @@
 /**
  * Editorial state, shown as a WORD and a SHAPE, never as a hue.
  *
- * Every badge here reports SERVER state — review status, listing, organisation verification, the
- * publisher's own `status`. None of it is computed in the browser.
+ * Every badge here is grounded in server state — review status, listing, organization verification,
+ * and the publisher's own `status`. The publisher-facing listing badge is the one deterministic
+ * projection over those server axes.
  *
  * THE FOUR SHAPES ARE THE VOCABULARY, and they are defined once in the stylesheet rather than
- * per-badge: a solid outline is live or included, filled ink is finished and terminal, a dashed
- * outline is provisional and waiting on somebody, and struck-through muted text is refused. A
+ * per-badge: filled ink is live, a quiet outline is finished or terminal, a dashed outline is
+ * provisional and waiting on somebody, and struck-through muted text is refused. A
  * reader who sees no colour at all, a printout, and a screenshot in a bug report all carry exactly
  * the same information as the screen does. That is the point of doing it this way rather than with
  * a green tick and a red cross.
  *
  * THE TOOLTIP IS NEVER THE ONLY EXPLANATION where the badge is load-bearing. A `title` does not
  * exist on a touch device and is not reliably announced; where a badge decides what happens to
- * somebody's work — the account page's organisation table above all — `gloss` puts the sentence on
+ * somebody's work — the account page's organization table above all — `gloss` puts the sentence on
  * screen beside it and the tooltip stays as the longer form.
  */
+import {
+  PUBLISHER_STATUS_LABELS,
+  type PublisherStatusSource,
+  opportunityStatusLabel,
+  publisherStatus,
+  reviewStatusLabel,
+} from "@/lib/presentation";
+
+/** The one state a publisher needs to understand whether a listing is public and what happens next. */
+export function PublisherStatusBadge({ source }: { source: PublisherStatusSource }) {
+  const status = publisherStatus(source);
+  const explanation = {
+    merged: "Merged into another listing; this record is terminal",
+    rejected: "Rejected by a Hub reviewer and not visible in the public directory",
+    pending: "Stored and waiting for a Hub reviewer",
+    hidden: "Approved, but hidden from the public directory",
+    live: "Approved and visible in the public directory",
+  }[status];
+  return (
+    <span className={`badge badge-${status}`} title={explanation}>
+      {PUBLISHER_STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 export function ReviewStatusBadge({ status }: { status: string }) {
   const explanation =
     status === "pending"
-      ? "Stored, and invisible to the public reads until a reviewer approves it"
+      ? "Stored and hidden from the public directory until a Hub reviewer approves it"
       : status === "approved"
         ? "Approved by a reviewer, or auto-approved for a verified namespace"
         : status === "rejected"
@@ -28,7 +53,7 @@ export function ReviewStatusBadge({ status }: { status: string }) {
           : status;
   return (
     <span className={`badge badge-${status}`} title={explanation}>
-      {status}
+      {reviewStatusLabel(status)}
     </span>
   );
 }
@@ -55,7 +80,7 @@ export function StatusBadge({ status }: { status: string }) {
             : status;
   return (
     <span className={`badge badge-${status}`} title={explanation}>
-      {status}
+      {opportunityStatusLabel(status)}
     </span>
   );
 }
@@ -64,23 +89,58 @@ export function StatusBadge({ status }: { status: string }) {
  * Listing is a separate axis from approval: an approved entry can be unlisted, and then it is not
  * in the public reads either. Showing only the review status would misreport that.
  */
-export function ListedBadge({ isListed }: { isListed: boolean }) {
+export function ListedBadge({
+  isListed,
+  reviewStatus,
+}: {
+  isListed: boolean;
+  reviewStatus: string;
+}) {
+  const visible = reviewStatus === "approved" && isListed;
+  const label = visible
+    ? "Visible in the public directory"
+    : reviewStatus === "pending" && isListed
+      ? "Will appear once approved"
+      : reviewStatus === "approved"
+        ? "Hidden from the public directory"
+        : isListed
+          ? "Listing preference: public"
+          : "Listing preference: hidden";
+  const explanation = visible
+    ? "Approved and visible in the public directory"
+    : reviewStatus === "pending" && isListed
+      ? "Hidden while it waits for review; it will appear in the public directory once approved"
+      : reviewStatus === "approved"
+        ? "Approved, but hidden from the public directory"
+        : isListed
+          ? "The listing preference is public, but this listing is hidden because it is not approved"
+          : "The listing preference is hidden; approval will not make it public";
   return (
     <span
-      className={isListed ? "badge badge-listed" : "badge badge-unlisted"}
-      title={
-        isListed
-          ? "Included in the public list and detail reads"
-          : "Withheld from the public reads, whatever its review status"
+      className={
+        visible ? "badge badge-listed" : isListed ? "badge badge-pending" : "badge badge-unlisted"
       }
+      title={explanation}
     >
-      {isListed ? "listed" : "unlisted"}
+      {label}
+    </span>
+  );
+}
+
+/** A merge is a terminal editorial state, so it uses the badge system's quiet outline. */
+export function MergedBadge() {
+  return (
+    <span
+      className="badge badge-merged"
+      title="Merged into another listing; this record is terminal"
+    >
+      Merged
     </span>
   );
 }
 
 /**
- * Organisation verification, which is what auto-approval hangs off: writes from a verified
+ * Organization verification, which is what auto-approval hangs off: writes from a verified
  * namespace publish immediately, writes from an unverified one land pending.
  *
  * `gloss` puts that consequence on screen. "Verified" on its own reads as a vanity tick, and the
@@ -89,14 +149,14 @@ export function ListedBadge({ isListed }: { isListed: boolean }) {
  */
 export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: boolean }) {
   const explanation = verified
-    ? "Verified organisation — its members' listings publish without review"
-    : "Not verified — listings published under this namespace land pending";
+    ? "Verified organization — its members' listings publish without review"
+    : "Not verified — listings published under this organization prefix wait for review";
   const badge = (
     <span
       className={verified ? "badge badge-verified" : "badge badge-unverified"}
       title={explanation}
     >
-      {verified ? "verified" : "unverified"}
+      {verified ? "Verified" : "Not verified"}
     </span>
   );
   if (!gloss) return badge;
@@ -119,7 +179,13 @@ export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: 
  * programme — and never a fact-check. The title text says that, because a tick that reads as
  * "these details are correct" would be the single most misleading thing on this frontend.
  */
-export function MatchBadge({ matched }: { matched: boolean | null }) {
+export function MatchBadge({
+  matched,
+  existsAtSource,
+}: {
+  matched: boolean | null;
+  existsAtSource?: boolean | null;
+}) {
   if (matched === null) {
     return (
       <span className="badge badge-unknown" title="This listing's link has not been checked yet">
@@ -127,16 +193,28 @@ export function MatchBadge({ matched }: { matched: boolean | null }) {
       </span>
     );
   }
+  const failedLabel =
+    existsAtSource === false
+      ? "link not reachable"
+      : existsAtSource === true
+        ? "content did not match"
+        : "link check failed";
+  const failedTitle =
+    existsAtSource === false
+      ? "The application link could not be reached"
+      : existsAtSource === true
+        ? "The linked page was reached, but its title does not look like this programme"
+        : "The link check failed; no more specific result is available";
   return (
     <span
       className={matched ? "badge badge-matched" : "badge badge-unmatched"}
       title={
         matched
           ? "The linked page exists and its title is about this programme. A low-bar anti-spam signal, not a fact-check."
-          : "The linked page did not resolve, or its title does not look like this programme"
+          : failedTitle
       }
     >
-      {matched ? "link looks right" : "link did not match"}
+      {matched ? "link looks right" : failedLabel}
     </span>
   );
 }

@@ -11,9 +11,10 @@
  * 2. **A pair is unordered, so it is written ordered.** `ux_dup_pair` is unique on
  *    `(least, greatest)`, so (A,B) and (B,A) are the same key and a dismissal cannot be undone by
  *    the mirrored row staying suspected.
- * 3. **A decision is never resurrected.** Re-embedding only ever touches `suspected` rows;
+ * 3. **Detection never resurrects a decision.** Re-embedding only ever touches `suspected` rows;
  *    `dismissed`, `confirmed` and `merged` are somebody's judgement and this pass has no new
- *    information about them.
+ *    information about them. A reviewer explicitly reopening a dismissal is a separate audited
+ *    transition.
  * 4. **Stale pairs are removed exactly, not approximately.** An update that makes two entries
  *    unalike must delete the suspected pair — but "it fell out of the top 20" is not the same fact
  *    as "it is below the threshold". So the cleanup recomputes the similarity of each existing
@@ -46,6 +47,7 @@ import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
 import { AuditService } from "../audit/audit.service.js";
+import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
   type EmbeddingProvider,
   createEmbeddingProvider,
@@ -174,6 +176,7 @@ export class DedupeService {
     return kept.map((match) => ({
       id: match.publicId,
       title: match.title,
+      isPublic: match.isPublic,
       similarity: round(match.similarity),
       status: "suspected" as const,
       detectedAt: new Date().toISOString(),
@@ -249,7 +252,9 @@ export class DedupeService {
   private async search(
     vector: number[],
     options: { exclude: number; scope: CandidateScope },
-  ): Promise<{ id: number; publicId: string; title: string; similarity: number }[]> {
+  ): Promise<
+    { id: number; publicId: string; title: string; isPublic: boolean; similarity: number }[]
+  > {
     const provider = this.provider;
     if (!provider) return [];
     // pgvector's cosine-distance operator, written out rather than through Drizzle's
@@ -272,6 +277,8 @@ export class DedupeService {
         id: opportunities.id,
         publicId: opportunities.publicId,
         title: opportunities.title,
+        reviewStatus: opportunities.reviewStatus,
+        isListed: opportunities.isListed,
         similarity: sql<number>`1 - (${distance})`,
       })
       .from(opportunityEmbeddings)
@@ -280,7 +287,11 @@ export class DedupeService {
       .orderBy(asc(distance))
       .limit(ANN_CANDIDATES);
 
-    return rows.map((row) => ({ ...row, similarity: Number(row.similarity) }));
+    return rows.map(({ reviewStatus, isListed, ...row }) => ({
+      ...row,
+      isPublic: reviewStatus === "approved" && isListed,
+      similarity: Number(row.similarity),
+    }));
   }
 
   /** Insert the pairs that are new; refresh the similarity of the ones already suspected. */
@@ -521,11 +532,46 @@ export class DedupeService {
     });
   }
 
+  /** Undo a dismissal by returning the pair to the suspected queue. */
+  async reopen(reviewerId: number, pairId: number): Promise<DuplicatePairView> {
+    return this.db.transaction(async (tx) => {
+      const pair = await lockPair(tx, pairId);
+      const transition = duplicateReopenTransition(pair.status);
+      let next = pair;
+
+      if (transition === "reopen") {
+        const now = new Date();
+        const updated = await tx
+          .update(opportunityDuplicates)
+          .set({ status: "suspected", reviewedBy: reviewerId, reviewedAt: now })
+          .where(eq(opportunityDuplicates.id, pairId))
+          .returning();
+        next = updated[0] ?? pair;
+        await this.audit.record(tx, {
+          subjectKind: "duplicate",
+          subjectId: pairId,
+          actorKind: "user",
+          actorAccountId: reviewerId,
+          action: "reopen",
+          patch: { status: { before: pair.status, after: "suspected" } },
+        });
+      }
+
+      const [left, right] = await Promise.all([
+        loadRowById(tx, next.opportunityId),
+        loadRowById(tx, next.duplicateOfId),
+      ]);
+      const survivors = await this.survivorIds([left.mergedIntoId, right.mergedIntoId]);
+      return toPairView(next, left, right, survivors);
+    });
+  }
+
   /**
    * Merge one pair: the loser is rejected, unlisted, archived and pointed at the survivor.
    *
    * The loser's row is KEPT rather than deleted — its public id may be in an export, a feed or
-   * somebody's bookmarks, and `merged_into_id` is what lets a future read redirect instead of 404.
+   * somebody's bookmarks, and `merged_into_id` is what lets a public read return a 404 that names
+   * the survivor without ever serving the loser's terminal row.
    *
    * THE SURVIVOR IS VALIDATED TWICE OVER. It must be publicly visible (merging into a pending entry
    * would take the public one away and leave nothing in its place), and it must not itself carry
@@ -619,6 +665,7 @@ export class DedupeService {
           isListed: false,
           status: "archived",
           mergedIntoId: survivor.id,
+          mergedFromPublic: loser.reviewStatus === "approved" && loser.isListed,
           updatedAt: now,
         })
         .where(eq(opportunities.id, loser.id));

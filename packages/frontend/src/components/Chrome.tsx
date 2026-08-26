@@ -1,5 +1,6 @@
 "use client";
 
+import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
  * The application shell: navigation, session state, and the one place a page's access is gated.
  *
@@ -18,10 +19,10 @@
  * renders the API's own 403.
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
-import { HOW_IT_WORKS, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import { HOW_IT_WORKS, HOW_IT_WORKS_ROLES, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import type { GateCopy } from "@/lib/presentation";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -43,38 +44,39 @@ const PUBLIC_NAV: NavItem[] = [
  * a credential belonging to the account — even though it keeps its own route.
  *
  * A FUNCTION RATHER THAN A CONSTANT, because one of these items is derived from the account: an
- * organisation is a place this account can act, and it belongs beside its listings rather than
+ * organization is a place this account can act, and it belongs beside its listings rather than
  * behind two clicks on the account page.
  */
 function accountNav(me: Me): NavItem[] {
-  const organisation = organisationNav(me);
+  const organization = organizationNav(me);
   return [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/listings", label: "Your listings" },
-    ...(organisation ? [organisation] : []),
+    organization,
     { href: "/account", label: "Account" },
     { href: "/keys", label: "API keys", requires: (item) => item.canManageKeys },
   ];
 }
 
 /**
- * The organisation link, or none.
+ * The organization link.
  *
  * ONE MEMBERSHIP GETS ITS OWN NAME AND ITS OWN ADDRESS. A landing page listing exactly one row is a
- * click that answers nothing, and "Organisations" as a label for a single named thing is vaguer than
- * the thing itself. Several memberships need somewhere to choose between them, and none gets no
- * link at all — an empty destination in a header is a promise the account cannot keep.
+ * click that answers nothing, and "Organizations" as a label for a single named thing is vaguer than
+ * the thing itself. Several memberships need somewhere to choose between them. An account with no
+ * memberships still gets the index: its empty state explains how publishing rights are granted,
+ * and keeping that route in the signed-in navigation makes it discoverable before the first grant.
  *
  * The label for the single case is publisher-supplied text. It is rendered as a text child like
  * every other untrusted string in this package, never as markup.
  */
-export function organisationNav(me: Me): NavItem | null {
+export function organizationNav(me: Me): NavItem {
   const [only] = me.memberships;
-  if (!only) return null;
+  if (!only) return { href: "/organizations", label: "Organizations" };
   if (me.memberships.length === 1) {
-    return { href: `/organisations/${encodeURIComponent(only.slug)}`, label: only.name };
+    return { href: `/organizations/${encodeURIComponent(only.slug)}`, label: only.name };
   }
-  return { href: "/organisations", label: "Organisations" };
+  return { href: "/organizations", label: "Organizations" };
 }
 
 /**
@@ -104,17 +106,18 @@ function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string;
   const visible = items.filter((item) => !item.requires || (me !== null && item.requires(me)));
   if (visible.length === 0) return null;
   return (
-    <span className="shell-nav-group">
+    <ul className="shell-nav-group">
       {visible.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
-        >
-          {item.label}
-        </Link>
+        <li key={item.href}>
+          <GuardedLink
+            href={item.href}
+            aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
+          >
+            {item.label}
+          </GuardedLink>
+        </li>
       ))}
-    </span>
+    </ul>
   );
 }
 
@@ -123,14 +126,18 @@ export function Chrome({ children }: { children: ReactNode }) {
   const api = useApi();
   const pathname = usePathname() ?? "/";
   const me = session.me.status === "ready" ? session.me.data : null;
+  const { confirmNavigation } = useNavigationBlocker();
 
   return (
     <div className="shell">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <header className="shell-header">
-        <Link href="/" className="brand">
+        <GuardedLink href="/" className="brand">
           RFP Hub
           <span className="brand-tagline">an open index of funding opportunities</span>
-        </Link>
+        </GuardedLink>
 
         <nav className="shell-nav" aria-label="Sections">
           <NavGroup items={PUBLIC_NAV} pathname={pathname} me={me} />
@@ -146,7 +153,12 @@ export function Chrome({ children }: { children: ReactNode }) {
           ) : session.authenticated ? (
             <>
               <span className="muted">{me ? (me.handle ?? `account ${me.accountId}`) : "…"}</span>
-              <button type="button" onClick={() => void session.logout()}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmNavigation()) void session.logout();
+                }}
+              >
                 Log out
               </button>
             </>
@@ -158,10 +170,12 @@ export function Chrome({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="shell-main">{children}</main>
+      <main id="main-content" className="shell-main" tabIndex={-1}>
+        {children}
+      </main>
 
       <footer className="shell-footer">
-        <Link href={HOW_IT_WORKS}>About</Link>
+        <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
         <a href={STANDARD} target="_blank" rel="noopener noreferrer">
           The Standard
         </a>
@@ -176,8 +190,8 @@ export function Chrome({ children }: { children: ReactNode }) {
         <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
           GitHub
         </a>
-        <Link href="/privacy">Privacy</Link>
-        <Link href="/terms">Terms</Link>
+        <GuardedLink href="/privacy">Privacy</GuardedLink>
+        <GuardedLink href="/terms">Terms</GuardedLink>
         <span className="shell-footer-note">Open data · CC0 exports · MIT code</span>
       </footer>
     </div>
@@ -194,10 +208,15 @@ export function Chrome({ children }: { children: ReactNode }) {
 export function RequireSession({
   children,
   capability,
+  gate,
 }: {
   children: (me: Me) => ReactNode;
-  /** An extra gate for the review and administration pages, mirrored from the API's own answer. */
-  capability?: { needs: (me: Me) => boolean; label: string };
+  /** Route-specific signed-out wording. Omitted consumers retain the established generic gate. */
+  gate?: GateCopy;
+  /** An extra capability gate, mirrored from the API's own answer. */
+  capability?: {
+    needs: (me: Me) => boolean;
+  } & GateCopy;
 }) {
   const session = useSession();
 
@@ -206,15 +225,16 @@ export function RequireSession({
   if (!session.authenticated) {
     return (
       <div className="state empty">
-        <p className="empty-title">You are not signed in.</p>
+        <p className="empty-title">{gate?.title ?? "You are not signed in."}</p>
         <p className="muted">
-          This page shows one account&rsquo;s own listings and traffic, so it needs a session.
+          {gate?.detail ??
+            "This page shows one account’s own listings and traffic, so it needs a session."}
         </p>
         <p className="row">
           <button type="button" className="button-primary" onClick={session.login}>
             Log in
           </button>
-          <Link href={HOW_IT_WORKS}>What an account is for</Link>
+          <GuardedLink href={HOW_IT_WORKS}>What an account is for</GuardedLink>
         </p>
       </div>
     );
@@ -237,11 +257,11 @@ export function RequireSession({
   if (capability && !capability.needs(me)) {
     return (
       <div className="state empty">
-        <p className="empty-title">This account does not have {capability.label}.</p>
-        <p className="muted">
-          The API is the authority on that — this page is only reporting what it answered for your
-          account. <Link href={HOW_IT_WORKS}>Who can do what</Link> explains which role holds it;
-          ask an administrator if you believe yours should.
+        <p className="empty-title">{capability.title}</p>
+        <p className="muted">{capability.detail}</p>
+        <p className="row">
+          <GuardedLink href="/account">Check your account</GuardedLink>
+          <GuardedLink href={HOW_IT_WORKS_ROLES}>See who can do what</GuardedLink>
         </p>
       </div>
     );

@@ -1,3 +1,4 @@
+import { and, eq, or } from "drizzle-orm";
 /**
  * THE PUBLIC READ INVARIANT, re-proved after every mutation type this wave introduces.
  *
@@ -14,7 +15,9 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
-import { pool } from "../../src/db/client.js";
+import { db, pool } from "../../src/db/client.js";
+import { opportunities, opportunityDuplicates } from "../../src/db/schema.js";
+import { DedupeService } from "../../src/modules/services/dedupe/dedupe.service.js";
 import {
   bearer,
   grantMembership,
@@ -40,6 +43,7 @@ run("M3INV the public read invariant", () => {
   let publisherToken: string;
   let submitterToken: string;
   let reviewerToken: string;
+  let reviewerId: number;
   const userIds: string[] = [];
 
   beforeAll(async () => {
@@ -57,6 +61,7 @@ run("M3INV the public read invariant", () => {
     publisherToken = publisher.token;
     submitterToken = submitter.token;
     reviewerToken = reviewer.token;
+    reviewerId = reviewer.account.id;
   });
 
   afterAll(async () => {
@@ -114,6 +119,79 @@ run("M3INV the public read invariant", () => {
     });
     expect(res.json().reviewStatus).toBe("pending");
     await expectPublic([]);
+  });
+
+  it("keeps a pending loser's merged destination private", async () => {
+    const survivorId = `${NS}:merge-survivor`;
+    const loserId = `${NS}:merge-pending`;
+    for (const [token, id] of [
+      [publisherToken, survivorId],
+      [submitterToken, loserId],
+    ] as const) {
+      const created = await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: bearer(token),
+        payload: submission(id, NS, { ecosystems: ["M3INV"] }),
+      });
+      expect(created.statusCode, created.body).toBe(201);
+    }
+
+    const rows = await db
+      .select({ id: opportunities.id, publicId: opportunities.publicId })
+      .from(opportunities)
+      .where(eq(opportunities.sourcePublisher, NS));
+    const byPublicId = new Map(rows.map((row) => [row.publicId, row.id]));
+    const low = Math.min(byPublicId.get(survivorId) as number, byPublicId.get(loserId) as number);
+    const high = Math.max(byPublicId.get(survivorId) as number, byPublicId.get(loserId) as number);
+    // With the default lexical provider, submit-time detection has already inserted this pair.
+    // With embeddings explicitly disabled, the test must create it itself. Resolve either
+    // orientation before inserting so the invariant is proved in both configurations without
+    // violating the unordered pair's expression-backed unique index.
+    const existing = await db
+      .select({ id: opportunityDuplicates.id })
+      .from(opportunityDuplicates)
+      .where(
+        or(
+          and(
+            eq(opportunityDuplicates.opportunityId, low),
+            eq(opportunityDuplicates.duplicateOfId, high),
+          ),
+          and(
+            eq(opportunityDuplicates.opportunityId, high),
+            eq(opportunityDuplicates.duplicateOfId, low),
+          ),
+        ),
+      )
+      .limit(1);
+    const pair =
+      existing[0] ??
+      (
+        await db
+          .insert(opportunityDuplicates)
+          .values({ opportunityId: low, duplicateOfId: high, similarity: "0.99" })
+          .returning({ id: opportunityDuplicates.id })
+      )[0];
+    expect(pair, "the merge pair exists with either embedding configuration").toBeDefined();
+    await new DedupeService().merge(reviewerId, pair?.id as number, {
+      survivorId,
+    });
+
+    const response = await app.inject({ url: `/v1/opportunities/${loserId}` });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "not_found",
+      message: `opportunity '${loserId}' not found`,
+    });
+    expect(response.json()).not.toHaveProperty("mergedInto");
+
+    const hidden = await app.inject({
+      method: "PATCH",
+      url: `/v1/review/opportunities/${survivorId}`,
+      headers: bearer(reviewerToken),
+      payload: { isListed: false },
+    });
+    expect(hidden.statusCode, hidden.body).toBe(200);
   });
 
   it("puts an auto-approved publisher write into all of them at once", async () => {

@@ -55,7 +55,7 @@
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { and, count, eq } from "drizzle-orm";
-import { humanizeErrors, validateOpportunity } from "rfphub-validate";
+import { humanizeErrors, humanizeIssues, validateOpportunity } from "rfphub-validate";
 import { config as defaultConfig } from "../../../config.js";
 import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
 import {
@@ -193,7 +193,10 @@ export class OpportunityWriteService {
         400,
         "validation_failed",
         "the submission is not a valid RFP Hub Standard opportunity.",
-        { errors: humanizeErrors(errors, record) },
+        {
+          errors: humanizeErrors(errors, record),
+          issues: humanizeIssues(errors, record),
+        },
       );
     }
     const document = record as unknown as Opportunity;
@@ -224,6 +227,9 @@ export class OpportunityWriteService {
     const preview = await this.findByPublicId(document.id);
     if (options.mode === "replace" && !preview) {
       throw notFound(`no opportunity ${JSON.stringify(document.id)}.`);
+    }
+    if (preview && preview.mergedIntoId !== null) {
+      throw opportunityMerged(preview.publicId);
     }
     const namespace = this.authorizationNamespace(document, preview);
     const advisory = this.decide({
@@ -330,7 +336,7 @@ export class OpportunityWriteService {
         if (!grandfathered) {
           throw badRequest(
             "publisher_not_operating",
-            `this entry is published under ${JSON.stringify(storedPublisher)}; a replacement must keep that organisation in \`operatingOrganizations\`.`,
+            `this entry is published under ${JSON.stringify(storedPublisher)}; a replacement must keep that organization in \`operatingOrganizations\`.`,
           );
         }
       }
@@ -406,7 +412,7 @@ export class OpportunityWriteService {
     if (namespace === undefined) {
       throw badRequest(
         "namespace_required",
-        "a submission must name the namespace it is published under: set `source.publisher` to an organisation slug, or give `operatingOrganizations[0].slug`.",
+        "a submission must name the namespace it is published under: set `source.publisher` to an organization slug, or give `operatingOrganizations[0].slug`.",
       );
     }
     // You may only publish under an organisation that OPERATES the programme. The namespace is the
@@ -418,7 +424,7 @@ export class OpportunityWriteService {
     if (!operatingSlugs(document).includes(namespace)) {
       throw badRequest(
         "publisher_not_operating",
-        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this programme. You may only publish under an organisation named in \`operatingOrganizations\`.`,
+        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this programme. You may only publish under an organization named in \`operatingOrganizations\`.`,
       );
     }
     const idProblem = checkPublicId(document.id, namespace);
@@ -550,6 +556,10 @@ export class OpportunityWriteService {
         .for("update")
         .limit(1);
       const existing = locked[0];
+
+      if (existing && existing.mergedIntoId !== null) {
+        throw opportunityMerged(existing.publicId);
+      }
 
       if (ctx.mode === "create" && existing) {
         // Created by somebody else between the fail-fast read and this lock. The same answer the
@@ -863,6 +873,7 @@ function asDocument(body: unknown): Record<string, unknown> {
 /** Field caps, checked before validation so an oversized body is cheap to refuse. */
 export function assertWithinCaps(record: Record<string, unknown>): void {
   const problems: string[] = [];
+  const issues: { path: string; message: string }[] = [];
   for (const [field, cap] of [
     ["title", FIELD_CAPS.title],
     ["summary", FIELD_CAPS.summary],
@@ -871,6 +882,10 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
     const value = record[field];
     if (typeof value === "string" && value.length > cap) {
       problems.push(`\`${field}\` must be at most ${cap} characters (got ${value.length}).`);
+      issues.push({
+        path: `/${field}`,
+        message: `must be at most ${cap} characters (got ${value.length}).`,
+      });
     }
   }
   for (const [field, value] of Object.entries(record)) {
@@ -878,11 +893,16 @@ export function assertWithinCaps(record: Record<string, unknown>): void {
       problems.push(
         `\`${field}\` must have at most ${FIELD_CAPS.arrayEntries} entries (got ${value.length}).`,
       );
+      issues.push({
+        path: `/${field}`,
+        message: `must have at most ${FIELD_CAPS.arrayEntries} entries (got ${value.length}).`,
+      });
     }
   }
   if (problems.length > 0) {
     throw new HttpError(400, "validation_failed", "the submission exceeds the size limits.", {
       errors: problems,
+      issues,
     });
   }
 }
@@ -959,6 +979,7 @@ const NON_CONTENT = new Set([
   "approvedAt",
   "lastSeenAt",
   "mergedIntoId",
+  "mergedFromPublic",
   "sourceSubmittedAt",
   "verifiedAgainstSource",
   "verifiedAt",
@@ -966,6 +987,13 @@ const NON_CONTENT = new Set([
   "nextDeadlineAt",
   "sourceSystem",
 ]);
+
+function opportunityMerged(publicId: string): HttpError {
+  return conflict(
+    "opportunity_merged",
+    `opportunity ${JSON.stringify(publicId)} has been merged and cannot be changed.`,
+  );
+}
 
 function comparable(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};

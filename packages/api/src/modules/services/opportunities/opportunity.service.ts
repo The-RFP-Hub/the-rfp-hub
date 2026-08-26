@@ -14,7 +14,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import type { PgColumn } from "drizzle-orm/pg-core";
+import { type PgColumn, alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityInsert,
@@ -229,6 +229,31 @@ export class OpportunityService {
       .limit(1);
     const r = rows[0];
     return r ? toStandard(r) : null;
+  }
+
+  /**
+   * Resolve a merged public id without weakening the public-read predicate.
+   *
+   * The loser's terminal row is never returned. Its destination is disclosed only when that id was
+   * public at merge time and the survivor remains public now; every other miss stays indistinguishable
+   * from an id that never existed.
+   */
+  async findMergedDestination(publicId: string): Promise<{ id: string; title: string } | null> {
+    const survivor = alias(opportunities, "public_merge_survivor");
+    const rows = await this.db
+      .select({ id: survivor.publicId, title: survivor.title })
+      .from(opportunities)
+      .innerJoin(survivor, eq(survivor.id, opportunities.mergedIntoId))
+      .where(
+        and(
+          eq(opportunities.publicId, publicId),
+          eq(opportunities.mergedFromPublic, true),
+          eq(survivor.reviewStatus, "approved"),
+          eq(survivor.isListed, true),
+        ),
+      )
+      .limit(1);
+    return rows[0] ?? null;
   }
 
   // ── write path (used by the seed loader, not exposed as a route in M2) ─────────────

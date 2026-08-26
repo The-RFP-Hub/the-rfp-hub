@@ -21,14 +21,18 @@ import {
   fromDocument,
   fromIsoUtc,
   idProblem,
+  localTimeZoneDescription,
   moveRow,
   namespaceAuthority,
   namespaceOf,
+  parseValidationIssueLine,
   slugifyTitle,
   splitLines,
   splitList,
   toDocument,
   toIsoUtc,
+  utcPreview,
+  validationPointerToFormPath,
 } from "@/lib/opportunity-form";
 import type { Opportunity } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
@@ -46,6 +50,55 @@ function usable(over: Partial<OpportunityFormState> = {}): OpportunityFormState 
     ...over,
   };
 }
+
+describe("validation issue mapping", () => {
+  it("maps root, array and funding envelope pointers to form controls", () => {
+    expect(validationPointerToFormPath("(root)", "grant")).toBe("(root)");
+    expect(validationPointerToFormPath("/operatingOrganizations/0/slug", "grant")).toBe(
+      "operatingOrganizations.0.slug",
+    );
+    expect(validationPointerToFormPath("/fundingInfo/budget", "grant")).toBe("budget");
+    expect(validationPointerToFormPath("/fundingDetails/programModel", "grant")).toBe(
+      "details.grant.programModel",
+    );
+    expect(validationPointerToFormPath("/fundingDetails/checkSize/max", "vc_fund")).toBe(
+      "details.vc_fund.checkMax",
+    );
+  });
+
+  it("unescapes JSON Pointer tokens and leaves server-owned paths unlinked", () => {
+    expect(validationPointerToFormPath("/fundingInfo/bud~1get", "grant")).toBeNull();
+    expect(validationPointerToFormPath("/source/submittedBy", "grant")).toBeNull();
+    expect(validationPointerToFormPath("/specVersion", "grant")).toBeNull();
+  });
+
+  it("parses every non-standard error line shape", () => {
+    expect(parseValidationIssueLine("(root) must be an object")).toMatchObject({
+      path: "(root)",
+      message: "must be an object",
+    });
+    expect(
+      parseValidationIssueLine(
+        "/fundingDetails/programModel grant details: must be a registered value",
+      ),
+    ).toMatchObject({
+      path: "/fundingDetails/programModel",
+      message: "must be a registered value",
+    });
+    expect(
+      parseValidationIssueLine(
+        "fundingDetails.fundingType 'grant' does not match the opportunity's fundingType 'rfp'",
+      ),
+    ).toMatchObject({ path: "/fundingType" });
+    expect(
+      parseValidationIssueLine("`title` must be at most 256 characters (got 300)."),
+    ).toMatchObject({ path: "/title", message: "must be at most 256 characters (got 300)." });
+    expect(parseValidationIssueLine("An unclassified server validation failure")).toMatchObject({
+      path: null,
+      message: "An unclassified server validation failure",
+    });
+  });
+});
 
 describe("splitList", () => {
   it("trims, drops blanks and never produces an empty string entry", () => {
@@ -68,9 +121,9 @@ describe("splitList", () => {
 describe("idProblem", () => {
   it("requires the namespaced form the API derives the source system from", () => {
     expect(idProblem("")).toContain("required");
-    expect(idProblem("no-namespace")).toContain("<namespace>:<local>");
-    expect(idProblem(":leading")).toContain("<namespace>:<local>");
-    expect(idProblem("trailing:")).toContain("<namespace>:<local>");
+    expect(idProblem("no-namespace")).toContain("organization slug and a colon");
+    expect(idProblem(":leading")).toContain("organization slug and a colon");
+    expect(idProblem("trailing:")).toContain("organization slug and a colon");
     expect(idProblem("acme-foundation:2026-round-1")).toBeNull();
   });
 
@@ -81,7 +134,7 @@ describe("idProblem", () => {
 });
 
 describe("the derived id", () => {
-  it("proposes the organisation slug and the slugified title", () => {
+  it("proposes the organization slug and the slugified title", () => {
     expect(deriveId("acme", "Round One: Public Goods!")).toBe("acme:round-one-public-goods");
   });
 
@@ -100,7 +153,7 @@ describe("the derived id", () => {
 });
 
 describe("the id's namespace", () => {
-  it("must be the primary operating organisation — the namespace the API derives", () => {
+  it("must be the primary operating organization — the namespace the API derives", () => {
     const problems = fieldProblems(usable({ id: "beta:round-one" }));
     expect(problems.id).toContain("acme");
   });
@@ -113,7 +166,7 @@ describe("the id's namespace", () => {
         { ...emptyOrganization(), name: "Beta Collective", slug: "beta" },
       ],
     });
-    expect(fieldProblems(form).id).toContain("not the primary organisation");
+    expect(fieldProblems(form).id).toContain("not the primary organization");
   });
 
   it("is happy when the two agree", () => {
@@ -128,8 +181,8 @@ describe("the id's namespace", () => {
  * On a create the API derives the namespace from `operatingOrganizations[0].slug` and requires the
  * id to start with it. On a REPLACE it never looks at the id — which is immutable — and authorises
  * against the row's STORED `source.publisher`, asking only that the publisher still appears among
- * the operating organisations. A claimed or imported listing carries an id from the system it came
- * from while being operated by the organisation that claimed it, so holding the id to the primary
+ * the operating organizations. A claimed or imported listing carries an id from the system it came
+ * from while being operated by the organization that claimed it, so holding the id to the primary
  * operator on edit refused a PUT the API would have accepted, and told the publisher to fix a field
  * they cannot change.
  */
@@ -260,7 +313,7 @@ describe("describePublish", () => {
   it("says pending for an account with no verified membership at all", () => {
     const said = describePublish("beta:x", { verifiedNamespaces: [], directCreate: false });
     expect(said?.immediate).toBe(false);
-    expect(said?.because).toContain("not a member of a verified organisation");
+    expect(said?.because).toContain("not a member of a verified organization");
   });
 
   it("honours the account-level direct-create grant whatever the namespace", () => {
@@ -309,9 +362,9 @@ describe("describePublish", () => {
 });
 
 describe("timestamps", () => {
-  it("emits the trailing-Z RFC 3339 form the schema pins", () => {
-    expect(toIsoUtc("2026-09-30T23:59")).toBe("2026-09-30T23:59:00.000Z");
-    expect(toIsoUtc("2026-09-30T23:59:59")).toBe("2026-09-30T23:59:59.000Z");
+  it("converts the publisher's local wall time to the trailing-Z instant the schema pins", () => {
+    expect(toIsoUtc("2026-09-30T23:59")).toBe("2026-10-01T02:59:00.000Z");
+    expect(toIsoUtc("2026-09-30T23:59:59")).toBe("2026-10-01T02:59:59.000Z");
   });
 
   it("round-trips a stored instant through the widget unchanged", () => {
@@ -319,15 +372,26 @@ describe("timestamps", () => {
     expect(toIsoUtc(fromIsoUtc(stored))).toBe(stored);
   });
 
-  it("reads the entered value AS UTC, not as the browser's zone", () => {
-    // The assertion that matters is that no `Date` is involved: the same input produces the same
-    // output in every timezone this suite could run in.
-    expect(toIsoUtc("2026-01-01T00:00")).toBe("2026-01-01T00:00:00.000Z");
+  it("uses the suite's pinned non-UTC browser zone", () => {
+    expect(toIsoUtc("2026-01-01T00:00")).toBe("2026-01-01T03:00:00.000Z");
+    expect(localTimeZoneDescription("2026-01-01T00:00")).toBe("America/Sao_Paulo, UTC−03:00");
+  });
+
+  it("previews the UTC clock and includes its date when conversion crosses midnight", () => {
+    expect(utcPreview("2026-01-01T10:00")).toBe("= 13:00 UTC");
+    expect(utcPreview("2026-09-30T23:59")).toBe("= 2026-10-01 02:59 UTC");
+  });
+
+  it("chooses the earlier instant in a repeated fall-back hour", () => {
+    // São Paulo repeated 23:00–23:59 when DST ended in 2018. JavaScript chooses the first copy,
+    // still at UTC−02:00; the later instant would have been 02:30Z at UTC−03:00.
+    expect(toIsoUtc("2018-02-17T23:30")).toBe("2018-02-18T01:30:00.000Z");
   });
 
   it("treats an empty box as absence, and a half-typed one as no value yet", () => {
     expect(toIsoUtc("")).toBeUndefined();
     expect(toIsoUtc("2026-09")).toBeUndefined();
+    expect(toIsoUtc("not a date")).toBeUndefined();
   });
 });
 
@@ -395,7 +459,7 @@ describe("the deadline conditional", () => {
     const built = toDocument(withDeadline("fixed", "2026-09-30T23:59"));
     expect(built.problems).toEqual([]);
     expect(built.document.deadlines).toEqual([
-      { deadlineType: "fixed", date: "2026-09-30T23:59:00.000Z", label: "application" },
+      { deadlineType: "fixed", date: "2026-10-01T02:59:00.000Z", label: "application" },
     ]);
   });
 
@@ -773,11 +837,11 @@ describe("the maximal round trip", () => {
         slug: "acme",
         website: "https://acme.example",
         logoUrl: "https://acme.example/logo.png",
-        // Members of an organisation the form does not render at all.
+        // Members of an organization the form does not render at all.
         contacts: [{ name: "A Steward", email: "grants@acme.example" }],
         ecosystems: ["ethereum"],
       },
-      // A SECOND operating organisation. Rebuilding the array from one pair of inputs deleted it.
+      // A SECOND operating organization. Rebuilding the array from one pair of inputs deleted it.
       { name: "Beta Collective", slug: "beta", website: "https://beta.example" },
     ],
     sponsoringOrganizations: [{ name: "Gamma DAO", slug: "gamma" }],
@@ -848,7 +912,7 @@ describe("the maximal round trip", () => {
     );
     const document = rebuilt.document as Record<string, unknown>;
 
-    // The first organisation's OTHER members survive an edit to its name…
+    // The first organization's OTHER members survive an edit to its name…
     expect(document.operatingOrganizations).toEqual([
       {
         name: "Acme",
@@ -870,7 +934,7 @@ describe("the maximal round trip", () => {
     });
   });
 
-  it("carries an organisation's unmodelled members with the ROW when the order changes", () => {
+  it("carries an organization's unmodelled members with the ROW when the order changes", () => {
     const { form, carried } = fromDocument(maximal);
     const rebuilt = toDocument(
       { ...form, operatingOrganizations: moveRow(form.operatingOrganizations, 0, 1) },

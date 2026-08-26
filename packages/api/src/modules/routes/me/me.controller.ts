@@ -2,12 +2,15 @@ import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
 import { AccountService } from "../../services/auth/account.service.js";
-import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
+import {
+  ManagedOpportunityService,
+  type PublisherStatus,
+} from "../../services/opportunities/managed-opportunity.service.js";
 import { OpportunityMetaService } from "../../services/opportunities/opportunity-meta.service.js";
 import type {
-  DuplicateListView,
   ManagedOpportunityListView,
   MeView,
+  OwnedDuplicateListView,
 } from "../../shared/api-views.js";
 import { effectiveCaps } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
@@ -65,7 +68,9 @@ export const meController = {
   listOpportunities: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const query = queryOf<{
+      id?: string;
       reviewStatus?: "pending" | "approved" | "rejected";
+      publisherStatus?: PublisherStatus;
       page?: number;
       limit?: number;
     }>(request);
@@ -84,6 +89,6 @@ export const meController = {
   listDuplicates: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const items = await meta.duplicatesForOwner(principal);
-    return { items } satisfies DuplicateListView;
+    return { items } satisfies OwnedDuplicateListView;
   }),
 };

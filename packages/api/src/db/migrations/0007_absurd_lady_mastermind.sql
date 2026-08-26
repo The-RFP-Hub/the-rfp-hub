@@ -1,0 +1,1 @@
+ALTER TABLE "opportunities" ADD COLUMN "merged_from_public" boolean DEFAULT false NOT NULL;

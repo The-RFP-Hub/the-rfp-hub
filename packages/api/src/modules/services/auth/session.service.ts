@@ -37,6 +37,8 @@ export interface VerifiedSession {
   subject: string;
   /** The verified address, carried so `/v1/me` needs no second query. */
   email: string | null;
+  /** Better-Auth's ownership verdict for the address carried by this session. */
+  emailVerified: boolean;
 }
 
 export class SessionService {
@@ -67,7 +69,11 @@ export class SessionService {
       });
       const user = session?.user;
       if (!user?.id) return null;
-      return { subject: user.id, email: user.email ?? null };
+      return {
+        subject: user.id,
+        email: user.email ?? null,
+        emailVerified: user.emailVerified === true,
+      };
     } catch (error) {
       // NOTHING ABOUT A BAD CREDENTIAL REACHES HERE, and that is checked rather than assumed:
       // `getSession` RETURNS null for every malformed, expired, revoked, foreign and unsigned token

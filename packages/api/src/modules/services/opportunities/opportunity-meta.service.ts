@@ -13,6 +13,7 @@
  * that has never been checked genuinely has no run.
  */
 import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityRow,
@@ -20,7 +21,11 @@ import {
   opportunityDuplicates,
   verificationRuns,
 } from "../../../db/schema.js";
-import type { DuplicateMatchView, VerificationRunView } from "../../shared/api-views.js";
+import type {
+  DuplicateMatchView,
+  OwnedDuplicateMatchView,
+  VerificationRunView,
+} from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
 
@@ -103,6 +108,7 @@ export class OpportunityMetaService {
       .map(({ pair, other: match }) => ({
         id: match.publicId,
         title: match.title,
+        isPublic: isPubliclyVisible(match),
         similarity: pair.similarity === null ? null : Number(pair.similarity),
         status: pair.status,
         detectedAt: pair.detectedAt.toISOString(),
@@ -112,10 +118,11 @@ export class OpportunityMetaService {
   /**
    * Every suspected/decided pair touching an entry this account owns, for the dashboard's queue.
    *
-   * The OWNED entry is the one whose side is filtered on; the OTHER side is what gets reported, and
-   * reporting it is disclosure of THAT entry. So the counterpart is held to its own visibility
-   * through `maySee`, which is the same ownership predicate this query selects by — public, or the
-   * caller's own by submission or namespace, or the caller is a reviewer.
+   * The OWNED entry is selected strictly by submission or namespace and named as `yourListing`;
+   * reviewer privilege never makes a pair belong in an account's own queue. The OTHER side remains
+   * in the published top-level match fields, and reporting it is disclosure of THAT entry. So the
+   * counterpart is held to its own visibility through `maySee`: public, or the caller's own by
+   * submission or namespace, or visible because the caller is a reviewer.
    *
    * WITHOUT ANY FILTER THIS ROUTE IS A WINDOW INTO THE REVIEW QUEUE. Detection runs a pending
    * submission against the PUBLIC corpus, so a pair between somebody's pending entry and an
@@ -127,44 +134,48 @@ export class OpportunityMetaService {
    * neither side of which is public — and that is precisely the pair this queue exists to show.
    * Entitlement, not publicity, is the question.
    */
-  async duplicatesForOwner(principal: Principal): Promise<DuplicateMatchView[]> {
+  async duplicatesForOwner(principal: Principal): Promise<OwnedDuplicateMatchView[]> {
     const namespaces = principal.memberships.map((m) => m.slug);
-    const ownedIds = this.db
-      .select({ id: opportunities.id })
-      .from(opportunities)
-      .where(
-        namespaces.length === 0
-          ? eq(opportunities.submittedBy, principal.accountId)
-          : or(
-              eq(opportunities.submittedBy, principal.accountId),
-              inArray(opportunities.sourcePublisher, namespaces),
-            ),
-      );
-    const mineOnLeft = inArray(opportunityDuplicates.opportunityId, ownedIds);
-    const mineOnRight = inArray(opportunityDuplicates.duplicateOfId, ownedIds);
+    const left = alias(opportunities, "owned_dup_left");
+    const right = alias(opportunities, "owned_dup_right");
+    const mineOnLeft =
+      namespaces.length === 0
+        ? eq(left.submittedBy, principal.accountId)
+        : or(eq(left.submittedBy, principal.accountId), inArray(left.sourcePublisher, namespaces));
+    const mineOnRight =
+      namespaces.length === 0
+        ? eq(right.submittedBy, principal.accountId)
+        : or(
+            eq(right.submittedBy, principal.accountId),
+            inArray(right.sourcePublisher, namespaces),
+          );
 
-    const other = opportunities;
     const rows = await this.db
-      .select({ pair: opportunityDuplicates, other })
+      .select({ pair: opportunityDuplicates, left, right })
       .from(opportunityDuplicates)
-      .innerJoin(
-        other,
-        or(
-          and(mineOnLeft, eq(other.id, opportunityDuplicates.duplicateOfId)),
-          and(mineOnRight, eq(other.id, opportunityDuplicates.opportunityId)),
-        ),
-      )
+      .innerJoin(left, eq(left.id, opportunityDuplicates.opportunityId))
+      .innerJoin(right, eq(right.id, opportunityDuplicates.duplicateOfId))
+      .where(or(mineOnLeft, mineOnRight))
       .orderBy(desc(opportunityDuplicates.detectedAt))
       .limit(100);
 
     return rows
-      .filter(({ other: match }) => maySee(match, principal))
-      .map(({ pair, other: match }) => ({
+      .map(({ pair, left: leftRow, right: rightRow }) => {
+        // The stored pair is canonical (left id < right id). Prefer its left side when both entries
+        // are owned so one pair produces one row with a stable account-side identity.
+        const yours = isOwnedBy(leftRow, principal) ? leftRow : rightRow;
+        const match = yours === leftRow ? rightRow : leftRow;
+        return { pair, match, yours };
+      })
+      .filter(({ match }) => maySee(match, principal))
+      .map(({ pair, match, yours }) => ({
         id: match.publicId,
         title: match.title,
+        isPublic: isPubliclyVisible(match),
         similarity: pair.similarity === null ? null : Number(pair.similarity),
         status: pair.status,
         detectedAt: pair.detectedAt.toISOString(),
+        yourListing: { id: yours.publicId, title: yours.title },
       }));
   }
 
@@ -217,6 +228,11 @@ function isPubliclyVisible(row: OpportunityRow): boolean {
 export function isPrivileged(row: OpportunityRow, principal: Principal | null): boolean {
   if (!principal) return false;
   if (isReviewer(principal)) return true;
+  return isOwnedBy(row, principal);
+}
+
+/** Ownership only — deliberately excludes reviewer privilege from account-scoped queries. */
+function isOwnedBy(row: OpportunityRow, principal: Principal): boolean {
   if (row.submittedBy === principal.accountId) return true;
   return (
     row.sourcePublisher !== null &&

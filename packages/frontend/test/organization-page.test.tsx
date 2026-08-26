@@ -1,9 +1,9 @@
 /**
- * THE ORGANISATION PAGE, whose whole job is to keep two gates apart.
+ * THE ORGANIZATION PAGE, whose whole job is to keep two gates apart.
  *
  * Seeing this page needs ANY membership; deciding on what is queued in the namespace needs a
- * membership on a VERIFIED organisation. Those are different permissions granted by different
- * events, and the failure mode if they blur is not cosmetic — it is an unverified organisation being
+ * membership on a VERIFIED organization. Those are different permissions granted by different
+ * events, and the failure mode if they blur is not cosmetic — it is an unverified organization being
  * offered a button that publishes to the world, or a verified one being denied the decision it was
  * verified in order to make.
  *
@@ -11,10 +11,16 @@
  * filecoin's name" and "recorded under your handle" are the whole reason the confirmation is there;
  * a panel that said "Are you sure?" would pass a test that only counted clicks.
  */
-import OrganisationPage from "@/app/organisations/[slug]/page";
+import OrganizationPage from "@/app/organizations/[slug]/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { ManagedOpportunityList, Me, MeMembership, PublisherList } from "@/lib/types";
+import type {
+  ManagedOpportunityList,
+  Me,
+  MeMembership,
+  MembershipInvite,
+  PublisherList,
+} from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,7 +44,7 @@ vi.mock("@/lib/auth-client", () => ({
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ slug: slug.current }),
-  usePathname: () => `/organisations/${slug.current}`,
+  usePathname: () => `/organizations/${slug.current}`,
   useRouter: () => ({ replace }),
   useSearchParams: () => new URLSearchParams(query.current),
 }));
@@ -80,6 +86,7 @@ const listing = (over: Record<string, unknown> = {}) => ({
   isListed: listedFixture.current,
   namespace: "filecoin",
   submittedBy: "fil-maintainer",
+  mergedInto: null,
   lastDecision: null,
   createdAt: "2026-08-01T00:00:00Z",
   updatedAt: "2026-08-10T00:00:00Z",
@@ -121,6 +128,14 @@ const approve = vi.fn(async () => ({ id: "x", reviewStatus: "approved", isListed
 const reject = vi.fn(async () => ({ id: "x", reviewStatus: "rejected", isListed: false }));
 // Typed parameters so a test can read the patch back without casting it blind.
 const update = vi.fn(async (_slug: string, _patch: Record<string, unknown>) => ({}));
+const membershipInviteRows: { current: MembershipInvite[] } = { current: [] };
+const membershipInvites = vi.fn(async () => ({ items: membershipInviteRows.current }));
+const revokeMembershipInvite = vi.fn(async (_slug: string, inviteId: number) => {
+  const invite = membershipInviteRows.current.find((row) => row.id === inviteId);
+  if (!invite) throw new Error("missing invite fixture");
+  membershipInviteRows.current = membershipInviteRows.current.filter((row) => row.id !== inviteId);
+  return invite;
+});
 
 /** Counts each read so a test can prove BOTH lists were re-read, not just the one clicked in. */
 const reads = { approved: 0, pending: 0 };
@@ -131,6 +146,7 @@ function client(account: Me, pending: unknown[] = []): ApiClient {
     me: { get: async () => account },
     publishers: { list: async () => publishers },
     opportunities: { audit: async () => ({ entries: [] }) },
+    review: { membershipInvites, revokeMembershipInvite },
     organizations: {
       opportunities: async (
         _slug: string,
@@ -155,7 +171,7 @@ function client(account: Me, pending: unknown[] = []): ApiClient {
 const mount = (account: Me, pending: unknown[] = []) =>
   render(
     <ApiClientProvider value={client(account, pending)}>
-      <OrganisationPage />
+      <OrganizationPage />
     </ApiClientProvider>,
   );
 
@@ -169,6 +185,7 @@ beforeEach(() => {
   session.data = { user: { id: "u1" } };
   slug.current = "filecoin";
   query.current = "";
+  membershipInviteRows.current = [];
 });
 
 describe("who may see the page", () => {
@@ -176,8 +193,8 @@ describe("who may see the page", () => {
     slug.current = "someone-else";
     mount(me());
 
-    expect(await screen.findByText("You are not a member of this organisation.")).toBeTruthy();
-    // It must not claim the organisation is missing — the API would answer 403 or 404 and this
+    expect(await screen.findByText("You are not a member of this organization.")).toBeTruthy();
+    // It must not claim the organization is missing — the API would answer 403 or 404 and this
     // page cannot tell which without asking.
     expect(screen.queryByText(/does not exist/i)).toBeNull();
   });
@@ -186,7 +203,41 @@ describe("who may see the page", () => {
     mount(me({ memberships: [membership({ verified: false })] }));
 
     expect(await screen.findByText("Your listings wait for a reviewer.")).toBeTruthy();
-    expect(screen.queryByText("You are not a member of this organisation.")).toBeNull();
+    expect(screen.queryByText("You are not a member of this organization.")).toBeNull();
+  });
+});
+
+describe("pending membership invites for staff", () => {
+  it("lists the pending email and lets a reviewer revoke it", async () => {
+    membershipInviteRows.current = [
+      {
+        id: 14,
+        organizationSlug: "filecoin",
+        email: "future.member@example.org",
+        role: "publisher",
+        invitedBy: 2,
+        createdAt: "2026-08-26T12:00:00Z",
+        acceptedAt: null,
+        acceptedAccountId: null,
+      },
+    ];
+    mount(me({ role: "reviewer", canReview: true }));
+
+    expect(await screen.findByRole("heading", { name: "Pending membership invites" })).toBeTruthy();
+    expect(
+      screen.getByText("The membership applies the first time they sign in with this email."),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole("row", {
+        name: /future\.member@example\.org Organization publisher/,
+      }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(revokeMembershipInvite).toHaveBeenCalledWith("filecoin", 14));
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /future\.member@example\.org/ })).toBeNull(),
+    );
   });
 });
 
@@ -240,15 +291,55 @@ describe("deciding as a verified member", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve…" }));
 
-    expect(screen.getByText("Publish this listing?")).toBeTruthy();
+    expect(screen.getByText("Publish “Filecoin Dev Grants Q4”?")).toBeTruthy();
     // The two facts that make this different from a reviewer approving it: whose name it publishes
     // under, and whose handle the decision is recorded against.
-    const panel = screen.getByRole("group", { name: "Publish this listing?" });
+    const panel = screen.getByRole("group", { name: "Publish “Filecoin Dev Grants Q4”?" });
     expect(
       within(panel).getByText(/publishes into the public directory immediately/i),
     ).toBeTruthy();
     expect(within(panel).getByText("filecoin")).toBeTruthy();
     expect(within(panel).getByText("@fil-ops")).toBeTruthy();
+  });
+
+  it("discloses a member deciding their own submission in the row and confirmation", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    mount(me(), [
+      listing({
+        id: "filecoin:self-review",
+        title: "Our own grants round",
+        reviewStatus: "pending",
+        isListed: false,
+        submittedBy: "fil-ops",
+        submittedByAccountId: 7,
+      }),
+    ]);
+
+    expect(await screen.findByText(notice)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(
+      within(screen.getByRole("group", { name: "Publish “Our own grants round”?" })).getByText(
+        notice,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("does not show the self-review notice for somebody else's submission", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    mount(me(), [
+      listing({
+        id: "filecoin:other-review",
+        title: "Somebody else's round",
+        reviewStatus: "pending",
+        isListed: false,
+        submittedByAccountId: 99,
+      }),
+    ]);
+
+    await screen.findByText("Somebody else's round");
+    expect(screen.queryByText(notice)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(screen.queryByText(notice)).toBeNull();
   });
 
   it("publishes only after the confirmation", async () => {
@@ -265,7 +356,7 @@ describe("deciding as a verified member", () => {
     mount(me(), pending);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject…" }));
-    expect(screen.getByText("Refuse this listing?")).toBeTruthy();
+    expect(screen.getByText("Refuse “Filecoin Dev Grants Q4”?")).toBeTruthy();
     // The reason is the counterweight to the conflict of interest, so the button cannot fire
     // without one.
     expect(screen.getByRole("button", { name: "Refuse it" })).toHaveProperty("disabled", true);
@@ -282,6 +373,11 @@ describe("deciding as a verified member", () => {
         "we have never run this programme",
       ),
     );
+    expect(
+      await screen.findByText(
+        "“Filecoin Dev Grants Q4” was refused. The reason is shown to whoever submitted it.",
+      ),
+    ).toBeTruthy();
   });
 
   it("re-reads BOTH lists after a decision, because the row moves between them", async () => {
@@ -300,7 +396,11 @@ describe("deciding as a verified member", () => {
      * manual page reload: the listing was live and the page said it was not.
      */
     await waitFor(() => expect(reads.approved).toBeGreaterThan(before));
-    expect(screen.getByText(/is published/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "“Filecoin Dev Grants Q4” is published. The decision is recorded under @fil-ops.",
+      ),
+    ).toBeTruthy();
   });
 
   it("says the refusal is attributed and shown to the submitter", async () => {
@@ -322,11 +422,11 @@ describe("the way back", () => {
     const url = new URL(link.getAttribute("href") ?? "", "https://x.example");
 
     expect(url.pathname).toBe("/listings/filecoin%3Around-1");
-    expect(url.searchParams.get("back")).toBe("/organisations/filecoin");
+    expect(url.searchParams.get("back")).toBe("/organizations/filecoin");
     expect(url.searchParams.get("backLabel")).toBe("Filecoin Foundation");
   });
 
-  it("sends the organisation's own name and address with every listing link", async () => {
+  it("sends the organization's own name and address with every listing link", async () => {
     mount(me(), [
       listing({ id: "filecoin:pending-1", title: "Dev Grants Q4", reviewStatus: "pending" }),
     ]);
@@ -335,7 +435,7 @@ describe("the way back", () => {
     const url = new URL(link.getAttribute("href") ?? "", "https://x.example");
 
     expect(url.pathname).toBe("/listings/filecoin%3Apending-1");
-    expect(url.searchParams.get("back")).toBe("/organisations/filecoin");
+    expect(url.searchParams.get("back")).toBe("/organizations/filecoin");
     // The slug is not what anybody calls it, so the display name rides along.
     expect(url.searchParams.get("backLabel")).toBe("Filecoin Foundation");
   });
@@ -351,7 +451,7 @@ describe("the way back", () => {
     const link = await screen.findByRole("link", { name: "Dev Grants Q4" });
     const url = new URL(link.getAttribute("href") ?? "", "https://x.example");
     expect(url.searchParams.get("back")).toBe(
-      "/organisations/filecoin?publishedPage=2&pendingPage=3",
+      "/organizations/filecoin?publishedPage=2&pendingPage=3",
     );
   });
 });
@@ -443,7 +543,7 @@ describe("paging through the two lists", () => {
 
     render(
       <ApiClientProvider value={api}>
-        <OrganisationPage />
+        <OrganizationPage />
       </ApiClientProvider>,
     );
 
@@ -472,9 +572,9 @@ describe("approved but withheld", () => {
     // The row is approved, so it belongs under "Published" — and the public reads 404 it, so it
     // cannot be presented as public.
     await waitFor(() => expect(screen.getByText("PropGF Batch 7")).toBeTruthy());
-    expect(screen.getByText("unlisted")).toBeTruthy();
+    expect(screen.getByText("Hidden from the public directory")).toBeTruthy();
     expect(
-      screen.getByText(/withheld from the public directory — a Hub reviewer controls listing/),
+      screen.getByText(/hidden from the public directory — a Hub reviewer controls listing/),
     ).toBeTruthy();
   });
 
@@ -482,7 +582,7 @@ describe("approved but withheld", () => {
     mount(me(), []);
 
     expect(await screen.findByText(/One listing on this page is/)).toBeTruthy();
-    expect(screen.getByText(/the public reads answer 404/)).toBeTruthy();
+    expect(screen.getByText(/no public detail page/)).toBeTruthy();
   });
 
   it("says nothing at all when every published row really is public", async () => {
@@ -490,8 +590,8 @@ describe("approved but withheld", () => {
     mount(me(), []);
 
     await waitFor(() => expect(screen.getByText("PropGF Batch 7")).toBeTruthy());
-    expect(screen.queryByText("unlisted")).toBeNull();
-    expect(screen.queryByText(/withheld from the public directory/)).toBeNull();
+    expect(screen.queryByText("Hidden from the public directory")).toBeNull();
+    expect(screen.queryByText(/hidden from the public directory/)).toBeNull();
   });
 });
 
@@ -499,7 +599,7 @@ describe("the directory entry", () => {
   it("is editable by an admin, and sends only what changed", async () => {
     mount(me());
 
-    fireEvent.click(await screen.findByRole("button", { name: /Edit the organisation/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Edit the organization/ }));
     fireEvent.change(screen.getByLabelText("Website"), {
       target: { value: "https://example.org" },
     });
@@ -514,11 +614,11 @@ describe("the directory entry", () => {
 
   it("does NOT wipe stored metadata when only the name is changed", async () => {
     // THE DEFECT: the form started blank and sent `website: null, description: null` on every save,
-    // so renaming an organisation silently deleted its website and description from every listing
+    // so renaming an organization silently deleted its website and description from every listing
     // that named it.
     mount(me());
 
-    fireEvent.click(await screen.findByRole("button", { name: /Edit the organisation/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Edit the organization/ }));
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Filecoin Fdn" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -531,7 +631,7 @@ describe("the directory entry", () => {
   it("seeds the fields from the public record, so a clear is deliberate", async () => {
     mount(me());
 
-    fireEvent.click(await screen.findByRole("button", { name: /Edit the organisation/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Edit the organization/ }));
     // The fixture publisher carries a website; the form must show it rather than an empty box that
     // looks like "no website".
     expect((screen.getByLabelText("Website") as HTMLInputElement).value).toBe(
@@ -548,7 +648,7 @@ describe("the directory entry", () => {
   it("says nothing changed rather than sending an empty patch", async () => {
     mount(me());
 
-    fireEvent.click(await screen.findByRole("button", { name: /Edit the organisation/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Edit the organization/ }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("Nothing changed.")).toBeTruthy();
@@ -559,7 +659,7 @@ describe("the directory entry", () => {
     mount(me({ memberships: [membership({ role: "publisher" })] }));
 
     await screen.findByText("You publish directly.");
-    expect(screen.queryByRole("button", { name: /Edit the organisation/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Edit the organization/ })).toBeNull();
     expect(screen.getByText(/needs the/)).toBeTruthy();
   });
 });

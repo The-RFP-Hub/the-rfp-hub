@@ -61,10 +61,14 @@ import type {
   ManagedOpportunityView,
   MeMembershipView,
   MeView,
+  MembershipInviteListView,
+  MembershipInviteView,
   MembershipResultView,
   MergeResultView,
   OrganizationListView,
   OrganizationSummaryView,
+  OwnedDuplicateListView,
+  OwnedDuplicateMatchView,
   PublisherListView,
   PublisherView,
   ReviewDecisionView,
@@ -296,11 +300,16 @@ describe("closed response components vs their producers", () => {
       "ManagedOpportunityList",
       "Me",
       "MeMembership",
+      "MembershipInvite",
+      "MembershipInviteList",
       "MembershipResult",
       "MergeResult",
+      "MergedOpportunityErrorResponse",
       "OpportunitySummary", // covered field-by-field by the mapper drift guard above
       "OrganizationList",
       "OrganizationSummary",
+      "OwnedDuplicateList",
+      "OwnedDuplicateMatch",
       "PaginatedOpportunities",
       "Publisher",
       "PublisherList",
@@ -424,6 +433,7 @@ describe("M3 closed components vs their view types", () => {
   const duplicateMatchSample: DuplicateMatchView = {
     id: "example-org:other",
     title: "Other",
+    isPublic: true,
     similarity: 0.91,
     status: "suspected",
     detectedAt: "2026-08-14T00:00:00.000Z",
@@ -446,6 +456,10 @@ describe("M3 closed components vs their view types", () => {
     patch: { title: { before: "a", after: "b" } },
   };
   const duplicateMatch: DuplicateMatchView = duplicateMatchSample;
+  const ownedDuplicateMatch: OwnedDuplicateMatchView = {
+    ...duplicateMatch,
+    yourListing: { id: "example-org:mine", title: "Mine" },
+  };
   const duplicateSide: DuplicateSideView = {
     id: "example-org:one",
     title: "One",
@@ -490,6 +504,7 @@ describe("M3 closed components vs their view types", () => {
     organizationSlug: "example-org",
     organizationVerified: true,
     claimedBy: "someone",
+    claimedByAccountId: 1,
     status: "pending",
     note: null,
     createdAt: "2026-08-14T00:00:00.000Z",
@@ -556,6 +571,8 @@ describe("M3 closed components vs their view types", () => {
     isListed: true,
     namespace: "example-org",
     submittedBy: null,
+    submittedByAccountId: 1,
+    mergedInto: null,
     // Null is the state most entries are in — nobody has decided anything yet. The populated shape
     // is asserted end to end in review.test.ts, where a real decision produces it.
     lastDecision: null,
@@ -566,6 +583,7 @@ describe("M3 closed components vs their view types", () => {
     id: 1,
     handle: null,
     displayName: null,
+    email: "person@example.com",
     globalRole: "submitter",
     directCreate: false,
     createdAt: "2026-08-14T00:00:00.000Z",
@@ -579,6 +597,16 @@ describe("M3 closed components vs their view types", () => {
     ecosystems: [],
     memberCount: 1,
   };
+  const membershipInvite: MembershipInviteView = {
+    id: 1,
+    organizationSlug: "example-org",
+    email: "invited@example.com",
+    role: "publisher",
+    invitedBy: 1,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    acceptedAt: null,
+    acceptedAccountId: null,
+  };
 
   const samples: Record<string, object> = {
     SubmissionResult: submissionResult,
@@ -586,6 +614,8 @@ describe("M3 closed components vs their view types", () => {
     AuditTrail: { entries: [auditEntry] } satisfies AuditTrailView,
     DuplicateMatch: duplicateMatch,
     DuplicateList: { items: [duplicateMatch] } satisfies DuplicateListView,
+    OwnedDuplicateMatch: ownedDuplicateMatch,
+    OwnedDuplicateList: { items: [ownedDuplicateMatch] } satisfies OwnedDuplicateListView,
     DuplicateSide: duplicateSide,
     DuplicatePair: duplicatePair,
     DuplicatePairList: { items: [duplicatePair] } satisfies DuplicatePairListView,
@@ -659,8 +689,19 @@ describe("M3 closed components vs their view types", () => {
       role: "publisher",
       member: true,
     } satisfies MembershipResultView,
+    MembershipInvite: membershipInvite,
+    MembershipInviteList: { items: [membershipInvite] } satisfies MembershipInviteListView,
+    MergedOpportunityErrorResponse: {
+      error: "opportunity_merged",
+      mergedInto: { id: "example-org:survivor", title: "The survivor" },
+    },
     // Not a view type: the error body is assembled by `HttpError.toBody()`.
-    ValidationErrorResponse: { error: "validation_failed", message: "…", errors: ["…"] },
+    ValidationErrorResponse: {
+      error: "validation_failed",
+      message: "…",
+      errors: ["…"],
+      issues: [{ path: "/title", message: "is required" }],
+    },
   };
 
   for (const [id, sample] of Object.entries(samples)) {

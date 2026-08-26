@@ -74,7 +74,12 @@ export class PrincipalService {
     // JIT provisioning happens here, on the first `/v1` request an identity ever makes, rather than
     // in a database hook on user creation: an account is what this API decides about a person, and
     // it is created when they first act on it.
-    const account = await this.accounts.resolveBySubject(verified.subject);
+    // An email may redeem an invite only after Better-Auth says it is verified. For the primary
+    // email-OTP path, the successful one-time code exchange is the proof of mailbox ownership.
+    const account = await this.accounts.resolveBySubject(
+      verified.subject,
+      verified.emailVerified ? (verified.email ?? undefined) : undefined,
+    );
     return this.assemble(account, "session", [], { email: verified.email });
   }
 

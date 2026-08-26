@@ -40,7 +40,9 @@ export interface SubmissionResultView {
    * Suspected matches, searched over PUBLICLY VISIBLE entries only.
    *
    * A submitter's duplicate check must never answer with somebody else's pending or unlisted title
-   * and id — that would make the endpoint a way to enumerate the review queue.
+   * and id — that would make the endpoint a way to enumerate the review queue. Consequently every
+   * match here has `isPublic: true`; the shared match shape keeps the field because other duplicate
+   * routes can return an owner-visible, non-public counterpart.
    */
   duplicates: DuplicateMatchView[];
 }
@@ -65,6 +67,8 @@ export interface DuplicateMatchView {
   /** The OTHER entry's public id. Only entries this viewer may see are ever listed. */
   id: string;
   title: string;
+  /** Whether the other entry is approved and listed, so clients can choose its safe detail route. */
+  isPublic: boolean;
   similarity: number | null;
   status: "suspected" | "confirmed" | "dismissed" | "merged";
   detectedAt: string;
@@ -75,11 +79,27 @@ export interface DuplicateListView {
 }
 
 /**
+ * The account-scoped duplicate shape names both sides while preserving `DuplicateMatchView`'s
+ * top-level meaning: those fields still name the OTHER entry, and `yourListing` names the side the
+ * account owns. `DuplicateMatch` / `DuplicateList` are already published OpenAPI components whose
+ * documented meaning is "named by the other entry" on a public API checked by an external
+ * compliance consumer. That compatibility constraint — not an in-repo consumer — is why the
+ * top-level fields are not repurposed for the owned side.
+ */
+export interface OwnedDuplicateMatchView extends DuplicateMatchView {
+  yourListing: { id: string; title: string };
+}
+
+export interface OwnedDuplicateListView {
+  items: OwnedDuplicateMatchView[];
+}
+
+/**
  * One side of a pair, as the REVIEW queue sees it.
  *
- * The submitter-facing `DuplicateMatchView` names only the other entry and only when it is public.
- * A reviewer decides between two entries, so they get both sides and the editorial state that
- * decides which one may survive a merge.
+ * `DuplicateMatchView` names only the other entry, and a non-public one appears only when the
+ * caller is independently entitled to it. A reviewer decides between two entries, so this review
+ * shape gives them both sides and the editorial state that decides which one may survive a merge.
  */
 export interface DuplicateSideView {
   id: string;
@@ -202,6 +222,8 @@ export interface ClaimSummaryView {
   organizationSlug: string;
   organizationVerified: boolean;
   claimedBy: string;
+  /** Stable identity for disclosing when the current reviewer is also the claimant. */
+  claimedByAccountId: number | null;
   status: "pending" | "approved" | "rejected" | "withdrawn";
   note: string | null;
   createdAt: string;
@@ -303,6 +325,10 @@ export interface ManagedOpportunityView {
   isListed: boolean;
   namespace: string | null;
   submittedBy: string | null;
+  /** Stable identity for disclosing when the current decider is also the submitter. */
+  submittedByAccountId: number | null;
+  /** The survivor, whose title is present only while it is currently public. */
+  mergedInto: { id: string; title: string | null } | null;
   /** The newest approve/reject on this entry, or null while nobody has decided anything. */
   lastDecision: ReviewDecisionSummaryView | null;
   createdAt: string;
@@ -327,6 +353,8 @@ export interface AccountSummaryView {
   id: number;
   handle: string | null;
   displayName: string | null;
+  /** Present on staff directory searches; omitted from unrelated account mutation responses. */
+  email?: string | null;
   globalRole: AccountRole;
   directCreate: boolean;
   createdAt: string;
@@ -356,6 +384,21 @@ export interface MembershipResultView {
   role: "owner" | "admin" | "publisher" | null;
   /** False when the membership was revoked rather than granted. */
   member: boolean;
+}
+
+export interface MembershipInviteView {
+  id: number;
+  organizationSlug: string;
+  email: string;
+  role: "owner" | "admin" | "publisher";
+  invitedBy: number;
+  createdAt: string;
+  acceptedAt: string | null;
+  acceptedAccountId: number | null;
+}
+
+export interface MembershipInviteListView {
+  items: MembershipInviteView[];
 }
 
 /**

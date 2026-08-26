@@ -105,14 +105,14 @@ test.describe("M3-2 who may publish, and where", () => {
     expect(created.body.reviewStatus).toBe("pending");
   });
 
-  test("a publisher that is not among the entry's operating organisations is refused", async ({
+  test("a publisher that is not among the entry's operating organizations is refused", async ({
     stack,
     api,
     opportunityFixture,
   }) => {
     const publisher = await api("publisher");
     const document = opportunityFixture(stack.namespaces.publisher, `notoperating-${Date.now()}`, {
-      // The namespace claims one organisation while the operating list names a different one.
+      // The namespace claims one organization while the operating list names a different one.
       operatingOrganizations: [{ name: "Some Other Body", slug: `${stack.namespaces.other}-body` }],
     });
 
@@ -127,7 +127,7 @@ test.describe("M3-2 publish authority is revocable", () => {
     skipUnlessActor(stack, "publisher", "reviewer");
   });
 
-  test("unverifying the organisation turns auto-publish off, and re-verifying turns it back on", async ({
+  test("unverifying the organization turns auto-publish off, and re-verifying turns it back on", async ({
     stack,
     api,
     opportunityFixture,
@@ -152,7 +152,7 @@ test.describe("M3-2 publish authority is revocable", () => {
       200,
     );
 
-    // The account still holds the membership — what changed is the organisation's standing, and
+    // The account still holds the membership — what changed is the organization's standing, and
     // `hasVerifiedMembership` reads both. The next write must land pending.
     const during = await publisher.post<{ reviewStatus: string }>(
       "/v1/opportunities",
@@ -288,7 +288,7 @@ test.describe("M3-2 provenance belongs to the server", () => {
     expect(renamed.body.error).toBe("id_immutable");
   });
 
-  test("a replace cannot strip the operating organisation off a submitted entry", async ({
+  test("a replace cannot strip the operating organization off a submitted entry", async ({
     stack,
     api,
     opportunityFixture,
@@ -388,9 +388,9 @@ test.describe("M3-2 provenance belongs to the server", () => {
  *      `pending`, so every fixture here is published by a reviewer first — which is also the real
  *      shape of the problem: a claim is how a publisher takes over an entry the public can already
  *      see.
- *   2. A claim for the organisation the entry is ALREADY published under is `unchanged`, not
+ *   2. A claim for the organization the entry is ALREADY published under is `unchanged`, not
  *      `granted` — there is nothing to transfer. So the entry is submitted under a third namespace
- *      and names the claiming organisation among its OPERATING organisations, which is exactly the
+ *      and names the claiming organization among its OPERATING organizations, which is exactly the
  *      aggregator-then-operator sequence the feature exists for.
  */
 test.describe("M3-2 claims", () => {
@@ -432,12 +432,12 @@ test.describe("M3-2 claims", () => {
     return id;
   }
 
-  test("a claim on a verified operating organisation is granted immediately", async ({
+  test("a claim on a verified operating organization is granted immediately", async ({
     stack,
     api,
     opportunityFixture,
   }) => {
-    // Published under a third-party namespace, but naming the publisher's own verified organisation
+    // Published under a third-party namespace, but naming the publisher's own verified organization
     // as an operator — the aggregator-listed-it, the-operator-claims-it case.
     const aggregator = `${stack.namespaces.publisher}-aggregator`;
     const id = await publishedEntry(
@@ -478,7 +478,7 @@ test.describe("M3-2 claims", () => {
       ],
     });
 
-    // The claimant must be a member of the organisation it claims for; that organisation is NOT
+    // The claimant must be a member of the organization it claims for; that organization is NOT
     // verified, which is what makes the claim reviewable rather than grantable.
     const publisherAccountId = stack.actors.publisher?.accountId;
     if (!publisherAccountId) throw new Error("the publisher's account id was not provisioned");
@@ -521,11 +521,11 @@ test.describe("M3-2 claims", () => {
     );
     expect(
       verified.rows[0]?.verified,
-      "approving with verification verifies the organisation",
+      "approving with verification verifies the organization",
     ).toBe(true);
   });
 
-  test("a sponsoring-only organisation can never be granted ownership", async ({
+  test("a sponsoring-only organization can never be granted ownership", async ({
     stack,
     api,
     opportunityFixture,

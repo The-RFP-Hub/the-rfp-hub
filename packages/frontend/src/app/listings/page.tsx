@@ -14,26 +14,40 @@
  * the README rather than pretended away.
  */
 import { RequireSession } from "@/components/Chrome";
+import { PublisherJourney } from "@/components/PublisherJourney";
 import { UntrustedText } from "@/components/UntrustedText";
-import { ListedBadge, MatchBadge, ReviewStatusBadge } from "@/components/badges";
+import { MatchBadge, PublisherStatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant } from "@/lib/format";
+import {
+  PUBLISHER_STATUS_LABELS,
+  type PublisherStatus,
+  ROUTE_GATE_COPY,
+  fundingTypeLabel,
+  isOpenDuplicateStatus,
+  opportunityStatusLabel,
+  publisherStatus,
+} from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { ManagedOpportunity, Me, ReviewStatus } from "@/lib/types";
+import type { ManagedOpportunity, Me } from "@/lib/types";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
-const FILTERS: { value: ReviewStatus | "all"; label: string }[] = [
+const FILTERS: { value: PublisherStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
+  { value: "live", label: PUBLISHER_STATUS_LABELS.live },
+  { value: "pending", label: PUBLISHER_STATUS_LABELS.pending },
+  { value: "hidden", label: PUBLISHER_STATUS_LABELS.hidden },
   { value: "rejected", label: "Rejected" },
+  { value: "merged", label: "Merged" },
 ];
 
 export default function ListingsPage() {
-  return <RequireSession>{(me) => <Listings me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.listings}>{(me) => <Listings me={me} />}</RequireSession>
+  );
 }
 
 /**
@@ -56,13 +70,13 @@ const PENDING_WARN_AT = 3;
 
 function Listings({ me }: { me: Me }) {
   const api = useApi();
-  const [filter, setFilter] = useState<ReviewStatus | "all">("all");
+  const [filter, setFilter] = useState<PublisherStatus | "all">("all");
   const [page, setPage] = useState(1);
 
   const load = useCallback(
     () =>
       api.me.opportunities({
-        reviewStatus: filter === "all" ? undefined : filter,
+        publisherStatus: filter === "all" ? undefined : filter,
         page,
         limit: 20,
       }),
@@ -72,6 +86,10 @@ function Listings({ me }: { me: Me }) {
 
   const loadDuplicates = useCallback(() => api.me.duplicates(), [api]);
   const duplicates = useResource(loadDuplicates);
+  const openDuplicateCount =
+    duplicates.state.status === "ready"
+      ? duplicates.state.data.items.filter((item) => isOpenDuplicateStatus(item.status)).length
+      : null;
 
   /*
    * THE SLOT COUNT IS ITS OWN READ, and a deliberately tiny one.
@@ -80,16 +98,16 @@ function Listings({ me }: { me: Me }) {
    * it cannot come from the table above — that list is filtered, paginated, and usually showing
    * something else. `limit: 1` because only `total` is wanted.
    *
-   * Skipped entirely for an account with a verified membership anywhere, because the API exempts
-   * those from the cap: showing somebody a limit that does not apply to them is worse than showing
-   * nothing.
+   * It runs for every account because the same cheap count also decides whether this page shows the
+   * journey at "In review". Verified memberships remove the CAP, not the possibility that a
+   * submission is pending — for example, one filed under a different namespace.
    */
   const capped = !me.memberships.some((membership) => membership.verified);
   const loadPending = useCallback(
-    () => api.me.opportunities({ reviewStatus: "pending", limit: 1 }),
+    () => api.me.opportunities({ publisherStatus: "pending", limit: 1 }),
     [api],
   );
-  const pending = useResource(loadPending, { enabled: capped });
+  const pending = useResource(loadPending);
   const pendingTotal = pending.state.status === "ready" ? pending.state.data.total : null;
 
   return (
@@ -101,6 +119,8 @@ function Listings({ me }: { me: Me }) {
         </Link>
       </div>
 
+      {pendingTotal !== null && pendingTotal > 0 ? <PublisherJourney current="review" /> : null}
+
       {capped && pendingTotal !== null && pendingTotal >= PENDING_WARN_AT ? (
         <p className="note">
           <strong>
@@ -110,8 +130,8 @@ function Listings({ me }: { me: Me }) {
           </strong>{" "}
           <span className="muted">
             {pendingTotal >= PENDING_LIMIT
-              ? "You may not be able to submit another until one of them is decided — a slot frees as soon as a reviewer approves or refuses one, and the API says so exactly if you try."
-              : "A slot frees as soon as a reviewer approves or refuses one. The limit applies to accounts without a verified publisher membership."}
+              ? "You may not be able to submit another until one of them is decided — a slot frees as soon as a Hub reviewer approves or refuses one, and the submission explains the limit if you try."
+              : "A slot frees as soon as a Hub reviewer approves or refuses one. The limit applies to accounts without a membership in a verified organization."}
           </span>
         </p>
       ) : null}
@@ -125,15 +145,14 @@ function Listings({ me }: { me: Me }) {
        * report is a page that cannot be reached to confirm there is nothing, and a reader who
        * remembers seeing the queue yesterday has no way back to it today.
        */}
-      {duplicates.state.status === "ready" && duplicates.state.data.items.length > 0 ? (
+      {openDuplicateCount !== null && openDuplicateCount > 0 ? (
         <p className="note">
           <Link href="/duplicates">
-            {duplicates.state.data.items.length} possible duplicate
-            {duplicates.state.data.items.length === 1 ? "" : "s"} touch your listings
+            {openDuplicateCount} possible duplicate
+            {openDuplicateCount === 1 ? " touches" : "s touch"} your listings
           </Link>{" "}
           <span className="muted">
-            — counted across all of them; the API reports the other side of each pair, not which of
-            yours it was matched against.
+            — see which of your listings was matched and what it resembles.
           </span>
         </p>
       ) : (
@@ -145,13 +164,15 @@ function Listings({ me }: { me: Me }) {
            * one that failed — is the page inventing an answer it does not have.
            */}
           {duplicates.state.status === "ready"
-            ? " — nothing of yours has been flagged as similar to another published listing."
+            ? duplicates.state.data.items.length > 0
+              ? " — no matches need review; resolved history is available."
+              : " — nothing of yours has been flagged as similar to another published listing."
             : null}
         </p>
       )}
 
       <fieldset className="segmented">
-        <legend className="visually-hidden">Review status</legend>
+        <legend className="visually-hidden">Listing status</legend>
         {FILTERS.map((option) => (
           <button
             key={option.value}
@@ -175,13 +196,11 @@ function Listings({ me }: { me: Me }) {
               detail={
                 filter === "all"
                   ? "Everything you submit shows up on this page — published or not — and stays visible to you while a reviewer looks at it."
-                  : `No listings with review status ${filter}. Other statuses may still have some.`
+                  : `No listings marked “${PUBLISHER_STATUS_LABELS[filter]}”. Other statuses may still have some.`
               }
               action={
                 filter === "all" ? (
-                  <Link className="button-primary" href="/listings/new">
-                    Submit an opportunity
-                  </Link>
+                  <Link href="/listings/new">Submit an opportunity</Link>
                 ) : (
                   <button type="button" onClick={() => setFilter("all")}>
                     Show every status
@@ -213,7 +232,8 @@ function Listings({ me }: { me: Me }) {
                             <UntrustedText value={item.title} />
                           </Link>
                           <div className="muted">
-                            <code>{item.id}</code> · {item.fundingType} · {item.status}
+                            <code>{item.id}</code> · {fundingTypeLabel(item.fundingType)} ·{" "}
+                            {opportunityStatusLabel(item.status)}
                             {item.namespace ? (
                               <>
                                 {" "}
@@ -224,8 +244,7 @@ function Listings({ me }: { me: Me }) {
                           <Outcome item={item} />
                         </th>
                         <td>
-                          <ReviewStatusBadge status={item.reviewStatus} />{" "}
-                          <ListedBadge isListed={item.isListed} />
+                          <PublisherStatusBadge source={item} />
                         </td>
                         <td>
                           <VerificationCell id={item.id} />
@@ -237,7 +256,7 @@ function Listings({ me }: { me: Me }) {
                 </table>
               </div>
 
-              <div className="row">
+              <div className="pagination">
                 <button
                   type="button"
                   disabled={list.page <= 1}
@@ -278,8 +297,25 @@ function Listings({ me }: { me: Me }) {
  */
 function Outcome({ item }: { item: ManagedOpportunity }) {
   const decision = item.lastDecision;
+  const status = publisherStatus(item);
 
-  if (item.reviewStatus === "rejected") {
+  if (status === "merged" && item.mergedInto) {
+    return (
+      <div className="cell-note">
+        Merged into{" "}
+        {item.mergedInto.title === null ? (
+          <UntrustedText value={item.mergedInto.id} />
+        ) : (
+          <Link href={`/opportunities/${encodeURIComponent(item.mergedInto.id)}`}>
+            <UntrustedText value={item.mergedInto.title} />
+          </Link>
+        )}{" "}
+        by a reviewer. This archived record now points to that listing.
+      </div>
+    );
+  }
+
+  if (status === "rejected") {
     return (
       <div className="cell-note">
         <strong>Not published.</strong>{" "}
@@ -299,7 +335,7 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
     );
   }
 
-  if (item.reviewStatus === "pending") {
+  if (status === "pending") {
     return (
       <div className="cell-note muted">
         Waiting for a reviewer. It is stored and nothing is wrong with it — it is not in the public
@@ -308,10 +344,18 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
     );
   }
 
+  if (status === "hidden") {
+    return (
+      <div className="cell-note muted">
+        Approved, but hidden from the public directory. A Hub reviewer can make it visible again.
+      </div>
+    );
+  }
+
   if (decision?.reason === "verified_publisher_namespace") {
     return (
       <div className="cell-note muted">
-        Published without review — your organisation is a verified publisher in this namespace.
+        Published without review — your organization is verified for this organization prefix.
       </div>
     );
   }
@@ -338,5 +382,5 @@ function VerificationCell({ id }: { id: string }) {
     const notChecked = state.error instanceof ApiError && state.error.isNotFound;
     return notChecked ? <MatchBadge matched={null} /> : <span className="muted">—</span>;
   }
-  return <MatchBadge matched={state.data.matched} />;
+  return <MatchBadge matched={state.data.matched} existsAtSource={state.data.existsAtSource} />;
 }

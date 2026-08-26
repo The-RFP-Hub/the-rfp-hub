@@ -22,7 +22,7 @@
  *   2. the plain submitter's first request (fresh account, `submitter`)
  *   3. the administrator the operator ceremony made, and the ceremony's idempotence
  *   4. every remaining identity's first request
- *   5. provisioning: organisations, memberships, verification — all through real routes
+ *   5. provisioning: organizations, memberships, verification — all through real routes
  */
 import { dirname } from "node:path";
 import { ceremonyLogFile, grantAdmin } from "../src/admin-ceremony.js";
@@ -248,7 +248,7 @@ test("ACCEPTANCE: every provisioned identity's token is accepted by the API", as
   }
 });
 
-test("provisioning: organisations exist, memberships are granted, verification is recorded", async ({
+test("provisioning: organizations exist, memberships are granted, verification is recorded", async ({
   stack,
   db,
 }) => {
@@ -322,7 +322,7 @@ test("provisioning: organisations exist, memberships are granted, verification i
   //
   // Provisioning is re-run, in full, against the live stack. Re-running it is a supported path: a
   // reused `E2E_RUN_ID` is how one debugs against a part-provisioned stack, and every step here is
-  // either create-only at the API (the organisation stub) or an upsert (membership, verification).
+  // either create-only at the API (the organization stub) or an upsert (membership, verification).
   //
   // Re-invoking the RUNNER with the same `E2E_RUN_ID` is deliberately refused instead — its
   // workspace is created exclusively, because two live runs sharing one directory ended with the
@@ -346,7 +346,7 @@ test("provisioning: organisations exist, memberships are granted, verification i
   );
 });
 
-/** Accounts, organisations and memberships this run owns — the things a second pass must not duplicate. */
+/** Accounts, organizations and memberships this run owns — the things a second pass must not duplicate. */
 async function counts(
   db: import("pg").Pool,
   stack: { runId: string; namespaces: { publisher: string; other: string } },

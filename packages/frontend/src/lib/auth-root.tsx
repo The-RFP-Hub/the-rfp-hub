@@ -18,7 +18,15 @@
  * context, provided once, at the root.
  */
 import { SignIn } from "@/components/SignIn";
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createApiClient } from "./api";
 import { ApiClientProvider } from "./api-context";
 import { readSessionToken } from "./auth-client";
@@ -40,6 +48,9 @@ export function useSignInOpener(): () => void {
 
 export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
+  const openerDisclosure = useRef<HTMLDetailsElement | null>(null);
+  const restoreAfter = useRef<"dismiss" | "signed-in" | null>(null);
 
   // One client per base URL. `readSessionToken` is called per request rather than captured, so a
   // session that arrives after this client was built — a sign-in, or the Google handoff — is picked
@@ -48,48 +59,134 @@ export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; childre
     createApiClient({ baseUrl: apiBaseUrl, getToken: async () => readSessionToken() }),
   );
 
-  const openSignIn = useCallback(() => setOpen(true), []);
-  const closeSignIn = useCallback(() => setOpen(false), []);
+  const openSignIn = useCallback(() => {
+    const active = document.activeElement;
+    opener.current = active instanceof HTMLElement ? active : null;
+    openerDisclosure.current = opener.current?.closest("details") ?? null;
+    setOpen(true);
+  }, []);
 
-  // Escape closes it. A panel that traps a reader with no keyboard way out is a worse failure than
-  // no panel, and this one can be opened from a header button on a public page.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+  const closeSignIn = useCallback((reason: "dismiss" | "signed-in") => {
+    restoreAfter.current = reason;
+    setOpen(false);
+  }, []);
+
+  /*
+   * Native dialogs restore focus to the opener when they close, but the sign-in success commit can
+   * remove that opener: the public claim control replaces its signed-out button with the claim
+   * fields. Restore after React has committed the closed state, and keep watching that disclosure
+   * if the session tree follows in a later commit. The stable `<details>` is intentionally captured
+   * when the dialog opens; once its button is detached, `closest()` can no longer find it.
+   */
+  useLayoutEffect(() => {
+    const reason = restoreAfter.current;
+    if (open || !reason) return;
+    restoreAfter.current = null;
+
+    const trigger = opener.current;
+    const disclosure = openerDisclosure.current;
+    const focusFallback = () => {
+      const next = disclosure?.isConnected
+        ? (firstFocusableInside(disclosure, trigger) ?? disclosure.querySelector("summary"))
+        : null;
+      const target = next ?? document.querySelector<HTMLElement>("#main-content");
+      target?.focus();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    if (trigger?.isConnected) trigger.focus();
+    else focusFallback();
+
+    if (reason !== "signed-in" || !trigger?.isConnected) return;
+
+    const observer = new MutationObserver(() => {
+      if (trigger.isConnected) return;
+      focusFallback();
+      observer.disconnect();
+    });
+    // A claim disclosure is the narrowest stable scope. Ordinary login openers live in session
+    // controls or page gates that a later session refresh may replace wholesale, so the document
+    // body is their stable ancestor; if they disappear, focus moves to the main-content fallback.
+    observer.observe(disclosure?.isConnected ? disclosure : document.body, {
+      childList: true,
+      subtree: true,
+    });
+    return () => observer.disconnect();
   }, [open]);
 
   return (
     <SignInContext.Provider value={openSignIn}>
       <ApiClientProvider value={api}>
         {children}
-        {open ? (
-          <div className="overlay">
-            {/*
-              `<dialog open>` rather than `showModal()`, and NOT `aria-modal`.
-
-              The element carries the dialog role natively, which is why it is the right tag. What it
-              is not is MODAL: `showModal()` is what puts a dialog in the top layer and makes the rest
-              of the page inert, and it is unimplemented in the jsdom version this package tests
-              under — a panel that throws in every unit test is worse than one that is honest about
-              its behaviour. So the background is dimmed and Escape closes it, but focus is not
-              trapped, and claiming `aria-modal="true"` would tell a screen reader the rest of the
-              page is unavailable when it is still perfectly reachable.
-            */}
-            <dialog open className="card overlay-panel" aria-labelledby="signin-heading">
-              <SignIn apiBaseUrl={apiBaseUrl} onSignedIn={closeSignIn} />
-              <p>
-                <button type="button" onClick={closeSignIn}>
-                  Close
-                </button>
-              </p>
-            </dialog>
-          </div>
-        ) : null}
+        {open ? <SignInDialog apiBaseUrl={apiBaseUrl} onClosed={closeSignIn} /> : null}
       </ApiClientProvider>
     </SignInContext.Provider>
+  );
+}
+
+const FOCUSABLE = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function firstFocusableInside(scope: HTMLElement, exclude: HTMLElement | null): HTMLElement | null {
+  return (
+    [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].find(
+      (candidate) => candidate !== exclude && candidate.tagName !== "SUMMARY",
+    ) ?? null
+  );
+}
+
+function SignInDialog({
+  apiBaseUrl,
+  onClosed,
+}: {
+  apiBaseUrl: string;
+  onClosed: (reason: "dismiss" | "signed-in") => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const closeReason = useRef<"dismiss" | "signed-in">("dismiss");
+
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    if (!element.open) element.showModal();
+    element.querySelector<HTMLInputElement>("#signin-email")?.focus();
+    return () => {
+      if (element.open) element.close();
+    };
+  }, []);
+
+  const close = (reason: "dismiss" | "signed-in") => {
+    closeReason.current = reason;
+    dialog.current?.close();
+  };
+
+  return (
+    <dialog
+      ref={dialog}
+      className="card overlay-panel"
+      aria-labelledby="signin-heading"
+      onCancel={(event) => {
+        event.preventDefault();
+        close("dismiss");
+      }}
+      onClose={() => {
+        // React Strict Mode replays layout effects in development. Its cleanup closes this dialog,
+        // but the browser queues that close event until after the replay has reopened it. Ignore
+        // that stale event; a real dismissal always reaches this handler with `open === false`.
+        if (!dialog.current?.open) onClosed(closeReason.current);
+      }}
+    >
+      <SignIn apiBaseUrl={apiBaseUrl} onSignedIn={() => close("signed-in")} />
+      <p>
+        <button type="button" onClick={() => close("dismiss")}>
+          Close
+        </button>
+      </p>
+    </dialog>
   );
 }

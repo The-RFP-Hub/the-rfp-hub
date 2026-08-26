@@ -19,6 +19,7 @@ describe("what may be returned to", () => {
   it("accepts a path under a route this application has", () => {
     expect(isSafeReturnPath("/review")).toBe(true);
     expect(isSafeReturnPath("/review?tab=claims")).toBe(true);
+    expect(isSafeReturnPath("/organizations/filecoin")).toBe(true);
     expect(isSafeReturnPath("/organisations/filecoin")).toBe(true);
     expect(isSafeReturnPath("/listings")).toBe(true);
     expect(isSafeReturnPath("/duplicates")).toBe(true);
@@ -49,18 +50,18 @@ describe("what may be returned to", () => {
 
   it("refuses a malformed percent-escape, which would otherwise throw during render", () => {
     /*
-     * `/organisations/%E0%A4%A` is a relative path under a route we own, so every other check here
+     * `/organizations/%E0%A4%A` is a relative path under a route we own, so every other check here
      * passes it — and then `decodeURIComponent` THROWS while the label is being derived, i.e. inside
      * a render, from a parameter any stranger can put in a link. An attacker-controlled crash.
      */
-    expect(isSafeReturnPath("/organisations/%E0%A4%A")).toBe(false);
-    expect(isSafeReturnPath("/organisations/%")).toBe(false);
+    expect(isSafeReturnPath("/organizations/%E0%A4%A")).toBe(false);
+    expect(isSafeReturnPath("/organizations/%")).toBe(false);
     expect(isSafeReturnPath("/review?tab=%ZZ")).toBe(false);
-    expect(parseReturnLink("/organisations/%E0%A4%A")).toBeNull();
+    expect(parseReturnLink("/organizations/%E0%A4%A")).toBeNull();
   });
 
   it("never throws for any input, however hostile", () => {
-    for (const hostile of ["/organisations/%E0%A4%A", "%", "/%%%", "/listings/%C0"]) {
+    for (const hostile of ["/organizations/%E0%A4%A", "%", "/%%%", "/listings/%C0"]) {
       expect(() => isSafeReturnPath(hostile)).not.toThrow();
       expect(() => parseReturnLink(hostile)).not.toThrow();
       expect(() => returnLabel(hostile)).not.toThrow();
@@ -78,18 +79,22 @@ describe("what the link is called", () => {
     expect(returnLabel("/review")).toBe("the review queue");
     expect(returnLabel("/review?tab=claims")).toBe("the claims queue");
     expect(returnLabel("/review?tab=duplicates")).toBe("the duplicate queue");
-    expect(returnLabel("/review?tab=organisations")).toBe("organisations");
+    expect(returnLabel("/review?tab=organizations")).toBe("organizations");
+    expect(returnLabel("/review?tab=organisations")).toBe("organizations");
   });
 
-  it("prefers an organisation's supplied name over its slug", () => {
+  it("prefers an organization's supplied name over its slug", () => {
+    expect(returnLabel("/organizations/filecoin", "Filecoin Foundation")).toBe(
+      "Filecoin Foundation",
+    );
+    expect(returnLabel("/organizations/filecoin")).toBe("filecoin");
     expect(returnLabel("/organisations/filecoin", "Filecoin Foundation")).toBe(
       "Filecoin Foundation",
     );
-    expect(returnLabel("/organisations/filecoin")).toBe("filecoin");
   });
 
   it("caps a supplied label, because a publisher's name has no length limit and a nav does", () => {
-    expect(returnLabel("/organisations/x", "n".repeat(500))).toHaveLength(60);
+    expect(returnLabel("/organizations/x", "n".repeat(500))).toHaveLength(60);
   });
 
   it("ignores a supplied label anywhere the path already says what the place is", () => {
@@ -112,11 +117,11 @@ describe("the round trip", () => {
   });
 
   it("percent-encodes the id and the parameter so neither can break the other", () => {
-    const href = detailHref("/listings", "acme:round 1", "/organisations/filecoin", "Filecoin");
+    const href = detailHref("/listings", "acme:round 1", "/organizations/filecoin", "Filecoin");
     const url = new URL(href, "https://x.example");
 
     expect(url.pathname).toBe("/listings/acme%3Around%201");
-    expect(url.searchParams.get("back")).toBe("/organisations/filecoin");
+    expect(url.searchParams.get("back")).toBe("/organizations/filecoin");
     expect(url.searchParams.get("backLabel")).toBe("Filecoin");
   });
 
@@ -125,7 +130,7 @@ describe("the round trip", () => {
     expect(detailHref("/listings", "acme:1", "//evil.example")).toBe("/listings/acme%3A1");
   });
 
-  it("sends a label only for an organisation, matching what the reader will consent to", () => {
+  it("sends a label only for an organization, matching what the reader will consent to", () => {
     expect(returnParams("/review", "Something Else")).toBe("back=%2Freview");
   });
 

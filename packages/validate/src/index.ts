@@ -6,6 +6,11 @@ export {
   type ValidationResult,
   type ValidateOptions,
 } from "./validator.js";
-export { humanizeError, humanizeErrors } from "./errors.js";
+export {
+  humanizeError,
+  humanizeErrors,
+  humanizeIssues,
+  type ValidationIssue,
+} from "./errors.js";
 export { checks, runChecks, entryPhrase, type Check, type Warning } from "./checks/index.js";
 export type { Opportunity } from "@the-rfp-hub/standard";

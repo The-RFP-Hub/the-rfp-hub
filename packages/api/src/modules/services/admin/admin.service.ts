@@ -160,12 +160,13 @@ function normalizeRole(raw: string): AccountRole {
   return role as AccountRole;
 }
 
-/** The account projection the review and admin screens read. Never the DID, never the email. */
-export function toAccountSummary(row: AccountRow): AccountSummaryView {
+/** The account projection the review and admin screens read. The provider subject never leaves. */
+export function toAccountSummary(row: AccountRow, email?: string | null): AccountSummaryView {
   return {
     id: row.id,
     handle: row.handle,
     displayName: row.displayName,
+    ...(email !== undefined ? { email } : {}),
     globalRole: row.globalRole,
     directCreate: row.directCreate,
     createdAt: row.createdAt.toISOString(),

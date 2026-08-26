@@ -13,12 +13,16 @@
  * the swap verbatim, which is the evidence that `SessionState` really did keep its contract:
  * `RequireSession` runs its real logic and calls the real `GET /v1/me` through an injected client.
  */
-import { RequireSession } from "@/components/Chrome";
+import { Chrome, RequireSession, organizationNav } from "@/components/Chrome";
+import { NavigationBlockerProvider, useNavigationBlocker } from "@/components/NavigationBlocker";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
+import { opportunityDraftKey } from "@/lib/opportunity-draft";
+import { CAPABILITY_DENIAL_COPY, type GateCopy, ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -70,10 +74,11 @@ const me: Me = {
 function renderGate(
   client: ApiClient,
   capability?: Parameters<typeof RequireSession>[0]["capability"],
+  gate?: GateCopy,
 ) {
   return render(
     <ApiClientProvider value={client}>
-      <RequireSession capability={capability}>
+      <RequireSession capability={capability} gate={gate}>
         {(account) => <p>Hello {account.handle}</p>}
       </RequireSession>
     </ApiClientProvider>,
@@ -105,12 +110,94 @@ describe("RequireSession", () => {
     expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
   });
 
+  it.each([
+    [
+      "/listings",
+      ROUTE_GATE_COPY.listings,
+      "Sign in to manage your listings.",
+      "See what is waiting for review, live, rejected, merged, or hidden.",
+    ],
+    [
+      "/listings/new",
+      ROUTE_GATE_COPY.newListing,
+      "Sign in to submit an opportunity.",
+      "After signing in, you can restore any draft saved for this account on this device.",
+    ],
+    [
+      "/listings/[id]",
+      ROUTE_GATE_COPY.listing,
+      "Sign in to view this listing.",
+      "See its review status, history, matches, and publishing controls.",
+    ],
+    [
+      "/listings/[id]/edit",
+      ROUTE_GATE_COPY.editListing,
+      "Sign in to edit this listing.",
+      "Open the saved listing and the account controls available to you.",
+    ],
+    [
+      "/account",
+      ROUTE_GATE_COPY.account,
+      "Sign in to view your account.",
+      "See your Hub role and verified organization memberships.",
+    ],
+    [
+      "/organizations",
+      ROUTE_GATE_COPY.organizations,
+      "Sign in to view your organizations.",
+      "See the organizations where this account has publishing rights.",
+    ],
+    [
+      "/organizations/[slug]",
+      ROUTE_GATE_COPY.organization,
+      "Sign in to view this organization.",
+      "Check your membership and manage the listings in its namespace.",
+    ],
+    [
+      "/duplicates",
+      ROUTE_GATE_COPY.duplicates,
+      "Sign in to review matches involving your listings.",
+      "These matches are private to listing owners and reviewers.",
+    ],
+    [
+      "/keys",
+      ROUTE_GATE_COPY.keys,
+      "Sign in to manage API keys.",
+      "API keys can publish or update listings on your behalf.",
+    ],
+    [
+      "/review",
+      ROUTE_GATE_COPY.review,
+      "Sign in with a Hub reviewer account.",
+      "Review submissions, claims, organizations, and duplicate matches.",
+    ],
+    [
+      "/admin",
+      ROUTE_GATE_COPY.admin,
+      "Sign in with a Hub administrator account.",
+      "Manage Hub roles and direct-publishing access.",
+    ],
+  ] as const)("renders the route-specific gate for %s", (_route, gate, title, detail) => {
+    renderGate(
+      clientFor(async () => me),
+      undefined,
+      gate,
+    );
+
+    expect(screen.getByText(title)).toBeTruthy();
+    expect(screen.getByText(detail)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+  });
+
   it("says sign-in is unavailable — not 'logged out' — when the API could not be asked", () => {
     session.error = { status: 0, message: "Failed to fetch" };
     renderGate(clientFor(async () => me));
 
-    expect(screen.getByText("Sign-in is unavailable.")).toBeTruthy();
-    expect(screen.getByText(/Failed to fetch/)).toBeTruthy();
+    expect(screen.getByText("This deployment cannot reach its service.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText(/Failed to fetch/)).toBeTruthy();
+    expect(within(details).getByText("NEXT_PUBLIC_API_URL")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Log in" })).toBeNull();
   });
 
@@ -121,20 +208,98 @@ describe("RequireSession", () => {
     await waitFor(() => expect(screen.getByText(/Hello acme-programs/)).toBeTruthy());
   });
 
-  it("reports a missing capability from the API's own answer, and never a queue", async () => {
+  it.each([
+    ["reviewer", CAPABILITY_DENIAL_COPY.reviewer],
+    ["administrator", CAPABILITY_DENIAL_COPY.admin],
+    ["key management", CAPABILITY_DENIAL_COPY.keyManagement],
+  ] as const)("reports a missing %s capability from the API's own answer", async (_name, copy) => {
     session.data = { user: { id: "user_1" } };
     renderGate(
       clientFor(async () => me),
-      {
-        needs: (account) => account.canReview,
-        label: "the reviewer capability",
-      },
+      { needs: () => false, ...copy },
     );
 
-    await waitFor(() =>
-      expect(screen.getByText(/does not have the reviewer capability/)).toBeTruthy(),
+    await waitFor(() => expect(screen.getByText(copy.title)).toBeTruthy());
+    expect(screen.getByText(copy.detail)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "See who can do what" }).getAttribute("href")).toBe(
+      "/how-it-works#roles",
     );
     expect(screen.queryByText(/Hello acme-programs/)).toBeNull();
+  });
+});
+
+describe("organization navigation", () => {
+  const acme: Me["memberships"][number] = {
+    slug: "acme",
+    name: "Acme Foundation",
+    role: "publisher",
+    verified: true,
+  };
+  const beta: Me["memberships"][number] = {
+    slug: "beta collective",
+    name: "Beta Collective",
+    role: "owner",
+    verified: false,
+  };
+
+  it.each([
+    ["zero memberships", [], "/organizations", "Organizations"],
+    ["one membership", [acme], "/organizations/acme", "Acme Foundation"],
+    ["multiple memberships", [acme, beta], "/organizations", "Organizations"],
+  ] as const)(
+    "links %s to the useful organization destination",
+    (_case, memberships, href, label) => {
+      expect(organizationNav({ ...me, memberships: [...memberships] })).toEqual({ href, label });
+    },
+  );
+
+  it("puts a skip link first and moves focus to the main landmark", () => {
+    session.data = null;
+    session.isPending = false;
+    session.error = null;
+    const view = render(
+      <ApiClientProvider value={clientFor(async () => me)}>
+        <Chrome>
+          <button type="button">Main action</button>
+        </Chrome>
+      </ApiClientProvider>,
+    );
+
+    const skip = screen.getByRole("link", { name: "Skip to main content" });
+    const firstFocusable = view.container.querySelector(
+      "a, button, input, select, textarea, summary",
+    );
+    expect(firstFocusable).toBe(skip);
+    expect(skip.getAttribute("href")).toBe("#main-content");
+
+    skip.focus();
+    expect(document.activeElement).toBe(skip);
+    expect(screen.getByRole("main").getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("keeps all nine admin destinations in three semantic groups with a long organization name", async () => {
+    const longName = "AnExtraordinarilyLongPublisherOrganizationNameWithoutConvenientBreaks";
+    const admin: Me = {
+      ...me,
+      role: "admin",
+      canReview: true,
+      canAdmin: true,
+      memberships: [{ ...acme, name: longName }],
+    };
+    session.data = { user: { id: "user_1" } };
+    render(
+      <ApiClientProvider value={clientFor(async () => admin)}>
+        <Chrome>
+          <p>Admin workbench</p>
+        </Chrome>
+      </ApiClientProvider>,
+    );
+
+    const navigation = await screen.findByRole("navigation", { name: "Sections" });
+    expect(navigation.querySelectorAll(":scope > ul")).toHaveLength(3);
+    expect(within(navigation).getAllByRole("list")).toHaveLength(3);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(9);
+    expect(within(navigation).getByRole("link", { name: longName })).toBeTruthy();
   });
 });
 
@@ -170,6 +335,9 @@ describe("logout", () => {
   });
 
   it("clears the token and invalidates the session on the happy path", async () => {
+    localStorage.setItem(opportunityDraftKey(7), "draft one");
+    localStorage.setItem(opportunityDraftKey(8), "draft two");
+    localStorage.setItem("rfphub.preference", "kept");
     render(
       <ApiClientProvider value={client as unknown as ApiClient}>
         <LogoutHarness />
@@ -180,6 +348,9 @@ describe("logout", () => {
 
     await waitFor(() => expect(clearSessionToken).toHaveBeenCalledTimes(1));
     expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(opportunityDraftKey(7))).toBeNull();
+    expect(localStorage.getItem(opportunityDraftKey(8))).toBeNull();
+    expect(localStorage.getItem("rfphub.preference")).toBe("kept");
   });
 
   it("still clears and invalidates when the sign-out REQUEST fails, and does not reject", async () => {
@@ -219,5 +390,43 @@ describe("logout", () => {
     expect(signOut.mock.invocationCallOrder[0]).toBeLessThan(
       clearSessionToken.mock.invocationCallOrder[0] as number,
     );
+  });
+});
+
+function DirtyPage() {
+  const { setBlocked } = useNavigationBlocker();
+  useEffect(() => {
+    setBlocked(true);
+    return () => setBlocked(false);
+  }, [setBlocked]);
+  return <p>Dirty form</p>;
+}
+
+describe("the header logout guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    signOut.mockResolvedValue(undefined);
+  });
+
+  it("does not log out when a dirty form's leave confirmation is declined", async () => {
+    session.data = { user: { id: "user_1" } };
+    session.isPending = false;
+    session.error = null;
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(
+      <ApiClientProvider value={clientFor(async () => me)}>
+        <NavigationBlockerProvider>
+          <Chrome>
+            <DirtyPage />
+          </Chrome>
+        </NavigationBlockerProvider>
+      </ApiClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText("Dirty form")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Log out" }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(signOut).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 });

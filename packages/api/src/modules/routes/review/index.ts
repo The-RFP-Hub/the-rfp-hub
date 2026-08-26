@@ -24,10 +24,45 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     required: ["id"],
     properties: { id: { type: "string", pattern: "^[0-9]+$" } },
   };
+  const reopenPairParams = {
+    type: "object",
+    required: ["pairId"],
+    properties: { pairId: { type: "string", pattern: "^[0-9]+$" } },
+  };
   const errors = {
     401: { $ref: "ErrorResponse#" },
     403: { $ref: "ErrorResponse#" },
     404: { $ref: "ErrorResponse#" },
+  };
+  const claimDecidedConflict = {
+    type: "object",
+    additionalProperties: false,
+    description: "`claim_decided` when the claim is no longer pending.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", enum: ["claim_decided"] },
+      message: { type: "string" },
+    },
+  };
+  const claimApprovalConflict = {
+    ...claimDecidedConflict,
+    description:
+      "`claim_decided` when the claim is no longer pending; `opportunity_merged` when approval would transfer ownership from a terminal merge loser.",
+    properties: {
+      ...claimDecidedConflict.properties,
+      error: { type: "string", enum: ["claim_decided", "opportunity_merged"] },
+    },
+  };
+  const duplicateReopenConflict = {
+    type: "object",
+    additionalProperties: false,
+    description:
+      "`already_merged` when the pair is terminal; `duplicate_not_dismissed` when it is confirmed and must use the existing duplicate decision actions.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", enum: ["already_merged", "duplicate_not_dismissed"] },
+      message: { type: "string" },
+    },
   };
 
   router.get(
@@ -43,6 +78,10 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           type: "object",
           additionalProperties: false,
           properties: {
+            id: {
+              type: "string",
+              description: "Exact public id; bypasses the default pending queue.",
+            },
             reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
             page: { type: "integer", minimum: 1, default: 1 },
             limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
@@ -87,7 +126,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { reason: { type: ["string", "null"] } },
         },
-        response: { 200: { $ref: "ReviewDecision#" }, ...errors },
+        response: {
+          200: { $ref: "ReviewDecision#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.approve,
@@ -108,7 +151,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { reason: { type: ["string", "null"] } },
         },
-        response: { 200: { $ref: "ReviewDecision#" }, ...errors },
+        response: {
+          200: { $ref: "ReviewDecision#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.reject,
@@ -130,7 +177,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { isListed: { type: "boolean" } },
         },
-        response: { 200: { $ref: "ReviewDecision#" }, ...errors },
+        response: {
+          200: { $ref: "ReviewDecision#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.setListed,
@@ -227,6 +278,28 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   );
 
   router.post(
+    "/duplicates/:pairId/reopen",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "reopenDuplicate",
+        tags: ["review"],
+        summary: "Return a dismissed pair to the suspected duplicate queue",
+        description:
+          "Idempotent for an already-suspected pair. A merged pair is terminal, while a confirmed pair remains a duplicate decision and must use the existing confirm/dismiss actions.",
+        security: [{ bearerAuth: [] }],
+        params: reopenPairParams,
+        response: {
+          200: { $ref: "DuplicatePair#" },
+          409: duplicateReopenConflict,
+          ...errors,
+        },
+      },
+    },
+    reviewController.reopenDuplicate,
+  );
+
+  router.post(
     "/duplicates/:id/merge",
     {
       onRequest: guard,
@@ -235,7 +308,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         tags: ["review"],
         summary: "Keep one entry of a pair and retire the other into it",
         description:
-          "The loser is rejected, unlisted, archived and pointed at the survivor; its row is kept so a future read can redirect rather than 404. The survivor must be approved AND listed, and must not itself have been merged — that check is what prevents chains and cycles (409 naming the real survivor). `fields` copies a whitelist from the loser; the result is re-validated against the Standard inside the transaction and the whole merge rolls back if it would no longer conform.",
+          "The loser is rejected, unlisted, archived and pointed at the survivor; when its id was public at merge time, a future public read remains a 404 but may name the currently-public survivor in its body. The survivor must be approved AND listed, and must not itself have been merged — that check is what prevents chains and cycles (409 naming the real survivor). `fields` copies a whitelist from the loser; the result is re-validated against the Standard inside the transaction and the whole merge rolls back if it would no longer conform.",
         security: [{ bearerAuth: [] }],
         params: pairParams,
         body: {
@@ -285,9 +358,9 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "approveClaim",
         tags: ["review"],
-        summary: "Approve a claim, deciding explicitly whether to verify the organisation",
+        summary: "Approve a claim, deciding explicitly whether to verify the organization",
         description:
-          "`verifyOrganization: false` transfers publisher ownership but does NOT unlock auto-approval — that requires a verified organisation, so the publisher's future writes keep landing pending. The response states which of the two happened.",
+          "`verifyOrganization: false` transfers publisher ownership but does NOT unlock auto-approval — that requires a verified organization, so the publisher's future writes keep landing pending. The response states which of the two happened.",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -300,7 +373,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { verifyOrganization: { type: "boolean" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: { 200: { $ref: "ClaimResult#" }, 409: claimApprovalConflict, ...errors },
       },
     },
     reviewController.approveClaim,
@@ -320,7 +393,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           required: ["id"],
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecidedConflict, ...errors },
       },
     },
     reviewController.rejectClaim,
@@ -333,7 +406,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "verifyOrganization",
         tags: ["review"],
-        summary: "Verify an organisation — every member becomes a publisher of its namespace",
+        summary: "Verify an organization — every member becomes a publisher of its namespace",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         response: { 200: { $ref: "OrganizationSummary#" }, ...errors },
@@ -365,7 +438,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "updateOrganizationAsReviewer",
         tags: ["review"],
-        summary: "Edit an organisation's directory entry",
+        summary: "Edit an organization's directory entry",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         body: organizationMetadataSchema,
@@ -386,7 +459,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "grantOrganizationMembership",
         tags: ["review"],
-        summary: "Grant an account publishing rights on an organisation",
+        summary: "Grant an account publishing rights on an organization",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         body: {
@@ -415,7 +488,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "revokeOrganizationMembership",
         tags: ["review"],
-        summary: "Revoke an account's publishing rights on an organisation",
+        summary: "Revoke an account's publishing rights on an organization",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -431,6 +504,76 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     reviewController.revokeMembership,
   );
 
+  router.post(
+    "/organizations/:slug/invites",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "createOrganizationMembershipInvite",
+        tags: ["review"],
+        summary: "Invite an email address to receive an organization membership on sign-in",
+        description:
+          "The membership is not active yet. It is applied the first time a person signs in with, and proves ownership of, this email address.",
+        security: [{ bearerAuth: [] }],
+        params: slugParams,
+        body: {
+          type: "object",
+          required: ["email"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", minLength: 3, maxLength: 320 },
+            role: { type: "string", enum: ["owner", "admin", "publisher"] },
+          },
+        },
+        response: {
+          200: { $ref: "MembershipInvite#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
+      },
+    },
+    reviewController.createMembershipInvite,
+  );
+
+  router.get(
+    "/organizations/:slug/invites",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "listOrganizationMembershipInvites",
+        tags: ["review"],
+        summary: "List pending membership invites for an organization",
+        security: [{ bearerAuth: [] }],
+        params: slugParams,
+        response: { 200: { $ref: "MembershipInviteList#" }, ...errors },
+      },
+    },
+    reviewController.listMembershipInvites,
+  );
+
+  router.delete(
+    "/organizations/:slug/invites/:inviteId",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "revokeOrganizationMembershipInvite",
+        tags: ["review"],
+        summary: "Revoke a pending organization membership invite",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["slug", "inviteId"],
+          properties: {
+            slug: { type: "string" },
+            inviteId: { type: "string", pattern: "^[0-9]+$" },
+          },
+        },
+        response: { 200: { $ref: "MembershipInvite#" }, ...errors },
+      },
+    },
+    reviewController.revokeMembershipInvite,
+  );
+
   router.get(
     "/accounts",
     {
@@ -438,7 +581,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "searchAccounts",
         tags: ["review"],
-        summary: "Find accounts by handle, display name or provider subject",
+        summary: "Find accounts by handle, id, display name, email or provider subject",
         security: [{ bearerAuth: [] }],
         querystring: {
           type: "object",
@@ -461,7 +604,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "searchOrganizations",
         tags: ["review"],
-        summary: "Find organisations, optionally filtered by verification",
+        summary: "Find organizations, optionally filtered by verification",
         security: [{ bearerAuth: [] }],
         querystring: {
           type: "object",

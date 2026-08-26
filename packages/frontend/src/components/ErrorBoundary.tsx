@@ -10,10 +10,10 @@
  * render of the provider tree still produces the same useless fallback, and the class of cause is
  * the same one (a build-time value that is wrong for this environment).
  *
- * So the boundary quotes the real message and says the thing that is actually true about this class
- * of failure — that the configuration is baked in at build time, so fixing the environment on the
- * host is not enough.
+ * So the boundary gives the reader a plain deployment-level state, then keeps the real message and
+ * build-time configuration diagnosis in a technical disclosure.
  */
+import { TechnicalDetails } from "@/components/states";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
@@ -44,19 +44,17 @@ export class AuthBoundary extends Component<Props, State> {
 
     return (
       <main className="shell-main">
-        <h1>The frontend could not start</h1>
-        <p className="state error" role="alert">
-          {error.message}
-        </p>
-        <p>
-          This usually means <code>NEXT_PUBLIC_API_URL</code> is wrong for this environment — a
-          placeholder, or an origin this browser cannot reach. See{" "}
-          <code>packages/frontend/README.md</code>.
-        </p>
-        <p className="muted">
-          The value is read when the frontend is <strong>built</strong>. Correcting it on the
-          running host changes nothing until the next build.
-        </p>
+        <div className="callout state error" role="alert">
+          <h1>This deployment cannot reach its service.</h1>
+          <p>The application could not start. Try again after the deployment is fixed.</p>
+          <TechnicalDetails error={error}>
+            <p>
+              Check <code>NEXT_PUBLIC_API_URL</code> and <code>packages/frontend/README.md</code>.
+              The value is read when the frontend is built, so changing the running host requires a
+              new build.
+            </p>
+          </TechnicalDetails>
+        </div>
       </main>
     );
   }
