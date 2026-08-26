@@ -30,21 +30,12 @@
  *    raises 23505 — which is caught and answered with the winning claim, not with a 500. The
  *    claim is the organisation's, so the loser of that race got what they asked for.
  */
-import { and, eq } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityRow,
-  type OrganizationRow,
-  accounts,
-  opportunities,
-  opportunityClaims,
-  orgMemberships,
-  organizations,
-} from "../../../db/schema.js";
+import type { OpportunityRow, OrganizationRow } from "../../../db/schema.js";
+import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import type { ClaimResultView, ClaimSummaryView } from "../../shared/api-views.js";
 import { effectiveCaps } from "../../shared/capabilities.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
 
@@ -56,10 +47,10 @@ export interface ClaimInput {
 }
 
 export class ClaimService {
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(private readonly db: DB = defaultDb) {
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   async claim(
@@ -127,14 +118,8 @@ export class ClaimService {
     organization: OrganizationRow,
     note: string | null,
   ): Promise<ClaimResultView> {
-    return this.db.transaction(async (tx) => {
-      const locked = await tx
-        .select()
-        .from(opportunities)
-        .where(eq(opportunities.id, entry.id))
-        .for("update")
-        .limit(1);
-      const row = locked[0];
+    return withTransaction(this.db, async (repos) => {
+      const row = await repos.opportunities.lockById(entry.id);
       if (!row) throw notFound(`no opportunity ${JSON.stringify(entry.publicId)}.`);
 
       // FOR SHARE on the ORGANISATION row as well, for the same reason as the membership below:
@@ -148,13 +133,7 @@ export class ClaimService {
       // verification committing after this transaction's snapshot is invisible whether the row is
       // locked or not, and locking a second row of the same table would introduce an ordering
       // hazard between two grants that name each other's organisations.
-      const org = await tx
-        .select()
-        .from(organizations)
-        .where(eq(organizations.id, organization.id))
-        .for("share")
-        .limit(1);
-      const currentOrg = org[0];
+      const currentOrg = await repos.organizations.lockByIdForClaim(organization.id);
       // FOR UPDATE on the MEMBERSHIP row, not merely a read of it.
       //
       // The opportunity's lock serialises this grant against another grant, and against the
@@ -163,19 +142,12 @@ export class ClaimService {
       // update below and the grant would still land on a membership that no longer exists. Locking
       // the row is what makes the two paths conflict: a concurrent DELETE waits here, and whichever
       // commits first is the one the other observes.
-      const membership = await tx
-        .select({ id: orgMemberships.id })
-        .from(orgMemberships)
-        .where(
-          and(
-            eq(orgMemberships.accountId, principal.accountId),
-            eq(orgMemberships.organizationId, organization.id),
-          ),
-        )
-        .for("update")
-        .limit(1);
+      const membership = await repos.memberships.lockForAccountAndOrganization(
+        principal.accountId,
+        organization.id,
+      );
 
-      if (!currentOrg?.verified || membership.length === 0) {
+      if (!currentOrg?.verified || membership === undefined) {
         throw forbidden(
           "claim_not_grantable",
           "the organization is no longer verified, or your membership on it has been revoked.",
@@ -188,12 +160,8 @@ export class ClaimService {
         );
       }
       if (row.sourcePublisher !== null && row.sourcePublisher !== currentOrg.slug) {
-        const owner = await tx
-          .select({ verified: organizations.verified })
-          .from(organizations)
-          .where(eq(organizations.slug, row.sourcePublisher))
-          .limit(1);
-        if (owner[0]?.verified) {
+        const ownerVerified = await repos.organizations.verifiedBySlug(row.sourcePublisher);
+        if (ownerVerified) {
           throw conflict(
             "already_claimed",
             `this entry is already published by the verified organization \`${row.sourcePublisher}\`.`,
@@ -203,33 +171,25 @@ export class ClaimService {
 
       const now = new Date();
       const wasPending = row.reviewStatus !== "approved";
-      await tx
-        .update(opportunities)
-        .set({
-          sourcePublisher: currentOrg.slug,
-          sourceSubmittedBy: currentOrg.slug,
-          // A granted claim is a publisher asserting the entry, which is exactly what the staleness
-          // clock measures.
-          lastSeenAt: now,
-          reviewStatus: "approved",
-          approvedBy: principal.accountId,
-          approvedAt: row.approvedAt ?? now,
-          updatedAt: now,
-        })
-        .where(eq(opportunities.id, row.id));
+      await repos.opportunities.updateClaimPublisher(row.id, {
+        sourcePublisher: currentOrg.slug,
+        sourceSubmittedBy: currentOrg.slug,
+        // A granted claim is a publisher asserting the entry, which is exactly what the staleness
+        // clock measures.
+        lastSeenAt: now,
+        reviewStatus: "approved",
+        approvedBy: principal.accountId,
+        approvedAt: row.approvedAt ?? now,
+        updatedAt: now,
+      });
 
       // A pending claim from this organisation is settled by the grant rather than left orphaned.
-      const settled = await tx
-        .update(opportunityClaims)
-        .set({ status: "approved", decidedBy: principal.accountId, decidedAt: now })
-        .where(
-          and(
-            eq(opportunityClaims.opportunityId, row.id),
-            eq(opportunityClaims.organizationId, currentOrg.id),
-            eq(opportunityClaims.status, "pending"),
-          ),
-        )
-        .returning({ id: opportunityClaims.id });
+      const settled = await repos.claims.settlePendingForGrant(
+        row.id,
+        currentOrg.id,
+        principal.accountId,
+        now,
+      );
 
       const actor = {
         actorKind:
@@ -237,7 +197,7 @@ export class ClaimService {
         actorAccountId: principal.accountId,
         actorApiKeyId: principal.apiKeyId ?? null,
       };
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...actor,
         subjectKind: "opportunity",
         subjectId: row.id,
@@ -247,7 +207,7 @@ export class ClaimService {
           note,
         },
       });
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...actor,
         subjectKind: "opportunity",
         subjectId: row.id,
@@ -255,7 +215,7 @@ export class ClaimService {
         patch: { organizationSlug: currentOrg.slug },
       });
       if (wasPending) {
-        await this.audit.record(tx, {
+        await repos.audit.record({
           ...actor,
           subjectKind: "opportunity",
           subjectId: row.id,
@@ -269,7 +229,7 @@ export class ClaimService {
 
       return {
         outcome: "granted" as const,
-        claimId: settled[0]?.id ?? null,
+        claimId: settled[0] ?? null,
         opportunityId: row.publicId,
         organizationSlug: currentOrg.slug,
         message: `\`${currentOrg.slug}\` now publishes this entry, and future writes into that namespace auto-approve.`,
@@ -301,83 +261,61 @@ export class ClaimService {
       };
     }
 
-    return this.db
-      .transaction(async (tx) => {
-        const inserted = await tx
-          .insert(opportunityClaims)
-          .values({
-            opportunityId: entry.id,
-            organizationId: organization.id,
-            accountId: principal.accountId,
-            note,
-          })
-          .returning();
-        const claim = inserted[0];
-        if (!claim) throw new Error("failed to file a claim");
-        await this.audit.record(tx, {
-          subjectKind: "claim",
-          subjectId: claim.id,
-          actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
-          actorAccountId: principal.accountId,
-          actorApiKeyId: principal.apiKeyId ?? null,
-          action: "claim",
-          patch: {
-            opportunity: entry.publicId,
-            organizationSlug: organization.slug,
-            note,
-          },
-        });
-        return {
-          outcome: "queued" as const,
-          claimId: claim.id,
-          opportunityId: entry.publicId,
-          organizationSlug: organization.slug,
-          message: reason,
-        };
-      })
-      .catch(async (error: unknown) => {
-        // TWO COLLEAGUES, ONE CLAIM. The read above and this insert are not one atomic step, so
-        // both members of an organisation can see no pending row and both reach here; the partial
-        // unique index lets one in and raises 23505 at the other. The claim is the ORGANISATION's,
-        // so the loser of that race has not failed — the thing they asked for exists. Loading the
-        // winner turns a 500 into the same idempotent 202 a serialised pair of requests would have
-        // produced.
-        if (!isUniqueViolation(error)) throw error;
-        const winner = await this.findPendingClaim(entry.id, organization.id);
-        if (!winner) throw error;
-        return {
-          outcome: "queued" as const,
-          claimId: winner.id,
-          opportunityId: entry.publicId,
-          organizationSlug: organization.slug,
-          message: `a claim from \`${organization.slug}\` is already awaiting review. ${reason}`,
-        };
+    return withTransaction(this.db, async (repos) => {
+      const claim = await repos.claims.insert({
+        opportunityId: entry.id,
+        organizationId: organization.id,
+        accountId: principal.accountId,
+        note,
       });
+      if (!claim) throw new Error("failed to file a claim");
+      await repos.audit.record({
+        subjectKind: "claim",
+        subjectId: claim.id,
+        actorKind: principal.credentialKind === "api_key" ? "api_key" : "user",
+        actorAccountId: principal.accountId,
+        actorApiKeyId: principal.apiKeyId ?? null,
+        action: "claim",
+        patch: {
+          opportunity: entry.publicId,
+          organizationSlug: organization.slug,
+          note,
+        },
+      });
+      return {
+        outcome: "queued" as const,
+        claimId: claim.id,
+        opportunityId: entry.publicId,
+        organizationSlug: organization.slug,
+        message: reason,
+      };
+    }).catch(async (error: unknown) => {
+      // TWO COLLEAGUES, ONE CLAIM. The read above and this insert are not one atomic step, so
+      // both members of an organisation can see no pending row and both reach here; the partial
+      // unique index lets one in and raises 23505 at the other. The claim is the ORGANISATION's,
+      // so the loser of that race has not failed — the thing they asked for exists. Loading the
+      // winner turns a 500 into the same idempotent 202 a serialised pair of requests would have
+      // produced.
+      if (!isUniqueViolation(error)) throw error;
+      const winner = await this.findPendingClaim(entry.id, organization.id);
+      if (!winner) throw error;
+      return {
+        outcome: "queued" as const,
+        claimId: winner.id,
+        opportunityId: entry.publicId,
+        organizationSlug: organization.slug,
+        message: `a claim from \`${organization.slug}\` is already awaiting review. ${reason}`,
+      };
+    });
   }
 
   /** The organisation's outstanding claim on one entry, if it has one. */
   private async findPendingClaim(opportunityId: number, organizationId: number) {
-    const rows = await this.db
-      .select()
-      .from(opportunityClaims)
-      .where(
-        and(
-          eq(opportunityClaims.opportunityId, opportunityId),
-          eq(opportunityClaims.organizationId, organizationId),
-          eq(opportunityClaims.status, "pending"),
-        ),
-      )
-      .limit(1);
-    return rows[0];
+    return this.repos.claims.findPending(opportunityId, organizationId);
   }
 
   private async findOpportunity(publicId: string): Promise<OpportunityRow> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(eq(opportunities.publicId, publicId))
-      .limit(1);
-    const row = rows[0];
+    const row = await this.repos.opportunities.findByPublicId(publicId);
     // A claim may be filed against a PUBLIC entry only. A pending entry is not discoverable, so
     // answering about one here would be an existence oracle over the review queue.
     if (!row || row.reviewStatus !== "approved" || !row.isListed) {
@@ -387,31 +325,14 @@ export class ClaimService {
   }
 
   private async findOrganization(slug: string): Promise<OrganizationRow> {
-    const rows = await this.db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.slug, slug))
-      .limit(1);
-    const row = rows[0];
+    const row = await this.repos.organizations.findBySlug(slug);
     if (!row) throw notFound(`no organization \`${slug}\`.`);
     return row;
   }
 
   // ── review side ────────────────────────────────────────────────────────────────
   async listForReview(status: "pending" | "approved" | "rejected" | "withdrawn" = "pending") {
-    const rows = await this.db
-      .select({
-        claim: opportunityClaims,
-        opportunity: opportunities,
-        organization: organizations,
-        handle: accounts.handle,
-      })
-      .from(opportunityClaims)
-      .innerJoin(opportunities, eq(opportunities.id, opportunityClaims.opportunityId))
-      .innerJoin(organizations, eq(organizations.id, opportunityClaims.organizationId))
-      .leftJoin(accounts, eq(accounts.id, opportunityClaims.accountId))
-      .where(eq(opportunityClaims.status, status))
-      .orderBy(opportunityClaims.createdAt);
+    const rows = await this.repos.claims.listForReview(status);
 
     return rows.map(
       ({ claim, opportunity, organization, handle }): ClaimSummaryView => ({
@@ -442,7 +363,7 @@ export class ClaimService {
     claimId: number,
     decision: { approve: boolean; verifyOrganization?: boolean },
   ): Promise<ClaimResultView> {
-    return this.db.transaction(async (tx) => {
+    return withTransaction(this.db, async (repos) => {
       // THE ENTRY IS LOCKED FIRST, before the claim and the organisation.
       //
       // `grant()` takes the opportunity, then the organisation, then the membership, and settles
@@ -451,24 +372,13 @@ export class ClaimService {
       // and PostgreSQL would answer one of them with a deadlock rather than a decision. Every path
       // that touches an entry and its claim therefore acquires the ENTRY first: this one, `grant()`
       // and the write path (see `services/auth/publish-authority.ts` for the whole order).
-      //
       // Learning which entry that is costs one unlocked read, which is safe because a claim's
       // `opportunity_id` is immutable: whatever else changes about the claim before the lock below,
       // it is still a claim about this entry.
-      const target = await tx
-        .select({ opportunityId: opportunityClaims.opportunityId })
-        .from(opportunityClaims)
-        .where(eq(opportunityClaims.id, claimId))
-        .limit(1);
-      if (!target[0]) throw notFound(`no claim ${claimId}.`);
+      const opportunityId = await repos.claims.findOpportunityId(claimId);
+      if (opportunityId === undefined) throw notFound(`no claim ${claimId}.`);
 
-      const entryRows = await tx
-        .select()
-        .from(opportunities)
-        .where(eq(opportunities.id, target[0].opportunityId))
-        .for("update")
-        .limit(1);
-      const entry = entryRows[0];
+      const entry = await repos.opportunities.lockById(opportunityId);
       if (!entry) throw notFound(`no opportunity for claim ${claimId}.`);
       if (decision.approve && entry.mergedIntoId !== null) {
         throw conflict(
@@ -477,33 +387,24 @@ export class ClaimService {
         );
       }
 
-      const rows = await tx
-        .select({ claim: opportunityClaims, organization: organizations })
-        .from(opportunityClaims)
-        .innerJoin(organizations, eq(organizations.id, opportunityClaims.organizationId))
-        .where(eq(opportunityClaims.id, claimId))
-        .for("update")
-        .limit(1);
-      const found = rows[0];
+      const found = await repos.claims.lockWithOrganization(claimId);
       if (!found) throw notFound(`no claim ${claimId}.`);
       if (found.claim.status !== "pending") {
         throw conflict("claim_decided", `claim ${claimId} has already been ${found.claim.status}.`);
       }
 
       const now = new Date();
-      await tx
-        .update(opportunityClaims)
-        .set({
-          status: decision.approve ? "approved" : "rejected",
-          decidedBy: reviewerId,
-          decidedAt: now,
-        })
-        .where(eq(opportunityClaims.id, claimId));
+      await repos.claims.decide(
+        claimId,
+        decision.approve ? "approved" : "rejected",
+        reviewerId,
+        now,
+      );
 
       const reviewerActor = { actorKind: "user" as const, actorAccountId: reviewerId };
 
       if (!decision.approve) {
-        await this.audit.record(tx, {
+        await repos.audit.record({
           ...reviewerActor,
           subjectKind: "claim",
           subjectId: claimId,
@@ -521,12 +422,9 @@ export class ClaimService {
 
       let verified = found.organization.verified;
       if (decision.verifyOrganization === true && !verified) {
-        await tx
-          .update(organizations)
-          .set({ verified: true, verifiedAt: now, updatedAt: now })
-          .where(eq(organizations.id, found.organization.id));
+        await repos.organizations.verifyForClaim(found.organization.id, now);
         verified = true;
-        await this.audit.record(tx, {
+        await repos.audit.record({
           ...reviewerActor,
           subjectKind: "organization",
           subjectId: found.organization.id,
@@ -536,29 +434,26 @@ export class ClaimService {
       }
 
       const wasPending = entry.reviewStatus !== "approved";
-      await tx
-        .update(opportunities)
-        .set({
-          sourcePublisher: found.organization.slug,
-          sourceSubmittedBy: found.organization.slug,
-          lastSeenAt: now,
-          // Approving the CLAIM publishes the entry only when the new publisher is verified;
-          // otherwise the entry keeps whatever review status it had.
-          reviewStatus: verified ? "approved" : entry.reviewStatus,
-          approvedBy: verified ? (entry.approvedBy ?? reviewerId) : entry.approvedBy,
-          approvedAt: verified ? (entry.approvedAt ?? now) : entry.approvedAt,
-          updatedAt: now,
-        })
-        .where(eq(opportunities.id, entry.id));
+      await repos.opportunities.updateClaimPublisher(entry.id, {
+        sourcePublisher: found.organization.slug,
+        sourceSubmittedBy: found.organization.slug,
+        lastSeenAt: now,
+        // Approving the CLAIM publishes the entry only when the new publisher is verified;
+        // otherwise the entry keeps whatever review status it had.
+        reviewStatus: verified ? "approved" : entry.reviewStatus,
+        approvedBy: verified ? (entry.approvedBy ?? reviewerId) : entry.approvedBy,
+        approvedAt: verified ? (entry.approvedAt ?? now) : entry.approvedAt,
+        updatedAt: now,
+      });
 
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...reviewerActor,
         subjectKind: "claim",
         subjectId: claimId,
         action: "approve",
         patch: { status: { before: "pending", after: "approved" }, verifyOrganization: verified },
       });
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...reviewerActor,
         subjectKind: "opportunity",
         subjectId: entry.id,
@@ -568,7 +463,7 @@ export class ClaimService {
         },
       });
       if (verified && wasPending) {
-        await this.audit.record(tx, {
+        await repos.audit.record({
           ...reviewerActor,
           subjectKind: "opportunity",
           subjectId: entry.id,

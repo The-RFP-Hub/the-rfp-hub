@@ -6,6 +6,7 @@ import { AnalyticsRepository } from "./insights/analytics.repository.js";
 import { MembershipInviteRepository } from "./membership-invites/membership-invite.repository.js";
 import { MembershipRepository } from "./memberships/membership.repository.js";
 import { NotificationRepository } from "./notifications/notification.repository.js";
+import { ClaimRepository } from "./opportunities/claim.repository.js";
 import { OpportunityRepository } from "./opportunities/opportunity.repository.js";
 import { OrganizationRepository } from "./organizations/organization.repository.js";
 import { VerificationRunRepository } from "./verification/verification-run.repository.js";
@@ -16,6 +17,7 @@ export interface Repositories {
   readonly apiKeys: ApiKeyRepository;
   readonly audit: AuditRepository;
   readonly analytics: AnalyticsRepository;
+  readonly claims: ClaimRepository;
   readonly membershipInvites: MembershipInviteRepository;
   readonly memberships: MembershipRepository;
   readonly notifications: NotificationRepository;
@@ -30,6 +32,7 @@ export function repositories(exec: DbLike): Repositories {
   let apiKeys: ApiKeyRepository | undefined;
   let audit: AuditRepository | undefined;
   let analytics: AnalyticsRepository | undefined;
+  let claims: ClaimRepository | undefined;
   let membershipInvites: MembershipInviteRepository | undefined;
   let memberships: MembershipRepository | undefined;
   let notifications: NotificationRepository | undefined;
@@ -53,6 +56,10 @@ export function repositories(exec: DbLike): Repositories {
     get analytics() {
       analytics ??= new AnalyticsRepository(exec);
       return analytics;
+    },
+    get claims() {
+      claims ??= new ClaimRepository(exec);
+      return claims;
     },
     get membershipInvites() {
       membershipInvites ??= new MembershipInviteRepository(exec);

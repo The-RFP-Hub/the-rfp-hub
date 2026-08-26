@@ -37,7 +37,12 @@ export {
   type NotificationRemainingSelection,
 } from "./notifications/notification.repository.js";
 export {
+  type ClaimInsert,
+  ClaimRepository,
+} from "./opportunities/claim.repository.js";
+export {
   escapeLike,
+  type ClaimPublisherUpdate,
   type ManagedOpportunityQuery,
   type ManagedOpportunityScope,
   type OpportunitySortField,

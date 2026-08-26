@@ -18,6 +18,32 @@ export class OrganizationRepository {
     return rows[0];
   }
 
+  async lockByIdForClaim(id: number): Promise<OrganizationRow | undefined> {
+    const rows = await this.exec
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, id))
+      .for("share")
+      .limit(1);
+    return rows[0];
+  }
+
+  async verifiedBySlug(slug: string): Promise<boolean | undefined> {
+    const rows = await this.exec
+      .select({ verified: organizations.verified })
+      .from(organizations)
+      .where(eq(organizations.slug, slug))
+      .limit(1);
+    return rows[0]?.verified;
+  }
+
+  async verifyForClaim(id: number, now: Date): Promise<void> {
+    await this.exec
+      .update(organizations)
+      .set({ verified: true, verifiedAt: now, updatedAt: now })
+      .where(eq(organizations.id, id));
+  }
+
   async listVerified(): Promise<OrganizationRow[]> {
     return this.exec
       .select()

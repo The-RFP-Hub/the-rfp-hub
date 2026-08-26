@@ -80,6 +80,16 @@ export interface OwnershipColumns {
   sourcePublisher: AnyPgColumn;
 }
 
+export interface ClaimPublisherUpdate {
+  sourcePublisher: string;
+  sourceSubmittedBy: string;
+  lastSeenAt: Date;
+  reviewStatus: OpportunityRow["reviewStatus"];
+  approvedBy: number | null;
+  approvedAt: Date | null;
+  updatedAt: Date;
+}
+
 /** SQL form of submission-or-namespace ownership, usable with the table or one of its aliases. */
 export function ownedOpportunityPredicate(
   opportunity: OwnershipColumns,
@@ -228,6 +238,10 @@ export class OpportunityRepository {
       lastSeenAt: Date | null;
     },
   ): Promise<void> {
+    await this.exec.update(opportunities).set(values).where(eq(opportunities.id, id));
+  }
+
+  async updateClaimPublisher(id: number, values: ClaimPublisherUpdate): Promise<void> {
     await this.exec.update(opportunities).set(values).where(eq(opportunities.id, id));
   }
 
