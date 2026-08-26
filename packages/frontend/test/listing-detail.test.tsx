@@ -139,6 +139,7 @@ const mount = (node: React.ReactNode, api: ApiClient = client()) =>
 beforeEach(() => {
   session.data = { user: { id: "u1" } };
   listingQuery.current = "";
+  document.title = "acme:old | RFP Hub";
 });
 
 describe("merged listing detail and edit routes", () => {
@@ -162,6 +163,7 @@ describe("merged listing detail and edit routes", () => {
     ).toBeTruthy();
     expect(screen.getByText("Review decision")).toBeTruthy();
     expect(screen.getByText("Public visibility")).toBeTruthy();
+    expect(document.title).toBe("Old Round | RFP Hub");
     const edit = screen.getByRole("link", { name: "Edit" });
     expect(edit.className).toContain("button");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();

@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { generateMetadata as listingMetadata } from "@/app/listings/[id]/layout";
+import { metadata as listingsMetadata } from "@/app/listings/layout";
 import { generateMetadata as opportunityMetadata } from "@/app/opportunities/[id]/layout";
 import { generateMetadata as organisationMetadata } from "@/app/organisations/[slug]/layout";
 import { metadata as organisationsMetadata } from "@/app/organisations/layout";
@@ -59,18 +60,23 @@ describe("route metadata", () => {
     }
   });
 
-  it("uses URL identifiers for dynamic titles without fetching private listing data", async () => {
+  it("keeps nested route templates and uses URL identifiers until client data loads", async () => {
     await expect(
       listingMetadata({ params: Promise.resolve({ id: "acme:round-4" }) }),
-    ).resolves.toEqual({ title: "Listing acme:round-4" });
+    ).resolves.toEqual({
+      title: { default: "acme:round-4", template: "%s | RFP Hub" },
+    });
     await expect(
       opportunityMetadata({ params: Promise.resolve({ id: "acme:round-4" }) }),
-    ).resolves.toEqual({ title: "Opportunity acme:round-4" });
+    ).resolves.toEqual({ title: "acme:round-4" });
     await expect(
       organisationMetadata({ params: Promise.resolve({ slug: "acme-foundation" }) }),
     ).resolves.toEqual({ title: "Organisation acme-foundation" });
     expect(organisationsMetadata).toEqual({
       title: { default: "Organisations", template: "%s | RFP Hub" },
+    });
+    expect(listingsMetadata).toEqual({
+      title: { default: "Your listings", template: "%s | RFP Hub" },
     });
   });
 });

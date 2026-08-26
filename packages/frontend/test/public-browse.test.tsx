@@ -477,6 +477,7 @@ describe("the public opportunity page", () => {
     authSession.error = null;
     navigation.params = new URLSearchParams();
     navigation.replace.mockClear();
+    document.title = "acme:round-4 | RFP Hub";
   });
 
   it("canonicalizes a merged public id and preserves return-navigation query parameters", async () => {
@@ -537,6 +538,7 @@ describe("the public opportunity page", () => {
 
     await screen.findByText(HOSTILE_TITLE);
     expect(find).toHaveBeenCalledWith("acme:round-4");
+    expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`);
   });
 
   it("renders the record's public fields", async () => {

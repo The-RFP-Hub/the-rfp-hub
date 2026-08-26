@@ -206,6 +206,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     expect((await publisher.post("/v1/opportunities", document)).status).toBe(201);
 
     await page.goto(`${stack.urls.frontend}/listings/${encodeURIComponent(id)}`);
+    await expect(page).toHaveTitle(`${document.title as string} | RFP Hub`);
     await expect(page.getByText(id, { exact: false }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^← Back to/ })).toHaveCount(0);
 

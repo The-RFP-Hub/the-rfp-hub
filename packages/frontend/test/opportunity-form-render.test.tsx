@@ -860,6 +860,31 @@ describe("drafts and dirty navigation", () => {
     localStorage.clear();
   });
 
+  it("re-enters the explicit draft choice when a session refresh reuses the form", () => {
+    localStorage.clear();
+    const initial = emptyForm();
+    const api = stub();
+    const tree = (accountId: number) => (
+      <ApiClientProvider value={api.client}>
+        <NavigationBlockerProvider>
+          <OpportunityForm mode="create" accountId={accountId} initial={initial} />
+        </NavigationBlockerProvider>
+      </ApiClientProvider>
+    );
+    const view = render(tree(6));
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Current session" } });
+    writeOpportunityDraft(7, fill({ title: "Stored for refreshed session" }));
+    view.rerender(tree(7));
+
+    expect(valueIn(screen.getByLabelText("Title"))).toBe("");
+    expect(screen.getByRole("button", { name: "Restore draft" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Discard draft" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
+    expect(valueIn(screen.getByLabelText("Title"))).toBe("Stored for refreshed session");
+    localStorage.clear();
+  });
+
   it("discards a stored draft and never offers another account's draft", () => {
     localStorage.clear();
     writeOpportunityDraft(8, fill({ title: "Another account" }));

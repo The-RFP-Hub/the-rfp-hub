@@ -18,6 +18,7 @@ import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresenta
  * without ever having decided to trust anyone.
  */
 import { PublicClaimControl } from "@/components/ClaimForm";
+import { DocumentTitle } from "@/components/DocumentTitle";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
@@ -86,6 +87,7 @@ export function PublicOpportunity({ id }: { id: string }) {
       <ResourceView resource={state} what="this opportunity" onRetry={reload}>
         {(entry) => (
           <>
+            <DocumentTitle title={entry.title} fallback={id} />
             <OpportunityView
               entry={entry}
               baseUrl={api.baseUrl}

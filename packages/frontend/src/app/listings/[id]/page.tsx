@@ -15,6 +15,7 @@
 import { AnalyticsTab } from "@/components/AnalyticsTab";
 import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 import { RequireSession } from "@/components/Chrome";
+import { DocumentTitle } from "@/components/DocumentTitle";
 import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { ReturnLink } from "@/components/ReturnLink";
 import { SectionNav } from "@/components/SectionNav";
@@ -97,6 +98,7 @@ function Listing({ id, me }: { id: string; me: Me }) {
       <ResourceView resource={state} what="this listing" onRetry={reload}>
         {({ entry, managed }) => (
           <>
+            <DocumentTitle title={entry.title} fallback={id} />
             {managed.mergedInto ? (
               <MergedOpportunityBanner mergedInto={managed.mergedInto} />
             ) : null}

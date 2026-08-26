@@ -4,6 +4,7 @@ import {
   expect,
   freshIdentity,
   skipUnlessActor,
+  skipUnlessBrowserSession,
   test,
 } from "../src/fixtures.js";
 /**
@@ -185,6 +186,35 @@ test.describe("M3-1 API keys", () => {
 
     const theirList = await other.get<{ items: Array<{ id: number }> }>("/v1/keys");
     expect(theirList.body.items.map((item) => item.id)).not.toContain(mine.keyId);
+  });
+});
+
+test.describe("M3-1 listing drafts", () => {
+  test.beforeEach(({ stack }) => {
+    skipUnlessActor(stack, "publisher");
+    skipUnlessBrowserSession(stack, "publisher");
+  });
+
+  test("a reload offers the stored draft instead of applying it silently", async ({
+    contextAs,
+    stack,
+  }) => {
+    const context = await contextAs("publisher");
+    const page = await context.newPage();
+    const draftTitle = `Reload draft ${Date.now()}`;
+
+    await page.goto(`${stack.urls.frontend}/listings/new`);
+    await page.getByLabel(/^Title/).fill(draftTitle);
+    await expect(page.getByText(/Draft saved on this device ·/)).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Restore draft" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Discard draft" })).toBeVisible();
+    await expect(page.getByLabel(/^Title/)).toHaveValue("");
+
+    await page.getByRole("button", { name: "Restore draft" }).click();
+    await expect(page.getByLabel(/^Title/)).toHaveValue(draftTitle);
+    await context.close();
   });
 });
 

@@ -53,6 +53,24 @@ function ClaimLikeOpener() {
   );
 }
 
+function RefreshingOpener() {
+  const openSignIn = useSignInOpener();
+  const [signedIn, setSignedIn] = useState(false);
+  return signedIn ? (
+    <span>Session refreshed</span>
+  ) : (
+    <button
+      type="button"
+      onClick={() => {
+        openSignIn();
+        window.addEventListener("auth-root-test-refresh", () => setSignedIn(true), { once: true });
+      }}
+    >
+      Log in here
+    </button>
+  );
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
 });
@@ -101,6 +119,27 @@ describe("the sign-in dialog", () => {
     const organisation = await screen.findByRole("combobox", { name: "Organisation" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(document.activeElement).toBe(organisation);
+  });
+
+  it("moves focus to main content when a later session refresh replaces an ordinary opener", async () => {
+    render(
+      <AuthRoot apiBaseUrl="https://api.example.com">
+        <main id="main-content" tabIndex={-1}>
+          <RefreshingOpener />
+        </main>
+      </AuthRoot>,
+    );
+
+    const opener = screen.getByRole("button", { name: "Log in here" });
+    opener.focus();
+    fireEvent.click(opener);
+    fireEvent.click(await screen.findByRole("button", { name: "Complete sign-in" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(opener);
+
+    fireEvent(window, new Event("auth-root-test-refresh"));
+    await screen.findByText("Session refreshed");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("main")));
   });
 
   it("stays open when Strict Mode replays the dialog layout effect", async () => {

@@ -10,7 +10,7 @@ export async function generateMetadata({
   params,
 }: Pick<OpportunityLayoutProps, "params">): Promise<Metadata> {
   const { id } = await params;
-  return { title: `Opportunity ${id}` };
+  return { title: id };
 }
 
 export default function OpportunityLayout({ children }: OpportunityLayoutProps) {

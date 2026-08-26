@@ -10,7 +10,12 @@ export async function generateMetadata({
   params,
 }: Pick<ListingLayoutProps, "params">): Promise<Metadata> {
   const { id } = await params;
-  return { title: `Listing ${id}` };
+  return {
+    title: {
+      default: id,
+      template: "%s | RFP Hub",
+    },
+  };
 }
 
 export default function ListingLayout({ children }: ListingLayoutProps) {

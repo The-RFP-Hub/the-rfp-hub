@@ -96,14 +96,20 @@ export function AuthRoot({ apiBaseUrl, children }: { apiBaseUrl: string; childre
     if (trigger?.isConnected) trigger.focus();
     else focusFallback();
 
-    if (reason !== "signed-in" || !trigger?.isConnected || !disclosure?.isConnected) return;
+    if (reason !== "signed-in" || !trigger?.isConnected) return;
 
     const observer = new MutationObserver(() => {
       if (trigger.isConnected) return;
       focusFallback();
       observer.disconnect();
     });
-    observer.observe(disclosure, { childList: true, subtree: true });
+    // A claim disclosure is the narrowest stable scope. Ordinary login openers live in session
+    // controls or page gates that a later session refresh may replace wholesale, so the document
+    // body is their stable ancestor; if they disappear, focus moves to the main-content fallback.
+    observer.observe(disclosure?.isConnected ? disclosure : document.body, {
+      childList: true,
+      subtree: true,
+    });
     return () => observer.disconnect();
   }, [open]);
 

@@ -282,6 +282,7 @@ export function OpportunityForm({
 }) {
   const api = useApi();
   const [form, setForm] = useState<OpportunityFormState>(initial);
+  const initialForm = useRef(initial);
   // `fromDocument(entry)` creates new row keys every time it is called. Capture the canonical
   // initial state exactly once so a parent render cannot manufacture a dirty edit.
   const initialSnapshot = useRef(canonicalForm(initial));
@@ -332,6 +333,12 @@ export function OpportunityForm({
 
     const stored = readOpportunityDraft(accountId);
     if (stored.kind === "draft") {
+      // A session refresh may reuse this component after a previous account made draft persistence
+      // ready. Re-enter the choice state explicitly: keep the stored form out of the controls and
+      // prevent the debounce from overwriting it until the publisher restores or discards it.
+      draftReadyRef.current = false;
+      setDraftReady(false);
+      setForm(initialForm.current);
       setDraftPrompt(stored);
       setDraftStatus({ kind: "saved", savedAt: stored.savedAt });
     } else {
