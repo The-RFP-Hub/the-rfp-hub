@@ -84,10 +84,13 @@ RUN mkdir -p /app/exports && chown node:node /app/exports
 # An image is not a secret store: anyone who can pull it — and, when the build
 # uses a `mode=max` layer cache in a public repository, anyone who can read
 # that cache — can read every value inside it. Every runtime variable is
-# therefore injected by the ECS task definition's `secrets:` array, each entry
+# therefore injected by the ECS task definition, which the DEPLOY job assembles
+# from Secrets Manager on its way past: interim in the container definition's
+# `environment` array, and eventually in its `secrets:` array, each entry
 # resolving a Secrets Manager JSON key at task start. See packages/api/docs/deploy.md
-# for the variable→secret table, the split migration/runtime credentials, and the
-# rotation runbook for values that were baked into earlier images.
+# for the variable→secret table, what the interim step exposes and to whom, the
+# split migration/runtime credentials, and the rotation runbook for values that
+# were baked into earlier images.
 #
 # `src/config.ts` still calls dotenv, so a developer's local `packages/api/.env`
 # keeps working; in the image there is no such file and the real environment is

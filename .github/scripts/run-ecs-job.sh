@@ -10,10 +10,18 @@
 # ── IT RUNS ON THE SERVICE'S OWN TASK DEFINITION, AND OWNS NO INFRASTRUCTURE ────────────────────
 #
 # A job is the deployed image with a different command. Everything it needs — the image, the
-# runtime `DATABASE_URL`, every secret in the task definition's `secrets:` array, the execution and
-# task roles — is already assembled in the task definition the API service runs, and the deploy
-# workflows keep it current. So this reuses it rather than asking an operator to provision and
-# maintain a parallel one, which would be a second copy of the same secret list to keep in step.
+# runtime `DATABASE_URL` and the rest of the configuration the deploy injects, every entry in the
+# task definition's `secrets:` array, the execution and task roles — is already assembled in the
+# task definition the API service runs, and the deploy workflows keep it current. So this reuses it
+# rather than asking an operator to provision and maintain a parallel one, which would be a second
+# copy of the same configuration to keep in step.
+#
+# THE EXACT REVISION, not the family. `run-task --task-definition rfp-hub-staging` resolves to the
+# latest ACTIVE revision, which is not necessarily the one the service is running: a revision whose
+# deployment failed and rolled back is still the latest, and so is one registered out of band. That
+# would silently run maintenance against a different configuration from the API's — a different
+# database, even. So the revision ARN is read off the service below and passed verbatim, which is
+# the only reading under which the paragraph above is true.
 #
 # The names are the ones staging.yml and production.yml already hardcode:
 #
@@ -55,6 +63,11 @@ set -euo pipefail
 
 # The deploy workflows' naming, in one place. Overridable so a deployment that named things
 # differently can say so without this script learning a second rule.
+#
+# ECS_TASK_DEFINITION does double duty, and both readings point the same way: it is the family the
+# container and service names are derived from, AND — because an operator who names a task
+# definition is naming the one to run — it is what `run-task` receives when it is set. Unset, which
+# is every scheduled run, `run-task` gets the service's own revision ARN instead of the family.
 task_definition="${ECS_TASK_DEFINITION:-rfp-hub-${TARGET_ENV}}"
 container="${ECS_CONTAINER:-${task_definition}}"
 service="${ECS_SERVICE:-${task_definition}-service}"
@@ -89,9 +102,13 @@ if ! service_json=$(
   exit 1
 fi
 
+# The revision the service is ACTUALLY running, straight off the same describe call — see the
+# header. An override wins, because it was typed on purpose.
+run_task_definition="${ECS_TASK_DEFINITION:-$(jq -r '.services[0].taskDefinition // empty' <<<"$service_json")}"
+
 network=$(jq -c '.services[0].networkConfiguration.awsvpcConfiguration // empty' <<<"$service_json")
-if [ -z "$network" ]; then
-  not_provisioned "no service ${service} on cluster ${cluster} (or it has no awsvpc network configuration): deploy the ${TARGET_ENV} API first, so '${JOB}' did not run"
+if [ -z "$network" ] || [ -z "$run_task_definition" ]; then
+  not_provisioned "no service ${service} on cluster ${cluster} (or it names no task definition and no awsvpc network configuration): deploy the ${TARGET_ENV} API first, so '${JOB}' did not run"
 fi
 
 # The service's own placement, verbatim: a Fargate service reports `launchType`, one on a capacity
@@ -119,11 +136,11 @@ overrides=$(
 )
 network_configuration=$(jq -nc --argjson vpc "$network" '{awsvpcConfiguration: $vpc}')
 
-echo "starting ${JOB} on ${task_definition} in ${cluster} (${TARGET_ENV}), placed like ${service}"
+echo "starting ${JOB} on ${run_task_definition} in ${cluster} (${TARGET_ENV}), placed like ${service}"
 task_arn=$(
   aws ecs run-task \
     --cluster "$cluster" \
-    --task-definition "$task_definition" \
+    --task-definition "$run_task_definition" \
     "${placement[@]}" \
     --network-configuration "$network_configuration" \
     --overrides "$overrides" \

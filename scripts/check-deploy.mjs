@@ -15,8 +15,12 @@
 //      build context at all even if a `COPY . .` is added later;
 //   3. `.github/workflows/*.yml` — nothing may write into a `.env` path in the build context.
 //
-// Configuration reaches the container through the ECS task definition's `secrets:` array instead.
-// See packages/api/docs/deploy.md for the variable→secret table and the rotation runbook.
+// Configuration reaches the container through the ECS TASK DEFINITION instead: the deploy job
+// reads Secrets Manager and writes the values into the definition it registers — interim into the
+// container's `environment` array (scripts/env-to-container-env.mjs), eventually into its
+// `secrets:` array. Neither is a build input, which is the only thing this file is about. See
+// packages/api/docs/deploy.md for the variable→secret table, what the interim step exposes, and
+// the rotation runbook.
 //
 // Run with `pnpm check:deploy`. Exits non-zero on any hit.
 import { readFileSync, readdirSync } from "node:fs";
@@ -112,7 +116,7 @@ export function scanWorkflow(text, file) {
         finding(
           file,
           i + 1,
-          `writes into an env file in the build context: ${line.trim()}. Put the value in the ECS task definition's \`secrets:\` array instead (packages/api/docs/deploy.md).`,
+          `writes into an env file in the build context: ${line.trim()}. Let the deploy job put the value in the ECS task definition instead (packages/api/docs/deploy.md).`,
         ),
       );
     }
@@ -143,7 +147,7 @@ function main() {
     console.error(
       "\n  The image is not a secret store: it is pushed to a registry and cached, with `mode=max`,\n" +
         "  in a PUBLIC repository's Actions cache. Every runtime variable belongs in the ECS task\n" +
-        "  definition's `secrets:` array, resolving a Secrets Manager key at task start — see\n" +
+        "  definition, which the deploy job assembles from Secrets Manager — see\n" +
         "  packages/api/docs/deploy.md, which also carries the rotation runbook for values that were\n" +
         "  baked into earlier images.",
     );

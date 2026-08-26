@@ -9,11 +9,12 @@ database roles, Actions caches — is **operator work**. The repository holds th
 (`scripts/check-deploy.mjs`, `.dockerignore`, the `Dockerfile`) and this runbook; it cannot and
 must not hold the values.
 
-> **Until the deploy-hygiene change lands**, the legacy baked-`.env` path is still how configuration
-> reaches the image: the deploy workflows fetch the Secrets Manager value into the build context and
-> the Dockerfile copies it in. This page describes the destination state — task-definition
-> injection, nothing in any layer — and every value that travels the legacy path must be **rotated
-> once the clean path is live**, because the layer cache it passed through is readable history.
+> **Nothing is baked into the image any more.** The deploy workflows fetch nothing into the build
+> context and the Dockerfile copies no `.env`; configuration is assembled into the ECS task
+> definition by the deploy job instead. §2 describes both where that stands today — every value in
+> the container's `environment` array, readable in-account — and where it is going, the `secrets:`
+> array, which needs AWS-side wiring. Every value that travelled the old baked-`.env` path must
+> still be **rotated** (§7): the layer cache it passed through is readable history.
 
 ---
 
@@ -33,7 +34,10 @@ Three things enforce this, and CI fails if any of them is undone:
 
 `pnpm check:deploy` (`scripts/check-deploy.mjs`) reads all three and runs in CI before the build.
 
-Configuration reaches the container **at task start**, from the ECS task definition.
+Configuration reaches the container **at task start**, from the ECS task definition. The DEPLOY job
+is what assembles that definition: it reads the environment's Secrets Manager value, parses it with
+`scripts/env-to-container-env.mjs`, and registers a revision carrying the values — after the image
+is built, in a different job, with nothing written next to the Dockerfile.
 
 ---
 
@@ -55,6 +59,44 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 * **`environment`** — the non-secret tunables. Putting these in `secrets` too is not "safer": it
   makes every rotation a task-definition revision and hides operational settings from the people
   who have to reason about them.
+
+### Interim: everything is in `environment`
+
+**The two lists above are the destination, not the present.** Today the deploy job puts every value
+— including the ones this page marks secret — in the container's `environment` array, because
+moving them into `secrets` is work only an operator with AWS access can do: reshape the Secrets
+Manager entry into JSON keys, write the `secrets` array, grant the execution role
+`secretsmanager:GetSecretValue` on it. The repository's own alternative was leaving the values in a
+public repository's layer cache, so the interim was taken deliberately.
+
+What it costs:
+
+* every value is readable by any principal that can call `ecs:DescribeTaskDefinition` in the
+  account, and by anyone looking at the task definition in the ECS console;
+* `RegisterTaskDefinition` sends the values as request parameters, so assume **CloudTrail** holds
+  them for its retention period;
+* a revision is immutable, so it **freezes** the values it was registered with: rotating a secret
+  changes nothing that is running until a deploy runs, and rolling the service back to an older
+  revision restores that revision's credentials along with its image.
+
+What it does not cost: nothing is in the image, in a build layer, or in the `mode=max` layer cache
+this **public** repository stores — which is the exposure this replaced, and the larger one.
+
+`PORT` and `NODE_ENV` are **skipped**, not injected (`--skip PORT,NODE_ENV`). The `Dockerfile` sets
+both, and a task definition's `environment` outranks the image's `ENV`: injecting them would let an
+edit to the secret move the port away from the container port and target group wired up in AWS, or
+turn production into development. Everything else in the secret is injected, and a name whose value
+is blank there is dropped — `readOptional` in `src/config.ts` already treats a blank value as unset.
+`DATABASE_URL` and a ≥32-character `BETTER_AUTH_SECRET` are required: missing either, the deploy
+fails before registering anything and the old revision keeps serving.
+
+**Migrating to `secrets` is the deletion of one workflow step.** Once the `secrets` array exists and
+the execution role can read it, delete the "Read configuration from Secrets Manager" step from both
+workflows and drop the `--env` argument from "Render the task definition"; that step then sets only
+the image, which is all the action it replaced ever did. The deploy gate accepts a `DATABASE_URL`
+from **either** list, so it keeps passing throughout. A partial move is caught rather than deployed:
+`scripts/env-to-container-env.mjs` refuses to render a name that appears in both `environment` and
+`secrets`, because ECS resolves one of them and silently ignores the other.
 
 ### Secret values → `secrets`
 
@@ -373,16 +415,25 @@ Removing the mechanism does not un-disclose anything already published. In order
 1. **Rotate every value** in `staging/rfp-hub` and `production/rfp-hub` — database passwords,
    identity-provider app secrets, third-party API keys, the analytics HMAC key. Rotate at the
    source system (issue a new key, then revoke the old one), not only in Secrets Manager.
-2. **Move each value into the task definition** per §2 and roll the service onto a new revision.
-3. **Purge the Actions caches** so the cached layers are gone:
+2. **Run a deploy.** Rotating in Secrets Manager alone changes nothing while §2's interim is in
+   force: the running configuration lives in the task definition revision, and only a deploy
+   registers a new one.
+3. **Delete the Actions caches** — every one of them, on the default branch especially, since that
+   is the set a pull request from a fork can read:
    ```sh
    gh cache list  --limit 100
    gh cache delete --all
    ```
-   The cache keys to be sure of are the buildx ones (`…-buildx-*`, `…-buildx-prod-*`).
-4. **Delete or expire the affected image tags** in the registry, or at minimum stop treating any
-   pre-remediation tag as deployable. A lifecycle policy that expires untagged images does not
-   remove a tagged one.
+   The keys to be sure of are the buildx ones (`…-buildx-*`, `…-buildx-prod-*`). The key prefixes
+   have been bumped to `…-buildx-v2-` / `…-buildx-prod-v2-` so a restore cannot quietly pull an old
+   entry back, but a changed prefix is not a deletion: the old entries stay readable until deleted.
+4. **Delete the affected image DIGESTS**, not just their tags. Untagging leaves the manifest
+   pullable by digest, and a lifecycle policy that expires untagged images does not remove a tagged
+   one:
+   ```sh
+   aws ecr batch-delete-image --repository-name staging-rfp-hub \
+     --image-ids imageDigest=sha256:…
+   ```
 5. **Review access logs** for the window the values were exposed — registry pulls and database
    authentication failures are the two that show use of a leaked credential.
 6. **Re-check** with `pnpm check:deploy` and by inspecting the newly built image:

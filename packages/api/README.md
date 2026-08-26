@@ -350,10 +350,12 @@ node packages/api/dist/seed.js packages/api/data/seed-corpus.json --strict
 node packages/api/dist/export.js
 ```
 
-`DATABASE_URL` comes from the **task environment**, exactly as it does for the server: the image's
-baked `.env` if there is one, and the task definition's own environment on top of it — a real
-environment variable always wins over the file (see [Configuration](#configuration)). Nothing here
-takes a connection string on the command line.
+`DATABASE_URL` comes from the **task environment**, exactly as it does for the server. The image
+bakes no `.env` — nothing is copied into it and nothing is fetched into its build context — so the
+task definition is the only source, and a one-off task launched on the SERVICE'S OWN task
+definition therefore inherits every value the running service has (see
+[Configuration](#configuration) and [docs/deploy.md](docs/deploy.md)). Nothing here takes a
+connection string on the command line.
 
 Notes on each:
 

@@ -12,8 +12,9 @@ exports
 
 # Environment files never enter the build context, so no layer — and no layer cache — can carry a
 # secret even if a Dockerfile line were added that copied one. This is the second half of the rule
-# the Dockerfile states: secrets reach the container through the ECS task definition's `secrets:`
-# array, never through the image. `scripts/check-deploy.mjs` fails CI if either half is removed.
+# the Dockerfile states: configuration reaches the container through the ECS task definition the
+# deploy job assembles from Secrets Manager, never through the image. `scripts/check-deploy.mjs`
+# fails CI if either half is removed.
 .env
 .env.*
 **/.env
