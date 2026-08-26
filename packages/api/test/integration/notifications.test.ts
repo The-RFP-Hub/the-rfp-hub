@@ -59,6 +59,31 @@ function entry(id: string, namespace: string, title: string, description: string
   } as Record<string, unknown>);
 }
 
+/**
+ * Establish this suite's lexical corpus before concurrent files can make the shared database look
+ * like a provider switch. The sentinel is deliberately unrelated to the notification pair and has
+ * no owning organization, so it can neither match nor receive an event.
+ */
+async function seedCompatibleCorpus(): Promise<void> {
+  const rows = await db
+    .insert(opportunities)
+    .values({
+      publicId: "m3notecoverage:sentinel",
+      fundingType: "accelerator",
+      status: "open",
+      title: "Pelagic taxonomy field fellowship",
+      description:
+        "Marine biologists catalogue deep-ocean invertebrates during a research voyage and deposit preserved specimens in a public natural-history collection.",
+      operatingOrganizations: [{ name: "M3NOTE coverage fixture", slug: "m3notecoverage" }],
+      reviewStatus: "approved",
+      isListed: true,
+    })
+    .returning({ id: opportunities.id });
+  const id = rows[0]?.id;
+  if (id === undefined) throw new Error("failed to seed the lexical corpus sentinel");
+  await new DedupeService().embedAndDetect(id, "public");
+}
+
 run("M3NOTE duplicate notifications", () => {
   let app: FastifyInstance;
   let publicOwnerToken: string;
@@ -153,6 +178,7 @@ run("M3NOTE duplicate notifications", () => {
     // The acting reviewer is also a real owner of the public side. They should receive exactly one
     // row in that capacity, never an extra row merely because they performed the decision.
     await grantMembership(reviewerOwner.account.id, publicOrg.id, "publisher");
+    await seedCompatibleCorpus();
 
     publicOwnerToken = publicOwner.token;
     privateOwnerToken = privateOwner.token;

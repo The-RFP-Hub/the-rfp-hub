@@ -108,10 +108,22 @@ export interface DuplicateCheckResult {
   duplicates: DuplicateMatchView[];
 }
 
+/** The structured subset needed for the one deployment-level corpus alarm. */
+export interface DedupeLogger {
+  warn(payload: Record<string, unknown>, message: string): void;
+}
+
+const consoleLogger: DedupeLogger = {
+  warn(payload, message) {
+    console.warn(message, payload);
+  },
+};
+
 export interface DedupeOptions {
   /** Injected by the tests; a deployment takes the configured provider. */
   provider?: EmbeddingProvider;
   config?: AppConfig;
+  logger?: DedupeLogger;
   /** Post-commit immediate email seam. Production uses the process-wide bounded queue. */
   notificationQueue?: NotificationDispatchEnqueuer;
 }
@@ -125,6 +137,9 @@ export class DedupeService {
   private readonly audit: AuditService;
   private readonly notifications: NotificationService;
   private readonly notificationQueue: NotificationDispatchEnqueuer;
+  private readonly logger: DedupeLogger;
+  /** One provider/corpus mismatch is one operator incident, not one warning per submission. */
+  private corpusMismatchWarned = false;
 
   constructor(
     private readonly db: DB = defaultDb,
@@ -135,6 +150,7 @@ export class DedupeService {
     this.audit = new AuditService(db);
     this.notifications = new NotificationService(db);
     this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
+    this.logger = options.logger ?? consoleLogger;
   }
 
   /** Whether this deployment can detect duplicates at all. */
@@ -155,6 +171,9 @@ export class DedupeService {
   ): Promise<DuplicateCheckResult> {
     if (!this.provider) return { status: "disabled", duplicates: [] };
     try {
+      if (!(await this.hasSearchableCorpus(opportunityId, scope))) {
+        return { status: "unavailable", duplicates: [] };
+      }
       const matches = await this.embedAndDetect(opportunityId, scope);
       return { status: "ok", duplicates: matches };
     } catch {
@@ -162,6 +181,66 @@ export class DedupeService {
       // rows this leaves without a current embedding row.
       return { status: "unavailable", duplicates: [] };
     }
+  }
+
+  /**
+   * Refuse to call an empty provider-specific slice of a non-empty corpus a successful search.
+   *
+   * Exact zero is deliberately the heuristic. A partial backfill can search the rows it has reached
+   * and honestly return that result; choosing an arbitrary percentage would only turn availability
+   * on and off around a threshold with no semantic basis. Zero is different: when eligible entries
+   * exist but not one vector belongs to the live model/provider, `search()` is guaranteed to return
+   * nothing before similarity is even considered. That is an unavailable check, not "no matches".
+   *
+   * This guard belongs in `check()`, not `embedAndDetect()`: the latter is what the
+   * `embedding-backfill` job calls to repair this exact state and must never block its own remedy.
+   */
+  private async hasSearchableCorpus(
+    opportunityId: number,
+    scope: CandidateScope,
+  ): Promise<boolean> {
+    const provider = this.provider;
+    if (!provider) return false;
+
+    const where: SQL[] = [
+      sql`${opportunities.id} <> ${opportunityId}`,
+      isNull(opportunities.mergedIntoId),
+    ];
+    if (scope === "public") {
+      where.push(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true));
+    }
+
+    const rows = await this.db
+      .select({
+        eligibleOpportunityCount: sql<number>`count(*)::int`,
+        compatibleEmbeddingCount: sql<number>`count(${opportunityEmbeddings.opportunityId}) filter (
+          where ${opportunityEmbeddings.model} = ${provider.model}
+            and ${opportunityEmbeddings.providerId} = ${provider.id}
+        )::int`,
+      })
+      .from(opportunities)
+      .leftJoin(opportunityEmbeddings, eq(opportunities.id, opportunityEmbeddings.opportunityId))
+      .where(and(...where));
+
+    const eligibleOpportunityCount = Number(rows[0]?.eligibleOpportunityCount ?? 0);
+    const compatibleEmbeddingCount = Number(rows[0]?.compatibleEmbeddingCount ?? 0);
+    if (eligibleOpportunityCount === 0 || compatibleEmbeddingCount > 0) return true;
+
+    if (!this.corpusMismatchWarned) {
+      this.corpusMismatchWarned = true;
+      this.logger.warn(
+        {
+          providerId: provider.id,
+          model: provider.model,
+          scope,
+          eligibleOpportunityCount,
+          compatibleEmbeddingCount,
+          remedy: "run the embedding-backfill job",
+        },
+        "DUPLICATE CHECK UNAVAILABLE: the live embedding model/provider has zero compatible rows in a non-empty opportunity corpus; run the embedding-backfill job",
+      );
+    }
+    return false;
   }
 
   /**

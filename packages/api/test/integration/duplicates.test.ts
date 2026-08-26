@@ -76,6 +76,32 @@ function entry(id: string, title: string, body: string, namespace = NS) {
   } as Record<string, unknown>);
 }
 
+/**
+ * Give this concurrently-run deployment one vector in its own live space before its first request.
+ * Other integration files share the database but intentionally boot different providers; without
+ * this sentinel their rows can make the corpus non-empty while this app has zero compatible rows —
+ * correctly tripping the production provider-switch guard for what is only test harness overlap.
+ */
+async function seedCompatibleCorpus(): Promise<void> {
+  const rows = await db
+    .insert(opportunities)
+    .values({
+      publicId: `${NS}coverage:sentinel`,
+      fundingType: "accelerator",
+      status: "open",
+      title: "Pelagic taxonomy field fellowship",
+      description:
+        "Marine biologists catalogue deep-ocean invertebrates during a research voyage and deposit preserved specimens in a public natural-history collection.",
+      operatingOrganizations: [{ name: "M3DUP coverage fixture", slug: `${NS}coverage` }],
+      reviewStatus: "approved",
+      isListed: true,
+    })
+    .returning({ id: opportunities.id });
+  const id = rows[0]?.id;
+  if (id === undefined) throw new Error("failed to seed the lexical corpus sentinel");
+  await new DedupeService().embedAndDetect(id, "public");
+}
+
 run("M3DUP duplicate detection", () => {
   let app: FastifyInstance;
   let publisherToken: string;
@@ -133,6 +159,7 @@ run("M3DUP duplicate detection", () => {
     const org = await seedOrganization({ slug: NS, verified: true });
     await seedOrganization({ slug: OTHER_NS, verified: false });
     await grantMembership(publisher.account.id, org.id, "owner");
+    await seedCompatibleCorpus();
     userIds.push(publisher.userId, stranger.userId, reviewer.userId);
 
     publisherToken = publisher.token;
@@ -159,8 +186,9 @@ run("M3DUP duplicate detection", () => {
       entry(`${NS}:alpha`, "Superchain Builders Fund", ALPHA_BODY),
     );
     expect(first.statusCode, first.body).toBe(201);
-    // Nothing to match against yet — and "checked, found nothing" is a different answer from
-    // "not checked", which is exactly what `duplicateCheck` exists to distinguish.
+    // The only prior row is the deliberately unrelated coverage sentinel — and "checked, found
+    // nothing" is a different answer from "not checked", which is exactly what `duplicateCheck`
+    // exists to distinguish.
     expect(first.json().duplicateCheck).toBe("ok");
     expect(ours(first)).toEqual([]);
 
