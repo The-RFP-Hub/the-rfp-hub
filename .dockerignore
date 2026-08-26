@@ -20,6 +20,14 @@ exports
 **/.env
 **/.env.*
 
+# The deploy job's two plaintext scratch files (packages/api/docs/deploy.md §2). They are written
+# under $RUNNER_TEMP, not here — these patterns exist so that a run which writes one into the
+# checkout root, or a developer who reproduces the deploy locally, still cannot hand it to the
+# daemon as build context. Same rule as the env patterns above, same reason: a `mode=max` layer
+# cache in a PUBLIC repository. `scripts/check-deploy.mjs` fails CI if either is removed.
+task-definition*.json
+container-env*.json
+
 # The frontend is not an input to the API image. It is deployed on its own (see its README) and
 # the API image must not be able to fail — and so block an ECS deploy — on a package the service
 # never runs, which `pnpm -r build` / `pnpm -r typecheck` in the builder stage would otherwise do.

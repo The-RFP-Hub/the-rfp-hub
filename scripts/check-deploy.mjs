@@ -12,8 +12,12 @@
 //   1. the Dockerfile — no `COPY` may name a `.env` file, and no `--env-file` flag may reintroduce
 //      one at start-up (a flag pointing at a file that must not exist is a request for it to);
 //   2. `.dockerignore` — the env patterns must all still be listed, so the file cannot reach the
-//      build context at all even if a `COPY . .` is added later;
-//   3. `.github/workflows/*.yml` — nothing may write into a `.env` path in the build context.
+//      build context at all even if a `COPY . .` is added later, and so must the deploy job's two
+//      plaintext scratch names;
+//   3. everything the runner executes — `.github/workflows/*.yml` AND `.github/scripts/**/*.sh` —
+//      because a redirect that used to sit inline in a workflow reads exactly the same when it is
+//      moved into a shell script the workflow calls, and a check that only reads YAML would not
+//      see it.
 //
 // Configuration reaches the container through the ECS TASK DEFINITION instead: the deploy job
 // reads Secrets Manager and writes the values into the definition it registers — interim into the
@@ -30,12 +34,24 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
- * The patterns `.dockerignore` has to carry. Four rather than one because Docker's ignore rules are
- * path patterns, not globs that cross directories: `.env` alone excludes only the repo-root file,
- * and `**​/.env` alone excludes only the nested ones. `.env.*` covers `.env.production` and friends,
- * which are the same secret under a different name.
+ * The patterns `.dockerignore` has to carry. Four env patterns rather than one because Docker's
+ * ignore rules are path patterns, not globs that cross directories: `.env` alone excludes only the
+ * repo-root file, and `**​/.env` alone excludes only the nested ones. `.env.*` covers
+ * `.env.production` and friends, which are the same secret under a different name.
+ *
+ * The last two are the deploy job's plaintext scratch files — the ECS task definition it downloads
+ * (which carries the PREVIOUS revision's environment) and the parsed pairs it renders from. Both
+ * live under `$RUNNER_TEMP` today; these patterns are what keeps a copy left in the checkout root,
+ * by a future edit or by an operator reproducing the deploy locally, out of the build context.
  */
-export const REQUIRED_DOCKERIGNORE = [".env", ".env.*", "**/.env", "**/.env.*"];
+export const REQUIRED_DOCKERIGNORE = [
+  ".env",
+  ".env.*",
+  "**/.env",
+  "**/.env.*",
+  "task-definition*.json",
+  "container-env*.json",
+];
 
 /**
  * A `COPY`/`ADD` instruction naming a `.env` file, in any of the forms one is written in:
@@ -86,7 +102,7 @@ export function scanDockerfile(text, file = "Dockerfile") {
   return out;
 }
 
-/** `.dockerignore` must keep every env pattern, so no env file can reach the build context. */
+/** `.dockerignore` must keep every required pattern, so no plaintext file can reach the build context. */
 export function scanDockerignore(text, file = ".dockerignore") {
   const patterns = new Set(
     text
@@ -101,13 +117,13 @@ export function scanDockerignore(text, file = ".dockerignore") {
       finding(
         file,
         0,
-        `missing the env exclusion(s) ${missing.map((p) => `\`${p}\``).join(", ")} — without them an env file can enter the build context`,
+        `missing the exclusion(s) ${missing.map((p) => `\`${p}\``).join(", ")} — without them a file holding plaintext configuration can enter the build context`,
       ),
     );
   }
   // Docker applies patterns in order and a later `!` re-includes: `!packages/api/.env` after the
-  // four exclusions puts that file straight back into the context. Any negation that can name an
-  // env file defeats the exclusions, so it is a finding regardless of where it sits.
+  // env exclusions puts that file straight back into the context. Any negation that can name an
+  // env file defeats them, so it is a finding regardless of where it sits.
   text.split("\n").forEach((raw, i) => {
     const line = raw.trim();
     if (line.startsWith("!") && /(^|\/)\.env(\.|$|\*)/.test(line.slice(1))) {
@@ -117,8 +133,12 @@ export function scanDockerignore(text, file = ".dockerignore") {
   return out;
 }
 
-/** No workflow may write a secret into a `.env` path in the build context. */
-export function scanWorkflow(text, file) {
+/**
+ * Nothing the runner executes may write a secret into a `.env` path in the build context — neither
+ * a workflow's inline `run:` nor a shell script under `.github/scripts/` that a workflow calls.
+ * Both are read as text, and both use `#` for comments, so one scanner covers them.
+ */
+export function scanRunnerSource(text, file) {
   const out = [];
   text.split("\n").forEach((line, i) => {
     if (line.trimStart().startsWith("#")) return;
@@ -136,18 +156,38 @@ export function scanWorkflow(text, file) {
 }
 
 const WORKFLOWS_DIR = ".github/workflows";
+const RUNNER_SCRIPTS_DIR = ".github/scripts";
+
+/**
+ * Every file the runner executes: the workflows, plus the shell scripts they call. The scripts
+ * directory is read recursively and tolerated absent — it is a convenience of the workflows, not a
+ * required part of the tree.
+ */
+function runnerSources() {
+  const list = (dir, test) => {
+    try {
+      return readdirSync(join(repoRoot, dir), { recursive: true })
+        .map(String)
+        .filter(test)
+        .map((name) => `${dir}/${name}`);
+    } catch {
+      return [];
+    }
+  };
+  return [
+    ...list(WORKFLOWS_DIR, (f) => /\.ya?ml$/.test(f)),
+    ...list(RUNNER_SCRIPTS_DIR, (f) => /\.sh$/.test(f)),
+  ];
+}
 
 function main() {
   const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
-  const workflows = readdirSync(join(repoRoot, WORKFLOWS_DIR)).filter((f) => /\.ya?ml$/.test(f));
+  const sources = runnerSources();
 
   const failures = [
     ...scanDockerfile(read("Dockerfile")),
     ...scanDockerignore(read(".dockerignore")),
-    ...workflows.flatMap((name) => {
-      const rel = `${WORKFLOWS_DIR}/${name}`;
-      return scanWorkflow(read(rel), rel);
-    }),
+    ...sources.flatMap((rel) => scanRunnerSource(read(rel), rel)),
   ];
 
   if (failures.length > 0) {
@@ -167,7 +207,7 @@ function main() {
 
   console.log(
     `✓ check-deploy: Dockerfile copies no env file, .dockerignore excludes ${REQUIRED_DOCKERIGNORE.join(", ")}, ` +
-      `and none of the ${workflows.length} workflow(s) writes one into the build context`,
+      `and none of the ${sources.length} workflow/runner script(s) writes one into the build context`,
   );
 }
 

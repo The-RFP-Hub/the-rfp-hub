@@ -42,17 +42,27 @@ on:
       - "packages/standard/spec.config.json"
       - "scripts/spec-freeze.mjs"
 
+# The workflow token, narrowed to reading the checkout. Without a `permissions:` block a job gets
+# whatever the repository's default Workflow permissions setting says — a checkbox in Settings that
+# nothing in the tree can see, and that the same file would read differently on a fork. The token's
+# scope must not depend on a repository setting, so it is stated here.
+permissions:
+  contents: read
+
 jobs:
   frozen:
     name: Reject edits to frozen spec versions
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # The gate reads git history and pushes nothing, so the checkout leaves no credential for
+        # the token in `.git/config` for the later steps to inherit.
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 

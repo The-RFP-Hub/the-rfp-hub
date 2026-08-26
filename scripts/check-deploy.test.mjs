@@ -17,7 +17,7 @@ import {
   REQUIRED_DOCKERIGNORE,
   scanDockerfile,
   scanDockerignore,
-  scanWorkflow,
+  scanRunnerSource,
 } from "./check-deploy.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -60,11 +60,15 @@ describe("the Dockerfile", () => {
 });
 
 describe(".dockerignore", () => {
-  it("requires every env pattern, and names the ones that went missing", () => {
+  it("requires every pattern, and names the ones that went missing", () => {
     const hits = scanDockerignore(".git\nnode_modules\n.env\n**/.env\n");
     expect(hits).toHaveLength(1);
     expect(hits[0].message).toContain(".env.*");
     expect(hits[0].message).toContain("**/.env.*");
+    // The deploy job's plaintext scratch names are part of the required set, not a nicety: a task
+    // definition left in the checkout root carries the previous revision's whole environment.
+    expect(hits[0].message).toContain("task-definition*.json");
+    expect(hits[0].message).toContain("container-env*.json");
   });
 
   it("accepts the full set, around comments and blank lines", () => {
@@ -81,20 +85,31 @@ describe(".dockerignore", () => {
   });
 });
 
-describe("the deploy workflows", () => {
+describe("everything the runner executes", () => {
   it("catches a secret being written into an env file in the build context", () => {
     for (const line of [
       "          aws secretsmanager get-secret-value --secret-id staging/rfp-hub --query SecretString --output text >> .env",
       "        run: echo $SECRET > ./.env",
       "        run: printf '%s' \"$VALUE\" >> packages/api/.env.production",
     ]) {
-      expect(scanWorkflow(line, "w.yml"), line).toHaveLength(1);
+      expect(scanRunnerSource(line, "w.yml"), line).toHaveLength(1);
     }
+  });
+
+  // The same line moved out of a workflow and into a script the workflow calls is the same line.
+  // The scan covers `.github/scripts/**/*.sh` for exactly this reason.
+  it("catches it in a shell script under .github/scripts too", () => {
+    const hits = scanRunnerSource(
+      '#!/usr/bin/env bash\nset -euo pipefail\naws secretsmanager get-secret-value --secret-id "$ID" --query SecretString --output text > .env\n',
+      ".github/scripts/deploy.sh",
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(3);
   });
 
   it("does not fire on a comment explaining why the step is gone", () => {
     expect(
-      scanWorkflow(
+      scanRunnerSource(
         "      # the step that wrote `>> .env` here was removed; see docs/deploy.md",
         "w.yml",
       ),
@@ -108,9 +123,13 @@ describe("this repository, as it stands", () => {
     expect(scanDockerignore(read(".dockerignore"))).toEqual([]);
   });
 
-  it("fetches no secret into the build context in either deploy workflow", () => {
-    for (const rel of [".github/workflows/staging.yml", ".github/workflows/production.yml"]) {
-      expect(scanWorkflow(read(rel), rel), rel).toEqual([]);
+  it("fetches no secret into the build context, in either deploy workflow or in the scripts they call", () => {
+    for (const rel of [
+      ".github/workflows/staging.yml",
+      ".github/workflows/production.yml",
+      ".github/scripts/run-ecs-job.sh",
+    ]) {
+      expect(scanRunnerSource(read(rel), rel), rel).toEqual([]);
     }
   });
 });
