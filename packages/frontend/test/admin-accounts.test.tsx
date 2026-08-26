@@ -53,6 +53,7 @@ const account = (over: Partial<AccountSummary> = {}): AccountSummary => ({
   id: 2,
   handle: "indie2",
   displayName: null,
+  email: "indie2@example.org",
   globalRole: "submitter",
   directCreate: false,
   createdAt: "2026-02-01T00:00:00Z",
@@ -112,6 +113,20 @@ describe("the page's scope", () => {
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
     expect(screen.getByLabelText("Search accounts")).toHaveProperty("value", "");
     await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: undefined, limit: 25 }));
+  });
+
+  it("searches every supported identifier and uses email as the no-handle identity", async () => {
+    mount([
+      account(),
+      account({ id: 61, handle: null, displayName: null, email: "new.person@example.org" }),
+    ]);
+
+    const search = await screen.findByLabelText("Search accounts");
+    expect(search).toHaveProperty("placeholder", "handle, name, email or id");
+    expect(await screen.findByText("indie2@example.org")).toBeTruthy();
+    const emailPrimary = await screen.findByText("new.person@example.org");
+    expect(emailPrimary.closest(".row-title")).toBeTruthy();
+    expect(screen.queryByText("account 61")).toBeNull();
   });
 });
 

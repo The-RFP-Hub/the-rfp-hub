@@ -368,6 +368,8 @@ export interface AccountSummary {
   id: number;
   handle: string | null;
   displayName: string | null;
+  /** Returned by privileged account-directory searches. */
+  email?: string | null;
   globalRole: AccountRole;
   directCreate: boolean;
   createdAt: string;
@@ -396,6 +398,21 @@ export interface MembershipResult {
   accountId: number;
   role: OrgRole | null;
   member: boolean;
+}
+
+export interface MembershipInvite {
+  id: number;
+  organizationSlug: string;
+  email: string;
+  role: OrgRole;
+  invitedBy: number;
+  createdAt: string;
+  acceptedAt: string | null;
+  acceptedAccountId: number | null;
+}
+
+export interface MembershipInviteList {
+  items: MembershipInvite[];
 }
 
 /**

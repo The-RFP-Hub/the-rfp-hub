@@ -14,7 +14,13 @@
 import OrganisationPage from "@/app/organisations/[slug]/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { ManagedOpportunityList, Me, MeMembership, PublisherList } from "@/lib/types";
+import type {
+  ManagedOpportunityList,
+  Me,
+  MeMembership,
+  MembershipInvite,
+  PublisherList,
+} from "@/lib/types";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -122,6 +128,14 @@ const approve = vi.fn(async () => ({ id: "x", reviewStatus: "approved", isListed
 const reject = vi.fn(async () => ({ id: "x", reviewStatus: "rejected", isListed: false }));
 // Typed parameters so a test can read the patch back without casting it blind.
 const update = vi.fn(async (_slug: string, _patch: Record<string, unknown>) => ({}));
+const membershipInviteRows: { current: MembershipInvite[] } = { current: [] };
+const membershipInvites = vi.fn(async () => ({ items: membershipInviteRows.current }));
+const revokeMembershipInvite = vi.fn(async (_slug: string, inviteId: number) => {
+  const invite = membershipInviteRows.current.find((row) => row.id === inviteId);
+  if (!invite) throw new Error("missing invite fixture");
+  membershipInviteRows.current = membershipInviteRows.current.filter((row) => row.id !== inviteId);
+  return invite;
+});
 
 /** Counts each read so a test can prove BOTH lists were re-read, not just the one clicked in. */
 const reads = { approved: 0, pending: 0 };
@@ -132,6 +146,7 @@ function client(account: Me, pending: unknown[] = []): ApiClient {
     me: { get: async () => account },
     publishers: { list: async () => publishers },
     opportunities: { audit: async () => ({ entries: [] }) },
+    review: { membershipInvites, revokeMembershipInvite },
     organizations: {
       opportunities: async (
         _slug: string,
@@ -170,6 +185,7 @@ beforeEach(() => {
   session.data = { user: { id: "u1" } };
   slug.current = "filecoin";
   query.current = "";
+  membershipInviteRows.current = [];
 });
 
 describe("who may see the page", () => {
@@ -188,6 +204,40 @@ describe("who may see the page", () => {
 
     expect(await screen.findByText("Your listings wait for a reviewer.")).toBeTruthy();
     expect(screen.queryByText("You are not a member of this organisation.")).toBeNull();
+  });
+});
+
+describe("pending membership invites for staff", () => {
+  it("lists the pending email and lets a reviewer revoke it", async () => {
+    membershipInviteRows.current = [
+      {
+        id: 14,
+        organizationSlug: "filecoin",
+        email: "future.member@example.org",
+        role: "publisher",
+        invitedBy: 2,
+        createdAt: "2026-08-26T12:00:00Z",
+        acceptedAt: null,
+        acceptedAccountId: null,
+      },
+    ];
+    mount(me({ role: "reviewer", canReview: true }));
+
+    expect(await screen.findByRole("heading", { name: "Pending membership invites" })).toBeTruthy();
+    expect(
+      screen.getByText("The membership applies the first time they sign in with this email."),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole("row", {
+        name: /future\.member@example\.org Organisation publisher/,
+      }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(revokeMembershipInvite).toHaveBeenCalledWith("filecoin", 14));
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /future\.member@example\.org/ })).toBeNull(),
+    );
   });
 });
 

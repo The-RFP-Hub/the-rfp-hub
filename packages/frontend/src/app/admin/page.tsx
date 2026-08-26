@@ -100,7 +100,7 @@ function Accounts({ me }: { me: Me }) {
           aria-label="Search accounts"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="handle, display name or provider subject"
+          placeholder="handle, name, email or id"
         />
         <button type="submit">Search</button>
         {search !== "" ? (
@@ -125,7 +125,7 @@ function Accounts({ me }: { me: Me }) {
               detail={
                 search === ""
                   ? "An account is created the first time somebody signs in."
-                  : "Handles, display names and provider subjects are all searched."
+                  : "Handles, names, emails and ids are all searched."
               }
               action={
                 search !== "" ? (
@@ -185,17 +185,26 @@ function AccountRow({
   /** Demoting yourself out of `admin` is the one change that cannot be undone from this screen. */
   const selfDemotion = isSelf && account.globalRole === "admin" && proposed !== "admin";
 
-  const name = account.handle ?? `account ${account.id}`;
+  const name = account.handle ?? account.email ?? `account ${account.id}`;
 
   return (
     <>
       <tr>
         <th scope="row">
           <span className="row-title">
-            <UntrustedText value={account.handle} fallback={`account ${account.id}`} />
+            <UntrustedText
+              value={account.handle ?? account.email}
+              fallback={`account ${account.id}`}
+            />
           </span>
           {isSelf ? <span className="badge badge-pending">you</span> : null}
           <div className="muted">
+            {account.handle && account.email ? (
+              <>
+                <UntrustedText value={account.email} />
+                <br />
+              </>
+            ) : null}
             <code>#{account.id}</code> ·{" "}
             <UntrustedText value={account.displayName} fallback="no display name" /> · joined{" "}
             {formatInstant(account.createdAt)}

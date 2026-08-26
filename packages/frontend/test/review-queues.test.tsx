@@ -18,7 +18,14 @@ import ReviewPage from "@/app/review/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { DuplicatePair, Me, Opportunity, OrganizationSummary } from "@/lib/types";
+import type {
+  AccountSummary,
+  DuplicatePair,
+  Me,
+  MembershipInvite,
+  Opportunity,
+  OrganizationSummary,
+} from "@/lib/types";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -168,18 +175,45 @@ const grantMembership = vi.fn(async () => ({
   role: "publisher",
   member: true,
 }));
-const accounts = vi.fn(async () => ({
-  items: [
-    {
-      id: 42,
-      handle: "fil-ops",
-      displayName: null,
-      globalRole: "submitter",
-      directCreate: false,
-      createdAt: "2026-02-01T00:00:00Z",
-    },
-  ],
-}));
+const inviteRows: { current: MembershipInvite[] } = { current: [] };
+const membershipInvites = vi.fn(async () => ({ items: inviteRows.current }));
+const inviteMembership = vi.fn(
+  async (slug: string, body: { email: string; role?: string }): Promise<MembershipInvite> => {
+    const invite: MembershipInvite = {
+      id: 91,
+      organizationSlug: slug,
+      email: body.email.toLowerCase(),
+      role: (body.role as MembershipInvite["role"] | undefined) ?? "publisher",
+      invitedBy: 1,
+      createdAt: "2026-08-26T12:00:00Z",
+      acceptedAt: null,
+      acceptedAccountId: null,
+    };
+    inviteRows.current = [...inviteRows.current, invite];
+    return invite;
+  },
+);
+const revokeMembershipInvite = vi.fn(async (_slug: string, inviteId: number) => {
+  const invite = inviteRows.current.find((row) => row.id === inviteId);
+  if (!invite) throw new Error("missing invite fixture");
+  inviteRows.current = inviteRows.current.filter((row) => row.id !== inviteId);
+  return invite;
+});
+const accounts = vi.fn(
+  async (): Promise<{ items: AccountSummary[] }> => ({
+    items: [
+      {
+        id: 42,
+        handle: "fil-ops",
+        displayName: null,
+        email: "ops@filecoin.example",
+        globalRole: "submitter",
+        directCreate: false,
+        createdAt: "2026-02-01T00:00:00Z",
+      },
+    ],
+  }),
+);
 const organizations = vi.fn(
   async (query?: { q?: string; verified?: boolean }): Promise<{ items: OrganizationSummary[] }> => {
     if (query?.verified === true) return { items: [verifiedOrg] };
@@ -219,6 +253,9 @@ function client(account: Me = me): ApiClient {
       reject,
       verifyOrganization,
       grantMembership,
+      membershipInvites,
+      inviteMembership,
+      revokeMembershipInvite,
       accounts,
       unverifyOrganization: vi.fn(),
       verifySource,
@@ -235,6 +272,7 @@ const mount = (account: Me = me) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  inviteRows.current = [];
   tab.current = null;
 });
 
@@ -1013,8 +1051,10 @@ describe("the organisations tab", () => {
     // By ROW: the Verified section renders first, so "the first Grant button" is Filecoin's.
     const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
-    expect(screen.getByLabelText("Account handle or id").closest(".filters")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Account handle or id"), {
+    expect(
+      screen.getByLabelText("Account handle, name, email or id").closest(".filters"),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
       target: { value: "fil-ops" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
@@ -1047,6 +1087,85 @@ describe("the organisations tab", () => {
     expect(screen.queryByText("Grant a membership on")).toBeNull();
   });
 
+  it("shows email below a handle and uses it instead of a useless account-number fallback", async () => {
+    accounts.mockResolvedValueOnce({
+      items: [
+        {
+          id: 42,
+          handle: "fil-ops",
+          displayName: "Filecoin Ops",
+          email: "ops@filecoin.example",
+          globalRole: "submitter",
+          directCreate: false,
+          createdAt: "2026-02-01T00:00:00Z",
+        },
+        {
+          id: 61,
+          handle: null,
+          displayName: null,
+          email: "new.person@example.org",
+          globalRole: "submitter",
+          directCreate: false,
+          createdAt: "2026-02-02T00:00:00Z",
+        },
+      ],
+    });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "person" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+
+    expect(await screen.findByText("ops@filecoin.example")).toBeTruthy();
+    const emailPrimary = screen.getByText("new.person@example.org");
+    expect(emailPrimary.closest(".row-title")).toBeTruthy();
+    expect(screen.queryByText("account 61")).toBeNull();
+  });
+
+  it("offers an email invite after an empty search, lists it, and revokes it", async () => {
+    accounts.mockResolvedValueOnce({ items: [] });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "New.Person@Example.org" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+
+    expect(
+      await screen.findByText("Invite by email instead", { selector: ".empty-title" }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByText(/The membership applies the first time they sign in with this email\./)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Email")).toHaveProperty("value", "New.Person@Example.org");
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "owner" } });
+    fireEvent.click(screen.getByRole("button", { name: "Invite by email instead" }));
+
+    await waitFor(() =>
+      expect(inviteMembership).toHaveBeenCalledWith("indie-collective", {
+        email: "New.Person@Example.org",
+        role: "owner",
+      }),
+    );
+    const pendingEmail = await screen.findByText("new.person@example.org");
+    const pendingRow = pendingEmail.closest("tr") as HTMLElement;
+    expect(within(pendingRow).getByText("Organisation owner")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() =>
+      expect(revokeMembershipInvite).toHaveBeenCalledWith("indie-collective", 91),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /new\.person@example\.org/ })).toBeNull(),
+    );
+  });
+
   it("pluralises account matches and omits an empty candidate table", async () => {
     accounts
       .mockResolvedValueOnce({
@@ -1075,14 +1194,14 @@ describe("the organisations tab", () => {
     const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
 
-    fireEvent.change(screen.getByLabelText("Account handle or id"), {
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
       target: { value: "fil-ops" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
     expect(await screen.findByText("2 accounts match “fil-ops”.")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Account" })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Account handle or id"), {
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
       target: { value: "missing" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
@@ -1096,11 +1215,14 @@ describe("the organisations tab", () => {
 
     const row = screen.getByText("Filecoin Foundation").closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
-    fireEvent.change(screen.getByLabelText("Account handle or id"), { target: { value: "42" } });
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "42" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Choose" }));
 
     const panel = await screen.findByRole("group", {
-      name: /Make account 42 an organisation publisher/,
+      name: /Make fil-ops an organisation publisher/,
     });
     // On a verified organisation the membership IS the grant — nothing else has to happen.
     expect(

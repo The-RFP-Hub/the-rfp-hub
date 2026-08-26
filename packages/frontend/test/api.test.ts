@@ -171,6 +171,30 @@ describe("createApiClient", () => {
     expect(calls[0]?.init.body).toBeUndefined();
   });
 
+  it("lists, creates and revokes membership invites on the reviewer organisation route", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.review.membershipInvites("filecoin foundation");
+    await api.review.inviteMembership("filecoin foundation", {
+      email: "person@example.org",
+      role: "owner",
+    });
+    await api.review.revokeMembershipInvite("filecoin foundation", 14);
+
+    expect(calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["GET", "https://api.example.com/v1/review/organizations/filecoin%20foundation/invites"],
+      ["POST", "https://api.example.com/v1/review/organizations/filecoin%20foundation/invites"],
+      [
+        "DELETE",
+        "https://api.example.com/v1/review/organizations/filecoin%20foundation/invites/14",
+      ],
+    ]);
+    expect(calls[1]?.init.body).toBe(
+      JSON.stringify({ email: "person@example.org", role: "owner" }),
+    );
+  });
+
   it("does not pretend a non-JSON body is JSON", async () => {
     const { fetchImpl } = stubFetch(
       () => new Response("<html>gateway timeout</html>", { status: 504 }),

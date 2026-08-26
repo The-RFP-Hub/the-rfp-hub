@@ -58,6 +58,7 @@ import type {
   ManagedOpportunity,
   ManagedOpportunityList,
   Me,
+  MembershipInviteList,
   MergeResult,
   Opportunity,
   OrgRole,
@@ -1825,34 +1826,26 @@ function GrantMembership({
   const [role, setRole] = useState<OrgRole>("publisher");
   const [candidates, setCandidates] = useState<AccountSummary[] | null>(null);
   const [chosen, setChosen] = useState<AccountSummary | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const loadInvites = useCallback(() => api.review.membershipInvites(org.slug), [api, org.slug]);
+  const invites = useResource(loadInvites);
 
   const find = async () => {
     const typed = query.trim();
     if (typed === "") return;
     setCandidates(null);
     setChosen(null);
-    // A bare integer is an id. Anything else is a handle to look up.
-    if (/^\d+$/.test(typed)) {
-      setChosen({
-        id: Number(typed),
-        handle: null,
-        displayName: null,
-        globalRole: "submitter",
-        directCreate: false,
-        createdAt: "",
-      });
-      return;
-    }
     await lookup.run(async () => {
       const found = await api.review.accounts({ q: typed, limit: 10 });
       setCandidates(found.items);
+      if (found.items.length === 0 && typed.includes("@")) setInviteEmail(typed);
       return found.items.length === 0
         ? `No account matches “${typed}”.`
         : `${found.items.length} ${found.items.length === 1 ? "account matches" : "accounts match"} “${typed}”.`;
     });
   };
 
-  const name = chosen?.handle ?? (chosen ? `account ${chosen.id}` : "");
+  const name = chosen ? accountIdentifier(chosen) : "";
 
   return (
     <div className="card">
@@ -1875,12 +1868,12 @@ function GrantMembership({
 
       <div className="filters">
         <div className="field">
-          <label htmlFor={`grant-who-${org.slug}`}>Account handle or id</label>
+          <label htmlFor={`grant-who-${org.slug}`}>Account handle, name, email or id</label>
           <input
             id={`grant-who-${org.slug}`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="e.g. fil-ops, or 42"
+            placeholder="handle, name, email or id"
           />
         </div>
         <div className="field">
@@ -1920,8 +1913,24 @@ function GrantMembership({
               {candidates.map((account) => (
                 <tr key={account.id}>
                   <th scope="row">
-                    <UntrustedText value={account.handle} fallback={`account ${account.id}`} />
+                    <span className="row-title">
+                      <UntrustedText
+                        value={account.handle ?? account.email}
+                        fallback={`account ${account.id}`}
+                      />
+                    </span>
                     <div className="muted">
+                      {account.handle && account.email ? (
+                        <>
+                          <UntrustedText value={account.email} />
+                          <br />
+                        </>
+                      ) : null}
+                      {account.displayName ? (
+                        <>
+                          <UntrustedText value={account.displayName} /> ·{" "}
+                        </>
+                      ) : null}
                       <code>#{account.id}</code>
                     </div>
                   </th>
@@ -1936,6 +1945,50 @@ function GrantMembership({
             </tbody>
           </table>
         </div>
+      ) : null}
+
+      {candidates?.length === 0 ? (
+        <section aria-labelledby={`invite-heading-${org.slug}`}>
+          <p className="empty-title" id={`invite-heading-${org.slug}`}>
+            Invite by email instead
+          </p>
+          <p className="muted footnote">
+            No account exists for that search yet. The membership applies the first time they sign
+            in with this email.
+          </p>
+          <div className="field">
+            <label htmlFor={`invite-email-${org.slug}`}>Email</label>
+            <input
+              id={`invite-email-${org.slug}`}
+              type="email"
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              placeholder="person@example.org"
+            />
+          </div>
+          <p className="row">
+            <button
+              type="button"
+              className="button-primary"
+              disabled={busy || lookup.busy || !looksLikeEmail(inviteEmail)}
+              onClick={() =>
+                void run(async () => {
+                  const invite = await api.review.inviteMembership(org.slug, {
+                    email: inviteEmail.trim(),
+                    role,
+                  });
+                  setCandidates(null);
+                  setQuery("");
+                  setInviteEmail("");
+                  invites.reload();
+                  return `Invitation saved for ${invite.email}. The membership applies the first time they sign in with this email.`;
+                })
+              }
+            >
+              Invite by email instead
+            </button>
+          </p>
+        </section>
       ) : null}
 
       {chosen ? (
@@ -1981,11 +2034,94 @@ function GrantMembership({
         </ConfirmPanel>
       ) : null}
 
+      <PendingMembershipInvites
+        resource={invites}
+        busy={busy}
+        onRevoke={(inviteId, email) =>
+          run(async () => {
+            await api.review.revokeMembershipInvite(org.slug, inviteId);
+            invites.reload();
+            return `The pending invitation for ${email} was revoked.`;
+          })
+        }
+      />
+
       <p className="row">
         <button type="button" disabled={busy || lookup.busy} onClick={onDone}>
           Close
         </button>
       </p>
     </div>
+  );
+}
+
+function accountIdentifier(account: AccountSummary): string {
+  return account.handle ?? account.email ?? `account ${account.id}`;
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function PendingMembershipInvites({
+  resource,
+  busy,
+  onRevoke,
+}: {
+  resource: ResourceHandle<MembershipInviteList>;
+  busy: boolean;
+  onRevoke: (inviteId: number, email: string) => Promise<void>;
+}) {
+  return (
+    <>
+      <h3>Pending invites</h3>
+      <p className="muted footnote">
+        The membership applies the first time they sign in with this email.
+      </p>
+      <ResourceView
+        resource={resource.state}
+        what="pending membership invites"
+        onRetry={resource.reload}
+      >
+        {(list) =>
+          list.items.length === 0 ? (
+            <p className="muted">No pending invites.</p>
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Invited</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((invite) => (
+                    <tr key={invite.id}>
+                      <th scope="row">
+                        <UntrustedText value={invite.email} />
+                      </th>
+                      <td>{orgRoleLabel(invite.role)}</td>
+                      <td className="muted">{formatInstant(invite.createdAt)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onRevoke(invite.id, invite.email)}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </ResourceView>
+    </>
   );
 }

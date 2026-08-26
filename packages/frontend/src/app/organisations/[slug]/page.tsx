@@ -288,6 +288,8 @@ function Member({
         </div>
       )}
 
+      {me.canReview ? <ReviewerPendingInvites slug={slug} /> : null}
+
       {/*
         THE ORIGIN DESCRIBES ITSELF ONCE. Every link out of this page carries where it came from, so
         a member who opens a submission from here gets "← Back to Filecoin Foundation" rather than a
@@ -318,6 +320,86 @@ function Member({
         seedSettled={publishers.state.status === "ready" || publishers.state.status === "error"}
       />
     </section>
+  );
+}
+
+/** Staff-only invite visibility on an organisation page otherwise scoped to its own members. */
+function ReviewerPendingInvites({ slug }: { slug: string }) {
+  const api = useApi();
+  const load = useCallback(() => api.review.membershipInvites(slug), [api, slug]);
+  const invites = useResource(load);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<ActionNoteValue | null>(null);
+
+  const revoke = async (inviteId: number, email: string) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      await api.review.revokeMembershipInvite(slug, inviteId);
+      setNote({ kind: "ok", message: `The pending invitation for ${email} was revoked.` });
+      invites.reload();
+    } catch (error) {
+      setNote(actionErrorNote(error, "The invitation could not be revoked."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <h2 className="section-head">Pending membership invites</h2>
+      <p className="muted footnote">
+        The membership applies the first time they sign in with this email.
+      </p>
+      <ActionNote note={note} />
+      <ResourceView
+        resource={invites.state}
+        what="pending membership invites"
+        onRetry={invites.reload}
+      >
+        {(list) =>
+          list.items.length === 0 ? (
+            <EmptyState
+              title="No pending membership invites."
+              detail="A Hub reviewer can create one from Review queues → Organisations."
+            />
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Invited</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((invite) => (
+                    <tr key={invite.id}>
+                      <th scope="row">
+                        <UntrustedText value={invite.email} />
+                      </th>
+                      <td>{orgRoleLabel(invite.role)}</td>
+                      <td className="muted">{formatInstant(invite.createdAt)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void revoke(invite.id, invite.email)}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </ResourceView>
+    </>
   );
 }
 

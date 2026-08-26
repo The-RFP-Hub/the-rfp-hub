@@ -39,6 +39,8 @@ import type {
   ManagedOpportunity,
   ManagedOpportunityList,
   Me,
+  MembershipInvite,
+  MembershipInviteList,
   MembershipResult,
   MergeResult,
   Opportunity,
@@ -388,6 +390,22 @@ export function createApiClient(options: ApiClientOptions) {
           "POST",
           `/v1/review/organizations/${encodeURIComponent(slug)}/members`,
           { body },
+        ),
+      membershipInvites: (slug: string) =>
+        request<MembershipInviteList>(
+          "GET",
+          `/v1/review/organizations/${encodeURIComponent(slug)}/invites`,
+        ),
+      inviteMembership: (slug: string, body: { email: string; role?: string }) =>
+        request<MembershipInvite>(
+          "POST",
+          `/v1/review/organizations/${encodeURIComponent(slug)}/invites`,
+          { body },
+        ),
+      revokeMembershipInvite: (slug: string, inviteId: number) =>
+        request<MembershipInvite>(
+          "DELETE",
+          `/v1/review/organizations/${encodeURIComponent(slug)}/invites/${inviteId}`,
         ),
     },
 

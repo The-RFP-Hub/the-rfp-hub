@@ -472,7 +472,7 @@ test.describe("M3-8 a reviewer grants a membership", () => {
     await row.getByRole("button", { name: "Grant a membership…" }).click();
     await expect(page.getByText("Grant a membership on")).toBeVisible();
 
-    await page.getByLabel("Account handle or id").fill(handle);
+    await page.getByLabel("Account handle, name, email or id").fill(handle);
     await page.getByRole("button", { name: "Find the account" }).click();
     await expect(page.getByRole("status").filter({ hasText: handle })).toBeVisible();
     await page.getByRole("button", { name: "Choose" }).first().click();
