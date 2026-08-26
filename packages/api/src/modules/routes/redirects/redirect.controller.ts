@@ -1,13 +1,13 @@
-import { and, eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { db } from "../../../db/client.js";
-import { opportunities } from "../../../db/schema.js";
+import { OpportunityService } from "../../services/opportunities/opportunity.service.js";
 import { captureViews } from "../../shared/analytics-capture.js";
 import { notFound } from "../../shared/http-error.js";
 import { handled, paramsOf } from "../../shared/route-helpers.js";
 
 /** The two link-outs, and which stored column each one means. */
 type LinkKind = "apply" | "source";
+
+const opportunityService = new OpportunityService();
 
 /**
  * Resolve one entry's stored link-out, or 404.
@@ -17,23 +17,7 @@ type LinkKind = "apply" | "source";
  * detail route refuses to do.
  */
 async function resolveDestination(publicId: string, kind: LinkKind): Promise<string> {
-  const rows = await db
-    .select({
-      applicationUrl: opportunities.applicationUrl,
-      website: opportunities.website,
-    })
-    .from(opportunities)
-    .where(
-      and(
-        eq(opportunities.publicId, publicId),
-        eq(opportunities.reviewStatus, "approved"),
-        eq(opportunities.isListed, true),
-      ),
-    )
-    .limit(1);
-
-  const row = rows[0];
-  const stored = (kind === "apply" ? row?.applicationUrl : row?.website)?.trim();
+  const stored = (await opportunityService.findLink(publicId, kind))?.trim();
   // One undifferentiated 404 for "no such entry", "not public" and "no link stored". Telling them
   // apart would answer questions about entries the public reads do not acknowledge.
   if (!stored) throw notFound(`no ${kind} link for ${JSON.stringify(publicId)}.`);

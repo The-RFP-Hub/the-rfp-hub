@@ -15,23 +15,21 @@
  * audited on the ORGANISATION, which is the subject whose state changed — the members' accounts did
  * not.
  */
-import { and, count, eq, ilike, or } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
+import type { OpportunityRow, OrganizationRow } from "../../../db/schema.js";
 import {
-  type OpportunityRow,
-  type OrganizationRow,
-  accounts,
-  opportunities,
-  orgMemberships,
-  organizations,
-} from "../../../db/schema.js";
+  type OrganizationUpdate,
+  type Repositories,
+  repositories,
+  withTransaction,
+} from "../../repositories/index.js";
 import type {
   MembershipResultView,
   OrganizationSummaryView,
   ReviewDecisionView,
 } from "../../shared/api-views.js";
 import { badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
-import { AuditService, OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
+import { OPERATING_ORG_CAPACITY } from "../audit/audit.service.js";
 import { isUniqueViolation } from "../auth/account.service.js";
 import { resolvePublishAuthority } from "../auth/publish-authority.js";
 
@@ -50,10 +48,10 @@ export interface OrganizationMetadata {
 }
 
 export class ReviewService {
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(private readonly db: DB = defaultDb) {
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   // ── opportunities ──────────────────────────────────────────────────────────────
@@ -70,28 +68,24 @@ export class ReviewService {
     approve: boolean,
     reason?: string | null,
   ): Promise<ReviewDecisionView> {
-    return this.db.transaction(async (tx) => {
-      const row = await lockOpportunity(tx, publicId);
+    return withTransaction(this.db, async (repos) => {
+      const row = await lockOpportunity(repos, publicId);
       assertNotMerged(row);
       const now = new Date();
       const target = approve ? "approved" : "rejected";
       if (row.reviewStatus === target) {
         return { id: row.publicId, reviewStatus: row.reviewStatus, isListed: row.isListed };
       }
-      const updated = await tx
-        .update(opportunities)
-        .set({
+      const next =
+        (await repos.opportunities.update(row.id, {
           reviewStatus: target,
           isListed: approve ? row.isListed : false,
           approvedBy: approve ? reviewerId : row.approvedBy,
           approvedAt: approve ? (row.approvedAt ?? now) : row.approvedAt,
           lastSeenAt: approve ? now : row.lastSeenAt,
           updatedAt: now,
-        })
-        .where(eq(opportunities.id, row.id))
-        .returning();
-      const next = updated[0] ?? row;
-      await this.audit.record(tx, {
+        })) ?? row;
+      await repos.audit.record({
         subjectKind: "opportunity",
         subjectId: row.id,
         actorKind: "user",
@@ -113,19 +107,15 @@ export class ReviewService {
     publicId: string,
     isListed: boolean,
   ): Promise<ReviewDecisionView> {
-    return this.db.transaction(async (tx) => {
-      const row = await lockOpportunity(tx, publicId);
+    return withTransaction(this.db, async (repos) => {
+      const row = await lockOpportunity(repos, publicId);
       assertNotMerged(row);
       if (row.isListed === isListed) {
         return { id: row.publicId, reviewStatus: row.reviewStatus, isListed: row.isListed };
       }
-      const updated = await tx
-        .update(opportunities)
-        .set({ isListed, updatedAt: new Date() })
-        .where(eq(opportunities.id, row.id))
-        .returning();
-      const next = updated[0] ?? row;
-      await this.audit.record(tx, {
+      const next =
+        (await repos.opportunities.update(row.id, { isListed, updatedAt: new Date() })) ?? row;
+      await repos.audit.record({
         subjectKind: "opportunity",
         subjectId: row.id,
         actorKind: "user",
@@ -143,19 +133,19 @@ export class ReviewService {
     slug: string,
     verified: boolean,
   ): Promise<OrganizationSummaryView> {
-    return this.db.transaction(async (tx) => {
+    return withTransaction(this.db, async (repos) => {
       // The no-op check is part of the write. Lock first so two identical concurrent decisions do
       // not both read the old flag, both UPDATE it, and append two audit rows for one transition.
-      const row = await lockOrganization(tx, slug);
-      if (row.verified === verified) return this.summarize(row);
+      const row = await lockOrganization(repos, slug);
+      if (row.verified === verified) return this.summarize(repos, row);
       const now = new Date();
-      const updated = await tx
-        .update(organizations)
-        .set({ verified, verifiedAt: verified ? now : null, updatedAt: now })
-        .where(eq(organizations.id, row.id))
-        .returning();
-      const next = updated[0] ?? row;
-      await this.audit.record(tx, {
+      const next =
+        (await repos.organizations.update(row.id, {
+          verified,
+          verifiedAt: verified ? now : null,
+          updatedAt: now,
+        })) ?? row;
+      await repos.audit.record({
         subjectKind: "organization",
         subjectId: row.id,
         actorKind: "user",
@@ -163,7 +153,7 @@ export class ReviewService {
         action: verified ? "verify_organization" : "unverify_organization",
         patch: { verified: { before: row.verified, after: verified } },
       });
-      return this.summarize(next);
+      return this.summarize(repos, next);
     });
   }
 
@@ -175,25 +165,14 @@ export class ReviewService {
     /** Owner/admin route only: re-prove the membership inside the transaction that writes. */
     requireManager = false,
   ): Promise<OrganizationSummaryView> {
-    return this.db.transaction(async (tx) => {
+    return withTransaction(this.db, async (repos) => {
       // The controller's check is only a cheap fail-fast. A membership can be revoked after that
       // read and before this UPDATE; locking the organisation first, then re-reading the membership
       // under a shared lock, makes revocation and the write serialize in the repository's standing
       // organisation → membership order. Whichever commits first is what the other observes.
-      const row = await lockOrganization(tx, slug);
+      const row = await lockOrganization(repos, slug);
       if (requireManager) {
-        const membership = await tx
-          .select({ role: orgMemberships.role })
-          .from(orgMemberships)
-          .where(
-            and(
-              eq(orgMemberships.accountId, actorAccountId),
-              eq(orgMemberships.organizationId, row.id),
-            ),
-          )
-          .for("share")
-          .limit(1);
-        const role = membership[0]?.role;
+        const role = await repos.memberships.lockRoleForManagerCheck(actorAccountId, row.id);
         if (role !== "owner" && role !== "admin") {
           throw forbidden(
             "not_an_org_manager",
@@ -201,7 +180,7 @@ export class ReviewService {
           );
         }
       }
-      const set: Partial<OrganizationRow> = { updatedAt: new Date() };
+      const set: OrganizationUpdate = { updatedAt: new Date() };
       const patch: Record<string, unknown> = {};
 
       if (metadata.name !== undefined) {
@@ -233,15 +212,10 @@ export class ReviewService {
         patch.ecosystems = { before: row.ecosystems, after: metadata.ecosystems };
       }
 
-      if (Object.keys(patch).length === 0) return this.summarize(row);
+      if (Object.keys(patch).length === 0) return this.summarize(repos, row);
 
-      const updated = await tx
-        .update(organizations)
-        .set(set)
-        .where(eq(organizations.id, row.id))
-        .returning();
-      const next = updated[0] ?? row;
-      await this.audit.record(tx, {
+      const next = (await repos.organizations.update(row.id, set)) ?? row;
+      await repos.audit.record({
         subjectKind: "organization",
         subjectId: row.id,
         actorKind: "user",
@@ -249,7 +223,7 @@ export class ReviewService {
         action: "update_organization",
         patch,
       });
-      return this.summarize(next);
+      return this.summarize(repos, next);
     });
   }
 
@@ -264,42 +238,26 @@ export class ReviewService {
   ): Promise<MembershipResultView> {
     const orgRole = normalizeOrgRole(role);
     try {
-      return await this.db.transaction(async (tx) => {
-        const org = await findOrganization(tx, slug);
-        const account = await tx
-          .select({ id: accounts.id })
-          .from(accounts)
-          .where(eq(accounts.id, accountId))
-          .limit(1);
-        if (!account[0]) throw notFound(`no account ${accountId}.`);
+      return await withTransaction(this.db, async (repos) => {
+        const org = await findOrganization(repos, slug);
+        const account = await repos.accounts.findById(accountId);
+        if (!account) throw notFound(`no account ${accountId}.`);
 
-        const existing = await tx
-          .select()
-          .from(orgMemberships)
-          .where(
-            and(eq(orgMemberships.accountId, accountId), eq(orgMemberships.organizationId, org.id)),
-          )
-          // A concurrent revoke must finish before this grant decides whether to UPDATE or INSERT.
-          // Without the lock, DELETE can remove the row after this read; the UPDATE then affects
-          // zero rows while the endpoint still audits and reports a membership that does not exist.
-          .for("update")
-          .limit(1);
+        // A concurrent revoke must finish before this grant decides whether to UPDATE or INSERT.
+        // Without the lock, DELETE can remove the row after this read; the UPDATE then affects
+        // zero rows while the endpoint still audits and reports a membership that does not exist.
+        const existing = await repos.memberships.lockForAccountAndOrganization(accountId, org.id);
 
-        if (existing[0]) {
-          if (existing[0].role === orgRole) {
+        if (existing) {
+          if (existing.role === orgRole) {
             return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
           }
-          await tx
-            .update(orgMemberships)
-            .set({ role: orgRole })
-            .where(eq(orgMemberships.id, existing[0].id));
+          await repos.memberships.updateRole(existing.id, orgRole);
         } else {
-          await tx
-            .insert(orgMemberships)
-            .values({ accountId, organizationId: org.id, role: orgRole });
+          await repos.memberships.insertRole(accountId, org.id, orgRole);
         }
 
-        await this.audit.record(tx, {
+        await repos.audit.record({
           subjectKind: "organization",
           subjectId: org.id,
           actorKind: "user",
@@ -307,7 +265,7 @@ export class ReviewService {
           action: "grant_publisher",
           patch: {
             accountId,
-            role: { before: existing[0]?.role ?? null, after: orgRole },
+            role: { before: existing?.role ?? null, after: orgRole },
           },
         });
         return { organizationSlug: org.slug, accountId, role: orgRole, member: true };
@@ -329,24 +287,22 @@ export class ReviewService {
     slug: string,
     accountId: number,
   ): Promise<MembershipResultView> {
-    return this.db.transaction(async (tx) => {
-      const org = await findOrganization(tx, slug);
-      const removed = await tx
-        .delete(orgMemberships)
-        .where(
-          and(eq(orgMemberships.accountId, accountId), eq(orgMemberships.organizationId, org.id)),
-        )
-        .returning();
-      if (removed.length === 0) {
+    return withTransaction(this.db, async (repos) => {
+      const org = await findOrganization(repos, slug);
+      const removedRole = await repos.memberships.removeForAccountAndOrganization(
+        accountId,
+        org.id,
+      );
+      if (removedRole === null) {
         return { organizationSlug: org.slug, accountId, role: null, member: false };
       }
-      await this.audit.record(tx, {
+      await repos.audit.record({
         subjectKind: "organization",
         subjectId: org.id,
         actorKind: "user",
         actorAccountId: actorAccountId,
         action: "revoke_publisher",
-        patch: { accountId, role: { before: removed[0]?.role ?? null, after: null } },
+        patch: { accountId, role: { before: removedRole, after: null } },
       });
       return { organizationSlug: org.slug, accountId, role: null, member: false };
     });
@@ -420,15 +376,15 @@ export class ReviewService {
     publicId: string,
     decision: { approve: boolean; reason?: string },
   ): Promise<ReviewDecisionView> {
-    return this.db.transaction(async (tx) => {
-      const row = await lockOpportunity(tx, publicId);
+    return withTransaction(this.db, async (repos) => {
+      const row = await lockOpportunity(repos, publicId);
       // Not 403: an entry filed under a namespace this account does not publish for is, as far as
       // this route is concerned, not there at all.
       if (row.sourcePublisher !== slug) {
         throw notFound(`no opportunity ${JSON.stringify(publicId)} published under \`${slug}\`.`);
       }
 
-      const authority = await resolvePublishAuthority(tx, accountId, slug);
+      const authority = await resolvePublishAuthority(repos, accountId, slug);
       if (!authority.member || !authority.verified) {
         throw forbidden(
           "not_a_verified_member",
@@ -447,9 +403,8 @@ export class ReviewService {
 
       const now = new Date();
       const target = decision.approve ? "approved" : "rejected";
-      const updated = await tx
-        .update(opportunities)
-        .set({
+      const next =
+        (await repos.opportunities.update(row.id, {
           reviewStatus: target,
           // APPROVAL IS NOT A LISTING DECISION, and the staff route has always known that: it
           // preserves `is_listed` on approve and clears it on reject. Forcing it true here would
@@ -465,12 +420,9 @@ export class ReviewService {
           // rejection says nothing about whether the programme exists.
           lastSeenAt: decision.approve ? now : row.lastSeenAt,
           updatedAt: now,
-        })
-        .where(eq(opportunities.id, row.id))
-        .returning();
-      const next = updated[0] ?? row;
+        })) ?? row;
 
-      await this.audit.record(tx, {
+      await repos.audit.record({
         subjectKind: "opportunity",
         subjectId: row.id,
         actorKind: "user",
@@ -500,17 +452,11 @@ export class ReviewService {
 
   /** The organisation a slug names, or the same 404 every other organisation route answers with. */
   async requireOrganization(slug: string): Promise<OrganizationRow> {
-    return findOrganization(this.db, slug);
+    return findOrganization(this.repos, slug);
   }
 
   async isOrgManager(accountId: number, slug: string): Promise<boolean> {
-    const rows = await this.db
-      .select({ role: orgMemberships.role })
-      .from(orgMemberships)
-      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
-      .where(and(eq(orgMemberships.accountId, accountId), eq(organizations.slug, slug)))
-      .limit(1);
-    const role = rows[0]?.role;
+    const role = await this.repos.memberships.roleForAccountAndOrganizationSlug(accountId, slug);
     return role === "owner" || role === "admin";
   }
 
@@ -520,28 +466,14 @@ export class ReviewService {
     verified: boolean | undefined,
     limit = 25,
   ): Promise<OrganizationSummaryView[]> {
-    const query = (q ?? "").trim();
-    const like = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
-    const where = and(
-      query === ""
-        ? undefined
-        : or(ilike(organizations.slug, like), ilike(organizations.name, like)),
-      verified === undefined ? undefined : eq(organizations.verified, verified),
-    );
-    const rows = await this.db
-      .select()
-      .from(organizations)
-      .where(where)
-      .orderBy(organizations.slug)
-      .limit(limit);
-    return Promise.all(rows.map((row) => this.summarize(row)));
+    const rows = await this.repos.organizations.search(q, verified, limit);
+    return Promise.all(rows.map((row) => this.summarize(this.repos, row)));
   }
 
-  private async summarize(row: OrganizationRow): Promise<OrganizationSummaryView> {
-    const counted = await this.db
-      .select({ value: count() })
-      .from(orgMemberships)
-      .where(eq(orgMemberships.organizationId, row.id));
+  private async summarize(
+    repos: Repositories,
+    row: OrganizationRow,
+  ): Promise<OrganizationSummaryView> {
     return {
       slug: row.slug,
       name: row.name,
@@ -549,22 +481,14 @@ export class ReviewService {
       verifiedAt: row.verifiedAt?.toISOString() ?? null,
       website: row.website,
       ecosystems: row.ecosystems,
-      memberCount: counted[0]?.value ?? 0,
+      memberCount: await repos.memberships.countForOrganization(row.id),
     };
   }
 }
 
-type TxLike = Parameters<Parameters<DB["transaction"]>[0]>[0];
-
 /** The entry, locked, or a 404. Locked because every caller is about to change its state. */
-async function lockOpportunity(tx: TxLike, publicId: string): Promise<OpportunityRow> {
-  const rows = await tx
-    .select()
-    .from(opportunities)
-    .where(eq(opportunities.publicId, publicId))
-    .for("update")
-    .limit(1);
-  const row = rows[0];
+async function lockOpportunity(repos: Repositories, publicId: string): Promise<OpportunityRow> {
+  const row = await repos.opportunities.lockByPublicId(publicId);
   if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
   return row;
 }
@@ -580,21 +504,14 @@ function assertNotMerged(row: OpportunityRow): void {
 }
 
 /** The organisation row a metadata transaction is about to change, locked before membership. */
-async function lockOrganization(tx: TxLike, slug: string): Promise<OrganizationRow> {
-  const rows = await tx
-    .select()
-    .from(organizations)
-    .where(eq(organizations.slug, slug))
-    .for("update")
-    .limit(1);
-  const row = rows[0];
+async function lockOrganization(repos: Repositories, slug: string): Promise<OrganizationRow> {
+  const row = await repos.organizations.lockBySlug(slug);
   if (!row) throw notFound(`no organization \`${slug}\`.`);
   return row;
 }
 
-async function findOrganization(tx: TxLike | DB, slug: string): Promise<OrganizationRow> {
-  const rows = await tx.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
-  const row = rows[0];
+async function findOrganization(repos: Repositories, slug: string): Promise<OrganizationRow> {
+  const row = await repos.organizations.findBySlug(slug);
   if (!row) throw notFound(`no organization \`${slug}\`.`);
   return row;
 }

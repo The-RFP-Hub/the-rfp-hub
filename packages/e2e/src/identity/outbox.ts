@@ -14,9 +14,10 @@
  * them. `EMAIL_OUTBOX_DIR` is never set in a deployment; `config.ts` refuses to boot a production
  * process with a revealing transport at all.
  *
- * DELETE ON READ. A consumed code must not be readable by a later assertion that did not send it —
- * otherwise a spec asserting "signing in again needs a fresh code" could pass by re-reading the
- * previous one. The file for an address is removed once its last line has been taken.
+ * CONSUME OTP MAIL ONLY. A consumed code must not be readable by a later assertion that did not
+ * send it, but duplicate notifications share the address's JSONL file and must not be mistaken for
+ * codes or deleted as collateral. OTP subjects are filtered explicitly; after a code is read, all
+ * OTP lines are removed and unrelated mail is preserved.
  *
  * POLLING, NOT A WATCHER. `fs.watch` semantics differ per platform and miss writes that landed
  * before the watcher attached — and the send is deliberately not awaited by the API (it must not be
@@ -24,7 +25,7 @@
  * both simpler and correct on every platform this runs on.
  */
 import { createHash } from "node:crypto";
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** How long to wait for a code before giving up. The API writes it within milliseconds of the send. */
@@ -33,15 +34,20 @@ const POLL_INTERVAL_MS = 100;
 
 /** The digits a code is made of. `OTP_LENGTH` in `packages/api/src/auth/better-auth.ts`. */
 const OTP_PATTERN = /\b(\d{6})\b/;
+const OTP_SUBJECTS: ReadonlySet<string> = new Set([
+  "Your RFP Hub sign-in code",
+  "Confirm your RFP Hub email address",
+  "Confirm your new RFP Hub email address",
+]);
 
 /**
  * The file the transport writes for one address.
  *
- * Mirrors `outboxFileFor` in `packages/api/src/auth/email-transport.ts`: one file per address, named
- * by a digest rather than the address itself, because file NAMES are the part that survives a
- * screenshot or a stray `ls` in a log. Mirrored rather than imported — that module lives in another
- * package's `src`, which is not an exported entry point — and the mirroring is self-checking: if the
- * naming drifted, no code would ever be found and every sign-in here would fail loudly.
+ * Mirrors `outboxFileFor` in the API's central email transport: one file per address, named by a
+ * digest rather than the address itself, because file NAMES are the part that survives a screenshot
+ * or a stray `ls` in a log. Mirrored rather than imported — that module lives in another package's
+ * `src`, which is not an exported entry point — and the mirroring is self-checking: if the naming
+ * drifted, no code would ever be found and every sign-in here would fail loudly.
  */
 export function outboxFileFor(dir: string, email: string): string {
   return join(dir, `${createHash("sha256").update(email.toLowerCase()).digest("hex")}.jsonl`);
@@ -51,8 +57,19 @@ export interface WaitForOtpOptions {
   timeoutMs?: number;
 }
 
+export interface OutboxEmail {
+  to: string;
+  subject: string;
+  text: string;
+}
+
+export interface WaitForEmailOptions extends WaitForOtpOptions {
+  /** All fragments must occur in the body; lets a shared outbox distinguish same-subject events. */
+  textIncludes?: readonly string[];
+}
+
 /**
- * Waits for the newest code sent to `email`, returns it, and removes the file.
+ * Waits for the newest code sent to `email`, returns it, and consumes OTP messages only.
  *
  * The LAST line is taken, not the first: a spec may legitimately ask for a second code (the "use a
  * different address" path, or the attempt-limit case), and the newest is the live one.
@@ -66,11 +83,10 @@ export async function waitForOtp(
   const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
   for (;;) {
-    const code = readNewestCode(path);
-    if (code) {
-      // Delete on read — see the header. `force` because a concurrent reader may have won.
-      rmSync(path, { force: true });
-      return code;
+    const found = readNewestCode(path);
+    if (found) {
+      preserveLines(path, found.remaining);
+      return found.code;
     }
     if (Date.now() >= deadline) {
       throw new Error(
@@ -81,8 +97,64 @@ export async function waitForOtp(
   }
 }
 
-/** The code on the newest line of an outbox file, or undefined if there is nothing readable yet. */
-function readNewestCode(path: string): string | undefined {
+/** Wait for and consume one non-OTP message with the exact subject. */
+export async function waitForEmail(
+  dir: string,
+  email: string,
+  subject: string,
+  options: WaitForEmailOptions = {},
+): Promise<OutboxEmail> {
+  const path = outboxFileFor(dir, email);
+  const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+  for (;;) {
+    let lines: string[] = [];
+    try {
+      lines = readFileSync(path, "utf8")
+        .split("\n")
+        .filter((line) => line.trim() !== "");
+    } catch {
+      // The immediate dispatcher has not written this address's outbox yet.
+    }
+
+    for (let index = 0; index < lines.length; index++) {
+      let message: Partial<OutboxEmail>;
+      try {
+        message = JSON.parse(lines[index] as string) as Partial<OutboxEmail>;
+      } catch {
+        continue;
+      }
+      if (
+        message.to === email &&
+        message.subject === subject &&
+        typeof message.text === "string" &&
+        (options.textIncludes ?? []).every((fragment) => message.text?.includes(fragment))
+      ) {
+        preserveLines(
+          path,
+          lines.filter((_, lineIndex) => lineIndex !== index),
+        );
+        return { to: email, subject, text: message.text };
+      }
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `outbox: no ${JSON.stringify(subject)} email arrived for ${email} within ${options.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+}
+
+interface ReadCode {
+  code: string;
+  /** Original JSONL lines with every OTP message removed; notification mail stays byte-for-byte. */
+  remaining: string[];
+}
+
+/** The newest OTP code, filtered by subject, plus the unrelated messages that must survive. */
+function readNewestCode(path: string): ReadCode | undefined {
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
@@ -91,20 +163,31 @@ function readNewestCode(path: string): string | undefined {
   }
 
   const lines = raw.split("\n").filter((line) => line.trim() !== "");
-  for (let index = lines.length - 1; index >= 0; index--) {
+  let code: string | undefined;
+  const remaining: string[] = [];
+  for (let index = 0; index < lines.length; index++) {
     // A torn final line from a concurrent append is skipped rather than throwing; the next poll
     // sees it whole.
-    let message: { text?: unknown };
+    let message: { subject?: unknown; text?: unknown };
     try {
       message = JSON.parse(lines[index] as string);
     } catch {
+      remaining.push(lines[index] as string);
       continue;
     }
-    if (typeof message.text !== "string") continue;
+    if (
+      typeof message.subject !== "string" ||
+      !OTP_SUBJECTS.has(message.subject) ||
+      typeof message.text !== "string"
+    ) {
+      remaining.push(lines[index] as string);
+      continue;
+    }
     const found = OTP_PATTERN.exec(message.text);
-    if (found?.[1]) return found[1];
+    if (found?.[1]) code = found[1];
+    else remaining.push(lines[index] as string);
   }
-  return undefined;
+  return code ? { code, remaining } : undefined;
 }
 
 /**
@@ -114,5 +197,15 @@ function readNewestCode(path: string): string | undefined {
  * `waitForOtp` cannot pick up the stale one and report success for the wrong reason.
  */
 export function discardOtp(dir: string, email: string): void {
-  rmSync(outboxFileFor(dir, email), { force: true });
+  const path = outboxFileFor(dir, email);
+  const found = readNewestCode(path);
+  if (found) preserveLines(path, found.remaining);
+}
+
+function preserveLines(path: string, lines: string[]): void {
+  if (lines.length === 0) {
+    rmSync(path, { force: true });
+  } else {
+    writeFileSync(path, `${lines.join("\n")}\n`, { mode: 0o600 });
+  }
 }

@@ -15,22 +15,17 @@
  * admin exists to make: that is an operator ceremony (`scripts/grant-admin.ts`, run with the
  * migration credential), and it is also how a lockout is undone.
  */
-import { eq } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type AccountRow, accounts } from "../../../db/schema.js";
+import type { AccountRow } from "../../../db/schema.js";
+import { type Repositories, withTransaction } from "../../repositories/index.js";
 import type { AccountSummaryView } from "../../shared/api-views.js";
 import type { AccountRole } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
 
 const ROLES: AccountRole[] = ["submitter", "reviewer", "admin"];
 
 export class AdminService {
-  private readonly audit: AuditService;
-
-  constructor(private readonly db: DB = defaultDb) {
-    this.audit = new AuditService(db);
-  }
+  constructor(private readonly db: DB = defaultDb) {}
 
   /**
    * Grant or revoke any global role, including `admin` — with one floor under it.
@@ -43,22 +38,14 @@ export class AdminService {
    */
   async assignRole(adminId: number, accountId: number, role: string): Promise<AccountSummaryView> {
     const target = normalizeRole(role);
-    return this.db.transaction(async (tx) => {
+    return withTransaction(this.db, async (repos) => {
       // Every transaction that could REMOVE an admin locks the admin set first, in id order — the
       // same order in all of them, so two demotions racing serialise instead of deadlocking, and
       // neither can count the other's admin as still there. Taken before the target's own lock
       // because a demotion's target is itself in this set.
-      const admins =
-        target === "admin"
-          ? []
-          : await tx
-              .select({ id: accounts.id })
-              .from(accounts)
-              .where(eq(accounts.globalRole, "admin"))
-              .orderBy(accounts.id)
-              .for("update");
+      const admins = target === "admin" ? [] : await repos.accounts.lockAdmins();
 
-      const row = await lockAccount(tx, accountId);
+      const row = await lockAccount(repos, accountId);
       if (row.globalRole === target) return toAccountSummary(row);
       // A privilege on an account nobody can sign in as is a ghost: it can never be exercised by
       // its owner, and it counts toward the last-admin guard, so a mistyped grant can convince the
@@ -75,13 +62,10 @@ export class AdminService {
           "this is the only admin account; promote another admin first. A lockout is recoverable only by an operator with the database credential.",
         );
       }
-      const updated = await tx
-        .update(accounts)
-        .set({ globalRole: target, updatedAt: new Date() })
-        .where(eq(accounts.id, accountId))
-        .returning();
-      const next = updated[0] ?? row;
-      await this.audit.record(tx, {
+      const next =
+        (await repos.accounts.update(accountId, { globalRole: target, updatedAt: new Date() })) ??
+        row;
+      await repos.audit.record({
         subjectKind: "account",
         subjectId: accountId,
         actorKind: "user",
@@ -98,19 +82,15 @@ export class AdminService {
     accountId: number,
     directCreate: boolean,
   ): Promise<AccountSummaryView> {
-    return this.db.transaction(async (tx) => {
-      const row = await lockAccount(tx, accountId);
+    return withTransaction(this.db, async (repos) => {
+      const row = await lockAccount(repos, accountId);
       if (row.directCreate === directCreate) return toAccountSummary(row);
       // The same rule as the role: granting to an unreachable account creates a privilege nobody can
       // hold, revoking one is cleanup.
       assertReachable(row, directCreate);
-      const updated = await tx
-        .update(accounts)
-        .set({ directCreate, updatedAt: new Date() })
-        .where(eq(accounts.id, accountId))
-        .returning();
-      const next = updated[0] ?? row;
-      await this.audit.record(tx, {
+      const next =
+        (await repos.accounts.update(accountId, { directCreate, updatedAt: new Date() })) ?? row;
+      await repos.audit.record({
         subjectKind: "account",
         subjectId: accountId,
         actorKind: "user",
@@ -122,8 +102,6 @@ export class AdminService {
     });
   }
 }
-
-type TxLike = Parameters<Parameters<DB["transaction"]>[0]>[0];
 
 /**
  * Refuse to hand a privilege to an account that has no identity behind it.
@@ -140,14 +118,8 @@ function assertReachable(row: AccountRow, granting: boolean): void {
   );
 }
 
-async function lockAccount(tx: TxLike, accountId: number): Promise<AccountRow> {
-  const rows = await tx
-    .select()
-    .from(accounts)
-    .where(eq(accounts.id, accountId))
-    .for("update")
-    .limit(1);
-  const row = rows[0];
+async function lockAccount(repos: Repositories, accountId: number): Promise<AccountRow> {
+  const row = await repos.accounts.lockById(accountId);
   if (!row) throw notFound(`no account ${accountId}.`);
   return row;
 }

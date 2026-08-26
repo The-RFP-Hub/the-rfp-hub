@@ -170,6 +170,16 @@ export const claimStatus = pgEnum("claim_status", ["pending", "approved", "rejec
 
 export const dupStatus = pgEnum("dup_status", ["suspected", "confirmed", "dismissed", "merged"]);
 
+/** Durable events emitted by the duplicate workflow and rendered by in-app and email channels. */
+export const notificationKind = pgEnum("notification_kind", [
+  "duplicate_suspected",
+  "duplicate_confirmed",
+  "duplicate_dismissed",
+  "duplicate_merged_away",
+  "duplicate_absorbed",
+  "duplicate_reopened",
+]);
+
 export const analyticsEvent = pgEnum("analytics_event", [
   "list_view",
   "detail_view",
@@ -706,6 +716,42 @@ export const opportunityDuplicates = pgTable(
   ],
 );
 
+// ── notifications (account inbox + email delivery state) ───────────────────────
+/**
+ * One durable account-scoped notification.
+ *
+ * The payload is structured data, never presentation copy. `subject_kind` remains text because it
+ * is a polymorphic extension seam; this first slice writes only `duplicate`. The four-column
+ * unique key is the final idempotency guard when a detector re-runs or a reviewer repeats an
+ * action. After commit, a bounded in-process queue attempts email without making the request wait;
+ * the nightly notification-dispatch job sweeps anything it misses. These timestamps remain the
+ * source of truth for both paths.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: bigint({ mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    accountId: bigint({ mode: "number" })
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    kind: notificationKind().notNull(),
+    subjectKind: text().notNull(),
+    subjectId: bigint({ mode: "number" }).notNull(),
+    payload: jsonb().$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp({ withTimezone: true }),
+    emailDispatchedAt: timestamp({ withTimezone: true }),
+    emailFailedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("ux_notification_event").on(t.accountId, t.kind, t.subjectKind, t.subjectId),
+    index("ix_notification_account_created").on(t.accountId, t.createdAt.desc(), t.id.desc()),
+    index("ix_notification_account_unread")
+      .on(t.accountId, t.createdAt.desc())
+      .where(sql`${t.readAt} is null`),
+  ],
+);
+
 // ── analytics: raw events + the daily rollup ─────────────────────────────────────
 /**
  * One recorded read or link-out. A PLAIN table, not partitioned.
@@ -790,5 +836,6 @@ export type VerificationRunRow = typeof verificationRuns.$inferSelect;
 export type VerificationRunInsert = typeof verificationRuns.$inferInsert;
 export type OpportunityEmbeddingRow = typeof opportunityEmbeddings.$inferSelect;
 export type OpportunityDuplicateRow = typeof opportunityDuplicates.$inferSelect;
+export type NotificationRow = typeof notifications.$inferSelect;
 export type OpportunityEventInsert = typeof opportunityEvents.$inferInsert;
 export type OpportunityStatsDailyRow = typeof opportunityStatsDaily.$inferSelect;

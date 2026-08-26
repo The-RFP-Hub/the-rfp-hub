@@ -29,6 +29,7 @@ env:
   # variables -> Actions -> Variables. The deploy job below refuses to run while it is unset,
   # because an empty `cluster:` silently means ECS's `default` cluster.
   ECS_CLUSTER: ${{ vars.STAGING_ECS_CLUSTER }}
+  APP_BASE_URL: ${{ vars.STAGING_APP_BASE_URL }}
   ECR_REPOSITORY_MAIN: staging-rfp-hub
   ECS_CONTAINER: rfp-hub-staging
 
@@ -129,6 +130,10 @@ jobs:
             echo "::error::Repository variable STAGING_ECS_CLUSTER is unset (Settings -> Secrets and variables -> Actions -> Variables)."
             exit 1
           fi
+          if [ -z "${{ env.APP_BASE_URL }}" ]; then
+            echo "::error::Repository variable STAGING_APP_BASE_URL is unset; notification email needs the canonical frontend origin."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -159,6 +164,8 @@ jobs:
           task-definition: task-definition.json
           container-name: ${{ env.ECS_CONTAINER }}
           image: ${{ steps.download-task.outputs.image }}
+          environment-variables: |
+            APP_BASE_URL=${{ env.APP_BASE_URL }}
 
       - name: Deploy Amazon ECS task definition and service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2

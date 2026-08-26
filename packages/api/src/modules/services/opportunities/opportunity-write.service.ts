@@ -54,18 +54,12 @@
  * punishing a flaky network. Anything else → 409.
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
-import { and, count, eq } from "drizzle-orm";
 import { humanizeErrors, humanizeIssues, validateOpportunity } from "rfphub-validate";
 import { config as defaultConfig } from "../../../config.js";
-import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityInsert,
-  type OpportunityRow,
-  accounts,
-  opportunities,
-  organizations,
-} from "../../../db/schema.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import type { OpportunityInsert, OpportunityRow } from "../../../db/schema.js";
 import { fromStandard, organizationInserts, toStandard } from "../../mappers/opportunity.mapper.js";
+import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import {
   type Capabilities,
   type Principal,
@@ -76,7 +70,6 @@ import {
 import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { checkPublicId, namespaceOfPublicId, resolveNamespace } from "../../shared/namespace.js";
 import { diffFields } from "../../shared/patch.js";
-import { AuditService } from "../audit/audit.service.js";
 import { violatedConstraint } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
 import {
@@ -169,14 +162,14 @@ interface WriteDecision {
 }
 
 export class OpportunityWriteService {
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(
     private readonly db: DB = defaultDb,
     private readonly hooks: WriteHooks = {},
     private readonly publishAuthority: PublishAuthorityResolver = resolvePublishAuthority,
   ) {
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   async write(
@@ -224,7 +217,7 @@ export class OpportunityWriteService {
     // FAIL-FAST ONLY, and deliberately unlocked: it exists so a malformed, unauthorized or unknown
     // write is refused without opening a transaction. Everything it derives is ADVISORY and none of
     // it reaches the write — `persist` derives the same answers again from the locked row.
-    const preview = await this.findByPublicId(document.id);
+    const preview = await this.repos.opportunities.findByPublicId(document.id);
     if (options.mode === "replace" && !preview) {
       throw notFound(`no opportunity ${JSON.stringify(document.id)}.`);
     }
@@ -365,11 +358,11 @@ export class OpportunityWriteService {
    * could consult it.
    */
   private async reproveAuthority(
-    tx: Tx,
+    repos: Repositories,
     principal: RequestPrincipal,
     namespace: string,
   ): Promise<RequestPrincipal> {
-    const authority = await this.publishAuthority(tx, principal.accountId, namespace);
+    const authority = await this.publishAuthority(repos, principal.accountId, namespace);
     return {
       ...principal,
       directCreate: authority.directCreate,
@@ -430,15 +423,6 @@ export class OpportunityWriteService {
     const idProblem = checkPublicId(document.id, namespace);
     if (idProblem) throw badRequest("invalid_id", idProblem);
     return namespace;
-  }
-
-  private async findByPublicId(publicId: string): Promise<OpportunityRow | undefined> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(eq(opportunities.publicId, publicId))
-      .limit(1);
-    return rows[0];
   }
 
   /**
@@ -548,14 +532,8 @@ export class OpportunityWriteService {
     mode: "create" | "replace";
     warnings: string[];
   }): Promise<WriteResult> {
-    const committed = await this.db.transaction(async (tx) => {
-      const locked = await tx
-        .select()
-        .from(opportunities)
-        .where(eq(opportunities.publicId, ctx.document.id))
-        .for("update")
-        .limit(1);
-      const existing = locked[0];
+    const committed = await withTransaction(this.db, async (repos) => {
+      const existing = await repos.opportunities.lockByPublicId(ctx.document.id);
 
       if (existing && existing.mergedIntoId !== null) {
         throw opportunityMerged(existing.publicId);
@@ -579,7 +557,7 @@ export class OpportunityWriteService {
         );
       }
 
-      return this.applyWrite(tx, { ...ctx, existing });
+      return this.applyWrite(repos, { ...ctx, existing });
     });
 
     const outcome = await this.runAfterCommit({
@@ -604,7 +582,7 @@ export class OpportunityWriteService {
 
   /** Everything inside the lock: re-decide, write the row, write the history. */
   private async applyWrite(
-    tx: Tx,
+    repos: Repositories,
     ctx: {
       principal: RequestPrincipal;
       document: Opportunity;
@@ -627,8 +605,8 @@ export class OpportunityWriteService {
     // first is not a preference: two such writes by one account would otherwise both hold the
     // shared lock and both try to upgrade it, and Postgres answers that with a deadlock rather than
     // a queue. Observed, not theorised — see `assertPendingHeadroom` for what the lock is FOR.
-    if (mayEnterQueue) await lockAccountRow(tx, ctx.principal.accountId);
-    const principal = await this.reproveAuthority(tx, ctx.principal, namespace);
+    if (mayEnterQueue) await lockAccountRow(repos, ctx.principal.accountId);
+    const principal = await this.reproveAuthority(repos, ctx.principal, namespace);
     const { caps, editorial, attributed } = this.decide({
       principal,
       document: ctx.document,
@@ -700,21 +678,20 @@ export class OpportunityWriteService {
     // that auto-publishes never gets here, and neither does an edit of an entry that was already
     // pending.
     if (mayEnterQueue && values.reviewStatus === "pending") {
-      await this.assertPendingHeadroom(tx, principal.accountId);
+      await this.assertPendingHeadroom(repos, principal.accountId);
     }
 
-    await insertOrganizationStubs(tx, document);
+    await insertOrganizationStubs(repos, document);
 
-    const written = await (existing === undefined
-      ? tx.insert(opportunities).values(values).returning()
-      : tx.update(opportunities).set(values).where(eq(opportunities.id, existing.id)).returning()
+    const stored = await (existing === undefined
+      ? repos.opportunities.insert(values)
+      : repos.opportunities.update(existing.id, values)
     ).catch((error: unknown) => {
       // Translated here rather than around the whole transaction so the message is built from the
       // document as the SERVER attributed it — the only unique keys a client can collide with are
       // the ones the server chose to accept.
       throw translateWriteFailure(error, document);
     });
-    const stored = written[0];
     if (!stored) throw new Error(`failed to persist ${document.id}`);
 
     const patch = diffFields(
@@ -726,7 +703,7 @@ export class OpportunityWriteService {
       actorAccountId: principal.accountId,
       actorApiKeyId: principal.apiKeyId ?? null,
     };
-    await this.audit.record(tx, {
+    await repos.audit.record({
       ...actor,
       subjectKind: "opportunity",
       subjectId: stored.id,
@@ -742,7 +719,7 @@ export class OpportunityWriteService {
     // An auto-approval is a second, separate decision and gets its own row: "created" and
     // "published without review" are different facts and a reader must be able to see both.
     if (autoApprove && existing?.reviewStatus !== "approved") {
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...actor,
         subjectKind: "opportunity",
         subjectId: stored.id,
@@ -757,7 +734,7 @@ export class OpportunityWriteService {
     // with a patch naming the transition and its reason says exactly what happened, and the
     // alternative is an `ALTER TYPE` migration for a verb the trail can already express.
     if (requeued) {
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...actor,
         subjectKind: "opportunity",
         subjectId: stored.id,
@@ -796,17 +773,11 @@ export class OpportunityWriteService {
    * advisory-lock namespace. The lock itself is taken at the TOP of `applyWrite` (see
    * `lockAccountRow`); only the counting happens here.
    */
-  private async assertPendingHeadroom(tx: Tx, accountId: number): Promise<void> {
+  private async assertPendingHeadroom(repos: Repositories, accountId: number): Promise<void> {
     const limit = defaultConfig.pendingSubmissionLimit;
-    if (await hasAnyVerifiedMembership(tx, accountId)) return;
+    if (await hasAnyVerifiedMembership(repos, accountId)) return;
 
-    const counted = await tx
-      .select({ value: count() })
-      .from(opportunities)
-      .where(
-        and(eq(opportunities.submittedBy, accountId), eq(opportunities.reviewStatus, "pending")),
-      );
-    const pending = counted[0]?.value ?? 0;
+    const pending = await repos.opportunities.countPendingBySubmitter(accountId);
     if (pending < limit) return;
 
     throw conflict(
@@ -839,12 +810,8 @@ export class OpportunityWriteService {
  * statement. Acquiring the strongest level once, up front, is the standard remedy and the reason
  * this is not simply folded into the check that needs it.
  */
-async function lockAccountRow(tx: Tx, accountId: number): Promise<void> {
-  await tx
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(eq(accounts.id, accountId))
-    .for("update");
+async function lockAccountRow(repos: Repositories, accountId: number): Promise<void> {
+  await repos.accounts.lockById(accountId);
 }
 
 /**
@@ -853,10 +820,12 @@ async function lockAccountRow(tx: Tx, accountId: number): Promise<void> {
  * This is the whole of D-9 in three lines: a slug nobody knows becomes a stub, and a slug that is
  * already a verified publisher keeps every field it has.
  */
-export async function insertOrganizationStubs(tx: Tx, document: Opportunity): Promise<void> {
+export async function insertOrganizationStubs(
+  repos: Repositories,
+  document: Opportunity,
+): Promise<void> {
   const orgs = organizationInserts(document);
-  if (orgs.length === 0) return;
-  await tx.insert(organizations).values(orgs).onConflictDoNothing({ target: organizations.slug });
+  await repos.organizations.insertStubs(orgs);
 }
 
 /** The document, as an object, or a 400 that says what arrived instead. */

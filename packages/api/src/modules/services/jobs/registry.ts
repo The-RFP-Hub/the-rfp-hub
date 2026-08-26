@@ -20,6 +20,10 @@
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { DedupeService } from "../dedupe/dedupe.service.js";
 import { AnalyticsRollupService } from "../insights/rollup.service.js";
+import {
+  type NotificationDispatchOptions,
+  NotificationDispatchService,
+} from "../notifications/notification-dispatch.service.js";
 import { VerificationService } from "../verification/verification.service.js";
 import { StalenessService } from "./staleness.service.js";
 import type { JobResult } from "./types.js";
@@ -40,6 +44,8 @@ export interface JobRunOptions {
   /** Injected clock, for the suites that seed relative dates. */
   now?: Date;
   db?: DB;
+  /** Injection seam for the dispatcher integration suite. */
+  notificationDispatch?: NotificationDispatchOptions;
 }
 
 function dbOf(options: JobRunOptions): DB {
@@ -47,9 +53,10 @@ function dbOf(options: JobRunOptions): DB {
 }
 
 /**
- * Definitions in schedule order, which is also the order they should be read in: the rollup and
- * the prune settle yesterday's traffic, the two backfills catch up on work the request path
- * deferred, and `staleness` runs last because the nightly export is chained to ITS success.
+ * Maintenance definitions are in chain order: rollup and prune settle yesterday's traffic, the
+ * backfills and notification delivery catch up, and `staleness` runs last because the nightly
+ * export is chained to its success. Provider refusals are durable row state rather than thrown job
+ * errors, so the notification backstop does not fail the chain merely because mail is unavailable.
  */
 export const JOBS: JobDefinition[] = [
   {
@@ -84,6 +91,16 @@ export const JOBS: JobDefinition[] = [
     describes: "Close past-due and long-inactive entries, and recompute the derived deadline key.",
     run: (options) =>
       new StalenessService(dbOf(options)).runBatch({ limit: options.limit, now: options.now }),
+  },
+  {
+    name: "notification-dispatch",
+    shape: "cursor",
+    describes: "Deliver pending account notifications by email, with bounded retries.",
+    run: (options) =>
+      new NotificationDispatchService(dbOf(options), options.notificationDispatch).runBatch({
+        limit: options.limit,
+        now: options.now,
+      }),
   },
 ];
 

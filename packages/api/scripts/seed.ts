@@ -38,8 +38,9 @@
 import { readFile } from "node:fs/promises";
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { humanizeErrors, validateOpportunity } from "rfphub-validate";
-import { type DB, db, pool } from "../src/db/client.js";
-import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
+import { db, pool } from "../src/db/client.js";
+import { withTransaction } from "../src/modules/repositories/index.js";
+import { upsertOpportunityFromStandard } from "../src/modules/services/opportunities/opportunity.service.js";
 
 const MIN_VALID = 100;
 
@@ -208,9 +209,9 @@ export function assertSeedContract(valid: number, min = MIN_VALID): void {
  * partial approved+listed dataset and only then reporting failure.
  *
  * The guards are only half the property, though: a failure INSIDE the loop would leave the records
- * written so far live. main() therefore calls this inside a single `db.transaction`, so the whole
- * write phase commits or rolls back as one unit. `write` is injected rather than reached for so
- * this can be exercised without a database.
+ * written so far live. main() therefore calls this inside a single repository unit of work, so the
+ * whole write phase commits or rolls back as one unit. `write` is injected rather than reached for
+ * so this can be exercised without a database.
  */
 export async function loadValidated(
   valid: readonly Opportunity[],
@@ -247,17 +248,14 @@ async function main(): Promise<void> {
   reportRejections(rejected);
   console.log(`  ${valid.length} valid, ${rejected.length} rejected`);
 
-  // One transaction for the whole write phase — see loadValidated. The service is bound to the
-  // transaction handle rather than the pool so every upsert (opportunities AND the organizations
-  // directory) joins it; the handle exposes the same query surface as `db` but is not structurally
-  // assignable to it, hence the cast.
-  const loaded = await db.transaction(async (tx) => {
-    const ctl = new OpportunityService(tx as unknown as DB);
+  // One transaction for the whole write phase — see loadValidated. Every upsert (opportunities AND
+  // the organizations directory) runs through the repositories bound to that held connection.
+  const loaded = await withTransaction(db, async (repos) => {
     return loadValidated(
       valid,
       rejected,
       (std) =>
-        ctl.upsertFromStandard(std, {
+        upsertOpportunityFromStandard(repos, std, {
           reviewStatus: "approved",
           isListed: true,
           sourceSystem: sourceSystemOf(std.id) ?? undefined,

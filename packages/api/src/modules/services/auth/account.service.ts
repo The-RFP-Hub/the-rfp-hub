@@ -19,20 +19,19 @@
  * credential (`grantAdmin` below); every admin after that is made by an admin, over
  * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
-import { and, eq, getTableColumns, ilike, isNull, or, sql } from "drizzle-orm";
-import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
+import type { AccountRow } from "../../../db/schema.js";
 import {
-  type AccountRow,
-  accounts,
-  authUser,
-  orgMembershipInvites,
-  orgMemberships,
-  organizations,
-} from "../../../db/schema.js";
+  type AccountSearchRow,
+  type AccountUpdate,
+  type Repositories,
+  repositories,
+  withTransaction,
+} from "../../repositories/index.js";
 import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
-import { AuditService, SYSTEM_ACTOR } from "../audit/audit.service.js";
+import { SYSTEM_ACTOR } from "../audit/audit.service.js";
 
 /** A handle is public and appears in `source.submittedBy`, so it is held to slug shape. */
 const HANDLE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -51,10 +50,7 @@ export interface ProfileUpdate {
   displayName?: string | null;
 }
 
-/** The privileged directory projection. Email stays out of the public account row and `/v1/me`. */
-export interface AccountSearchRow extends AccountRow {
-  email: string | null;
-}
+export type { AccountSearchRow };
 
 /** What the admin ceremony did, so an operator's console can say which of the three happened. */
 export interface AdminGrant {
@@ -77,13 +73,13 @@ const consoleLogger: AccountLogger = {
 };
 
 export class AccountService {
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
 
   constructor(
     private readonly db: DB = defaultDb,
     private readonly logger: AccountLogger = consoleLogger,
   ) {
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   /**
@@ -93,14 +89,9 @@ export class AccountService {
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
    */
   async resolveBySubject(subject: string, verifiedEmail?: string): Promise<AccountRow> {
-    const account = await this.db.transaction(async (tx) => {
-      await tx.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
-      const rows = await tx
-        .select()
-        .from(accounts)
-        .where(eq(accounts.authUserId, subject))
-        .limit(1);
-      const account = rows[0];
+    const account = await withTransaction(this.db, async (repos) => {
+      await repos.accounts.insertBySubject(subject);
+      const account = await repos.accounts.findBySubject(subject);
       if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
       return account;
     });
@@ -111,8 +102,8 @@ export class AccountService {
         // when JavaScript catches it; keeping redemption in the provisioning transaction could
         // return an account whose insert was silently rolled back. Redemption is retryable, so its
         // own transaction may roll back while this committed account still resolves the session.
-        await this.db.transaction((tx) =>
-          this.redeemMembershipInvites(tx, account, verifiedEmail.trim().toLowerCase()),
+        await withTransaction(this.db, (repos) =>
+          this.redeemMembershipInvites(repos, account, verifiedEmail.trim().toLowerCase()),
         );
       } catch (error) {
         this.logger.error(
@@ -130,69 +121,38 @@ export class AccountService {
   }
 
   /** Apply every still-pending invite for an address during session principal resolution. */
-  private async redeemMembershipInvites(tx: Tx, account: AccountRow, email: string): Promise<void> {
-    const invites = await tx
-      .select()
-      .from(orgMembershipInvites)
-      .where(
-        and(
-          isNull(orgMembershipInvites.acceptedAt),
-          sql`lower(${orgMembershipInvites.email}) = ${email}`,
-        ),
-      )
-      .orderBy(orgMembershipInvites.id)
-      .for("update");
+  private async redeemMembershipInvites(
+    repos: Repositories,
+    account: AccountRow,
+    email: string,
+  ): Promise<void> {
+    const invites = await repos.membershipInvites.lockPendingForEmail(email);
 
     for (const invite of invites) {
-      const existing = await tx
-        .select({ id: orgMemberships.id, role: orgMemberships.role })
-        .from(orgMemberships)
-        .where(
-          and(
-            eq(orgMemberships.accountId, account.id),
-            eq(orgMemberships.organizationId, invite.organizationId),
-          ),
-        )
-        .for("update")
-        .limit(1);
-      const previousRole = existing[0]?.role ?? null;
+      const existing = await repos.memberships.lockForAccountAndOrganization(
+        account.id,
+        invite.organizationId,
+      );
+      const previousRole = existing?.role ?? null;
       let actualRole = previousRole;
 
-      if (existing[0] && existing[0].role !== invite.role) {
-        const settled = await tx
-          .update(orgMemberships)
-          .set({ role: invite.role })
-          .where(eq(orgMemberships.id, existing[0].id))
-          .returning({ role: orgMemberships.role });
-        actualRole = settled[0]?.role ?? null;
-      } else if (!existing[0]) {
+      if (existing && existing.role !== invite.role) {
+        actualRole = await repos.memberships.updateRole(existing.id, invite.role);
+      } else if (!existing) {
         // A direct grant can race this first redemption after the membership read. The upsert
         // makes the invite's role authoritative in either ordering instead of reviving the old
         // conflict-ignore behavior.
-        const settled = await tx
-          .insert(orgMemberships)
-          .values({
-            accountId: account.id,
-            organizationId: invite.organizationId,
-            role: invite.role,
-          })
-          .onConflictDoUpdate({
-            target: [orgMemberships.accountId, orgMemberships.organizationId],
-            set: { role: invite.role },
-          })
-          .returning({ role: orgMemberships.role });
-        actualRole = settled[0]?.role ?? null;
+        actualRole = await repos.memberships.upsertRole(
+          account.id,
+          invite.organizationId,
+          invite.role,
+        );
       }
       if (actualRole === null) throw new Error("membership vanished while accepting invite");
 
       const now = new Date();
-      await tx
-        .update(orgMembershipInvites)
-        .set({ acceptedAt: now, acceptedAccountId: account.id })
-        .where(
-          and(eq(orgMembershipInvites.id, invite.id), isNull(orgMembershipInvites.acceptedAt)),
-        );
-      await this.audit.record(tx, {
+      await repos.membershipInvites.accept(invite.id, account.id, now);
+      await repos.audit.record({
         subjectKind: "organization",
         subjectId: invite.organizationId,
         actorKind: "user",
@@ -211,12 +171,7 @@ export class AccountService {
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */
   async findBySubject(subject: string): Promise<AccountRow | undefined> {
-    const rows = await this.db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.authUserId, subject))
-      .limit(1);
-    return rows[0];
+    return this.repos.accounts.findBySubject(subject);
   }
 
   /**
@@ -237,16 +192,8 @@ export class AccountService {
    * audit row. The lock is what makes the read-then-write safe against a concurrent role change.
    */
   async grantAdmin(subject: string, options: { create?: boolean } = {}): Promise<AdminGrant> {
-    return this.db.transaction(async (tx) => {
-      const locked = async () =>
-        (
-          await tx
-            .select()
-            .from(accounts)
-            .where(eq(accounts.authUserId, subject))
-            .for("update")
-            .limit(1)
-        )[0];
+    return withTransaction(this.db, async (repos) => {
+      const locked = () => repos.accounts.lockBySubject(subject);
 
       let account = await locked();
       let created = false;
@@ -254,21 +201,19 @@ export class AccountService {
         if (options.create !== true) {
           throw notFound(`no account for ${JSON.stringify(subject)}.`);
         }
-        await tx.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
+        await repos.accounts.insertBySubject(subject);
         account = await locked();
         created = account !== undefined;
       }
       if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
       if (account.globalRole === "admin") return { account, created, promoted: false };
 
-      const updated = await tx
-        .update(accounts)
-        .set({ globalRole: "admin", updatedAt: new Date() })
-        .where(eq(accounts.id, account.id))
-        .returning();
-      const row = updated[0];
+      const row = await repos.accounts.update(account.id, {
+        globalRole: "admin",
+        updatedAt: new Date(),
+      });
       if (!row) throw new Error(`account ${account.id} vanished during the admin grant`);
-      await this.audit.record(tx, {
+      await repos.audit.record({
         // Nobody's account did this: an operator holding the migration credential did, and the
         // trail says so rather than naming an account that was not acting.
         ...SYSTEM_ACTOR,
@@ -285,8 +230,7 @@ export class AccountService {
   }
 
   async findById(id: number): Promise<AccountRow | undefined> {
-    const rows = await this.db.select().from(accounts).where(eq(accounts.id, id)).limit(1);
-    return rows[0];
+    return this.repos.accounts.findById(id);
   }
 
   /**
@@ -296,12 +240,7 @@ export class AccountService {
    * whether a write into it auto-approves. Reading them separately is how the two answers drift.
    */
   async memberships(accountId: number): Promise<Membership[]> {
-    const rows = await this.db
-      .select({ slug: organizations.slug, verified: organizations.verified })
-      .from(orgMemberships)
-      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
-      .where(eq(orgMemberships.accountId, accountId));
-    return rows;
+    return this.repos.memberships.forAccount(accountId);
   }
 
   /**
@@ -310,17 +249,7 @@ export class AccountService {
    * verified flag and nothing else, and a wider read on a hot path is a wider read.
    */
   async membershipsDetailed(accountId: number): Promise<DetailedMembership[]> {
-    return this.db
-      .select({
-        slug: organizations.slug,
-        name: organizations.name,
-        verified: organizations.verified,
-        role: orgMemberships.role,
-      })
-      .from(orgMemberships)
-      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
-      .where(eq(orgMemberships.accountId, accountId))
-      .orderBy(organizations.slug);
+    return this.repos.memberships.detailedForAccount(accountId);
   }
 
   /**
@@ -334,7 +263,7 @@ export class AccountService {
    * because the route admits no other credential.
    */
   async updateProfile(accountId: number, update: ProfileUpdate): Promise<AccountRow> {
-    const set: Partial<AccountRow> = { updatedAt: new Date() };
+    const set: AccountUpdate = { updatedAt: new Date() };
 
     if (update.handle !== undefined) {
       if (update.handle === null) {
@@ -368,22 +297,11 @@ export class AccountService {
     }
 
     try {
-      return await this.db.transaction(async (tx) => {
-        const before = await tx
-          .select()
-          .from(accounts)
-          .where(eq(accounts.id, accountId))
-          .for("update")
-          .limit(1);
-        const previous = before[0];
+      return await withTransaction(this.db, async (repos) => {
+        const previous = await repos.accounts.lockById(accountId);
         if (!previous) throw new Error(`account ${accountId} vanished during a profile update`);
 
-        const rows = await tx
-          .update(accounts)
-          .set(set)
-          .where(eq(accounts.id, accountId))
-          .returning();
-        const row = rows[0];
+        const row = await repos.accounts.update(accountId, set);
         if (!row) throw new Error(`account ${accountId} vanished during a profile update`);
 
         const patch = diffFields(
@@ -392,7 +310,7 @@ export class AccountService {
         );
         // A PATCH that changed nothing writes no history row, the same rule the write path uses.
         if (!isEmptyPatch(patch)) {
-          await this.audit.record(tx, {
+          await repos.audit.record({
             subjectKind: "account",
             subjectId: row.id,
             actorKind: "user",
@@ -413,26 +331,7 @@ export class AccountService {
 
   /** T3 account discovery for staff screens. Email is joined only for this privileged read. */
   async search(q: string | undefined, limit = 25): Promise<AccountSearchRow[]> {
-    const query = (q ?? "").trim();
-    const select = () =>
-      this.db
-        .select({ ...getTableColumns(accounts), email: authUser.email })
-        .from(accounts)
-        .leftJoin(authUser, eq(authUser.id, accounts.authUserId));
-    if (query === "") {
-      return select().orderBy(accounts.id).limit(limit);
-    }
-    const like = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
-    const prefix = `${query.replace(/[\\%_]/g, "\\$&")}%`;
-    const accountId = /^\d+$/.test(query) ? Number(query) : Number.NaN;
-    const match = or(
-      ilike(accounts.handle, like),
-      ilike(accounts.displayName, like),
-      eq(accounts.authUserId, query),
-      ilike(authUser.email, prefix),
-      Number.isSafeInteger(accountId) ? eq(accounts.id, accountId) : undefined,
-    );
-    return select().where(match).orderBy(accounts.id).limit(limit);
+    return this.repos.accounts.search(q, limit);
   }
 }
 

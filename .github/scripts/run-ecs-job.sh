@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Start one scheduled maintenance job as a one-off container task, wait for it, and exit with its
-# exit code. Called by .github/workflows/jobs-nightly.yml, once per job, with $JOB set.
+# exit code. Called by the nightly maintenance workflow with $JOB set.
 #
 # It lives in a file rather than inline in the workflow for two reasons: the same lines would
 # otherwise be duplicated for every job in the matrix AND for the staleness job beside them, and a
@@ -173,7 +173,7 @@ task_arn=$(
     --task-definition "$task_definition" \
     "${run_args[@]}" \
     --overrides "$overrides" \
-    --started-by "jobs-nightly/${JOB}" \
+    --started-by "scheduled-jobs/${JOB}" \
     --query 'tasks[0].taskArn' \
     --output text
 )

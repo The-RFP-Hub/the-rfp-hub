@@ -5,7 +5,14 @@
  * turns them into words for people, so a public page, a publisher workbench and a reviewer queue do
  * not quietly invent three names for the same state.
  */
-import type { AccountRole, AuditEntry, DuplicateStatus, OrgRole, ReviewStatus } from "./types";
+import type {
+  AccountRole,
+  AuditEntry,
+  DuplicateStatus,
+  NotificationKind,
+  OrgRole,
+  ReviewStatus,
+} from "./types";
 
 const FUNDING_TYPE_LABELS: Readonly<Record<string, string>> = {
   grant: "Grant",
@@ -153,6 +160,66 @@ export function duplicateStatusLabel(value: string): string {
   return DUPLICATE_STATUS_LABELS[value as DuplicateStatus] ?? fallbackLabel(value);
 }
 
+export interface NotificationCopy {
+  title: string;
+  /** Joins the owned title to a visible counterpart title. */
+  withOther: string;
+  /** Follows the owned title when privacy withholds the counterpart. */
+  withoutOther: string;
+  detail: string;
+}
+
+const NOTIFICATION_COPY: Readonly<Record<NotificationKind, NotificationCopy>> = {
+  duplicate_suspected: {
+    title: "Possible match found",
+    withOther: " looked similar to ",
+    withoutOther: " looked similar to another submission.",
+    detail: "A reviewer will compare them; the match is a likeness signal, not a verdict.",
+  },
+  duplicate_confirmed: {
+    title: "Possible match kept on record",
+    withOther: " was reviewed alongside ",
+    withoutOther: " was reviewed alongside another submission.",
+    detail: "A reviewer kept the possible match on record. This does not change either listing.",
+  },
+  duplicate_dismissed: {
+    title: "Possible match dismissed",
+    withOther: " was reviewed alongside ",
+    withoutOther: " was reviewed alongside another submission.",
+    detail: "A reviewer dismissed the possible match. No action is needed.",
+  },
+  duplicate_merged_away: {
+    title: "Your listing was merged",
+    withOther: " was merged into ",
+    withoutOther: " was merged into another listing.",
+    detail: "The surviving listing remains in the directory.",
+  },
+  duplicate_absorbed: {
+    title: "Your listing remains",
+    withOther: " remains after a reviewer merged ",
+    withoutOther: " remains after another submission was merged into it.",
+    detail: "Its public address is unchanged.",
+  },
+  duplicate_reopened: {
+    title: "Possible match reopened",
+    withOther: " will be compared with ",
+    withoutOther: " will be compared with another submission again.",
+    detail: "A reviewer reopened the likeness check for another look.",
+  },
+};
+
+export function notificationCopy(kind: NotificationKind): NotificationCopy {
+  return NOTIFICATION_COPY[kind];
+}
+
+export function notificationActionLabel(
+  action: "review_match" | "view_match" | "view_survivor",
+): string {
+  if (action === "review_match") return "Review possible matches";
+  if (action === "view_survivor") return "Open surviving listing";
+  return "View match history";
+}
+
 export function ingestionMethodLabel(value: string | null | undefined): string {
   if (!value?.trim()) return "Not stated";
   return INGESTION_METHOD_LABELS[value] ?? fallbackLabel(value);
@@ -262,6 +329,10 @@ export const ROUTE_GATE_COPY = {
   duplicates: {
     title: "Sign in to review matches involving your listings.",
     detail: "These matches are private to listing owners and reviewers.",
+  },
+  notifications: {
+    title: "Sign in to view your notifications.",
+    detail: "See duplicate checks and reviewer actions involving listings you own.",
   },
   keys: {
     title: "Sign in to manage API keys.",

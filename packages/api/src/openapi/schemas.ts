@@ -399,6 +399,87 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     properties: { items: { type: "array", items: { $ref: "OwnedDuplicateMatch" } } },
   },
   {
+    $id: "DuplicateNotificationPayload",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "Structured duplicate facts, not presentation copy. `otherListing` is omitted unless that counterpart was approved and listed when the event was emitted; `decidedBy` is coarsened to a role and never identifies the deciding account.",
+    required: ["pairId", "similarity", "yourListing", "action", "link", "decidedBy"],
+    properties: {
+      pairId: { type: "integer" },
+      similarity: { type: ["number", "null"] },
+      yourListing: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: { id: { type: "string" }, title: { type: "string" } },
+      },
+      otherListing: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: { id: { type: "string" }, title: { type: "string" } },
+      },
+      action: {
+        type: "string",
+        enum: ["review_match", "view_match", "view_survivor"],
+      },
+      link: { type: "string", pattern: "^/" },
+      decidedBy: { type: ["string", "null"], enum: ["reviewer", null] },
+    },
+  },
+  {
+    $id: "Notification",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "One account-scoped in-app notification. Email dispatch state is internal delivery telemetry and is not exposed here.",
+    required: ["id", "kind", "subjectKind", "subjectId", "payload", "createdAt", "readAt"],
+    properties: {
+      id: { type: "integer" },
+      kind: {
+        type: "string",
+        enum: [
+          "duplicate_suspected",
+          "duplicate_confirmed",
+          "duplicate_dismissed",
+          "duplicate_merged_away",
+          "duplicate_absorbed",
+          "duplicate_reopened",
+        ],
+      },
+      subjectKind: { type: "string", enum: ["duplicate"] },
+      subjectId: { type: "integer" },
+      payload: { $ref: "DuplicateNotificationPayload" },
+      createdAt: { type: "string", format: "date-time" },
+      readAt: { type: ["string", "null"], format: "date-time" },
+    },
+  },
+  {
+    $id: "NotificationList",
+    type: "object",
+    additionalProperties: false,
+    required: ["items", "page", "limit", "total", "totalPages", "unreadCount"],
+    properties: {
+      items: { type: "array", items: { $ref: "Notification" } },
+      page: { type: "integer" },
+      limit: { type: "integer" },
+      total: { type: "integer" },
+      totalPages: { type: "integer" },
+      unreadCount: { type: "integer" },
+    },
+  },
+  {
+    $id: "NotificationReadAll",
+    type: "object",
+    additionalProperties: false,
+    required: ["markedRead", "unreadCount"],
+    properties: {
+      markedRead: { type: "integer" },
+      unreadCount: { type: "integer", enum: [0] },
+    },
+  },
+  {
     $id: "DuplicateSide",
     type: "object",
     additionalProperties: false,

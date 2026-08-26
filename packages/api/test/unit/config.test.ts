@@ -10,6 +10,7 @@ import {
   mailgunCredentialWarning,
   readAllowPrivateHosts,
   readAnalyticsHmacKey,
+  readAppBaseUrl,
   readBoolean,
   readDbPoolMax,
   readEmailTransport,
@@ -144,6 +145,30 @@ describe("readPublicBaseUrl", () => {
   it("rejects a value that is not an absolute URL", () => {
     for (const raw of ["api.example.org", "https://", "//api.example.org", "not a url"]) {
       expect(() => readPublicBaseUrl(raw), raw).toThrow(/PUBLIC_BASE_URL/);
+    }
+  });
+});
+
+describe("readAppBaseUrl", () => {
+  it("uses the local frontend in development and requires an explicit production origin", () => {
+    expect(readAppBaseUrl(undefined, false)).toBe("http://localhost:3005");
+    expect(() => readAppBaseUrl(undefined, true)).toThrow(/APP_BASE_URL is required/);
+  });
+
+  it("accepts and normalizes a secure frontend origin", () => {
+    expect(readAppBaseUrl(" https://app.example.org/ ", true)).toBe("https://app.example.org");
+    expect(readAppBaseUrl("http://127.0.0.1:3005", false)).toBe("http://127.0.0.1:3005");
+  });
+
+  it("rejects a remote plaintext URL or anything broader than an origin", () => {
+    for (const raw of [
+      "http://app.example.org",
+      "app.example.org",
+      "https://app.example.org/notifications",
+      "https://app.example.org?from=email",
+      "https://user@app.example.org",
+    ]) {
+      expect(() => readAppBaseUrl(raw, false), raw).toThrow(/APP_BASE_URL/);
     }
   });
 });

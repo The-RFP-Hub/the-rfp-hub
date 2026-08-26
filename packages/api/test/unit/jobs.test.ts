@@ -14,10 +14,11 @@ describe("the job catalogue", () => {
     expect(new Set(JOB_NAMES).size).toBe(JOB_NAMES.length);
   });
 
-  it("carries the five jobs the schedule and the docs name", () => {
+  it("carries every job the schedules and docs name", () => {
     expect([...JOB_NAMES].sort()).toEqual([
       "analytics-rollup",
       "embedding-backfill",
+      "notification-dispatch",
       "retention",
       "staleness",
       "verification-backfill",

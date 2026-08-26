@@ -143,4 +143,75 @@ export const me = async (router: FastifyInstance): Promise<void> => {
     },
     meController.listDuplicates,
   );
+
+  router.get(
+    "/notifications",
+    {
+      onRequest: router.auth.requireAuth,
+      schema: {
+        operationId: "listMyNotifications",
+        tags: ["account"],
+        summary: "Notifications for this account, newest first",
+        description:
+          "Session and API-key principals receive the same account-scoped inbox. `unreadCount` covers the whole account independently of pagination and the optional unread filter.",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            unread: { type: "boolean" },
+            page: { type: "integer", minimum: 1, default: 1 },
+            limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          },
+        },
+        response: {
+          200: { $ref: "NotificationList#" },
+          401: { $ref: "ErrorResponse#" },
+        },
+      },
+    },
+    meController.listNotifications,
+  );
+
+  router.post(
+    "/notifications/read-all",
+    {
+      onRequest: router.auth.requireAuth,
+      schema: {
+        operationId: "markAllMyNotificationsRead",
+        tags: ["account"],
+        summary: "Mark every unread notification for this account as read",
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: { $ref: "NotificationReadAll#" },
+          401: { $ref: "ErrorResponse#" },
+        },
+      },
+    },
+    meController.markAllNotificationsRead,
+  );
+
+  router.post(
+    "/notifications/:id/read",
+    {
+      onRequest: router.auth.requireAuth,
+      schema: {
+        operationId: "markMyNotificationRead",
+        tags: ["account"],
+        summary: "Mark one notification belonging to this account as read",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string", pattern: "^[0-9]+$" } },
+        },
+        response: {
+          200: { $ref: "Notification#" },
+          401: { $ref: "ErrorResponse#" },
+          404: { $ref: "ErrorResponse#" },
+        },
+      },
+    },
+    meController.markNotificationRead,
+  );
 };

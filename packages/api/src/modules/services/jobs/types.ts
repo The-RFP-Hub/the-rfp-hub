@@ -5,9 +5,10 @@
  * admin route and the workflow all read one contract. What differs is what `remaining` MEANS, and
  * that difference is the whole of the cursor/sweep split documented in `docs/jobs.md`:
  *
- *   **Cursor jobs** (`staleness`, `embedding-backfill`, `verification-backfill`) select rows by a
- *   predicate the run itself retires. `remaining` counts what the predicate still matches, so it
- *   falls, and the runner may go round again.
+ *   **Cursor jobs** (`staleness`, both backfills, `notification-dispatch`) select rows by a
+ *   predicate the run retires or deliberately leaves waiting for a later retry. `remaining`
+ *   counts what the predicate still matches, so it falls, and the runner may go round again until
+ *   a no-progress pass stops it.
  *
  *   **Sweep jobs** (`analytics-rollup`, `retention`) deliberately reprocess a fixed window every
  *   time — the rollup recomputes the last three days precisely so a late-arriving event is never
@@ -16,7 +17,7 @@
  *   case in the runner: a job that reports 0 is not asked again.
  *
  * `skipped` means the job did not run because the FEATURE is off — no embedding provider,
- * `VERIFICATION_ENABLED=false`. It is deliberately distinct from the runner's own
+ * `VERIFICATION_ENABLED=false`, or no delivering email transport. It is deliberately distinct from the runner's own
  * `{skipped: "locked"}`, which means another run held the advisory lock. Both exit 0; only one of
  * them says something about configuration.
  */
