@@ -504,6 +504,76 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     reviewController.revokeMembership,
   );
 
+  router.post(
+    "/organizations/:slug/invites",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "createOrganizationMembershipInvite",
+        tags: ["review"],
+        summary: "Invite an email address to receive an organisation membership on sign-in",
+        description:
+          "The membership is not active yet. It is applied the first time a person signs in with, and proves ownership of, this email address.",
+        security: [{ bearerAuth: [] }],
+        params: slugParams,
+        body: {
+          type: "object",
+          required: ["email"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", minLength: 3, maxLength: 320 },
+            role: { type: "string", enum: ["owner", "admin", "publisher"] },
+          },
+        },
+        response: {
+          200: { $ref: "MembershipInvite#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
+      },
+    },
+    reviewController.createMembershipInvite,
+  );
+
+  router.get(
+    "/organizations/:slug/invites",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "listOrganizationMembershipInvites",
+        tags: ["review"],
+        summary: "List pending membership invites for an organisation",
+        security: [{ bearerAuth: [] }],
+        params: slugParams,
+        response: { 200: { $ref: "MembershipInviteList#" }, ...errors },
+      },
+    },
+    reviewController.listMembershipInvites,
+  );
+
+  router.delete(
+    "/organizations/:slug/invites/:inviteId",
+    {
+      onRequest: guard,
+      schema: {
+        operationId: "revokeOrganizationMembershipInvite",
+        tags: ["review"],
+        summary: "Revoke a pending organisation membership invite",
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["slug", "inviteId"],
+          properties: {
+            slug: { type: "string" },
+            inviteId: { type: "string", pattern: "^[0-9]+$" },
+          },
+        },
+        response: { 200: { $ref: "MembershipInvite#" }, ...errors },
+      },
+    },
+    reviewController.revokeMembershipInvite,
+  );
+
   router.get(
     "/accounts",
     {

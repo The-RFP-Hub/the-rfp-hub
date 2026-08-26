@@ -19,12 +19,13 @@
  * credential (`grantAdmin` below); every admin after that is made by an admin, over
  * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
-import { eq, getTableColumns, ilike, or } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../../db/client.js";
+import { and, eq, getTableColumns, ilike, isNull, or, sql } from "drizzle-orm";
+import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
 import {
   type AccountRow,
   accounts,
   authUser,
+  orgMembershipInvites,
   orgMemberships,
   organizations,
 } from "../../../db/schema.js";
@@ -77,16 +78,68 @@ export class AccountService {
    * `ON CONFLICT DO NOTHING` followed by a read rather than a read-then-insert: two tabs logging in
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
    */
-  async resolveBySubject(subject: string): Promise<AccountRow> {
-    await this.db.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
-    const rows = await this.db
+  async resolveBySubject(subject: string, verifiedEmail?: string): Promise<AccountRow> {
+    return this.db.transaction(async (tx) => {
+      await tx.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
+      const rows = await tx
+        .select()
+        .from(accounts)
+        .where(eq(accounts.authUserId, subject))
+        .limit(1);
+      const account = rows[0];
+      if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
+      if (verifiedEmail !== undefined) {
+        await this.redeemMembershipInvites(tx, account, verifiedEmail.trim().toLowerCase());
+      }
+      return account;
+    });
+  }
+
+  /** Apply every still-pending invite for an address during session principal resolution. */
+  private async redeemMembershipInvites(tx: Tx, account: AccountRow, email: string): Promise<void> {
+    const invites = await tx
       .select()
-      .from(accounts)
-      .where(eq(accounts.authUserId, subject))
-      .limit(1);
-    const account = rows[0];
-    if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
-    return account;
+      .from(orgMembershipInvites)
+      .where(
+        and(
+          isNull(orgMembershipInvites.acceptedAt),
+          sql`lower(${orgMembershipInvites.email}) = ${email}`,
+        ),
+      )
+      .orderBy(orgMembershipInvites.id)
+      .for("update");
+
+    for (const invite of invites) {
+      await tx
+        .insert(orgMemberships)
+        .values({
+          accountId: account.id,
+          organizationId: invite.organizationId,
+          role: invite.role,
+        })
+        .onConflictDoNothing({ target: [orgMemberships.accountId, orgMemberships.organizationId] });
+      const now = new Date();
+      await tx
+        .update(orgMembershipInvites)
+        .set({ acceptedAt: now, acceptedAccountId: account.id })
+        .where(
+          and(eq(orgMembershipInvites.id, invite.id), isNull(orgMembershipInvites.acceptedAt)),
+        );
+      await this.audit.record(tx, {
+        subjectKind: "organization",
+        subjectId: invite.organizationId,
+        actorKind: "user",
+        actorAccountId: account.id,
+        action: "accept_member_invite",
+        patch: {
+          inviteId: invite.id,
+          email,
+          invitedBy: invite.invitedBy,
+          accountId: account.id,
+          role: invite.role,
+        },
+      });
+    }
   }
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */

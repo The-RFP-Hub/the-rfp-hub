@@ -57,6 +57,13 @@
       "when": 1787688215342,
       "tag": "0007_absurd_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787747816318,
+      "tag": "0008_melted_black_crow",
+      "breakpoints": true
     }
   ]
 }

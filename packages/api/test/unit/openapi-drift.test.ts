@@ -61,6 +61,8 @@ import type {
   ManagedOpportunityView,
   MeMembershipView,
   MeView,
+  MembershipInviteListView,
+  MembershipInviteView,
   MembershipResultView,
   MergeResultView,
   OrganizationListView,
@@ -298,6 +300,8 @@ describe("closed response components vs their producers", () => {
       "ManagedOpportunityList",
       "Me",
       "MeMembership",
+      "MembershipInvite",
+      "MembershipInviteList",
       "MembershipResult",
       "MergeResult",
       "MergedOpportunityErrorResponse",
@@ -593,6 +597,16 @@ describe("M3 closed components vs their view types", () => {
     ecosystems: [],
     memberCount: 1,
   };
+  const membershipInvite: MembershipInviteView = {
+    id: 1,
+    organizationSlug: "example-org",
+    email: "invited@example.com",
+    role: "publisher",
+    invitedBy: 1,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    acceptedAt: null,
+    acceptedAccountId: null,
+  };
 
   const samples: Record<string, object> = {
     SubmissionResult: submissionResult,
@@ -675,6 +689,8 @@ describe("M3 closed components vs their view types", () => {
       role: "publisher",
       member: true,
     } satisfies MembershipResultView,
+    MembershipInvite: membershipInvite,
+    MembershipInviteList: { items: [membershipInvite] } satisfies MembershipInviteListView,
     MergedOpportunityErrorResponse: {
       error: "opportunity_merged",
       mergedInto: { id: "example-org:survivor", title: "The survivor" },

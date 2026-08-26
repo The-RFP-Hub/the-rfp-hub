@@ -147,6 +147,9 @@ export const auditAction = pgEnum("audit_action", [
   "claim",
   "grant_publisher",
   "revoke_publisher",
+  "invite_member",
+  "accept_member_invite",
+  "revoke_member_invite",
   // organizations
   "verify_organization",
   "unverify_organization",
@@ -294,6 +297,37 @@ export const orgMemberships = pgTable(
     // The hot lookup is "which organizations does this principal publish for", resolved on every
     // authenticated write.
     index("ix_org_membership_account").on(t.accountId),
+  ],
+);
+
+// ── org_membership_invites (publishing rights waiting for a verified sign-in) ────
+export const orgMembershipInvites = pgTable(
+  "org_membership_invites",
+  {
+    id: bigint({ mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    organizationId: bigint({ mode: "number" })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Normalized to lowercase by the service; the partial index also lowers defensively. */
+    email: text().notNull(),
+    role: orgRole().notNull().default("publisher"),
+    invitedBy: bigint({ mode: "number" })
+      .notNull()
+      .references(() => accounts.id),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    acceptedAccountId: bigint({ mode: "number" }).references(() => accounts.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    uniqueIndex("ux_org_membership_invite_pending")
+      .on(t.organizationId, sql`lower(${t.email})`)
+      .where(sql`${t.acceptedAt} is null`),
+    index("ix_org_membership_invite_pending_email")
+      .on(sql`lower(${t.email})`)
+      .where(sql`${t.acceptedAt} is null`),
+    index("ix_org_membership_invite_organization").on(t.organizationId, t.createdAt),
   ],
 );
 
@@ -748,6 +782,7 @@ export type AccountInsert = typeof accounts.$inferInsert;
 export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type ApiKeyInsert = typeof apiKeys.$inferInsert;
 export type OrgMembershipRow = typeof orgMemberships.$inferSelect;
+export type OrgMembershipInviteRow = typeof orgMembershipInvites.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type AuditLogInsert = typeof auditLog.$inferInsert;
 export type OpportunityClaimRow = typeof opportunityClaims.$inferSelect;

@@ -386,6 +386,21 @@ export interface MembershipResultView {
   member: boolean;
 }
 
+export interface MembershipInviteView {
+  id: number;
+  organizationSlug: string;
+  email: string;
+  role: "owner" | "admin" | "publisher";
+  invitedBy: number;
+  createdAt: string;
+  acceptedAt: string | null;
+  acceptedAccountId: number | null;
+}
+
+export interface MembershipInviteListView {
+  items: MembershipInviteView[];
+}
+
 /**
  * One scheduled job's run, as `POST /v1/admin/jobs/{job}/run` reports it.
  *
