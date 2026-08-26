@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_OVERLAP_THRESHOLD,
   DEFAULT_SIMILARITY_THRESHOLD,
   config,
   mailgunCredentialWarning,
@@ -19,6 +20,8 @@ import {
   readList,
   readMailgunApiBase,
   readNonNegativeInt,
+  readOverlapMinSimilarity,
+  readOverlapThreshold,
   readPem,
   readPort,
   readPositiveInt,
@@ -293,6 +296,48 @@ describe("readSimilarityThreshold", () => {
   it("rejects a value that is not a cosine similarity", () => {
     for (const raw of ["-0.1", "1.5", "86%", "high"]) {
       expect(() => readSimilarityThreshold(raw, "lexical"), raw).toThrow(/DEDUPE_SIMILARITY/);
+    }
+  });
+});
+
+describe("readOverlapThreshold", () => {
+  it("defaults per provider, like the similarity threshold", () => {
+    expect(readOverlapThreshold(undefined, "lexical")).toBe(DEFAULT_OVERLAP_THRESHOLD.lexical);
+    expect(readOverlapThreshold("", "disabled")).toBe(DEFAULT_OVERLAP_THRESHOLD.disabled);
+    expect(DEFAULT_OVERLAP_THRESHOLD.lexical).not.toBe(DEFAULT_OVERLAP_THRESHOLD.disabled);
+  });
+
+  /**
+   * THE EASY WRONG ANSWER, pinned. `readSimilarityThreshold`'s `[0, 1]` range is right for a
+   * cosine and wrong here: overlap is cosine corrected by a norm ratio and is NOT bounded by 1 —
+   * an honest 40 % truncation of a real corpus entry measures 1.223. A copied clamp would refuse a
+   * legitimate operating point and, worse, would encode the false claim that this is a proportion.
+   */
+  it("accepts values above 1, because overlap is not a proportion", () => {
+    expect(readOverlapThreshold("1.25", "lexical")).toBe(1.25);
+    expect(readOverlapThreshold("4", "lexical")).toBe(4);
+  });
+
+  it("refuses a value outside (0, 4] rather than clamping it", () => {
+    for (const raw of ["0", "-1", "4.1", "85%", "high"]) {
+      expect(() => readOverlapThreshold(raw, "lexical"), raw).toThrow(/DEDUPE_OVERLAP_THRESHOLD/);
+    }
+  });
+});
+
+describe("readOverlapMinSimilarity", () => {
+  it("falls back and takes a cosine in range", () => {
+    expect(readOverlapMinSimilarity(undefined, 0.35)).toBe(0.35);
+    expect(readOverlapMinSimilarity("", 0.35)).toBe(0.35);
+    expect(readOverlapMinSimilarity("0.55", 0.35)).toBe(0.55);
+    expect(readOverlapMinSimilarity("0", 0.35)).toBe(0);
+  });
+
+  it("refuses a value that is not a cosine similarity", () => {
+    for (const raw of ["-0.1", "1.5", "low"]) {
+      expect(() => readOverlapMinSimilarity(raw, 0.35), raw).toThrow(
+        /DEDUPE_OVERLAP_MIN_SIMILARITY/,
+      );
     }
   });
 });
