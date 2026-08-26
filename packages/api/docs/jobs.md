@@ -167,18 +167,21 @@ run on its own** — nothing downstream will report its absence for you.
 
 ### What actually runs today
 
-**The external scheduler above is an Airflow DAG, owned by the operator's data-warehouse
-project.** It is not a workflow in this repository and this repository does not name it further —
-that ownership is outside what a checkout can show. It runs the six jobs at **01:05 UTC** daily,
-`staleness` after the other five, exactly the ordering this section states, and it invokes them the
-same way `jobs-nightly.yml` and `run-ecs-job.sh` do: one-off `run-task` overrides against the
-deployed ECS image, on the API service's own task definition. Its **first production run was
-2026-08-26**, against release `prod-1.3.0`.
+**As stated by the operator** — these facts are not corroborable from this checkout, so they are
+attributed rather than asserted as fact this repository can verify: the external scheduler above is
+an Airflow DAG, owned by the operator's data-warehouse project. It is not a workflow in this
+repository. It runs the six jobs at **01:05 UTC** daily, `staleness` after the other five, exactly
+the ordering this section states, and it invokes them the same way `jobs-nightly.yml` and
+`run-ecs-job.sh` do: one-off `run-task` overrides against the deployed ECS image, on the API
+service's own task definition. Its **first production run was 2026-08-26**, against release
+`prod-1.3.0`.
 
 That run's logs live in the Airflow deployment itself and are **not reachable from this
 repository** — there is no link to add here, and none this document can keep current if there were.
 What an auditor without Airflow access can read instead is the same database the run wrote to, for
-the run's calendar day:
+the run's calendar day. **None of what follows is job history — no row here names which caller ran
+a job, or that one ran at all — it is the ordinary data the jobs write, read for the window a run
+would have touched:**
 
 * **`audit_log`** — every entry `staleness` closed that night, `actor_kind='job'` naming the job in
   the patch (§7):
@@ -189,17 +192,22 @@ the run's calendar day:
   where actor_kind = 'job'
     and action = 'close'
     and patch->>'job' = 'staleness'
-    and created_at >= '2026-08-26' and created_at < '2026-08-27'
+    and created_at >= timestamptz '2026-08-26T00:00:00Z'
+    and created_at <  timestamptz '2026-08-27T00:00:00Z'
   order by created_at;
   ```
 
-* **`verification_runs`** — one row per source fetch the same night's `verification-backfill`
-  attempted:
+* **`verification_runs`** — every source check in the window, **from any origin**. The table has no
+  job/origin column: `VerificationService.verify()` writes the same row shape for a nightly
+  `verification-backfill` pass, a submit-time check and a reviewer's manual re-check from the
+  dashboard, so a row's mere existence proves a check happened, not that the job ran it. The signal
+  worth reading for is a **burst around 01:05 UTC**, not the rows' presence:
 
   ```sql
   select id, opportunity_id, run_at, http_status, matched, error
   from verification_runs
-  where run_at >= '2026-08-26' and run_at < '2026-08-27'
+  where run_at >= timestamptz '2026-08-26T00:00:00Z'
+    and run_at <  timestamptz '2026-08-27T00:00:00Z'
   order by run_at;
   ```
 
@@ -210,20 +218,34 @@ the run's calendar day:
   select opportunity_id, day, list_views, detail_views, source_clicks, apply_clicks, updated_at
   from opportunity_stats_daily
   where day = '2026-08-25'
-    and updated_at >= '2026-08-26' and updated_at < '2026-08-27'
+    and updated_at >= timestamptz '2026-08-26T00:00:00Z'
+    and updated_at <  timestamptz '2026-08-27T00:00:00Z'
   order by updated_at desc;
   ```
 
-**There is no admin endpoint or CLI for any of the three.** `POST /v1/admin/jobs/{job}/run` (§4c)
-starts a job; it does not report a history of past runs, and nothing under `/v1/admin/jobs` reads
-one back. The nearest API-level view is `GET /v1/opportunities/:id/audit` — the public per-entry
-trail (§7) — but that is one entry at a time and presupposes the id; it does not answer "did the
-chain run last night" on its own. Direct SQL against the three tables above, run by someone with
-database access, is the only path that does not require reaching into Airflow.
+  All three columns above are `timestamptz`; an unzoned literal is interpreted in the reading
+  session's `TimeZone` setting, not UTC, and silently shifts the window. The explicit `timestamptz
+  '…Z'` casts are what keep the bounds meant here regardless of that setting.
 
-**The known gap above still stands.** Confirming these three tables says the chain ran; it says
-nothing about whether it finished before `nightly-export.yml`'s `17 3 * * *` cron, which remains
-unenforced or ordered by anything but the clock.
+**There is no admin endpoint or CLI for any of the three, and the read-only routes that touch these
+tables are not job history either.** `POST /v1/admin/jobs/{job}/run` (§4c) starts a job; it does not
+report a history of past runs, and nothing under `/v1/admin/jobs` reads one back. `GET
+/v1/opportunities/:id/audit` (§7) is the public per-entry trail — one entry at a time, and it
+presupposes the id. `GET /v1/opportunities/:id/verification` returns only the **latest**
+`verification_runs` row for an entry, with the same any-origin caveat as above. The `/v1/insights/*`
+routes read `opportunity_stats_daily` for a publisher's own numbers. None of the four tells an
+auditor whether a scheduled run happened, only what the data currently says. Direct SQL against the
+three tables above, run by someone with database access, is the only path that does not require
+reaching into Airflow.
+
+**These are the only in-database footprints, and reading them proves less than it looks like.**
+`retention`, `embedding-backfill` and `notification-dispatch` leave no comparable trace here: a
+healthy `retention` pass may have nothing past the window to delete, a healthy `embedding-backfill`
+may have no backlog, a healthy `notification-dispatch` may have no pending notification. Presence in
+the three tables above is **consistent with** a run having happened; **absence proves nothing** —
+not that a job failed, and not that it didn't run — because every one of these jobs is also
+reachable by hand (§4b) or via `workflow_dispatch` (§4a). None of it says anything about **ordering**
+either: the known gap stated above stands regardless of what these queries return.
 
 ### Which deployment a run maintains
 
