@@ -284,7 +284,7 @@ export function OpportunityView({
  * carries no `applicationUrl` — an ongoing bounty programme, a record imported from a feed that
  * never had one. The old page said "This entry states no application link." and stopped, which
  * left the reader holding a description and nowhere to go. It now says the same true thing and
- * then hands over the two things it does have: the programme's own site, and the organisation
+ * then hands over the two things it does have: the programme's own site, and the organization
  * running it.
  */
 function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
@@ -329,7 +329,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
       </p>
       <p className="muted footnote">
         That is what the publisher filed, not something missing from this page. Applications for
-        this programme are arranged wherever {operator ? "the organisation below" : "its organiser"}{" "}
+        this programme are arranged wherever {operator ? "the organization below" : "its organiser"}{" "}
         says — start from the programme&rsquo;s own site.
       </p>
       <p className="row">
@@ -343,7 +343,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
             Open the programme site ↗
           </a>
         ) : operator?.website ? (
-          <UntrustedLink href={operator.website} label="Open the organisation’s site ↗" />
+          <UntrustedLink href={operator.website} label="Open the organization’s site ↗" />
         ) : (
           <span className="muted">
             No site was stated either. Everything the listing does carry is below.
@@ -481,13 +481,13 @@ function Milestones({ entry }: { entry: Opportunity }) {
  *
  * Operating and sponsoring are different roles and the Standard models them as different arrays:
  * the operator runs the intake and is who an applicant deals with, a sponsor may only have put money
- * behind it. Merging them into one "organisations" list is the misattribution that split them.
+ * behind it. Merging them into one "organizations" list is the misattribution that split them.
  */
 function Organizations({ entry }: { entry: Opportunity }) {
   const sponsors = entry.sponsoringOrganizations ?? [];
   return (
     <section aria-labelledby="orgs-heading">
-      <h2 id="orgs-heading">Organisations</h2>
+      <h2 id="orgs-heading">Organizations</h2>
       <dl className="grid-2">
         <div>
           <dt>Runs this opportunity</dt>

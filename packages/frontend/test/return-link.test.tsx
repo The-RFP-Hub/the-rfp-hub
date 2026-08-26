@@ -33,12 +33,12 @@ describe("the labelled way back", () => {
     expect(link.getAttribute("href")).toBe("/review?tab=claims");
   });
 
-  it("names an organisation by the name the origin supplied, not by its slug", () => {
-    mount("back=%2Forganisations%2Ffilecoin&backLabel=Filecoin+Foundation");
+  it("names an organization by the name the origin supplied, not by its slug", () => {
+    mount("back=%2Forganizations%2Ffilecoin&backLabel=Filecoin+Foundation");
 
     expect(screen.getByRole("link", { name: /Back to Filecoin Foundation/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Filecoin Foundation/ }).getAttribute("href")).toBe(
-      "/organisations/filecoin",
+      "/organizations/filecoin",
     );
   });
 

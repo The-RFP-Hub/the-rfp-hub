@@ -96,9 +96,9 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "claimOpportunity",
         tags: ["submissions"],
-        summary: "Claim publisher ownership of an entry on an organisation's behalf",
+        summary: "Claim publisher ownership of an entry on an organization's behalf",
         description:
-          "Granted immediately (200) when the organisation is verified AND appears among the entry's OPERATING organisations — sponsorship is not operation. Anything else is queued for review (202).",
+          "Granted immediately (200) when the organization is verified AND appears among the entry's OPERATING organizations — sponsorship is not operation. Anything else is queued for review (202).",
         security: [{ bearerAuth: [] }],
         params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
         body: {

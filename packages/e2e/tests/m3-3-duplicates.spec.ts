@@ -18,7 +18,7 @@ test.describe.configure({ mode: "serial" });
  * Two descriptions of the same programme, worded differently — the pair the detector must catch.
  *
  * PARAMETERISED BY A LABEL, and that is not cosmetic. The embedding text is built from the title,
- * description, funding type, ecosystems and organisations; the public id is NOT part of it. Two
+ * description, funding type, ecosystems and organizations; the public id is NOT part of it. Two
  * fixtures with identical prose therefore produce identical vectors, so every "original" in this
  * file would be an exact duplicate of every other one. Candidate matches are capped
  * (`DEDUPE_MAX_MATCHES`, default 5) and ordered by distance with ties broken arbitrarily, so as the

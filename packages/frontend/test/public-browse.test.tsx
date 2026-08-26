@@ -241,7 +241,7 @@ describe("the public directory list", () => {
     // position a scanning eye reads second, and telling a reader nothing about whether to click.
     expect(screen.queryByText("acme:round-4")).toBeNull();
 
-    // The operating organisation — entry 0, the party that runs the intake.
+    // The operating organization — entry 0, the party that runs the intake.
     expect(screen.getByText("Acme Foundation")).toBeTruthy();
 
     // Status is its own column now, as a word. Scoped to the badge, because "open" is also an
@@ -562,7 +562,7 @@ describe("the public opportunity page", () => {
     expect(screen.getByText("5,000–50,000 USD per award")).toBeTruthy();
     expect(screen.getByText("120,000 USD")).toBeTruthy();
 
-    // Operating and sponsoring organisations, kept apart. The operator is named twice — in the
+    // Operating and sponsoring organizations, kept apart. The operator is named twice — in the
     // identity line and under "Runs this opportunity" — and the sponsor only in its own column.
     expect(screen.getAllByText("Acme Foundation")).toHaveLength(2);
     expect(screen.getByText("Beta Collective")).toBeTruthy();

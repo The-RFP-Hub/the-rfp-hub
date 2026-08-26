@@ -10,7 +10,7 @@
  * demotes themselves cannot undo it, and if they are the only one nobody can. That warning is
  * asserted for its words.
  *
- * ORGANISATIONS ARE NOT ON THIS PAGE any more; verification is a reviewer capability. A read-only
+ * ORGANIZATIONS ARE NOT ON THIS PAGE any more; verification is a reviewer capability. A read-only
  * copy of the directory here taught that it was an administrator's job.
  */
 import AdminPage from "@/app/admin/page";
@@ -81,7 +81,7 @@ const mount = (accounts: AccountSummary[] = [account()]) =>
 beforeEach(() => vi.clearAllMocks());
 
 describe("the page's scope", () => {
-  it("does not carry an organisation directory — that lives with the reviewer who verifies them", async () => {
+  it("does not carry an organization directory — that lives with the reviewer who verifies them", async () => {
     mount();
 
     expect(await screen.findByRole("heading", { name: "Accounts & roles" })).toBeTruthy();
@@ -135,7 +135,7 @@ describe("changing a role", () => {
     });
 
     const panel = screen.getByRole("group", { name: "Make indie2 a Hub reviewer?" });
-    expect(within(panel).getByText(/verify organisations/)).toBeTruthy();
+    expect(within(panel).getByText(/verify organizations/)).toBeTruthy();
     expect(within(panel).getByText(/grants publishing rights over a whole namespace/)).toBeTruthy();
   });
 
@@ -182,7 +182,7 @@ describe("direct create", () => {
     const panel = screen.getByRole("group", { name: "Grant direct-create to indie2?" });
     expect(within(panel).getByText(/any namespace/)).toBeTruthy();
     expect(
-      within(panel).getByText(/A membership on a verified organisation is the narrower way/),
+      within(panel).getByText(/A membership on a verified organization is the narrower way/),
     ).toBeTruthy();
     // The thing people assume wrongly: that it makes their API key powerful too.
     expect(within(panel).getByText(/does not elevate an API key/)).toBeTruthy();

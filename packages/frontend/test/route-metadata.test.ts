@@ -3,8 +3,8 @@ import { join, relative, sep } from "node:path";
 import { generateMetadata as listingMetadata } from "@/app/listings/[id]/layout";
 import { metadata as listingsMetadata } from "@/app/listings/layout";
 import { generateMetadata as opportunityMetadata } from "@/app/opportunities/[id]/layout";
-import { generateMetadata as organisationMetadata } from "@/app/organisations/[slug]/layout";
-import { metadata as organisationsMetadata } from "@/app/organisations/layout";
+import { generateMetadata as organizationMetadata } from "@/app/organizations/[slug]/layout";
+import { metadata as organizationsMetadata } from "@/app/organizations/layout";
 import { describe, expect, it } from "vitest";
 
 const appRoot = join(process.cwd(), "src", "app");
@@ -44,8 +44,9 @@ describe("route metadata", () => {
       "/listings/[id]/edit",
       "/listings/new",
       "/opportunities/[id]",
-      "/organisations",
-      "/organisations/[slug]",
+      "/organisations/[[...rest]]",
+      "/organizations",
+      "/organizations/[slug]",
       "/privacy",
       "/review",
       "/terms",
@@ -70,10 +71,10 @@ describe("route metadata", () => {
       opportunityMetadata({ params: Promise.resolve({ id: "acme:round-4" }) }),
     ).resolves.toEqual({ title: "acme:round-4" });
     await expect(
-      organisationMetadata({ params: Promise.resolve({ slug: "acme-foundation" }) }),
-    ).resolves.toEqual({ title: "Organisation acme-foundation" });
-    expect(organisationsMetadata).toEqual({
-      title: { default: "Organisations", template: "%s | RFP Hub" },
+      organizationMetadata({ params: Promise.resolve({ slug: "acme-foundation" }) }),
+    ).resolves.toEqual({ title: "Organization acme-foundation" });
+    expect(organizationsMetadata).toEqual({
+      title: { default: "Organizations", template: "%s | RFP Hub" },
     });
     expect(listingsMetadata).toEqual({
       title: { default: "Your listings", template: "%s | RFP Hub" },

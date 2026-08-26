@@ -6,7 +6,7 @@
  * This page exists because the answer was previously distributed across a dozen footnotes — a
  * sentence on the submit form, a tooltip on a badge, a paragraph in an empty state — and none of
  * them could be linked to. A submitter who wanted to know why their listing was still pending, an
- * organisation wondering what "verified" would actually get them, and a new reviewer working out
+ * organization wondering what "verified" would actually get them, and a new reviewer working out
  * the limits of their own role were all reading fragments.
  *
  * IT IS A TABLE, because the question is a matrix and prose is the wrong shape for a matrix. The
@@ -16,11 +16,11 @@
  * authority.
  *
  * THE SHAPE OF THE TABLE IS THE SCOPE OF EACH ROLE, and the phrase "own namespace" is doing most of
- * the work. A verified organisation decides — approves AND rejects — what publishes in its own
- * name; a Hub reviewer decides anywhere, and is the only one who can verify an organisation, grant
+ * the work. A verified organization decides — approves AND rejects — what publishes in its own
+ * name; a Hub reviewer decides anywhere, and is the only one who can verify an organization, grant
  * somebody membership of one, or settle a claim or a duplicate. Those four are exactly the powers
  * that would let a namespace grant itself more power, which is why they sit with a neutral party. A
- * paragraph saying "organisations moderate their own namespace" would be true and would still leave
+ * paragraph saying "organizations moderate their own namespace" would be true and would still leave
  * a reader unable to work out which of the fifteen things below they may actually do.
  */
 import { REPOSITORY, STANDARD } from "@/lib/links";
@@ -74,27 +74,27 @@ const ACTIONS: Action[] = [
   },
   {
     what: "Have more than five submissions waiting at once",
-    note: "An account with no verified membership holds up to five undecided submissions. A slot frees the moment one is decided — by a Hub reviewer, or by the organisation it names.",
+    note: "An account with no verified membership holds up to five undecided submissions. A slot frees the moment one is decided — by a Hub reviewer, or by the organization it names.",
     can: { member: true, reviewer: true, admin: true },
   },
   {
     what: "Edit a listing",
-    note: "Its own submitter, anyone in the organisation whose namespace it is in, or Hub staff.",
+    note: "Its own submitter, anyone in the organization whose namespace it is in, or Hub staff.",
     can: { submitter: "own", member: "own namespace", reviewer: true, admin: true },
   },
   {
     what: "See listings that are not published yet",
-    note: "Your own submissions; and, for a member, everything filed in the organisation's name.",
+    note: "Your own submissions; and, for a member, everything filed in the organization's name.",
     can: { submitter: "own", member: "own namespace", reviewer: true, admin: true },
   },
   {
     what: "Publish without review",
-    note: "A listing whose id is in a verified organisation's namespace goes live on submission.",
+    note: "A listing whose id is in a verified organization's namespace goes live on submission.",
     can: { member: "own namespace", reviewer: true, admin: true },
   },
   {
     what: "Approve a pending submission",
-    note: "A member approving one in their own namespace is the organisation endorsing it, in its own name.",
+    note: "A member approving one in their own namespace is the organization endorsing it, in its own name.",
     can: { member: "own namespace", reviewer: true, admin: true },
   },
   {
@@ -103,8 +103,8 @@ const ACTIONS: Action[] = [
     can: { member: "own namespace", reviewer: true, admin: true },
   },
   {
-    what: "Claim a listing for an organisation",
-    note: "Asks for an existing listing to be moved into your organisation's ownership.",
+    what: "Claim a listing for an organization",
+    note: "Asks for an existing listing to be moved into your organization's ownership.",
     can: { submitter: true, member: true, reviewer: true, admin: true },
   },
   {
@@ -116,12 +116,12 @@ const ACTIONS: Action[] = [
     can: { reviewer: true, admin: true },
   },
   {
-    what: "Verify an organisation",
-    note: "The decision that turns an organisation's submissions into instant publications.",
+    what: "Verify an organization",
+    note: "The decision that turns an organization's submissions into instant publications.",
     can: { reviewer: true, admin: true },
   },
   {
-    what: "Grant somebody membership of an organisation",
+    what: "Grant somebody membership of an organization",
     can: { reviewer: true, admin: true },
   },
   {
@@ -161,15 +161,15 @@ export default function HowItWorksPage() {
           <dd>
             Any account, created by signing in once. Submits opportunities and edits its own. Every
             submission waits for a decision before the public can see it — including submissions
-            about a programme you run, until your organisation is verified. Up to{" "}
+            about a programme you run, until your organization is verified. Up to{" "}
             <strong>five</strong> can be waiting at a time.
           </dd>
         </div>
         <div>
-          <dt>Organisation member</dt>
+          <dt>Organization member</dt>
           <dd>
-            An account a reviewer has attached to an organisation. Sees everything filed in that
-            organisation&rsquo;s name, published or not. If the organisation is{" "}
+            An account a reviewer has attached to an organization. Sees everything filed in that
+            organization&rsquo;s name, published or not. If the organization is{" "}
             <strong>verified</strong>, its members publish into its namespace instantly and decide —
             approve or reject — what anybody else files there.
           </dd>
@@ -177,10 +177,10 @@ export default function HowItWorksPage() {
         <div>
           <dt>Hub reviewer</dt>
           <dd>
-            A staff role, and deliberately <strong>organisation-agnostic</strong>: a reviewer works
-            every queue, in every namespace, including the namespaces of organisations they belong
+            A staff role, and deliberately <strong>organization-agnostic</strong>: a reviewer works
+            every queue, in every namespace, including the namespaces of organizations they belong
             to and the ones they compete with. Approves and rejects anywhere, and is the only role
-            that verifies organisations, grants memberships, and settles claims and duplicates.
+            that verifies organizations, grants memberships, and settles claims and duplicates.
           </dd>
         </div>
         <div>
@@ -248,23 +248,23 @@ export default function HowItWorksPage() {
         </table>
       </div>
 
-      <h2>Deciding in your organisation&rsquo;s name</h2>
+      <h2>Deciding in your organization&rsquo;s name</h2>
       <p className="prose">
-        A verified organisation decides what publishes in its own namespace. Somebody outside the
-        organisation files a listing about your programme; a member approves it — the organisation
+        A verified organization decides what publishes in its own namespace. Somebody outside the
+        organization files a listing about your programme; a member approves it — the organization
         saying <em>yes, this is ours and it is right</em> — or rejects it. Nobody is better placed
         to know.
       </p>
       <p className="prose">
-        <strong>Decisions in your organisation&rsquo;s name carry your name.</strong> A rejection
+        <strong>Decisions in your organization&rsquo;s name carry your name.</strong> A rejection
         needs a written reason, and both the reason and the handle of the member who wrote it go
         into the listing&rsquo;s history, which anybody can read. That is the whole safeguard, and
-        it is deliberately the only one: an organisation that can quietly bury an accurate listing
-        about itself is a problem, and an organisation that has to say why, in public, under a name,
+        it is deliberately the only one: an organization that can quietly bury an accurate listing
+        about itself is a problem, and an organization that has to say why, in public, under a name,
         is not.
       </p>
       <p className="prose">
-        Everything past your own namespace stays with Hub staff. Verifying an organisation, granting
+        Everything past your own namespace stays with Hub staff. Verifying an organization, granting
         somebody membership of one, settling a claim over who owns a listing, deciding which of two
         near-identical listings survives — those are the four powers that could be used to widen a
         namespace&rsquo;s own reach, so they sit with people who have no stake in any of them.
@@ -275,7 +275,7 @@ export default function HowItWorksPage() {
       <h2>Five waiting at a time</h2>
       <p className="prose">
         An account with no verified membership can hold <strong>five</strong> submissions awaiting a
-        decision. A slot frees as soon as one is decided — by a Hub reviewer, or by the organisation
+        decision. A slot frees as soon as one is decided — by a Hub reviewer, or by the organization
         the listing names.
       </p>
       <p className="muted prose">
@@ -288,7 +288,7 @@ export default function HowItWorksPage() {
       <h2>What &ldquo;verified&rdquo; means, and what it does not</h2>
       <p className="prose">
         Verification says a reviewer has satisfied themselves that the people holding an
-        organisation&rsquo;s membership really do speak for it. That is all. It is{" "}
+        organization&rsquo;s membership really do speak for it. That is all. It is{" "}
         <strong>not</strong> an endorsement of the programme, a check that its amounts are real, or
         a statement that it is a good place to apply.
       </p>
@@ -314,14 +314,14 @@ export default function HowItWorksPage() {
           <dt>Submission</dt>
           <dd>
             A listing that has been filed but not yet published. Only its submitter, its
-            organisation and Hub staff can see one.
+            organization and Hub staff can see one.
           </dd>
         </div>
         <div>
           <dt>Namespace</dt>
           <dd>
             The part of an id before the colon — <code>acme:round-4</code> is in <code>acme</code>.
-            It names the organisation a listing is published under.
+            It names the organization a listing is published under.
           </dd>
         </div>
       </dl>

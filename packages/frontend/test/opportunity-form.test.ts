@@ -121,9 +121,9 @@ describe("splitList", () => {
 describe("idProblem", () => {
   it("requires the namespaced form the API derives the source system from", () => {
     expect(idProblem("")).toContain("required");
-    expect(idProblem("no-namespace")).toContain("organisation slug and a colon");
-    expect(idProblem(":leading")).toContain("organisation slug and a colon");
-    expect(idProblem("trailing:")).toContain("organisation slug and a colon");
+    expect(idProblem("no-namespace")).toContain("organization slug and a colon");
+    expect(idProblem(":leading")).toContain("organization slug and a colon");
+    expect(idProblem("trailing:")).toContain("organization slug and a colon");
     expect(idProblem("acme-foundation:2026-round-1")).toBeNull();
   });
 
@@ -134,7 +134,7 @@ describe("idProblem", () => {
 });
 
 describe("the derived id", () => {
-  it("proposes the organisation slug and the slugified title", () => {
+  it("proposes the organization slug and the slugified title", () => {
     expect(deriveId("acme", "Round One: Public Goods!")).toBe("acme:round-one-public-goods");
   });
 
@@ -153,7 +153,7 @@ describe("the derived id", () => {
 });
 
 describe("the id's namespace", () => {
-  it("must be the primary operating organisation — the namespace the API derives", () => {
+  it("must be the primary operating organization — the namespace the API derives", () => {
     const problems = fieldProblems(usable({ id: "beta:round-one" }));
     expect(problems.id).toContain("acme");
   });
@@ -166,7 +166,7 @@ describe("the id's namespace", () => {
         { ...emptyOrganization(), name: "Beta Collective", slug: "beta" },
       ],
     });
-    expect(fieldProblems(form).id).toContain("not the primary organisation");
+    expect(fieldProblems(form).id).toContain("not the primary organization");
   });
 
   it("is happy when the two agree", () => {
@@ -181,8 +181,8 @@ describe("the id's namespace", () => {
  * On a create the API derives the namespace from `operatingOrganizations[0].slug` and requires the
  * id to start with it. On a REPLACE it never looks at the id — which is immutable — and authorises
  * against the row's STORED `source.publisher`, asking only that the publisher still appears among
- * the operating organisations. A claimed or imported listing carries an id from the system it came
- * from while being operated by the organisation that claimed it, so holding the id to the primary
+ * the operating organizations. A claimed or imported listing carries an id from the system it came
+ * from while being operated by the organization that claimed it, so holding the id to the primary
  * operator on edit refused a PUT the API would have accepted, and told the publisher to fix a field
  * they cannot change.
  */
@@ -313,7 +313,7 @@ describe("describePublish", () => {
   it("says pending for an account with no verified membership at all", () => {
     const said = describePublish("beta:x", { verifiedNamespaces: [], directCreate: false });
     expect(said?.immediate).toBe(false);
-    expect(said?.because).toContain("not a member of a verified organisation");
+    expect(said?.because).toContain("not a member of a verified organization");
   });
 
   it("honours the account-level direct-create grant whatever the namespace", () => {
@@ -837,11 +837,11 @@ describe("the maximal round trip", () => {
         slug: "acme",
         website: "https://acme.example",
         logoUrl: "https://acme.example/logo.png",
-        // Members of an organisation the form does not render at all.
+        // Members of an organization the form does not render at all.
         contacts: [{ name: "A Steward", email: "grants@acme.example" }],
         ecosystems: ["ethereum"],
       },
-      // A SECOND operating organisation. Rebuilding the array from one pair of inputs deleted it.
+      // A SECOND operating organization. Rebuilding the array from one pair of inputs deleted it.
       { name: "Beta Collective", slug: "beta", website: "https://beta.example" },
     ],
     sponsoringOrganizations: [{ name: "Gamma DAO", slug: "gamma" }],
@@ -912,7 +912,7 @@ describe("the maximal round trip", () => {
     );
     const document = rebuilt.document as Record<string, unknown>;
 
-    // The first organisation's OTHER members survive an edit to its name…
+    // The first organization's OTHER members survive an edit to its name…
     expect(document.operatingOrganizations).toEqual([
       {
         name: "Acme",
@@ -934,7 +934,7 @@ describe("the maximal round trip", () => {
     });
   });
 
-  it("carries an organisation's unmodelled members with the ROW when the order changes", () => {
+  it("carries an organization's unmodelled members with the ROW when the order changes", () => {
     const { form, carried } = fromDocument(maximal);
     const rebuilt = toDocument(
       { ...form, operatingOrganizations: moveRow(form.operatingOrganizations, 0, 1) },

@@ -2,25 +2,25 @@
 
 import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 /**
- * An organisation's own view of itself: what it has published, what is waiting in its name, and —
+ * An organization's own view of itself: what it has published, what is waiting in its name, and —
  * when it is verified — the decision on each of those.
  *
  * WHO THIS PAGE IS FOR, AND WHY IT IS NOT `/review`. A Hub reviewer decides about anybody. A member
  * here decides about their OWN namespace, and the API scopes them differently: a listing filed under
- * another organisation answers 404 rather than 403, so nothing on this page can be used to find out
+ * another organization answers 404 rather than 403, so nothing on this page can be used to find out
  * what is queued elsewhere.
  *
  * THE TWO GATES ARE NOT THE SAME GATE, and the page keeps them visibly apart because the model does:
  *   - ANY membership is enough to SEE this. Verification governs publishing, not visibility, so an
- *     unverified organisation can still find out what has been filed in its name.
- *   - Deciding needs a membership on a VERIFIED organisation. That is the same trust event that
+ *     unverified organization can still find out what has been filed in its name.
+ *   - Deciding needs a membership on a VERIFIED organization. That is the same trust event that
  *     makes a member's own writes publish without review; it would be incoherent to grant one and
  *     withhold the other.
  *
  * THERE IS NO `GET /v1/organizations/:slug`. Identity — name, slug, role, verified — comes from
  * `GET /v1/me`'s membership list, which is also the gate; `verifiedAt` and the public description
- * come from `GET /v1/publishers`, which lists verified organisations only. That is why the "verified
- * on" line appears for a verified organisation and simply is not claimed for an unverified one:
+ * come from `GET /v1/publishers`, which lists verified organizations only. That is why the "verified
+ * on" line appears for a verified organization and simply is not claimed for an unverified one:
  * there is no date to show, rather than a date being hidden.
  */
 import { RequireSession } from "@/components/Chrome";
@@ -64,7 +64,7 @@ function pageFromUrl(raw: string | null | undefined): number {
 }
 
 function organizationPageHref(slug: string, publishedPage: number, pendingPage: number): string {
-  const path = `/organisations/${encodeURIComponent(slug)}`;
+  const path = `/organizations/${encodeURIComponent(slug)}`;
   const query = new URLSearchParams();
   if (publishedPage > 1) query.set("publishedPage", String(publishedPage));
   if (pendingPage > 1) query.set("pendingPage", String(pendingPage));
@@ -72,26 +72,26 @@ function organizationPageHref(slug: string, publishedPage: number, pendingPage: 
   return encoded === "" ? path : `${path}?${encoded}`;
 }
 
-export default function OrganisationPage() {
+export default function OrganizationPage() {
   const params = useParams<{ slug: string }>();
   const slug = decodeURIComponent(String(params.slug ?? ""));
   return (
-    <RequireSession gate={ROUTE_GATE_COPY.organisation}>
-      {(me) => <Organisation slug={slug} me={me} />}
+    <RequireSession gate={ROUTE_GATE_COPY.organization}>
+      {(me) => <Organization slug={slug} me={me} />}
     </RequireSession>
   );
 }
 
-function Organisation({ slug, me }: { slug: string; me: Me }) {
+function Organization({ slug, me }: { slug: string; me: Me }) {
   const membership = me.memberships.find((entry) => entry.slug === slug);
   if (!membership) return <NotAMember slug={slug} me={me} />;
   return <Member slug={slug} membership={membership} me={me} />;
 }
 
 /**
- * Not a member — said plainly, without pretending the organisation does not exist.
+ * Not a member — said plainly, without pretending the organization does not exist.
  *
- * The API would answer 403 for a real organisation and 404 for an unknown slug, and this page cannot
+ * The API would answer 403 for a real organization and 404 for an unknown slug, and this page cannot
  * tell which without asking; it does not guess. What it can say without ambiguity is that THIS
  * account holds no membership on that slug, which is true either way and is the only thing the
  * reader can act on.
@@ -103,16 +103,16 @@ function NotAMember({ slug, me }: { slug: string; me: Me }) {
         <code>{slug}</code>
       </h1>
       <div className="state empty">
-        <p className="empty-title">You are not a member of this organisation.</p>
+        <p className="empty-title">You are not a member of this organization.</p>
         <p className="muted">
-          This page shows what an organisation has published and what is waiting in its name, so it
+          This page shows what an organization has published and what is waiting in its name, so it
           needs a membership — the API refuses it otherwise, and would refuse it just the same if
           you typed the address directly. A Hub reviewer grants memberships.
         </p>
         <p className="row">
           {me.memberships.length > 0 ? (
-            <Link className="button-primary" href="/organisations">
-              Your organisations
+            <Link className="button-primary" href="/organizations">
+              Your organizations
             </Link>
           ) : (
             <Link className="button-primary" href="/">
@@ -124,9 +124,9 @@ function NotAMember({ slug, me }: { slug: string; me: Me }) {
       </div>
       {me.canReview ? (
         <p className="muted footnote">
-          You have Hub reviewer access, so you can see this organisation from{" "}
-          <Link href="/review?tab=organisations">Review queues → Organisations</Link>. That is a
-          different view: it is the Hub deciding about an organisation, not the organisation acting
+          You have Hub reviewer access, so you can see this organization from{" "}
+          <Link href="/review?tab=organizations">Review queues → Organizations</Link>. That is a
+          different view: it is the Hub deciding about an organization, not the organization acting
           on itself.
         </p>
       ) : null}
@@ -146,8 +146,8 @@ function Member({
   const api = useApi();
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Verified organisations are the public list, so this is where `verifiedAt` and the published
-  // description come from. It fails soft: an organisation is not less real because this read did
+  // Verified organizations are the public list, so this is where `verifiedAt` and the published
+  // description come from. It fails soft: an organization is not less real because this read did
   // not return, and every line that depends on it is simply omitted rather than guessed.
   const loadPublishers = useCallback(() => api.publishers.list(), [api]);
   const publishers = useResource(loadPublishers);
@@ -168,7 +168,7 @@ function Member({
    * page — the listing had been published and the page said it had not.
    */
   /*
-   * A PAGE PER LIST. Both used to ask for the first fifty rows and nothing else, so an organisation
+   * A PAGE PER LIST. Both used to ask for the first fifty rows and nothing else, so an organization
    * with more than fifty had rows that could not be reached at all — and on the pending side that
    * meant submissions in its own namespace that it could not decide from the only page that offers
    * the decision.
@@ -279,7 +279,7 @@ function Member({
         <div className="card card-strong">
           <p className="empty-title">Your listings wait for a reviewer.</p>
           <p>
-            This organisation is not verified, so a listing you submit under <code>{slug}:</code>{" "}
+            This organization is not verified, so a listing you submit under <code>{slug}:</code>{" "}
             lands pending like any other submission. Verification is what changes that — it is a
             reviewer&rsquo;s decision, and it grants every member the right to publish here without
             review. <Link href={HOW_IT_WORKS}>How that works</Link>.
@@ -290,7 +290,7 @@ function Member({
       {/*
         THE ORIGIN DESCRIBES ITSELF ONCE. Every link out of this page carries where it came from, so
         a member who opens a submission from here gets "← Back to Filecoin Foundation" rather than a
-        browser button that cannot say where it goes. The organisation's own name is the label
+        browser button that cannot say where it goes. The organization's own name is the label
         because a slug is not what anybody calls it.
       */}
       <Published
@@ -355,7 +355,7 @@ function Pager({
   );
 }
 
-/** What this organisation has actually published. */
+/** What this organization has actually published. */
 function Published({
   resource,
   back,
@@ -372,15 +372,15 @@ function Published({
   return (
     <>
       <h2 className="section-head">
-        Published for this organisation
+        Published for this organization
         {state.status === "ready" ? ` · ${state.data.total}` : null}
       </h2>
-      <ResourceView resource={state} what="this organisation's listings" onRetry={reload}>
+      <ResourceView resource={state} what="this organization's listings" onRetry={reload}>
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState
-              title="Nothing published for this organisation yet."
-              detail="Listings submitted with an id starting with this organisation's slug appear here once they are approved."
+              title="Nothing published for this organization yet."
+              detail="Listings submitted with an id starting with this organization's slug appear here once they are approved."
               action={
                 <Link className="button-primary" href="/listings/new">
                   Submit an opportunity
@@ -474,7 +474,7 @@ function Withheld({ list }: { list: ManagedOpportunityList }) {
 }
 
 /**
- * What somebody else has filed in this organisation's name.
+ * What somebody else has filed in this organization's name.
  *
  * THE SENTENCE UNDER THE HEADING IS LOAD-BEARING. A member seeing two rows here will reasonably
  * assume they are seeing everything queued about them, and they are not: only entries filed INTO
@@ -507,12 +507,12 @@ function AwaitingReview({
   return (
     <>
       <h2 className="section-head">
-        Awaiting review for this organisation
+        Awaiting review for this organization
         {state.status === "ready" ? ` · ${state.data.total}` : null}
       </h2>
       <p className="muted footnote">
-        Filed with the <code>{slug}:</code> organisation prefix by people outside the organisation.
-        You can see them because they carry your organisation&rsquo;s name.{" "}
+        Filed with the <code>{slug}:</code> organization prefix by people outside the organization.
+        You can see them because they carry your organization&rsquo;s name.{" "}
         {canDecide ? (
           <>
             Because <code>{slug}</code> is verified, you can decide them yourself — a Hub reviewer
@@ -527,8 +527,8 @@ function AwaitingReview({
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState
-              title="Nothing is waiting for this organisation."
-              detail="If somebody submits a listing under this organisation's slug, it appears here while it waits."
+              title="Nothing is waiting for this organization."
+              detail="If somebody submits a listing under this organization's slug, it appears here while it waits."
             />
           ) : (
             <div className="table-scroll">
@@ -569,7 +569,7 @@ function AwaitingReview({
       <p className="muted footnote">
         If somebody has listed an opportunity in your name that is not here, it has not been
         submitted to the Hub — only reviewers see the rest of the queue. <strong>Claim</strong> asks
-        a reviewer to transfer an existing listing to this organisation, and lives on the listing
+        a reviewer to transfer an existing listing to this organization, and lives on the listing
         itself.
       </p>
     </>
@@ -689,7 +689,7 @@ function PendingRow({
                   <strong>
                     <UntrustedText value={slug} />
                   </strong>
-                  &rsquo;s name — anyone reading the Hub will see it as this organisation&rsquo;s.
+                  &rsquo;s name — anyone reading the Hub will see it as this organization&rsquo;s.
                   The decision is recorded under <strong>{attribution}</strong>.
                 </p>
               </ConfirmPanel>
@@ -707,7 +707,7 @@ function PendingRow({
                 <p>
                   It stays out of the public directory and is unlisted.{" "}
                   <strong>A reason is required</strong> — anyone may submit a listing about an
-                  organisation, so refusing one in your own namespace is attributed to you by name
+                  organization, so refusing one in your own namespace is attributed to you by name
                   rather than to the Hub. Your reason is shown to whoever submitted it, and the
                   decision is recorded under <strong>{attribution}</strong>.
                 </p>
@@ -737,7 +737,7 @@ function PendingRow({
  * The public, redacted audit trail for one row.
  *
  * The same read a member of the public gets — action, time, coarse actor, changed field NAMES, never
- * the values. A member of the organisation is not entitled to more here: the entry is somebody
+ * the values. A member of the organization is not entitled to more here: the entry is somebody
  * else's submission until it is approved.
  */
 function History({ id }: { id: string }) {
@@ -792,10 +792,10 @@ function History({ id }: { id: string }) {
 }
 
 /**
- * The organisation's public identity, edited in place.
+ * The organization's public identity, edited in place.
  *
  * OWNER OR ADMIN ONLY, which is the API's rule and not this page's — a `publisher` member may
- * submit into the namespace but may not rename the organisation on every listing that names it.
+ * submit into the namespace but may not rename the organization on every listing that names it.
  *
  * WHAT THE FORM DOES NOT DO: the PATCH response is an `OrganizationSummary`, which carries `name`,
  * `website` and `ecosystems` but NOT `description`. So a saved description cannot be read back from
@@ -819,9 +819,9 @@ function DirectoryEntry({
    * Whether the public record has been ASKED FOR AND ANSWERED — either way.
    *
    * The form seeds from that record when it opens, so opening it before the read settles would show
-   * an empty website box for an organisation that has one. That is not merely cosmetic here: an
+   * an empty website box for an organization that has one. That is not merely cosmetic here: an
    * empty box invites a reader to fill it in, and the box they are looking at is the one that
-   * decides what every listing naming this organisation says.
+   * decides what every listing naming this organization says.
    */
   seedSettled: boolean;
 }) {
@@ -836,7 +836,7 @@ function DirectoryEntry({
    * A PATCH that always sent every field DESTROYED DATA: the form started blank, so saving a
    * name-only change sent `website: null, description: null` and wiped both. Sending only changed
    * keys makes an untouched field impossible to clear by accident, and it is also the only correct
-   * behaviour for an unverified organisation — there is no public record to read its current
+   * behaviour for an unverified organization — there is no public record to read its current
    * website from, so the form cannot show it and must not overwrite it either.
    */
   const [baseline, setBaseline] = useState({ name: membership.name, website: "", description: "" });
@@ -887,7 +887,7 @@ function DirectoryEntry({
       });
       setNote({
         kind: "ok",
-        message: "Saved. The change appears on every listing that names this organisation.",
+        message: "Saved. The change appears on every listing that names this organization.",
       });
     } catch (error) {
       setNote(actionErrorNote(error, "The change could not be saved."));
@@ -900,13 +900,13 @@ function DirectoryEntry({
     <>
       <h2 className="section-head">Directory entry</h2>
       <p className="muted footnote">
-        The name, website and description shown on every listing that names this organisation.
+        The name, website and description shown on every listing that names this organization.
       </p>
       {!canEdit ? (
         <p className="muted">
-          Editing it needs the <strong>organisation owner</strong> or{" "}
-          <strong>organisation admin</strong> role; you are an{" "}
-          <strong>{orgRoleLabel(membership.role).toLowerCase()}</strong>. An organisation owner can
+          Editing it needs the <strong>organization owner</strong> or{" "}
+          <strong>organization admin</strong> role; you are an{" "}
+          <strong>{orgRoleLabel(membership.role).toLowerCase()}</strong>. An organization owner can
           change your role, and a Hub reviewer can change theirs.
         </p>
       ) : !seedSettled ? (
@@ -914,7 +914,7 @@ function DirectoryEntry({
       ) : !open ? (
         <p>
           <button type="button" onClick={openForm}>
-            Edit the organisation&rsquo;s entry
+            Edit the organization&rsquo;s entry
           </button>
         </p>
       ) : (
@@ -927,8 +927,8 @@ function DirectoryEntry({
             <label htmlFor="org-website">Website</label>
             <p className="hint">
               {publisher
-                ? "Clearing it removes the website from every listing that names this organisation."
-                : "This organisation has no public record to read the current value from, so this box starts empty. Leaving it empty changes nothing; typing something replaces whatever is stored."}
+                ? "Clearing it removes the website from every listing that names this organization."
+                : "This organization has no public record to read the current value from, so this box starts empty. Leaving it empty changes nothing; typing something replaces whatever is stored."}
             </p>
             <input
               id="org-website"
@@ -943,7 +943,7 @@ function DirectoryEntry({
               One or two sentences.{" "}
               {publisher
                 ? "This value is not returned after saving, so it is not re-read here."
-                : "No public record exists for this organisation yet, so this box starts empty; leaving it empty changes nothing."}
+                : "No public record exists for this organization yet, so this box starts empty; leaving it empty changes nothing."}
             </p>
             <input
               id="org-description"

@@ -382,7 +382,7 @@ describe("the fully-online checkbox", () => {
 });
 
 describe("the id", () => {
-  it("is derived from the organisation slug and the title until somebody types over it", () => {
+  it("is derived from the organization slug and the title until somebody types over it", () => {
     mount({}, { initial: emptyForm() });
 
     const id = screen.getByLabelText(/^Id/) as HTMLInputElement;
@@ -412,14 +412,14 @@ describe("the id", () => {
     expect(screen.getByText(/pending, until a reviewer approves it/)).toBeTruthy();
   });
 
-  it("blocks a namespace that is not the primary operating organisation", () => {
+  it("blocks a namespace that is not the primary operating organization", () => {
     const api = mount({ id: "beta:round-one" });
     submit();
 
     expect(api.create).not.toHaveBeenCalled();
     expect(screen.getByLabelText(/^Id/).getAttribute("aria-invalid")).toBe("true");
     expect(
-      screen.getAllByText(/must be the primary operating organisation/).length,
+      screen.getAllByText(/must be the primary operating organization/).length,
     ).toBeGreaterThan(0);
   });
 
@@ -432,21 +432,21 @@ describe("the id", () => {
 });
 
 /**
- * The derived id follows the PRIMARY organisation, and the primary changes on a move or a remove
+ * The derived id follows the PRIMARY organization, and the primary changes on a move or a remove
  * just as surely as on a keystroke.
  *
- * The bug this pins down was self-contradicting: promoting another organisation left the id under
- * the old namespace, and the form's own error then told the publisher to promote the organisation
+ * The bug this pins down was self-contradicting: promoting another organization left the id under
+ * the old namespace, and the form's own error then told the publisher to promote the organization
  * they had just promoted.
  */
-describe("the derived id follows the primary organisation", () => {
-  /** A fresh form with two operating organisations and an id nobody has typed over. */
-  function twoOrganisations() {
+describe("the derived id follows the primary organization", () => {
+  /** A fresh form with two operating organizations and an id nobody has typed over. */
+  function twoOrganizations() {
     const api = mount({}, { initial: emptyForm() });
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Acme Foundation" } });
     fireEvent.change(screen.getByLabelText(/^Slug/), { target: { value: "acme" } });
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Round One" } });
-    fireEvent.click(screen.getByRole("button", { name: /\+ Add an operating organisation/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add an operating organization/ }));
     fireEvent.change(nth(screen.getAllByLabelText("Name"), 1), {
       target: { value: "Beta Collective" },
     });
@@ -455,8 +455,8 @@ describe("the derived id follows the primary organisation", () => {
     return api;
   }
 
-  it("regenerates when another organisation is moved to the top", () => {
-    twoOrganisations();
+  it("regenerates when another organization is moved to the top", () => {
+    twoOrganizations();
     fireEvent.click(nth(screen.getAllByRole("button", { name: /^Move up/ }), 1));
     expect(valueIn(screen.getByLabelText(/^Id/))).toBe("beta:round-one");
     // And the form does not then complain about the id it just wrote.
@@ -465,19 +465,19 @@ describe("the derived id follows the primary organisation", () => {
   });
 
   it("regenerates when the current primary is removed", () => {
-    twoOrganisations();
+    twoOrganizations();
     fireEvent.click(nth(screen.getAllByRole("button", { name: /^Remove/ }), 0));
     expect(valueIn(screen.getByLabelText(/^Id/))).toBe("beta:round-one");
   });
 
   it("regenerates when the primary's slug is edited, as it always did", () => {
-    twoOrganisations();
+    twoOrganizations();
     fireEvent.change(nth(screen.getAllByLabelText(/^Slug/), 0), { target: { value: "acme-two" } });
     expect(valueIn(screen.getByLabelText(/^Id/))).toBe("acme-two:round-one");
   });
 
   it("NEVER clobbers a hand-typed id, whichever operation moves the primary", () => {
-    twoOrganisations();
+    twoOrganizations();
     fireEvent.change(screen.getByLabelText(/^Id/), { target: { value: "acme:my-own-key" } });
 
     fireEvent.click(nth(screen.getAllByRole("button", { name: /^Move up/ }), 1));
@@ -489,7 +489,7 @@ describe("the derived id follows the primary organisation", () => {
 });
 
 describe("replacing a claimed listing", () => {
-  /** An imported id, published under and operated by the organisation that claimed it. */
+  /** An imported id, published under and operated by the organization that claimed it. */
   const claimed = {
     specVersion: "1.0.0",
     id: "host:123",
@@ -634,8 +634,8 @@ describe("required fields and intrinsic alignment", () => {
     expect(summary.getAttribute("required")).toBeNull();
     expect(summary.getAttribute("aria-required")).toBeNull();
     expect(screen.getByText(/Required/).textContent).toContain("Required");
-    expect(screen.getByText(/Running organisations/).textContent).toContain(
-      "Running organisations",
+    expect(screen.getByText(/Running organizations/).textContent).toContain(
+      "Running organizations",
     );
 
     for (const label of [
@@ -1164,11 +1164,11 @@ describe("after a submission", () => {
 });
 
 describe("the repeating groups", () => {
-  it("adds and removes an operating organisation", () => {
+  it("adds and removes an operating organization", () => {
     mount();
 
     expect(screen.getAllByLabelText("Name")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: /\+ Add an operating organisation/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add an operating organization/ }));
     expect(screen.getAllByLabelText("Name")).toHaveLength(2);
 
     fireEvent.click(nth(screen.getAllByRole("button", { name: /^Remove/ }), 1));
@@ -1178,7 +1178,7 @@ describe("the repeating groups", () => {
   it("reorders the two lists whose order means something, and only those", async () => {
     const api = mount();
 
-    fireEvent.click(screen.getByRole("button", { name: /\+ Add an operating organisation/ }));
+    fireEvent.click(screen.getByRole("button", { name: /\+ Add an operating organization/ }));
     const names = screen.getAllByLabelText("Name");
     fireEvent.change(nth(names, 1), { target: { value: "Beta Collective" } });
     fireEvent.change(nth(screen.getAllByLabelText(/^Slug/), 1), { target: { value: "beta" } });

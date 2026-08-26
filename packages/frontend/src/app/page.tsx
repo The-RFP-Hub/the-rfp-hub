@@ -70,7 +70,7 @@ function PublisherInvitation() {
       <p className="footnote">
         Submit your opportunities, keep them current, and see what they get read and applied for.
         Signing in creates an account the first time; publishing without review additionally
-        requires membership of a verified organisation, which a reviewer grants.{" "}
+        requires membership of a verified organization, which a reviewer grants.{" "}
         <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it.
       </p>
       {!session.ready ? (

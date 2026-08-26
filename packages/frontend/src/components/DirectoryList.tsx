@@ -239,7 +239,7 @@ export function DirectoryList() {
                     <thead>
                       <tr>
                         <th scope="col">Opportunity</th>
-                        <th scope="col">Organisation</th>
+                        <th scope="col">Organization</th>
                         <th scope="col">Type</th>
                         <th scope="col">Status</th>
                         <th scope="col" className="numeric">
@@ -341,9 +341,9 @@ function ResultLine({
 /**
  * One row.
  *
- * `operatingOrganizations` is a required, order-significant array whose entry 0 is the organisation
+ * `operatingOrganizations` is a required, order-significant array whose entry 0 is the organization
  * to display — the party that actually runs the intake. Sponsors are a different array and are left
- * to the detail page: naming a backer in a column headed "Organisation" would misattribute who a
+ * to the detail page: naming a backer in a column headed "Organization" would misattribute who a
  * reader is applying to.
  *
  * THE RAW ID IS GONE FROM THE ROW and the publisher's own summary took its place. `acme:round-4`

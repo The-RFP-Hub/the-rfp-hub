@@ -588,14 +588,14 @@ async function lockOrganization(tx: TxLike, slug: string): Promise<OrganizationR
     .for("update")
     .limit(1);
   const row = rows[0];
-  if (!row) throw notFound(`no organisation \`${slug}\`.`);
+  if (!row) throw notFound(`no organization \`${slug}\`.`);
   return row;
 }
 
 async function findOrganization(tx: TxLike | DB, slug: string): Promise<OrganizationRow> {
   const rows = await tx.select().from(organizations).where(eq(organizations.slug, slug)).limit(1);
   const row = rows[0];
-  if (!row) throw notFound(`no organisation \`${slug}\`.`);
+  if (!row) throw notFound(`no organization \`${slug}\`.`);
   return row;
 }
 

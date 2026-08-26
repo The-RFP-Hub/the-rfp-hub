@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Claiming publisher ownership on an organisation's behalf.
+ * Claiming publisher ownership on an organization's behalf.
  *
  * The API answers 200 (granted) or 202 (queued) and returns a `message` saying what the outcome
- * means for FUTURE writes — an approval on an unverified organisation transfers ownership without
+ * means for FUTURE writes — an approval on an unverified organization transfers ownership without
  * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
  * paraphrase is exactly where a dashboard would start promising something the API did not.
  */
@@ -53,7 +53,7 @@ function ClaimFields({ id, me, onCancel }: { id: string; me: Me; onCancel: () =>
   if (me.memberships.length === 0) {
     return (
       <p className="muted">
-        This account is not a member of any organisation, so there is nothing to claim on behalf of.
+        This account is not a member of any organization, so there is nothing to claim on behalf of.
         A reviewer grants membership.
       </p>
     );
@@ -78,12 +78,12 @@ function ClaimFields({ id, me, onCancel }: { id: string; me: Me; onCancel: () =>
   return (
     <>
       <p className="muted footnote">
-        Granted immediately when the organisation is verified <em>and</em> appears among the
-        listing&rsquo;s operating organisations. Sponsorship is not operation, so a sponsor&rsquo;s
+        Granted immediately when the organization is verified <em>and</em> appears among the
+        listing&rsquo;s operating organizations. Sponsorship is not operation, so a sponsor&rsquo;s
         claim is queued for a reviewer instead.
       </p>
       <div className="field">
-        <label htmlFor="claim-org">Organisation</label>
+        <label htmlFor="claim-org">Organization</label>
         <select id="claim-org" value={slug} onChange={(event) => setSlug(event.target.value)}>
           {me.memberships.map((membership) => (
             <option key={membership.slug} value={membership.slug}>
@@ -142,7 +142,7 @@ export function PublicClaimControl({ id }: { id: string }) {
     content = (
       <>
         <p className="muted footnote">
-          Sign in with the account that belongs to the organisation running this programme.
+          Sign in with the account that belongs to the organization running this programme.
         </p>
         <button type="button" onClick={session.login}>
           Sign in to claim
@@ -150,12 +150,12 @@ export function PublicClaimControl({ id }: { id: string }) {
       </>
     );
   } else if (session.me.status === "idle" || session.me.status === "loading") {
-    content = <p className="muted footnote">Loading your organisations…</p>;
+    content = <p className="muted footnote">Loading your organizations…</p>;
   } else if (session.me.status === "error") {
     content = (
       <>
         <ActionNote
-          note={actionErrorNote(session.me.error, "Could not load your organisations.")}
+          note={actionErrorNote(session.me.error, "Could not load your organizations.")}
         />
         <button type="button" onClick={session.reloadMe}>
           Try again

@@ -178,13 +178,13 @@ export class ClaimService {
       if (!currentOrg?.verified || membership.length === 0) {
         throw forbidden(
           "claim_not_grantable",
-          "the organisation is no longer verified, or your membership on it has been revoked.",
+          "the organization is no longer verified, or your membership on it has been revoked.",
         );
       }
       if (!operatingSlugs(row).includes(currentOrg.slug)) {
         throw forbidden(
           "claim_not_grantable",
-          `\`${currentOrg.slug}\` is not an operating organisation of this entry. Sponsorship is not operation.`,
+          `\`${currentOrg.slug}\` is not an operating organization of this entry. Sponsorship is not operation.`,
         );
       }
       if (row.sourcePublisher !== null && row.sourcePublisher !== currentOrg.slug) {
@@ -196,7 +196,7 @@ export class ClaimService {
         if (owner[0]?.verified) {
           throw conflict(
             "already_claimed",
-            `this entry is already published by the verified organisation \`${row.sourcePublisher}\`.`,
+            `this entry is already published by the verified organization \`${row.sourcePublisher}\`.`,
           );
         }
       }
@@ -285,7 +285,7 @@ export class ClaimService {
     note: string | null,
   ): Promise<ClaimResultView> {
     const reason = organization.verified
-      ? `\`${organization.slug}\` is not listed among this entry's operating organisations, so a reviewer will decide.`
+      ? `\`${organization.slug}\` is not listed among this entry's operating organizations, so a reviewer will decide.`
       : `\`${organization.slug}\` is not a verified publisher yet, so a reviewer will decide.`;
 
     const already = await this.findPendingClaim(entry.id, organization.id);
@@ -393,7 +393,7 @@ export class ClaimService {
       .where(eq(organizations.slug, slug))
       .limit(1);
     const row = rows[0];
-    if (!row) throw notFound(`no organisation \`${slug}\`.`);
+    if (!row) throw notFound(`no organization \`${slug}\`.`);
     return row;
   }
 
@@ -586,7 +586,7 @@ export class ClaimService {
         organizationSlug: found.organization.slug,
         message: verified
           ? `\`${found.organization.slug}\` now publishes this entry, and future writes into that namespace auto-approve.`
-          : `\`${found.organization.slug}\` now publishes this entry, but the organisation is NOT verified — future writes into that namespace will keep landing pending until it is.`,
+          : `\`${found.organization.slug}\` now publishes this entry, but the organization is NOT verified — future writes into that namespace will keep landing pending until it is.`,
       };
     });
   }

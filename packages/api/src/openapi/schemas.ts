@@ -318,7 +318,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       actorKind: { type: "string", enum: ["user", "api_key", "job", "outbox"] },
       actor: {
         type: "string",
-        description: "A public handle, an organisation slug, `reviewer`, `job` or `community`.",
+        description: "A public handle, an organization slug, `reviewer`, `job` or `community`.",
       },
       changedFields: { type: "array", items: { type: "string" } },
       patch: {
@@ -585,7 +585,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "The outcome of claiming publisher ownership. `granted` transferred it immediately (the organisation is verified and OPERATES the entry); `queued` filed a claim for review.",
+      "The outcome of claiming publisher ownership. `granted` transferred it immediately (the organization is verified and OPERATES the entry); `queued` filed a claim for review.",
     required: ["outcome", "claimId", "opportunityId", "organizationSlug", "message"],
     properties: {
       outcome: { type: "string", enum: ["granted", "queued", "unchanged"] },
@@ -595,7 +595,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       message: {
         type: "string",
         description:
-          "What the outcome means for future writes — in particular, a grant on an UNVERIFIED organisation transfers ownership without unlocking auto-approval.",
+          "What the outcome means for future writes — in particular, a grant on an UNVERIFIED organization transfers ownership without unlocking auto-approval.",
       },
     },
   },
@@ -640,7 +640,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "A VERIFIED organisation — the namespace a write can auto-approve into. Verification is a publishing relationship, not an attribute of the issuer, so the directory holds many organisations that are not here.",
+      "A VERIFIED organization — the namespace a write can auto-approve into. Verification is a publishing relationship, not an attribute of the issuer, so the directory holds many organizations that are not here.",
     required: ["slug", "name", "description", "website", "logoUrl", "ecosystems", "verifiedAt"],
     properties: {
       slug: {
@@ -676,7 +676,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       role: { type: "string", enum: ["owner", "admin", "publisher"] },
       verified: {
         type: "boolean",
-        description: "Only a membership on a VERIFIED organisation auto-approves a write.",
+        description: "Only a membership on a VERIFIED organization auto-approves a write.",
       },
     },
   },

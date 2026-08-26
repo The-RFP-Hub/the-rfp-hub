@@ -26,18 +26,18 @@ describe("presentation vocabulary", () => {
     expect(ingestionMethodLabel("publisher_api")).toBe("Submitted with an API key");
   });
 
-  it("disambiguates global and organisation roles only in display copy", () => {
+  it("disambiguates global and organization roles only in display copy", () => {
     expect(accountRoleLabel("submitter")).toBe("Submitter");
     expect(accountRoleLabel("reviewer")).toBe("Hub reviewer");
     expect(accountRoleLabel("admin")).toBe("Hub admin");
-    expect(orgRoleLabel("owner")).toBe("Organisation owner");
-    expect(orgRoleLabel("admin")).toBe("Organisation admin");
-    expect(orgRoleLabel("publisher")).toBe("Organisation publisher");
+    expect(orgRoleLabel("owner")).toBe("Organization owner");
+    expect(orgRoleLabel("admin")).toBe("Organization admin");
+    expect(orgRoleLabel("publisher")).toBe("Organization publisher");
   });
 
   it("humanizes audit vocabulary with deterministic future-token fallbacks", () => {
     expect(auditActionLabel("verify_source")).toBe("Checked the source");
-    expect(auditFieldLabel("operatingOrganizations/0/slug")).toBe("Running organisations");
+    expect(auditFieldLabel("operatingOrganizations/0/slug")).toBe("Running organizations");
     expect(auditFieldLabel("futureFieldName")).toBe("Future field name");
     expect(auditActionLabel("future_action")).toBe("Future action");
   });
@@ -55,7 +55,7 @@ describe("presentation vocabulary", () => {
     ).toEqual([
       "HTTP status",
       "Ingestion method",
-      "Organisation slugs",
+      "Organization slugs",
       "Programme details",
       "Public ID",
       "Specification version",

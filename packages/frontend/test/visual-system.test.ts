@@ -145,7 +145,7 @@ describe("the visual-system token boundary", () => {
     for (const path of [
       join(process.cwd(), "src", "app", "keys", "page.tsx"),
       join(process.cwd(), "src", "app", "review", "page.tsx"),
-      join(process.cwd(), "src", "app", "organisations", "[slug]", "page.tsx"),
+      join(process.cwd(), "src", "app", "organizations", "[slug]", "page.tsx"),
     ]) {
       expect(readFileSync(path, "utf8")).not.toContain("style={{");
     }

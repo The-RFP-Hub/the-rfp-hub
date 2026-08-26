@@ -44,14 +44,14 @@ export default function TermsPage() {
       <h2>Moderation</h2>
       <p>
         Submissions go through review before publication, with two exceptions: verified members of
-        an organisation publish directly in that organisation&rsquo;s own name, and an account an
+        an organization publish directly in that organization&rsquo;s own name, and an account an
         admin has explicitly granted direct publication may publish with an eligible credential. An
-        account holding no verified organisation membership anywhere may keep at most five
+        account holding no verified organization membership anywhere may keep at most five
         submissions awaiting review at once; editing an already-pending submission reuses its slot.
       </p>
       <p>
-        The Hub may reject or unpublish content, demote roles, and revoke organisation memberships
-        and API keys — through the documented review roles: verified organisations decide what
+        The Hub may reject or unpublish content, demote roles, and revoke organization memberships
+        and API keys — through the documented review roles: verified organizations decide what
         publishes in their own name, Hub reviewers decide everywhere else. Decisions on listings are
         recorded in an append-only history; for currently public listings, a coarsened version of
         that history is publicly readable. Sign-in and selected write and authenticated routes are

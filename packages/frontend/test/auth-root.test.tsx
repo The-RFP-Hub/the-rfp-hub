@@ -33,7 +33,7 @@ function ClaimLikeOpener() {
     <details open>
       <summary>This is my programme — claim it</summary>
       {signedIn ? (
-        <select aria-label="Organisation">
+        <select aria-label="Organization">
           <option>Acme</option>
         </select>
       ) : (
@@ -116,9 +116,9 @@ describe("the sign-in dialog", () => {
     fireEvent(window, new Event("auth-root-test-signed-in"));
     fireEvent.click(complete);
 
-    const organisation = await screen.findByRole("combobox", { name: "Organisation" });
+    const organization = await screen.findByRole("combobox", { name: "Organization" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(document.activeElement).toBe(organisation);
+    expect(document.activeElement).toBe(organization);
   });
 
   it("moves focus to main content when a later session refresh replaces an ordinary opener", async () => {

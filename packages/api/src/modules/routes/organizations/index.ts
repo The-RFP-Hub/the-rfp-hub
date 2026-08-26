@@ -27,7 +27,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "updateOwnOrganization",
         tags: ["publishers"],
-        summary: "Edit your own organisation's directory entry (owner or admin, session only)",
+        summary: "Edit your own organization's directory entry (owner or admin, session only)",
         security: [{ bearerAuth: [] }],
         params: { type: "object", required: ["slug"], properties: { slug: { type: "string" } } },
         body: organizationMetadataSchema,
@@ -52,9 +52,9 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "listOrganizationOpportunities",
         tags: ["publishers"],
-        summary: "Entries published under this organisation, to its members, whatever their status",
+        summary: "Entries published under this organization, to its members, whatever their status",
         description:
-          "Requires ANY membership on the organisation — verification governs publishing, not visibility. Scoped to the entries the organisation PUBLISHES (`source.publisher`), never the ones it merely sponsors.",
+          "Requires ANY membership on the organization — verification governs publishing, not visibility. Scoped to the entries the organization PUBLISHES (`source.publisher`), never the ones it merely sponsors.",
         security: [{ bearerAuth: [] }],
         params: { type: "object", required: ["slug"], properties: { slug: { type: "string" } } },
         querystring: {
@@ -88,9 +88,9 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "approveOrganizationOpportunity",
         tags: ["publishers"],
-        summary: "Publish one of your organisation's own pending entries",
+        summary: "Publish one of your organization's own pending entries",
         description:
-          "Requires a membership on the organisation while it is a VERIFIED publisher — the same trust event that makes a write auto-publish. Scoped to entries this organisation PUBLISHES (`source.publisher`); an entry under another namespace answers 404 rather than 403, so this cannot enumerate other organisations' queues. Verified members decide within their own namespace; Hub reviewers decide anywhere. The companion `reject` route requires a written reason.",
+          "Requires a membership on the organization while it is a VERIFIED publisher — the same trust event that makes a write auto-publish. Scoped to entries this organization PUBLISHES (`source.publisher`); an entry under another namespace answers 404 rather than 403, so this cannot enumerate other organizations' queues. Verified members decide within their own namespace; Hub reviewers decide anywhere. The companion `reject` route requires a written reason.",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -117,9 +117,9 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "rejectOrganizationOpportunity",
         tags: ["publishers"],
-        summary: "Refuse one of your organisation's own pending entries, with a reason",
+        summary: "Refuse one of your organization's own pending entries, with a reason",
         description:
-          "The same guards as the approve route. `reason` is REQUIRED and is the counterweight to the obvious conflict of interest: anyone may submit an entry ABOUT an organisation, so a rejection here is attributed to the deciding member by handle — never coarsened to `reviewer` — and the reason is shown to whoever submitted it. An organisation may refuse things in its own namespace; it may not do so silently or anonymously. Hub reviewers remain able to decide anywhere.",
+          "The same guards as the approve route. `reason` is REQUIRED and is the counterweight to the obvious conflict of interest: anyone may submit an entry ABOUT an organization, so a rejection here is attributed to the deciding member by handle — never coarsened to `reviewer` — and the reason is shown to whoever submitted it. An organization may refuse things in its own namespace; it may not do so silently or anonymously. Hub reviewers remain able to decide anywhere.",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",

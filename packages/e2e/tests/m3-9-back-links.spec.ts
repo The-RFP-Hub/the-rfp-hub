@@ -9,7 +9,7 @@
  * open a listing → back → `/review`, showing Submissions, which is a different screen.
  *
  * TWO ORIGINS, because they exercise different halves of the module. `/review` carries state in its
- * QUERY (which tab), and its label is derived from that query. `/organisations/<slug>` carries state
+ * QUERY (which tab), and its label is derived from that query. `/organizations/<slug>` carries state
  * in its PATH, and its label is publisher-supplied text that travels as a second parameter — the one
  * case `returnLabel` consents to read from the URL rather than deriving.
  *
@@ -84,8 +84,8 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const stamp = Date.now();
 
     // A claim has to exist for the tab to have a row to open, and it has to be QUEUED rather than
-    // granted: a claim for an organisation that is verified but is NOT among the entry's operating
-    // organisations is 202, which is precisely a claim awaiting a reviewer.
+    // granted: a claim for an organization that is verified but is NOT among the entry's operating
+    // organizations is 202, which is precisely a claim awaiting a reviewer.
     const document = opportunityFixture(stack.namespaces.publisher, `backlink-claim-${stamp}`, {
       title: `Back-link claim fixture ${stamp}`,
     });
@@ -101,7 +101,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     );
     expect(
       filed.status,
-      "a claim on an organisation that does not operate the entry is queued",
+      "a claim on an organization that does not operate the entry is queued",
     ).toBe(202);
 
     // The review surface needs the reviewer capability, and the browser session this project
@@ -139,7 +139,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     await expect(page.locator("tr").filter({ hasText: id })).toHaveCount(1);
   });
 
-  test("from an organisation's own page, and back to it by name", async ({
+  test("from an organization's own page, and back to it by name", async ({
     page,
     stack,
     api,
@@ -150,22 +150,22 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const outsider = await api("otherPublisher");
     const stamp = Date.now();
 
-    // Filed by somebody outside the organisation, so it is waiting — the rows on an organisation's
+    // Filed by somebody outside the organization, so it is waiting — the rows on an organization's
     // page that link out are the pending ones.
     const document = opportunityFixture(slug, `backlink-org-${stamp}`, {
-      title: `Back-link organisation fixture ${stamp}`,
+      title: `Back-link organization fixture ${stamp}`,
     });
     const id = document.id as string;
     expect((await outsider.post("/v1/opportunities", document)).status).toBe(201);
 
-    const origin = `/organisations/${encodeURIComponent(slug)}`;
+    const origin = `/organizations/${encodeURIComponent(slug)}`;
     await page.goto(`${stack.urls.frontend}${origin}`);
 
     const row = page.locator("tr").filter({ hasText: id });
     await expect(row).toHaveCount(1);
-    await row.getByRole("link", { name: `Back-link organisation fixture ${stamp}` }).click();
+    await row.getByRole("link", { name: `Back-link organization fixture ${stamp}` }).click();
 
-    // THE ORGANISATION'S NAME TRAVELS WITH THE LINK, and it is the one case that needs to: a slug
+    // THE ORGANIZATION'S NAME TRAVELS WITH THE LINK, and it is the one case that needs to: a slug
     // is not what anybody calls the place, and the destination has no way to look the name up.
     await expect(page).toHaveURL((url) => url.searchParams.get("back") === origin);
     await expect(page).toHaveURL((url) => url.searchParams.get("backLabel") === slug);
@@ -173,15 +173,15 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const back = page.getByRole("link", { name: `← Back to ${slug}` });
     await expect(
       back,
-      "the way back is labelled with the organisation, not with a slugified path",
+      "the way back is labelled with the organization, not with a slugified path",
     ).toBeVisible();
     await back.click();
 
     await expect(page).toHaveURL(
-      (url) => decodeURIComponent(url.pathname) === `/organisations/${slug}`,
+      (url) => decodeURIComponent(url.pathname) === `/organizations/${slug}`,
     );
     await expect(
-      page.getByRole("heading", { name: /Awaiting review for this organisation/ }),
+      page.getByRole("heading", { name: /Awaiting review for this organization/ }),
     ).toBeVisible();
     await expect(page.locator("tr").filter({ hasText: id })).toHaveCount(1);
   });

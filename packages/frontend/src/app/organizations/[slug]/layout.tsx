@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-interface OrganisationLayoutProps {
+interface OrganizationLayoutProps {
   children: ReactNode;
   params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({
   params,
-}: Pick<OrganisationLayoutProps, "params">): Promise<Metadata> {
+}: Pick<OrganizationLayoutProps, "params">): Promise<Metadata> {
   const { slug } = await params;
-  return { title: `Organisation ${slug}` };
+  return { title: `Organization ${slug}` };
 }
 
-export default function OrganisationLayout({ children }: OrganisationLayoutProps) {
+export default function OrganizationLayout({ children }: OrganizationLayoutProps) {
   return children;
 }

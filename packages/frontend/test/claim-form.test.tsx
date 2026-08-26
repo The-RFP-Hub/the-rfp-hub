@@ -5,7 +5,7 @@ import { join } from "node:path";
  *
  * The form itself still speaks the API's outcome message verbatim. The public wrapper adds only
  * the states that a page anybody can read needs: restoring a session, opening sign-in, loading the
- * authenticated account and explaining why an account with no organisation cannot file a claim.
+ * authenticated account and explaining why an account with no organization cannot file a claim.
  */
 import { ClaimForm, PublicClaimControl } from "@/components/ClaimForm";
 import { type ApiClient, ApiError } from "@/lib/api";
@@ -136,7 +136,7 @@ describe("the public claim control", () => {
     expect(fetch.mock.calls.every(([url]) => !String(url).includes("/v1/me"))).toBe(true);
   });
 
-  it("waits for the signed-in account and explains that claims require an organisation", async () => {
+  it("waits for the signed-in account and explains that claims require an organization", async () => {
     authSession.data = { user: { id: "user_7" } };
     const client = clientFor({ me: account([]) });
 
@@ -190,7 +190,7 @@ describe("the public claim control", () => {
     const summary = await screen.findByText("This is my programme — claim it");
     fireEvent.click(summary);
     await screen.findByRole("button", { name: "File the claim" });
-    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
       target: { value: "Unsent public note" },
     });
@@ -198,7 +198,7 @@ describe("the public claim control", () => {
 
     expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
     fireEvent.click(summary);
-    expect((screen.getByLabelText("Organisation") as HTMLSelectElement).value).toBe("acme");
+    expect((screen.getByLabelText("Organization") as HTMLSelectElement).value).toBe("acme");
     expect(
       (screen.getByLabelText("Note for the reviewer (optional)") as HTMLInputElement).value,
     ).toBe("");
@@ -209,7 +209,7 @@ describe("the extracted claim form", () => {
   it("shows every membership and selects the first one by default", () => {
     renderForm(clientFor());
 
-    const select = screen.getByLabelText("Organisation") as HTMLSelectElement;
+    const select = screen.getByLabelText("Organization") as HTMLSelectElement;
     expect(select.value).toBe("acme");
     expect(screen.getByRole("option", { name: "Acme Foundation — acme (verified)" })).toBeTruthy();
     expect(
@@ -217,10 +217,10 @@ describe("the extracted claim form", () => {
     ).toBeTruthy();
   });
 
-  it("closes on Cancel and discards the unsent organisation and note", () => {
+  it("closes on Cancel and discards the unsent organization and note", () => {
     renderForm(clientFor());
 
-    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
       target: { value: "Unsent note" },
     });
@@ -229,17 +229,17 @@ describe("the extracted claim form", () => {
     const summary = screen.getByText("This is my programme — claim it");
     expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
     fireEvent.click(summary);
-    expect((screen.getByLabelText("Organisation") as HTMLSelectElement).value).toBe("acme");
+    expect((screen.getByLabelText("Organization") as HTMLSelectElement).value).toBe("acme");
     expect(
       (screen.getByLabelText("Note for the reviewer (optional)") as HTMLInputElement).value,
     ).toBe("");
   });
 
-  it("posts exactly the selected organisation and reviewer note", async () => {
+  it("posts exactly the selected organization and reviewer note", async () => {
     const claim = vi.fn(async () => result("queued", "A reviewer will decide this claim."));
     renderForm(clientFor({ claim }));
 
-    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
       target: { value: "I operate this programme for Beta." },
     });

@@ -4,7 +4,7 @@
  * A new submission.
  *
  * The page says up front what happens to it, because "submit" means two different things depending
- * on the account: a member of a verified organisation publishes immediately, everybody else files
+ * on the account: a member of a verified organization publishes immediately, everybody else files
  * something a reviewer will look at. A form that implies the first to somebody in the second case
  * has misled them about whether their programme is visible.
  */
@@ -27,12 +27,12 @@ export default function NewListingPage() {
               <p className="muted footnote">
                 This account publishes into{" "}
                 {verified.map((membership) => membership.slug).join(", ")} without review. An id
-                with one of those organisation prefixes publishes immediately; anything else waits
+                with one of those organization prefixes publishes immediately; anything else waits
                 for review.
               </p>
             ) : (
               <p className="muted footnote">
-                This account is not a member of a verified organisation, so this submission will be
+                This account is not a member of a verified organization, so this submission will be
                 stored <strong>waiting for review</strong> and stay hidden from the public directory
                 until a Hub reviewer approves it. That is the normal path for a community
                 submission.

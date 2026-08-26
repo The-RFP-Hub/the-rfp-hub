@@ -68,13 +68,13 @@ test.describe("M3-5 the signed-in dashboard", () => {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
-    // AN ACCOUNT WITH MEMBERSHIPS GETS AN ORGANISATION ENTRY, beside its listings rather than behind
+    // AN ACCOUNT WITH MEMBERSHIPS GETS AN ORGANIZATION ENTRY, beside its listings rather than behind
     // two clicks on the account page. Its SHAPE follows the account: one membership gets the
-    // organisation's own name and its own address, because a landing page listing exactly one row is
+    // organization's own name and its own address, because a landing page listing exactly one row is
     // a click that answers nothing; several get a chooser.
     //
     // WHICH CASE THIS RUN IS IN IS READ FROM THE API, NOT ASSUMED. Earlier files grant the publisher
-    // memberships on further organisations while exercising claims, so the count here is a
+    // memberships on further organizations while exercising claims, so the count here is a
     // consequence of what has run — and hard-coding either shape would make this test an assertion
     // about execution order.
     const me = await (await api("publisher")).get<{
@@ -84,20 +84,20 @@ test.describe("M3-5 the signed-in dashboard", () => {
     const memberships = me.body.memberships;
     expect(
       memberships.length,
-      "this actor is a member of at least one organisation",
+      "this actor is a member of at least one organization",
     ).toBeGreaterThan(0);
     const only = memberships.length === 1 ? memberships[0] : undefined;
-    const organisation = nav.getByRole("link", {
-      name: only ? only.name : "Organisations",
+    const organization = nav.getByRole("link", {
+      name: only ? only.name : "Organizations",
       exact: true,
     });
     await expect(
-      organisation,
-      "a member's organisation belongs beside their listings, not behind two clicks",
+      organization,
+      "a member's organization belongs beside their listings, not behind two clicks",
     ).toBeVisible();
-    await expect(organisation).toHaveAttribute(
+    await expect(organization).toHaveAttribute(
       "href",
-      only ? `/organisations/${encodeURIComponent(only.slug)}` : "/organisations",
+      only ? `/organizations/${encodeURIComponent(only.slug)}` : "/organizations",
     );
 
     // DUPLICATES LEFT THE TOP LEVEL, and the demotion is the assertion rather than a side effect:
@@ -196,7 +196,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
       .fill(
         "An entry submitted through the publisher dashboard's own form by the end-to-end suite.",
       );
-    // The primary operating organisation: its name, and the slug that IS the publishing namespace.
+    // The primary operating organization: its name, and the slug that IS the publishing namespace.
     await page.getByLabel(/^Name/).fill(stack.namespaces.publisher);
     await page.getByLabel(/^Slug/).fill(stack.namespaces.publisher);
 

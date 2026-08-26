@@ -336,7 +336,7 @@ export class OpportunityWriteService {
         if (!grandfathered) {
           throw badRequest(
             "publisher_not_operating",
-            `this entry is published under ${JSON.stringify(storedPublisher)}; a replacement must keep that organisation in \`operatingOrganizations\`.`,
+            `this entry is published under ${JSON.stringify(storedPublisher)}; a replacement must keep that organization in \`operatingOrganizations\`.`,
           );
         }
       }
@@ -412,7 +412,7 @@ export class OpportunityWriteService {
     if (namespace === undefined) {
       throw badRequest(
         "namespace_required",
-        "a submission must name the namespace it is published under: set `source.publisher` to an organisation slug, or give `operatingOrganizations[0].slug`.",
+        "a submission must name the namespace it is published under: set `source.publisher` to an organization slug, or give `operatingOrganizations[0].slug`.",
       );
     }
     // You may only publish under an organisation that OPERATES the programme. The namespace is the
@@ -424,7 +424,7 @@ export class OpportunityWriteService {
     if (!operatingSlugs(document).includes(namespace)) {
       throw badRequest(
         "publisher_not_operating",
-        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this programme. You may only publish under an organisation named in \`operatingOrganizations\`.`,
+        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this programme. You may only publish under an organization named in \`operatingOrganizations\`.`,
       );
     }
     const idProblem = checkPublicId(document.id, namespace);
