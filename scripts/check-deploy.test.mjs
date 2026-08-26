@@ -76,11 +76,13 @@ describe(".dockerignore", () => {
   });
 
   it("rejects a negation that re-includes an env file after the exclusions", () => {
-    const text = `${REQUIRED_DOCKERIGNORE.join("\n")}\n!packages/api/.env\n!**/.env.local\n!dist\n`;
+    const text = `${REQUIRED_DOCKERIGNORE.join("\n")}\n!packages/api/.env\n!**/.env.local\n!task-definition.json\n!container-env-prod.json\n!dist\n`;
     const hits = scanDockerignore(text);
     expect(hits.map((h) => h.message)).toEqual([
       expect.stringContaining("!packages/api/.env"),
       expect.stringContaining("!**/.env.local"),
+      expect.stringContaining("!task-definition.json"),
+      expect.stringContaining("!container-env-prod.json"),
     ]);
   });
 });

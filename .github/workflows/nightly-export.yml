@@ -188,6 +188,9 @@ jobs:
             # shellcheck disable=SC2086
             set -- $pattern
             [ -f "$1" ] || { echo "::error::the export artifact carries no ${pattern} archive"; bad=1; }
+            # Exactly one: a second archive of the same format would be copied and committed too,
+            # and the manifest-driven verifier never enumerates the export root to notice it.
+            [ "$#" -eq 1 ] || { echo "::error::the export artifact carries $# ${pattern} archives; expected exactly one"; bad=1; }
           done
 
           [ "$bad" -eq 0 ] || exit 1

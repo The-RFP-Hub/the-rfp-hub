@@ -126,7 +126,12 @@ export function scanDockerignore(text, file = ".dockerignore") {
   // env file defeats them, so it is a finding regardless of where it sits.
   text.split("\n").forEach((raw, i) => {
     const line = raw.trim();
-    if (line.startsWith("!") && /(^|\/)\.env(\.|$|\*)/.test(line.slice(1))) {
+    if (
+      line.startsWith("!") &&
+      /(^|\/)(\.env(\.|$|\*)|task-definition[^/]*\.json$|container-env[^/]*\.json$)/.test(
+        line.slice(1),
+      )
+    ) {
       out.push(finding(file, i + 1, `re-includes an env file after the exclusions: ${line}`));
     }
   });
