@@ -83,6 +83,16 @@ describe("the visual-system token boundary", () => {
     );
   });
 
+  it("keeps the skip link keyboard-visible and reserves faint ink for decoration", () => {
+    const css = readFileSync(stylesheets[0][1], "utf8");
+    expect(css).toMatch(/\.skip-link\s*\{[^}]*transform:\s*translateY\(-150%\);/s);
+    expect(css).toMatch(/\.skip-link:focus\s*\{[^}]*transform:\s*translateY\(var\(--space-2\)\);/s);
+    expect(css).not.toMatch(/(?:^|\n)\.faint\b/);
+    expect(css).toMatch(
+      /\.publisher-journey li:not\(:last-child\)::after\s*\{[^}]*color:\s*var\(--ink-faint\);/s,
+    );
+  });
+
   it("leaves the intrinsic form alignment rules semantic", () => {
     const css = readFileSync(stylesheets[1][1], "utf8");
     expect(css).toMatch(/\.cols\s*\{[^}]*align-items:\s*stretch;/s);

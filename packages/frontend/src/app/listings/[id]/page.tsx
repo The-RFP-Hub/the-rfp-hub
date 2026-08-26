@@ -152,8 +152,8 @@ function Header({
           <PublisherStatusBadge source={managed} />
         </div>
         {managed.mergedInto ? null : (
-          <Link href={`/listings/${encodeURIComponent(id)}/edit`}>
-            <button type="button">Edit</button>
+          <Link className="button" href={`/listings/${encodeURIComponent(id)}/edit`}>
+            Edit
           </Link>
         )}
       </div>

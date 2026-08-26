@@ -181,6 +181,19 @@ button {
   cursor: pointer;
 }
 
+/* A link that initiates a button-shaped task remains one interactive element. */
+.button {
+  display: inline-block;
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  text-decoration: none;
+}
+
 /*
  * Hover and selected are the accent's lightest step — AND A BORDER, AND (when selected) A WEIGHT.
  * The tint alone is 1.12:1 against paper: it reads as warmth, not as a mark, so it is never asked
@@ -189,6 +202,12 @@ button {
 button:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  text-decoration: none;
 }
 
 button[aria-pressed="true"],
@@ -486,6 +505,23 @@ caption {
 
 .shell-main {
   padding: var(--space-8) 0 0;
+}
+
+.skip-link {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: var(--space-3);
+  z-index: 20;
+  transform: translateY(-150%);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+
+.skip-link:focus {
+  transform: translateY(var(--space-2));
 }
 
 .shell-footer {
@@ -1319,6 +1355,7 @@ pre.untrusted-block {
 /* ---------------------------------------------------------------- narrow --- */
 
 @media (pointer: coarse) {
+  .button,
   button,
   input,
   select,
@@ -1327,6 +1364,7 @@ pre.untrusted-block {
     min-block-size: var(--control-touch);
   }
 
+  .button,
   button,
   input[type="range"],
   input[type="radio"],

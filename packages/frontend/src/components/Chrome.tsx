@@ -130,6 +130,9 @@ export function Chrome({ children }: { children: ReactNode }) {
 
   return (
     <div className="shell">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <header className="shell-header">
         <GuardedLink href="/" className="brand">
           RFP Hub
@@ -167,7 +170,9 @@ export function Chrome({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="shell-main">{children}</main>
+      <main id="main-content" className="shell-main" tabIndex={-1}>
+        {children}
+      </main>
 
       <footer className="shell-footer">
         <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>

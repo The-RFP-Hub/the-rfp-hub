@@ -253,6 +253,30 @@ describe("organisation navigation", () => {
     },
   );
 
+  it("puts a skip link first and moves focus to the main landmark", () => {
+    session.data = null;
+    session.isPending = false;
+    session.error = null;
+    const view = render(
+      <ApiClientProvider value={clientFor(async () => me)}>
+        <Chrome>
+          <button type="button">Main action</button>
+        </Chrome>
+      </ApiClientProvider>,
+    );
+
+    const skip = screen.getByRole("link", { name: "Skip to main content" });
+    const firstFocusable = view.container.querySelector(
+      "a, button, input, select, textarea, summary",
+    );
+    expect(firstFocusable).toBe(skip);
+    expect(skip.getAttribute("href")).toBe("#main-content");
+
+    skip.focus();
+    expect(document.activeElement).toBe(skip);
+    expect(screen.getByRole("main").getAttribute("tabindex")).toBe("-1");
+  });
+
   it("keeps all nine admin destinations in three semantic groups with a long organisation name", async () => {
     const longName = "AnExtraordinarilyLongPublisherOrganisationNameWithoutConvenientBreaks";
     const admin: Me = {

@@ -372,6 +372,7 @@ describe("the accent never carries state", () => {
     const allowed = [
       "a", // textual links on paper
       "button:hover",
+      ".button:hover",
       'button[aria-pressed="true"],\nbutton[aria-selected="true"]',
       ".button-primary",
       ".button-primary:hover",

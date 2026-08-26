@@ -162,6 +162,9 @@ describe("merged listing detail and edit routes", () => {
     ).toBeTruthy();
     expect(screen.getByText("Review decision")).toBeTruthy();
     expect(screen.getByText("Public visibility")).toBeTruthy();
+    const edit = screen.getByRole("link", { name: "Edit" });
+    expect(edit.className).toContain("button");
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
 
   it("retains the full editorial axes when a Hub reviewer opens the detail", async () => {
