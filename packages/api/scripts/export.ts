@@ -20,7 +20,7 @@
  */
 import { join } from "node:path";
 import { db, pool } from "../src/db/client.js";
-import { datasetSnapshots } from "../src/db/schema.js";
+import { repositories } from "../src/modules/repositories/index.js";
 import { OpportunityService } from "../src/modules/services/opportunities/opportunity.service.js";
 import {
   ExportAliasError,
@@ -44,7 +44,7 @@ export async function runExport(options: ExportOptions = {}): Promise<ExportResu
 
   const result = await writeExport(records, options);
 
-  await db.insert(datasetSnapshots).values(
+  await repositories(db).system.recordDatasetSnapshots(
     result.manifest.artifacts.map((artifact) => ({
       format: artifact.format,
       entryCount: artifact.count,

@@ -29,7 +29,7 @@
 
 import { validateOpportunity } from "rfphub-validate";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
-import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityDuplicateRow, OpportunityRow } from "../../../db/schema.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
 import {
@@ -47,12 +47,14 @@ import type {
 import { nextDeadlineAt } from "../../shared/deadlines.js";
 import { contentHash, embeddingText } from "../../shared/embedding-text.js";
 import { conflict, notFound } from "../../shared/http-error.js";
-import { AuditService } from "../audit/audit.service.js";
 import {
   type NotificationDispatchEnqueuer,
   notificationDispatchQueue,
 } from "../notifications/notification-dispatch.queue.js";
-import { NotificationService } from "../notifications/notification.service.js";
+import {
+  type RecordDuplicateNotificationsInput,
+  duplicateNotificationInserts,
+} from "../notifications/notification.service.js";
 import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import { type EmbeddingProvider, createEmbeddingProvider } from "./embedding-provider.js";
 
@@ -123,8 +125,6 @@ export class DedupeService {
   private readonly provider: EmbeddingProvider | undefined;
   private readonly config: AppConfig;
   private readonly repos: Repositories;
-  private readonly audit: AuditService;
-  private readonly notifications: NotificationService;
   private readonly notificationQueue: NotificationDispatchEnqueuer;
   private readonly logger: DedupeLogger;
   /** One provider/corpus mismatch is one operator incident, not one warning per submission. */
@@ -137,8 +137,6 @@ export class DedupeService {
     this.config = options.config ?? defaultConfig;
     this.provider = options.provider ?? createEmbeddingProvider(this.config.embedding);
     this.repos = repositories(db);
-    this.audit = new AuditService(db);
-    this.notifications = new NotificationService(db);
     this.notificationQueue = options.notificationQueue ?? notificationDispatchQueue;
     this.logger = options.logger ?? consoleLogger;
   }
@@ -339,7 +337,7 @@ export class DedupeService {
             loadRowById(repos, pair.duplicateOfId),
           ]);
           insertedNotificationIds.push(
-            ...(await this.notifications.recordDuplicate(repos, {
+            ...(await recordDuplicateNotifications(repos, {
               pair,
               left,
               right,
@@ -503,7 +501,7 @@ export class DedupeService {
           reviewedBy: reviewerId,
           reviewedAt: now,
         })) ?? pair;
-      await this.audit.record(repos, {
+      await repos.audit.record({
         subjectKind: "duplicate",
         subjectId: pairId,
         actorKind: "user",
@@ -515,7 +513,7 @@ export class DedupeService {
         loadRowById(repos, next.opportunityId),
         loadRowById(repos, next.duplicateOfId),
       ]);
-      const notificationIds = await this.notifications.recordDuplicate(repos, {
+      const notificationIds = await recordDuplicateNotifications(repos, {
         pair: next,
         left,
         right,
@@ -547,7 +545,7 @@ export class DedupeService {
             reviewedBy: reviewerId,
             reviewedAt: now,
           })) ?? pair;
-        await this.audit.record(repos, {
+        await repos.audit.record({
           subjectKind: "duplicate",
           subjectId: pairId,
           actorKind: "user",
@@ -563,7 +561,7 @@ export class DedupeService {
       ]);
       const notificationIds =
         transition === "reopen"
-          ? await this.notifications.recordDuplicate(repos, {
+          ? await recordDuplicateNotifications(repos, {
               pair: next,
               left,
               right,
@@ -694,7 +692,7 @@ export class DedupeService {
           },
         ],
       ] as const) {
-        await this.audit.record(repos, {
+        await repos.audit.record({
           subjectKind: "opportunity",
           subjectId: subject,
           actorKind: "user",
@@ -710,7 +708,7 @@ export class DedupeService {
         loadRowById(repos, pairRow.opportunityId),
         loadRowById(repos, pairRow.duplicateOfId),
       ]);
-      const notificationIds = await this.notifications.recordDuplicate(repos, {
+      const notificationIds = await recordDuplicateNotifications(repos, {
         pair: pairRow,
         left,
         right,
@@ -750,17 +748,24 @@ export class DedupeService {
 
   /** Public ids for a set of `merged_into_id` values, so a side can name its survivor. */
   private async survivorIds(
-    exec: DbLike | Repositories,
+    repos: Repositories,
     ids: (number | null)[],
   ): Promise<Map<number, string>> {
     const wanted = [...new Set(ids.filter((id): id is number => id !== null))];
     if (wanted.length === 0) return new Map();
-    const repos = "duplicatePairs" in exec ? exec : repositories(exec);
     return repos.duplicatePairs.survivorPublicIds(wanted);
   }
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────────
+async function recordDuplicateNotifications(
+  repos: Repositories,
+  input: RecordDuplicateNotificationsInput,
+): Promise<number[]> {
+  const values = await duplicateNotificationInserts(repos, input);
+  return repos.notifications.recordDuplicate(values);
+}
+
 async function loadRowById(repos: Repositories, id: number): Promise<OpportunityRow> {
   const row = await repos.opportunities.findById(id);
   if (!row) throw notFound(`no opportunity ${id}.`);

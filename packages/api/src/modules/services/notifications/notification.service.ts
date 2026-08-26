@@ -6,14 +6,18 @@
  * counterpart is named only while it is approved and listed at emission time; otherwise even an
  * owner-visible pending row is coarsened to an unnamed "other submission" by presentation.
  */
-import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 import type {
   NotificationRow,
   OpportunityDuplicateRow,
   OpportunityRow,
   notificationKind,
 } from "../../../db/schema.js";
-import { type Repositories, repositories } from "../../repositories/index.js";
+import {
+  type NotificationInsert,
+  type Repositories,
+  repositories,
+} from "../../repositories/index.js";
 import type {
   DuplicateNotificationPayloadView,
   NotificationListView,
@@ -57,65 +61,58 @@ export interface NotificationListQuery {
   limit?: number;
 }
 
+/**
+ * Build the owner-side notification rows for a duplicate event.
+ *
+ * Recipient discovery uses the caller's executor-bound bundle, so every membership read remains in
+ * the same transaction as the pair mutation. Persistence is deliberately left to the caller's
+ * `repos.notifications.recordDuplicate(...)` call.
+ */
+export async function duplicateNotificationInserts(
+  repos: Repositories,
+  input: RecordDuplicateNotificationsInput,
+): Promise<NotificationInsert[]> {
+  const sides = new Map([
+    [input.left.id, input.left],
+    [input.right.id, input.right],
+  ]);
+  const recipients = new Map<
+    string,
+    { accountId: number; kind: NotificationKind; yours: OpportunityRow; other: OpportunityRow }
+  >();
+
+  for (const event of input.events) {
+    const yours = sides.get(event.ownerOpportunityId);
+    if (!yours) {
+      throw new Error(
+        `notification event side ${event.ownerOpportunityId} is not in duplicate pair ${input.pair.id}`,
+      );
+    }
+    const other = yours.id === input.left.id ? input.right : input.left;
+    const memberAccountIds =
+      yours.sourcePublisher === null
+        ? []
+        : await repos.memberships.accountIdsForOrgSlug(yours.sourcePublisher);
+    for (const accountId of mergeOpportunityOwnerAccountIds(yours, memberAccountIds)) {
+      const key = `${accountId}:${event.kind}`;
+      if (!recipients.has(key)) recipients.set(key, { accountId, kind: event.kind, yours, other });
+    }
+  }
+
+  return [...recipients.values()].map(({ accountId, kind, yours, other }) => ({
+    accountId,
+    kind,
+    subjectKind: "duplicate",
+    subjectId: input.pair.id,
+    payload: duplicatePayload(input, kind, yours, other) as unknown as Record<string, unknown>,
+  }));
+}
+
 export class NotificationService {
   private readonly repos: Repositories;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(db: DB = defaultDb) {
     this.repos = repositories(db);
-  }
-
-  /**
-   * Record one or more owner-side views of a pair event.
-   *
-   * Takes the caller's handle rather than reaching for the pool, exactly like AuditService.record:
-   * a rolled-back pair mutation cannot leave a notification claiming it happened. The unique
-   * constraint remains the backstop, while the map makes recipient deduplication explicit.
-   *
-   * @deprecated transitional — call repos.notifications.recordDuplicate(values) after dedupe moves.
-   */
-  async recordDuplicate(
-    exec: DbLike | Repositories,
-    input: RecordDuplicateNotificationsInput,
-  ): Promise<number[]> {
-    const repos = "notifications" in exec ? exec : repositories(exec);
-    const sides = new Map([
-      [input.left.id, input.left],
-      [input.right.id, input.right],
-    ]);
-    const recipients = new Map<
-      string,
-      { accountId: number; kind: NotificationKind; yours: OpportunityRow; other: OpportunityRow }
-    >();
-
-    for (const event of input.events) {
-      const yours = sides.get(event.ownerOpportunityId);
-      if (!yours) {
-        throw new Error(
-          `notification event side ${event.ownerOpportunityId} is not in duplicate pair ${input.pair.id}`,
-        );
-      }
-      const other = yours.id === input.left.id ? input.right : input.left;
-      const memberAccountIds =
-        yours.sourcePublisher === null
-          ? []
-          : await repos.memberships.accountIdsForOrgSlug(yours.sourcePublisher);
-      for (const accountId of mergeOpportunityOwnerAccountIds(yours, memberAccountIds)) {
-        const key = `${accountId}:${event.kind}`;
-        if (!recipients.has(key))
-          recipients.set(key, { accountId, kind: event.kind, yours, other });
-      }
-    }
-
-    if (recipients.size === 0) return [];
-    return repos.notifications.recordDuplicate(
-      [...recipients.values()].map(({ accountId, kind, yours, other }) => ({
-        accountId,
-        kind,
-        subjectKind: "duplicate",
-        subjectId: input.pair.id,
-        payload: duplicatePayload(input, kind, yours, other) as unknown as Record<string, unknown>,
-      })),
-    );
   }
 
   /** Account-scoped inbox, newest first, plus a count the chrome can render without a second API. */

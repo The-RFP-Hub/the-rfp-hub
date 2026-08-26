@@ -11,9 +11,10 @@ import { DuplicatePairRepository } from "./opportunities/duplicate-pair.reposito
 import { EmbeddingRepository } from "./opportunities/embedding.repository.js";
 import { OpportunityRepository } from "./opportunities/opportunity.repository.js";
 import { OrganizationRepository } from "./organizations/organization.repository.js";
+import { SystemRepository } from "./system/system.repository.js";
 import { VerificationRunRepository } from "./verification/verification-run.repository.js";
 
-/** The repositories a service may compose. Add domain repositories here as migrations land. */
+/** The complete executor-bound repository set that services may compose. */
 export interface Repositories {
   readonly accounts: AccountRepository;
   readonly apiKeys: ApiKeyRepository;
@@ -27,6 +28,7 @@ export interface Repositories {
   readonly notifications: NotificationRepository;
   readonly opportunities: OpportunityRepository;
   readonly organizations: OrganizationRepository;
+  readonly system: SystemRepository;
   readonly verificationRuns: VerificationRunRepository;
 }
 
@@ -44,6 +46,7 @@ export function repositories(exec: DbLike): Repositories {
   let notifications: NotificationRepository | undefined;
   let opportunities: OpportunityRepository | undefined;
   let organizations: OrganizationRepository | undefined;
+  let system: SystemRepository | undefined;
   let verificationRuns: VerificationRunRepository | undefined;
 
   return {
@@ -94,6 +97,10 @@ export function repositories(exec: DbLike): Repositories {
     get organizations() {
       organizations ??= new OrganizationRepository(exec);
       return organizations;
+    },
+    get system() {
+      system ??= new SystemRepository(exec);
+      return system;
     },
     get verificationRuns() {
       verificationRuns ??= new VerificationRunRepository(exec);

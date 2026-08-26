@@ -11,6 +11,7 @@ import {
   NotificationRepository,
   OpportunityRepository,
   OrganizationRepository,
+  SystemRepository,
   VerificationRunRepository,
   repositories,
   withTransaction,
@@ -42,6 +43,8 @@ describe("repository unit of work", () => {
     expect(bundle.opportunities).toBe(bundle.opportunities);
     expect(bundle.organizations).toBeInstanceOf(OrganizationRepository);
     expect(bundle.organizations).toBe(bundle.organizations);
+    expect(bundle.system).toBeInstanceOf(SystemRepository);
+    expect(bundle.system).toBe(bundle.system);
     expect(bundle.verificationRuns).toBeInstanceOf(VerificationRunRepository);
     expect(bundle.verificationRuns).toBe(bundle.verificationRuns);
   });
@@ -65,6 +68,7 @@ describe("repository unit of work", () => {
         "notifications",
         "opportunities",
         "organizations",
+        "system",
         "verificationRuns",
       ]);
       expect(bundle).not.toBe(tx);

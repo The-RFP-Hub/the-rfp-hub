@@ -34,6 +34,7 @@ export class NotificationRepository {
   constructor(private readonly exec: DbLike) {}
 
   async recordDuplicate(values: NotificationInsert[]): Promise<number[]> {
+    if (values.length === 0) return [];
     const inserted = await this.exec
       .insert(notifications)
       .values(values)

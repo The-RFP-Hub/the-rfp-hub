@@ -23,8 +23,8 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { type DB, db, pool } from "../../src/db/client.js";
 import { accounts, apiKeys, auditLog } from "../../src/db/schema.js";
+import { repositories } from "../../src/modules/repositories/index.js";
 import { AdminService } from "../../src/modules/services/admin/admin.service.js";
-import { AuditService } from "../../src/modules/services/audit/audit.service.js";
 import { mintApiKey } from "../../src/modules/shared/api-key-token.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
@@ -106,7 +106,7 @@ run("M3ORPHAN the pre-identity accounts", () => {
       scopes: ["read", "write", "publish"],
     });
     // A history row, so the "the rows STAY" half of the policy has something to be about.
-    await new AuditService(db).record(db, {
+    await repositories(db).audit.record({
       subjectKind: "account",
       subjectId: account.id,
       actorKind: "user",

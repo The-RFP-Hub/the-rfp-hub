@@ -221,6 +221,15 @@ export class OpportunityRepository {
     return rows[0];
   }
 
+  /** Idempotent seed ingest; preserve the Hub's original creation timestamp on conflict. */
+  async upsertByPublicId(values: OpportunityInsert): Promise<void> {
+    const { createdAt, ...onUpdate } = values;
+    await this.exec
+      .insert(opportunities)
+      .values(values)
+      .onConflictDoUpdate({ target: opportunities.publicId, set: onUpdate });
+  }
+
   async update(
     id: number,
     values: Partial<OpportunityInsert>,

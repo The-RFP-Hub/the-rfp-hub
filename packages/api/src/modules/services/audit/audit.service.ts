@@ -20,7 +20,7 @@
  * is coarsened by is RECORDED WITH THE ROW rather than looked up when it is read, because a role is
  * revocable and the trail must say what was true when the action was taken.
  */
-import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
+import { type DB, db as defaultDb } from "../../../db/client.js";
 import {
   type ActorKind,
   type AuditAction,
@@ -57,14 +57,8 @@ export interface AuditEntryRecord {
 export class AuditService {
   private readonly repos: Repositories;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(db: DB = defaultDb) {
     this.repos = repositories(db);
-  }
-
-  /** @deprecated transitional — call repos.audit.record(entry). Deleted in the final migration run. */
-  async record(exec: DbLike | Repositories, entry: AuditRecordInput): Promise<void> {
-    const repos = "audit" in exec ? exec : repositories(exec);
-    await repos.audit.record(entry);
   }
 
   /** The trail for one subject, newest first, projected for this viewer. */

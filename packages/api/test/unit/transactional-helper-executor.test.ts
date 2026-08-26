@@ -47,7 +47,7 @@ describe("transaction-bound service helpers", () => {
     expect(exec.select).toHaveBeenCalledOnce();
   });
 
-  it("loads survivor public ids with the executor passed to survivorIds", async () => {
+  it("loads survivor public ids with the repository bundle passed to survivorIds", async () => {
     const service = new DedupeService(rejectingPool());
     const exec = fakeExec([
       { id: 11, publicId: "acme:survivor" },
@@ -55,11 +55,11 @@ describe("transaction-bound service helpers", () => {
     ]);
     const survivorIds = (
       service as unknown as {
-        survivorIds(exec: DbLike, ids: (number | null)[]): Promise<Map<number, string>>;
+        survivorIds(repos: Repositories, ids: (number | null)[]): Promise<Map<number, string>>;
       }
     ).survivorIds.bind(service);
 
-    const survivors = await survivorIds(exec, [11, null, 12, 11]);
+    const survivors = await survivorIds(repositories(exec), [11, null, 12, 11]);
 
     expect(survivors).toEqual(
       new Map([

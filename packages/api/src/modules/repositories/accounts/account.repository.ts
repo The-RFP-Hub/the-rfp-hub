@@ -1,6 +1,6 @@
 import { eq, getTableColumns, ilike, inArray, or } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
-import { type AccountRow, accounts, authUser } from "../../../db/schema.js";
+import { type AccountRow, type AuthUserRow, accounts, authUser } from "../../../db/schema.js";
 
 /** The privileged directory projection. Email stays out of the public account row and `/v1/me`. */
 export interface AccountSearchRow extends AccountRow {
@@ -12,12 +12,34 @@ export interface AccountRecipientRow {
   email: string | null;
 }
 
+export type AuthIdentity = Pick<AuthUserRow, "id" | "email" | "emailVerified">;
+
 export type AccountUpdate = Partial<
   Pick<AccountRow, "directCreate" | "displayName" | "globalRole" | "handle" | "updatedAt">
 >;
 
 export class AccountRepository {
   constructor(private readonly exec: DbLike) {}
+
+  /** The identity behind an address, or nothing. Better-Auth stores addresses lower-cased. */
+  async identityByEmail(address: string): Promise<AuthIdentity | undefined> {
+    const rows = await this.exec
+      .select({ id: authUser.id, email: authUser.email, emailVerified: authUser.emailVerified })
+      .from(authUser)
+      .where(eq(authUser.email, address.trim().toLowerCase()))
+      .limit(1);
+    return rows[0];
+  }
+
+  /** The identity an opaque authentication subject names, or nothing. */
+  async identityBySubject(subject: string): Promise<AuthIdentity | undefined> {
+    const rows = await this.exec
+      .select({ id: authUser.id, email: authUser.email, emailVerified: authUser.emailVerified })
+      .from(authUser)
+      .where(eq(authUser.id, subject))
+      .limit(1);
+    return rows[0];
+  }
 
   async insertBySubject(subject: string): Promise<void> {
     await this.exec.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();

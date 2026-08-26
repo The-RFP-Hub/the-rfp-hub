@@ -19,40 +19,12 @@
  * all without `--yes`. Every refusal exits non-zero.
  */
 import { pathToFileURL } from "node:url";
-import { eq } from "drizzle-orm";
 import { config } from "../src/config.js";
-import { authUser } from "../src/db/auth-schema.js";
-import { pool } from "../src/db/client.js";
-import { db } from "../src/db/client.js";
+import { db, pool } from "../src/db/client.js";
+import { repositories } from "../src/modules/repositories/index.js";
 import { AccountService } from "../src/modules/services/auth/account.service.js";
 import { isHttpError } from "../src/modules/shared/http-error.js";
 import { isLoopbackHost } from "../src/shared/loopback.js";
-
-interface Identity {
-  id: string;
-  email: string;
-  emailVerified: boolean;
-}
-
-/** The identity behind an address, or nothing. Addresses are stored lower-cased by the library. */
-async function identityByEmail(address: string): Promise<Identity | undefined> {
-  const rows = await db
-    .select({ id: authUser.id, email: authUser.email, emailVerified: authUser.emailVerified })
-    .from(authUser)
-    .where(eq(authUser.email, address.trim().toLowerCase()))
-    .limit(1);
-  return rows[0];
-}
-
-/** The identity a subject names, or nothing. */
-async function identityBySubject(subject: string): Promise<Identity | undefined> {
-  const rows = await db
-    .select({ id: authUser.id, email: authUser.email, emailVerified: authUser.emailVerified })
-    .from(authUser)
-    .where(eq(authUser.id, subject))
-    .limit(1);
-  return rows[0];
-}
 
 export interface GrantAdminOptions {
   /** The address the person signs in with. A LOOKUP key — never what gets stored. */
@@ -181,9 +153,10 @@ export async function main(
   // catch a mistyped subject: `--subject --create` would mint an admin nobody can ever sign in as,
   // and that ghost would then count toward the last-admin guard — the exact hazard the migration's
   // orphan policy exists to clear.
+  const repos = repositories(db);
   const identity = subject
-    ? await identityBySubject(subject)
-    : await identityByEmail(email as string);
+    ? await repos.accounts.identityBySubject(subject)
+    : await repos.accounts.identityByEmail(email as string);
   if (!identity) {
     out(
       subject

@@ -24,6 +24,32 @@ export type OrganizationUpdate = Partial<
 export class OrganizationRepository {
   constructor(private readonly exec: DbLike) {}
 
+  /** Keep the directory synchronized with a validated Standard document during ingest. */
+  async upsertFromIngest(org: OrganizationInsert): Promise<number> {
+    const rows = await this.exec
+      .insert(organizations)
+      .values(org)
+      .onConflictDoUpdate({
+        target: organizations.slug,
+        set: {
+          name: org.name,
+          orgType: org.orgType,
+          description: org.description,
+          website: org.website,
+          logoUrl: org.logoUrl,
+          bannerUrl: org.bannerUrl,
+          socialLinks: org.socialLinks,
+          ecosystems: org.ecosystems,
+          contacts: org.contacts,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: organizations.id });
+    const upserted = rows[0];
+    if (!upserted) throw new Error(`failed to upsert organization '${org.slug}'`);
+    return upserted.id;
+  }
+
   async findBySlug(slug: string): Promise<OrganizationRow | undefined> {
     const rows = await this.exec
       .select()

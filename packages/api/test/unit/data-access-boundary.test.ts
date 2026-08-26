@@ -1,9 +1,9 @@
 /**
  * Architectural boundary: repositories own every database query and transaction.
  *
- * The temporary allowlist is migration debt, not permission. Its exact-match assertion is a
- * two-way ratchet: a new offender fails because it is absent, and a migrated offender fails because
- * its stale entry remains. Reduce the list and TEMPORARY_CEILING together; never raise the ceiling.
+ * Production database access is permitted only in the permanent implementation locations below.
+ * The completed migration leaves the temporary allowlist empty and its ceiling at zero: the exact
+ * offender assertion makes that zero-debt state a permanent invariant.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -34,15 +34,9 @@ const PERMANENT_ALLOWLIST: PermanentEntry[] = [
   { label: "test/**", matches: (file) => file.startsWith("test/") },
 ];
 
-// Seeded by running this scanner against the pre-R0 tree. Keep sorted.
-const TEMPORARY_ALLOWLIST: string[] = [
-  "scripts/export.ts",
-  "scripts/grant-admin.ts",
-  "scripts/seed.ts",
-  "src/modules/services/health/health.service.ts",
-  "src/modules/services/opportunities/opportunity.service.ts",
-];
-const TEMPORARY_CEILING = 5;
+// Migration complete. Keep empty: production access outside the permanent locations is a defect.
+const TEMPORARY_ALLOWLIST: string[] = [];
+const TEMPORARY_CEILING = 0;
 
 type Violation = "drizzle-import" | "schema-value-import" | "transaction";
 
@@ -140,21 +134,19 @@ describe("repository data-access boundary", () => {
     ).toEqual([]);
   });
 
-  it("ratchets the current migration debt in both directions", () => {
+  it("keeps migration debt at zero as a permanent invariant", () => {
     expect(offenders).toEqual(TEMPORARY_ALLOWLIST);
-    expect(TEMPORARY_CEILING).toBeGreaterThanOrEqual(TEMPORARY_ALLOWLIST.length);
+    expect(TEMPORARY_ALLOWLIST).toEqual([]);
+    expect(TEMPORARY_CEILING).toBe(0);
   });
 
-  it("scans a non-vacuous tree and keeps every allowlist entry live", () => {
+  it("scans a non-vacuous tree and keeps every permanent allowlist entry live", () => {
     expect(files.length).toBeGreaterThan(80);
     for (const entry of PERMANENT_ALLOWLIST) {
       expect(
         files.some((file) => entry.matches(file)),
         `${entry.label} exists`,
       ).toBe(true);
-    }
-    for (const file of TEMPORARY_ALLOWLIST) {
-      expect(files, `${file} exists`).toContain(file);
     }
   });
 });

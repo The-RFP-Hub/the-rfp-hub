@@ -3,6 +3,7 @@ export {
   type AccountRecipientRow,
   type AccountSearchRow,
   type AccountUpdate,
+  type AuthIdentity,
 } from "./accounts/account.repository.js";
 export {
   ApiKeyRepository,
@@ -56,6 +57,10 @@ export {
   OrganizationRepository,
   type OrganizationUpdate,
 } from "./organizations/organization.repository.js";
+export {
+  type DatasetSnapshotInsert,
+  SystemRepository,
+} from "./system/system.repository.js";
 export { VerificationRunRepository } from "./verification/verification-run.repository.js";
 export {
   type Repositories,

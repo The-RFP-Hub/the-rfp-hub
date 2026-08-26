@@ -19,9 +19,10 @@ pool connection and wait forever for the extra reads; the pool has no connection
 timeout by default. Passing the transaction to the two known helpers fixes those instances, but it
 does not make future nested pool reads structurally impossible.
 
-The API is already shipped and the migration spans many domains, so the boundary must become
-enforceable before all existing query sites can move. This decision therefore needs an incremental
-ratchet as well as the final dependency shape.
+The API was already shipped and the migration spanned many domains, so the boundary became
+enforceable before all existing query sites moved. The incremental ratchet has now reached its
+final dependency shape: zero production offenders outside repositories and the permanent database
+implementation locations.
 
 ## Decision drivers
 
@@ -93,9 +94,13 @@ boundary first.
 
 The filesystem guard permanently permits database implementation details only in `src/db/**`,
 `src/modules/repositories/**`, the Better-Auth adapter configuration, the two database bootstrap
-scripts, Drizzle configuration, and tests. Existing production offenders are pinned in an exact
-temporary allowlist with a ceiling. Both a new offender and a stale entry fail, so each migration
-can only reduce the debt.
+scripts, Drizzle configuration, and tests. The temporary allowlist is empty and its ceiling is
+zero. Any production offender outside those permanent locations fails the guard.
+
+The completed bundle contains 14 lazy repositories: accounts, API keys, audit, analytics, claims,
+duplicate pairs, embeddings, membership invites, memberships, notifications, opportunities,
+organizations, system operations, and verification runs. Services contain zero Drizzle imports,
+runtime schema-table imports, or transaction calls.
 
 Each cross-aggregate join has one repository owner: the aggregate whose result or invariant the
 query serves. If ownership is ambiguous, the implementing change must document the choice instead
@@ -108,21 +113,19 @@ of creating an unowned shared-query bucket.
 - **Good:** a filesystem-only unit test enforces the dependency direction without `DATABASE_URL`.
 - **Good:** services become testable against domain-shaped repository fakes rather than Drizzle
   builder-shaped database fakes.
-- **Bad:** the planned migration introduces 14 repository files and moves existing query code; that
-  is real review surface even where SQL behavior remains identical.
+- **Bad:** the completed migration introduced 14 repository files and moved existing query code;
+  that was real review surface even where SQL behavior remained identical.
 - **Bad:** every database operation gains one indirection through a repository method.
 - **Bad:** cross-aggregate joins require an explicit owner, and maintainers must resolve genuinely
   ambiguous cases rather than placing them in whichever service first needs them.
-- **Neutral:** the R0 scaffold and guard change no endpoint behavior; existing services remain on a
-  temporary exact allowlist until later migrations.
+- **Neutral:** the R0 scaffold and ratchet changed no endpoint behavior; the exact allowlist was
+  reduced to zero as each domain migrated.
 
-## Follow-ups
+## Completion
 
-- Migrate the temporary allowlist domain by domain without changing service behavior in the same
-  step.
-- Add each domain repository to the lazy bundle and replace the initial empty scaffold as its first
-  queries move.
-- Remove each migrated file from the temporary allowlist and lower `TEMPORARY_CEILING` in the same
-  commit; never raise the ceiling.
-- Record the owner beside any cross-aggregate query whose placement would not be obvious to a future
-  maintainer.
+- The temporary allowlist was migrated domain by domain without changing service behavior.
+- All 14 domain and system repositories are present in the lazy bundle.
+- `TEMPORARY_ALLOWLIST` is empty and `TEMPORARY_CEILING` is zero; the ratchet is now the permanent
+  invariant.
+- Cross-aggregate queries have explicit repository owners, including system ownership of readiness
+  and dataset-snapshot bookkeeping.

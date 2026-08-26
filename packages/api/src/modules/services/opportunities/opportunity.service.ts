@@ -1,11 +1,6 @@
 import type { Opportunity } from "@the-rfp-hub/standard";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityInsert,
-  type OrganizationInsert,
-  opportunities,
-  organizations,
-} from "../../../db/schema.js";
+import type { OpportunityInsert } from "../../../db/schema.js";
 import {
   type OpportunityInsertData,
   type OpportunitySummary,
@@ -48,7 +43,7 @@ export { escapeLike } from "../../repositories/index.js";
 export class OpportunityService {
   private readonly repos: Repositories;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(db: DB = defaultDb) {
     this.repos = repositories(db);
   }
 
@@ -123,46 +118,30 @@ export class OpportunityService {
       sourceSystem?: string;
     } = {},
   ): Promise<void> {
-    const { orgs, opp } = fromStandard(std);
-    for (const org of orgs) await this.upsertOrganization(org);
-    const row: OpportunityInsert = {
-      ...opp,
-      sourceSystem: opts.sourceSystem ?? null,
-      reviewStatus: opts.reviewStatus ?? "approved",
-      isListed: opts.isListed ?? true,
-      updatedAt: new Date(),
-    };
-    const { createdAt, ...onUpdate } = row; // preserve the Hub's created timestamp on update
-    await this.db
-      .insert(opportunities)
-      .values(row)
-      .onConflictDoUpdate({ target: opportunities.publicId, set: onUpdate });
+    await upsertOpportunityFromStandard(this.repos, std, opts);
   }
+}
 
-  private async upsertOrganization(org: OrganizationInsert): Promise<number> {
-    const res = await this.db
-      .insert(organizations)
-      .values(org)
-      .onConflictDoUpdate({
-        target: organizations.slug,
-        set: {
-          name: org.name,
-          orgType: org.orgType,
-          description: org.description,
-          website: org.website,
-          logoUrl: org.logoUrl,
-          bannerUrl: org.bannerUrl,
-          socialLinks: org.socialLinks,
-          ecosystems: org.ecosystems,
-          contacts: org.contacts,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: organizations.id });
-    const created = res[0];
-    if (!created) throw new Error(`failed to upsert organization '${org.slug}'`);
-    return created.id;
-  }
+/** Repository-bundle form used by the atomic seed batch and the pool-bound service method. */
+export async function upsertOpportunityFromStandard(
+  repos: Repositories,
+  std: Opportunity,
+  opts: {
+    reviewStatus?: "pending" | "approved" | "rejected";
+    isListed?: boolean;
+    sourceSystem?: string;
+  } = {},
+): Promise<void> {
+  const { orgs, opp } = fromStandard(std);
+  for (const org of orgs) await repos.organizations.upsertFromIngest(org);
+  const row: OpportunityInsert = {
+    ...opp,
+    sourceSystem: opts.sourceSystem ?? null,
+    reviewStatus: opts.reviewStatus ?? "approved",
+    isListed: opts.isListed ?? true,
+    updatedAt: new Date(),
+  };
+  await repos.opportunities.upsertByPublicId(row);
 }
 
 export type { OpportunityInsertData };
