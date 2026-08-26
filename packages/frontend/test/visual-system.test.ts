@@ -74,4 +74,13 @@ describe("the visual-system token boundary", () => {
     expect(css).toMatch(/\.cols\s*\{[^}]*align-items:\s*stretch;/s);
     expect(css).toMatch(/\.control\s*\{[^}]*margin-top:\s*auto;/s);
   });
+
+  it("gives both table scroll containers a local edge fade and contained scrolling", () => {
+    for (const [, path] of stylesheets) {
+      const css = readFileSync(path, "utf8");
+      expect(css).toContain("background-attachment: local, local, scroll, scroll;");
+      expect(css).toContain("overscroll-behavior-inline: contain;");
+      expect(css).toContain("scrollbar-gutter: stable;");
+    }
+  });
 });

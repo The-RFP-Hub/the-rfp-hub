@@ -323,7 +323,7 @@ function ResultLine({
           </>
         ) : null}{" "}
         · page {page} of {totalPages}
-        {stale ? <span className="faint"> · refreshing…</span> : null}
+        {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
       {narrowed ? (
         <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>

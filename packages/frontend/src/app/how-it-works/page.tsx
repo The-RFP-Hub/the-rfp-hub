@@ -233,7 +233,7 @@ export default function HowItWorksPage() {
                         <span className="muted">{cell}</span>
                       ) : (
                         <>
-                          <span aria-hidden="true" className="faint">
+                          <span aria-hidden="true" className="muted">
                             —
                           </span>
                           <span className="visually-hidden">no</span>

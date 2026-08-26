@@ -641,7 +641,7 @@ function PendingRow({
         </td>
         <td className="muted">
           <UntrustedText value={item.submittedBy} fallback="community" />
-          <div className="faint">{formatInstant(item.createdAt)}</div>
+          <div className="muted">{formatInstant(item.createdAt)}</div>
         </td>
         <td>
           <div className="row">

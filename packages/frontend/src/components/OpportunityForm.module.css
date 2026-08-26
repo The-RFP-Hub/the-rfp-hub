@@ -275,6 +275,17 @@
  */
 .tableScroll {
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  background-image: linear-gradient(to right, var(--paper) 35%, transparent),
+    linear-gradient(to left, var(--paper) 35%, transparent),
+    linear-gradient(to right, var(--line), transparent),
+    linear-gradient(to left, var(--line), transparent);
+  background-position: left center, right center, left center, right center;
+  background-repeat: no-repeat;
+  background-size: var(--space-8) 100%, var(--space-8) 100%, var(--space-2) 100%, var(--space-2)
+    100%;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .table {

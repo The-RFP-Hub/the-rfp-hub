@@ -26,9 +26,9 @@ export function UntrustedText({
   fallback?: string;
 }) {
   if (value === null || value === undefined || value.trim() === "") {
-    return <span className="muted">{fallback}</span>;
+    return <span className="muted untrusted-text">{fallback}</span>;
   }
-  return <span className={className}>{value}</span>;
+  return <span className={[className, "untrusted-text"].filter(Boolean).join(" ")}>{value}</span>;
 }
 
 /** The multi-line variant, for descriptions and other long free text. */
@@ -55,7 +55,7 @@ export function UntrustedLink({
   href,
   label,
 }: { href: string | null | undefined; label?: string }) {
-  if (!href) return <span className="muted">—</span>;
+  if (!href) return <span className="muted untrusted-link">—</span>;
   let safe = false;
   try {
     const parsed = new URL(href);
@@ -65,13 +65,16 @@ export function UntrustedLink({
   }
   if (!safe) {
     return (
-      <span className="muted" title="Not an http(s) URL, so it is shown but not linked">
+      <span
+        className="muted untrusted-link"
+        title="Not an http(s) URL, so it is shown but not linked"
+      >
         {href}
       </span>
     );
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
+    <a className="untrusted-link" href={href} target="_blank" rel="noopener noreferrer">
       {label ?? href}
     </a>
   );

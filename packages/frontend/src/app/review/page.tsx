@@ -746,7 +746,7 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                               Reject…
                             </button>
                           </div>
-                          <p className="faint footnote">
+                          <p className="muted footnote">
                             Approving alone transfers this listing; the organisation&rsquo;s future
                             writes still wait for review.
                           </p>
@@ -1647,7 +1647,7 @@ function OrgRow({
             </button>
           </div>
           {showStubGuard && memberless && !org.verified ? (
-            <p className="faint footnote">
+            <p className="muted footnote">
               0 members — verifying grants nothing today and arms whoever is added next.
             </p>
           ) : null}

@@ -293,6 +293,7 @@ td {
   padding: var(--space-3);
   border-bottom: 1px solid var(--line-faint);
   vertical-align: top;
+  min-width: 0;
 }
 
 /*
@@ -349,9 +350,23 @@ caption {
  */
 .table-scroll {
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
   /* Keeps a focus ring on a cell from being clipped by the scroll container. */
   padding: 2px;
   margin: 0 -2px;
+  /* The fades begin inside that 2px focus-ring clearance, not over it. */
+  --scroll-fade-inset: 2px;
+  background-image: linear-gradient(to right, var(--paper) 35%, transparent),
+    linear-gradient(to left, var(--paper) 35%, transparent),
+    linear-gradient(to right, var(--line), transparent),
+    linear-gradient(to left, var(--line), transparent);
+  background-position: left var(--scroll-fade-inset) center, right var(--scroll-fade-inset) center,
+    left var(--scroll-fade-inset) center, right var(--scroll-fade-inset) center;
+  background-repeat: no-repeat;
+  background-size: var(--space-8) 100%, var(--space-8) 100%, var(--space-2) 100%, var(--space-2)
+    100%;
+  background-attachment: local, local, scroll, scroll;
 }
 
 /* ------------------------------------------------------------------ the shell --- */
@@ -516,10 +531,6 @@ caption {
   color: var(--ink-soft);
 }
 
-.faint {
-  color: var(--ink-faint);
-}
-
 .footnote {
   font-size: var(--text-md);
   max-width: 68ch;
@@ -542,6 +553,13 @@ caption {
   gap: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
+}
+
+.row > *,
+.row-between > *,
+.grid-2 > *,
+.card {
+  min-width: 0;
 }
 
 /* Search forms opt out of the global full-width input without weakening normal form fields. */
@@ -1140,6 +1158,13 @@ ul.plain {
   align-items: center;
   gap: var(--space-3);
   margin-top: var(--space-4);
+}
+
+.untrusted-text,
+.untrusted-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .untrusted-block {
