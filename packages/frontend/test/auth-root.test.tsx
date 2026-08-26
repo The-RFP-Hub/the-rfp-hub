@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/components/SignIn", () => ({
   SignIn: ({ onSignedIn }: { onSignedIn?: () => void }) => (
     <div className="signin">
-      <h2 id="signin-heading">Sign in</h2>
+      <h2 id="signin-heading">Log in</h2>
       <label htmlFor="signin-email">Email address</label>
       <input id="signin-email" />
       <button type="button" onClick={onSignedIn}>

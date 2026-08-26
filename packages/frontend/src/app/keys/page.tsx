@@ -82,7 +82,7 @@ function Keys() {
       setSecret(created.token);
       setCopyResult(null);
       setName("");
-      setCreateNote({ kind: "ok", message: "Key created. The secret below is shown once." });
+      setCreateNote({ kind: "ok", message: "Key created. The secret above is shown once." });
       reload();
     } catch (error) {
       setCreateNote(actionErrorNote(error, "Could not mint a key."));

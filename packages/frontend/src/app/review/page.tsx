@@ -409,7 +409,7 @@ function SubmissionRow({
 
             {panel === "approve" ? (
               <ConfirmPanel
-                title="Publish this listing?"
+                title={`Publish “${item.title}”?`}
                 confirmLabel="Publish it"
                 busyLabel="Publishing…"
                 busy={busy}
@@ -419,7 +419,7 @@ function SubmissionRow({
                     await api.review.approve(item.id);
                     setPanel("none");
                     reload();
-                    return `${item.id} is published.`;
+                    return `“${item.title}” is published.`;
                   })
                 }
               >
@@ -433,7 +433,7 @@ function SubmissionRow({
 
             {panel === "reject" ? (
               <ConfirmPanel
-                title="Refuse this listing?"
+                title={`Refuse “${item.title}”?`}
                 confirmLabel="Refuse it"
                 busyLabel="Refusing…"
                 busy={busy}
@@ -445,7 +445,7 @@ function SubmissionRow({
                     setPanel("none");
                     setReason("");
                     reload();
-                    return `${item.id} was refused and unlisted.`;
+                    return `“${item.title}” was refused and unlisted.`;
                   })
                 }
               >
@@ -1725,7 +1725,7 @@ function OrgRow({
                     await api.review.verifyOrganization(org.slug);
                     setConfirming(false);
                     reload();
-                    return `${org.slug} is verified — its ${org.memberCount} member(s) now publish into that namespace without review.`;
+                    return `${org.slug} is verified — its ${org.memberCount} ${org.memberCount === 1 ? "member now publishes" : "members now publish"} into that namespace without review.`;
                   })
                 }
               >
@@ -1814,7 +1814,7 @@ function GrantMembership({
       setCandidates(found.items);
       return found.items.length === 0
         ? `No account matches “${typed}”.`
-        : `${found.items.length} account(s) match “${typed}”.`;
+        : `${found.items.length} ${found.items.length === 1 ? "account matches" : "accounts match"} “${typed}”.`;
     });
   };
 
@@ -1872,7 +1872,7 @@ function GrantMembership({
 
       <ActionNote note={lookup.note} />
 
-      {candidates && !chosen ? (
+      {candidates && candidates.length > 0 && !chosen ? (
         <div className="table-scroll">
           <table>
             <thead>

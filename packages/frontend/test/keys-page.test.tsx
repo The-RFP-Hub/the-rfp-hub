@@ -150,7 +150,7 @@ describe("revoking a key", () => {
     mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Mint" }));
-    expect(await screen.findByText("Key created. The secret below is shown once.")).toBeTruthy();
+    expect(await screen.findByText("Key created. The secret above is shown once.")).toBeTruthy();
 
     const row = await productionRow();
     fireEvent.click(within(row).getByRole("button", { name: "Revoke…" }));
@@ -160,7 +160,7 @@ describe("revoking a key", () => {
       "Key Production ingest revoked. Audit rows naming it still resolve.",
     );
     expect(result.closest("tr")?.previousElementSibling).toBe(row);
-    expect(screen.getByText("Key created. The secret below is shown once.")).toBeTruthy();
+    expect(screen.getByText("Key created. The secret above is shown once.")).toBeTruthy();
     expect(screen.queryByText(/Key 11 revoked/)).toBeNull();
   });
 

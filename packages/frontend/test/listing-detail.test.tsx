@@ -220,6 +220,9 @@ describe("merged listing detail and edit routes", () => {
   it("shows the survivor banner instead of mounting the edit form", async () => {
     mount(<EditListingPage />);
 
+    expect(
+      (await screen.findByRole("link", { name: "← Back to listing" })).getAttribute("href"),
+    ).toBe("/listings/acme%3Aold");
     expect(await screen.findByLabelText("Merged listing")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Current Round" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Replace" })).toBeNull();

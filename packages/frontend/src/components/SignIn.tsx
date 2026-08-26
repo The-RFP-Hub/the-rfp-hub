@@ -101,7 +101,7 @@ export function SignIn({
       setStep("code");
       setNote({
         kind: "ok",
-        message: `Code sent to ${email.trim()}. It is good for five minutes.`,
+        message: `Code sent to ${email.trim()}.`,
       });
     } catch (cause) {
       setNote({ kind: "error", message: describeTransportFailure(cause) });
@@ -207,7 +207,7 @@ export function SignIn({
 
   return (
     <div className="signin">
-      <h2 id="signin-heading">Sign in</h2>
+      <h2 id="signin-heading">Log in</h2>
       <p className="muted footnote">
         We email you a {OTP_LENGTH}-digit code. There is no password. The first time you sign in,
         this creates your account; publishing without review additionally requires membership of a

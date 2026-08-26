@@ -131,7 +131,7 @@ describe("the public claim control", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign in to claim" }));
 
     expect(await screen.findByRole("dialog")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Sign in" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Log in" })).toBeTruthy();
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(fetch.mock.calls.every(([url]) => !String(url).includes("/v1/me"))).toBe(true);
   });
@@ -177,6 +177,32 @@ describe("the public claim control", () => {
     expect(screen.getByText("This is my programme — claim it")).toBe(summary);
     expect(disclosure.open).toBe(true);
   });
+
+  it("closes and resets the public claim draft on Cancel", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    const client = clientFor();
+    render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    const summary = await screen.findByText("This is my programme — claim it");
+    fireEvent.click(summary);
+    await screen.findByRole("button", { name: "File the claim" });
+    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
+      target: { value: "Unsent public note" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
+    fireEvent.click(summary);
+    expect((screen.getByLabelText("Organisation") as HTMLSelectElement).value).toBe("acme");
+    expect(
+      (screen.getByLabelText("Note for the reviewer (optional)") as HTMLInputElement).value,
+    ).toBe("");
+  });
 });
 
 describe("the extracted claim form", () => {
@@ -185,8 +211,28 @@ describe("the extracted claim form", () => {
 
     const select = screen.getByLabelText("Organisation") as HTMLSelectElement;
     expect(select.value).toBe("acme");
-    expect(screen.getByRole("option", { name: "acme (verified)" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "beta (unverified)" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Acme Foundation — acme (verified)" })).toBeTruthy();
+    expect(
+      screen.getByRole("option", { name: "Beta Collective — beta (unverified)" }),
+    ).toBeTruthy();
+  });
+
+  it("closes on Cancel and discards the unsent organisation and note", () => {
+    renderForm(clientFor());
+
+    fireEvent.change(screen.getByLabelText("Organisation"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
+      target: { value: "Unsent note" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    const summary = screen.getByText("This is my programme — claim it");
+    expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
+    fireEvent.click(summary);
+    expect((screen.getByLabelText("Organisation") as HTMLSelectElement).value).toBe("acme");
+    expect(
+      (screen.getByLabelText("Note for the reviewer (optional)") as HTMLInputElement).value,
+    ).toBe("");
   });
 
   it("posts exactly the selected organisation and reviewer note", async () => {

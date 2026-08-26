@@ -3,6 +3,7 @@ import { join, relative, sep } from "node:path";
 import { generateMetadata as listingMetadata } from "@/app/listings/[id]/layout";
 import { generateMetadata as opportunityMetadata } from "@/app/opportunities/[id]/layout";
 import { generateMetadata as organisationMetadata } from "@/app/organisations/[slug]/layout";
+import { metadata as organisationsMetadata } from "@/app/organisations/layout";
 import { describe, expect, it } from "vitest";
 
 const appRoot = join(process.cwd(), "src", "app");
@@ -68,5 +69,8 @@ describe("route metadata", () => {
     await expect(
       organisationMetadata({ params: Promise.resolve({ slug: "acme-foundation" }) }),
     ).resolves.toEqual({ title: "Organisation acme-foundation" });
+    expect(organisationsMetadata).toEqual({
+      title: { default: "Organisations", template: "%s | RFP Hub" },
+    });
   });
 });

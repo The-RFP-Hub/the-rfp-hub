@@ -18,6 +18,7 @@ import { ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Me } from "@/lib/types";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
 
@@ -48,6 +49,9 @@ function EditForm({ id, me }: { id: string; me: Me }) {
 
   return (
     <section>
+      <p>
+        <Link href={`/listings/${encodeURIComponent(id)}`}>← Back to listing</Link>
+      </p>
       <ResourceView resource={state} what="this listing" onRetry={reload}>
         {({ entry, managed }) => {
           if (managed.mergedInto) {

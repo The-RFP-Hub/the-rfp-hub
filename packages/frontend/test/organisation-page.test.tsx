@@ -241,10 +241,10 @@ describe("deciding as a verified member", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve…" }));
 
-    expect(screen.getByText("Publish this listing?")).toBeTruthy();
+    expect(screen.getByText("Publish “Filecoin Dev Grants Q4”?")).toBeTruthy();
     // The two facts that make this different from a reviewer approving it: whose name it publishes
     // under, and whose handle the decision is recorded against.
-    const panel = screen.getByRole("group", { name: "Publish this listing?" });
+    const panel = screen.getByRole("group", { name: "Publish “Filecoin Dev Grants Q4”?" });
     expect(
       within(panel).getByText(/publishes into the public directory immediately/i),
     ).toBeTruthy();
@@ -266,7 +266,7 @@ describe("deciding as a verified member", () => {
     mount(me(), pending);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject…" }));
-    expect(screen.getByText("Refuse this listing?")).toBeTruthy();
+    expect(screen.getByText("Refuse “Filecoin Dev Grants Q4”?")).toBeTruthy();
     // The reason is the counterweight to the conflict of interest, so the button cannot fire
     // without one.
     expect(screen.getByRole("button", { name: "Refuse it" })).toHaveProperty("disabled", true);
@@ -283,6 +283,11 @@ describe("deciding as a verified member", () => {
         "we have never run this programme",
       ),
     );
+    expect(
+      await screen.findByText(
+        "“Filecoin Dev Grants Q4” was refused. The reason is shown to whoever submitted it.",
+      ),
+    ).toBeTruthy();
   });
 
   it("re-reads BOTH lists after a decision, because the row moves between them", async () => {
@@ -301,7 +306,11 @@ describe("deciding as a verified member", () => {
      * manual page reload: the listing was live and the page said it was not.
      */
     await waitFor(() => expect(reads.approved).toBeGreaterThan(before));
-    expect(screen.getByText(/is published/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "“Filecoin Dev Grants Q4” is published. The decision is recorded under @fil-ops.",
+      ),
+    ).toBeTruthy();
   });
 
   it("says the refusal is attributed and shown to the submitter", async () => {

@@ -17,7 +17,7 @@ import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { InsightsSeries, InsightsSummary, Me } from "@/lib/types";
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session } = vi.hoisted(() => ({
   session: {
@@ -67,6 +67,10 @@ function renderTab(client: ApiClient) {
   );
 }
 
+beforeEach(() => {
+  session.data = { user: { id: "u1" } };
+});
+
 describe("the analytics tab", () => {
   it("renders the totals, one bar per day and the day labels from a real series shape", async () => {
     const { container } = renderTab(clientReturning(series));
@@ -100,12 +104,13 @@ describe("the analytics tab", () => {
 
     // The title of the entry, and the promise the whole surface has to keep.
     expect(screen.getByText(/Acme Ecosystem Round One/)).toBeTruthy();
-    expect(screen.getByText(/Best-effort/)).toBeTruthy();
+    expect(screen.getByText(/Counts are approximate and aggregate/)).toBeTruthy();
+    expect(screen.getByText("How counting works").closest("details")?.open).toBe(false);
     expect(container.querySelectorAll("details th.numeric")).toHaveLength(series.days.length + 2);
     expect(container.querySelectorAll("details td.numeric")).toHaveLength(series.days.length);
   });
 
-  it("draws the flat floor rather than dividing by zero when nothing has happened yet", async () => {
+  it("replaces an all-zero chart with a plain explanation", async () => {
     const empty: InsightsSeries = {
       ...series,
       totals: { listViews: 0, detailViews: 0, sourceClicks: 0, applyClicks: 0 },
@@ -119,8 +124,13 @@ describe("the analytics tab", () => {
     };
     const { container } = renderTab(clientReturning(empty));
 
-    await screen.findByText("No detail views in this window");
-    expect(container.querySelectorAll("rect.bar-zero").length).toBe(empty.days.length);
+    await screen.findByText("No detail views were recorded in this period.");
+    expect(
+      screen.getByText("Only public directory opens and outbound clicks are counted."),
+    ).toBeTruthy();
+    expect(container.querySelector("svg.chart-svg")).toBeNull();
+    expect(container.querySelectorAll("rect.bar-zero")).toHaveLength(0);
+    expect(screen.getByText("How counting works").closest("details")?.open).toBe(false);
   });
 
   it("shows the API's own failure rather than an empty chart", async () => {
@@ -188,11 +198,54 @@ describe("the dashboard", () => {
 
     const link = await screen.findByRole("link", { name: "Submit an opportunity" });
     expect(link.getAttribute("href")).toBe("/listings/new");
+    expect(screen.getByRole("heading", { level: 1, name: "Dashboard" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Listings traffic" })).toBeTruthy();
     expect(await screen.findByText("Acme Round One")).toBeTruthy();
+    expect(screen.getByText("Most-read listings first")).toBeTruthy();
     expect(container.querySelector("ul.kpi-grid")).toBeTruthy();
     expect(container.querySelectorAll(".kpi-grid .tile-value")).toHaveLength(4);
     expect(container.querySelectorAll("table th.numeric")).toHaveLength(2);
     expect(container.querySelectorAll("table td.numeric")).toHaveLength(2);
+  });
+
+  it("explains why pending listings produce no traffic", async () => {
+    const me: Me = {
+      accountId: 1,
+      handle: "publisher",
+      displayName: null,
+      email: null,
+      role: "submitter",
+      directCreate: false,
+      credentialKind: "session",
+      scopes: [],
+      memberships: [],
+      canManageKeys: true,
+      canReview: false,
+      canAdmin: false,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const summary: InsightsSummary = {
+      from: "2026-07-26",
+      to: "2026-08-25",
+      totals: { listViews: 0, detailViews: 0, sourceClicks: 0, applyClicks: 0 },
+      opportunities: [],
+    };
+    const client = {
+      baseUrl: "https://api.example.com",
+      me: { get: async () => me },
+      insights: { summary: vi.fn(async () => summary) },
+    } as unknown as ApiClient;
+
+    render(
+      <ApiClientProvider value={client}>
+        <DashboardPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("No published listings to measure yet.")).toBeTruthy();
+    expect(
+      screen.getByText(/Pending listings are not public and produce no traffic here/),
+    ).toBeTruthy();
   });
 
   it("makes login primary when the dashboard is signed out", () => {

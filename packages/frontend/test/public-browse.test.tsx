@@ -651,6 +651,28 @@ describe("the public opportunity page", () => {
     expect(machineDetails?.textContent).toContain('"ingestedVia": "publisher_api"');
     expect(screen.getByText("R4")).toBeTruthy();
     expect(screen.getByText("1.0.0")).toBeTruthy();
+    expect(screen.getByText("Publisher")).toBeTruthy();
+    expect(screen.getByText("Namespace")).toBeTruthy();
+    const provenance = screen
+      .getByRole("heading", { name: "Where this listing came from" })
+      .closest("section");
+    expect(within(provenance as HTMLElement).getByText("acme", { selector: "code" })).toBeTruthy();
+    expect(provenance?.textContent).toContain("Conforms to RFP Hub Standard 1.0.0.");
+    expect(provenance?.textContent).not.toContain("1.0.0 .");
+  });
+
+  it("separates publisher attribution from the id namespace for an imported listing", async () => {
+    const imported: Opportunity = {
+      ...entry,
+      id: "curated:ethonline-2026",
+      source: { ...entry.source, publisher: undefined },
+    };
+    const { client } = stub({ find: async () => imported });
+    mount(client, <PublicOpportunity id={imported.id} />);
+
+    expect(await screen.findByText("Not claimed by a publisher")).toBeTruthy();
+    const namespace = screen.getByText("Namespace").closest("div") as HTMLElement;
+    expect(within(namespace).getByText("curated", { selector: "code" })).toBeTruthy();
   });
 
   it("sends the apply action through the API's counted redirect, in a new tab", async () => {

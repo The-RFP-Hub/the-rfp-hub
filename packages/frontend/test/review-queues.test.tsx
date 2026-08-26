@@ -379,16 +379,18 @@ describe("deciding a submission", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve…" }));
     expect(approve).not.toHaveBeenCalled();
-    expect(screen.getByText("Publish this listing?")).toBeTruthy();
+    expect(screen.getByText("Publish “Indie Dev Grants”?")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish it" }));
     await waitFor(() => expect(approve).toHaveBeenCalledWith("indie:grant-1"));
+    expect(await screen.findByText("“Indie Dev Grants” is published.")).toBeTruthy();
   });
 
   it("requires a reason to refuse, and sends it", async () => {
     mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject…" }));
+    expect(screen.getByText("Refuse “Indie Dev Grants”?")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refuse it" })).toHaveProperty("disabled", true);
     expect(screen.getByText(/shown to whoever submitted it/)).toBeTruthy();
 
@@ -400,6 +402,7 @@ describe("deciding a submission", () => {
     await waitFor(() =>
       expect(reject).toHaveBeenCalledWith("indie:grant-1", "the application link 404s"),
     );
+    expect(await screen.findByText("“Indie Dev Grants” was refused and unlisted.")).toBeTruthy();
   });
 });
 
@@ -835,6 +838,11 @@ describe("the organisations tab", () => {
 
     fireEvent.click(within(panel).getByRole("button", { name: "Verify organisation" }));
     await waitFor(() => expect(verifyOrganization).toHaveBeenCalledWith("indie-collective"));
+    expect(
+      await screen.findByText(
+        "indie-collective is verified — its 1 member now publishes into that namespace without review.",
+      ),
+    ).toBeTruthy();
   });
 
   it("grants a membership, resolving the handle the reviewer knows to the id the API wants", async () => {
@@ -852,6 +860,7 @@ describe("the organisations tab", () => {
 
     // The API takes an integer account id; a reviewer reading a claim knows the handle.
     await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: "fil-ops", limit: 10 }));
+    expect(await screen.findByText("1 account matches “fil-ops”.")).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Choose" }));
 
     expect(grantMembership).not.toHaveBeenCalled();
@@ -875,6 +884,49 @@ describe("the organisations tab", () => {
     ).toBeTruthy();
     // The panel is gone; the note is not.
     expect(screen.queryByText("Grant a membership on")).toBeNull();
+  });
+
+  it("pluralises account matches and omits an empty candidate table", async () => {
+    accounts
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 42,
+            handle: "fil-ops",
+            displayName: null,
+            globalRole: "submitter",
+            directCreate: false,
+            createdAt: "2026-02-01T00:00:00Z",
+          },
+          {
+            id: 43,
+            handle: "fil-ops-two",
+            displayName: null,
+            globalRole: "submitter",
+            directCreate: false,
+            createdAt: "2026-02-02T00:00:00Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ items: [] });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+
+    fireEvent.change(screen.getByLabelText("Account handle or id"), {
+      target: { value: "fil-ops" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    expect(await screen.findByText("2 accounts match “fil-ops”.")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Account" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Account handle or id"), {
+      target: { value: "missing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    expect(await screen.findByText("No account matches “missing”.")).toBeTruthy();
+    expect(screen.queryByRole("columnheader", { name: "Account" })).toBeNull();
   });
 
   it("states the consequence differently for a verified organisation", async () => {

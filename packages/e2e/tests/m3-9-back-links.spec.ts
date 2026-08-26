@@ -44,7 +44,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
       await opener.focus();
       await opener.click();
 
-      const dialog = page.getByRole("dialog", { name: "Sign in" });
+      const dialog = page.getByRole("dialog", { name: "Log in" });
       const email = page.getByLabel("Email address", { exact: true });
       await expect(dialog).toBeVisible();
       await expect(email).toBeFocused();

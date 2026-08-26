@@ -57,7 +57,7 @@ function Account({ me }: { me: Me }) {
         <h2>Identity</h2>
         <p className="muted footnote">
           Your handle is the byline shown on listings. Changing it changes future attribution;
-          entries already published keep the byline they were stored with.
+          listings already published keep the byline they were stored with.
         </p>
         <div className="field">
           <label htmlFor="handle">Handle</label>
@@ -103,11 +103,11 @@ function Account({ me }: { me: Me }) {
                 <td>{me.credentialKind === "session" ? "browser session" : "API key"}</td>
               </tr>
               <tr>
-                <th scope="row">Direct create</th>
+                <th scope="row">Direct-create</th>
                 <td>
                   {me.directCreate
-                    ? "yes — may publish into any namespace without a membership"
-                    : "no"}
+                    ? "Yes — may publish into any namespace without a membership"
+                    : "No — this account publishes without review only through a verified organisation membership; other submissions wait for review."}
                 </td>
               </tr>
               <tr>
@@ -140,7 +140,7 @@ function Account({ me }: { me: Me }) {
           <>
             <p className="muted">
               No memberships. Submissions from this account land pending, which is the normal path
-              for a community submission. Claiming an entry for an organisation you run is how that
+              for a community submission. Claiming a listing for an organisation you run is how that
               changes.
             </p>
             <p>

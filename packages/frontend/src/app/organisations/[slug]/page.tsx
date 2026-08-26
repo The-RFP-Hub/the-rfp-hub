@@ -610,10 +610,10 @@ function PendingRow({
     try {
       if (action === "approve") {
         await api.organizations.approve(slug, item.id);
-        onDecided(`${item.id} is published. The decision is recorded under ${attribution}.`);
+        onDecided(`“${item.title}” is published. The decision is recorded under ${attribution}.`);
       } else {
         await api.organizations.reject(slug, item.id, reason.trim());
-        onDecided(`${item.id} was refused. The reason is shown to whoever submitted it.`);
+        onDecided(`“${item.title}” was refused. The reason is shown to whoever submitted it.`);
       }
       setPanel("none");
       setReason("");
@@ -677,7 +677,7 @@ function PendingRow({
             {panel === "history" ? <History id={item.id} /> : null}
             {panel === "approve" ? (
               <ConfirmPanel
-                title="Publish this listing?"
+                title={`Publish “${item.title}”?`}
                 confirmLabel="Publish it"
                 busyLabel="Publishing…"
                 busy={busy}
@@ -696,7 +696,7 @@ function PendingRow({
             ) : null}
             {panel === "reject" ? (
               <ConfirmPanel
-                title="Refuse this listing?"
+                title={`Refuse “${item.title}”?`}
                 confirmLabel="Refuse it"
                 busyLabel="Refusing…"
                 busy={busy}

@@ -68,11 +68,12 @@ function Overview() {
   return (
     <section>
       <div className="row-between">
-        <h1>Your listings&rsquo; traffic</h1>
+        <h1>Dashboard</h1>
         <Link className="button-primary" href="/listings/new">
           Submit an opportunity
         </Link>
       </div>
+      <h2>Listings traffic</h2>
       <ResourceView resource={state} what="your traffic summary" onRetry={reload}>
         {(summary) => (
           <>
@@ -90,9 +91,10 @@ function Overview() {
 
             {summary.opportunities.length === 0 ? (
               <div className="state empty">
-                <p className="empty-title">Nothing published under this account yet.</p>
+                <p className="empty-title">No published listings to measure yet.</p>
                 <p className="muted">
-                  There is no traffic to report until something of yours is in the directory.
+                  Traffic starts after a listing reaches the public directory. Pending listings are
+                  not public and produce no traffic here.
                 </p>
                 <p className="row">
                   <Link href="/listings/new">Submit an opportunity</Link>
@@ -104,7 +106,7 @@ function Overview() {
             ) : (
               <div className="table-scroll">
                 <table>
-                  <caption>Most-read entries first</caption>
+                  <caption>Most-read listings first</caption>
                   <thead>
                     <tr>
                       <th scope="col">Listing</th>

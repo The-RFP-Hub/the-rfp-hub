@@ -16,15 +16,34 @@ import { type ReactNode, useState } from "react";
 const CLAIM_SUMMARY = "This is my programme — claim it";
 
 export function ClaimForm({ id, me }: { id: string; me: Me }) {
+  const [open, setOpen] = useState(false);
+  const [draftKey, setDraftKey] = useState(0);
+  const cancel = () => {
+    setOpen(false);
+    setDraftKey((current) => current + 1);
+  };
+
   return (
-    <details className="card">
-      <summary>{CLAIM_SUMMARY}</summary>
-      <ClaimFields id={id} me={me} />
+    <details className="card" open={open}>
+      <summary
+        onClick={(event) => {
+          event.preventDefault();
+          setOpen((current) => !current);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          setOpen((current) => !current);
+        }}
+      >
+        {CLAIM_SUMMARY}
+      </summary>
+      <ClaimFields key={draftKey} id={id} me={me} onCancel={cancel} />
     </details>
   );
 }
 
-function ClaimFields({ id, me }: { id: string; me: Me }) {
+function ClaimFields({ id, me, onCancel }: { id: string; me: Me; onCancel: () => void }) {
   const api = useApi();
   const [slug, setSlug] = useState(me.memberships[0]?.slug ?? "");
   const [note, setNote] = useState("");
@@ -68,7 +87,8 @@ function ClaimFields({ id, me }: { id: string; me: Me }) {
         <select id="claim-org" value={slug} onChange={(event) => setSlug(event.target.value)}>
           {me.memberships.map((membership) => (
             <option key={membership.slug} value={membership.slug}>
-              {membership.slug} {membership.verified ? "(verified)" : "(unverified)"}
+              {membership.name} — {membership.slug}{" "}
+              {membership.verified ? "(verified)" : "(unverified)"}
             </option>
           ))}
         </select>
@@ -82,9 +102,14 @@ function ClaimFields({ id, me }: { id: string; me: Me }) {
           placeholder="Anything that helps a reviewer confirm the connection"
         />
       </div>
-      <button type="button" onClick={() => void submit()} disabled={busy || !slug}>
-        {busy ? "Filing…" : "File the claim"}
-      </button>
+      <div className="row">
+        <button type="button" onClick={() => void submit()} disabled={busy || !slug}>
+          {busy ? "Filing…" : "File the claim"}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      </div>
       <ActionNote note={result} />
     </>
   );
@@ -98,6 +123,11 @@ function ClaimFields({ id, me }: { id: string; me: Me }) {
 export function PublicClaimControl({ id }: { id: string }) {
   const session = useSession();
   const [open, setOpen] = useState(false);
+  const [draftKey, setDraftKey] = useState(0);
+  const cancel = () => {
+    setOpen(false);
+    setDraftKey((current) => current + 1);
+  };
   let content: ReactNode;
 
   if (session.error) {
@@ -133,12 +163,24 @@ export function PublicClaimControl({ id }: { id: string }) {
       </>
     );
   } else {
-    content = <ClaimFields id={id} me={session.me.data} />;
+    content = <ClaimFields key={draftKey} id={id} me={session.me.data} onCancel={cancel} />;
   }
 
   return (
-    <details className="card" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>{CLAIM_SUMMARY}</summary>
+    <details className="card" open={open}>
+      <summary
+        onClick={(event) => {
+          event.preventDefault();
+          setOpen((current) => !current);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          setOpen((current) => !current);
+        }}
+      >
+        {CLAIM_SUMMARY}
+      </summary>
       {content}
     </details>
   );

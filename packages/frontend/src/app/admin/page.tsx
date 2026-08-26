@@ -137,7 +137,7 @@ function Accounts({ me }: { me: Me }) {
                   <tr>
                     <th scope="col">Account</th>
                     <th scope="col">Global role</th>
-                    <th scope="col">Direct create</th>
+                    <th scope="col">Direct-create</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,8 +302,9 @@ function AccountRow({
                 </p>
               )}
               <p className="muted footnote">
-                It does not elevate an API key: a `write`-scoped key on this account still lands its
-                submissions pending. Publishing without review is a session-only power.
+                It does not elevate an API key: a <code>write</code>-scoped key on this account
+                still lands its submissions pending. Publishing without review is a session-only
+                power.
               </p>
             </ConfirmPanel>
           </td>

@@ -117,6 +117,7 @@ export function OpportunityView({
   const funding = entry.fundingInfo;
   const award = describeAward(funding);
   const operator = entry.operatingOrganizations[0];
+  const namespace = entry.id.split(":")[0];
 
   return (
     <>
@@ -219,9 +220,15 @@ export function OpportunityView({
         </p>
         <dl className="grid-2">
           <div>
-            <dt>Published under</dt>
+            <dt>Publisher</dt>
             <dd>
-              <UntrustedText value={source.publisher} fallback="no namespace" />
+              <UntrustedText value={source.publisher} fallback="Not claimed by a publisher" />
+            </dd>
+          </div>
+          <div>
+            <dt>Namespace</dt>
+            <dd>
+              <code>{namespace}</code>
             </dd>
           </div>
           <div>

@@ -67,6 +67,15 @@ describe("account organisation links", () => {
     expect(links.every((link) => link.getAttribute("href") === "/organisations")).toBe(true);
   });
 
+  it("explains how an account without Direct-create can still publish without review", async () => {
+    mount(account);
+
+    const label = await screen.findByRole("rowheader", { name: "Direct-create" });
+    expect(label.nextElementSibling?.textContent).toBe(
+      "No — this account publishes without review only through a verified organisation membership; other submissions wait for review.",
+    );
+  });
+
   it("keeps membership names direct while exposing the organisation index", async () => {
     mount({
       ...account,

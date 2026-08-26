@@ -80,6 +80,7 @@ test.describe("M3-8 the organisation's own page", () => {
     const document = opportunityFixture(slug, `org-approve-${stamp}`, {
       title: `Filed by an outsider ${token}`,
     });
+    const title = document.title as string;
     const id = document.id as string;
     const filed = await outsider.post<{ reviewStatus: string }>("/v1/opportunities", document);
     expect(filed.status).toBe(201);
@@ -107,14 +108,16 @@ test.describe("M3-8 the organisation's own page", () => {
     // THE CONSEQUENCE IS STATED BEFORE THE BUTTON THAT CAUSES IT. Approving publishes a stranger's
     // account of this programme to the world in this organisation's name, and it is not undone by
     // clicking again — so it does not fire on the first click.
-    const confirm = page.getByRole("group", { name: "Publish this listing?" });
+    const confirm = page.getByRole("group", { name: `Publish “${title}”?` });
     await expect(confirm).toBeVisible();
     await expect(
       confirm.getByText(/anyone reading the Hub will see it as this organisation/i),
     ).toBeVisible();
     await confirm.getByRole("button", { name: "Publish it" }).click();
 
-    await expect(page.getByRole("status").filter({ hasText: `${id} is published.` })).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: `“${title}” is published.` }),
+    ).toBeVisible();
 
     // …and it MOVED, rather than the page merely saying so. The waiting list reloads on the spot,
     // so the decision controls go with the row immediately.
@@ -165,6 +168,7 @@ test.describe("M3-8 the organisation's own page", () => {
     const document = opportunityFixture(slug, `org-reject-${stamp}`, {
       title: `Filed in error ${token}`,
     });
+    const title = document.title as string;
     const id = document.id as string;
     expect((await outsider.post("/v1/opportunities", document)).status).toBe(201);
 
@@ -173,7 +177,7 @@ test.describe("M3-8 the organisation's own page", () => {
     await expect(row).toHaveCount(1);
     await row.getByRole("button", { name: "Reject…" }).click();
 
-    const confirm = page.getByRole("group", { name: "Refuse this listing?" });
+    const confirm = page.getByRole("group", { name: `Refuse “${title}”?` });
     await expect(confirm).toBeVisible();
 
     // A REASON IS REQUIRED, AND THE UI REFUSES BEFORE THE API HAS TO. The API answers 400
@@ -190,7 +194,9 @@ test.describe("M3-8 the organisation's own page", () => {
     await expect(refuse).toBeEnabled();
     await refuse.click();
 
-    await expect(page.getByRole("status").filter({ hasText: `${id} was refused.` })).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: `“${title}” was refused.` }),
+    ).toBeVisible();
 
     // It is out of the public reads. The directory is the surface a reader actually uses, so that
     // is where the absence is checked rather than in an API status code.

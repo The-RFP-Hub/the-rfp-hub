@@ -85,6 +85,7 @@ describe("the page's scope", () => {
     mount();
 
     expect(await screen.findByRole("heading", { name: "Accounts & roles" })).toBeTruthy();
+    expect(await screen.findByRole("columnheader", { name: "Direct-create" })).toBeTruthy();
     expect(screen.getByLabelText("Search accounts").closest("form")?.className).toBe("search-row");
     expect(screen.queryByRole("columnheader", { name: "Members" })).toBeNull();
     // It says where verification went, rather than leaving a reviewer to guess.
@@ -163,6 +164,8 @@ describe("direct create", () => {
     ).toBeTruthy();
     // The thing people assume wrongly: that it makes their API key powerful too.
     expect(within(panel).getByText(/does not elevate an API key/)).toBeTruthy();
+    expect(within(panel).getByText("write", { selector: "code" })).toBeTruthy();
+    expect(panel.textContent).not.toContain("`write`");
     expect(setDirectCreate).not.toHaveBeenCalled();
 
     fireEvent.click(within(panel).getByRole("button", { name: "Grant it" }));
