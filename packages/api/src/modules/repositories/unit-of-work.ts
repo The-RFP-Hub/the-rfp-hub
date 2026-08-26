@@ -1,4 +1,5 @@
 import type { DB, DbLike } from "../../db/client.js";
+import { AuditRepository } from "./audit/audit.repository.js";
 
 /**
  * The first repository seam. Domain query methods arrive here as services are migrated; until then
@@ -15,14 +16,20 @@ export class OpportunityRepository {
 
 /** The repositories a service may compose. Add domain repositories here as migrations land. */
 export interface Repositories {
+  readonly audit: AuditRepository;
   readonly opportunities: OpportunityRepository;
 }
 
 /** Build one executor-bound bundle. Repositories are constructed only when first requested. */
 export function repositories(exec: DbLike): Repositories {
+  let audit: AuditRepository | undefined;
   let opportunities: OpportunityRepository | undefined;
 
   return {
+    get audit() {
+      audit ??= new AuditRepository(exec);
+      return audit;
+    },
     get opportunities() {
       opportunities ??= new OpportunityRepository(exec);
       return opportunities;
