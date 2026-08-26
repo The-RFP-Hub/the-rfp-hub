@@ -1,7 +1,7 @@
 /** Membership invites: privileged creation, revocation, and verified-email redemption. */
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
 import { accounts, auditLog, orgMembershipInvites, orgMemberships } from "../../src/db/schema.js";
@@ -13,6 +13,7 @@ const SLUG = "m3invite-org";
 const EMAILS = {
   reviewer: "m3invite-reviewer@rfphub.invalid",
   accepted: "m3invite-accepted@rfphub.invalid",
+  failed: "m3invite-failed@rfphub.invalid",
   revoked: "m3invite-revoked@rfphub.invalid",
 };
 
@@ -132,6 +133,74 @@ describeWithDb("organisation membership invites", () => {
       headers: bearer(reviewerToken),
     });
     expect(noLongerPending.json().items).toEqual([]);
+  });
+
+  it("keeps the session live and the invite pending when redemption throws", async () => {
+    const created = await app.inject({
+      method: "POST",
+      url: `/v1/review/organizations/${SLUG}/invites`,
+      headers: bearer(reviewerToken),
+      payload: { email: EMAILS.failed, role: "publisher" },
+    });
+    expect(created.statusCode).toBe(200);
+
+    const identity = await signIn(EMAILS.failed);
+    userIds.push(identity.userId);
+    const accountsService = app.auth.principals.accounts as unknown as {
+      redeemMembershipInvites(...args: unknown[]): Promise<void>;
+    };
+    const failure = new Error("simulated invite redemption failure");
+    const redemption = vi
+      .spyOn(accountsService, "redeemMembershipInvites")
+      .mockRejectedValueOnce(failure);
+    const logged = vi.spyOn(app.log, "error");
+
+    try {
+      const me = await app.inject({
+        method: "GET",
+        url: "/v1/me",
+        headers: bearer(identity.token),
+      });
+      expect(me.statusCode).toBe(200);
+      expect(me.json().memberships).not.toContainEqual(expect.objectContaining({ slug: SLUG }));
+
+      const account = (
+        await db.select().from(accounts).where(eq(accounts.authUserId, identity.userId)).limit(1)
+      )[0];
+      expect(account).toBeTruthy();
+      expect(logged).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: failure,
+          operation: "redeem_membership_invites",
+          accountId: account?.id,
+          authUserId: identity.userId,
+        }),
+        "membership invite redemption failed; principal resolution will continue",
+      );
+
+      const invite = (
+        await db
+          .select()
+          .from(orgMembershipInvites)
+          .where(eq(orgMembershipInvites.id, created.json().id))
+          .limit(1)
+      )[0];
+      expect(invite).toMatchObject({ acceptedAt: null, acceptedAccountId: null });
+      expect(
+        await db
+          .select()
+          .from(orgMemberships)
+          .where(
+            and(
+              eq(orgMemberships.organizationId, organizationId),
+              eq(orgMemberships.accountId, account?.id ?? -1),
+            ),
+          ),
+      ).toEqual([]);
+    } finally {
+      redemption.mockRestore();
+      logged.mockRestore();
+    }
   });
 
   it("revokes an invite before sign-in so no membership can materialize", async () => {

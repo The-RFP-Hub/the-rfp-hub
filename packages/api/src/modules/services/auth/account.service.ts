@@ -65,10 +65,24 @@ export interface AdminGrant {
   promoted: boolean;
 }
 
+/** The structured subset of Fastify's logger used by principal-side account work. */
+export interface AccountLogger {
+  error(payload: Record<string, unknown>, message: string): void;
+}
+
+const consoleLogger: AccountLogger = {
+  error(payload, message) {
+    console.error(message, payload);
+  },
+};
+
 export class AccountService {
   private readonly audit: AuditService;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(
+    private readonly db: DB = defaultDb,
+    private readonly logger: AccountLogger = consoleLogger,
+  ) {
     this.audit = new AuditService(db);
   }
 
@@ -79,7 +93,7 @@ export class AccountService {
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
    */
   async resolveBySubject(subject: string, verifiedEmail?: string): Promise<AccountRow> {
-    return this.db.transaction(async (tx) => {
+    const account = await this.db.transaction(async (tx) => {
       await tx.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
       const rows = await tx
         .select()
@@ -88,11 +102,32 @@ export class AccountService {
         .limit(1);
       const account = rows[0];
       if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
-      if (verifiedEmail !== undefined) {
-        await this.redeemMembershipInvites(tx, account, verifiedEmail.trim().toLowerCase());
-      }
       return account;
     });
+
+    if (verifiedEmail !== undefined) {
+      try {
+        // Separate from provisioning deliberately. A database error aborts its transaction even
+        // when JavaScript catches it; keeping redemption in the provisioning transaction could
+        // return an account whose insert was silently rolled back. Redemption is retryable, so its
+        // own transaction may roll back while this committed account still resolves the session.
+        await this.db.transaction((tx) =>
+          this.redeemMembershipInvites(tx, account, verifiedEmail.trim().toLowerCase()),
+        );
+      } catch (error) {
+        this.logger.error(
+          {
+            err: error,
+            operation: "redeem_membership_invites",
+            accountId: account.id,
+            authUserId: subject,
+          },
+          "membership invite redemption failed; principal resolution will continue",
+        );
+      }
+    }
+
+    return account;
   }
 
   /** Apply every still-pending invite for an address during session principal resolution. */
