@@ -487,6 +487,10 @@ run("M3DUP duplicate detection", () => {
       id: real.id,
       model: real.model,
       dimensions: real.dimensions,
+      suppliesNorm: real.suppliesNorm,
+      async embedDetailed(text: string) {
+        return { vector: await this.embed(text), norm: 1, tokens: 40 };
+      },
       async embed(text: string) {
         calls++;
         if (calls === 1) {

@@ -61,8 +61,43 @@ export interface EmbeddingProvider {
   readonly id: string;
   readonly model: string;
   readonly dimensions: number;
+  /**
+   * Whether this provider can report the PRE-NORMALISATION L2 norm and the distinct-token count
+   * of a piece of text.
+   *
+   * A DECLARED CAPABILITY, not something the caller infers from an absent method. The overlap arm
+   * of duplicate detection (`duplicate-signal.ts`) needs both numbers; the backfill's pending
+   * predicate selects rows that are missing them. A provider that cannot supply them must be able
+   * to say so, or the backfill would select rows it can never repair and the cursor would never
+   * retire — which `docs/jobs.md` forbids. `false` degrades the overlap arm to OFF, never to a
+   * guess.
+   */
+  readonly suppliesNorm: boolean;
   /** One vector, L2-normalised, `dimensions` long. Rejects rather than returns a wrong width. */
   embed(text: string): Promise<number[]>;
+  /**
+   * The same vector, plus the two scalars the overlap arm decides on.
+   *
+   * REQUIRED on the interface rather than optional: `suppliesNorm === false` returns nulls, which
+   * is a provider *declaring* what it cannot do. An optional method leaves "absent" and "supplies
+   * nothing" indistinguishable at the call site, and the pending predicate would then have no
+   * honest way to gate itself.
+   */
+  embedDetailed(text: string): Promise<EmbeddingDetail>;
+}
+
+/**
+ * A vector and the two scalars the overlap arm needs beside it.
+ *
+ * `norm` is the L2 norm of the vector BEFORE normalisation — the magnitude the stored unit vector
+ * threw away, which is what makes a length-corrected comparison possible at all. `tokens` is the
+ * count of DISTINCT tokens the text contributed, which is the substance guard's input. Both are
+ * `null` from a provider whose `suppliesNorm` is `false`.
+ */
+export interface EmbeddingDetail {
+  vector: number[];
+  norm: number | null;
+  tokens: number | null;
 }
 
 /** The shape `idf-table.json` commits — kept structural so tests can hand in synthetic tables. */
@@ -71,14 +106,21 @@ export interface IdfTable {
   df: Record<string, number>;
 }
 
-/** L2-normalise in place and return. A zero vector stays zero — there is nothing to point at. */
-function normalize(vector: number[]): number[] {
+/**
+ * L2-normalise in place, returning the vector AND the norm it was divided by.
+ *
+ * The norm used to be computed here and discarded. It is now returned instead — the arithmetic is
+ * byte-for-byte what it always was, so no vector, no `content_hash` and no model string changes;
+ * the only difference is that the caller may keep a number this function already had. A zero
+ * vector stays zero (there is nothing to point at) and reports a norm of 0.
+ */
+function normalize(vector: number[]): { vector: number[]; norm: number } {
   let sum = 0;
   for (const value of vector) sum += value * value;
-  if (sum === 0) return vector;
+  if (sum === 0) return { vector, norm: 0 };
   const norm = Math.sqrt(sum);
   for (let i = 0; i < vector.length; i++) vector[i] = (vector[i] as number) / norm;
-  return vector;
+  return { vector, norm };
 }
 
 /**
@@ -119,6 +161,18 @@ export function tokenize(text: string): string[] {
 export class LexicalEmbeddingProvider implements EmbeddingProvider {
   readonly id = "lexical";
   /**
+   * ALWAYS true, and the norm/token count are therefore ALWAYS numbers, never null.
+   *
+   * Both fall out of a computation `embedSync` already performs — `normalize()` computed the norm
+   * and threw it away, and the distinct-token count is the size of the map it already built. THIS
+   * IS NOT A MODEL CHANGE: the weights, the tokenizer, the hashing, the draws, the dimensions and
+   * therefore every vector and every `content_hash` are untouched, and the `model` string does not
+   * move. Nothing is re-embedded because of this. That matters enough to say here rather than in a
+   * commit message, because this file's own header calls a weighting change a release event and a
+   * reader arriving at `suppliesNorm` needs to know this is not one.
+   */
+  readonly suppliesNorm = true;
+  /**
    * The weighting scheme PLUS a digest of the exact table (and exponent) the weights came from.
    *
    * The docs call refreshing the idf table "a deliberate release event alongside a model-string
@@ -156,6 +210,10 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
     return this.embedSync(text);
   }
 
+  async embedDetailed(text: string): Promise<EmbeddingDetail> {
+    return this.embedSyncDetailed(text);
+  }
+
   /** `log((N + 1) / (df + 1)) + 1` — smoothed, floor 1, so no committed token is zeroed out. */
   private idf(token: string): number {
     const df = this.df.get(token) ?? 0;
@@ -164,6 +222,18 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
 
   /** The same computation without the promise — what the offline threshold sweep calls. */
   embedSync(text: string): number[] {
+    return this.embedSyncDetailed(text).vector;
+  }
+
+  /**
+   * `embedSync` plus the two numbers it used to throw away.
+   *
+   * `embedSync` now delegates here, which is deliberate: one computation, so the vector this
+   * returns and the vector `embedSync` returns cannot drift apart. `test/unit/embedding-provider.
+   * test.ts` pins that they are element-for-element identical and that the model string is the
+   * literal it has always been.
+   */
+  embedSyncDetailed(text: string): { vector: number[]; norm: number; tokens: number } {
     const counts = new Map<string, number>();
     for (const token of tokenize(text)) counts.set(token, (counts.get(token) ?? 0) + 1);
 
@@ -179,7 +249,11 @@ export class LexicalEmbeddingProvider implements EmbeddingProvider {
         vector[index] = (vector[index] as number) + sign * weight;
       }
     }
-    return normalize(vector);
+    const normalized = normalize(vector);
+    // The DISTINCT-token count, not the word count: it is the size of the weighted vocabulary the
+    // vector actually carries, which is what the overlap arm's substance guard is about. A stub
+    // that repeats one rare term four hundred times still has a vocabulary of one.
+    return { vector: normalized.vector, norm: normalized.norm, tokens: counts.size };
   }
 }
 

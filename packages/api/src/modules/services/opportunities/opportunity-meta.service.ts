@@ -15,6 +15,7 @@
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow } from "../../../db/schema.js";
 import { type Repositories, repositories } from "../../repositories/unit-of-work.js";
+import { matchReasons } from "../dedupe/duplicate-reasons.js";
 import type {
   DuplicateMatchView,
   OwnedDuplicateMatchView,
@@ -87,6 +88,9 @@ export class OpportunityMetaService {
         title: match.title,
         isPublic: isPubliclyVisible(match),
         similarity: pair.similarity === null ? null : Number(pair.similarity),
+        // Computed from the two LIVE rows, and `[]` for a pair recorded before `signal` existed —
+        // "no reasons recorded", never an absent field and never a crash on a legacy row.
+        matchedOn: matchReasons(pair.signal, scope.row, match),
         status: pair.status,
         detectedAt: pair.detectedAt.toISOString(),
       }));
@@ -128,6 +132,7 @@ export class OpportunityMetaService {
         title: match.title,
         isPublic: isPubliclyVisible(match),
         similarity: pair.similarity === null ? null : Number(pair.similarity),
+        matchedOn: matchReasons(pair.signal, yours, match),
         status: pair.status,
         detectedAt: pair.detectedAt.toISOString(),
         yourListing: { id: yours.publicId, title: yours.title },

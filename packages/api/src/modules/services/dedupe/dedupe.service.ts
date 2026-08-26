@@ -2,7 +2,7 @@
  * Semantic duplicate detection: embed an entry, find its neighbours, record the pairs, and give a
  * reviewer somewhere to decide.
  *
- * SIX THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
+ * SEVEN THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
  *
  * 1. **The candidate scope is credential-dependent.** A submitter's check runs over `approved AND
  *    is_listed` rows only. Searching everything would turn a submission into a way to enumerate the
@@ -18,13 +18,24 @@
  * 4. **Stale pairs are removed exactly, not approximately.** An update that makes two entries
  *    unalike must delete the suspected pair — but "it fell out of the top 20" is not the same fact
  *    as "it is below the threshold". So the cleanup recomputes the similarity of each existing
- *    suspected pair directly against the counterpart's stored vector, and deletes on that.
+ *    suspected pair directly against the counterpart's stored vector, and deletes on that. Since
+ *    the rule has two arms, "below the threshold" now means BELOW BOTH — the cleanup asks
+ *    `shouldPrune`, which is the detection rule read from the other side and is deliberately not
+ *    its negation (see `duplicate-signal.ts`).
  * 5. **Failure never blocks a write.** The whole check is wrapped: a missing key, a timeout, a
  *    provider outage all resolve to `unavailable` with no embedding row, which is precisely the
  *    predicate the backfill job selects on. A submission that was accepted stays accepted.
  * 6. **A newly inserted pair emits in the same transaction.** `returning()` distinguishes a real
  *    creation from a re-detection, and the notification unique key is the final backstop. Decisions,
  *    merges and reopens likewise record owner notifications beside their mutations and audit rows.
+ * 7. **Detection and pruning apply the SAME combined rule, and a pair records the rule version that
+ *    produced it.** One predicate lives in `duplicate-signal.ts` and both paths call it, because an
+ *    arm added to detection but not to pruning deletes its own output on the next nightly run. The
+ *    `rules_version` stamp is what makes a threshold move — or `DEDUPE_OVERLAP_ENABLED=false` — an
+ *    actual rollback: `runBatch`'s resweep arm selects every suspected pair the current rule did
+ *    not write and re-judges it. Without the stamp, turning an arm off strands every row it wrote,
+ *    because pruning only ever runs for entries the backfill selects and a drained backfill selects
+ *    nothing. That was already true of `DEDUPE_SIMILARITY_THRESHOLD` before this arm existed.
  */
 
 import { validateOpportunity } from "rfphub-validate";
@@ -56,6 +67,14 @@ import {
   duplicateNotificationInserts,
 } from "../notifications/notification.service.js";
 import { duplicateReopenTransition } from "./duplicate-reopen.js";
+import { matchReasons } from "./duplicate-reasons.js";
+import {
+  type DuplicateRuleConfig,
+  type DuplicateSignalRecord,
+  RULES_VERSION,
+  decidePair,
+  shouldPrune,
+} from "./duplicate-signal.js";
 import { type EmbeddingProvider, createEmbeddingProvider } from "./embedding-provider.js";
 
 /**
@@ -146,6 +165,26 @@ export class DedupeService {
     return this.provider !== undefined;
   }
 
+  /**
+   * The combined rule's configuration, assembled in ONE place.
+   *
+   * The provider's `suppliesNorm` capability is folded in here rather than checked at each call
+   * site: a provider that cannot report a norm must make the overlap arm inert everywhere at once
+   * — detection, pruning and the backfill predicate — and three independent checks are three
+   * chances for one of them to be forgotten.
+   */
+  private ruleConfig(provider: EmbeddingProvider): DuplicateRuleConfig {
+    const dedupe = this.config.dedupe;
+    return {
+      similarityThreshold: dedupe.similarityThreshold,
+      overlapEnabled: dedupe.overlapEnabled,
+      overlapThreshold: dedupe.overlapThreshold,
+      overlapMinTokens: dedupe.overlapMinTokens,
+      overlapMinSimilarity: dedupe.overlapMinSimilarity,
+      suppliesNorm: provider.suppliesNorm,
+    };
+  }
+
   // ── the write path's after-commit call ─────────────────────────────────────────
   /**
    * Embed one entry, record its suspected pairs, and report what the submitter may see.
@@ -227,44 +266,88 @@ export class DedupeService {
     if (!provider) throw new Error("no embedding provider is configured");
 
     const row = await this.loadRow(opportunityId);
-    const vector = await this.ensureEmbedding(row, provider);
+    const subject = await this.ensureEmbedding(row, provider);
+    const rule = this.ruleConfig(provider);
 
-    const neighbours = await this.search(vector, { exclude: row.id, scope });
-    const threshold = this.config.dedupe.similarityThreshold;
-    const above = neighbours.filter((n) => n.similarity >= threshold);
-    const kept = above.slice(0, this.config.dedupe.maxMatches);
+    const neighbours = await this.search(subject.vector, { exclude: row.id, scope });
+    // Neighbours arrive in descending cosine order and STAY in it. `maxMatches` truncates, so the
+    // order decides which five a submitter sees: sorting by anything else — or letting arm-B pairs
+    // interleave by overlap — would let a length-corrected match crowd out a stronger lexical one.
+    const accepted: { match: (typeof neighbours)[number]; signal: DuplicateSignalRecord }[] = [];
+    for (const match of neighbours) {
+      const decision = decidePair(
+        {
+          similarity: match.similarity,
+          left: { norm: subject.norm, tokenCount: subject.tokenCount },
+          right: { norm: match.norm, tokenCount: match.tokenCount },
+        },
+        rule,
+      );
+      if (decision.accepted && decision.signal) accepted.push({ match, signal: decision.signal });
+    }
+    const kept = accepted.slice(0, this.config.dedupe.maxMatches);
 
     await this.recordPairs(row.id, kept);
-    await this.pruneStalePairs(row.id, vector, threshold);
+    await this.pruneStalePairs(row.id, subject, rule);
 
-    return kept.map((match) => ({
+    // Structural labels come from the counterpart's LIVE row, which is why they are loaded here
+    // rather than projected through the ANN query: a stored label goes stale on the next edit, and
+    // widening the vector search's projection to carry columns it does not order on is how an ANN
+    // query slowly stops being one. At most `maxMatches` rows.
+    const counterparts = await Promise.all(kept.map(({ match }) => this.loadRow(match.id)));
+    const detectedAt = new Date().toISOString();
+    return kept.map(({ match, signal }, index) => ({
       id: match.publicId,
       title: match.title,
       isPublic: match.isPublic,
       similarity: round(match.similarity),
+      matchedOn: matchReasons(signal as unknown as Record<string, unknown>, row, {
+        applicationUrl: counterparts[index]?.applicationUrl ?? null,
+        operatingOrganizations: counterparts[index]?.operatingOrganizations ?? null,
+      }),
       status: "suspected" as const,
-      detectedAt: new Date().toISOString(),
+      detectedAt,
     }));
   }
 
   /**
-   * The stored vector, recomputed only when the content it was made from changed.
+   * The stored vector and its two scalars, recomputed only when the content changed OR the scalars
+   * are missing.
    *
    * `content_hash` is over the text AND the model AND the provider, so a provider switch invalidates
    * every row rather than leaving vectors from two incomparable spaces in one index.
+   *
+   * THE SHORT-CIRCUIT'S SECOND CLAUSE IS THE HIGHEST-RISK LINE OF THIS CHANGE. `norm` and
+   * `token_count` arrived as nullable columns on rows whose text did not change, so after the
+   * migration EVERY existing row matches its content hash with a null norm. A short-circuit on the
+   * hash alone would return early, never write the scalars, and leave the row selected by the
+   * backfill's pending predicate forever — a cursor job that never retires its rows, which
+   * `docs/jobs.md` forbids and which would present as a nightly job reporting the same `remaining`
+   * for ever. The extra clause is gated on `suppliesNorm`, so a provider that cannot supply the
+   * scalars never re-embeds chasing values it will never produce.
    */
   private async ensureEmbedding(
     row: OpportunityRow,
     provider: EmbeddingProvider,
     depth = 0,
-  ): Promise<number[]> {
+  ): Promise<{ vector: number[]; norm: number | null; tokenCount: number | null }> {
     const text = embeddingTextFor(row);
     const hash = contentHash(text, provider.model, provider.id);
 
     const current = await this.repos.embeddings.findByOpportunityId(row.id);
-    if (current && current.contentHash === hash) return current.embedding;
+    if (
+      current &&
+      current.contentHash === hash &&
+      (!provider.suppliesNorm || (current.norm !== null && current.tokenCount !== null))
+    ) {
+      return {
+        vector: current.embedding,
+        norm: current.norm,
+        tokenCount: current.tokenCount,
+      };
+    }
 
-    const vector = await provider.embed(text);
+    const detail = await provider.embedDetailed(text);
 
     // COMPARE-AND-SET AGAINST THE ENTRY'S CURRENT CONTENT, not the snapshot this vector was
     // computed from — and NOT dead now that the featurizer is local. The awaits on either side of
@@ -284,10 +367,15 @@ export class DedupeService {
       opportunityId: row.id,
       model: provider.model,
       providerId: provider.id,
-      embedding: vector,
+      embedding: detail.vector,
       contentHash: hash,
+      norm: detail.norm,
+      tokenCount: detail.tokens,
     });
-    return vector;
+    // Returned rather than re-read: the caller needs the subject's own norm and token count for
+    // every candidate comparison, and a second SELECT for numbers we just computed is a round trip
+    // that can also disagree with what was written.
+    return { vector: detail.vector, norm: detail.norm, tokenCount: detail.tokens };
   }
 
   /**
@@ -300,7 +388,15 @@ export class DedupeService {
     vector: number[],
     options: { exclude: number; scope: CandidateScope },
   ): Promise<
-    { id: number; publicId: string; title: string; isPublic: boolean; similarity: number }[]
+    {
+      id: number;
+      publicId: string;
+      title: string;
+      isPublic: boolean;
+      similarity: number;
+      norm: number | null;
+      tokenCount: number | null;
+    }[]
   > {
     const provider = this.provider;
     if (!provider) return [];
@@ -310,24 +406,40 @@ export class DedupeService {
     });
   }
 
-  /** Insert the pairs that are new; refresh the similarity of the ones already suspected. */
+  /**
+   * Insert the pairs that are new; refresh the similarity of the ones already suspected.
+   *
+   * `similarity` REMAINS THE LEXICAL COSINE, with the same rounding it has always had — an arm-B
+   * pair simply carries one below the lexical threshold. Every published number, every stored row
+   * and every client that reads `similarity` keeps its meaning; the arm that decided is a separate
+   * field, so arm-B volume is filterable from day one rather than hidden inside an average.
+   */
   private async recordPairs(
     opportunityId: number,
-    matches: { id: number; similarity: number }[],
+    matches: { match: { id: number; similarity: number }; signal: DuplicateSignalRecord }[],
   ): Promise<void> {
     if (matches.length === 0) return;
     const notificationIds = await withTransaction(this.db, async (repos) => {
       const insertedNotificationIds: number[] = [];
-      for (const match of matches) {
+      for (const { match, signal } of matches) {
         // Canonical ordering, matching `ux_dup_pair`'s (least, greatest) expression index, so the
         // mirrored pair is the same key rather than a second row with its own status.
         const [low, high] =
           opportunityId < match.id ? [opportunityId, match.id] : [match.id, opportunityId];
         const similarity = round(match.similarity).toString();
-        const inserted = await repos.duplicatePairs.insertSuspected(low, high, similarity);
+        const evidence = {
+          signal: signal as unknown as Record<string, unknown>,
+          rulesVersion: RULES_VERSION,
+        };
+        const inserted = await repos.duplicatePairs.insertSuspected(
+          low,
+          high,
+          similarity,
+          evidence,
+        );
         // Only a suspected pair is refreshed. A dismissal is a judgement, and a re-run of the
         // detector is not new information about it.
-        await repos.duplicatePairs.refreshSuspected(low, high, similarity);
+        await repos.duplicatePairs.refreshSuspected(low, high, similarity, evidence);
 
         // `returning()` is the intent guard: an existing pair is a refresh, not a new event.
         const pair = inserted;
@@ -368,20 +480,40 @@ export class DedupeService {
    * that typically lands below any threshold, and without the predicate this method read it as
    * "dissimilar" and deleted a pair that was never re-measured. The backfill re-embeds the
    * counterpart eventually; until then its pairs are left exactly as the comment above promises.
+   *
+   * WHAT "BELOW THE THRESHOLD" MEANS SINCE THE RULE GREW A SECOND ARM. The paragraphs above argue
+   * at length about measuring exactly, and would otherwise read as complete while being wrong: a
+   * pair the overlap arm accepts has a cosine BELOW the lexical threshold by construction, so a
+   * cosine-only cleanup would delete every arm-B pair on the first pass and detection would put it
+   * straight back on the next — an oscillation that re-notifies both owners each time round. The
+   * decision therefore goes through `shouldPrune`, which is the detection rule read from the other
+   * side and, deliberately, NOT its negation: a counterpart whose norm or token count is unknown is
+   * left alone, exactly as a counterpart with no comparable vector always has been.
    */
   private async pruneStalePairs(
     opportunityId: number,
-    vector: number[],
-    threshold: number,
+    subject: { vector: number[]; norm: number | null; tokenCount: number | null },
+    rule: DuplicateRuleConfig,
   ): Promise<void> {
     const provider = this.provider;
     if (!provider) return;
-    const rows = await this.repos.embeddings.pairSimilarities(opportunityId, vector, {
+    const rows = await this.repos.embeddings.pairSimilarities(opportunityId, subject.vector, {
       model: provider.model,
       providerId: provider.id,
     });
 
-    const stale = rows.filter((row) => Number(row.similarity) < threshold).map((row) => row.id);
+    const stale = rows
+      .filter((row) =>
+        shouldPrune(
+          {
+            similarity: Number(row.similarity),
+            left: { norm: subject.norm, tokenCount: subject.tokenCount },
+            right: { norm: row.norm, tokenCount: row.tokenCount },
+          },
+          rule,
+        ),
+      )
+      .map((row) => row.id);
     await this.repos.duplicatePairs.deleteByIds(stale);
   }
 
@@ -413,13 +545,73 @@ export class DedupeService {
         // One unembeddable row must not end the batch — it stays in the predicate for the next run.
       }
     }
-    const remaining = (await this.pendingEmbeddingIds(limit + 1)).length;
-    return { processed, remaining };
+
+    // THE SECOND ARM, and it only runs once the embedding cursor has drained. Re-judging pairs
+    // against vectors that are themselves about to be replaced would spend the budget twice and
+    // could delete a pair the very next embedding pass re-creates.
+    const resweptPairs = pending.length === 0 ? await this.resweepStaleRules(limit) : 0;
+
+    const remaining =
+      (await this.pendingEmbeddingIds(limit + 1)).length +
+      (await this.staleRulesPairCount(limit + 1));
+    return { processed: processed + resweptPairs, remaining };
   }
 
   /**
-   * Entries with no CURRENT embedding: no row at all, a row from another model or provider, **or a
-   * row whose `content_hash` no longer matches the entry's text**.
+   * Re-judge suspected pairs that a previous rule wrote, and retire them either way.
+   *
+   * A CURSOR ARM in the `docs/jobs.md` sense: every row it selects leaves the predicate on this
+   * pass — deleted if the current rule no longer accepts it, re-stamped if it does — so `remaining`
+   * decreases monotonically and the runner may loop it to zero. That is what makes
+   * `DEDUPE_OVERLAP_ENABLED=false` an actual rollback rather than a switch that strands the rows it
+   * already wrote, and it fixes the same latent bug for `DEDUPE_SIMILARITY_THRESHOLD`, which has
+   * always stranded pairs the same way.
+   *
+   * `shouldPrune` — not `!decidePair` — for the reason spelled out in `duplicate-signal.ts`.
+   */
+  private async resweepStaleRules(limit: number): Promise<number> {
+    const provider = this.provider;
+    if (!provider) return 0;
+    const rule = this.ruleConfig(provider);
+    const pairs = await this.repos.embeddings.staleRulesPairs(
+      RULES_VERSION,
+      { model: provider.model, providerId: provider.id },
+      limit,
+    );
+    if (pairs.length === 0) return 0;
+
+    const doomed: number[] = [];
+    const kept: number[] = [];
+    for (const pair of pairs) {
+      const inputs = {
+        similarity: pair.similarity,
+        left: { norm: pair.leftNorm, tokenCount: pair.leftTokenCount },
+        right: { norm: pair.rightNorm, tokenCount: pair.rightTokenCount },
+      };
+      if (shouldPrune(inputs, rule)) doomed.push(pair.id);
+      else kept.push(pair.id);
+    }
+    await this.repos.duplicatePairs.deleteByIds(doomed);
+    await this.repos.duplicatePairs.restampRulesVersion(kept, RULES_VERSION);
+    return pairs.length;
+  }
+
+  /** How much resweep work is left, for the same `remaining` contract the embedding arm has. */
+  private async staleRulesPairCount(limit: number): Promise<number> {
+    const provider = this.provider;
+    if (!provider) return 0;
+    const pairs = await this.repos.embeddings.staleRulesPairs(
+      RULES_VERSION,
+      { model: provider.model, providerId: provider.id },
+      limit,
+    );
+    return pairs.length;
+  }
+
+  /**
+   * Entries with no CURRENT embedding: no row at all, a row from another model or provider, a row
+   * whose `content_hash` no longer matches the entry's text, **or a row missing the norm and token
+   * count the overlap arm decides on**.
    *
    * THE HASH ARM IS THE ONE THAT WAS MISSING, and without it the backfill could never repair the
    * exact failure it exists to repair. An edit changes the text; if the submit-time check then
@@ -448,10 +640,18 @@ export class DedupeService {
 
       for (const entry of page.rows) {
         afterId = entry.row.id;
+        // THE NORM ARM IS GATED ON THE PROVIDER'S DECLARED CAPABILITY. A provider that cannot
+        // supply a norm would otherwise select every row on every run and never fix one of them:
+        // a cursor that can never retire, reporting the whole table as `remaining` for ever. With
+        // the gate, such a provider simply never has this arm, and the overlap rule is inert for
+        // it end to end.
+        const missingScalars =
+          provider.suppliesNorm && (entry.norm === null || entry.tokenCount === null);
         if (
           entry.contentHash === null ||
           entry.model !== provider.model ||
           entry.providerId !== provider.id ||
+          missingScalars ||
           entry.contentHash !==
             contentHash(embeddingTextFor(entry.row), provider.model, provider.id)
         ) {
@@ -861,6 +1061,7 @@ function toPairView(
     id: number;
     status: "suspected" | "confirmed" | "dismissed" | "merged";
     similarity: string | null;
+    signal?: Record<string, unknown> | null;
     detectedAt: Date;
     reviewedAt: Date | null;
   },
@@ -872,6 +1073,10 @@ function toPairView(
     id: pair.id,
     status: pair.status,
     similarity: pair.similarity === null ? null : Number(pair.similarity),
+    // The decision inputs verbatim, for the reviewer queue. `null` on every pair written before
+    // this column existed, which the queue renders as "no signal recorded".
+    signal: pair.signal ?? null,
+    matchedOn: matchReasons(pair.signal ?? null, left, right),
     detectedAt: pair.detectedAt.toISOString(),
     reviewedAt: pair.reviewedAt?.toISOString() ?? null,
     left: toSideView(left, survivors),

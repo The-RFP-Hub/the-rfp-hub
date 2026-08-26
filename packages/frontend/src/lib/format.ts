@@ -41,6 +41,27 @@ export function formatSimilarity(similarity: number | null): string {
 }
 
 /**
+ * The API's `matchedOn` labels as reader-facing chips.
+ *
+ * A LOOKUP WITH A FALLBACK, not a switch: `matchedOn` is an open enum on a published component, so
+ * a label this build has never heard of must still render as itself rather than vanish or crash.
+ * An empty array means the pair predates recorded reasons and gets no chips at all — deliberately
+ * not a "no reasons" chip, which would read as a finding about the pair rather than about its age.
+ */
+const MATCH_REASON_LABELS: Record<string, string> = {
+  lexical: "similar wording",
+  // Never "contains" or "copy of": the underlying number is cosine corrected by a length ratio —
+  // an estimate of shared vocabulary, not a containment proof.
+  overlap: "shortened re-listing",
+  application_url: "same application link",
+  operating_org: "same organization",
+};
+
+export function formatMatchReasons(matchedOn: string[] | undefined): string[] {
+  return (matchedOn ?? []).map((reason) => MATCH_REASON_LABELS[reason] ?? reason);
+}
+
+/**
  * A monetary amount in the document's own currency, or null when there is nothing to show.
  *
  * Grouped with the same locale-free separator as `formatCount`, and NEVER converted or rounded: the

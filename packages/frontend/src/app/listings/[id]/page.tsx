@@ -29,7 +29,7 @@ import {
 } from "@/components/badges";
 import { ActionNote, EmptyState, ResourceView, actionErrorNote } from "@/components/states";
 import { ApiError, linkOutUrl, loadManagedOpportunity, loadOpportunity } from "@/lib/api";
-import { formatInstant, formatSimilarity } from "@/lib/format";
+import { formatInstant, formatMatchReasons, formatSimilarity } from "@/lib/format";
 import {
   ROUTE_GATE_COPY,
   duplicateStatusLabel,
@@ -438,7 +438,14 @@ function DuplicatesTab({
                           <code>{match.id}</code>
                         </div>
                       </th>
-                      <td>{formatSimilarity(match.similarity)}</td>
+                      <td>
+                        {formatSimilarity(match.similarity)}
+                        {formatMatchReasons(match.matchedOn).length > 0 && (
+                          <div className="muted">
+                            {formatMatchReasons(match.matchedOn).join(" · ")}
+                          </div>
+                        )}
+                      </td>
                       <td>{duplicateStatusLabel(match.status)}</td>
                       <td className="muted">{formatInstant(match.detectedAt)}</td>
                     </tr>

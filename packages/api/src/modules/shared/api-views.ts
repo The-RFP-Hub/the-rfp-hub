@@ -70,6 +70,18 @@ export interface DuplicateMatchView {
   /** Whether the other entry is approved and listed, so clients can choose its safe detail route. */
   isPublic: boolean;
   similarity: number | null;
+  /**
+   * Why this pair was flagged, as LABELS — `["overlap", "application_url"]`, never the values.
+   *
+   * The first entry is always the arm that decided (`lexical` or `overlap`); anything after it is
+   * structural evidence corroborating the decision, computed from the two LIVE rows at read time
+   * and never stored, because "these share an application URL" stops being true the moment either
+   * is edited. Structural signals are deliberately barred from the decision itself — the corpus's
+   * hardest negatives ARE the structurally identical siblings.
+   *
+   * **Empty** on every pair recorded before the reasons existed: no reasons recorded.
+   */
+  matchedOn: string[];
   status: "suspected" | "confirmed" | "dismissed" | "merged";
   detectedAt: string;
 }
@@ -164,6 +176,26 @@ export interface DuplicatePairView {
   id: number;
   status: "suspected" | "confirmed" | "dismissed" | "merged";
   similarity: number | null;
+  /**
+   * The NUMERIC decision inputs the detector recorded — `{ arm, lexical, overlap, minTokens }`.
+   *
+   * A reviewer's queue is where an arm-B pair has to be explicable: its `similarity` sits below
+   * the lexical threshold by construction, and without the signal it would look like a pair the
+   * detector should never have written. `null` on every pair written before the column existed.
+   */
+  signal: Record<string, unknown> | null;
+  /**
+   * Why this pair was flagged, as LABELS — `["overlap", "application_url"]`, never the values.
+   *
+   * The first entry is always the arm that decided (`lexical` or `overlap`); anything after it is
+   * structural evidence corroborating the decision, computed from the two LIVE rows at read time
+   * and never stored, because "these share an application URL" stops being true the moment either
+   * is edited. Structural signals are deliberately barred from the decision itself — the corpus's
+   * hardest negatives ARE the structurally identical siblings.
+   *
+   * **Empty** on every pair recorded before the reasons existed: no reasons recorded.
+   */
+  matchedOn: string[];
   detectedAt: string;
   reviewedAt: string | null;
   left: DuplicateSideView;

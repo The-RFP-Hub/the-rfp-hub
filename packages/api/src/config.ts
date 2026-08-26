@@ -90,6 +90,18 @@ export interface DedupeConfig {
   /** Cosine similarity at or above which a pair is recorded as suspected. Per-provider. */
   similarityThreshold: number;
   maxMatches: number;
+  /**
+   * The second arm: length-corrected term overlap, which catches the re-listing that copies a
+   * programme and publishes a shorter version of it. Cosine cannot — normalisation erases the
+   * length difference that IS the signal. Off makes detection exactly what it was before.
+   */
+  overlapEnabled: boolean;
+  /** Overlap at or above which a pair is suspected even though its cosine is not. Per-provider. */
+  overlapThreshold: number;
+  /** Distinct embedded tokens required on the SHORTER side before the overlap arm may fire. */
+  overlapMinTokens: number;
+  /** Cosine floor under which the overlap arm is not evaluated at all. */
+  overlapMinSimilarity: number;
 }
 
 export interface VerificationConfig {
@@ -481,6 +493,79 @@ export function readSimilarityThreshold(
 }
 
 /**
+ * Per-provider defaults for the OVERLAP arm, mirroring `DEFAULT_SIMILARITY_THRESHOLD` for the
+ * same reason: a length-corrected overlap means something different in every weighting.
+ *
+ * `lexical` is settled at **0.85**, measured by `scripts/dedupe-threshold-report.ts` over every
+ * distinct pair of the committed corpus with the same substance guard the runtime applies:
+ *
+ * | | full corpus | held out (idf from one half, scored on the other) |
+ * |---|---|---|
+ * | hardest negative overlap | 0.682 | 0.750 |
+ * | worst positive overlap | 0.956 | 0.945 |
+ * | band | 0.274 | 0.195 |
+ *
+ * 0.85 is inside both bands and on the edge of neither: +0.168 above the hardest full-corpus
+ * negative, −0.106 below the worst positive; +0.100 / −0.095 out of sample.
+ *
+ * `disabled` is **4**, not 1 — see `readOverlapThreshold`, overlap is not bounded by 1, so 1 would
+ * be a reachable value rather than an unreachable one.
+ */
+export const DEFAULT_OVERLAP_THRESHOLD: Record<EmbeddingProvider, number> = {
+  lexical: 0.85,
+  disabled: 4,
+};
+
+/**
+ * An overlap threshold in **(0, 4]** — deliberately NOT `[0, 1]`.
+ *
+ * Overlap is cosine corrected by the norm ratio, and it is not bounded by 1: a shorter side made
+ * of the longer side's highest-weight terms measures above 1 (1.223 on an honest 40 % truncation
+ * of a real corpus entry, 1.543 on a cherry-picked stub). A `[0, 1]` range copied from
+ * `readSimilarityThreshold` would refuse legitimate operating points and, worse, would encode the
+ * false claim that this number is a proportion. Zero is refused because it accepts everything the
+ * cosine floor lets through, which is not a configuration anybody means.
+ *
+ * Out of range REFUSES rather than clamps: a clamped threshold is a detector running at a setting
+ * nobody chose.
+ */
+export function readOverlapThreshold(
+  raw: string | undefined,
+  provider: EmbeddingProvider,
+): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return DEFAULT_OVERLAP_THRESHOLD[provider];
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 4) {
+    throw new Error(
+      `DEDUPE_OVERLAP_THRESHOLD must be a length-corrected overlap in (0, 4] — it is cosine times a norm ratio and is NOT bounded by 1 — got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * The overlap arm's cosine floor, in [0, 1].
+ *
+ * NOT A SECURITY CONTROL, and the doc comment says so because the name invites the opposite
+ * reading. Arm B is only ever evaluated on ANN candidates, which are already cosine-ordered; this
+ * makes that implicit dependency explicit and configurable. Raising it 0.35 → 0.55 was measured to
+ * change the stub attack not at all — the attacker simply uses a larger stub. The guard that works
+ * is `DEDUPE_OVERLAP_MIN_TOKENS`.
+ */
+export function readOverlapMinSimilarity(raw: string | undefined, fallback: number): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(
+      `DEDUPE_OVERLAP_MIN_SIMILARITY must be a cosine similarity in [0, 1], got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return parsed;
+}
+
+/**
  * The SSRF escape hatch, and the one reader that refuses rather than falls back.
  *
  * Enabling it lets the verifier fetch loopback, link-local and private addresses — which is what
@@ -798,6 +883,19 @@ export const config: AppConfig = {
       embeddingProvider,
     ),
     maxMatches: readPositiveInt(process.env.DEDUPE_MAX_MATCHES, 5),
+    overlapEnabled: readBoolean(process.env.DEDUPE_OVERLAP_ENABLED, true),
+    overlapThreshold: readOverlapThreshold(
+      process.env.DEDUPE_OVERLAP_THRESHOLD,
+      embeddingProvider,
+    ),
+    // 20 distinct tokens on the shorter side. The only guard measured to work against the stub
+    // attack (142 → 3 wins of 160), and it costs nothing on real negatives — the hardest stays
+    // 0.682 at every setting — while every mutation rung clears it with at least 16 tokens spare.
+    overlapMinTokens: readPositiveInt(process.env.DEDUPE_OVERLAP_MIN_TOKENS, 20),
+    overlapMinSimilarity: readOverlapMinSimilarity(
+      process.env.DEDUPE_OVERLAP_MIN_SIMILARITY,
+      0.35,
+    ),
   },
 
   verification: {

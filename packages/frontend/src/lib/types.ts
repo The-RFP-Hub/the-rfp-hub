@@ -137,6 +137,11 @@ export interface DuplicateMatch {
   /** Whether the other entry has a public detail page; otherwise use the entitled workbench. */
   isPublic: boolean;
   similarity: number | null;
+  /**
+   * Why this pair was flagged, as labels: the arm that decided (`lexical` or `overlap`) followed
+   * by any structural evidence corroborating it. Empty on a pair recorded before reasons existed.
+   */
+  matchedOn: string[];
   status: DuplicateStatus;
   detectedAt: string;
 }
@@ -212,6 +217,9 @@ export interface DuplicatePair {
   id: number;
   status: DuplicateStatus;
   similarity: number | null;
+  /** The detector's numeric decision inputs. Null on a pair written before the column existed. */
+  signal: Record<string, unknown> | null;
+  matchedOn: string[];
   detectedAt: string;
   reviewedAt: string | null;
   left: DuplicateSide;

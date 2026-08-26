@@ -21,6 +21,18 @@ export interface DuplicatePairOtherRow {
   other: OpportunityRow;
 }
 
+/**
+ * What a detection pass records ALONGSIDE the similarity: the numeric decision inputs, and the
+ * identity of the rule that made the decision.
+ *
+ * Passed as one object rather than two positional arguments because they are one fact — a signal
+ * without its rule version cannot be interpreted once the thresholds move.
+ */
+export interface DuplicatePairEvidence {
+  signal: Record<string, unknown> | null;
+  rulesVersion: number;
+}
+
 export interface DuplicatePairReviewUpdate {
   status: OpportunityDuplicateRow["status"];
   reviewedBy: number;
@@ -36,24 +48,38 @@ export class DuplicatePairRepository {
     opportunityId: number,
     duplicateOfId: number,
     similarity: string,
+    evidence: DuplicatePairEvidence,
   ): Promise<OpportunityDuplicateRow | undefined> {
     const rows = await this.exec
       .insert(opportunityDuplicates)
-      .values({ opportunityId, duplicateOfId, similarity, status: "suspected" })
+      .values({
+        opportunityId,
+        duplicateOfId,
+        similarity,
+        signal: evidence.signal,
+        rulesVersion: evidence.rulesVersion,
+        status: "suspected",
+      })
       .onConflictDoNothing()
       .returning();
     return rows[0];
   }
 
-  /** Detection may refresh only an undecided pair; it never resurrects a review decision. */
+  /**
+   * Detection may refresh only an undecided pair; it never resurrects a review decision.
+   *
+   * The rule version is rewritten alongside the similarity, which is what keeps a re-detected pair
+   * out of the resweep arm's cursor on the very next pass.
+   */
   async refreshSuspected(
     opportunityId: number,
     duplicateOfId: number,
     similarity: string,
+    evidence: DuplicatePairEvidence,
   ): Promise<void> {
     await this.exec
       .update(opportunityDuplicates)
-      .set({ similarity })
+      .set({ similarity, signal: evidence.signal, rulesVersion: evidence.rulesVersion })
       .where(
         and(
           eq(opportunityDuplicates.opportunityId, opportunityId),
@@ -61,6 +87,21 @@ export class DuplicatePairRepository {
           eq(opportunityDuplicates.status, "suspected"),
         ),
       );
+  }
+
+  /**
+   * Re-stamp pairs the resweep arm re-judged and kept.
+   *
+   * Retiring them from the cursor is the whole point: a resweep that deleted the pairs it rejected
+   * but left the accepted ones stamped with the old rule would select the same rows on the next
+   * run forever, which is precisely the non-retiring cursor `docs/jobs.md` forbids.
+   */
+  async restampRulesVersion(ids: number[], rulesVersion: number): Promise<void> {
+    if (ids.length === 0) return;
+    await this.exec
+      .update(opportunityDuplicates)
+      .set({ rulesVersion })
+      .where(inArray(opportunityDuplicates.id, ids));
   }
 
   async deleteByIds(ids: number[]): Promise<void> {
