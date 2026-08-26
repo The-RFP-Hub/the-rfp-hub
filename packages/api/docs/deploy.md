@@ -303,14 +303,11 @@ A job is the deployed image with a different command, so it inherits everything 
 in the service's task definition — the image, the runtime `DATABASE_URL`, every secret in
 `secrets:` (§2), the execution and task roles — and the deploy workflows keep it current
 automatically; there is no second copy of that list to fall out of step. Placement is not configured
-either: `run-ecs-job.sh` reads the launch type (or capacity provider strategy) off the running
-service with `aws ecs describe-services` at task-start time, so the job lands exactly where the API
-lands. **An `awsvpc` deployment is not required.** The runner also describes the task definition,
-and `networkMode` decides the call: `awsvpc` reuses the service's subnets, security groups and
-`assignPublicIp` verbatim, while `bridge` or `host` — the ordinary shape of an EC2 launch type —
-has none to reuse and the task starts without a `--network-configuration`, which ECS would reject
-for it. Only an `awsvpc` task definition whose service states no network configuration is treated
-as "not deployed yet".
+either: `run-ecs-job.sh` reads the launch type (or capacity provider strategy) and the placement
+constraints off the running service with `aws ecs describe-services` at task-start time, and passes
+them verbatim, so the job lands exactly where the API lands. **The deployment runs EC2 with `bridge`
+networking and the runner assumes that** — it passes no `--network-configuration`, because there is
+none to pass.
 
 There is **no public job endpoint and no shared job token**, deliberately: a credential that can
 start a job has to live somewhere, and a token in repository secrets that the internet-facing API

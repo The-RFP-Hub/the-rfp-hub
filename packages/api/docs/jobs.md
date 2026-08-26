@@ -143,36 +143,25 @@ run time:
 | Task definition family, container name | `rfp-hub-<env>`, derived in `run-ecs-job.sh` (overridable via `ECS_TASK_DEFINITION` / `ECS_CONTAINER`) |
 | Service | `rfp-hub-<env>-service`, likewise (`ECS_SERVICE`) |
 | Launch type / capacity provider strategy | **read from the service** with `aws ecs describe-services`, and reused verbatim |
-| Placement constraints | **read from the service** and reused verbatim on the EC2 path, so a job cannot land on capacity the API is deliberately kept off. Fargate neither accepts nor can have them |
-| Subnets, security groups, `assignPublicIp` | **read from the service** (`services[0].networkConfiguration.awsvpcConfiguration`) when the task definition is `awsvpc`; a `bridge` or `host` deployment has none, and the job runs without them |
-| `networkMode`, `requiresCompatibilities` | **read from the task definition** with `aws ecs describe-task-definition` on the same family the deploy workflow already describes |
+| Placement constraints | **read from the service** and reused verbatim, so a job cannot land on capacity the API is deliberately kept off |
+| Network configuration | **none.** The deployment runs EC2 with `bridge` networking, and `run-ecs-job.sh` assumes that: no `--network-configuration` is passed, and none is needed |
 
-**A non-awsvpc deployment carries one requirement, and it is the operator's to meet.** A job is a
-SECOND task from the service's own task definition, running while the service is up. Under
-`networkMode: host` — or `bridge` with a **fixed** `hostPort` — the service already reserves that
-port on every instance it is eligible for, so a second task wanting the same port is unplaceable on
-all of them. Nothing in the runner can resolve that: the task definition is the service's, and the
-port is in it. So either the task definition uses a **dynamic host port** (`hostPort: 0`, which is
-the ordinary bridge-mode choice and lets both tasks coexist), or there is **spare eligible capacity**
-the constraint expression still admits. `awsvpc` and Fargate deployments are unaffected — each task
-gets its own interface, so there is no reservation to collide with.
+Placement is discovered rather than configured for the same reason the task definition is reused:
+restating it in repository variables is asking an operator to keep a copy in sync by hand, and a
+stale copy starts the job on capacity the API is deliberately kept off. Reading the service means
+**the job lands exactly where the API lands, by construction**.
+
+**One requirement comes with that, and it is the operator's to meet.** A job is a SECOND task from
+the service's own task definition, running while the service is up. With a **fixed** `hostPort`, the
+service already reserves that port on every instance it is eligible for, so a second task wanting
+the same port is unplaceable on all of them. Nothing in the runner can resolve it: the task
+definition is the service's, and the port is in it. So either the task definition uses a **dynamic
+host port** (`hostPort: 0`, the ordinary bridge-mode choice, which lets both tasks coexist), or
+there is **spare eligible capacity** the constraint expression still admits.
 
 The symptom when it is not met is a **placement** failure, not an application error, and it reads
 like an outage until somebody knows otherwise — so `run-ecs-job.sh` names this cause explicitly when
 a stopped task's `stoppedReason` mentions a resource or a port.
-
-The network configuration is discovered rather than configured for the same reason the task
-definition is reused: restating the VPC layout in repository variables is asking an operator to
-keep a copy of it in sync by hand, and a stale copy starts the job in a subnet that cannot reach the
-database. Reading the service means **the job lands exactly where the API lands, by construction**.
-
-**`awsvpc` is not required.** `awsvpcConfiguration` exists only when the task definition's
-`networkMode` is `awsvpc`; a service whose tasks use `bridge` or `host` — the ordinary shape of an
-EC2 launch type — has none, and ECS *rejects* `--network-configuration` for one. So the runner
-describes the task definition too and lets `networkMode` decide the shape of the `run-task` call:
-`awsvpc` reuses the service's configuration, anything else omits the flag and keeps only the
-placement. The only combination treated as unprovisioned is an `awsvpc` task definition whose
-service states no network configuration — a service that cannot have been deployed.
 
 There is consequently **no maintenance task definition to provision** and no second copy of the
 secret list to keep in step with the service's.
@@ -221,29 +210,26 @@ carries the time of the change, which is where that fact belongs.
 ### a. The schedule (how it actually runs)
 
 `.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
-own task definition**, using the AWS credentials the deploy workflows already hold. Read the service
-to learn where it runs and the task definition to learn what shape it is, then start that task
-definition there with a different command.
+own task definition**, using the AWS credentials the deploy workflows already hold. **Two calls**:
+read the service to learn where it runs, then start that task definition there with a different
+command.
 
 ```sh
-# where the API runs — its own placement and, on awsvpc only, its subnets and security groups
+# where the API runs — its own placement, reused verbatim
 svc=$(aws ecs describe-services --cluster "$CLUSTER" --services rfp-hub-<env>-service)
-vpc=$(jq -c '.services[0].networkConfiguration.awsvpcConfiguration // empty' <<<"$svc")
-# what shape it is — awsvpc takes a --network-configuration, bridge and host REJECT one
-mode=$(aws ecs describe-task-definition --task-definition rfp-hub-<env> \
-        --query 'taskDefinition.networkMode' --output text)
 
-# placement comes from the service, never a literal: FARGATE cannot run a bridge/host task
-args=(--launch-type "$(jq -r '.services[0].launchType' <<<"$svc")")
-[ "$mode" = awsvpc ] && args+=(--network-configuration "$(jq -nc --argjson vpc "$vpc" '{awsvpcConfiguration: $vpc}')")
-
-aws ecs run-task --cluster "$CLUSTER" --task-definition rfp-hub-<env> "${args[@]}" \
+aws ecs run-task --cluster "$CLUSTER" --task-definition rfp-hub-<env> \
+  --launch-type "$(jq -r '.services[0].launchType' <<<"$svc")" \
   --overrides '{"containerOverrides":[{"name":"rfp-hub-<env>","command":["node","packages/api/dist/jobs.js","staleness","--json"]}]}'
 ```
 
+No `--network-configuration`: the deployment is EC2 with `bridge` networking, so there is none to
+pass and ECS would reject one anyway.
+
 That is the sketch. `run-ecs-job.sh` is the same two calls plus the cases a sketch omits: a service
 on a **capacity provider** reports no `launchType` and needs `--capacity-provider-strategy` instead,
-and every branch that declines prints what it read first.
+placement constraints are carried across too, and every branch that declines prints what it read
+first.
 
 **There is no public job endpoint and no shared job token.** A credential that can start a job has
 to live somewhere, and "a token in repository secrets that the internet-facing API accepts forever"
@@ -256,11 +242,11 @@ never existed would turn a not-yet-deployed environment into a nightly red build
 on — while on a `workflow_dispatch` either **fails**, because an operator dispatching the run is
 asking whether the wiring works.
 
-Before it declines it **prints what it read** — the `failures` array, the service's status, launch
-type, capacity provider strategy and task definition ARN, and that task definition's `networkMode`
-and `requiresCompatibilities` — and the message names which case it is: *service missing (failures:
-…)* or *service present but states no awsvpc network configuration*. The two look identical from
-outside and have completely different fixes, and the log is all an operator has a night later.
+Before it declines it **prints what it read** — the `failures` array, the service's ARN, status and
+task definition ARN, and its launch type, capacity provider strategy and placement constraints — and
+names the case in the message: *service missing (failures: …)*. An absent service and a cluster
+variable pointing at the wrong cluster look identical from outside and have completely different
+fixes, and the log is all an operator has a night later.
 
 ### b. The image, or a checkout (an operator, by hand)
 
@@ -411,14 +397,13 @@ Before the first M3 job run on any deployment, in order:
 3. Deploy the API to that environment at least once, so `rfp-hub-<env>` and
    `rfp-hub-<env>-service` exist and `<ENV>_ECS_CLUSTER` is set. Both are prerequisites of the
    deploy workflow itself, so this is nearly always already true; the runner reads the service for
-   its launch type — and, on an `awsvpc` deployment, its subnets and security groups — and prints
-   everything it read when the service is not there yet.
+   its placement and prints everything it read when the service is not there yet.
 4. Grant the deploy IAM user **`ecs:RunTask` on the task definition and `iam:PassRole` for the
    task's execution and task roles**. This is the one permission that may be missing: registering a
    task definition and updating a service — which the deploy workflow already does — does not imply
-   the right to start a task from it. `ecs:DescribeServices` and `ecs:DescribeTaskDefinition` are
-   already exercised by the deploy workflow with the same credential. Nothing else is needed; the
-   maintenance chain uses the **runtime** credential inside the container, not a DDL one.
+   the right to start a task from it. `ecs:DescribeServices` is already exercised by the deploy
+   workflow with the same credential. Nothing else is needed; the maintenance chain uses the
+   **runtime** credential inside the container, not a DDL one.
 5. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
    loudly if the cluster variable is unset or the service cannot be described. Nothing here
    triggers the export — it runs on its own cron (§2) — so confirm it separately, either by waiting
