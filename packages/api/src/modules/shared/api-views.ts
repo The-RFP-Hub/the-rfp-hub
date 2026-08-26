@@ -353,6 +353,8 @@ export interface AccountSummaryView {
   id: number;
   handle: string | null;
   displayName: string | null;
+  /** Present on staff directory searches; omitted from unrelated account mutation responses. */
+  email?: string | null;
   globalRole: AccountRole;
   directCreate: boolean;
   createdAt: string;

@@ -187,7 +187,7 @@ export const reviewController = {
   searchAccounts: handled(async (request: FastifyRequest) => {
     const { q, limit } = queryOf<{ q?: string; limit?: number }>(request);
     const rows = await accountsService.search(q, limit);
-    return { items: rows.map(toAccountSummary) } satisfies AccountListView;
+    return { items: rows.map((row) => toAccountSummary(row, row.email)) } satisfies AccountListView;
   }),
 
   searchOrganizations: handled(async (request: FastifyRequest) => {

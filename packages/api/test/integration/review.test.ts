@@ -10,7 +10,13 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { db, pool } from "../../src/db/client.js";
-import { auditLog, opportunities, orgMemberships, organizations } from "../../src/db/schema.js";
+import {
+  accounts,
+  auditLog,
+  opportunities,
+  orgMemberships,
+  organizations,
+} from "../../src/db/schema.js";
 import {
   bearer,
   grantMembership,
@@ -69,6 +75,10 @@ run("M3REV review and administration", () => {
     const candidate = await seedOrganization({ slug: CANDIDATE, verified: false });
     await seedOrganization({ slug: VERIFY_RACE, verified: false });
     candidateOrgId = candidate.id;
+    await db
+      .update(accounts)
+      .set({ displayName: "Membership Search Person" })
+      .where(eq(accounts.id, member.account.id));
     await grantMembership(member.account.id, candidate.id, "owner");
 
     submitterToken = submitter.token;
@@ -631,6 +641,35 @@ run("M3REV review and administration", () => {
     expect(accounts.json().items.map((a: { handle: string }) => a.handle)).toContain(
       "m3rev-member",
     );
+
+    const byEmail = await app.inject({
+      method: "GET",
+      url: "/v1/review/accounts?q=M3REV-MEMBER%40RFPHUB",
+      headers: bearer(reviewerToken),
+    });
+    expect(byEmail.statusCode).toBe(200);
+    expect(byEmail.json().items).toEqual([
+      expect.objectContaining({
+        id: memberId,
+        handle: "m3rev-member",
+        email: EMAILS.member,
+      }),
+    ]);
+
+    // `/admin` uses this same staff directory route; an admin gets the same display-name search.
+    const byNameAsAdmin = await app.inject({
+      method: "GET",
+      url: "/v1/review/accounts?q=search%20person",
+      headers: bearer(adminToken),
+    });
+    expect(byNameAsAdmin.statusCode).toBe(200);
+    expect(byNameAsAdmin.json().items).toEqual([
+      expect.objectContaining({
+        id: memberId,
+        displayName: "Membership Search Person",
+        email: EMAILS.member,
+      }),
+    ]);
 
     const orgs = await app.inject({
       method: "GET",

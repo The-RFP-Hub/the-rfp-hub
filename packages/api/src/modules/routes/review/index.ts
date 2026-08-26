@@ -511,7 +511,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "searchAccounts",
         tags: ["review"],
-        summary: "Find accounts by handle, display name or provider subject",
+        summary: "Find accounts by handle, id, display name, email or provider subject",
         security: [{ bearerAuth: [] }],
         querystring: {
           type: "object",

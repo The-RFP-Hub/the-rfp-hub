@@ -19,9 +19,15 @@
  * credential (`grantAdmin` below); every admin after that is made by an admin, over
  * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, getTableColumns, ilike, or } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type AccountRow, accounts, orgMemberships, organizations } from "../../../db/schema.js";
+import {
+  type AccountRow,
+  accounts,
+  authUser,
+  orgMemberships,
+  organizations,
+} from "../../../db/schema.js";
 import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
@@ -42,6 +48,11 @@ export interface DetailedMembership extends Membership {
 export interface ProfileUpdate {
   handle?: string | null;
   displayName?: string | null;
+}
+
+/** The privileged directory projection. Email stays out of the public account row and `/v1/me`. */
+export interface AccountSearchRow extends AccountRow {
+  email: string | null;
 }
 
 /** What the admin ceremony did, so an operator's console can say which of the three happened. */
@@ -280,19 +291,28 @@ export class AccountService {
     }
   }
 
-  /** T3 account discovery for the review screens. Matches handle, display name or subject. */
-  async search(q: string | undefined, limit = 25): Promise<AccountRow[]> {
+  /** T3 account discovery for staff screens. Email is joined only for this privileged read. */
+  async search(q: string | undefined, limit = 25): Promise<AccountSearchRow[]> {
     const query = (q ?? "").trim();
+    const select = () =>
+      this.db
+        .select({ ...getTableColumns(accounts), email: authUser.email })
+        .from(accounts)
+        .leftJoin(authUser, eq(authUser.id, accounts.authUserId));
     if (query === "") {
-      return this.db.select().from(accounts).orderBy(accounts.id).limit(limit);
+      return select().orderBy(accounts.id).limit(limit);
     }
     const like = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+    const prefix = `${query.replace(/[\\%_]/g, "\\$&")}%`;
+    const accountId = /^\d+$/.test(query) ? Number(query) : Number.NaN;
     const match = or(
       ilike(accounts.handle, like),
       ilike(accounts.displayName, like),
       eq(accounts.authUserId, query),
+      ilike(authUser.email, prefix),
+      Number.isSafeInteger(accountId) ? eq(accounts.id, accountId) : undefined,
     );
-    return this.db.select().from(accounts).where(match).orderBy(accounts.id).limit(limit);
+    return select().where(match).orderBy(accounts.id).limit(limit);
   }
 }
 

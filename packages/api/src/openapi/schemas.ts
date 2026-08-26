@@ -876,12 +876,13 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "An account as the review and admin screens see it. Never carries the DID or the email.",
+      "An account as the review and admin screens see it. Never carries the provider subject; privileged directory searches additionally carry email.",
     required: ["id", "handle", "displayName", "globalRole", "directCreate", "createdAt"],
     properties: {
       id: { type: "integer" },
       handle: { type: ["string", "null"] },
       displayName: { type: ["string", "null"] },
+      email: { type: ["string", "null"], format: "email" },
       globalRole: { type: "string", enum: ["submitter", "reviewer", "admin"] },
       directCreate: { type: "boolean" },
       createdAt: { type: "string", format: "date-time" },

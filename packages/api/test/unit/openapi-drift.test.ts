@@ -579,6 +579,7 @@ describe("M3 closed components vs their view types", () => {
     id: 1,
     handle: null,
     displayName: null,
+    email: "person@example.com",
     globalRole: "submitter",
     directCreate: false,
     createdAt: "2026-08-14T00:00:00.000Z",
