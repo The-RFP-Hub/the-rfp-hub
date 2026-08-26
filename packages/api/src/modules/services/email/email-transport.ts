@@ -137,6 +137,19 @@ function memoryTransport(): EmailTransport {
 }
 
 /**
+ * How long ONE provider call may take before it is abandoned.
+ *
+ * Not a nicety: `notification-dispatch` leases a row for a five-minute retry floor and renews that
+ * lease immediately before each send, so a single call that outlives the floor is the one thing
+ * that can put a row back in play while it is still being sent. Neither the AWS SDK nor `fetch`
+ * imposes any deadline of its own — a silent socket hangs until the OS gives up, which is measured
+ * in minutes. Thirty seconds is far longer than any healthy send and comfortably inside the floor,
+ * and it is deliberately not configurable: it is a correctness bound of the dispatcher, not an
+ * operator preference. (`mailgun` already carries a tighter one for the sign-in path.)
+ */
+const SEND_TIMEOUT_MS = 30_000;
+
+/**
  * Amazon SES through the task role — the reason SES was chosen over an API-key provider.
  *
  * The SDK is imported lazily, inside `send`, so a deployment that uses any other transport never
@@ -168,6 +181,9 @@ function sesTransport(cfg: EmailConfig): EmailTransport {
             },
           },
         }),
+        // The SDK's own retry policy is per-attempt; this bounds the whole call. See
+        // `SEND_TIMEOUT_MS` — a send that outlives the dispatch lease is the hazard being closed.
+        { abortSignal: AbortSignal.timeout(SEND_TIMEOUT_MS) },
       );
     },
   };
@@ -201,6 +217,7 @@ function resendTransport(cfg: EmailConfig): EmailTransport {
           subject: message.subject,
           text: message.text,
         }),
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
       // The body may name the address; the status alone says what an operator needs to know.
       if (!response.ok)
