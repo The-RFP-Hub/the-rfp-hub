@@ -54,6 +54,7 @@ const MATCH_URL = "https://programmes.example.org/superchain-builders";
 const SOFT_404_URL = "https://programmes.example.org/gone";
 const OFFSITE_URL = "https://programmes.example.org/moved";
 const OFFSITE_DESTINATION = "https://apply.elsewhere-example.net/superchain-builders";
+const CHALLENGE_URL = "https://programmes.example.org/challenge";
 
 const DEADLINE = "2099-03-01T00:00:00.000Z";
 
@@ -74,6 +75,9 @@ const PAGES = {
   [OFFSITE_URL]: { status: 302, headers: { location: OFFSITE_DESTINATION } },
   [OFFSITE_DESTINATION]: {
     body: sourcePage({ title: "Superchain Builders Fund", organization: "Example Foundation" }),
+  },
+  [CHALLENGE_URL]: {
+    body: "<!doctype html><html><head><title>Just a moment...</title></head><body>Enable JavaScript and cookies to continue</body></html>",
   },
 };
 
@@ -220,6 +224,22 @@ run("M3VER verification", () => {
     // WHICH heuristic fired is recorded: one whose reasoning is invisible is one a reviewer has to
     // take on faith.
     expect(String(extracted.softNotFoundHeuristic)).toMatch(/not-found phrase|characters/);
+
+    const row = (await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1))[0];
+    expect(row?.verifiedAgainstSource).toBe(false);
+  });
+
+  it("records a challenge-shaped response without changing its not-verified semantics", async () => {
+    const id = await seedEntry("challenge", CHALLENGE_URL);
+    const view = await serviceWith(fixtureTransport(PAGES)).verify(id);
+
+    expect(view.httpStatus).toBe(200);
+    expect(view.existsAtSource).toBe(false);
+    expect(view.matched).toBe(false);
+    expect(view.extracted).toMatchObject({
+      automatedCheckBlocked: true,
+      automatedCheckBlockedHeuristic: expect.stringContaining("automated-access challenge"),
+    });
 
     const row = (await db.select().from(opportunities).where(eq(opportunities.id, id)).limit(1))[0];
     expect(row?.verifiedAgainstSource).toBe(false);

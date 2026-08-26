@@ -381,7 +381,9 @@ test.describe("M3-4 source verification", () => {
     for (const request of fetched) {
       // A distinct agent is how an operator on the other end tells this traffic apart from a
       // person's browser, and how they can refuse it if they want to.
-      expect(request.headers.userAgent, "the verifier names itself").toMatch(/rfphub-verifier/i);
+      expect(request.headers.userAgent, "the verifier names itself").toBe(
+        "RFPHubVerifier/1.0 (+https://github.com/The-RFP-Hub/the-rfp-hub)",
+      );
       // None of these may ever travel outbound: they would carry the deployment's own session or
       // internal URLs to a third party the entry merely pointed at.
       expect(request.headers.cookie ?? null).toBeNull();

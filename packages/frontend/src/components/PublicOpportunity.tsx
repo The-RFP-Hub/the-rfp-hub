@@ -1,5 +1,6 @@
 "use client";
 
+import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresentation";
 /**
  * One published opportunity, as a visitor with no account reads it.
  *
@@ -16,10 +17,12 @@
  * signed-in pages give, and it matters more here: this is the surface an anonymous visitor reaches
  * without ever having decided to trust anyone.
  */
+import { PublicClaimControl } from "@/components/ClaimForm";
+import { DocumentTitle } from "@/components/DocumentTitle";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
-import { linkOutUrl } from "@/lib/api";
+import { ApiError, linkOutUrl } from "@/lib/api";
 import {
   describeAward,
   describeDeadline,
@@ -27,23 +30,70 @@ import {
   formatAmount,
   formatInstant,
 } from "@/lib/format";
+import { fundingTypeLabel, ingestionMethodLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
-import { useCallback, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+
+const MERGED_REDIRECT_PARAM = "mergedRedirect";
 
 export function PublicOpportunity({ id }: { id: string }) {
   const api = useApi();
-  const load = useCallback(() => api.directory.find(id), [api, id]);
+  const { replace } = useRouter();
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+  const [showMergedRedirect, setShowMergedRedirect] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(query);
+    if (params.get(MERGED_REDIRECT_PARAM) !== "1") return;
+
+    setShowMergedRedirect(true);
+    params.delete(MERGED_REDIRECT_PARAM);
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    replace(`/opportunities/${encodeURIComponent(id)}${suffix}`);
+  }, [id, query, replace]);
+
+  const load = useCallback(async () => {
+    try {
+      return await api.directory.find(id);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "opportunity_merged" && error.mergedInto) {
+        const params = new URLSearchParams(query);
+        params.set(MERGED_REDIRECT_PARAM, "1");
+        const suffix = `?${params.toString()}`;
+        replace(`/opportunities/${encodeURIComponent(error.mergedInto.id)}${suffix}`);
+        // Navigation unmounts this tree. Keeping the resource pending prevents the expected 404
+        // from flashing as an error while the canonical survivor route loads.
+        return new Promise<Opportunity>(() => undefined);
+      }
+      throw error;
+    }
+  }, [api, id, query, replace]);
   const { state, reload } = useResource(load);
 
   return (
     <section>
+      {showMergedRedirect ? (
+        <output className="note row">
+          <span>You were redirected here: the listing you followed was merged into this one.</span>
+          <button type="button" onClick={() => setShowMergedRedirect(false)}>
+            Dismiss
+          </button>
+        </output>
+      ) : null}
       <ResourceView resource={state} what="this opportunity" onRetry={reload}>
         {(entry) => (
           <>
-            <OpportunityView entry={entry} baseUrl={api.baseUrl} />
-            <PublicHistory id={id} />
+            <DocumentTitle title={entry.title} fallback={id} />
+            <OpportunityView
+              entry={entry}
+              baseUrl={api.baseUrl}
+              claimControl={<PublicClaimControl id={entry.id} />}
+            />
+            <PublicHistory id={entry.id} />
           </>
         )}
       </ResourceView>
@@ -56,11 +106,20 @@ export function PublicOpportunity({ id }: { id: string }) {
  * payload is a Standard object, and what has to be provable is that each of its fields reaches the
  * page as text rather than as markup.
  */
-export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
+export function OpportunityView({
+  entry,
+  baseUrl,
+  claimControl,
+}: {
+  entry: Opportunity;
+  baseUrl: string;
+  claimControl?: ReactNode;
+}) {
   const source = entry.source ?? {};
   const funding = entry.fundingInfo;
   const award = describeAward(funding);
   const operator = entry.operatingOrganizations[0];
+  const namespace = entry.id.split(":")[0];
 
   return (
     <>
@@ -68,7 +127,7 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
         <UntrustedText value={entry.title} />
       </h1>
       <p className="muted">
-        {entry.fundingType} · <StatusBadge status={entry.status} />
+        {fundingTypeLabel(entry.fundingType)} · <StatusBadge status={entry.status} />
         {operator ? (
           <>
             {" "}
@@ -81,6 +140,8 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
       {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
 
       <ApplyAction entry={entry} baseUrl={baseUrl} />
+
+      {claimControl}
 
       <dl className="grid-2 card">
         <div>
@@ -140,6 +201,10 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
           per-type layout that could drop a field a publisher entered.
         </p>
         <pre className="untrusted-block">{JSON.stringify(entry.fundingDetails, null, 2)}</pre>
+        <p className="muted footnote">
+          Source record, including the wire value for how this listing arrived.
+        </p>
+        <pre className="untrusted-block">{JSON.stringify(source, null, 2)}</pre>
       </details>
 
       <section aria-labelledby="provenance-heading" className="card">
@@ -157,9 +222,15 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
         </p>
         <dl className="grid-2">
           <div>
-            <dt>Published under</dt>
+            <dt>Publisher</dt>
             <dd>
-              <UntrustedText value={source.publisher} fallback="no namespace" />
+              <UntrustedText value={source.publisher} fallback="Not claimed by a publisher" />
+            </dd>
+          </div>
+          <div>
+            <dt>Namespace</dt>
+            <dd>
+              <code>{namespace}</code>
             </dd>
           </div>
           <div>
@@ -174,9 +245,7 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
           </div>
           <div>
             <dt>How it arrived</dt>
-            <dd>
-              <UntrustedText value={source.ingestedVia} fallback="not stated" />
-            </dd>
+            <dd>{ingestionMethodLabel(source.ingestedVia)}</dd>
           </div>
           <div>
             <dt>Id at the source</dt>
@@ -215,7 +284,7 @@ export function OpportunityView({ entry, baseUrl }: { entry: Opportunity; baseUr
  * carries no `applicationUrl` — an ongoing bounty programme, a record imported from a feed that
  * never had one. The old page said "This entry states no application link." and stopped, which
  * left the reader holding a description and nowhere to go. It now says the same true thing and
- * then hands over the two things it does have: the programme's own site, and the organisation
+ * then hands over the two things it does have: the programme's own site, and the organization
  * running it.
  */
 function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
@@ -260,7 +329,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
       </p>
       <p className="muted footnote">
         That is what the publisher filed, not something missing from this page. Applications for
-        this programme are arranged wherever {operator ? "the organisation below" : "its organiser"}{" "}
+        this programme are arranged wherever {operator ? "the organization below" : "its organiser"}{" "}
         says — start from the programme&rsquo;s own site.
       </p>
       <p className="row">
@@ -274,7 +343,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
             Open the programme site ↗
           </a>
         ) : operator?.website ? (
-          <UntrustedLink href={operator.website} label="Open the organisation’s site ↗" />
+          <UntrustedLink href={operator.website} label="Open the organization’s site ↗" />
         ) : (
           <span className="muted">
             No site was stated either. Everything the listing does carry is below.
@@ -412,13 +481,13 @@ function Milestones({ entry }: { entry: Opportunity }) {
  *
  * Operating and sponsoring are different roles and the Standard models them as different arrays:
  * the operator runs the intake and is who an applicant deals with, a sponsor may only have put money
- * behind it. Merging them into one "organisations" list is the misattribution that split them.
+ * behind it. Merging them into one "organizations" list is the misattribution that split them.
  */
 function Organizations({ entry }: { entry: Opportunity }) {
   const sponsors = entry.sponsoringOrganizations ?? [];
   return (
     <section aria-labelledby="orgs-heading">
-      <h2 id="orgs-heading">Organisations</h2>
+      <h2 id="orgs-heading">Organizations</h2>
       <dl className="grid-2">
         <div>
           <dt>Runs this opportunity</dt>
@@ -577,17 +646,14 @@ export function PublicHistory({ id }: { id: string }) {
                   {trail.entries.map((audited) => (
                     <tr key={`${audited.at}-${audited.action}`}>
                       <td className="muted">{formatInstant(audited.at)}</td>
-                      <td>{audited.action}</td>
                       <td>
-                        <UntrustedText value={audited.actor} />{" "}
-                        <span className="muted">({audited.actorKind})</span>
+                        <AuditAction entry={audited} />
                       </td>
                       <td>
-                        {audited.changedFields.length === 0 ? (
-                          <span className="muted">—</span>
-                        ) : (
-                          <code>{audited.changedFields.join(", ")}</code>
-                        )}
+                        <AuditActor entry={audited} />
+                      </td>
+                      <td>
+                        <AuditFields fields={audited.changedFields} />
                       </td>
                     </tr>
                   ))}

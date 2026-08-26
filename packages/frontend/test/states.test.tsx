@@ -21,7 +21,7 @@ import {
 import { EmptyState, ErrorState, Loading, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { useResource } from "@/lib/resource";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useCallback, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -125,7 +125,9 @@ describe("useResource", () => {
     // refresh is a dashboard reporting figures that are quietly hours old.
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.queryByText("first answer")).toBeNull();
-    expect(screen.getByText("The API fell over.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("The API fell over.")).toBeTruthy();
   });
 });
 
@@ -143,11 +145,12 @@ describe("ErrorState", () => {
       />,
     );
 
-    expect(screen.getByText("The API did not accept this session.")).toBeTruthy();
-    // The API's own sentence survives the framing — this branch is reached both by a session that
-    // aged out mid-task and by a one-shot credential that had already been spent, and only the
-    // API knows which.
-    expect(screen.getByText("No session was presented.")).toBeTruthy();
+    expect(screen.getByText("Your sign-in has ended.")).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("No session was presented.")).toBeTruthy();
+    expect(within(details).getByText("unauthenticated")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Log in again" }));
     expect(login).toHaveBeenCalledTimes(1);
@@ -167,11 +170,19 @@ describe("ErrorState", () => {
     // ends exactly where it started is the worst thing this component could do.
     expect(screen.queryByRole("button", { name: "Log in again" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
-    expect(screen.getByText(/may not read the review queue/)).toBeTruthy();
-    expect(screen.getByText(/403 · forbidden/)).toBeTruthy();
+    expect(screen.getByText(/You don’t have access to the review queue/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Check your account" }).getAttribute("href")).toBe(
+      "/account",
+    );
+    expect(screen.getByRole("link", { name: "See who can do what" }).getAttribute("href")).toBe(
+      "/how-it-works#roles",
+    );
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("forbidden")).toBeTruthy();
   });
 
-  it("still quotes the code for everything else, so a bug report can carry it", () => {
+  it("keeps generic diagnostics in a closed disclosure", () => {
     render(
       <ErrorState
         error={new ApiError(0, "network_error", "Could not reach the API.")}
@@ -179,7 +190,30 @@ describe("ErrorState", () => {
       />,
     );
 
-    expect(screen.getByText(/no response · network_error/)).toBeTruthy();
+    expect(screen.getByText(/We couldn’t load the directory/)).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("0 (no response)")).toBeTruthy();
+    expect(within(details).getByText("network_error")).toBeTruthy();
+  });
+
+  it("gives a 404 a directory action and no retry", () => {
+    render(
+      <ErrorState
+        error={new ApiError(404, "not_found", "No opportunity matched this id.")}
+        what="this listing"
+        onRetry={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/We couldn’t find this listing/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Search the directory" }).getAttribute("href")).toBe(
+      "/",
+    );
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("No opportunity matched this id.")).toBeTruthy();
   });
 });
 
@@ -214,14 +248,21 @@ describe("badges carry meaning without colour", () => {
         <StatusBadge status="closed" />
         <ReviewStatusBadge status="pending" />
         <ReviewStatusBadge status="rejected" />
-        <ListedBadge isListed={false} />
+        <ListedBadge isListed={false} reviewStatus="approved" />
         <MatchBadge matched={null} />
       </>,
     );
 
     // The WORD is the primary carrier. A screenshot in greyscale, a printout and a colourblind
     // reader all get the same information as the screen.
-    for (const word of ["open", "closed", "pending", "rejected", "unlisted", "not checked"]) {
+    for (const word of [
+      "Open",
+      "Closed",
+      "Waiting for review",
+      "Rejected",
+      "Hidden from the public directory",
+      "not checked",
+    ]) {
       expect(screen.getByText(word)).toBeTruthy();
     }
     // The SHAPE is a class the stylesheet turns into an outline, a fill, a dash or a strike.
@@ -231,9 +272,39 @@ describe("badges carry meaning without colour", () => {
     }
   });
 
+  it("distinguishes a public listing from a pending public preference", () => {
+    const { rerender } = render(<ListedBadge isListed reviewStatus="pending" />);
+
+    expect(screen.getByText("Will appear once approved")).toBeTruthy();
+    expect(screen.queryByText("Visible in the public directory")).toBeNull();
+    expect(screen.getByText("Will appear once approved").className).toContain("badge-pending");
+
+    rerender(<ListedBadge isListed reviewStatus="approved" />);
+    expect(screen.getByText("Visible in the public directory").className).toContain("badge-listed");
+  });
+
   it("says what a verification verdict is NOT, in the badge's own title", () => {
     render(<MatchBadge matched={true} />);
     expect(screen.getByText("link looks right").getAttribute("title")).toMatch(/not a fact-check/);
+  });
+
+  it("names failed link checks by reachability without striking them through", () => {
+    const { rerender } = render(<MatchBadge matched={false} existsAtSource={false} />);
+    expect(screen.getByText("link not reachable").getAttribute("title")).toMatch(
+      /could not be reached/,
+    );
+
+    rerender(<MatchBadge matched={false} existsAtSource />);
+    expect(screen.getByText("content did not match").getAttribute("title")).toMatch(/was reached/);
+
+    rerender(<MatchBadge matched={false} />);
+    expect(screen.getByText("link check failed")).toBeTruthy();
+
+    const unmatchedRule = readFileSync(
+      join(process.cwd(), "src", "app", "globals.css"),
+      "utf8",
+    ).match(/\.badge-unmatched\s*\{([^}]*)\}/)?.[1];
+    expect(unmatchedRule).not.toContain("line-through");
   });
 
   it("puts the consequence of verification ON SCREEN where a member has to act on it", () => {
@@ -249,7 +320,7 @@ describe("badges carry meaning without colour", () => {
     // Without the flag it is the bare badge, for the dense tables that have no room for a sentence.
     rerender(<VerifiedBadge verified />);
     expect(screen.queryByText(/publish immediately/)).toBeNull();
-    expect(screen.getByText("verified").getAttribute("title")).toMatch(/without review/);
+    expect(screen.getByText("Verified").getAttribute("title")).toMatch(/without review/);
   });
 });
 
@@ -259,8 +330,8 @@ describe("badges carry meaning without colour", () => {
  * THE ACCENT IS RATIONED, AND THIS IS THE RATION, ENFORCED.
  *
  * One olive accent exists on this site and it means exactly one thing: HERE IS WHERE YOU CAN ACT.
- * The primary button, the focus ring, the current-section underline, the link colour, and the tint
- * under a hovered control or row. That is the whole list.
+ * The primary button, native selected controls, the focus ring, the current-section underline, the
+ * link colour, and the tint under a hovered control or row. That is the whole list.
  *
  * It is barred from every state, verdict and category — status, review status, listing,
  * verification, success, error, warning, chart bars — because those are read by people who cannot
@@ -301,10 +372,14 @@ describe("the accent never carries state", () => {
     const allowed = [
       "a", // textual links on paper
       "button:hover",
+      ".button:hover",
       'button[aria-pressed="true"],\nbutton[aria-selected="true"]',
       ".button-primary",
       ".button-primary:hover",
+      'input[type="range"],\ninput[type="radio"],\ninput[type="checkbox"]',
       '.shell-nav a[aria-current="page"]',
+      ".section-nav a:hover",
+      '.section-nav a[aria-current="page"]',
       ".shell-footer a",
       "tbody tr:hover",
     ];
@@ -317,6 +392,28 @@ describe("the accent never carries state", () => {
       .filter((selector) => !selector.includes("focus-visible"));
 
     for (const selector of used) expect([...allowlist]).toContain(selector);
+  });
+
+  it("uses the action accent for native range, radio and checkbox controls", () => {
+    const native = rules.find(
+      (rule) => rule.selector.includes('input[type="range"]') && rule.selector.includes("radio"),
+    );
+    expect(native?.selector).toContain('input[type="checkbox"]');
+    expect(native?.body).toContain("accent-color: var(--accent)");
+  });
+
+  it("emphasises live listings while terminal badges remain quiet outlines", () => {
+    const live = rules.find((rule) => rule.selector === ".badge-live");
+    const terminal = rules.find((rule) => rule.selector.includes(".badge-merged"));
+    expect(live?.body).toContain("background: var(--ink)");
+    expect(terminal?.body).toContain("border-color: var(--line)");
+    expect(terminal?.body).not.toContain("background:");
+  });
+
+  it("keeps links inside error summaries in the error hue", () => {
+    const errorLink = rules.find((rule) => rule.selector === ".state.error a");
+    expect(errorLink?.body).toContain("color: var(--bad)");
+    expect(errorLink?.body).toContain("text-decoration-thickness: 2px");
   });
 
   it("keeps the focus ring on the accent, at 2px, for everything focusable", () => {
@@ -341,12 +438,14 @@ describe("the accent never carries state", () => {
     }
   });
 
-  it("still resolves the hueless state tokens the submit form's stylesheet consumes", () => {
-    // `--ok`, `--warn` and `--bad` are referenced by `OpportunityForm.module.css`. They resolve to
-    // ink weights rather than a red/amber/green ramp: the accent is barred from state, and so is
-    // every other hue.
-    for (const token of ["--ok", "--warn", "--bad"]) {
-      expect(css).toMatch(new RegExp(`${token}:\\s*var\\(--ink`));
+  it("gives form errors and warnings fallback-backed hues while badges stay hueless", () => {
+    expect(css).toMatch(/--ok:\s*var\(--ink/);
+    for (const token of ["--warn", "--warn-soft", "--bad", "--bad-soft"]) {
+      const hex = new RegExp(`${token}:\\s*#[0-9a-f]{6};`);
+      const oklch = new RegExp(`${token}:\\s*oklch\\(`);
+      expect(css).toMatch(hex);
+      expect(css).toMatch(oklch);
+      expect(css.indexOf(`${token}: #`)).toBeLessThan(css.indexOf(`${token}: oklch`));
     }
     const form = readFileSync(
       join(process.cwd(), "src", "components", "OpportunityForm.module.css"),

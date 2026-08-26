@@ -11,15 +11,20 @@
  * namespace this account publishes for. The second is what a granted claim transfers — ownership
  * follows the namespace, not the original typist.
  */
-import { type SQL, and, count, desc, eq, inArray, or } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type OpportunityRow, accounts, auditLog, opportunities } from "../../../db/schema.js";
 import type { ManagedOpportunityView, ReviewDecisionSummaryView } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { paginate } from "../../shared/pagination.js";
 
+export type PublisherStatus = "merged" | "rejected" | "pending" | "hidden" | "live";
+
 export interface ManagedQuery {
+  id?: string;
   reviewStatus?: "pending" | "approved" | "rejected";
+  publisherStatus?: PublisherStatus;
   page?: number;
   limit?: number;
 }
@@ -68,13 +73,31 @@ export class ManagedOpportunityService {
     const { page, limit, offset } = paginate(query.page ?? 1, query.limit ?? 20);
     const where = and(
       scope,
+      query.id !== undefined ? eq(opportunities.publicId, query.id) : undefined,
       query.reviewStatus ? eq(opportunities.reviewStatus, query.reviewStatus) : undefined,
+      publisherStatusPredicate(query.publisherStatus),
     );
 
+    const survivor = alias(opportunities, "managed_survivor");
+
     const rows = await this.db
-      .select({ opportunity: opportunities, submitterHandle: accounts.handle })
+      .select({
+        opportunity: opportunities,
+        submitterHandle: accounts.handle,
+        survivor: {
+          id: survivor.publicId,
+          // The merge audit already entitles an owner to the survivor's id. Its current title is
+          // public data only while the survivor itself satisfies the public-read invariant.
+          title: sql<string | null>`case
+            when ${survivor.reviewStatus} = 'approved' and ${survivor.isListed}
+            then ${survivor.title}
+            else null
+          end`,
+        },
+      })
       .from(opportunities)
       .leftJoin(accounts, eq(accounts.id, opportunities.submittedBy))
+      .leftJoin(survivor, eq(survivor.id, opportunities.mergedIntoId))
       .where(where)
       .orderBy(desc(opportunities.updatedAt), desc(opportunities.id))
       .limit(limit)
@@ -86,7 +109,12 @@ export class ManagedOpportunityService {
 
     return {
       items: rows.map((row) =>
-        toManagedView(row.opportunity, row.submitterHandle, decisions.get(row.opportunity.id)),
+        toManagedView(
+          row.opportunity,
+          row.submitterHandle,
+          row.survivor,
+          decisions.get(row.opportunity.id),
+        ),
       ),
       page,
       limit,
@@ -163,9 +191,35 @@ export class ManagedOpportunityService {
   }
 }
 
+/** The five mutually exclusive publisher states. Merged and rejected facts take precedence. */
+function publisherStatusPredicate(status: PublisherStatus | undefined): SQL | undefined {
+  if (status === undefined) return undefined;
+  switch (status) {
+    case "merged":
+      return isNotNull(opportunities.mergedIntoId);
+    case "rejected":
+      return and(isNull(opportunities.mergedIntoId), eq(opportunities.reviewStatus, "rejected"));
+    case "pending":
+      return and(isNull(opportunities.mergedIntoId), eq(opportunities.reviewStatus, "pending"));
+    case "hidden":
+      return and(
+        isNull(opportunities.mergedIntoId),
+        eq(opportunities.reviewStatus, "approved"),
+        eq(opportunities.isListed, false),
+      );
+    case "live":
+      return and(
+        isNull(opportunities.mergedIntoId),
+        eq(opportunities.reviewStatus, "approved"),
+        eq(opportunities.isListed, true),
+      );
+  }
+}
+
 export function toManagedView(
   row: OpportunityRow,
   submitterHandle: string | null,
+  mergedInto: { id: string; title: string | null } | null,
   lastDecision?: ReviewDecisionSummaryView,
 ): ManagedOpportunityView {
   return {
@@ -179,6 +233,9 @@ export function toManagedView(
     // The stored attribution string, falling back to the submitting account's handle: an entry
     // published as an organisation is credited to the organisation, and that is what belongs here.
     submittedBy: row.sourceSubmittedBy ?? submitterHandle,
+    // Attribution text is not identity: an organisation slug can replace the account handle above.
+    submittedByAccountId: row.submittedBy,
+    mergedInto,
     lastDecision: lastDecision ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

@@ -43,7 +43,10 @@ describe("in-browser validation against the Standard", () => {
     const result = validateDocument(conformant);
 
     expect(result.available).toBe(true);
-    if (result.available) expect(result.errors).toEqual([]);
+    if (result.available) {
+      expect(result.errors).toEqual([]);
+      expect(result.issues).toEqual([]);
+    }
   });
 
   it("reports a violation as a humanized sentence rather than a raw ajv error", () => {
@@ -52,6 +55,9 @@ describe("in-browser validation against the Standard", () => {
     expect(result.available).toBe(true);
     if (result.available) {
       expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.issues).toEqual(
+        expect.arrayContaining([expect.objectContaining({ path: "/title" })]),
+      );
       // The humanizer names the field. A bare "must be string" with no path is what this replaced.
       expect(result.errors.join(" ")).toContain("title");
     }

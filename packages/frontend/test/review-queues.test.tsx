@@ -4,13 +4,13 @@
  * Three properties are worth holding here, and none of them is visible in an API test:
  *
  *   1. NOTHING CONSEQUENTIAL FIRES ON THE FIRST CLICK. Approving publishes a stranger's listing to
- *      the world; verifying an organisation hands publishing rights to everyone in it, including
+ *      the world; verifying an organization hands publishing rights to everyone in it, including
  *      people added later. The confirmations are asserted for their WORDS — "this is not a badge; it
  *      is a grant of publishing power" is the entire reason the panel exists.
  *   2. A REFUSAL CARRIES A REASON. The API allows a reviewer to refuse without one; this UI does
  *      not, because the reason is the only thing that tells a submitter what to fix.
- *   3. THE ORGANISATIONS TAB IS SEARCH-FIRST. The directory auto-registers a stub for every
- *      organisation any listing merely names, so an unfiltered list is hundreds of names nobody
+ *   3. THE ORGANIZATIONS TAB IS SEARCH-FIRST. The directory auto-registers a stub for every
+ *      organization any listing merely names, so an unfiltered list is hundreds of names nobody
  *      vouched for — and verifying the wrong row from it grants a namespace to whoever is added
  *      next. Stubs must not appear until somebody searches for one.
  */
@@ -18,8 +18,16 @@ import ReviewPage from "@/app/review/page";
 import type { ApiClient } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { Me, OrganizationSummary } from "@/lib/types";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type {
+  AccountSummary,
+  DuplicatePair,
+  Me,
+  MembershipInvite,
+  Opportunity,
+  OrganizationSummary,
+} from "@/lib/types";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session, tab, replace } = vi.hoisted(() => ({
@@ -39,6 +47,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
   useSearchParams: () => new URLSearchParams(tab.current ? `tab=${tab.current}` : ""),
   usePathname: () => "/review",
+}));
+
+vi.mock("next/link", () => ({
+  default: ({ replace: shouldReplace, ...props }: ComponentProps<"a"> & { replace?: boolean }) => (
+    <a {...props} data-replace={shouldReplace ? "true" : undefined} />
+  ),
 }));
 
 const me: Me = {
@@ -66,6 +80,8 @@ const pending = {
   isListed: false,
   namespace: "indie-collective",
   submittedBy: "indie2",
+  submittedByAccountId: 2,
+  mergedInto: null,
   lastDecision: null,
   createdAt: "2026-08-01T00:00:00Z",
   updatedAt: "2026-08-01T00:00:00Z",
@@ -90,6 +106,47 @@ const verifiedOrg = org({
   memberCount: 2,
 });
 const stub = org({ slug: "0g", name: "0G", memberCount: 0 });
+const duplicatePair: DuplicatePair = {
+  id: 17,
+  status: "suspected",
+  similarity: 0.92,
+  detectedAt: "2026-08-24T00:00:00Z",
+  reviewedAt: null,
+  left: {
+    id: "acme:survivor",
+    title: "Acme Grants",
+    reviewStatus: "approved",
+    isListed: true,
+    namespace: "acme",
+    mergedInto: null,
+    updatedAt: "2026-08-24T00:00:00Z",
+  },
+  right: {
+    id: "legacy:loser",
+    title: "Legacy Acme Grants",
+    reviewStatus: "approved",
+    isListed: true,
+    namespace: "legacy",
+    mergedInto: null,
+    updatedAt: "2026-08-24T00:00:00Z",
+  },
+};
+
+const opportunity = (id: string, over: Partial<Opportunity> = {}): Opportunity =>
+  ({
+    specVersion: "1.0.0",
+    id,
+    fundingType: "grant",
+    title: id,
+    summary: null,
+    description: `Description for ${id}.`,
+    status: "open",
+    applicationUrl: null,
+    operatingOrganizations: [{ name: "Acme", slug: "acme" }],
+    source: {},
+    fundingDetails: { fundingType: "grant" },
+    ...over,
+  }) as Opportunity;
 
 const approve = vi.fn(async () => ({ id: "x", reviewStatus: "approved", isListed: true }));
 const reject = vi.fn(async () => ({ id: "x", reviewStatus: "rejected", isListed: false }));
@@ -100,24 +157,63 @@ const reviewOpportunity = vi.fn(async () => ({
   applicationUrl: "https://indie.example.org/apply",
 }));
 const verifyOrganization = vi.fn(async () => verifiedOrg);
+const verifySource = vi.fn(async () => ({
+  runAt: "2026-08-25T12:00:00Z",
+  requestedUrl: "https://indie.example.org/apply",
+  finalUrl: "https://indie.example.org/apply",
+  httpStatus: 200,
+  existsAtSource: true,
+  matched: true,
+  fieldDiff: null,
+  extracted: null,
+  snapshotSha256: null,
+  error: null,
+}));
 const grantMembership = vi.fn(async () => ({
   organizationSlug: "indie-collective",
   accountId: 42,
   role: "publisher",
   member: true,
 }));
-const accounts = vi.fn(async () => ({
-  items: [
-    {
-      id: 42,
-      handle: "fil-ops",
-      displayName: null,
-      globalRole: "submitter",
-      directCreate: false,
-      createdAt: "2026-02-01T00:00:00Z",
-    },
-  ],
-}));
+const inviteRows: { current: MembershipInvite[] } = { current: [] };
+const membershipInvites = vi.fn(async () => ({ items: inviteRows.current }));
+const inviteMembership = vi.fn(
+  async (slug: string, body: { email: string; role?: string }): Promise<MembershipInvite> => {
+    const invite: MembershipInvite = {
+      id: 91,
+      organizationSlug: slug,
+      email: body.email.toLowerCase(),
+      role: (body.role as MembershipInvite["role"] | undefined) ?? "publisher",
+      invitedBy: 1,
+      createdAt: "2026-08-26T12:00:00Z",
+      acceptedAt: null,
+      acceptedAccountId: null,
+    };
+    inviteRows.current = [...inviteRows.current, invite];
+    return invite;
+  },
+);
+const revokeMembershipInvite = vi.fn(async (_slug: string, inviteId: number) => {
+  const invite = inviteRows.current.find((row) => row.id === inviteId);
+  if (!invite) throw new Error("missing invite fixture");
+  inviteRows.current = inviteRows.current.filter((row) => row.id !== inviteId);
+  return invite;
+});
+const accounts = vi.fn(
+  async (): Promise<{ items: AccountSummary[] }> => ({
+    items: [
+      {
+        id: 42,
+        handle: "fil-ops",
+        displayName: null,
+        email: "ops@filecoin.example",
+        globalRole: "submitter",
+        directCreate: false,
+        createdAt: "2026-02-01T00:00:00Z",
+      },
+    ],
+  }),
+);
 const organizations = vi.fn(
   async (query?: { q?: string; verified?: boolean }): Promise<{ items: OrganizationSummary[] }> => {
     if (query?.verified === true) return { items: [verifiedOrg] };
@@ -127,10 +223,10 @@ const organizations = vi.fn(
   },
 );
 
-function client(): ApiClient {
+function client(account: Me = me): ApiClient {
   return {
     baseUrl: "https://api.example.com",
-    me: { get: async () => me },
+    me: { get: async () => account },
     /*
      * THE PUBLIC READ 404s A PENDING LISTING — which is the whole population of this queue. A panel
      * built on it could never once have shown the thing it exists to show, so the stub refuses it
@@ -157,51 +253,105 @@ function client(): ApiClient {
       reject,
       verifyOrganization,
       grantMembership,
+      membershipInvites,
+      inviteMembership,
+      revokeMembershipInvite,
       accounts,
       unverifyOrganization: vi.fn(),
-      verifySource: vi.fn(),
+      verifySource,
     },
   } as unknown as ApiClient;
 }
 
-const mount = () =>
+const mount = (account: Me = me) =>
   render(
-    <ApiClientProvider value={client()}>
+    <ApiClientProvider value={client(account)}>
       <ReviewPage />
     </ApiClientProvider>,
   );
 
 beforeEach(() => {
   vi.clearAllMocks();
+  inviteRows.current = [];
   tab.current = null;
 });
 
-describe("the tabs", () => {
+describe("the section navigation", () => {
   it("carries each queue's count, so a reviewer sees the backlog before opening it", async () => {
     mount();
 
-    expect(await screen.findByRole("tab", { name: "Submissions · 7" })).toBeTruthy();
-    await waitFor(() => expect(screen.getByRole("tab", { name: "Claims · 0" })).toBeTruthy());
-    expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Submissions · 7" })).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole("link", { name: "Claims · 0" })).toBeTruthy());
+    expect(screen.getByRole("link", { name: "Duplicates · 0 open" })).toBeTruthy();
   });
 
   it("reads the open tab from the URL, so a link to one lands on it", async () => {
+    tab.current = "organizations";
+    mount();
+
+    expect(
+      await screen.findByRole("link", { name: "Organizations", current: "page" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Submissions/ }).hasAttribute("aria-current")).toBe(
+      false,
+    );
+  });
+
+  it("accepts the old British tab value as an alias", async () => {
     tab.current = "organisations";
     mount();
 
-    expect(await screen.findByRole("tab", { name: "Organisations", selected: true })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: /Submissions/, selected: false })).toBeTruthy();
+    expect(
+      await screen.findByRole("link", { name: "Organizations", current: "page" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Organizations" }).getAttribute("href")).toBe(
+      "/review?tab=organizations",
+    );
   });
 
-  it("puts the tab in the address when one is chosen", async () => {
+  it("puts the section in the address and replaces rather than extending history", async () => {
     mount();
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Organisations" }));
-    expect(replace).toHaveBeenCalledWith("/review?tab=organisations");
+    const organizations = await screen.findByRole("link", { name: "Organizations" });
+    expect(organizations.getAttribute("href")).toBe("/review?tab=organizations");
+    expect(organizations.getAttribute("data-replace")).toBe("true");
   });
 });
 
 describe("deciding a submission", () => {
+  it("discloses a reviewer deciding their own submission in the row and confirmation", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    const api = client();
+    api.review.opportunities = async () => ({
+      items: [{ ...pending, submittedBy: "hub-reviewer", submittedByAccountId: me.accountId }],
+      page: 1,
+      limit: 50,
+      total: 1,
+      totalPages: 1,
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText(notice)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(
+      within(screen.getByRole("group", { name: "Publish “Indie Dev Grants”?" })).getByText(notice),
+    ).toBeTruthy();
+  });
+
+  it("does not show the self-review notice for another submitter", async () => {
+    const notice = "You submitted this listing. The decision will be recorded under your handle.";
+    mount();
+
+    await screen.findByText("Indie Dev Grants");
+    expect(screen.queryByText(notice)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve…" }));
+    expect(screen.queryByText(notice)).toBeNull();
+  });
+
   it("can reach submissions after the first fifty rows", async () => {
     const requestedPages: number[] = [];
     const api = client();
@@ -298,7 +448,14 @@ describe("deciding a submission", () => {
     // Both the row and the panel name the submitter; the panel is what is under test.
     expect(screen.getAllByText("indie2").length).toBeGreaterThan(1);
     expect(screen.getAllByText("indie-collective").length).toBeGreaterThan(1);
-    expect(screen.getByRole("button", { name: /Check the source link/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Check the source link/ }));
+    expect(await screen.findByText(/Source response: Page found \(HTTP 200\)/)).toBeTruthy();
+    const technical = screen
+      .getByText("Technical details")
+      .closest("details") as HTMLDetailsElement;
+    expect(technical.open).toBe(false);
+    expect(within(technical).getByText("HTTP status")).toBeTruthy();
+    expect(within(technical).getByText("200")).toBeTruthy();
   });
 
   it("does not publish on the first click", async () => {
@@ -306,16 +463,18 @@ describe("deciding a submission", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve…" }));
     expect(approve).not.toHaveBeenCalled();
-    expect(screen.getByText("Publish this listing?")).toBeTruthy();
+    expect(screen.getByText("Publish “Indie Dev Grants”?")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish it" }));
     await waitFor(() => expect(approve).toHaveBeenCalledWith("indie:grant-1"));
+    expect(await screen.findByText("“Indie Dev Grants” is published.")).toBeTruthy();
   });
 
   it("requires a reason to refuse, and sends it", async () => {
     mount();
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject…" }));
+    expect(screen.getByText("Refuse “Indie Dev Grants”?")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refuse it" })).toHaveProperty("disabled", true);
     expect(screen.getByText(/shown to whoever submitted it/)).toBeTruthy();
 
@@ -327,6 +486,63 @@ describe("deciding a submission", () => {
     await waitFor(() =>
       expect(reject).toHaveBeenCalledWith("indie:grant-1", "the application link 404s"),
     );
+    expect(await screen.findByText("“Indie Dev Grants” was refused and unlisted.")).toBeTruthy();
+  });
+});
+
+describe("deciding a claim", () => {
+  const claimNotice = "You filed this claim. The decision will be recorded under your handle.";
+  const claim = {
+    id: 12,
+    opportunityId: "indie:grant-1",
+    opportunityTitle: "Indie Dev Grants",
+    organizationSlug: "indie-collective",
+    organizationVerified: false,
+    claimedBy: "hub-reviewer",
+    claimedByAccountId: me.accountId,
+    status: "pending" as const,
+    note: "This is our programme.",
+    createdAt: "2026-08-20T00:00:00Z",
+    decidedAt: null,
+  };
+
+  it("discloses a reviewer deciding their own claim in the row and confirmation", async () => {
+    tab.current = "claims";
+    const api = client();
+    api.review.claims = async () => ({ items: [claim] });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText(claimNotice)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Approve and verify…" }));
+    expect(
+      within(
+        screen.getByRole("group", {
+          name: "Approve the claim and verify indie-collective?",
+        }),
+      ).getByText(claimNotice),
+    ).toBeTruthy();
+  });
+
+  it("does not show the self-review notice for another claimant", async () => {
+    tab.current = "claims";
+    const api = client();
+    api.review.claims = async () => ({
+      items: [{ ...claim, claimedBy: "someone-else", claimedByAccountId: 99 }],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    await screen.findByText("someone-else");
+    expect(screen.queryByText(claimNotice)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Approve and verify…" }));
+    expect(screen.queryByText(claimNotice)).toBeNull();
   });
 });
 
@@ -349,17 +565,434 @@ describe("the way back", () => {
     tab.current = "claims";
     mount();
 
-    fireEvent.click(await screen.findByRole("tab", { name: /Submissions/ }));
-    expect(replace).toHaveBeenCalledWith("/review");
+    const submissions = await screen.findByRole("link", { name: /Submissions/ });
+    expect(submissions.getAttribute("href")).toBe("/review");
+    expect(submissions.getAttribute("data-replace")).toBe("true");
 
-    fireEvent.click(screen.getByRole("tab", { name: /Duplicates/ }));
-    expect(replace).toHaveBeenCalledWith("/review?tab=duplicates");
+    const duplicates = screen.getByRole("link", { name: /Duplicates/ });
+    expect(duplicates.getAttribute("href")).toBe("/review?tab=duplicates");
+    expect(duplicates.getAttribute("data-replace")).toBe("true");
   });
 });
 
-describe("the organisations tab", () => {
+describe("merging duplicates", () => {
+  it("says the loser's public link will forward to the survivor", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Merge…" }));
+    const panel = screen.getByRole("group", { name: "Merge these two listings?" });
+    expect(panel.textContent).toContain("Acme Grants — acme:survivor survives");
+    expect(panel.textContent).toContain("Legacy Acme Grants — legacy:loser is rejected");
+    expect(panel.textContent).toContain(
+      "leaves the public directory and its public link forwards to the survivor",
+    );
+  });
+
+  it("loads both open statuses with explicit limits, then filters and sorts the loaded page", async () => {
+    tab.current = "duplicates";
+    const requested: Array<{ status?: string; limit?: number } | undefined> = [];
+    const api = client();
+    api.review.duplicates = async (query) => {
+      requested.push(query);
+      if (query?.status === "suspected") {
+        return {
+          items: [
+            {
+              ...duplicatePair,
+              id: 18,
+              similarity: 0.84,
+              left: { ...duplicatePair.left, title: "Below" },
+            },
+            {
+              ...duplicatePair,
+              id: 19,
+              similarity: 0.88,
+              left: { ...duplicatePair.left, title: "Second" },
+            },
+          ],
+        };
+      }
+      if (query?.status === "confirmed") {
+        return {
+          items: [
+            {
+              ...duplicatePair,
+              id: 20,
+              status: "confirmed",
+              similarity: 0.96,
+              left: { ...duplicatePair.left, title: "First" },
+            },
+          ],
+        };
+      }
+      return { items: [] };
+    };
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("First")).toBeTruthy();
+    expect(requested).toEqual(
+      expect.arrayContaining([
+        { status: "suspected", limit: 200 },
+        { status: "confirmed", limit: 200 },
+      ]),
+    );
+    expect(screen.queryByText("Below")).toBeNull();
+    expect(screen.getByText(/2 of 3 open pairs loaded on this page/)).toBeTruthy();
+    const visibleCards = document.querySelectorAll(".card");
+    expect(visibleCards[0]?.textContent).toContain("First");
+    expect(visibleCards[1]?.textContent).toContain("Second");
+
+    fireEvent.click(screen.getByRole("button", { name: "1 below the threshold — show them" }));
+    expect(screen.getByText("Below")).toBeTruthy();
+  });
+
+  it("fetches full descriptions lazily from the reviewer detail routes", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const fetchOpportunity = vi.fn(async (id: string) =>
+      id === duplicatePair.left.id
+        ? opportunity(id, {
+            title: duplicatePair.left.title,
+            summary: "Current programme summary.",
+            description: "Current programme description.",
+            applicationUrl: "https://acme.example/apply",
+          })
+        : opportunity(id, {
+            title: duplicatePair.right.title,
+            fundingType: "rfp",
+            summary: "Legacy programme summary.",
+            description: "Legacy programme description.",
+            applicationUrl: "https://legacy.example/apply",
+          }),
+    );
+    api.review.opportunity = fetchOpportunity;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const compare = await screen.findByRole("button", { name: "Compare" });
+    expect(fetchOpportunity).not.toHaveBeenCalled();
+    fireEvent.click(compare);
+
+    await waitFor(() =>
+      expect(fetchOpportunity.mock.calls.map(([id]) => id)).toEqual([
+        duplicatePair.left.id,
+        duplicatePair.right.id,
+      ]),
+    );
+    expect(await screen.findByText("Current programme description.")).toBeTruthy();
+    expect(screen.getByText("Legacy programme description.")).toBeTruthy();
+    expect(screen.getByText("https://acme.example/apply")).toBeTruthy();
+    expect(screen.getAllByText("Different").length).toBeGreaterThan(0);
+    expect(screen.getByText("Description").querySelector(".badge")).toBeNull();
+  });
+
+  it("keeps a dismissed row in place and reopens it through Undo", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const dismiss = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "dismissed" as const,
+      reviewedAt: "2026-08-25T12:00:00Z",
+    }));
+    const reopen = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "suspected" as const,
+      reviewedAt: "2026-08-25T12:01:00Z",
+    }));
+    api.review.dismissDuplicate = dismiss;
+    api.review.reopenDuplicate = reopen;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Dismiss" }));
+
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 0 open", current: "page" })).toBeTruthy();
+    expect(screen.getByText("Decision saved.")).toBeTruthy();
+    expect(screen.queryByText(/undo it from Recently resolved/i)).toBeNull();
+    expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByRole("button", { name: "Confirm" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1 open", current: "page" })).toBeTruthy();
+    expect(reopen).toHaveBeenCalledWith(duplicatePair.id);
+  });
+
+  it("keeps action slots stable across confirmation and dismissal", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const confirm = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "confirmed" as const,
+      reviewedAt: "2026-08-25T12:00:00Z",
+    }));
+    const dismiss = vi.fn(async () => ({
+      ...duplicatePair,
+      status: "dismissed" as const,
+      reviewedAt: "2026-08-25T12:01:00Z",
+    }));
+    api.review.confirmDuplicate = confirm;
+    api.review.dismissDuplicate = dismiss;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const actionGroup = await screen.findByRole("group", {
+      name: `Actions for pair ${duplicatePair.id}`,
+    });
+    const actionLabels = () =>
+      within(actionGroup)
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+
+    expect(actionLabels()).toEqual(["Compare", "Confirm", "Dismiss", "Merge…"]);
+    fireEvent.click(within(actionGroup).getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("Confirmed", { selector: "strong" })).toBeTruthy();
+    expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(actionLabels()).toEqual(["Compare", "Confirmed", "Dismiss", "Merge…"]);
+    expect(within(actionGroup).getByRole("button", { name: "Confirmed" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    expect(screen.getByRole("link", { name: "Duplicates · 1 open", current: "page" })).toBeTruthy();
+
+    fireEvent.click(within(actionGroup).getByRole("button", { name: "Dismiss" }));
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(actionLabels()).toEqual(["Compare", "Confirm", "Dismiss", "Merge…"]);
+    expect(within(actionGroup).getByRole("button", { name: "Dismiss" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    expect(
+      screen.getByText("Decision saved. Undo returns this pair to Needs review, not to Confirmed."),
+    ).toBeTruthy();
+    expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
+  });
+
+  it("makes every enabled action on a directly loaded confirmed pair visibly act", async () => {
+    tab.current = "duplicates";
+    const confirmedPair: DuplicatePair = { ...duplicatePair, status: "confirmed" };
+    const api = client();
+    const dismiss = vi.fn(async () => ({ ...confirmedPair, status: "dismissed" as const }));
+    api.review.dismissDuplicate = dismiss;
+    api.review.opportunity = async (id) => opportunity(id);
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "confirmed" ? [confirmedPair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const actions = await screen.findByRole("group", {
+      name: `Actions for pair ${duplicatePair.id}`,
+    });
+    expect(within(actions).getByRole("button", { name: "Confirmed" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    for (const name of ["Compare", "Dismiss", "Merge…"]) {
+      expect(within(actions).getByRole("button", { name })).toHaveProperty("disabled", false);
+    }
+
+    fireEvent.click(within(actions).getByRole("button", { name: "Compare" }));
+    expect(await screen.findByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeTruthy();
+    fireEvent.click(within(actions).getByRole("button", { name: "Hide" }));
+    expect(screen.queryByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeNull();
+    fireEvent.click(within(actions).getByRole("button", { name: "Compare" }));
+    expect(await screen.findByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeTruthy();
+    fireEvent.click(within(actions).getByRole("button", { name: "Merge…" }));
+
+    expect(await screen.findByRole("group", { name: "Merge these two listings?" })).toBeTruthy();
+    expect(screen.queryByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeNull();
+    expect(within(actions).getByRole("button", { name: "Compare" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(actions).getByRole("button", { name: "Dismiss" }));
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
+  });
+
+  it("renders unavailable terminal-pair actions with native disabled attributes", async () => {
+    tab.current = "duplicates";
+    const dismissedPair: DuplicatePair = { ...duplicatePair, status: "dismissed" };
+    const api = client();
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "dismissed" ? [dismissedPair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const actions = await screen.findByRole("group", {
+      name: `Actions for pair ${duplicatePair.id}`,
+    });
+    expect(within(actions).getByRole("button", { name: "Compare" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+    for (const name of ["Confirm", "Dismiss", "Merge…"]) {
+      expect(within(actions).getByRole("button", { name })).toHaveProperty("disabled", true);
+    }
+  });
+
+  it("marks merge busy, then keeps a receipt without inventing copied fields", async () => {
+    tab.current = "duplicates";
+    const api = client();
+    const mergedPair = {
+      ...duplicatePair,
+      status: "merged" as const,
+      reviewedAt: "2026-08-25T12:00:00Z",
+      right: {
+        ...duplicatePair.right,
+        reviewStatus: "rejected" as const,
+        isListed: false,
+        mergedInto: duplicatePair.left.id,
+      },
+    };
+    let finishMerge!: (result: {
+      pair: DuplicatePair;
+      survivorId: string;
+      mergedId: string;
+      copiedFields: string[];
+    }) => void;
+    const merge = vi.fn(
+      () =>
+        new Promise<{
+          pair: DuplicatePair;
+          survivorId: string;
+          mergedId: string;
+          copiedFields: string[];
+        }>((resolve) => {
+          finishMerge = resolve;
+        }),
+    );
+    api.review.mergeDuplicate = merge;
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "suspected" ? [duplicatePair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Merge…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge them" }));
+
+    expect(screen.getByRole("button", { name: "Merging…" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Compare" })).toHaveProperty("disabled", true);
+
+    await act(async () => {
+      finishMerge({
+        pair: mergedPair,
+        survivorId: duplicatePair.left.id,
+        mergedId: duplicatePair.right.id,
+        copiedFields: [],
+      });
+    });
+
+    expect(
+      await screen.findByText((_, node) =>
+        Boolean(
+          node?.tagName === "STRONG" &&
+            node.textContent?.includes(`Merged into ${duplicatePair.left.id} · view`),
+        ),
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "view" })).toBeTruthy();
+    expect(screen.getByText("Acme Grants")).toBeTruthy();
+    expect(screen.queryByText(/Copied fields: none/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Duplicates · 0 open", current: "page" })).toBeTruthy();
+  });
+
+  it("restores dismissed and merged receipts from the explicitly bounded resolved page", async () => {
+    tab.current = "duplicates";
+    const mergedPair: DuplicatePair = {
+      ...duplicatePair,
+      status: "merged",
+      right: { ...duplicatePair.right, mergedInto: duplicatePair.left.id },
+    };
+    const dismissedPair: DuplicatePair = {
+      ...duplicatePair,
+      id: 18,
+      status: "dismissed",
+      reviewedAt: "2026-08-25T13:00:00Z",
+      left: { ...duplicatePair.left, title: "Dismissed Acme Grants" },
+    };
+    const requested: Array<{ status?: string; limit?: number } | undefined> = [];
+    const api = client();
+    const reopen = vi.fn(async () => ({ ...dismissedPair, status: "suspected" as const }));
+    api.review.reopenDuplicate = reopen;
+    api.review.duplicates = async (query) => {
+      requested.push(query);
+      if (query?.status === "dismissed") return { items: [dismissedPair] };
+      if (query?.status === "merged") return { items: [mergedPair] };
+      return { items: [] };
+    };
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("Recently resolved")).toBeTruthy();
+    expect(
+      await screen.findByText((_, node) =>
+        Boolean(
+          node?.tagName === "STRONG" &&
+            node.textContent?.includes(`Merged into ${duplicatePair.left.id} · view`),
+        ),
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Dismissed Acme Grants")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText(/pair 18 · Needs review/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Duplicates · 1 open", current: "page" })).toBeTruthy();
+    expect(reopen).toHaveBeenCalledWith(dismissedPair.id);
+    expect(requested).toContainEqual({ status: "dismissed", limit: 200 });
+    expect(requested).toContainEqual({ status: "merged", limit: 200 });
+  });
+});
+
+describe("the organizations tab", () => {
   beforeEach(() => {
-    tab.current = "organisations";
+    tab.current = "organizations";
   });
 
   it("separates what is verified from what merely has members", async () => {
@@ -371,14 +1004,30 @@ describe("the organisations tab", () => {
     expect(screen.getByText("Indie Collective")).toBeTruthy();
   });
 
+  it("links only organizations this reviewer belongs to", async () => {
+    mount({
+      ...me,
+      memberships: [
+        { slug: "filecoin", name: "Filecoin Foundation", role: "publisher", verified: true },
+      ],
+    });
+
+    const memberLink = await screen.findByRole("link", { name: "Filecoin Foundation" });
+    expect(memberLink.getAttribute("href")).toBe("/organizations/filecoin");
+    expect(screen.getByText("Indie Collective").closest("a")).toBeNull();
+  });
+
   it("hides directory stubs until somebody searches for one", async () => {
     mount();
 
     await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    expect(screen.getByLabelText(/Search organizations/).closest("form")?.className).toBe(
+      "search-row",
+    );
     // The stub is in the corpus and the API would return it — it must not be on screen unasked.
     expect(screen.queryByText("0G")).toBeNull();
 
-    fireEvent.change(screen.getByLabelText(/Search organisations/), { target: { value: "0g" } });
+    fireEvent.change(screen.getByLabelText(/Search organizations/), { target: { value: "0g" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => expect(screen.getByText("0G")).toBeTruthy());
@@ -398,8 +1047,13 @@ describe("the organisations tab", () => {
     expect(within(panel).getByText(/already-published listings stay published/)).toBeTruthy();
     expect(verifyOrganization).not.toHaveBeenCalled();
 
-    fireEvent.click(within(panel).getByRole("button", { name: "Verify organisation" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Verify organization" }));
     await waitFor(() => expect(verifyOrganization).toHaveBeenCalledWith("indie-collective"));
+    expect(
+      await screen.findByText(
+        "indie-collective is verified — its 1 member now publishes into that namespace without review.",
+      ),
+    ).toBeTruthy();
   });
 
   it("grants a membership, resolving the handle the reviewer knows to the id the API wants", async () => {
@@ -409,13 +1063,17 @@ describe("the organisations tab", () => {
     // By ROW: the Verified section renders first, so "the first Grant button" is Filecoin's.
     const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
-    fireEvent.change(screen.getByLabelText("Account handle or id"), {
+    expect(
+      screen.getByLabelText("Account handle, name, email or id").closest(".filters"),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
       target: { value: "fil-ops" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
 
     // The API takes an integer account id; a reviewer reading a claim knows the handle.
     await waitFor(() => expect(accounts).toHaveBeenCalledWith({ q: "fil-ops", limit: 10 }));
+    expect(await screen.findByText("1 account matches “fil-ops”.")).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Choose" }));
 
     expect(grantMembership).not.toHaveBeenCalled();
@@ -434,22 +1092,178 @@ describe("the organisations tab", () => {
      * unmounted tree. The grant worked and the feedback died — the worst shape for an action whose
      * only visible outcome is a member count going up by one.
      */
-    expect(await screen.findByText("fil-ops is now publisher of indie-collective.")).toBeTruthy();
+    expect(
+      await screen.findByText("fil-ops is now an organization publisher at indie-collective."),
+    ).toBeTruthy();
     // The panel is gone; the note is not.
     expect(screen.queryByText("Grant a membership on")).toBeNull();
   });
 
-  it("states the consequence differently for a verified organisation", async () => {
+  it("shows email below a handle and uses it instead of a useless account-number fallback", async () => {
+    accounts.mockResolvedValueOnce({
+      items: [
+        {
+          id: 42,
+          handle: "fil-ops",
+          displayName: "Filecoin Ops",
+          email: "ops@filecoin.example",
+          globalRole: "submitter",
+          directCreate: false,
+          createdAt: "2026-02-01T00:00:00Z",
+        },
+        {
+          id: 61,
+          handle: null,
+          displayName: null,
+          email: "new.person@example.org",
+          globalRole: "submitter",
+          directCreate: false,
+          createdAt: "2026-02-02T00:00:00Z",
+        },
+      ],
+    });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "person" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+
+    expect(await screen.findByText("ops@filecoin.example")).toBeTruthy();
+    const emailPrimary = screen.getByText("new.person@example.org");
+    expect(emailPrimary.closest(".row-title")).toBeTruthy();
+    expect(screen.queryByText("account 61")).toBeNull();
+  });
+
+  it("offers an email invite after an empty search, lists it, and revokes it", async () => {
+    accounts.mockResolvedValueOnce({ items: [] });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "New.Person@Example.org" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+
+    expect(
+      await screen.findByText("Invite by email instead", { selector: ".empty-title" }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByText(/The membership applies the first time they sign in with this email\./)
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Email")).toHaveProperty("value", "New.Person@Example.org");
+    fireEvent.change(screen.getByLabelText("Role"), { target: { value: "owner" } });
+    fireEvent.click(screen.getByRole("button", { name: "Invite by email instead" }));
+
+    await waitFor(() =>
+      expect(inviteMembership).toHaveBeenCalledWith("indie-collective", {
+        email: "New.Person@Example.org",
+        role: "owner",
+      }),
+    );
+    const pendingEmail = await screen.findByText("new.person@example.org");
+    const pendingRow = pendingEmail.closest("tr") as HTMLElement;
+    expect(within(pendingRow).getByText("Organization owner")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() =>
+      expect(revokeMembershipInvite).toHaveBeenCalledWith("indie-collective", 91),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("row", { name: /new\.person@example\.org/ })).toBeNull(),
+    );
+  });
+
+  it("clears a previous invite address before an empty handle search", async () => {
+    accounts.mockResolvedValueOnce({ items: [] }).mockResolvedValueOnce({ items: [] });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+
+    const search = screen.getByLabelText("Account handle, name, email or id");
+    fireEvent.change(search, { target: { value: "first.person@example.org" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    expect(await screen.findByLabelText("Email")).toHaveProperty(
+      "value",
+      "first.person@example.org",
+    );
+
+    fireEvent.change(search, { target: { value: "missing-handle" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    await waitFor(() =>
+      expect(screen.getByText("No account matches “missing-handle”.")).toBeTruthy(),
+    );
+    expect(screen.getByLabelText("Email")).toHaveProperty("value", "");
+    expect(screen.getByRole("button", { name: "Invite by email instead" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("pluralises account matches and omits an empty candidate table", async () => {
+    accounts
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 42,
+            handle: "fil-ops",
+            displayName: null,
+            globalRole: "submitter",
+            directCreate: false,
+            createdAt: "2026-02-01T00:00:00Z",
+          },
+          {
+            id: 43,
+            handle: "fil-ops-two",
+            displayName: null,
+            globalRole: "submitter",
+            directCreate: false,
+            createdAt: "2026-02-02T00:00:00Z",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ items: [] });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "fil-ops" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    expect(await screen.findByText("2 accounts match “fil-ops”.")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Account" })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "missing" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    expect(await screen.findByText("No account matches “missing”.")).toBeTruthy();
+    expect(screen.queryByRole("columnheader", { name: "Account" })).toBeNull();
+  });
+
+  it("states the consequence differently for a verified organization", async () => {
     mount();
     await waitFor(() => expect(screen.getByText("Filecoin Foundation")).toBeTruthy());
 
     const row = screen.getByText("Filecoin Foundation").closest("tr") as HTMLElement;
     fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
-    fireEvent.change(screen.getByLabelText("Account handle or id"), { target: { value: "42" } });
+    fireEvent.change(screen.getByLabelText("Account handle, name, email or id"), {
+      target: { value: "42" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Choose" }));
 
-    const panel = await screen.findByRole("group", { name: /Make account 42 a publisher/ });
-    // On a verified organisation the membership IS the grant — nothing else has to happen.
+    const panel = await screen.findByRole("group", {
+      name: /Make fil-ops an organization publisher/,
+    });
+    // On a verified organization the membership IS the grant — nothing else has to happen.
     expect(
       within(panel).getByText(/publish into the[\s\S]*immediately and without\s+review/),
     ).toBeTruthy();
@@ -459,7 +1273,7 @@ describe("the organisations tab", () => {
     mount();
 
     // The search box only exists once the account read has come back and the tab has rendered.
-    fireEvent.change(await screen.findByLabelText(/Search organisations/), {
+    fireEvent.change(await screen.findByLabelText(/Search organizations/), {
       target: { value: "0g" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -473,6 +1287,6 @@ describe("the organisations tab", () => {
 
     // Not a confirmation with a warning in it — a refusal with an instruction.
     expect(screen.getByText(/Grant a membership first/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Verify organisation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Verify organization" })).toBeNull();
   });
 });

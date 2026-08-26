@@ -13,7 +13,7 @@
  * absent, external, malformed and off-allowlist to the same `null`, so this component has exactly
  * two states.
  *
- * The label can be publisher-supplied (an organisation's name), so it renders as a text node like
+ * The label can be publisher-supplied (an organization's name), so it renders as a text node like
  * every other untrusted string here.
  */
 import { UntrustedText } from "@/components/UntrustedText";

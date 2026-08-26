@@ -1,5 +1,6 @@
 "use client";
 
+import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
  * The submit / replace form.
  *
@@ -27,10 +28,14 @@
  *    waiting to happen.
  */
 import styles from "@/components/OpportunityForm.module.css";
+import { PublisherJourney } from "@/components/PublisherJourney";
+import { UntrustedText } from "@/components/UntrustedText";
+import { PublisherStatusBadge } from "@/components/badges";
 import {
   CheckField,
   CheckList,
   Field,
+  type FieldChrome,
   Repeatable,
   Section,
   SelectField,
@@ -39,9 +44,16 @@ import {
   TextField,
   fieldId,
 } from "@/components/form-fields";
-import { ActionNote } from "@/components/states";
+import { ActionNote, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { describeDuplicateCheck } from "@/lib/format";
+import { describeDuplicateCheck, formatInstant, formatSimilarity } from "@/lib/format";
+import {
+  BEFORE_DRAFTS_CLEARED_EVENT,
+  canonicalForm,
+  readOpportunityDraft,
+  removeOpportunityDraft,
+  writeOpportunityDraft,
+} from "@/lib/opportunity-draft";
 import {
   ACCELERATOR_STAGES,
   BOUNTY_ASSET_TYPES,
@@ -82,17 +94,29 @@ import {
   emptyPrize,
   emptyRewardTier,
   emptySocialLink,
+  localTimeZoneDescription,
   moveRow,
   namespaceAuthority,
+  parseValidationIssueLine,
   removeRow,
   replaceRow,
   toDocument,
+  utcPreview,
+  validationPointerToFormPath,
 } from "@/lib/opportunity-form";
+import { fundingTypeLabel, opportunityStatusLabel, publisherStatus } from "@/lib/presentation";
 import { useApi } from "@/lib/session";
-import type { SubmissionResult } from "@/lib/types";
+import type { SubmissionResult, ValidationIssue } from "@/lib/types";
 import { validateDocument } from "@/lib/validate-client";
-import Link from "next/link";
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 /**
  * What to SHOW for the schema's tokens.
@@ -101,16 +125,8 @@ import { type ReactNode, useMemo, useState } from "react";
  * publisher to read the schema; the value stored is the token either way.
  */
 const LABELS: Readonly<Record<string, string>> = {
-  grant: "Grant",
-  hackathon: "Hackathon",
-  bounty: "Bounty",
-  accelerator: "Accelerator",
-  vc_fund: "VC fund",
-  rfp: "RFP",
-  upcoming: "Upcoming",
-  open: "Open",
-  closed: "Closed",
-  archived: "Archived",
+  ...Object.fromEntries(FUNDING_TYPES.map((value) => [value, fundingTypeLabel(value)])),
+  ...Object.fromEntries(STATUSES.map((value) => [value, opportunityStatusLabel(value)])),
   fixed: "Fixed date",
   rolling: "Rolling",
   task: "Task",
@@ -139,23 +155,115 @@ const LABELS: Readonly<Record<string, string>> = {
  * and a reviewer quoting a field name is talking about something the form does not name. So the
  * envelope section is "Funding information" (`fundingInfo`), the date section names `deadlines`
  * outright, and the type-specific section is "Funding details — <type>" (`fundingDetails`). The
- * purely organisational sections — what it is, who runs it, identity, reach — map to no single
+ * purely organizational sections — what it is, who runs it, identity, reach — map to no single
  * field and keep descriptive names.
  */
 const DETAILS_SUFFIX: Record<FundingType, string> = {
-  grant: "grant",
-  hackathon: "hackathon",
-  bounty: "bounty",
-  accelerator: "accelerator",
-  vc_fund: "VC fund",
-  rfp: "RFP",
+  grant: fundingTypeLabel("grant"),
+  hackathon: fundingTypeLabel("hackathon"),
+  bounty: fundingTypeLabel("bounty"),
+  accelerator: fundingTypeLabel("accelerator"),
+  vc_fund: fundingTypeLabel("vc_fund"),
+  rfp: fundingTypeLabel("rfp"),
 };
 
 const detailsTitle = (type: FundingType) => `Funding details — ${DETAILS_SUFFIX[type]}`;
 
+const ERROR_SUMMARY_ID = "form-error-summary";
+
+interface FormIssue {
+  /** Form path, `(root)`, or null when the issue cannot safely target a control. */
+  path: string | null;
+  message: string;
+  raw: string;
+}
+
+function mapValidationIssue(
+  issue: ValidationIssue,
+  raw: string,
+  fundingType: FundingType,
+): FormIssue {
+  return {
+    path: validationPointerToFormPath(issue.path, fundingType),
+    message: issue.message,
+    raw,
+  };
+}
+
+function issuesFromApi(error: ApiError, fundingType: FundingType): FormIssue[] {
+  if (error.issues.length === 0) {
+    return error.details.map((line) => {
+      const parsed = parseValidationIssueLine(line);
+      return {
+        ...parsed,
+        path: parsed.path ? validationPointerToFormPath(parsed.path, fundingType) : null,
+      };
+    });
+  }
+  const structured = error.issues.map((issue, index) =>
+    mapValidationIssue(
+      issue,
+      error.details[index] ?? `${issue.path} ${issue.message}`,
+      fundingType,
+    ),
+  );
+  const residue = error.details.slice(error.issues.length).map((line) => {
+    const parsed = parseValidationIssueLine(line);
+    return {
+      ...parsed,
+      path: parsed.path ? validationPointerToFormPath(parsed.path, fundingType) : null,
+    };
+  });
+  return [...structured, ...residue];
+}
+
+const FIELD_LABELS: Readonly<Record<string, string>> = {
+  id: "Listing id",
+  fundingType: "Funding type",
+  title: "Title",
+  summary: "Summary",
+  description: "Description",
+  status: "Application stage",
+  budget: "Budget",
+  allocated: "Allocated",
+  minAward: "Minimum award",
+  maxAward: "Maximum award",
+  opensAt: "Opens at",
+  postedAt: "Posted at",
+  operatingOrganizations: "Running organizations",
+  sponsoringOrganizations: "Sponsoring organizations",
+  programModel: "Programme model",
+};
+
+function issueLabel(path: string | null): string | null {
+  if (!path) return null;
+  if (path === "(root)") return "Whole form";
+  const parts = path.split(".");
+  const leaf = parts.at(-1) ?? path;
+  const plain =
+    FIELD_LABELS[path] ??
+    FIELD_LABELS[leaf] ??
+    leaf.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  const index = parts.findIndex((part) => /^\d+$/.test(part));
+  if (index > 0) {
+    const row = Number(parts[index]) + 1;
+    const group = parts[index - 1];
+    if (group === "operatingOrganizations" || group === "sponsoringOrganizations") {
+      return `Organization ${row} — ${plain}`;
+    }
+    if (group === "deadlines") return `Deadline ${row} — ${plain}`;
+    if (group === "socialLinks") return `Social link ${row} — ${plain}`;
+    if (group === "milestones") return `Milestone ${row} — ${plain}`;
+    if (group === "prizes") return `Prize ${row} — ${plain}`;
+    if (group === "rewardTiers") return `Reward tier ${row} — ${plain}`;
+  }
+  return plain.charAt(0).toUpperCase() + plain.slice(1);
+}
+
 export function OpportunityForm({
   initial,
   mode,
+  accountId,
   /** The stored record a replace is layered over. Empty on a create. */
   carried = {},
   /**
@@ -167,17 +275,121 @@ export function OpportunityForm({
 }: {
   initial: OpportunityFormState;
   mode: "create" | "edit";
+  /** Create drafts are isolated by the API account id; edit mode never persists a draft. */
+  accountId?: number;
   carried?: Record<string, unknown>;
   authority?: PublishAuthority;
 }) {
   const api = useApi();
   const [form, setForm] = useState<OpportunityFormState>(initial);
+  const initialForm = useRef(initial);
+  // `fromDocument(entry)` creates new row keys every time it is called. Capture the canonical
+  // initial state exactly once so a parent render cannot manufacture a dirty edit.
+  const initialSnapshot = useRef(canonicalForm(initial));
+  const latestForm = useRef(form);
+  latestForm.current = form;
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [serverErrors, setServerErrors] = useState<string[]>([]);
+  const [serverIssues, setServerIssues] = useState<FormIssue[]>([]);
+  const [serverValidationLines, setServerValidationLines] = useState<string[]>([]);
+  const [focusSummary, setFocusSummary] = useState(0);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
   const [result, setResult] = useState<SubmissionResult | null>(null);
+  const [draftPrompt, setDraftPrompt] = useState<{
+    form: OpportunityFormState;
+    savedAt: string;
+  } | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<
+    { kind: "saved"; savedAt: string } | { kind: "error" } | null
+  >(null);
+  const draftReadyRef = useRef(false);
+  const skipDraftCleanup = useRef(false);
+  const draftTimer = useRef<number | undefined>(undefined);
+  const { setBlocked } = useNavigationBlocker();
+
+  const dirty = canonicalForm(form) !== initialSnapshot.current;
+
+  const persistDraft = useCallback(
+    (report: boolean, current = latestForm.current) => {
+      if (mode !== "create" || accountId === undefined || !draftReadyRef.current) return;
+      if (canonicalForm(current) === initialSnapshot.current) {
+        removeOpportunityDraft(accountId);
+        if (report) setDraftStatus(null);
+        return;
+      }
+      const saved = writeOpportunityDraft(accountId, current);
+      if (report) {
+        setDraftStatus(saved.ok ? { kind: "saved", savedAt: saved.savedAt } : { kind: "error" });
+      }
+    },
+    [accountId, mode],
+  );
+
+  useLayoutEffect(() => {
+    if (mode !== "create" || accountId === undefined) return;
+
+    const stored = readOpportunityDraft(accountId);
+    if (stored.kind === "draft") {
+      // A session refresh may reuse this component after a previous account made draft persistence
+      // ready. Re-enter the choice state explicitly: keep the stored form out of the controls and
+      // prevent the debounce from overwriting it until the publisher restores or discards it.
+      draftReadyRef.current = false;
+      setDraftReady(false);
+      setForm(initialForm.current);
+      setDraftPrompt(stored);
+      setDraftStatus({ kind: "saved", savedAt: stored.savedAt });
+    } else {
+      draftReadyRef.current = true;
+      setDraftReady(true);
+      if (stored.kind === "error") setDraftStatus({ kind: "error" });
+    }
+
+    const beforeClear = () => {
+      if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+      persistDraft(false);
+      // `clearAllOpportunityDrafts()` now removes the just-flushed key. The form unmount cleanup
+      // must not recreate it after logout invalidates the session.
+      skipDraftCleanup.current = true;
+    };
+    window.addEventListener(BEFORE_DRAFTS_CLEARED_EVENT, beforeClear);
+
+    return () => {
+      window.removeEventListener(BEFORE_DRAFTS_CLEARED_EVENT, beforeClear);
+      if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+      // Layout cleanup is synchronous: a normal route unmount cannot outrun the debounce and lose
+      // the publisher's last keystrokes.
+      if (!skipDraftCleanup.current) persistDraft(false);
+    };
+  }, [accountId, mode, persistDraft]);
+
+  useEffect(() => {
+    if (mode !== "create" || accountId === undefined || !draftReady) return;
+    if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+    draftTimer.current = window.setTimeout(() => persistDraft(true, form), 500);
+    return () => {
+      if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+    };
+  }, [accountId, draftReady, form, mode, persistDraft]);
+
+  useLayoutEffect(() => {
+    setBlocked(dirty && result === null);
+    return () => setBlocked(false);
+  }, [dirty, result, setBlocked]);
+
+  useEffect(() => {
+    if (!dirty || result) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+    // Browser Back/Forward is intentionally not trapped: App Router has no complete supported
+    // blocker for it, and a popstate/history trap is brittle. Links and unloads are covered here.
+  }, [dirty, result]);
 
   // The stored record is the BASE the edited fields are written over, not a set of leftovers
   // merged after the fact: a shallow merge cannot preserve the members of a container this form
@@ -196,13 +408,43 @@ export function OpportunityForm({
   const document = built.document;
   const validation = useMemo(() => validateDocument(document), [document]);
 
+  const friendlyIssues: FormIssue[] = Object.entries(built.fieldProblems).map(
+    ([path, message]) => ({ path, message, raw: message }),
+  );
+  const friendlyPaths = new Set(Object.keys(built.fieldProblems));
+  const standardIssues: FormIssue[] = validation.available
+    ? validation.issues
+        .map((issue, index) =>
+          mapValidationIssue(
+            issue,
+            validation.errors[index] ?? `${issue.path} ${issue.message}`,
+            form.fundingType,
+          ),
+        )
+        // Prefer the form's direct, task-specific wording when both validators found the same field.
+        .filter((issue) => issue.path === null || !friendlyPaths.has(issue.path))
+    : [];
+  const localIssues = [...friendlyIssues, ...standardIssues];
+  const localProblems = new Map(
+    [...friendlyIssues, ...standardIssues]
+      .filter((issue): issue is FormIssue & { path: string } => Boolean(issue.path))
+      .map((issue) => [issue.path, issue.message]),
+  );
+  const serverProblems = new Map(
+    serverIssues
+      .filter((issue): issue is FormIssue & { path: string } => Boolean(issue.path))
+      .map((issue) => [issue.path, issue.message]),
+  );
+
   const touch = (path: string) =>
     setTouched((current) => (current.has(path) ? current : new Set(current).add(path)));
 
   /** The chrome every field shares: its path, its problem if that problem is due, its blur. */
   const at = (path: string) => ({
     path,
-    problem: attempted || touched.has(path) ? built.fieldProblems[path] : undefined,
+    problem:
+      serverProblems.get(path) ??
+      (attempted || touched.has(path) ? localProblems.get(path) : undefined),
     // Advice is not gated on having pressed anything. A problem shown early is a scolding; a
     // consequence shown early is the only version of it that can still change the answer.
     advisory: built.fieldAdvisories[path],
@@ -237,11 +479,11 @@ export function OpportunityForm({
     }));
 
   /**
-   * EVERY change to the operating organisations goes through here, and that is the point.
+   * EVERY change to the operating organizations goes through here, and that is the point.
    *
-   * The primary organisation names the namespace, and it changes on a move or a remove exactly as
+   * The primary organization names the namespace, and it changes on a move or a remove exactly as
    * surely as on a keystroke in row 0. An earlier version regenerated the derived id only on the
-   * keystroke, so promoting another organisation left the id under the old namespace — and the
+   * keystroke, so promoting another organization left the id under the old namespace — and the
    * form's own error then told the publisher to do the thing they had just done.
    *
    * A hand-typed id is never touched: `idDirty` is the whole guard, and it is set the moment
@@ -275,25 +517,54 @@ export function OpportunityForm({
    */
   const advisories = [...built.advisories, ...(validation.available ? validation.warnings : [])];
 
-  const localErrors = [...built.problems, ...(validation.available ? validation.errors : [])];
+  const visibleIssues = [...(attempted ? localIssues : []), ...serverIssues];
+  const technicalValidationLines = [
+    ...new Set([
+      ...(attempted && validation.available ? validation.errors : []),
+      ...serverValidationLines,
+    ]),
+  ];
+
+  const clearServerIssue = (path: string) => {
+    const clearedLines = new Set(
+      serverIssues.filter((issue) => issue.path === path).map((issue) => issue.raw),
+    );
+    if (clearedLines.size === 0) return;
+    setServerIssues((current) => current.filter((issue) => issue.path !== path));
+    setServerValidationLines((current) => current.filter((line) => !clearedLines.has(line)));
+  };
+
+  useEffect(() => {
+    if (focusSummary === 0) return;
+    errorSummaryRef.current?.focus();
+  }, [focusSummary]);
 
   const send = async () => {
     setBusy(true);
     setNote(null);
-    setServerErrors([]);
+    setServerIssues([]);
+    setServerValidationLines([]);
     try {
       const response =
         mode === "create"
           ? await api.opportunities.create(document)
           : await api.opportunities.replace(form.id, document);
+      if (mode === "create" && accountId !== undefined) {
+        skipDraftCleanup.current = true;
+        if (draftTimer.current !== undefined) window.clearTimeout(draftTimer.current);
+        removeOpportunityDraft(accountId);
+      }
+      if (mode === "edit") initialSnapshot.current = canonicalForm(form);
       setResult(response);
     } catch (error) {
       if (error instanceof ApiError) {
-        setServerErrors(error.details);
-        setNote({ kind: "error", message: `${error.message} (${error.code})` });
+        setServerIssues(issuesFromApi(error, form.fundingType));
+        setServerValidationLines(error.details);
+        setNote(actionErrorNote(error, "The submission could not be sent."));
       } else {
-        setNote({ kind: "error", message: "The submission could not be sent." });
+        setNote(actionErrorNote(error, "The submission could not be sent."));
       }
+      setFocusSummary((current) => current + 1);
     } finally {
       setBusy(false);
     }
@@ -309,10 +580,14 @@ export function OpportunityForm({
         onAgain={() => {
           setResult(null);
           setNote(null);
-          setServerErrors([]);
+          setServerIssues([]);
+          setServerValidationLines([]);
           setAttempted(false);
           setTouched(new Set());
-          if (mode === "create") setForm(emptyForm());
+          if (mode === "create") {
+            skipDraftCleanup.current = false;
+            setForm(emptyForm());
+          }
         }}
       />
     );
@@ -324,17 +599,68 @@ export function OpportunityForm({
     <form
       className={styles.form}
       noValidate
+      onChangeCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const path = target.closest<HTMLElement>("[data-field-path]")?.dataset.fieldPath;
+        if (path) clearServerIssue(path);
+      }}
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
         // Pressing Submit is how a publisher asks what is wrong. It answers, and does not send.
-        if (localErrors.length > 0) return;
+        if (localIssues.length > 0) {
+          setFocusSummary((current) => current + 1);
+          return;
+        }
         void send();
       }}
     >
+      {draftPrompt ? (
+        <div className="state">
+          <p>
+            <strong>Draft saved on this device</strong> on {formatInstant(draftPrompt.savedAt)}.
+          </p>
+          <p className="row">
+            <button
+              type="button"
+              className="button-primary"
+              onClick={() => {
+                setForm(draftPrompt.form);
+                setDraftPrompt(null);
+                draftReadyRef.current = true;
+                setDraftReady(true);
+              }}
+            >
+              Restore draft
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (accountId !== undefined && !removeOpportunityDraft(accountId)) {
+                  setDraftStatus({ kind: "error" });
+                } else {
+                  setDraftStatus(null);
+                }
+                setDraftPrompt(null);
+                draftReadyRef.current = true;
+                setDraftReady(true);
+              }}
+            >
+              Discard draft
+            </button>
+          </p>
+        </div>
+      ) : null}
+
+      <p className={styles.requiredLegend}>
+        <span aria-hidden="true">*</span> Required
+      </p>
+
       <Section title="What is it">
         <TextField
           {...at("title")}
+          required
           label="Title"
           hint="The name the programme is published under."
           maxLength={300}
@@ -344,8 +670,9 @@ export function OpportunityForm({
         <div className={styles.cols}>
           <SelectField
             {...at("fundingType")}
+            required
             label="Funding type"
-            hint={`Decides the shape of the funding-details section below — currently ${DETAILS_SUFFIX[form.fundingType]}.`}
+            hint={`Decides the details requested for this funding type below — currently ${DETAILS_SUFFIX[form.fundingType]}.`}
             options={FUNDING_TYPES}
             labels={LABELS}
             value={form.fundingType}
@@ -364,6 +691,7 @@ export function OpportunityForm({
         </div>
         <TextArea
           {...at("description")}
+          required
           label="Description"
           hint="Markdown is permitted by the Standard. This frontend renders it as plain text everywhere, deliberately — see the README."
           rows={7}
@@ -373,20 +701,23 @@ export function OpportunityForm({
       </Section>
 
       <Section title="Who runs it">
+        <p className={styles.requiredLegend}>
+          Running organizations <span aria-hidden="true">*</span>
+        </p>
         <p className="hint">
-          The organisations that actually run the intake — not necessarily who pays. The first one
+          The organizations that actually run the intake — not necessarily who pays. The first one
           is the primary: it is the one displayed, and its slug is the namespace this listing
           publishes under.
         </p>
         <Repeatable
-          name="operating organisations"
+          name="operating organizations"
           rows={form.operatingOrganizations}
-          addLabel="+ Add an operating organisation"
+          addLabel="+ Add an operating organization"
           onAdd={() => withOperating((rows) => [...rows, emptyOrganization()])}
           onRemove={(index) => withOperating((rows) => removeRow(rows, index))}
           onMove={(index, direction) => withOperating((rows) => moveRow(rows, index, direction))}
           rowLabel={(row, index) =>
-            index === 0 ? "Primary organisation" : row.name.trim() || `Organisation ${index + 1}`
+            index === 0 ? "Primary organization" : row.name.trim() || `Organization ${index + 1}`
           }
         >
           {(row, index) => (
@@ -403,14 +734,14 @@ export function OpportunityForm({
         ) : null}
 
         <p className="hint">
-          Sponsoring organisations issue or back the opportunity. Leave this empty when the operator
+          Sponsoring organizations issue or back the opportunity. Leave this empty when the operator
           is the only party to name.
         </p>
         <Repeatable
-          name="sponsoring organisations"
+          name="sponsoring organizations"
           rows={form.sponsoringOrganizations}
-          addLabel="+ Add a sponsoring organisation"
-          emptyLabel="No sponsoring organisation named."
+          addLabel="+ Add a sponsoring organization"
+          emptyLabel="No sponsoring organization named."
           onAdd={() =>
             set("sponsoringOrganizations", [...form.sponsoringOrganizations, emptyOrganization()])
           }
@@ -438,6 +769,7 @@ export function OpportunityForm({
       <Section title="Identity">
         <TextField
           {...at("id")}
+          required
           label={
             mode === "edit" ? (
               <>
@@ -452,7 +784,7 @@ export function OpportunityForm({
           hint={
             mode === "edit"
               ? "An id is immutable. Everything that has ever linked to this listing links to this string."
-              : "Proposed from the primary organisation's slug and the title. Edit it if you already have a key for this programme."
+              : "Proposed from the primary organization's slug and the title. Edit it if you already have a key for this programme."
           }
           readOnly={mode === "edit"}
           maxLength={128}
@@ -462,6 +794,7 @@ export function OpportunityForm({
         {consequence ? (
           <p
             className={[
+              "callout",
               styles.consequence,
               consequence.immediate === true ? styles.consequenceNow : undefined,
               consequence.immediate === false ? styles.consequenceLater : undefined,
@@ -482,6 +815,7 @@ export function OpportunityForm({
         ) : null}
         <SelectField
           {...at("status")}
+          required
           label="Status"
           hint="'upcoming' is also the value for a posting made before the intake opens — there is no draft status."
           options={STATUSES}
@@ -492,12 +826,13 @@ export function OpportunityForm({
       </Section>
 
       <Section title="Funding information">
-        <div className={styles.cols}>
+        <div className={`${styles.cols} ${styles.fundingGrid}`}>
           <TextField
             {...at("currency")}
             className={styles.narrow}
             label="Currency"
             optional
+            hint="One currency for the whole listing — the reward table, milestones and prizes below all read it from here."
             maxLength={16}
             placeholder="USD"
             value={form.currency}
@@ -506,33 +841,35 @@ export function OpportunityForm({
           <NumberField
             {...at("budget")}
             label="Total budget"
+            optional
             value={form.budget}
             onChange={(value) => set("budget", value)}
           />
           <NumberField
             {...at("allocated")}
             label="Committed"
+            optional
+            hint="What has been promised to date, not what has been paid."
             value={form.allocated}
             onChange={(value) => set("allocated", value)}
           />
+        </div>
+        <div className={`${styles.cols} ${styles.fundingGrid}`}>
           <NumberField
             {...at("minAward")}
             label="Min award"
+            optional
             value={form.minAward}
             onChange={(value) => set("minAward", value)}
           />
           <NumberField
             {...at("maxAward")}
             label="Max award"
+            optional
             value={form.maxAward}
             onChange={(value) => set("maxAward", value)}
           />
         </div>
-        <p className="hint">
-          One currency for the whole listing — the reward table, milestones and prizes below all
-          read it from here. &lsquo;Committed&rsquo; is what has been promised to date, not what has
-          been paid.
-        </p>
 
         <p className="hint">
           Milestones, in sequence. Their order is the only thing that orders them.
@@ -565,12 +902,14 @@ export function OpportunityForm({
           <MomentField
             {...at("opensAt")}
             label="Applications open"
+            optional
             value={form.opensAt}
             onChange={(value) => set("opensAt", value)}
           />
           <MomentField
             {...at("postedAt")}
             label="First announced"
+            optional
             value={form.postedAt}
             onChange={(value) => set("postedAt", value)}
           />
@@ -722,6 +1061,7 @@ export function OpportunityForm({
             <CheckList
               path="details.grant.fundingMechanisms"
               legend="Funding mechanisms"
+              optional
               hint="More than one is normal: a funder can offer a fixed grant and a matching grant in the same programme."
               options={FUNDING_MECHANISMS}
               selected={details.grant.fundingMechanisms}
@@ -729,7 +1069,7 @@ export function OpportunityForm({
             />
             <SuggestField
               {...at("details.grant.programModel")}
-              label="Program model"
+              label="Programme model"
               optional
               hint="The operating model, as distinct from the funding instrument. The listed values are conventional, not exhaustive — your own is valid."
               options={PROGRAM_MODELS}
@@ -740,12 +1080,14 @@ export function OpportunityForm({
               <TriField2
                 {...at("details.grant.milestoneBased")}
                 label="Paid against milestones"
+                optional
                 value={details.grant.milestoneBased}
                 onChange={(milestoneBased) => setDetails("grant", { milestoneBased })}
               />
               <TriField2
                 {...at("details.grant.recurring")}
                 label="Runs in recurring rounds"
+                optional
                 value={details.grant.recurring}
                 onChange={(recurring) => setDetails("grant", { recurring })}
               />
@@ -994,17 +1336,40 @@ export function OpportunityForm({
         ) : null}
       </Section>
 
-      {!validation.available ? <p className="note error">{validation.reason}</p> : null}
+      {!validation.available ? <p className="callout note error">{validation.reason}</p> : null}
 
-      {attempted && localErrors.length > 0 ? (
-        <div className="state error" role="alert">
+      {visibleIssues.length > 0 ? (
+        <div
+          className="callout state error"
+          role="alert"
+          id={ERROR_SUMMARY_ID}
+          ref={errorSummaryRef}
+          tabIndex={-1}
+        >
           <p>
-            <strong>Not conformant yet.</strong> Each of these is also marked next to its field.
+            <strong>
+              {serverIssues.length > 0
+                ? "We couldn’t submit this listing."
+                : "Fix these fields before submitting."}
+            </strong>{" "}
+            Linked items go to their field.
           </p>
           <ul>
-            {localErrors.map((problem) => (
-              <li key={problem}>{problem}</li>
-            ))}
+            {visibleIssues.map((issue, index) => {
+              const label = issueLabel(issue.path);
+              const target =
+                issue.path === "(root)"
+                  ? ERROR_SUMMARY_ID
+                  : issue.path
+                    ? fieldId(issue.path)
+                    : null;
+              const copy = label ? `${label}: ${issue.message}` : issue.message;
+              return (
+                <li key={`${issue.raw}-${index}`}>
+                  {target ? <a href={`#${target}`}>{copy}</a> : copy}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}
@@ -1012,8 +1377,7 @@ export function OpportunityForm({
       {advisories.length > 0 ? (
         <div className="state">
           <p>
-            <strong>Advisory warnings</strong> — the document is conformant with these, and they are
-            worth a look before it goes out.
+            <strong>Things to review</strong> — these notes do not block submission.
           </p>
           <ul>
             {advisories.map((warning) => (
@@ -1023,17 +1387,17 @@ export function OpportunityForm({
         </div>
       ) : null}
 
-      {serverErrors.length > 0 ? (
-        <div className="state error" role="alert">
-          <p>
-            <strong>The API rejected this document:</strong>
-          </p>
+      {technicalValidationLines.length > 0 ? (
+        <details>
+          <summary>Technical validation details</summary>
           <ul>
-            {serverErrors.map((problem) => (
-              <li key={problem}>{problem}</li>
+            {technicalValidationLines.map((line) => (
+              <li key={line}>
+                <code>{line}</code>
+              </li>
             ))}
           </ul>
-        </div>
+        </details>
       ) : null}
 
       <div className={styles.submitBar}>
@@ -1045,9 +1409,22 @@ export function OpportunityForm({
         <button type="submit" className="button-primary" disabled={busy}>
           {busy ? "Sending…" : mode === "create" ? "Submit" : "Replace"}
         </button>
+        {mode === "edit" ? (
+          <GuardedLink href={`/listings/${encodeURIComponent(form.id)}`}>Cancel</GuardedLink>
+        ) : null}
         <span className="muted footnote">
           Conformance is checked as you type; problems appear next to their field.
         </span>
+        {mode === "create" && !draftPrompt && draftStatus?.kind === "saved" ? (
+          <span className="muted footnote">
+            Draft saved on this device · {formatInstant(draftStatus.savedAt)}
+          </span>
+        ) : null}
+        {mode === "create" && draftStatus?.kind === "error" ? (
+          <span className="callout note error">
+            Draft saving is unavailable in this browser. Keep this page open until you submit.
+          </span>
+        ) : null}
         <ActionNote note={note} />
       </div>
     </form>
@@ -1079,6 +1456,7 @@ function OrganizationFields({
       <div className={styles.cols}>
         <TextField
           {...at(`${prefix}.name`)}
+          required
           className={styles.grow}
           label="Name"
           maxLength={256}
@@ -1087,8 +1465,9 @@ function OrganizationFields({
         />
         <TextField
           {...at(`${prefix}.slug`)}
+          required
           label="Slug"
-          hint="Lowercase, URL-safe. Also this organisation's namespace."
+          hint="Lowercase, URL-safe. Also this organization's namespace."
           value={row.slug}
           onChange={(slug) => onChange({ ...row, slug })}
         />
@@ -1096,7 +1475,7 @@ function OrganizationFields({
       <div className={styles.cols}>
         <SelectField
           {...at(`${prefix}.orgType`)}
-          label="Organisation kind"
+          label="Organization kind"
           optional
           options={ORG_TYPES}
           blank="not stated"
@@ -1174,6 +1553,7 @@ function DeadlineFields({
     <div className={styles.cols}>
       <SelectField
         {...at(`deadlines.${index}.deadlineType`)}
+        required
         label="Deadline kind"
         options={DEADLINE_TYPES}
         labels={LABELS}
@@ -1191,6 +1571,7 @@ function DeadlineFields({
       {row.deadlineType === "fixed" ? (
         <MomentField
           {...at(`deadlines.${index}.date`)}
+          required
           label="Date"
           value={row.date}
           onChange={(date) => onChange({ ...row, date })}
@@ -1230,6 +1611,7 @@ function SocialLinkFields({
     <div className={styles.cols}>
       <SelectField
         {...at(`socialLinks.${index}.platform`)}
+        required
         label="Platform"
         options={SOCIAL_PLATFORMS}
         value={row.platform}
@@ -1237,6 +1619,7 @@ function SocialLinkFields({
       />
       <TextField
         {...at(`socialLinks.${index}.url`)}
+        required
         className={styles.grow}
         label="URL"
         type="url"
@@ -1271,6 +1654,7 @@ function PrizeFields({
       />
       <NumberField
         {...at(`details.hackathon.prizes.${index}.amount`)}
+        required
         label="Amount"
         value={row.amount}
         onChange={(amount) => onChange({ ...row, amount })}
@@ -1305,6 +1689,7 @@ function BountyDetails({
       <div className={styles.cols}>
         <SelectField
           {...at("details.bounty.bountyKind")}
+          required
           label="Bounty kind"
           hint="Security bounties always pay against a reward table. A task bounty offers a single reward or a table — never both."
           options={BOUNTY_KINDS}
@@ -1342,6 +1727,7 @@ function BountyDetails({
         <>
           <SelectField
             {...at("details.bounty.rewardMode")}
+            required
             label="Compensation"
             hint="Exactly one of the two. Switching removes the other from the document — they are alternative descriptions of the same money."
             options={["single", "tiers"]}
@@ -1393,6 +1779,7 @@ function BountyDetails({
       ) : (
         <NumberField
           {...at("details.bounty.reward")}
+          required
           label="Reward"
           hint="Paid on completion, in the currency set under Funding information."
           value={bounty.reward}
@@ -1466,6 +1853,7 @@ function RewardTable({
                   <td>
                     <SelectField
                       {...at(`${base}.payout.model`)}
+                      required
                       label={
                         <span className="visually-hidden">Payout model, tier {index + 1}</span>
                       }
@@ -1542,18 +1930,20 @@ function PayoutAmounts({
   const amount = (
     member: "amount" | "min" | "max" | "percent" | "floor" | "cap",
     label: string,
-  ) => (
-    <NumberField
-      {...at(`${base}.${member}`)}
-      label={
+    required = false,
+  ) => {
+    const props = {
+      ...at(`${base}.${member}`),
+      label: (
         <span className="visually-hidden">
           {label}, tier {index + 1}
         </span>
-      }
-      value={payout[member]}
-      onChange={(value) => onChange({ ...row, payout: { ...payout, [member]: value } })}
-    />
-  );
+      ),
+      value: payout[member],
+      onChange: (value: string) => onChange({ ...row, payout: { ...payout, [member]: value } }),
+    };
+    return required ? <NumberField {...props} required /> : <NumberField {...props} />;
+  };
 
   if (payout.model === "discretionary") {
     return <span className="muted">Decided case by case — no figure.</span>;
@@ -1561,21 +1951,22 @@ function PayoutAmounts({
 
   return (
     <div className={styles.amounts}>
-      {payout.model === "fixed" ? amount("amount", "Amount") : null}
+      {payout.model === "fixed" ? amount("amount", "Amount", true) : null}
       {payout.model === "range" ? (
         <>
-          {amount("min", "Lower bound")}
+          {amount("min", "Lower bound", true)}
           <span aria-hidden="true">to</span>
-          {amount("max", "Upper bound")}
+          {amount("max", "Upper bound", true)}
         </>
       ) : null}
-      {payout.model === "up_to" ? amount("max", "Ceiling") : null}
+      {payout.model === "up_to" ? amount("max", "Ceiling", true) : null}
       {payout.model === "percentage" ? (
         <>
-          {amount("percent", "Percentage")}
+          {amount("percent", "Percentage", true)}
           <span aria-hidden="true">% of</span>
           <SelectField
             {...at(`${base}.basis`)}
+            required
             label={<span className="visually-hidden">Basis, tier {index + 1}</span>}
             options={PAYOUT_BASES}
             labels={LABELS}
@@ -1595,58 +1986,71 @@ function PayoutAmounts({
 // ── two thin wrappers, for the shapes used everywhere ───────────────────────────
 
 /** An amount or count input: right-aligned, decimal keypad, and never `type="number"` — see below. */
-function NumberField(props: {
-  path: string;
-  label: ReactNode;
-  hint?: ReactNode;
-  problem?: string;
-  optional?: boolean;
-  value: string;
-  onBlur?: () => void;
-  onChange: (value: string) => void;
-  className?: string;
-}) {
+function NumberField(
+  props: FieldChrome & {
+    value: string;
+    onBlur?: () => void;
+    onChange: (value: string) => void;
+    className?: string;
+  },
+) {
   // `type="number"` silently discards a value the browser considers malformed, which means the
   // publisher's typo becomes an empty field and the form has nothing to complain about. Text plus
   // `inputMode` gets the numeric keypad without the data loss.
   return <TextField {...props} inputMode="decimal" className={props.className} />;
 }
 
-/** A UTC instant. The Standard's timestamps are all UTC with a trailing `Z`. */
-function MomentField(props: {
-  path: string;
-  label: ReactNode;
-  hint?: ReactNode;
-  problem?: string;
+/** A local wall time, with the exact UTC instant visible before submission. */
+function MomentField({
+  value,
+  onChange,
+  onBlur,
+  hint,
+  ...chrome
+}: FieldChrome & {
   value: string;
   onBlur?: () => void;
   onChange: (value: string) => void;
 }) {
+  const preview = utcPreview(value);
+  const zone = localTimeZoneDescription(value);
   return (
-    <TextField
-      {...props}
-      type="datetime-local"
-      label={
+    <Field
+      {...chrome}
+      hint={
         <>
-          {props.label} <span className="muted">— UTC</span>
+          {hint ? <>{hint} </> : null}
+          Enter local time ({zone}).
         </>
       }
-    />
+    >
+      {(control) => (
+        <div className={styles.momentControl}>
+          <input
+            {...control}
+            type="datetime-local"
+            step={1}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+          />
+          {preview ? <span className={styles.utcPreview}>{preview}</span> : null}
+        </div>
+      )}
+    </Field>
   );
 }
 
 /** The three-state select. Named apart from the primitive so the import list stays readable. */
-function TriField2(props: {
-  path: string;
-  label: ReactNode;
-  hint?: ReactNode;
-  problem?: string;
-  value: Tri;
-  onChange: (value: Tri) => void;
-  onBlur?: () => void;
-}) {
+function TriField2(
+  props: FieldChrome & {
+    value: Tri;
+    onChange: (value: Tri) => void;
+    onBlur?: () => void;
+  },
+) {
   return (
-    <Field path={props.path} label={props.label} hint={props.hint} problem={props.problem}>
+    <Field {...props}>
       {(chrome) => (
         <select
           {...chrome}
@@ -1678,32 +2082,82 @@ function SubmissionOutcome({
   mode: "create" | "edit";
   onAgain: () => void;
 }) {
-  const published = result.reviewStatus === "approved" && result.isListed;
+  const [duplicatesAcknowledged, setDuplicatesAcknowledged] = useState(false);
+  const source = { mergedInto: null, reviewStatus: result.reviewStatus, isListed: result.isListed };
+  const status = publisherStatus(source);
+  const hasPublicPage = result.reviewStatus === "approved" && result.isListed;
+  const journey =
+    mode === "create" && result.reviewStatus === "pending"
+      ? { current: "review" as const, reviewSkipped: false }
+      : mode === "create" && result.reviewStatus === "approved" && result.isListed
+        ? { current: "live" as const, reviewSkipped: true }
+        : null;
   return (
     <output className={`card ${styles.outcome}`}>
       <h2>{result.created ? "Submitted." : "Replaced."}</h2>
-      <p>
-        {published
-          ? "Published — it is in the public reads now."
-          : result.reviewStatus === "pending"
-            ? "Stored as a pending submission. It is invisible to the public reads until a reviewer approves it; publishing immediately requires membership of a verified organisation for this namespace."
-            : `Stored with review status ${result.reviewStatus}.`}
-      </p>
-      <p>{describeDuplicateCheck(result.duplicateCheck, result.duplicates.length)}</p>
-      {result.duplicates.length > 0 ? (
-        <ul>
-          {result.duplicates.map((match) => (
-            <li key={match.id}>
-              <Link href={`/listings/${encodeURIComponent(match.id)}`}>{match.title}</Link>{" "}
-              <code>{match.id}</code>
-            </li>
-          ))}
-        </ul>
+      {journey ? (
+        <PublisherJourney current={journey.current} reviewSkipped={journey.reviewSkipped} />
       ) : null}
+      <p className="lede">
+        <strong>
+          <UntrustedText value={result.opportunity.title} />
+        </strong>
+      </p>
+      <p>
+        <PublisherStatusBadge source={source} />
+      </p>
+      <p>
+        {status === "live"
+          ? "Published — it is in the public directory now."
+          : status === "pending"
+            ? "Stored as a pending submission. It is hidden from the public directory until a Hub reviewer approves it; publishing immediately requires membership of a verified organization for this organization prefix."
+            : status === "hidden"
+              ? "Approved, but hidden from the public directory."
+              : status === "rejected"
+                ? "Rejected — it is not in the public directory."
+                : "Merged into another listing."}
+      </p>
+      {result.duplicates.length === 0 ? (
+        <p>{describeDuplicateCheck(result.duplicateCheck, 0)}</p>
+      ) : duplicatesAcknowledged ? (
+        <p className="muted">
+          Marked as a different programme on this screen. Reviewers will still see the possible
+          match.
+        </p>
+      ) : (
+        <section className={styles.duplicateWarning} aria-labelledby="duplicate-warning-heading">
+          <div className={styles.duplicateWarningHeading}>
+            <span aria-hidden="true">⚠</span>
+            <h3 id="duplicate-warning-heading">Possible duplicate</h3>
+          </div>
+          <p>{describeDuplicateCheck(result.duplicateCheck, result.duplicates.length)}</p>
+          <ul>
+            {result.duplicates.map((match) => (
+              <li key={match.id}>
+                <strong>{formatSimilarity(match.similarity)}</strong> —{" "}
+                <GuardedLink
+                  href={`${match.isPublic ? "/opportunities" : "/listings"}/${encodeURIComponent(match.id)}`}
+                >
+                  <UntrustedText value={match.title} />
+                </GuardedLink>{" "}
+                <code>{match.id}</code>
+              </li>
+            ))}
+          </ul>
+          <p>
+            {status === "pending"
+              ? "A reviewer will compare the pair before publication."
+              : "A reviewer will also see this match."}
+          </p>
+          <button type="button" onClick={() => setDuplicatesAcknowledged(true)}>
+            This is a different programme
+          </button>
+        </section>
+      )}
       {result.warnings.length > 0 ? (
         <>
           <p>
-            <strong>Advisory warnings from the API:</strong>
+            <strong>Things to review:</strong>
           </p>
           <ul>
             {result.warnings.map((warning) => (
@@ -1713,11 +2167,14 @@ function SubmissionOutcome({
         </>
       ) : null}
       <p className="row">
-        <Link href={`/listings/${encodeURIComponent(result.opportunity.id)}`}>
-          Open this listing
-        </Link>
+        <GuardedLink
+          className="button-primary"
+          href={`/${hasPublicPage ? "opportunities" : "listings"}/${encodeURIComponent(result.opportunity.id)}`}
+        >
+          {hasPublicPage ? "View it as applicants see it" : "Open this listing"}
+        </GuardedLink>
         <button type="button" onClick={onAgain}>
-          {mode === "create" ? "Submit another" : "Keep editing"}
+          {mode === "create" ? "Submit another" : "Continue editing"}
         </button>
       </p>
     </output>

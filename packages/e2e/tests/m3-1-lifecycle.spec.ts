@@ -4,6 +4,7 @@ import {
   expect,
   freshIdentity,
   skipUnlessActor,
+  skipUnlessBrowserSession,
   test,
 } from "../src/fixtures.js";
 /**
@@ -188,6 +189,35 @@ test.describe("M3-1 API keys", () => {
   });
 });
 
+test.describe("M3-1 listing drafts", () => {
+  test.beforeEach(({ stack }) => {
+    skipUnlessActor(stack, "publisher");
+    skipUnlessBrowserSession(stack, "publisher");
+  });
+
+  test("a reload offers the stored draft instead of applying it silently", async ({
+    contextAs,
+    stack,
+  }) => {
+    const context = await contextAs("publisher");
+    const page = await context.newPage();
+    const draftTitle = `Reload draft ${Date.now()}`;
+
+    await page.goto(`${stack.urls.frontend}/listings/new`);
+    await page.getByLabel(/^Title/).fill(draftTitle);
+    await expect(page.getByText(/Draft saved on this device ·/)).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Restore draft" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Discard draft" })).toBeVisible();
+    await expect(page.getByLabel(/^Title/)).toHaveValue("");
+
+    await page.getByRole("button", { name: "Restore draft" }).click();
+    await expect(page.getByLabel(/^Title/)).toHaveValue(draftTitle);
+    await context.close();
+  });
+});
+
 /**
  * The review queue is a shared resource, and one account may not fill it.
  *
@@ -268,14 +298,19 @@ test.describe("M3-1 how many submissions may wait at once", () => {
     // configurable, so the only number a reader can trust is the one the server put in the message.
     // A generic "something went wrong" here would leave somebody deleting drafts at random.
     await expect(
-      page.getByText(
-        new RegExp(
-          `which is the limit of ${PENDING_SUBMISSION_LIMIT} for an account without a verified publisher membership`,
+      page
+        .getByRole("status")
+        .getByText(
+          new RegExp(
+            `which is the limit of ${PENDING_SUBMISSION_LIMIT} for an account without a verified publisher membership`,
+          ),
         ),
-      ),
       "the form shows what the API said, including the number it enforced",
     ).toBeVisible();
-    await expect(page.getByText(/pending_limit_reached/)).toBeVisible();
+    await expect(
+      page.getByText(/pending_limit_reached/),
+      "the machine code remains available in the collapsed technical details",
+    ).toHaveCount(1);
     await expect(
       page.getByRole("heading", { name: "Submitted." }),
       "and nothing was stored",

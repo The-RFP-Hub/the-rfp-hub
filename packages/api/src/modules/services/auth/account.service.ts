@@ -19,9 +19,16 @@
  * credential (`grantAdmin` below); every admin after that is made by an admin, over
  * `POST /v1/admin/accounts/:id/role`. Both write the same audited `assign_role` row.
  */
-import { eq, ilike, or } from "drizzle-orm";
-import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type AccountRow, accounts, orgMemberships, organizations } from "../../../db/schema.js";
+import { and, eq, getTableColumns, ilike, isNull, or, sql } from "drizzle-orm";
+import { type DB, type Tx, db as defaultDb } from "../../../db/client.js";
+import {
+  type AccountRow,
+  accounts,
+  authUser,
+  orgMembershipInvites,
+  orgMemberships,
+  organizations,
+} from "../../../db/schema.js";
 import type { Membership } from "../../shared/capabilities.js";
 import { badRequest, conflict, notFound } from "../../shared/http-error.js";
 import { diffFields, isEmptyPatch } from "../../shared/patch.js";
@@ -44,6 +51,11 @@ export interface ProfileUpdate {
   displayName?: string | null;
 }
 
+/** The privileged directory projection. Email stays out of the public account row and `/v1/me`. */
+export interface AccountSearchRow extends AccountRow {
+  email: string | null;
+}
+
 /** What the admin ceremony did, so an operator's console can say which of the three happened. */
 export interface AdminGrant {
   account: AccountRow;
@@ -53,10 +65,24 @@ export interface AdminGrant {
   promoted: boolean;
 }
 
+/** The structured subset of Fastify's logger used by principal-side account work. */
+export interface AccountLogger {
+  error(payload: Record<string, unknown>, message: string): void;
+}
+
+const consoleLogger: AccountLogger = {
+  error(payload, message) {
+    console.error(message, payload);
+  },
+};
+
 export class AccountService {
   private readonly audit: AuditService;
 
-  constructor(private readonly db: DB = defaultDb) {
+  constructor(
+    private readonly db: DB = defaultDb,
+    private readonly logger: AccountLogger = consoleLogger,
+  ) {
     this.audit = new AuditService(db);
   }
 
@@ -66,16 +92,121 @@ export class AccountService {
    * `ON CONFLICT DO NOTHING` followed by a read rather than a read-then-insert: two tabs logging in
    * at once is an ordinary race, and the unique index is the only arbiter that cannot lose it.
    */
-  async resolveBySubject(subject: string): Promise<AccountRow> {
-    await this.db.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
-    const rows = await this.db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.authUserId, subject))
-      .limit(1);
-    const account = rows[0];
-    if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
+  async resolveBySubject(subject: string, verifiedEmail?: string): Promise<AccountRow> {
+    const account = await this.db.transaction(async (tx) => {
+      await tx.insert(accounts).values({ authUserId: subject }).onConflictDoNothing();
+      const rows = await tx
+        .select()
+        .from(accounts)
+        .where(eq(accounts.authUserId, subject))
+        .limit(1);
+      const account = rows[0];
+      if (!account) throw new Error(`account for '${subject}' vanished between insert and read`);
+      return account;
+    });
+
+    if (verifiedEmail !== undefined) {
+      try {
+        // Separate from provisioning deliberately. A database error aborts its transaction even
+        // when JavaScript catches it; keeping redemption in the provisioning transaction could
+        // return an account whose insert was silently rolled back. Redemption is retryable, so its
+        // own transaction may roll back while this committed account still resolves the session.
+        await this.db.transaction((tx) =>
+          this.redeemMembershipInvites(tx, account, verifiedEmail.trim().toLowerCase()),
+        );
+      } catch (error) {
+        this.logger.error(
+          {
+            ...sanitizedInviteRedemptionError(error),
+            operation: "redeem_membership_invites",
+            accountId: account.id,
+          },
+          "membership invite redemption failed; principal resolution will continue",
+        );
+      }
+    }
+
     return account;
+  }
+
+  /** Apply every still-pending invite for an address during session principal resolution. */
+  private async redeemMembershipInvites(tx: Tx, account: AccountRow, email: string): Promise<void> {
+    const invites = await tx
+      .select()
+      .from(orgMembershipInvites)
+      .where(
+        and(
+          isNull(orgMembershipInvites.acceptedAt),
+          sql`lower(${orgMembershipInvites.email}) = ${email}`,
+        ),
+      )
+      .orderBy(orgMembershipInvites.id)
+      .for("update");
+
+    for (const invite of invites) {
+      const existing = await tx
+        .select({ id: orgMemberships.id, role: orgMemberships.role })
+        .from(orgMemberships)
+        .where(
+          and(
+            eq(orgMemberships.accountId, account.id),
+            eq(orgMemberships.organizationId, invite.organizationId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      const previousRole = existing[0]?.role ?? null;
+      let actualRole = previousRole;
+
+      if (existing[0] && existing[0].role !== invite.role) {
+        const settled = await tx
+          .update(orgMemberships)
+          .set({ role: invite.role })
+          .where(eq(orgMemberships.id, existing[0].id))
+          .returning({ role: orgMemberships.role });
+        actualRole = settled[0]?.role ?? null;
+      } else if (!existing[0]) {
+        // A direct grant can race this first redemption after the membership read. The upsert
+        // makes the invite's role authoritative in either ordering instead of reviving the old
+        // conflict-ignore behavior.
+        const settled = await tx
+          .insert(orgMemberships)
+          .values({
+            accountId: account.id,
+            organizationId: invite.organizationId,
+            role: invite.role,
+          })
+          .onConflictDoUpdate({
+            target: [orgMemberships.accountId, orgMemberships.organizationId],
+            set: { role: invite.role },
+          })
+          .returning({ role: orgMemberships.role });
+        actualRole = settled[0]?.role ?? null;
+      }
+      if (actualRole === null) throw new Error("membership vanished while accepting invite");
+
+      const now = new Date();
+      await tx
+        .update(orgMembershipInvites)
+        .set({ acceptedAt: now, acceptedAccountId: account.id })
+        .where(
+          and(eq(orgMembershipInvites.id, invite.id), isNull(orgMembershipInvites.acceptedAt)),
+        );
+      await this.audit.record(tx, {
+        subjectKind: "organization",
+        subjectId: invite.organizationId,
+        actorKind: "user",
+        actorAccountId: account.id,
+        action: "accept_member_invite",
+        patch: {
+          inviteId: invite.id,
+          email,
+          invitedBy: invite.invitedBy,
+          accountId: account.id,
+          role: { before: previousRole, after: actualRole },
+        },
+      });
+    }
   }
 
   /** The account a subject names, or `undefined`. The read half of the admin ceremony. */
@@ -280,19 +411,28 @@ export class AccountService {
     }
   }
 
-  /** T3 account discovery for the review screens. Matches handle, display name or subject. */
-  async search(q: string | undefined, limit = 25): Promise<AccountRow[]> {
+  /** T3 account discovery for staff screens. Email is joined only for this privileged read. */
+  async search(q: string | undefined, limit = 25): Promise<AccountSearchRow[]> {
     const query = (q ?? "").trim();
+    const select = () =>
+      this.db
+        .select({ ...getTableColumns(accounts), email: authUser.email })
+        .from(accounts)
+        .leftJoin(authUser, eq(authUser.id, accounts.authUserId));
     if (query === "") {
-      return this.db.select().from(accounts).orderBy(accounts.id).limit(limit);
+      return select().orderBy(accounts.id).limit(limit);
     }
     const like = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+    const prefix = `${query.replace(/[\\%_]/g, "\\$&")}%`;
+    const accountId = /^\d+$/.test(query) ? Number(query) : Number.NaN;
     const match = or(
       ilike(accounts.handle, like),
       ilike(accounts.displayName, like),
       eq(accounts.authUserId, query),
+      ilike(authUser.email, prefix),
+      Number.isSafeInteger(accountId) ? eq(accounts.id, accountId) : undefined,
     );
-    return this.db.select().from(accounts).where(match).orderBy(accounts.id).limit(limit);
+    return select().where(match).orderBy(accounts.id).limit(limit);
   }
 }
 
@@ -315,6 +455,17 @@ function driverError(error: unknown): { code?: string; constraint?: string } | u
     current = named.cause;
   }
   return undefined;
+}
+
+/** The only error details safe to place beside principal-resolution context in production logs. */
+function sanitizedInviteRedemptionError(error: unknown): {
+  errorCategory: "database" | "unexpected";
+  errorCode: string;
+} {
+  const code = driverError(error)?.code;
+  return code === undefined
+    ? { errorCategory: "unexpected", errorCode: "unknown" }
+    : { errorCategory: "database", errorCode: code };
 }
 
 /** Postgres unique-violation SQLSTATE. */

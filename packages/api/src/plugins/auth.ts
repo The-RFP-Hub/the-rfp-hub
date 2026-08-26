@@ -90,7 +90,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   const db = options.db ?? defaultDb;
   const auth = options.auth ?? defaultAuth();
   const sessions = new SessionService(auth);
-  const accounts = new AccountService(db);
+  const accounts = new AccountService(db, app.log);
   const principals = new PrincipalService(db, {
     accounts,
     keys: new ApiKeyService(db),

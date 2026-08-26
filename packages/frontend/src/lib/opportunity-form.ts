@@ -141,7 +141,7 @@ export interface OrganizationRow {
   slug: string;
   orgType: string;
   website: string;
-  /** The stored organisation this row was loaded from. Its unmodelled members ride along. */
+  /** The stored organization this row was loaded from. Its unmodelled members ride along. */
   base: Rec;
 }
 
@@ -305,6 +305,160 @@ export interface OpportunityFormState {
   postedAt: string;
   deadlines: DeadlineRow[];
   details: DetailsState;
+}
+
+export interface ParsedValidationIssue {
+  /** JSON Pointer, `(root)`, or null when the producer supplied no usable location. */
+  path: string | null;
+  message: string;
+  /** The complete server/validator line retained for technical disclosure. */
+  raw: string;
+}
+
+const FUNDING_DETAIL_INFIX = new RegExp(`^(?:${FUNDING_TYPES.join("|")}) details:\\s*`);
+
+/** Parse legacy humanized lines, including the API's two pointer-less validation classes. */
+export function parseValidationIssueLine(line: string): ParsedValidationIssue {
+  const raw = line.trim();
+  if (raw.startsWith("(root)")) {
+    return { path: "(root)", message: raw.slice("(root)".length).trim(), raw };
+  }
+  if (raw.startsWith("fundingDetails.fundingType ")) {
+    return { path: "/fundingType", message: raw, raw };
+  }
+  const bareField = /^`([^`]+)`\s+(.+)$/.exec(raw);
+  if (bareField) {
+    const [, field, message] = bareField;
+    return {
+      path: `/${(field ?? "").replaceAll("~", "~0").replaceAll("/", "~1")}`,
+      message: message ?? raw,
+      raw,
+    };
+  }
+  if (raw.startsWith("/")) {
+    const separator = raw.search(/\s/);
+    const path = separator === -1 ? raw : raw.slice(0, separator);
+    let message = separator === -1 ? "is invalid" : raw.slice(separator).trim();
+    if (path === "/fundingDetails" || path.startsWith("/fundingDetails/")) {
+      message = message.replace(FUNDING_DETAIL_INFIX, "");
+    }
+    return { path, message, raw };
+  }
+  return { path: null, message: raw, raw };
+}
+
+function pointerSegments(pointer: string): string[] | null {
+  if (!pointer.startsWith("/")) return null;
+  return pointer
+    .slice(1)
+    .split("/")
+    .map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"));
+}
+
+const DIRECT_FORM_FIELDS = new Set([
+  "id",
+  "fundingType",
+  "title",
+  "summary",
+  "description",
+  "status",
+  "ecosystems",
+  "categories",
+  "eligibility",
+  "prerequisites",
+  "additionalReferences",
+  "serviceAgreement",
+  "applicationUrl",
+  "website",
+  "logoUrl",
+  "bannerUrl",
+  "currency",
+  "budget",
+  "allocated",
+  "minAward",
+  "maxAward",
+  "opensAt",
+  "postedAt",
+]);
+
+const ROW_FIELDS: Record<string, ReadonlySet<string>> = {
+  operatingOrganizations: new Set(["name", "slug", "orgType", "website"]),
+  sponsoringOrganizations: new Set(["name", "slug", "orgType", "website"]),
+  socialLinks: new Set(["platform", "url"]),
+  milestones: new Set(["title", "amount", "criteria"]),
+  deadlines: new Set(["deadlineType", "date", "label"]),
+};
+
+const DETAIL_ROOT_FIELDS: Record<FundingType, ReadonlySet<string>> = {
+  grant: new Set(["fundingMechanisms", "programModel", "milestoneBased", "recurring"]),
+  hackathon: new Set(["location", "online", "tracks", "prizes", "teamSize"]),
+  bounty: new Set([
+    "bountyKind",
+    "reward",
+    "rewardTiers",
+    "severityScheme",
+    "rewardPoolStatus",
+    "difficulty",
+    "skills",
+    "platform",
+  ]),
+  accelerator: new Set([
+    "programDurationWeeks",
+    "batchSize",
+    "equity",
+    "funding",
+    "stage",
+    "location",
+    "online",
+  ]),
+  vc_fund: new Set([
+    "checkSize",
+    "stages",
+    "thesis",
+    "portfolio",
+    "contactMethod",
+    "activelyInvesting",
+  ]),
+  rfp: new Set(["scope", "requirements"]),
+};
+
+/** JSON Pointer → the path used to derive the corresponding control id. */
+export function validationPointerToFormPath(
+  pointer: string,
+  currentFundingType: FundingType,
+): string | null {
+  if (pointer === "(root)") return "(root)";
+  const segments = pointerSegments(pointer);
+  if (!segments || segments.length === 0) return null;
+  const [root, second, third, ...rest] = segments;
+
+  if (root === "fundingInfo") {
+    return second && DIRECT_FORM_FIELDS.has(second) ? second : null;
+  }
+  if (root === "fundingDetails") {
+    if (!second || second === "fundingType") return "fundingType";
+    if (!DETAIL_ROOT_FIELDS[currentFundingType].has(second)) return null;
+    const detail = ["details", currentFundingType, second, third, ...rest].filter(
+      (part): part is string => part !== undefined,
+    );
+    if (currentFundingType === "hackathon" && second === "teamSize") {
+      return third === "max" ? "details.hackathon.teamMax" : "details.hackathon.teamMin";
+    }
+    if (currentFundingType === "vc_fund" && second === "checkSize") {
+      return third === "max" ? "details.vc_fund.checkMax" : "details.vc_fund.checkMin";
+    }
+    return detail.join(".");
+  }
+  if (root && DIRECT_FORM_FIELDS.has(root)) return root;
+
+  const rowFields = root ? ROW_FIELDS[root] : undefined;
+  if (root && rowFields && second && /^\d+$/.test(second)) {
+    if (third && rowFields.has(third)) return `${root}.${second}.${third}`;
+    const fallback = root === "deadlines" ? "deadlineType" : [...rowFields][0];
+    return fallback ? `${root}.${second}.${fallback}` : null;
+  }
+  if (root === "operatingOrganizations" && !second) return "operatingOrganizations.0.name";
+  return null;
 }
 
 // ── constructors ────────────────────────────────────────────────────────────────
@@ -534,10 +688,13 @@ function showText(value: unknown): string {
  *
  * `<input type="datetime-local">` hands back a naive `YYYY-MM-DDTHH:mm[:ss]` with no zone. Every
  * timestamp in the Standard is UTC with a literal trailing `Z` (the schema pins `pattern: "Z$"`),
- * so the value is read AS UTC rather than converted from the browser's zone: converting would make
- * the same document round-trip differently in two cities, and a deadline that moves when you open
- * the form in a different country is worse than one you have to enter in UTC on purpose. Every
- * date input on the form is labelled UTC for that reason.
+ * so the publisher's local wall time is converted to the corresponding UTC instant. The form shows
+ * that conversion beside the input; read surfaces continue to render the stored instant in UTC.
+ *
+ * DST follows JavaScript `Date` semantics deliberately. A repeated fall-back hour resolves to the
+ * EARLIER of its two instants; a spring-forward gap is normalized forward by the runtime. Both are
+ * the platform behavior a native local-time control feeds, and the preview makes the resulting UTC
+ * instant visible before submission.
  *
  * NORMALISATION IS DELIBERATE and slightly lossy: a stored `…:59.500Z` comes back as `…:59.000Z`,
  * because the widget has no field for a fraction of a second. Nothing in the Standard gives
@@ -549,22 +706,44 @@ const LOCAL_DATE_TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 export function toIsoUtc(local: string): string | undefined {
   const trimmed = local.trim();
   if (trimmed === "") return undefined;
-  const match = LOCAL_DATE_TIME.exec(trimmed);
-  if (!match) return undefined;
-  const [, date, hours, minutes, seconds] = match;
-  return `${date}T${hours}:${minutes}:${seconds ?? "00"}.000Z`;
+  if (!LOCAL_DATE_TIME.test(trimmed)) return undefined;
+  const instant = new Date(trimmed);
+  return Number.isNaN(instant.getTime()) ? undefined : instant.toISOString();
 }
 
 export function fromIsoUtc(iso: unknown): string {
   if (typeof iso !== "string") return "";
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(iso.trim());
-  if (!match) return "";
-  const [, date, hours, minutes, seconds] = match;
-  return `${date}T${hours}:${minutes}:${seconds}`;
+  const instant = new Date(iso.trim());
+  if (Number.isNaN(instant.getTime())) return "";
+  const two = (value: number) => String(value).padStart(2, "0");
+  return `${instant.getFullYear()}-${two(instant.getMonth() + 1)}-${two(instant.getDate())}T${two(instant.getHours())}:${two(instant.getMinutes())}:${two(instant.getSeconds())}`;
+}
+
+/** The local input's instant in the read surfaces' UTC vocabulary. */
+export function utcPreview(local: string): string | undefined {
+  const iso = toIsoUtc(local);
+  const match = LOCAL_DATE_TIME.exec(local.trim());
+  if (!iso || !match) return undefined;
+  const localDate = match[1];
+  const utcDate = iso.slice(0, 10);
+  const utcTime = iso.slice(11, 16);
+  return localDate === utcDate ? `= ${utcTime} UTC` : `= ${utcDate} ${utcTime} UTC`;
+}
+
+/** IANA zone plus the offset at this entered wall time, when the browser exposes a zone name. */
+export function localTimeZoneDescription(local: string): string {
+  const entered = LOCAL_DATE_TIME.test(local.trim()) ? new Date(local.trim()) : new Date();
+  const instant = Number.isNaN(entered.getTime()) ? new Date() : entered;
+  const offsetMinutes = -instant.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "−";
+  const absolute = Math.abs(offsetMinutes);
+  const offset = `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return zone ? `${zone}, ${offset}` : offset;
 }
 
 function isDateTimeShaped(local: string): boolean {
-  return local.trim() === "" || LOCAL_DATE_TIME.test(local.trim());
+  return local.trim() === "" || toIsoUtc(local) !== undefined;
 }
 
 // ── the id, derived ─────────────────────────────────────────────────────────────
@@ -588,7 +767,7 @@ export function slugifyTitle(title: string): string {
 }
 
 /**
- * The id the form proposes: the primary operating organisation's slug, then the slugified title.
+ * The id the form proposes: the primary operating organization's slug, then the slugified title.
  *
  * A proposal rather than a rule — the field stays editable, because the local half is the
  * publisher's own key and they may already have one. Empty when either half is missing, so the
@@ -618,7 +797,7 @@ export function idProblem(id: string): string | null {
   }
   const colon = trimmed.indexOf(":");
   if (colon <= 0 || colon === trimmed.length - 1) {
-    return "An id must be <namespace>:<local>, for example acme-foundation:2026-round-1.";
+    return "Start the id with the organization slug and a colon, for example acme-foundation:2026-round-1.";
   }
   return null;
 }
@@ -635,7 +814,7 @@ export function namespaceOf(id: string): string | null {
 
 /** What the API says this account may publish. Absent when the form has not been told. */
 export interface PublishAuthority {
-  /** Slugs of the verified organisations this account belongs to. */
+  /** Slugs of the verified organizations this account belongs to. */
   verifiedNamespaces: string[];
   /** An account-level grant that publishes immediately whatever the namespace. */
   directCreate: boolean;
@@ -664,7 +843,7 @@ export function describePublish(
    *
    * Absent on a create, where the namespace is the id's own prefix. On a replace the id is
    * immutable and says nothing about authority — a claimed listing keeps the id it was imported
-   * with (`host:123`) while being published under the organisation that claimed it — so predicting
+   * with (`host:123`) while being published under the organization that claimed it — so predicting
    * the outcome from the prefix predicts the wrong one.
    */
   storedNamespace?: string | null,
@@ -677,7 +856,7 @@ export function describePublish(
   // it, and saying so would send a publisher off to edit an immutable field.
   const how =
     stored !== "" && stored !== namespaceOf(id)
-      ? `This listing is published under ${namespace}, which is what a replacement is authorised against — not the id.`
+      ? `This listing is published under the organization prefix ${namespace}, which decides replacement access — not the id.`
       : "The part before the colon decides this.";
 
   if (!authority) {
@@ -686,15 +865,15 @@ export function describePublish(
       immediate: null,
       because:
         stored !== ""
-          ? `${namespace} is the namespace this listing is published under, and membership of it decides whether a replacement publishes immediately or waits for a reviewer.`
-          : "the part before the colon decides whether it publishes immediately or waits for a reviewer.",
+          ? `${namespace} is the organization prefix this listing is published under, and membership of that organization decides whether a replacement publishes immediately or waits for a Hub reviewer.`
+          : "the part before the colon decides whether it publishes immediately or waits for a Hub reviewer.",
     };
   }
   if (authority.directCreate) {
     return {
       id: shown,
       immediate: true,
-      because: "this account publishes directly, whichever namespace it publishes under.",
+      because: "this account publishes directly, whichever organization prefix it uses.",
     };
   }
   if (authority.verifiedNamespaces.includes(namespace)) {
@@ -708,14 +887,14 @@ export function describePublish(
     return {
       id: shown,
       immediate: false,
-      because: `${namespace} is not one of your verified organisations (${authority.verifiedNamespaces.join(", ")}). ${how}`,
+      because: `${namespace} is not one of your verified organizations (${authority.verifiedNamespaces.join(", ")}). ${how}`,
     };
   }
   return {
     id: shown,
     immediate: false,
     because:
-      "this account is not a member of a verified organisation, which is the normal path for a community submission.",
+      "this account is not a member of a verified organization, which is the normal path for a community submission.",
   };
 }
 
@@ -738,7 +917,7 @@ const LEGACY_INGEST_ORIGINS: ReadonlySet<string> = new Set(["import", "scrape", 
  * stored publisher still appears somewhere in `operatingOrganizations`.
  *
  * That distinction is not academic. A claimed or imported listing legitimately carries an id from
- * the system it came from (`host:123`) while being published under the organisation that operates
+ * the system it came from (`host:123`) while being published under the organization that operates
  * it (`acme`). Holding the id to the primary operator on edit refused a PUT the API would have
  * accepted, and — worse — told the publisher to fix a field they cannot change.
  */
@@ -984,7 +1163,7 @@ function buildDetails(form: OpportunityFormState, base: unknown): Rec {
  *
  * `base` IS WHAT MAKES A REPLACE SAFE, and it goes deeper than the top level. `PUT` replaces the
  * stored record, so anything this form does not rebuild has to arrive unchanged. The form now
- * models far more than it did, but "models" still is not "owns": an organisation carries contacts,
+ * models far more than it did, but "models" still is not "owns": an organization carries contacts,
  * a description, a logo and social links this form never renders, and `source` carries attribution
  * the server owns outright.
  *
@@ -1186,8 +1365,8 @@ export function fieldProblems(
       fail(
         "id",
         elsewhere
-          ? `${namespace} runs this opportunity but is not the primary organisation. Move it to the top of Who runs it, or start the id with ${primary}.`
-          : `The part before the colon must be the primary operating organisation's slug — ${primary}.`,
+          ? `${namespace} runs this opportunity but is not the primary organization. Move it to the top of Who runs it, or start the id with ${primary}.`
+          : `The part before the colon must be the primary operating organization's slug — ${primary}.`,
       );
     }
   }
@@ -1199,7 +1378,7 @@ export function fieldProblems(
     if (!kept) {
       fail(
         "operatingOrganizations",
-        `This listing is published under ${authority.namespace}. A replacement must keep that organisation in the list — removing it would leave the listing published under an organisation that no longer operates it.`,
+        `This listing is published under ${authority.namespace}. A replacement must keep that organization in the list — removing it would leave the listing published under an organization that no longer operates it.`,
       );
     }
   }
@@ -1210,17 +1389,17 @@ export function fieldProblems(
   limit("currency", form.currency, "The currency", 16);
 
   if (form.operatingOrganizations.length === 0) {
-    fail("operatingOrganizations", "At least one operating organisation is required.");
+    fail("operatingOrganizations", "At least one operating organization is required.");
   }
   const organizations = (rows: OrganizationRow[], prefix: string) => {
     rows.forEach((row, index) => {
-      requireText(`${prefix}.${index}.name`, row.name, "The organisation name", 256);
+      requireText(`${prefix}.${index}.name`, row.name, "The organization name", 256);
       const slug = row.slug.trim();
-      if (slug === "") fail(`${prefix}.${index}.slug`, "The organisation slug is required.");
+      if (slug === "") fail(`${prefix}.${index}.slug`, "The organization slug is required.");
       else if (!ORG_SLUG.test(slug)) {
         fail(`${prefix}.${index}.slug`, "A slug is lowercase letters, digits and hyphens only.");
       }
-      uri(`${prefix}.${index}.website`, row.website, "The organisation website");
+      uri(`${prefix}.${index}.website`, row.website, "The organization website");
     });
   };
   organizations(form.operatingOrganizations, "operatingOrganizations");
@@ -1589,7 +1768,7 @@ export function replaceRow<T>(rows: T[], index: number, row: T): T[] {
 
 /**
  * Move a row one place, for the two lists whose ORDER IS SEMANTIC: `operatingOrganizations[0]` is
- * the primary organisation and the one displayed, and `milestones` is a sequence with no index
+ * the primary organization and the one displayed, and `milestones` is a sequence with no index
  * field of its own. Everywhere else order is presentational and there are no arrows.
  */
 export function moveRow<T>(rows: T[], index: number, direction: -1 | 1): T[] {

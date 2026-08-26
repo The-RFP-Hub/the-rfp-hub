@@ -1,10 +1,9 @@
 /**
  * M3-3 — duplicate detection, and what a reviewer can do about it.
  *
- * Determinism first: the stack runs `EMBEDDING_PROVIDER=deterministic`, so a pair either crosses
- * the similarity threshold or it does not, every time. The optional `e2e:openai` run re-runs THIS
- * FILE ONLY against the real embedding provider; it is an extra, never the gate, because a criterion
- * that depends on a paid third party is a criterion that fails for reasons unrelated to the product.
+ * Determinism first: the stack runs `EMBEDDING_PROVIDER=lexical`, the same in-process featurizer
+ * production runs, so a pair either crosses the similarity threshold or it does not, every time —
+ * there is no "real provider" variant because the lexical detector IS the real provider.
  * If a fixture pair sits under the threshold, the fixture TEXT is what changes — never the threshold.
  *
  * One thing in this area is recorded rather than tested: "the submitter is notified" is the
@@ -19,7 +18,7 @@ test.describe.configure({ mode: "serial" });
  * Two descriptions of the same programme, worded differently — the pair the detector must catch.
  *
  * PARAMETERISED BY A LABEL, and that is not cosmetic. The embedding text is built from the title,
- * description, funding type, ecosystems and organisations; the public id is NOT part of it. Two
+ * description, funding type, ecosystems and organizations; the public id is NOT part of it. Two
  * fixtures with identical prose therefore produce identical vectors, so every "original" in this
  * file would be an exact duplicate of every other one. Candidate matches are capped
  * (`DEDUPE_MAX_MATCHES`, default 5) and ordered by distance with ties broken arbitrarily, so as the
@@ -314,7 +313,7 @@ async function pairIdFor(db: import("pg").Pool, a: string, b: string): Promise<n
   const id = found.rows[0]?.id;
   if (id === undefined) {
     throw new Error(
-      `no duplicate pair was detected for ${a} / ${b}. With EMBEDDING_PROVIDER=deterministic this is a fixture problem, not a flake: tune the fixture TEXT so the pair crosses the similarity threshold — never lower the threshold to make a test pass.`,
+      `no duplicate pair was detected for ${a} / ${b}. With EMBEDDING_PROVIDER=lexical this is a fixture problem, not a flake: tune the fixture TEXT so the pair crosses the similarity threshold — never lower the threshold to make a test pass.`,
     );
   }
   return Number(id);

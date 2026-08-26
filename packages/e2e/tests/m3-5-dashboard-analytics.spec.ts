@@ -68,13 +68,13 @@ test.describe("M3-5 the signed-in dashboard", () => {
       await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
     }
 
-    // AN ACCOUNT WITH MEMBERSHIPS GETS AN ORGANISATION ENTRY, beside its listings rather than behind
+    // AN ACCOUNT WITH MEMBERSHIPS GETS AN ORGANIZATION ENTRY, beside its listings rather than behind
     // two clicks on the account page. Its SHAPE follows the account: one membership gets the
-    // organisation's own name and its own address, because a landing page listing exactly one row is
+    // organization's own name and its own address, because a landing page listing exactly one row is
     // a click that answers nothing; several get a chooser.
     //
     // WHICH CASE THIS RUN IS IN IS READ FROM THE API, NOT ASSUMED. Earlier files grant the publisher
-    // memberships on further organisations while exercising claims, so the count here is a
+    // memberships on further organizations while exercising claims, so the count here is a
     // consequence of what has run — and hard-coding either shape would make this test an assertion
     // about execution order.
     const me = await (await api("publisher")).get<{
@@ -84,20 +84,20 @@ test.describe("M3-5 the signed-in dashboard", () => {
     const memberships = me.body.memberships;
     expect(
       memberships.length,
-      "this actor is a member of at least one organisation",
+      "this actor is a member of at least one organization",
     ).toBeGreaterThan(0);
     const only = memberships.length === 1 ? memberships[0] : undefined;
-    const organisation = nav.getByRole("link", {
-      name: only ? only.name : "Organisations",
+    const organization = nav.getByRole("link", {
+      name: only ? only.name : "Organizations",
       exact: true,
     });
     await expect(
-      organisation,
-      "a member's organisation belongs beside their listings, not behind two clicks",
+      organization,
+      "a member's organization belongs beside their listings, not behind two clicks",
     ).toBeVisible();
-    await expect(organisation).toHaveAttribute(
+    await expect(organization).toHaveAttribute(
       "href",
-      only ? `/organisations/${encodeURIComponent(only.slug)}` : "/organisations",
+      only ? `/organizations/${encodeURIComponent(only.slug)}` : "/organizations",
     );
 
     // DUPLICATES LEFT THE TOP LEVEL, and the demotion is the assertion rather than a side effect:
@@ -107,6 +107,8 @@ test.describe("M3-5 the signed-in dashboard", () => {
       nav.getByRole("link", { name: "Duplicates", exact: true }),
       "Duplicates is not a top-level destination any more",
     ).toHaveCount(0);
+    await page.goto(`${stack.urls.frontend}/dashboard`);
+    await expect(page).toHaveTitle("Dashboard | RFP Hub");
     await page.goto(`${stack.urls.frontend}/listings`);
     await expect(
       page.getByRole("link", { name: /duplicate/i }).first(),
@@ -154,7 +156,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     // Matched loosely rather than exactly: the section NUMBER is a stylesheet counter on the
     // legend, and generated content counts towards an accessible name.
     await expect(page.getByRole("group", { name: /Funding information/ })).toBeVisible();
-    await expect(page.getByRole("group", { name: /Funding details — grant/ })).toBeVisible();
+    await expect(page.getByRole("group", { name: /Funding details — Grant/ })).toBeVisible();
 
     // SUBMIT IS ALWAYS LIVE, and that is the criterion rather than a relaxation of it. A disabled
     // button that does not say why cannot be told apart from a broken page, so pressing it on an
@@ -164,7 +166,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     await expect(submit, "the button stays live so that pressing it can answer").toBeEnabled();
     await submit.click();
     await expect(
-      page.getByRole("alert").filter({ hasText: "Not conformant yet." }),
+      page.getByRole("alert").filter({ hasText: "Fix these fields before submitting." }),
       "pressing Submit on an empty form answers, in the page's own words",
     ).toBeVisible();
     await expect(
@@ -194,7 +196,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
       .fill(
         "An entry submitted through the publisher dashboard's own form by the end-to-end suite.",
       );
-    // The primary operating organisation: its name, and the slug that IS the publishing namespace.
+    // The primary operating organization: its name, and the slug that IS the publishing namespace.
     await page.getByLabel(/^Name/).fill(stack.namespaces.publisher);
     await page.getByLabel(/^Slug/).fill(stack.namespaces.publisher);
 
@@ -227,7 +229,7 @@ test.describe("M3-5 the signed-in dashboard", () => {
     // opportunity gets submitted twice, so the panel's presence and the form's absence are one
     // assertion about the same fix.
     await expect(page.getByRole("heading", { name: "Submitted." })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open this listing" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "View it as applicants see it" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Submit another" })).toBeVisible();
     await expect(submit, "the form is gone, so it cannot be sent again").toHaveCount(0);
 
@@ -240,12 +242,14 @@ test.describe("M3-5 the signed-in dashboard", () => {
     expect(stored.status, "the entry the form created must exist at the API").toBe(200);
     expect(stored.body.title).toBe(`Dashboard form entry ${localId}`);
 
-    // "Open this listing" goes to the row that was just created, which is the only thing that makes
-    // the panel a way forward rather than a dead end.
-    await page.getByRole("link", { name: "Open this listing" }).click();
+    // The primary action goes to the public page that applicants see, which proves the successful
+    // direct publication is more than a row in the publisher workbench.
+    await page.getByRole("link", { name: "View it as applicants see it" }).click();
     // Compared on the DECODED path: an id carries a colon, which is percent-encoded in the address
     // and would make a literal comparison a test of the encoder rather than of the destination.
-    await expect(page).toHaveURL((url) => decodeURIComponent(url.pathname) === `/listings/${id}`);
+    await expect(page).toHaveURL(
+      (url) => decodeURIComponent(url.pathname) === `/opportunities/${id}`,
+    );
   });
 
   test("a key's secret is shown once and is gone after a reload", async ({ page, stack }) => {

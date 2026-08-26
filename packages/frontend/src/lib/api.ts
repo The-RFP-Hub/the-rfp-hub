@@ -1,3 +1,4 @@
+import type { PublisherStatus } from "./presentation";
 /**
  * THE ONLY MODULE THAT KNOWS THE API EXISTS.
  *
@@ -35,13 +36,17 @@ import type {
   Health,
   InsightsSeries,
   InsightsSummary,
+  ManagedOpportunity,
   ManagedOpportunityList,
   Me,
+  MembershipInvite,
+  MembershipInviteList,
   MembershipResult,
   MergeResult,
   Opportunity,
   OrganizationList,
   OrganizationSummary,
+  OwnedDuplicateList,
   PaginatedOpportunities,
   PublisherList,
   ReviewDecision,
@@ -63,8 +68,12 @@ export class ApiError extends Error {
   readonly code: string;
   /** The humanized, field-by-field report from a Standard validation failure. Empty otherwise. */
   readonly details: string[];
+  /** Structured field locations from a validation failure. Empty on older/error-only responses. */
+  readonly issues: NonNullable<ApiErrorBody["issues"]>;
   /** Set on `survivor_already_merged`: the entry that really survived, for a link-out. */
   readonly survivorId: string | undefined;
+  /** Set on the public detail route's `opportunity_merged` 404. */
+  readonly mergedInto: { id: string; title: string } | undefined;
 
   constructor(status: number, code: string, message: string, extra?: Partial<ApiErrorBody>) {
     super(message);
@@ -72,7 +81,9 @@ export class ApiError extends Error {
     this.status = status;
     this.code = code;
     this.details = extra?.errors ?? [];
+    this.issues = extra?.issues ?? [];
     this.survivorId = extra?.survivorId;
+    this.mergedInto = extra?.mergedInto;
   }
 
   /** The session is gone or was never presented. Pages offer a login rather than an error. */
@@ -150,7 +161,7 @@ export type DirectoryQuery = {
   status?: string;
   ecosystem?: string;
   category?: string;
-  /** Organisation slug — matches any operating OR sponsoring organisation. */
+  /** Organization slug — matches any operating OR sponsoring organization. */
   organization?: string;
   minAward?: number;
   maxAward?: number;
@@ -256,12 +267,17 @@ export function createApiClient(options: ApiClientOptions) {
       get: () => request<Me>("GET", "/v1/me"),
       update: (body: { handle?: string | null; displayName?: string | null }) =>
         request<Me>("PATCH", "/v1/me", { body }),
-      opportunities: (query?: { reviewStatus?: ReviewStatus; page?: number; limit?: number }) =>
-        request<ManagedOpportunityList>("GET", "/v1/me/opportunities", { query }),
+      opportunities: (query?: {
+        id?: string;
+        reviewStatus?: ReviewStatus;
+        publisherStatus?: PublisherStatus;
+        page?: number;
+        limit?: number;
+      }) => request<ManagedOpportunityList>("GET", "/v1/me/opportunities", { query }),
       /** The one route that serves an owner their own pending or rejected record in full. */
       opportunity: (id: string) =>
         request<Opportunity>("GET", `/v1/me/opportunities/${encodeURIComponent(id)}`),
-      duplicates: () => request<DuplicateList>("GET", "/v1/me/duplicates"),
+      duplicates: () => request<OwnedDuplicateList>("GET", "/v1/me/duplicates"),
     },
 
     keys: {
@@ -301,8 +317,12 @@ export function createApiClient(options: ApiClientOptions) {
 
     // ── review (T3) ─────────────────────────────────────────────────────────────
     review: {
-      opportunities: (query?: { reviewStatus?: ReviewStatus; page?: number; limit?: number }) =>
-        request<ManagedOpportunityList>("GET", "/v1/review/opportunities", { query }),
+      opportunities: (query?: {
+        id?: string;
+        reviewStatus?: ReviewStatus;
+        page?: number;
+        limit?: number;
+      }) => request<ManagedOpportunityList>("GET", "/v1/review/opportunities", { query }),
       /** One entry in full, entitled by ROLE rather than by ownership. See `loadOpportunity`. */
       opportunity: (id: string) =>
         request<Opportunity>("GET", `/v1/review/opportunities/${encodeURIComponent(id)}`),
@@ -337,6 +357,8 @@ export function createApiClient(options: ApiClientOptions) {
         request<DuplicatePair>("POST", `/v1/review/duplicates/${pairId}/confirm`),
       dismissDuplicate: (pairId: number) =>
         request<DuplicatePair>("POST", `/v1/review/duplicates/${pairId}/dismiss`),
+      reopenDuplicate: (pairId: number) =>
+        request<DuplicatePair>("POST", `/v1/review/duplicates/${pairId}/reopen`),
       /** `fields` is omitted by default: a merge copies nothing unless a reviewer asks it to. */
       mergeDuplicate: (pairId: number, body: { survivorId: string; fields?: string[] }) =>
         request<MergeResult>("POST", `/v1/review/duplicates/${pairId}/merge`, { body }),
@@ -369,20 +391,36 @@ export function createApiClient(options: ApiClientOptions) {
           `/v1/review/organizations/${encodeURIComponent(slug)}/members`,
           { body },
         ),
+      membershipInvites: (slug: string) =>
+        request<MembershipInviteList>(
+          "GET",
+          `/v1/review/organizations/${encodeURIComponent(slug)}/invites`,
+        ),
+      inviteMembership: (slug: string, body: { email: string; role?: string }) =>
+        request<MembershipInvite>(
+          "POST",
+          `/v1/review/organizations/${encodeURIComponent(slug)}/invites`,
+          { body },
+        ),
+      revokeMembershipInvite: (slug: string, inviteId: number) =>
+        request<MembershipInvite>(
+          "DELETE",
+          `/v1/review/organizations/${encodeURIComponent(slug)}/invites/${inviteId}`,
+        ),
     },
 
     /**
-     * AN ORGANISATION ACTING ON ITSELF — a different authority from `review` above, and the reason
+     * AN ORGANIZATION ACTING ON ITSELF — a different authority from `review` above, and the reason
      * these four are their own group rather than more members of it.
      *
      * `review.*` is Hub staff deciding about anybody. These are a MEMBER deciding about their own
-     * namespace, and the API scopes them accordingly: an id filed under another organisation answers
+     * namespace, and the API scopes them accordingly: an id filed under another organization answers
      * 404 rather than 403, so this cannot be used to enumerate somebody else's queue.
      *
      * The two gates differ on purpose and the difference is the whole model:
      *   - `opportunities` needs ANY membership. Verification governs publishing, not visibility, so
-     *     an unverified organisation can still see what has been filed in its name.
-     *   - `approve` and `reject` need a membership on a VERIFIED organisation, and are SESSION-ONLY.
+     *     an unverified organization can still see what has been filed in its name.
+     *   - `approve` and `reject` need a membership on a VERIFIED organization, and are SESSION-ONLY.
      *     Approving publishes unreviewed content to the world, which is exactly the power a leaked
      *     API key must never hold.
      */
@@ -400,8 +438,8 @@ export function createApiClient(options: ApiClientOptions) {
         ),
       /**
        * `reason` is REQUIRED by the API, not optional-with-a-default, and the asymmetry with
-       * `approve` is deliberate on their side: anyone may submit a listing ABOUT an organisation, so
-       * an organisation refusing one in its own namespace is a conflict of interest. The written
+       * `approve` is deliberate on their side: anyone may submit a listing ABOUT an organization, so
+       * an organization refusing one in its own namespace is a conflict of interest. The written
        * reason is the counterweight — it is shown to the submitter, and the decision is attributed
        * to the deciding member by handle rather than coarsened to "reviewer".
        */
@@ -412,9 +450,9 @@ export function createApiClient(options: ApiClientOptions) {
           { body: { reason } },
         ),
       /**
-       * The organisation's own directory entry. Owner or admin, session only.
+       * The organization's own directory entry. Owner or admin, session only.
        *
-       * `verified` is deliberately absent from the patch contract: an organisation verifying itself
+       * `verified` is deliberately absent from the patch contract: an organization verifying itself
        * would make the flag meaningless. Every member below is optional — send only what changed.
        */
       update: (slug: string, patch: OrganizationPatch) =>
@@ -498,4 +536,30 @@ export async function loadOpportunity(
     if (!canReview || !(error instanceof ApiError) || !error.isNotFound) throw error;
     return api.review.opportunity(id);
   }
+}
+
+/**
+ * The editorial row beside `loadOpportunity`'s full Standard document.
+ *
+ * The owner list is queried first with the exact id. An empty page is its scoped equivalent of a
+ * 404, so a reviewer then tries the role-entitled list; every real request failure is passed through
+ * unchanged. This keeps merge state available to detail/edit pages without teaching public reads
+ * about editorial columns.
+ */
+export async function loadManagedOpportunity(
+  api: ApiClient,
+  id: string,
+  canReview: boolean,
+): Promise<ManagedOpportunity> {
+  const owned = await api.me.opportunities({ id, limit: 1 });
+  const mine = owned.items.find((item) => item.id === id);
+  if (mine) return mine;
+
+  if (canReview) {
+    const review = await api.review.opportunities({ id, limit: 1 });
+    const item = review.items.find((candidate) => candidate.id === id);
+    if (item) return item;
+  }
+
+  throw new ApiError(404, "not_found", `No managed opportunity ${JSON.stringify(id)} was found.`);
 }

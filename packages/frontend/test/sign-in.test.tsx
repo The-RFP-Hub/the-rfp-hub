@@ -85,21 +85,31 @@ describe("signing in with an email code", () => {
   it("asks for an address first, and will not send an empty one", () => {
     mount();
 
+    expect(screen.getByRole("heading", { name: "Log in" })).toBeTruthy();
     expect(screen.getByLabelText("Email address")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send code" })).toHaveProperty("disabled", true);
     // The code box does not exist yet — there is nothing to type into until a code was sent.
     expect(screen.queryByLabelText(/6-digit code/)).toBeNull();
   });
 
-  it("sends the code, then asks for it — naming the address it went to", async () => {
-    mount();
+  it("sends the code, then names the address and expiry once", async () => {
+    const { container } = mount();
     await reachCodeStep();
 
     expect(sendVerificationOtp).toHaveBeenCalledWith({
       email: "programs@acme.example.org",
       type: "sign-in",
     });
-    expect(screen.getByText(/Code sent to programs@acme\.example\.org/)).toBeTruthy();
+    expect(
+      screen.getByText((_, node) =>
+        Boolean(
+          node?.tagName === "P" &&
+            node.textContent?.startsWith("Sent to programs@acme.example.org."),
+        ),
+      ),
+    ).toBeTruthy();
+    expect(container.textContent?.match(/programs@acme\.example\.org/g)).toHaveLength(1);
+    expect(container.textContent?.match(/expires five minutes after it was sent/g)).toHaveLength(1);
     expect(screen.queryByLabelText("Email address")).toBeNull();
   });
 

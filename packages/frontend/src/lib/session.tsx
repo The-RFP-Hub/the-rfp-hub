@@ -21,6 +21,7 @@ import { useApi } from "./api-context";
 import { authClient, clearSessionToken, refreshSession } from "./auth-client";
 import { AuthRoot, useSignInOpener } from "./auth-root";
 import { readConfig } from "./config";
+import { clearAllOpportunityDrafts } from "./opportunity-draft";
 import { type Resource, useResource } from "./resource";
 import type { Me } from "./types";
 
@@ -75,6 +76,10 @@ export function useSession(): SessionState {
         cause,
       );
     } finally {
+      // Drafts are private to the signed-in account. Clear every account key on logout so a shared
+      // browser never offers the previous person's unpublished work. The helper first gives a
+      // mounted form a synchronous chance to flush and suppress its later unmount cleanup.
+      clearAllOpportunityDrafts();
       clearSessionToken();
       // ON BOTH PATHS, and the failing one is why this is here rather than left to the library.
       // Better-Auth refreshes `useSession` from its `/sign-out` atom listener, which fires on

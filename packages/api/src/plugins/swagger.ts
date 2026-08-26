@@ -52,9 +52,9 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
           description:
             "Creating, replacing and claiming entries. The server sets every provenance attribution field itself.",
         },
-        { name: "review", description: "Reviewer surface — the queue, claims and organisations" },
+        { name: "review", description: "Reviewer surface — the queue, claims and organizations" },
         { name: "admin", description: "Administrator surface — roles and direct-create grants" },
-        { name: "publishers", description: "Verified publishing organisations" },
+        { name: "publishers", description: "Verified publishing organizations" },
         {
           name: "insights",
           description:

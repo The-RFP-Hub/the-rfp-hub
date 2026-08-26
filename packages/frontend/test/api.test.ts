@@ -4,7 +4,13 @@
  * behaviour a page depends on: the token is attached, a failure is an `ApiError` carrying the API's
  * own code, and a body that is not JSON is not silently treated as one.
  */
-import { ApiError, createApiClient, linkOutUrl, loadOpportunity } from "@/lib/api";
+import {
+  ApiError,
+  createApiClient,
+  linkOutUrl,
+  loadManagedOpportunity,
+  loadOpportunity,
+} from "@/lib/api";
 import { describe, expect, it } from "vitest";
 
 interface Call {
@@ -72,9 +78,16 @@ describe("createApiClient", () => {
     const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
     const api = createApiClient({ baseUrl: "https://api.example.com/", fetchImpl });
 
-    await api.me.opportunities({ reviewStatus: undefined, page: 2, limit: 20 });
+    await api.me.opportunities({
+      reviewStatus: undefined,
+      publisherStatus: "hidden",
+      page: 2,
+      limit: 20,
+    });
 
-    expect(calls[0]?.url).toBe("https://api.example.com/v1/me/opportunities?page=2&limit=20");
+    expect(calls[0]?.url).toBe(
+      "https://api.example.com/v1/me/opportunities?publisherStatus=hidden&page=2&limit=20",
+    );
   });
 
   it("percent-encodes an id that contains the namespace separator", async () => {
@@ -93,6 +106,10 @@ describe("createApiClient", () => {
           error: "validation_failed",
           message: "The document is not conformant.",
           errors: ["/title must be a string", "/fundingDetails must have fundingType"],
+          issues: [
+            { path: "/title", message: "must be a string" },
+            { path: "/fundingDetails", message: "must have fundingType" },
+          ],
         },
         400,
       ),
@@ -106,6 +123,10 @@ describe("createApiClient", () => {
     expect(error.status).toBe(400);
     expect(error.code).toBe("validation_failed");
     expect(error.details).toHaveLength(2);
+    expect(error.issues).toEqual([
+      { path: "/title", message: "must be a string" },
+      { path: "/fundingDetails", message: "must have fundingType" },
+    ]);
   });
 
   it("flags a 401 as unauthenticated so a page can offer a login instead of an error", async () => {
@@ -137,6 +158,41 @@ describe("createApiClient", () => {
 
     expect(error.code).toBe("survivor_already_merged");
     expect(error.survivorId).toBe("acme:c");
+  });
+
+  it("reopens a dismissed duplicate through the pair route without a body", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ id: 17, status: "suspected" }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.review.reopenDuplicate(17);
+
+    expect(calls[0]?.url).toBe("https://api.example.com/v1/review/duplicates/17/reopen");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.body).toBeUndefined();
+  });
+
+  it("lists, creates and revokes membership invites on the reviewer organization route", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await api.review.membershipInvites("filecoin foundation");
+    await api.review.inviteMembership("filecoin foundation", {
+      email: "person@example.org",
+      role: "owner",
+    });
+    await api.review.revokeMembershipInvite("filecoin foundation", 14);
+
+    expect(calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["GET", "https://api.example.com/v1/review/organizations/filecoin%20foundation/invites"],
+      ["POST", "https://api.example.com/v1/review/organizations/filecoin%20foundation/invites"],
+      [
+        "DELETE",
+        "https://api.example.com/v1/review/organizations/filecoin%20foundation/invites/14",
+      ],
+    ]);
+    expect(calls[1]?.init.body).toBe(
+      JSON.stringify({ email: "person@example.org", role: "owner" }),
+    );
   });
 
   it("does not pretend a non-JSON body is JSON", async () => {
@@ -291,14 +347,72 @@ describe("loadOpportunity", () => {
   });
 });
 
+describe("loadManagedOpportunity", () => {
+  const row = {
+    id: "acme:1",
+    title: "One",
+    fundingType: "grant",
+    status: "archived",
+    reviewStatus: "rejected",
+    isListed: false,
+    namespace: "acme",
+    submittedBy: "acme",
+    mergedInto: { id: "acme:2", title: "Two" },
+    lastDecision: null,
+    createdAt: "2026-08-01T00:00:00Z",
+    updatedAt: "2026-08-02T00:00:00Z",
+  };
+  const page = (items: (typeof row)[]) => ({
+    items,
+    page: 1,
+    limit: 1,
+    total: items.length,
+    totalPages: 1,
+  });
+
+  it("queries the owner list by exact id and stops when it finds the row", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json(page([row])));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(loadManagedOpportunity(api, "acme:1", true)).resolves.toMatchObject(row);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.com/v1/me/opportunities?id=acme%3A1&limit=1",
+    ]);
+  });
+
+  it("falls back to the reviewer list when the owner-scoped id lookup is empty", async () => {
+    const { fetchImpl, calls } = stubFetch((call) =>
+      call.url.includes("/v1/me/opportunities") ? json(page([])) : json(page([row])),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(loadManagedOpportunity(api, "acme:1", true)).resolves.toMatchObject(row);
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example.com/v1/me/opportunities?id=acme%3A1&limit=1",
+      "https://api.example.com/v1/review/opportunities?id=acme%3A1&limit=1",
+    ]);
+  });
+
+  it("does not probe the reviewer list for an account without that role", async () => {
+    const { fetchImpl, calls } = stubFetch(() => json(page([])));
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(loadManagedOpportunity(api, "acme:1", false)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    expect(calls).toHaveLength(1);
+  });
+});
+
 /**
- * AN ORGANISATION ACTING ON ITSELF — four routes whose URLs carry the authorisation.
+ * AN ORGANIZATION ACTING ON ITSELF — four routes whose URLs carry the authorisation.
  *
  * The slug and the id are both in the path, and the API scopes the decision by BOTH: a listing filed
- * under another organisation answers 404 rather than 403, so a mis-encoded slug does not silently
+ * under another organization answers 404 rather than 403, so a mis-encoded slug does not silently
  * decide somebody else's queue. That makes the exact path worth pinning.
  */
-describe("the organisation routes", () => {
+describe("the organization routes", () => {
   it("lists a namespace's own listings, filtered and paginated", async () => {
     const { fetchImpl, calls } = stubFetch(() =>
       json({ items: [], page: 1, limit: 20, total: 0, totalPages: 1 }),

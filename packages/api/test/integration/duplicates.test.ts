@@ -11,9 +11,9 @@
  * contained. CI sets the same variable globally (`.github/workflows/ci.yml`); this makes the suite
  * self-sufficient rather than dependent on that, which matters when somebody runs one file by hand.
  */
-process.env.EMBEDDING_PROVIDER = "deterministic";
+process.env.EMBEDDING_PROVIDER = "lexical";
 
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import type { EmbeddingProvider } from "../../src/modules/services/dedupe/embedding-provider.js";
@@ -31,7 +31,7 @@ const { auditLog, opportunities, opportunityDuplicates, opportunityEmbeddings } 
   "../../src/db/schema.js"
 );
 const { contentHash, embeddingText } = await import("../../src/modules/shared/embedding-text.js");
-const { DeterministicEmbeddingProvider } = await import(
+const { LexicalEmbeddingProvider } = await import(
   "../../src/modules/services/dedupe/embedding-provider.js"
 );
 const { bearer, grantMembership, seedIdentity, seedOrganization, testAuth } = await import(
@@ -81,6 +81,7 @@ run("M3DUP duplicate detection", () => {
   let publisherToken: string;
   let strangerToken: string;
   let reviewerToken: string;
+  let reviewerAccountId: number;
 
   const post = async (token: string, payload: Record<string, unknown>) =>
     app.inject({ method: "POST", url: "/v1/opportunities", headers: bearer(token), payload });
@@ -137,6 +138,7 @@ run("M3DUP duplicate detection", () => {
     publisherToken = publisher.token;
     strangerToken = stranger.token;
     reviewerToken = reviewer.token;
+    reviewerAccountId = reviewer.account.id;
   });
 
   afterAll(async () => {
@@ -169,9 +171,11 @@ run("M3DUP duplicate detection", () => {
     expect(second.statusCode, second.body).toBe(201);
     expect(second.json().duplicateCheck).toBe("ok");
     expect(ours(second)).toContain(`${NS}:alpha`);
-    expect(
-      second.json().duplicates.find((d: { id: string }) => d.id === `${NS}:alpha`).similarity,
-    ).toBeGreaterThan(0.74);
+    const submissionMatch = second
+      .json()
+      .duplicates.find((d: { id: string }) => d.id === `${NS}:alpha`);
+    expect(submissionMatch.similarity).toBeGreaterThan(0.74);
+    expect(submissionMatch.isPublic).toBe(true);
 
     const pair = await pairBetween(`${NS}:alpha`, `${NS}:alpha-copy`);
     expect(pair?.status).toBe("suspected");
@@ -180,10 +184,25 @@ run("M3DUP duplicate detection", () => {
     const mine = await app.inject({ url: "/v1/me/duplicates", headers: bearer(publisherToken) });
     expect(mine.statusCode).toBe(200);
     expect(mine.json().items.length).toBeGreaterThan(0);
+    expect(mine.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: `${NS}:alpha-copy`,
+          yourListing: { id: `${NS}:alpha`, title: "Superchain Builders Fund" },
+        }),
+      ]),
+    );
+    for (const item of mine.json().items) {
+      expect(item.yourListing).toEqual({
+        id: expect.any(String),
+        title: expect.any(String),
+      });
+    }
 
     const sub = await app.inject({ url: `/v1/opportunities/${NS}:alpha-copy/duplicates` });
     expect(sub.statusCode).toBe(200);
-    expect(sub.json().items.map((d: { id: string }) => d.id)).toContain(`${NS}:alpha`);
+    const publicCounterpart = sub.json().items.find((d: { id: string }) => d.id === `${NS}:alpha`);
+    expect(publicCounterpart).toEqual(expect.objectContaining({ isPublic: true }));
   });
 
   // ── T-DUP-2 ───────────────────────────────────────────────────────────────────
@@ -261,6 +280,15 @@ run("M3DUP duplicate detection", () => {
         pair.right.id,
       ]);
     expect(sides).toContain(`${OTHER_NS}:hidden`);
+
+    // Reviewer visibility is not ownership: their account-scoped queue remains empty because none
+    // of these pairs touches a listing they submitted or publish by namespace.
+    const reviewerMine = await app.inject({
+      url: "/v1/me/duplicates",
+      headers: bearer(reviewerToken),
+    });
+    expect(reviewerMine.statusCode).toBe(200);
+    expect(reviewerMine.json().items).toEqual([]);
   });
 
   it("still shows an owner a pair of their OWN entries when neither side is public", async () => {
@@ -284,11 +312,48 @@ run("M3DUP duplicate detection", () => {
     // is not one it can find. The all-scope pass — what the backfill job runs — is.
     await new DedupeService().embedAndDetect(await rowIdOf(`${OTHER_NS}:hidden-twin`), "all");
     expect(await pairBetween(`${OTHER_NS}:hidden`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();
+    expect(await pairBetween(`${NS}:alpha`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();
 
     const mine = await app.inject({ url: "/v1/me/duplicates", headers: bearer(strangerToken) });
     expect(mine.statusCode).toBe(200);
-    const items = mine.json().items.map((item: { id: string }) => item.id);
-    expect(items).toContain(`${OTHER_NS}:hidden`);
+    const items = mine.json().items as Array<{
+      id: string;
+      isPublic: boolean;
+      yourListing: { id: string; title: string };
+    }>;
+
+    // The all-owned pair is one stored pair and therefore one row. Its canonical left side is the
+    // account side, even though both sides qualify as owned.
+    const pendingPair = items.filter(
+      (item) =>
+        new Set([item.yourListing.id, item.id]).size === 2 &&
+        [item.yourListing.id, item.id].every((id) =>
+          [`${OTHER_NS}:hidden`, `${OTHER_NS}:hidden-twin`].includes(id),
+        ),
+    );
+    expect(pendingPair).toEqual([
+      expect.objectContaining({
+        id: `${OTHER_NS}:hidden-twin`,
+        isPublic: false,
+        yourListing: expect.objectContaining({ id: `${OTHER_NS}:hidden` }),
+      }),
+    ]);
+
+    // Two owned submissions can match the same public listing. `yourListing` keeps those rows
+    // distinct instead of leaving two indistinguishable copies of the public counterpart.
+    const againstAlpha = items.filter((item) => item.id === `${NS}:alpha`);
+    expect(againstAlpha).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          isPublic: true,
+          yourListing: expect.objectContaining({ id: `${OTHER_NS}:hidden` }),
+        }),
+        expect.objectContaining({
+          isPublic: true,
+          yourListing: expect.objectContaining({ id: `${OTHER_NS}:hidden-twin` }),
+        }),
+      ]),
+    );
 
     // …and the sub-resource agrees, from either side of the same pair.
     const sub = await app.inject({
@@ -296,7 +361,11 @@ run("M3DUP duplicate detection", () => {
       headers: bearer(strangerToken),
     });
     expect(sub.statusCode).toBe(200);
-    expect(sub.json().items.map((item: { id: string }) => item.id)).toContain(`${OTHER_NS}:hidden`);
+    expect(sub.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: `${OTHER_NS}:hidden`, isPublic: false }),
+      ]),
+    );
 
     // The leak stays closed: neither pending entry has become visible to the publisher, who owns
     // the public entry they were both matched against.
@@ -350,7 +419,7 @@ run("M3DUP duplicate detection", () => {
     expect(created.statusCode, created.body).toBe(201);
     const rowId = await rowIdOf(`${NS}:racing-embed`);
 
-    const real = new DeterministicEmbeddingProvider();
+    const real = new LexicalEmbeddingProvider();
     const project = (row: {
       title: string;
       summary: string | null;
@@ -437,6 +506,142 @@ run("M3DUP duplicate detection", () => {
   });
 
   // ── T-DUP-5 ───────────────────────────────────────────────────────────────────
+  it("reopens only dismissed pairs, returns them to review, and audits the transition once", async () => {
+    const original = await post(
+      publisherToken,
+      entry(`${NS}:reopen`, "Superchain Reopen Fund", ALPHA_BODY),
+    );
+    expect(original.statusCode, original.body).toBe(201);
+    const copy = await post(
+      publisherToken,
+      entry(`${NS}:reopen-copy`, "Superchain Reopen Fund | Directory", reword(ALPHA_BODY)),
+    );
+    expect(copy.statusCode, copy.body).toBe(201);
+
+    const pair = await pairBetween(`${NS}:reopen`, `${NS}:reopen-copy`);
+    expect(pair, "reopen fixtures should be suspected duplicates").toBeTruthy();
+    if (!pair) throw new Error("missing reopen pair");
+
+    // A retry that arrives before the dismissal is already in the requested state: success, with
+    // neither a timestamp rewrite nor a fictional transition in the append-only audit trail.
+    const alreadySuspected = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(alreadySuspected.statusCode, alreadySuspected.body).toBe(200);
+    expect(alreadySuspected.json().status).toBe("suspected");
+
+    const confirmed = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/confirm`,
+      headers: bearer(reviewerToken),
+    });
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    expect(confirmed.json().status).toBe("confirmed");
+
+    const confirmedReopen = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(confirmedReopen.statusCode, confirmedReopen.body).toBe(409);
+    expect(confirmedReopen.json()).toEqual(
+      expect.objectContaining({
+        error: "duplicate_not_dismissed",
+        message: expect.stringContaining("confirmed, not dismissed"),
+      }),
+    );
+
+    // Confirmed ↔ dismissed remains an ordinary decision; reopen starts only after that dismissal.
+    const dismissed = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/dismiss`,
+      headers: bearer(reviewerToken),
+    });
+    expect(dismissed.statusCode, dismissed.body).toBe(200);
+    expect(dismissed.json().status).toBe("dismissed");
+    expect(
+      (await new DedupeService().listForReview("suspected", 200)).some(
+        (candidate) => candidate.id === pair.id,
+      ),
+    ).toBe(false);
+
+    const reopened = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(reopened.statusCode, reopened.body).toBe(200);
+    expect(reopened.json()).toEqual(
+      expect.objectContaining({ id: pair.id, status: "suspected", reviewedAt: expect.any(String) }),
+    );
+    expect(
+      (await new DedupeService().listForReview("suspected", 200)).map((candidate) => candidate.id),
+    ).toContain(pair.id);
+
+    const stored = await pairBetween(`${NS}:reopen`, `${NS}:reopen-copy`);
+    expect(stored).toEqual(
+      expect.objectContaining({
+        status: "suspected",
+        reviewedBy: reviewerAccountId,
+        reviewedAt: expect.any(Date),
+      }),
+    );
+    const reopenAudits = await db
+      .select({
+        subjectKind: auditLog.subjectKind,
+        subjectId: auditLog.subjectId,
+        actorKind: auditLog.actorKind,
+        actorAccountId: auditLog.actorAccountId,
+        action: auditLog.action,
+        patch: auditLog.patch,
+      })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "duplicate"),
+          eq(auditLog.subjectId, pair.id),
+          eq(auditLog.action, "reopen"),
+        ),
+      );
+    expect(reopenAudits).toEqual([
+      {
+        subjectKind: "duplicate",
+        subjectId: pair.id,
+        actorKind: "user",
+        actorAccountId: reviewerAccountId,
+        action: "reopen",
+        patch: { status: { before: "dismissed", after: "suspected" } },
+      },
+    ]);
+
+    const repeated = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(repeated.statusCode, repeated.body).toBe(200);
+    expect(repeated.json()).toEqual(reopened.json());
+    const auditCount = await db
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "duplicate"),
+          eq(auditLog.subjectId, pair.id),
+          eq(auditLog.action, "reopen"),
+        ),
+      );
+    expect(auditCount).toHaveLength(1);
+
+    // These deliberately near-identical fixtures have finished their job. Remove them before the
+    // later ANN tests so they do not consume slots in the detector's fixed top-20 candidate window.
+    await db
+      .delete(opportunities)
+      .where(inArray(opportunities.publicId, [`${NS}:reopen`, `${NS}:reopen-copy`]));
+  });
+
   it("never resurrects a dismissed pair", async () => {
     const pair = await pairBetween(`${NS}:alpha`, `${NS}:probe`);
     expect(pair).toBeTruthy();
@@ -487,8 +692,24 @@ run("M3DUP duplicate detection", () => {
     expect(merged.json().mergedId).toBe(`${NS}:beta-copy`);
     expect(merged.json().copiedFields).toEqual([]);
 
-    // The loser leaves the public reads; its row stays, pointed at the survivor.
-    expect((await app.inject({ url: `/v1/opportunities/${NS}:beta-copy` })).statusCode).toBe(404);
+    const reopened = await app.inject({
+      method: "POST",
+      url: `/v1/review/duplicates/${pair?.id}/reopen`,
+      headers: bearer(reviewerToken),
+    });
+    expect(reopened.statusCode, reopened.body).toBe(409);
+    expect(reopened.json().error).toBe("already_merged");
+
+    // The loser's old public id remains a 404, enriched only with its currently-public survivor.
+    const formerPublic = await app.inject({ url: `/v1/opportunities/${NS}:beta-copy` });
+    expect(formerPublic.statusCode).toBe(404);
+    expect(formerPublic.json()).toEqual({
+      error: "opportunity_merged",
+      mergedInto: {
+        id: `${NS}:beta`,
+        title: "Superchain Builders Fund Cohort",
+      },
+    });
     expect((await app.inject({ url: `/v1/opportunities/${NS}:beta` })).statusCode).toBe(200);
     const loser = (
       await db
@@ -501,6 +722,94 @@ run("M3DUP duplicate detection", () => {
     expect(loser?.isListed).toBe(false);
     expect(loser?.status).toBe("archived");
     expect(loser?.mergedIntoId).toBe(await rowIdOf(`${NS}:beta`));
+    expect(loser?.mergedFromPublic).toBe(true);
+
+    const mine = await app.inject({
+      url: `/v1/me/opportunities?id=${encodeURIComponent(`${NS}:beta-copy`)}`,
+      headers: bearer(publisherToken),
+    });
+    expect(mine.statusCode, mine.body).toBe(200);
+    expect(mine.json().items).toEqual([
+      expect.objectContaining({
+        id: `${NS}:beta-copy`,
+        mergedInto: {
+          id: `${NS}:beta`,
+          title: "Superchain Builders Fund Cohort",
+        },
+      }),
+    ]);
+
+    // The owner remains entitled to the survivor id through the merge audit, but unlisting the
+    // survivor makes its current title private and removes the public destination the UI could
+    // safely link to.
+    const unlisted = await app.inject({
+      method: "PATCH",
+      url: `/v1/review/opportunities/${NS}:beta`,
+      headers: bearer(reviewerToken),
+      payload: { isListed: false },
+    });
+    expect(unlisted.statusCode, unlisted.body).toBe(200);
+    const mineWithHiddenSurvivor = await app.inject({
+      url: `/v1/me/opportunities?id=${encodeURIComponent(`${NS}:beta-copy`)}`,
+      headers: bearer(publisherToken),
+    });
+    expect(mineWithHiddenSurvivor.statusCode, mineWithHiddenSurvivor.body).toBe(200);
+    expect(mineWithHiddenSurvivor.json().items).toEqual([
+      expect.objectContaining({
+        id: `${NS}:beta-copy`,
+        mergedInto: { id: `${NS}:beta`, title: null },
+      }),
+    ]);
+    const relisted = await app.inject({
+      method: "PATCH",
+      url: `/v1/review/opportunities/${NS}:beta`,
+      headers: bearer(reviewerToken),
+      payload: { isListed: true },
+    });
+    expect(relisted.statusCode, relisted.body).toBe(200);
+
+    // A merge is terminal at the services that own every revival path: create/replace, both
+    // approval authorities, and the listing decision route all return the same stable conflict.
+    const loserDocument = entry(
+      `${NS}:beta-copy`,
+      "Superchain Builders Fund Cohort | Directory",
+      reword(ALPHA_BODY),
+    );
+    const revivalAttempts = [
+      await app.inject({
+        method: "PUT",
+        url: `/v1/opportunities/${NS}:beta-copy`,
+        headers: bearer(publisherToken),
+        payload: loserDocument,
+      }),
+      await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: bearer(publisherToken),
+        payload: loserDocument,
+      }),
+      await app.inject({
+        method: "POST",
+        url: `/v1/review/opportunities/${NS}:beta-copy/approve`,
+        headers: bearer(reviewerToken),
+        payload: {},
+      }),
+      await app.inject({
+        method: "POST",
+        url: `/v1/organizations/${NS}/opportunities/${NS}:beta-copy/approve`,
+        headers: bearer(publisherToken),
+      }),
+      await app.inject({
+        method: "PATCH",
+        url: `/v1/review/opportunities/${NS}:beta-copy`,
+        headers: bearer(reviewerToken),
+        payload: { isListed: true },
+      }),
+    ];
+    for (const attempt of revivalAttempts) {
+      expect(attempt.statusCode, attempt.body).toBe(409);
+      expect(attempt.json().error).toBe("opportunity_merged");
+    }
 
     // One audit row on EACH entry: "this absorbed that" and "this was absorbed" are different facts.
     for (const publicId of [`${NS}:beta`, `${NS}:beta-copy`]) {

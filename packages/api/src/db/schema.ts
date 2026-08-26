@@ -147,6 +147,9 @@ export const auditAction = pgEnum("audit_action", [
   "claim",
   "grant_publisher",
   "revoke_publisher",
+  "invite_member",
+  "accept_member_invite",
+  "revoke_member_invite",
   // organizations
   "verify_organization",
   "unverify_organization",
@@ -297,6 +300,37 @@ export const orgMemberships = pgTable(
   ],
 );
 
+// ── org_membership_invites (publishing rights waiting for a verified sign-in) ────
+export const orgMembershipInvites = pgTable(
+  "org_membership_invites",
+  {
+    id: bigint({ mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+    organizationId: bigint({ mode: "number" })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Normalized to lowercase by the service; the partial index also lowers defensively. */
+    email: text().notNull(),
+    role: orgRole().notNull().default("publisher"),
+    invitedBy: bigint({ mode: "number" })
+      .notNull()
+      .references(() => accounts.id),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    acceptedAccountId: bigint({ mode: "number" }).references(() => accounts.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    uniqueIndex("ux_org_membership_invite_pending")
+      .on(t.organizationId, sql`lower(${t.email})`)
+      .where(sql`${t.acceptedAt} is null`),
+    index("ix_org_membership_invite_pending_email")
+      .on(sql`lower(${t.email})`)
+      .where(sql`${t.acceptedAt} is null`),
+    index("ix_org_membership_invite_organization").on(t.organizationId, t.createdAt),
+  ],
+);
+
 // ── opportunities (core; trimmed to the M2 read surface) ─────────────────────────
 export const opportunities = pgTable(
   "opportunities",
@@ -406,12 +440,21 @@ export const opportunities = pgTable(
      * Set on the LOSER of a merge, pointing at the survivor.
      *
      * The row is kept rather than deleted: its public id may already be in an export, a feed or
-     * someone's bookmarks, and a merge should redirect rather than 404. A survivor that itself
-     * carries this is refused as a merge target, which is what prevents chains and cycles.
+     * someone's bookmarks, and a public id that used to resolve may still tell a client where the
+     * listing went. A survivor that itself carries this is refused as a merge target, which is what
+     * prevents chains and cycles.
      */
     mergedIntoId: bigint({ mode: "number" }).references((): AnyPgColumn => opportunities.id, {
       onDelete: "set null",
     }),
+    /**
+     * Whether the LOSER was public at the instant it was merged.
+     *
+     * This is intentionally stored rather than reconstructed from the loser's terminal state: the
+     * merge itself rejects, unlists and archives that row. False by default means rows merged before
+     * this provenance bit existed reveal nothing conservatively.
+     */
+    mergedFromPublic: boolean().notNull().default(false),
 
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -739,6 +782,7 @@ export type AccountInsert = typeof accounts.$inferInsert;
 export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type ApiKeyInsert = typeof apiKeys.$inferInsert;
 export type OrgMembershipRow = typeof orgMemberships.$inferSelect;
+export type OrgMembershipInviteRow = typeof orgMembershipInvites.$inferSelect;
 export type AuditLogRow = typeof auditLog.$inferSelect;
 export type AuditLogInsert = typeof auditLog.$inferInsert;
 export type OpportunityClaimRow = typeof opportunityClaims.$inferSelect;

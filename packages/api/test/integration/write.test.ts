@@ -96,6 +96,13 @@ run("M3WRITE submissions", () => {
     expect(Array.isArray(body.errors)).toBe(true);
     expect(body.errors.length).toBeGreaterThan(0);
     expect(body.errors.join(" ")).toMatch(/title/);
+    // Response schemas are closed. This round-trip assertion proves Fastify did not silently drop
+    // the additive structured contract during serialization.
+    expect(body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "/title", message: expect.any(String) }),
+      ]),
+    );
     // Fastify's own message would read "body/title must be string"; the service's does not.
     expect(body.message).not.toMatch(/^body\//);
   });
@@ -130,6 +137,10 @@ run("M3WRITE submissions", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(res.json().errors.join(" ")).toMatch(/`title` must be at most 256/);
+    expect(res.json().issues).toContainEqual({
+      path: "/title",
+      message: "must be at most 256 characters (got 300).",
+    });
   });
 
   it("stores an unprivileged submission as pending and keeps it out of every public read", async () => {

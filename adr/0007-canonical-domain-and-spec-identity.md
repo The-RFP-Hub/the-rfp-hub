@@ -391,6 +391,8 @@ exist.
 - **Decide whether `https://ethrfps.app/ns/rfp` should serve anything.** A vocabulary namespace is
   not required to dereference, and `ARTIFACTS.md` already schedules `vocabulary.ttl` behind "a
   consumer asks for it". If it is ever built, that document is what the namespace resolves to.
+  *(Decided 2026-08-25 — it dereferences now; see the addendum below. The resolving document is a
+  JSON-LD landing document, not the still-planned `vocabulary.ttl`.)*
 - `adr/README.md` gains a 0007 index row.
 
 ---
@@ -458,3 +460,30 @@ unchanged. Neither layer is redundant, for the same reason as before.
 - **Neutral:** the frontend must know the API's origin to proxy at all. It already does —
   `NEXT_PUBLIC_API_URL` is inlined at build time and named in the page's `connect-src` — so a
   deployment pointing at a different API must be rebuilt, which was already true.
+
+---
+
+## Addendum — 2026-08-25: the vocabulary namespace dereferences
+
+The fourth follow-up is closed, and slightly differently from its own hypothesis. The namespace
+resolves — but to a **JSON-LD landing document** (`packages/standard/ns/rfp.jsonld`, served at
+`/ns/rfp` with `application/ld+json`), not to `vocabulary.ttl`, which stays planned behind its
+stated trigger. The landing document invents nothing: its term set is derived from the one place a
+term already *becomes* ours — the frozen context's `@vocab` expansion, judged by EFFECTIVE TARGET
+(a definition's string value, its `@id`, or the term's own name; any relative target resolves into
+the namespace — the same classifier the validate package's context suite uses, which is how
+`platform` correctly contributes `socialPlatform` rather than itself) — and each term's comment
+quotes the schema's own field definition. No
+axioms, no cross-vocabulary equivalences; those are exactly what the planned Turtle serialization
+is for, and shipping an informal version of them here would spend the RDF decline's credibility.
+
+`ns` joins `PUBLISHED_TREES`, so the apex allowlist, the API's root-mounted routes and the
+package's `exports` map stay derived from one list — and the frontend's `/ns/*` carve-out, held in
+reserve since the 2026-08-20 addendum, finally forwards something. The one novelty in the serving
+machinery is the one the IRI itself demands: a fragment IRI dereferences at the IRI minus its
+fragment, so `/ns/rfp` — extensionless, because a namespace's identity carries no serialization
+hint — serves the same bytes as `ns/rfp.jsonld`, and the mirror test pins that alias as the single
+deliberate exception to one-file-one-path. Drift between the context's self-defined terms and the
+landing document is a publication-rule failure (`check-spec.mjs` rule 2d), in both directions:
+a term the context mints that the document omits, and a term the document lists that nothing
+expands to.

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The form's building blocks: one input, one label, one hint, one problem.
+ * The form's building blocks: one label, one input, one hint, one problem.
  *
  * WHY THESE EXIST rather than a hundred hand-rolled `<div className="field">`s. Three things have
  * to be true of every single input on the submission form, and each of them is the kind of thing
@@ -28,7 +28,7 @@ export function fieldId(path: string): string {
   return `f-${path.replace(/[^A-Za-z0-9]+/g, "-")}`;
 }
 
-export interface FieldChrome {
+interface FieldChromeBase {
   path: string;
   label: ReactNode;
   hint?: ReactNode;
@@ -39,11 +39,17 @@ export interface FieldChrome {
    * validator's advisory warnings, and a field carrying one is conformant.
    */
   advisory?: string;
-  /** Rendered under the input, above the problem — the character counters live here. */
+  /** Rendered beside or just below the hint, above the problem — character counters live here. */
   meter?: ReactNode;
-  /** Marks the label so a publisher can tell what they may leave alone. */
-  optional?: boolean;
 }
+
+/** Required and optional are explicit, mutually exclusive claims. */
+export type FieldChrome = FieldChromeBase &
+  (
+    | { required: true; optional?: never }
+    | { optional: true; required?: never }
+    | { required?: false; optional?: false }
+  );
 
 /**
  * The wiring, without the control.
@@ -60,6 +66,7 @@ export function Field({
   advisory,
   meter,
   optional,
+  required,
   className,
   children,
 }: FieldChrome & {
@@ -68,7 +75,9 @@ export function Field({
     id: string;
     "aria-describedby": string | undefined;
     "aria-invalid": boolean | undefined;
+    "aria-required": true | undefined;
     className: string | undefined;
+    required: boolean | undefined;
   }) => ReactNode;
 }) {
   const id = fieldId(path);
@@ -78,30 +87,50 @@ export function Field({
   const describedBy = [hintId, problemId, advisoryId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className={className ? `field ${className}` : "field"}>
-      <label htmlFor={id}>
-        {label}
-        {optional ? <span className="muted"> — optional</span> : null}
-      </label>
-      {hint ? (
-        <p className="hint" id={hintId}>
-          {hint}
-        </p>
+    <div
+      data-field-path={path}
+      className={
+        className ? `field ${styles.fieldLayout} ${className}` : `field ${styles.fieldLayout}`
+      }
+    >
+      <div className={styles.labelRow}>
+        <label htmlFor={id}>
+          {label}
+          {optional ? <span className="muted"> — optional</span> : null}
+        </label>
+        {required ? (
+          <span className={styles.requiredMark} aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </div>
+      <div className={styles.control}>
+        {children({
+          id,
+          "aria-describedby": describedBy,
+          "aria-invalid": problem ? true : undefined,
+          "aria-required": required ? true : undefined,
+          className: problem ? styles.invalid : undefined,
+          required: required ? true : undefined,
+        })}
+      </div>
+      {hint || meter ? (
+        <div className={styles.guidanceRow}>
+          {hint ? (
+            <p className="hint" id={hintId}>
+              {hint}
+            </p>
+          ) : null}
+          {meter}
+        </div>
       ) : null}
-      {children({
-        id,
-        "aria-describedby": describedBy,
-        "aria-invalid": problem ? true : undefined,
-        className: problem ? styles.invalid : undefined,
-      })}
-      {meter}
       {problem ? (
         <span className={styles.problem} id={problemId}>
           {problem}
         </span>
       ) : null}
       {advisory ? (
-        <span className={styles.advisory} id={advisoryId}>
+        <span className={`callout ${styles.advisory}`} id={advisoryId}>
           {advisory}
         </span>
       ) : null}
@@ -343,7 +372,7 @@ export function CheckField({
   const id = fieldId(path);
   const hintId = hint ? `${id}-hint` : undefined;
   return (
-    <div className="field">
+    <div className="field" data-field-path={path}>
       <label className={styles.check} htmlFor={id}>
         <input
           id={id}
@@ -367,6 +396,7 @@ export function CheckField({
 export function CheckList({
   path,
   legend,
+  optional,
   hint,
   options,
   selected,
@@ -374,14 +404,18 @@ export function CheckList({
 }: {
   path: string;
   legend: ReactNode;
+  optional?: boolean;
   hint?: ReactNode;
   options: readonly string[];
   selected: string[];
   onChange: (selected: string[]) => void;
 }) {
   return (
-    <fieldset className="field">
-      <legend>{legend}</legend>
+    <fieldset className="field" data-field-path={path}>
+      <legend>
+        {legend}
+        {optional ? <span className="muted"> — optional</span> : null}
+      </legend>
       {hint ? <p className="hint">{hint}</p> : null}
       <div className={styles.checks}>
         {options.map((option) => {
@@ -425,7 +459,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
  * A repeating group: a list of rows, each removable, with an add button under it.
  *
  * `onMove` is passed ONLY by the two lists whose order means something — the primary operating
- * organisation and the milestone sequence. Arrows on a list whose order is presentational would
+ * organization and the milestone sequence. Arrows on a list whose order is presentational would
  * imply a meaning that is not there.
  */
 export function Repeatable<T extends { key: string }>({

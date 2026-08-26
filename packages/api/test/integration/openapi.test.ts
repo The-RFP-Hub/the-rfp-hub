@@ -144,6 +144,9 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "ApiKey",
       "ApiKeyCreated",
       "ManagedOpportunityList",
+      "MergedOpportunityErrorResponse",
+      "OwnedDuplicateMatch",
+      "OwnedDuplicateList",
       "DuplicatePairList",
       "MergeResult",
       "InsightsSeries",
@@ -163,6 +166,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/review/opportunities", "get"],
       ["/v1/review/opportunities/{id}", "get"],
       ["/v1/review/duplicates", "get"],
+      ["/v1/review/duplicates/{pairId}/reopen", "post"],
       ["/v1/review/duplicates/{id}/merge", "post"],
       ["/v1/review/opportunities/{id}/verify", "post"],
       ["/v1/insights/me/summary", "get"],
@@ -179,7 +183,44 @@ run("OpenAPI 3.1 live-spec contract", () => {
     expect(doc.paths["/v1/publishers"].get.security).toBeUndefined();
     // the error contract is published, too
     expect(doc.paths["/v1/opportunities"].get.responses["400"]).toBeTruthy();
-    expect(doc.paths["/v1/opportunities/{id}"].get.responses["404"]).toBeTruthy();
+    const detail404 =
+      doc.paths["/v1/opportunities/{id}"].get.responses["404"].content["application/json"].schema;
+    expect(detail404.oneOf.map((variant: { $ref: string }) => variant.$ref)).toEqual([
+      "#/components/schemas/ErrorResponse",
+      "#/components/schemas/MergedOpportunityErrorResponse",
+    ]);
+    // The enriched variant is additive: the ordinary not-found contract remains one arm.
+    expect(doc.components.schemas.MergedOpportunityErrorResponse.required).toEqual([
+      "error",
+      "mergedInto",
+    ]);
+    expect(
+      [
+        ...doc.components.schemas.ManagedOpportunity.properties.mergedInto.properties.title.type,
+      ].sort(),
+    ).toEqual(["null", "string"]);
+    const approveClaimConflict =
+      doc.paths["/v1/review/claims/{id}/approve"].post.responses["409"].content["application/json"]
+        .schema;
+    expect(approveClaimConflict.properties.error.enum).toEqual([
+      "claim_decided",
+      "opportunity_merged",
+    ]);
+    expect(approveClaimConflict.description).toContain("opportunity_merged");
+    const rejectClaimConflict =
+      doc.paths["/v1/review/claims/{id}/reject"].post.responses["409"].content["application/json"]
+        .schema;
+    expect(rejectClaimConflict.properties.error.enum).toEqual(["claim_decided"]);
+    expect(rejectClaimConflict.description).not.toContain("opportunity_merged");
+    const reopenDuplicateConflict =
+      doc.paths["/v1/review/duplicates/{pairId}/reopen"].post.responses["409"].content[
+        "application/json"
+      ].schema;
+    expect(reopenDuplicateConflict.properties.error.enum).toEqual([
+      "already_merged",
+      "duplicate_not_dismissed",
+    ]);
+    expect(reopenDuplicateConflict.description).toContain("confirmed");
     // no trailing-slash paths, and every operation carries a unique operationId
     const operationIds: string[] = [];
     for (const [path, ops] of Object.entries<Record<string, { operationId?: string }>>(doc.paths)) {

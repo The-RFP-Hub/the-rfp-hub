@@ -99,10 +99,6 @@ export function SignIn({
         return;
       }
       setStep("code");
-      setNote({
-        kind: "ok",
-        message: `Code sent to ${email.trim()}. It is good for five minutes.`,
-      });
     } catch (cause) {
       setNote({ kind: "error", message: describeTransportFailure(cause) });
     } finally {
@@ -207,11 +203,11 @@ export function SignIn({
 
   return (
     <div className="signin">
-      <h2 id="signin-heading">Sign in</h2>
+      <h2 id="signin-heading">Log in</h2>
       <p className="muted footnote">
         We email you a {OTP_LENGTH}-digit code. There is no password. The first time you sign in,
         this creates your account; publishing without review additionally requires membership of a
-        verified organisation, which a reviewer grants.{" "}
+        verified organization, which a reviewer grants.{" "}
         <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it — including
         everything you can already do here without an account.
       </p>
@@ -283,8 +279,8 @@ export function SignIn({
       ) : null}
 
       <p className="muted footnote">
-        Signing in stores a session token in this browser and sends it to the API, which is the only
-        thing that decides what an account may do. Signing out removes it.
+        This browser stores a session so you can manage your account. Permissions are checked when
+        you submit or manage a listing. Signing out removes the session.
       </p>
     </div>
   );

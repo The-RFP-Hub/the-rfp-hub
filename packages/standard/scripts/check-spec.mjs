@@ -18,6 +18,12 @@
 //                        rule existed only in PROCESS.md prose until 2026-08-10; it is
 //                        mechanised here because that is the release checklist item most
 //                        likely to be forgotten in the one release that performs it.
+//   2d. VOCAB DOC    — the dereferenceable vocabulary document (`ns/rfp.jsonld`, served at the
+//                        vocab IRI minus its fragment) and the JSON-LD context must name the
+//                        same self-defined term set. The context is where a term BECOMES ours
+//                        (no explicit @id, so it expands via @vocab); the ns document is where
+//                        that fact dereferences. Two hand-maintained lists of one fact — the
+//                        exact shape rule 1 exists for.
 //   3. NEUTRALITY      — an internal issue-tracker ID inside a CC0 artifact that is
 //                        designed to be embedded, forked and code-generated from. One leak
 //                        in a normative field description travels into every downstream copy.
@@ -363,6 +369,52 @@ for (const file of walk(pkgRoot)) {
   }
 }
 
+// ------------------------------------------------- 2d. vocab document drift ---
+const vocabDoc = readJson(p("ns", "rfp.jsonld"));
+const vocabNodes = vocabDoc["@graph"] ?? [];
+const vocabNamespaceNode = vocabNodes.find((n) => n["@id"] === spec.vocabIri);
+if (!vocabNamespaceNode) {
+  fail("vocab-drift", `ns/rfp.jsonld has no namespace node with @id '${spec.vocabIri}'`);
+}
+const vocabDocTerms = new Set(
+  vocabNodes
+    .map((n) => n["@id"])
+    .filter((id) => typeof id === "string" && id.startsWith(spec.vocabIri) && id !== spec.vocabIri)
+    .map((id) => id.slice(spec.vocabIri.length)),
+);
+// The context's SELF-DEFINED terms, by EFFECTIVE TARGET: a definition's target is its string
+// value, its @id, or — absent both — the term's own name, and any target without a colon is
+// relative, which JSON-LD resolves through @vocab into OUR namespace. Same classifier as
+// packages/validate's standard-context suite; `platform` mapping to `socialPlatform` is why the
+// comparison is on targets, never on term names.
+const selfDefined = new Set();
+const collectSelfDefined = (ctx) => {
+  for (const [term, value] of Object.entries(ctx)) {
+    if (term.startsWith("@") || CONTEXT_MACHINERY.has(term)) continue;
+    if (value === null) continue;
+    const target = typeof value === "string" ? value : (value["@id"] ?? term);
+    if (typeof target === "string" && !target.includes(":")) selfDefined.add(target);
+    if (typeof value === "object" && "@context" in value) collectSelfDefined(value["@context"]);
+  }
+};
+collectSelfDefined(context);
+for (const term of selfDefined) {
+  if (!vocabDocTerms.has(term)) {
+    fail(
+      "vocab-drift",
+      `context resolves a term to '${spec.vocabIri}${term}' but ns/rfp.jsonld does not list it`,
+    );
+  }
+}
+for (const term of vocabDocTerms) {
+  if (!selfDefined.has(term)) {
+    fail(
+      "vocab-drift",
+      `ns/rfp.jsonld lists '${term}' but no context definition resolves to it via @vocab`,
+    );
+  }
+}
+
 // ------------------------------------------------------------------ report --
 if (failures.length > 0) {
   console.error(`✗ check-spec: ${failures.length} failure(s)`);
@@ -370,5 +422,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `✓ check-spec: context covers ${topLevelProperties.length} top-level terms, identifiers all ${spec.identityStatus} and stamped from spec.config.json (${spec.baseUrl}), identity sweep found no stray schema/vocab URLs, maturity '${spec.status}' agrees with ${isFrozen ? "a present" : "no"} FROZEN marker, version strings agree on ${want}, no tracker IDs, unowned-domain URLs or retired identifiers`,
+  `✓ check-spec: context covers ${topLevelProperties.length} top-level terms, ns/rfp.jsonld carries all ${vocabDocTerms.size} self-defined terms, identifiers all ${spec.identityStatus} and stamped from spec.config.json (${spec.baseUrl}), identity sweep found no stray schema/vocab URLs, maturity '${spec.status}' agrees with ${isFrozen ? "a present" : "no"} FROZEN marker, version strings agree on ${want}, no tracker IDs, unowned-domain URLs or retired identifiers`,
 );

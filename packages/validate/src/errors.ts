@@ -44,6 +44,13 @@ function branchValidator(tag: string): ValidateFunction | undefined {
   return generatedBranchValidators[tag];
 }
 
+export interface ValidationIssue {
+  /** JSON Pointer, or the literal `(root)` for a whole-document error. */
+  path: string;
+  /** The rule without a duplicated pointer or funding-details infix. */
+  message: string;
+}
+
 /**
  * A failing `fundingDetails` makes ajv report every branch of the `oneOf`, burying the message
  * that matters. The instance's own `fundingType` tag says which shape was meant: keep only that
@@ -74,8 +81,46 @@ function explainOneOf(errors: readonly ErrorObject[], data: unknown): string[] |
       e.keyword === "additionalProperties"
         ? `unknown field '${(e.params as { additionalProperty: string }).additionalProperty}'`
         : describe(e);
-    return `/fundingDetails${e.instancePath} ${tag} details: ${msg}`;
+    return `/fundingDetails${errorPointer(e)} ${tag} details: ${msg}`;
   });
+}
+
+function explainOneOfIssues(
+  errors: readonly ErrorObject[],
+  data: unknown,
+): ValidationIssue[] | undefined {
+  if (!errors.some(isFundingDetailsError)) return undefined;
+  if (!isRecord(data) || !isRecord(data.fundingDetails)) return undefined;
+
+  const tag = data.fundingDetails.fundingType;
+  if (typeof tag !== "string" || !FUNDING_TYPES.includes(tag)) {
+    return [
+      {
+        path: "/fundingDetails",
+        message: `must carry a fundingType tag naming its shape (one of: ${FUNDING_TYPES.join(", ")})`,
+      },
+    ];
+  }
+
+  const declared = data.fundingType;
+  if (typeof declared === "string" && FUNDING_TYPES.includes(declared) && declared !== tag) {
+    return [
+      {
+        path: "/fundingType",
+        message: `fundingDetails.fundingType '${tag}' does not match the opportunity's fundingType '${declared}'`,
+      },
+    ];
+  }
+
+  const validate = branchValidator(tag);
+  if (!validate || validate(data.fundingDetails)) return undefined;
+  return (validate.errors ?? []).map((error) => ({
+    path: `/fundingDetails${errorPointer(error)}`,
+    message:
+      error.keyword === "additionalProperties"
+        ? `unknown field '${(error.params as { additionalProperty: string }).additionalProperty}'`
+        : describe(error),
+  }));
 }
 
 /** The message part of a humanized line, naming the values ajv leaves in `params`. */
@@ -117,4 +162,41 @@ export function humanizeErrors(errors: readonly ErrorObject[], data?: unknown): 
   const detailLines = explainOneOf(kept, data);
   if (!detailLines) return kept.map(humanizeError);
   return [...detailLines, ...kept.filter((e) => !isFundingDetailsError(e)).map(humanizeError)];
+}
+
+function pointerToken(value: string): string {
+  return value.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function errorPointer(error: ErrorObject): string {
+  if (error.keyword === "required") {
+    const missing = (error.params as { missingProperty?: string }).missingProperty;
+    if (missing) return `${error.instancePath}/${pointerToken(missing)}`;
+  }
+  return error.instancePath;
+}
+
+function issueFor(error: ErrorObject): ValidationIssue {
+  if (error.keyword === "required") {
+    const missing = (error.params as { missingProperty?: string }).missingProperty;
+    if (missing) {
+      return {
+        path: errorPointer(error),
+        message: "is required",
+      };
+    }
+  }
+  return {
+    path: error.instancePath?.length ? error.instancePath : "(root)",
+    message: describe(error),
+  };
+}
+
+/** Structured companions to `humanizeErrors`; the legacy strings remain unchanged. */
+export function humanizeIssues(errors: readonly ErrorObject[], data?: unknown): ValidationIssue[] {
+  const meaningful = errors.filter((error) => !isRedundantIfWrapper(error));
+  const kept = meaningful.length > 0 ? meaningful : errors;
+  const detailIssues = explainOneOfIssues(kept, data);
+  if (!detailIssues) return kept.map(issueFor);
+  return [...detailIssues, ...kept.filter((error) => !isFundingDetailsError(error)).map(issueFor)];
 }

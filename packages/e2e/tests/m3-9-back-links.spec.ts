@@ -9,20 +9,68 @@
  * open a listing → back → `/review`, showing Submissions, which is a different screen.
  *
  * TWO ORIGINS, because they exercise different halves of the module. `/review` carries state in its
- * QUERY (which tab), and its label is derived from that query. `/organisations/<slug>` carries state
+ * QUERY (which tab), and its label is derived from that query. `/organizations/<slug>` carries state
  * in its PATH, and its label is publisher-supplied text that travels as a second parameter — the one
  * case `returnLabel` consents to read from the URL rather than deriving.
  *
  * The allowlist itself is asserted in the frontend unit suite, where every rejected shape can be
  * enumerated cheaply. What is here is the part that needs the whole application running.
  */
-import { expect, skipUnlessActor, skipUnlessBrowserSession, test } from "../src/fixtures.js";
+import {
+  DESKTOP_UA,
+  expect,
+  skipUnlessActor,
+  skipUnlessBrowserSession,
+  test,
+} from "../src/fixtures.js";
 
 test.describe.configure({ mode: "serial" });
 
 test.describe("M3-9 opening a listing from a queue, and getting back to it", () => {
   test.beforeEach(({ stack }) => {
     skipUnlessActor(stack, "publisher", "otherPublisher", "reviewer");
+  });
+
+  test("the modal sign-in surface keeps focus out of the background and restores its opener", async ({
+    browser,
+    stack,
+  }) => {
+    const context = await browser.newContext({ userAgent: DESKTOP_UA, storageState: undefined });
+    try {
+      const page = await context.newPage();
+      await page.goto(stack.urls.frontend);
+
+      const opener = page.getByRole("button", { name: "Log in" }).first();
+      await opener.focus();
+      await opener.click();
+
+      const dialog = page.getByRole("dialog", { name: "Log in" });
+      const email = page.getByLabel("Email address", { exact: true });
+      await expect(dialog).toBeVisible();
+      await expect(email).toBeFocused();
+
+      const close = dialog.getByRole("button", { name: "Close" });
+      await close.focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        page.locator(".shell :focus"),
+        "Tab from the last control never reaches the inert application shell",
+      ).toHaveCount(0);
+      await page.keyboard.press("Shift+Tab");
+      await expect(close).toBeFocused();
+
+      await page.getByRole("link", { name: "Directory", exact: true }).focus();
+      await expect(
+        page.locator(".shell :focus"),
+        "the page behind a modal dialog is inert",
+      ).toHaveCount(0);
+
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(opener).toBeFocused();
+    } finally {
+      await context.close();
+    }
   });
 
   test("from the review queue's claims tab, and back to the claims tab", async ({
@@ -36,8 +84,8 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const stamp = Date.now();
 
     // A claim has to exist for the tab to have a row to open, and it has to be QUEUED rather than
-    // granted: a claim for an organisation that is verified but is NOT among the entry's operating
-    // organisations is 202, which is precisely a claim awaiting a reviewer.
+    // granted: a claim for an organization that is verified but is NOT among the entry's operating
+    // organizations is 202, which is precisely a claim awaiting a reviewer.
     const document = opportunityFixture(stack.namespaces.publisher, `backlink-claim-${stamp}`, {
       title: `Back-link claim fixture ${stamp}`,
     });
@@ -53,7 +101,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     );
     expect(
       filed.status,
-      "a claim on an organisation that does not operate the entry is queued",
+      "a claim on an organization that does not operate the entry is queued",
     ).toBe(202);
 
     // The review surface needs the reviewer capability, and the browser session this project
@@ -62,9 +110,9 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const page = await context.newPage();
 
     await page.goto(`${stack.urls.frontend}/review?tab=claims`);
-    await expect(page.getByRole("tab", { name: /^Claims/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await expect(page.getByRole("link", { name: /^Claims/ })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
 
     const row = page.locator("tr").filter({ hasText: id });
@@ -84,14 +132,14 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     // THE ROUND TRIP CLOSES ON THE SAME SCREEN. Landing on `/review` with Submissions selected is
     // the bug; the tab has to come back too.
     await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "claims");
-    await expect(page.getByRole("tab", { name: /^Claims/ })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await expect(page.getByRole("link", { name: /^Claims/ })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
     await expect(page.locator("tr").filter({ hasText: id })).toHaveCount(1);
   });
 
-  test("from an organisation's own page, and back to it by name", async ({
+  test("from an organization's own page, and back to it by name", async ({
     page,
     stack,
     api,
@@ -102,22 +150,22 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const outsider = await api("otherPublisher");
     const stamp = Date.now();
 
-    // Filed by somebody outside the organisation, so it is waiting — the rows on an organisation's
+    // Filed by somebody outside the organization, so it is waiting — the rows on an organization's
     // page that link out are the pending ones.
     const document = opportunityFixture(slug, `backlink-org-${stamp}`, {
-      title: `Back-link organisation fixture ${stamp}`,
+      title: `Back-link organization fixture ${stamp}`,
     });
     const id = document.id as string;
     expect((await outsider.post("/v1/opportunities", document)).status).toBe(201);
 
-    const origin = `/organisations/${encodeURIComponent(slug)}`;
+    const origin = `/organizations/${encodeURIComponent(slug)}`;
     await page.goto(`${stack.urls.frontend}${origin}`);
 
     const row = page.locator("tr").filter({ hasText: id });
     await expect(row).toHaveCount(1);
-    await row.getByRole("link", { name: `Back-link organisation fixture ${stamp}` }).click();
+    await row.getByRole("link", { name: `Back-link organization fixture ${stamp}` }).click();
 
-    // THE ORGANISATION'S NAME TRAVELS WITH THE LINK, and it is the one case that needs to: a slug
+    // THE ORGANIZATION'S NAME TRAVELS WITH THE LINK, and it is the one case that needs to: a slug
     // is not what anybody calls the place, and the destination has no way to look the name up.
     await expect(page).toHaveURL((url) => url.searchParams.get("back") === origin);
     await expect(page).toHaveURL((url) => url.searchParams.get("backLabel") === slug);
@@ -125,15 +173,15 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     const back = page.getByRole("link", { name: `← Back to ${slug}` });
     await expect(
       back,
-      "the way back is labelled with the organisation, not with a slugified path",
+      "the way back is labelled with the organization, not with a slugified path",
     ).toBeVisible();
     await back.click();
 
     await expect(page).toHaveURL(
-      (url) => decodeURIComponent(url.pathname) === `/organisations/${slug}`,
+      (url) => decodeURIComponent(url.pathname) === `/organizations/${slug}`,
     );
     await expect(
-      page.getByRole("heading", { name: /Awaiting review in this namespace/ }),
+      page.getByRole("heading", { name: /Awaiting review for this organization/ }),
     ).toBeVisible();
     await expect(page.locator("tr").filter({ hasText: id })).toHaveCount(1);
   });
@@ -158,6 +206,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     expect((await publisher.post("/v1/opportunities", document)).status).toBe(201);
 
     await page.goto(`${stack.urls.frontend}/listings/${encodeURIComponent(id)}`);
+    await expect(page).toHaveTitle(`${document.title as string} | RFP Hub`);
     await expect(page.getByText(id, { exact: false }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^← Back to/ })).toHaveCount(0);
 
@@ -172,5 +221,27 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
       page.getByRole("link", { name: /^← Back to/ }),
       "an attacker-supplied destination is never offered as a way back",
     ).toHaveCount(0);
+  });
+
+  test("a cold listing load changes section through its first visible navigation link", async ({
+    page,
+    stack,
+    api,
+    opportunityFixture,
+  }) => {
+    skipUnlessBrowserSession(stack, "publisher");
+    const publisher = await api("publisher");
+    const document = opportunityFixture(stack.namespaces.publisher, `cold-section-${Date.now()}`);
+    const id = document.id as string;
+    expect((await publisher.post("/v1/opportunities", document)).status).toBe(201);
+
+    await page.goto(`${stack.urls.frontend}/listings/${encodeURIComponent(id)}`);
+    await page
+      .getByRole("navigation", { name: "Listing detail" })
+      .getByRole("link", { name: "Audit" })
+      .click();
+
+    await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "audit");
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
   });
 });

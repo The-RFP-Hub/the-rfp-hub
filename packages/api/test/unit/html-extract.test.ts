@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   MIN_CONTENT_CHARS,
   decodeEntities,
+  detectBotChallenge,
   detectSoftNotFound,
   extractPage,
 } from "../../src/modules/shared/html-extract.js";
@@ -106,5 +107,18 @@ describe("detectSoftNotFound", () => {
     const result = detectSoftNotFound(extractPage("<title>Grants</title><body>Loading…</body>"));
     expect(result.suspected).toBe(true);
     expect(result.heuristic).toContain(String(MIN_CONTENT_CHARS));
+  });
+});
+
+describe("detectBotChallenge", () => {
+  it("recognises common challenge copy without classifying an ordinary page", () => {
+    const challenge = extractPage(
+      "<title>Just a moment...</title><body>Enable JavaScript and cookies to continue</body>",
+    );
+    expect(detectBotChallenge(challenge)).toMatchObject({
+      suspected: true,
+      heuristic: expect.stringContaining("automated-access challenge"),
+    });
+    expect(detectBotChallenge(extractPage(PAGE)).suspected).toBe(false);
   });
 });

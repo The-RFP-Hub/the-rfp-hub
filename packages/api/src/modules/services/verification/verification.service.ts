@@ -28,7 +28,7 @@ import { type DB, db as defaultDb } from "../../../db/client.js";
 import { type OpportunityRow, opportunities, verificationRuns } from "../../../db/schema.js";
 import type { VerificationRunView } from "../../shared/api-views.js";
 import { type FieldDiff, fieldDiff, isMatched } from "../../shared/field-diff.js";
-import { detectSoftNotFound, extractPage } from "../../shared/html-extract.js";
+import { detectBotChallenge, detectSoftNotFound, extractPage } from "../../shared/html-extract.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
 import { type AuditActor, AuditService, SYSTEM_ACTOR } from "../audit/audit.service.js";
 import {
@@ -351,6 +351,7 @@ interface Assessment {
 function assess(row: OpportunityRow, fetched: FetchedSource): Assessment {
   const page = extractPage(fetched.text, { textLimit: SNAPSHOT_TEXT_LIMIT });
   const soft = detectSoftNotFound(page);
+  const challenge = detectBotChallenge(page);
   const ok = fetched.status >= 200 && fetched.status < 300;
   const existsAtSource = ok && !soft.suspected;
 
@@ -384,6 +385,8 @@ function assess(row: OpportunityRow, fetched: FetchedSource): Assessment {
       redirects: fetched.redirects,
       softNotFound: soft.suspected,
       ...(soft.heuristic ? { softNotFoundHeuristic: soft.heuristic } : {}),
+      automatedCheckBlocked: challenge.suspected,
+      ...(challenge.heuristic ? { automatedCheckBlockedHeuristic: challenge.heuristic } : {}),
     },
     snapshotText: page.text.slice(0, SNAPSHOT_TEXT_LIMIT),
   };

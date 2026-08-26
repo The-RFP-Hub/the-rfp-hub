@@ -3,9 +3,9 @@
 /**
  * The states every read has, rendered the same way everywhere.
  *
- * AN ERROR IS SHOWN WITH ITS CODE. "Something went wrong" is not a state, it is a refusal to say
- * what happened; the API returns a machine-readable code and a human sentence for every failure and
- * a publisher reporting a problem can quote both.
+ * AN ERROR KEEPS ITS CODE WITHOUT LEADING WITH IT. The immediate state says what happened and what
+ * to do next; the API's message, status, code and detail paths remain available in one closed
+ * disclosure for diagnosis and bug reports.
  *
  * 401 AND 403 ARE NOT THE SAME PAGE, and collapsing them was the single most misleading thing this
  * file used to do. A 401 means the session expired while the tab was open — the reader did nothing
@@ -17,8 +17,10 @@
  * EVERY STATE NAMES A NEXT STEP. That is a house rule, not a nicety: an empty list that does not
  * say what would fill it is a dead end with a border around it.
  */
-import type { ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import { DIRECTORY, HOW_IT_WORKS_ROLES } from "@/lib/links";
 import type { Resource } from "@/lib/resource";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -77,81 +79,95 @@ export function ErrorState({
 }) {
   if (error.isUnauthenticated) {
     return (
-      <div className="state error" role="alert">
-        {/*
-         * THE HEADING DESCRIBES THE REFUSAL, NOT ITS CAUSE. A 401 reaches this branch from two very
-         * different places — a session that quietly aged out under a reader who was mid-task, and a
-         * one-shot credential that had already been spent — and a heading that guessed "your session
-         * expired" would be telling half of them something untrue. The API's own sentence follows
-         * immediately and IS the specific answer; the paragraph after it is the part that is true
-         * either way.
-         */}
-        <p className="empty-title">The API did not accept this session.</p>
-        <p>{error.message}</p>
+      <div className="callout state error" role="alert">
+        <p className="empty-title">Your sign-in has ended.</p>
         <p className="muted">
-          It would not show {what} without one. Nothing was lost and nothing is wrong with your
-          account — sessions end after ninety days, and signing out anywhere else ends them sooner.
-          Signing in again picks up where you were.
+          Sign in again to continue to {what}. Nothing was lost, and you can pick up where you were.
         </p>
-        <p className="row">
-          {onLogin ? (
+        {onLogin ? (
+          <p className="row">
             <button type="button" className="button-primary" onClick={onLogin}>
               Log in again
             </button>
-          ) : null}
-          {onRetry ? (
-            <button type="button" onClick={onRetry}>
-              Try again
-            </button>
-          ) : null}
-        </p>
-        <p className="muted">
-          <code>401 · {error.code}</code>
-        </p>
+          </p>
+        ) : null}
+        <TechnicalDetails error={error} />
       </div>
     );
   }
 
   if (error.isForbidden) {
     return (
-      <div className="state error" role="alert">
-        <p className="empty-title">This account may not read {what}.</p>
-        <p>{error.message}</p>
+      <div className="callout state error" role="alert">
+        <p className="empty-title">You don&rsquo;t have access to {what}.</p>
         <p className="muted">
-          You are signed in and the API knows who you are — it has refused this particular thing, so
-          signing in again would change nothing. An administrator can grant the capability.
+          Your account is signed in, but its role does not include this access.
         </p>
-        <p className="muted">
-          <code>403 · {error.code}</code>
+        <p className="row">
+          <Link href="/account">Check your account</Link>
+          <Link href={HOW_IT_WORKS_ROLES}>See who can do what</Link>
         </p>
+        <TechnicalDetails error={error} />
+      </div>
+    );
+  }
+
+  if (error.isNotFound) {
+    return (
+      <div className="callout state error" role="alert">
+        <p className="empty-title">We couldn&rsquo;t find {what}.</p>
+        <p className="muted">It may have moved, been merged, or no longer be available.</p>
+        <p className="row">
+          <Link href={DIRECTORY}>Search the directory</Link>
+        </p>
+        <TechnicalDetails error={error} />
       </div>
     );
   }
 
   return (
-    <div className="state error" role="alert">
-      <p>
-        <strong>Could not load {what}.</strong>
-      </p>
-      <p>{error.message}</p>
-      {error.details.length > 0 ? (
-        <ul>
-          {error.details.map((detail) => (
-            <li key={detail}>{detail}</li>
-          ))}
-        </ul>
-      ) : null}
-      <p className="muted">
-        <code>
-          {error.status === 0 ? "no response" : error.status} · {error.code}
-        </code>
-      </p>
+    <div className="callout state error" role="alert">
+      <p className="empty-title">We couldn&rsquo;t load {what}.</p>
+      <p className="muted">Try again. If the problem continues, the technical details can help.</p>
       {onRetry ? (
         <button type="button" onClick={onRetry}>
           Try again
         </button>
       ) : null}
+      <TechnicalDetails error={error} />
     </div>
+  );
+}
+
+/** Raw failure data is available for diagnosis without competing with the human-facing state. */
+export function TechnicalDetails({ error, children }: { error: Error; children?: ReactNode }) {
+  const apiError = error instanceof ApiError ? error : null;
+  return (
+    <details>
+      <summary>Technical details</summary>
+      <dl>
+        <dt>Message</dt>
+        <dd>{error.message}</dd>
+        {apiError ? (
+          <>
+            <dt>Status</dt>
+            <dd>{apiError.status === 0 ? "0 (no response)" : apiError.status}</dd>
+            <dt>Code</dt>
+            <dd>
+              <code>{apiError.code}</code>
+            </dd>
+          </>
+        ) : null}
+      </dl>
+      {apiError && apiError.details.length > 0 ? (
+        <ul>
+          {apiError.details.map((detail) => (
+            <li key={detail}>{detail}</li>
+          ))}
+        </ul>
+      ) : null}
+      {children}
+    </details>
   );
 }
 
@@ -193,20 +209,57 @@ export function ResourceView<T>({
  */
 export function AuthUnavailable({ error }: { error: Error }) {
   return (
-    <div className="state error" role="alert">
-      <p className="empty-title">Sign-in is unavailable.</p>
-      <p>{error.message}</p>
-      <p className="muted">
-        Sessions are issued by the API itself, so this means the API could not be reached — it is
-        down, or <code>NEXT_PUBLIC_API_URL</code> names an origin this browser cannot talk to.
-        Nothing here is broken on your side and retrying will not help until it is fixed.
-      </p>
+    <div className="callout state error" role="alert">
+      <p className="empty-title">This deployment cannot reach its service.</p>
+      <p className="muted">Sign-in is unavailable right now. Nothing is wrong with your account.</p>
+      <TechnicalDetails error={error}>
+        <p>
+          Check whether <code>NEXT_PUBLIC_API_URL</code> names an API origin this browser can reach.
+        </p>
+      </TechnicalDetails>
     </div>
   );
 }
 
+export interface ActionNoteValue {
+  kind: "ok" | "error";
+  message: string;
+  error?: Error;
+  technical?: { label: string; value: string | number }[];
+}
+
+/** Keep the API's human sentence visible while moving transport-shaped diagnostics out of the way. */
+export function actionErrorNote(error: unknown, fallback: string): ActionNoteValue {
+  if (error instanceof ApiError) return { kind: "error", message: error.message, error };
+  return {
+    kind: "error",
+    message: fallback,
+    ...(error instanceof Error ? { error } : {}),
+  };
+}
+
 /** A one-line note that an action succeeded or failed, shown next to the control that ran it. */
-export function ActionNote({ note }: { note: { kind: "ok" | "error"; message: string } | null }) {
+export function ActionNote({ note }: { note: ActionNoteValue | null }) {
   if (!note) return null;
-  return <output className={note.kind === "ok" ? "note ok" : "note error"}>{note.message}</output>;
+  return (
+    <>
+      <output className={note.kind === "ok" ? "note ok" : "callout note error"}>
+        {note.message}
+      </output>
+      {note.error ? <TechnicalDetails error={note.error} /> : null}
+      {note.technical ? (
+        <details>
+          <summary>Technical details</summary>
+          <dl>
+            {note.technical.map((item) => (
+              <div key={item.label}>
+                <dt>{item.label}</dt>
+                <dd>{item.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      ) : null}
+    </>
+  );
 }

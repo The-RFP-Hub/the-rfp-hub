@@ -80,7 +80,13 @@ export const me = async (router: FastifyInstance): Promise<void> => {
           type: "object",
           additionalProperties: false,
           properties: {
+            id: { type: "string", description: "Exact public id." },
             reviewStatus: { type: "string", enum: ["pending", "approved", "rejected"] },
+            publisherStatus: {
+              type: "string",
+              enum: ["merged", "rejected", "pending", "hidden", "live"],
+              description: "One derived publisher-facing listing state.",
+            },
             page: { type: "integer", minimum: 1, default: 1 },
             limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
           },
@@ -127,10 +133,10 @@ export const me = async (router: FastifyInstance): Promise<void> => {
         tags: ["account"],
         summary: "Suspected duplicates against this account's entries",
         description:
-          "Pairs are surfaced by the duplicate-detection pass. An entry that has not been through it — or a deployment with detection disabled — has none, and an empty list is that answer.",
+          "Pairs are surfaced by the duplicate-detection pass. Each row names the account-owned side in `yourListing`; the existing top-level fields keep naming the other entry for compatibility with the published DuplicateMatch contract. An entry that has not been through detection — or a deployment with detection disabled — has none, and an empty list is that answer.",
         security: [{ bearerAuth: [] }],
         response: {
-          200: { $ref: "DuplicateList#" },
+          200: { $ref: "OwnedDuplicateList#" },
           401: { $ref: "ErrorResponse#" },
         },
       },

@@ -15,7 +15,7 @@ export default function PrivacyPage() {
         The RFP Hub is an open index of funding opportunities. No account is required to read the
         directory; like any web service, it still processes request metadata, described below. This
         page says what the Hub stores, what leaves its servers, what is public forever, and how to
-        leave. Effective 24&nbsp;August&nbsp;2026.
+        leave. Effective 25&nbsp;August&nbsp;2026.
       </p>
 
       <h2>What we store when you sign in</h2>
@@ -47,10 +47,10 @@ export default function PrivacyPage() {
         beyond that, the Hub does not read your Google data.
       </p>
       <p>
-        An account also carries what you create on it: an optional public handle, roles and
-        organisation memberships, API-key records (name, prefix, a hash of the key, scopes, last-use
-        — never the secret itself), your submissions, and an append-only history of changes and
-        decisions.
+        An account also carries what you create on it: an optional public handle (the byline shown
+        on listings), roles and organization memberships, API-key records (name, prefix, a hash of
+        the key, scopes, last-use — never the secret itself), your submissions, and an append-only
+        history of changes and decisions.
       </p>
 
       <h2>Analytics without addresses</h2>
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
         content, which become part of the public dataset.
       </p>
       <p>
-        If you choose a public handle, submissions you make outside an organisation carry it as
+        If you choose a public handle, submissions you make outside an organization carry it as
         their <code>submittedBy</code> attribution — displayed on the listing and included in the
         exports. Without a handle, they are attributed to &ldquo;community&rdquo;. For listings that
         are currently public, a coarsened change history is also publicly readable: which fields
@@ -93,12 +93,11 @@ export default function PrivacyPage() {
         codes, the way any mail carrier does. Google is involved only if you choose Google sign-in.
       </p>
       <p>
-        When semantic duplicate-detection is enabled, a listing&rsquo;s text fields — title,
-        summary, description, funding type, ecosystems, categories and operating organisations — are
-        sent to OpenAI to compute embeddings. Account data is never sent. Submitting a listing with
-        an application URL normally triggers a server-side check of that URL: the destination site
-        sees a request from the Hub&rsquo;s servers with a Hub user-agent, carrying no cookies and
-        no referrer.
+        Listing text is processed for duplicate detection{" "}
+        <strong>entirely on the Hub&rsquo;s own servers</strong> — no AI vendor, no third party,
+        nothing sent anywhere. Submitting a listing with an application URL normally triggers a
+        server-side check of that URL: the destination site sees a request from the Hub&rsquo;s
+        servers with a Hub user-agent, carrying no cookies and no referrer.
       </p>
       <p>
         The Hub does not sell personal data, runs no third-party trackers, and shows no advertising.

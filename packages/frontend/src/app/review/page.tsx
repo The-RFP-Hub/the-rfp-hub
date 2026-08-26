@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The reviewer surface: submissions, ownership claims, duplicates, and the organisations whose
+ * The reviewer surface: submissions, ownership claims, duplicates, and the organizations whose
  * verification decides who may publish without any of this.
  *
  * Every action here is enforced on the API as a session-only reviewer capability — a reviewer's own
@@ -17,17 +17,35 @@
  * reloads after a decision, or presses Back — and every one of those used to land on Submissions.
  *
  * EVERY CONSEQUENTIAL BUTTON IS BEHIND A STATED CONSEQUENCE. Approving publishes somebody's listing
- * to the world; verifying an organisation grants publishing power to everyone in it, including
+ * to the world; verifying an organization grants publishing power to everyone in it, including
  * people added later; merging rejects and archives a record. None of them is undone by clicking
  * again, so none of them fires on the first click.
  */
 import { RequireSession } from "@/components/Chrome";
 import { ConfirmPanel } from "@/components/Confirm";
-import { UntrustedText } from "@/components/UntrustedText";
+import { SectionNav } from "@/components/SectionNav";
+import { SelfReviewNotice } from "@/components/SelfReviewNotice";
+import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { ListedBadge, ReviewStatusBadge, VerifiedBadge } from "@/components/badges";
-import { ActionNote, EmptyState, ResourceView } from "@/components/states";
+import {
+  ActionNote,
+  type ActionNoteValue,
+  EmptyState,
+  ResourceView,
+  actionErrorNote,
+} from "@/components/states";
 import { ApiError } from "@/lib/api";
 import { formatInstant, formatSimilarity } from "@/lib/format";
+import {
+  CAPABILITY_DENIAL_COPY,
+  ROUTE_GATE_COPY,
+  accountRoleLabel,
+  duplicateStatusLabel,
+  fundingTypeLabel,
+  isOpenDuplicateStatus,
+  opportunityStatusLabel,
+  orgRoleLabel,
+} from "@/lib/presentation";
 import { type ResourceHandle, useResource } from "@/lib/resource";
 import { detailHref } from "@/lib/return-to";
 import { useApi } from "@/lib/session";
@@ -39,20 +57,26 @@ import type {
   DuplicateSide,
   ManagedOpportunity,
   ManagedOpportunityList,
+  Me,
+  MembershipInviteList,
+  MergeResult,
+  Opportunity,
+  OrgRole,
   OrganizationSummary,
 } from "@/lib/types";
+import { BOT_PROTECTION_NOTE, verificationPresentation } from "@/lib/verification";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
-type Tab = "submissions" | "claims" | "duplicates" | "organisations";
-const TABS: Tab[] = ["submissions", "claims", "duplicates", "organisations"];
+type Tab = "submissions" | "claims" | "duplicates" | "organizations";
+const TABS: Tab[] = ["submissions", "claims", "duplicates", "organizations"];
 const SUBMISSION_PAGE_SIZE = 50;
 const LABELS: Record<Tab, string> = {
   submissions: "Submissions",
   claims: "Claims",
   duplicates: "Duplicates",
-  organisations: "Organisations",
+  organizations: "Organizations",
 };
 
 function submissionPageFromUrl(raw: string | null | undefined): number {
@@ -69,19 +93,26 @@ const submissionHref = (page: number): string => (page > 1 ? `/review?page=${pag
 
 export default function ReviewPage() {
   return (
-    <RequireSession capability={{ needs: (me) => me.canReview, label: "the reviewer capability" }}>
-      {() => <Review />}
+    <RequireSession
+      gate={ROUTE_GATE_COPY.review}
+      capability={{ needs: (me) => me.canReview, ...CAPABILITY_DENIAL_COPY.reviewer }}
+    >
+      {(me) => <Review me={me} />}
     </RequireSession>
   );
 }
 
-function Review() {
+function Review({ me }: { me: Me }) {
   const api = useApi();
   const router = useRouter();
   const params = useSearchParams();
   const requested = params?.get("tab");
-  const tab: Tab = TABS.includes(requested as Tab) ? (requested as Tab) : "submissions";
+  const normalizedTab = requested === "organisations" ? "organizations" : requested;
+  const tab: Tab = TABS.includes(normalizedTab as Tab) ? (normalizedTab as Tab) : "submissions";
   const [queuePage, setQueuePage] = useState(() => submissionPageFromUrl(params?.get("page")));
+  const [duplicateDecisions, setDuplicateDecisions] = useState<Record<number, DuplicateDecision>>(
+    {},
+  );
 
   const loadQueue = useCallback(
     () =>
@@ -93,14 +124,37 @@ function Review() {
     [api, queuePage],
   );
   const loadClaims = useCallback(() => api.review.claims({ status: "pending" }), [api]);
-  const loadDuplicates = useCallback(
-    () => api.review.duplicates({ status: "suspected", limit: 100 }),
-    [api],
-  );
+  const loadDuplicates = useCallback(async () => {
+    const [suspected, confirmed] = await Promise.all([
+      api.review.duplicates({ status: "suspected", limit: 200 }),
+      api.review.duplicates({ status: "confirmed", limit: 200 }),
+    ]);
+    return { items: [...suspected.items, ...confirmed.items] } satisfies DuplicatePairList;
+  }, [api]);
+  const loadResolvedDuplicates = useCallback(async () => {
+    const [dismissed, merged] = await Promise.all([
+      api.review.duplicates({ status: "dismissed", limit: 200 }),
+      api.review.duplicates({ status: "merged", limit: 200 }),
+    ]);
+    return {
+      items: [...dismissed.items, ...merged.items].sort(
+        (a, b) =>
+          Date.parse(b.reviewedAt ?? b.detectedAt) - Date.parse(a.reviewedAt ?? a.detectedAt),
+      ),
+    } satisfies DuplicatePairList;
+  }, [api]);
 
   const queue = useResource(loadQueue);
   const claims = useResource(loadClaims);
   const duplicates = useResource(loadDuplicates);
+  const resolvedDuplicates = useResource(loadResolvedDuplicates, { enabled: tab === "duplicates" });
+
+  const recordDuplicateDecision = useCallback((pair: DuplicatePair, mergeResult?: MergeResult) => {
+    setDuplicateDecisions((current) => ({
+      ...current,
+      [pair.id]: { pair, mergeResult },
+    }));
+  }, []);
 
   useEffect(() => {
     if (queue.state.status !== "ready") return;
@@ -114,8 +168,13 @@ function Review() {
   const counts: Record<Tab, number | null> = {
     submissions: queue.state.status === "ready" ? queue.state.data.total : null,
     claims: claims.state.status === "ready" ? claims.state.data.items.length : null,
-    duplicates: duplicates.state.status === "ready" ? duplicates.state.data.items.length : null,
-    organisations: null,
+    duplicates:
+      duplicates.state.status === "ready"
+        ? trackedDuplicatePairs(duplicates.state.data.items, duplicateDecisions).filter((pair) =>
+            isOpenDuplicateStatus(pair.status),
+          ).length
+        : null,
+    organizations: null,
   };
 
   /**
@@ -133,9 +192,6 @@ function Review() {
     next === "submissions" ? submissionHref(queuePage) : `/review?tab=${next}`;
   const returnHere = tabHref(tab);
 
-  // `replace`, not `push`: switching tabs is not a navigation a reader wants to walk back through
-  // one at a time, but the address still has to name where they are.
-  const select = (next: Tab) => router.replace(tabHref(next));
   const selectQueuePage = (page: number) => {
     setQueuePage(page);
     router.replace(submissionHref(page));
@@ -144,47 +200,53 @@ function Review() {
   return (
     <section>
       <h1>Review queues</h1>
-      <div className="tabs" role="tablist" aria-label="Review queues">
-        {TABS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            role="tab"
-            aria-selected={tab === item}
-            aria-pressed={tab === item}
-            onClick={() => select(item)}
-          >
-            {LABELS[item]}
-            {counts[item] !== null ? ` · ${counts[item]}` : null}
-          </button>
-        ))}
-      </div>
+      {/* Replace keeps queue switching out of browser history while retaining honest URL state. */}
+      <SectionNav
+        label="Review queues"
+        replace
+        items={TABS.map((item) => ({
+          current: tab === item,
+          href: tabHref(item),
+          label: `${LABELS[item]}${
+            counts[item] !== null
+              ? item === "duplicates"
+                ? ` · ${counts[item]} open`
+                : ` · ${counts[item]}`
+              : ""
+          }`,
+        }))}
+      />
 
       {tab === "submissions" ? (
-        <Submissions queue={queue} origin={returnHere} onPage={selectQueuePage} />
+        <Submissions queue={queue} me={me} origin={returnHere} onPage={selectQueuePage} />
       ) : null}
-      {tab === "claims" ? <Claims claims={claims} origin={returnHere} /> : null}
-      {tab === "duplicates" ? <Duplicates duplicates={duplicates} origin={returnHere} /> : null}
-      {tab === "organisations" ? <Organisations /> : null}
+      {tab === "claims" ? <Claims claims={claims} me={me} origin={returnHere} /> : null}
+      {tab === "duplicates" ? (
+        <Duplicates
+          duplicates={duplicates}
+          resolved={resolvedDuplicates}
+          decisions={duplicateDecisions}
+          onDecision={recordDuplicateDecision}
+          origin={returnHere}
+        />
+      ) : null}
+      {tab === "organizations" ? <Organizations memberships={me.memberships} /> : null}
     </section>
   );
 }
 
 /** One action, its in-flight flag and whatever the API said about it. */
 function useAction() {
-  const [note, setNote] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const [note, setNote] = useState<ActionNoteValue | null>(null);
   const [busy, setBusy] = useState(false);
-  const run = async (work: () => Promise<string>) => {
+  const run = async (work: () => Promise<string | ActionNoteValue>) => {
     setBusy(true);
     setNote(null);
     try {
-      setNote({ kind: "ok", message: await work() });
+      const result = await work();
+      setNote(typeof result === "string" ? { kind: "ok", message: result } : result);
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError ? `${error.message} (${error.code})` : "The action failed.",
-      });
+      setNote(actionErrorNote(error, "The action failed."));
     } finally {
       setBusy(false);
     }
@@ -196,10 +258,12 @@ function useAction() {
 
 function Submissions({
   queue,
+  me,
   origin,
   onPage,
 }: {
   queue: ResourceHandle<ManagedOpportunityList>;
+  me: Me;
   origin: string;
   onPage: (page: number) => void;
 }) {
@@ -241,6 +305,7 @@ function Submissions({
                       <SubmissionRow
                         key={item.id}
                         item={item}
+                        me={me}
                         busy={busy}
                         run={run}
                         reload={queue.reload}
@@ -290,12 +355,14 @@ type SubmissionPanel = "none" | "details" | "approve" | "reject";
  */
 function SubmissionRow({
   item,
+  me,
   busy,
   run,
   reload,
   origin,
 }: {
   item: ManagedOpportunity;
+  me: Me;
   busy: boolean;
   run: (work: () => Promise<string>) => Promise<void>;
   reload: () => void;
@@ -304,6 +371,7 @@ function SubmissionRow({
   const api = useApi();
   const [panel, setPanel] = useState<SubmissionPanel>("none");
   const [reason, setReason] = useState("");
+  const isSelfReview = item.submittedByAccountId === me.accountId;
 
   return (
     <>
@@ -313,11 +381,13 @@ function SubmissionRow({
             <UntrustedText value={item.title} />
           </Link>
           <div className="muted">
-            <code>{item.id}</code> · {item.fundingType} · {formatInstant(item.createdAt)}
+            <code>{item.id}</code> · {fundingTypeLabel(item.fundingType)} ·{" "}
+            {formatInstant(item.createdAt)}
           </div>
         </th>
         <td>
           <UntrustedText value={item.submittedBy} fallback="community" />
+          {isSelfReview ? <SelfReviewNotice kind="listing" compact /> : null}
           {item.namespace ? (
             <div className="muted">
               namespace <UntrustedText value={item.namespace} />
@@ -325,7 +395,8 @@ function SubmissionRow({
           ) : null}
         </td>
         <td>
-          <ReviewStatusBadge status={item.reviewStatus} /> <ListedBadge isListed={item.isListed} />
+          <ReviewStatusBadge status={item.reviewStatus} />{" "}
+          <ListedBadge isListed={item.isListed} reviewStatus={item.reviewStatus} />
         </td>
         <td>
           <div className="row">
@@ -355,7 +426,7 @@ function SubmissionRow({
 
             {panel === "approve" ? (
               <ConfirmPanel
-                title="Publish this listing?"
+                title={`Publish “${item.title}”?`}
                 confirmLabel="Publish it"
                 busyLabel="Publishing…"
                 busy={busy}
@@ -365,10 +436,11 @@ function SubmissionRow({
                     await api.review.approve(item.id);
                     setPanel("none");
                     reload();
-                    return `${item.id} is published.`;
+                    return `“${item.title}” is published.`;
                   })
                 }
               >
+                {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It becomes visible to everyone in the public directory and in the open-data
                   exports, immediately. Publishing is not an endorsement of the programme — it is a
@@ -379,7 +451,7 @@ function SubmissionRow({
 
             {panel === "reject" ? (
               <ConfirmPanel
-                title="Refuse this listing?"
+                title={`Refuse “${item.title}”?`}
                 confirmLabel="Refuse it"
                 busyLabel="Refusing…"
                 busy={busy}
@@ -391,10 +463,11 @@ function SubmissionRow({
                     setPanel("none");
                     setReason("");
                     reload();
-                    return `${item.id} was refused and unlisted.`;
+                    return `“${item.title}” was refused and unlisted.`;
                   })
                 }
               >
+                {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It stays out of the public directory and is unlisted.{" "}
                   <strong>The reason is shown to whoever submitted it</strong> and is the only thing
@@ -501,13 +574,22 @@ function SubmissionDetails({ item, origin }: { item: ManagedOpportunity; origin:
           onClick={() =>
             void run(async () => {
               const result = await api.review.verifySource(item.id);
-              return `Source check: ${
+              const presentation = verificationPresentation(result);
+              const message = `Source check: ${
                 result.matched === null
                   ? "no verdict"
                   : result.matched
                     ? "the linked page looks like this programme"
                     : "the linked page did not match"
-              } (HTTP ${result.httpStatus ?? "—"}).`;
+              }. Source response: ${presentation.response}${presentation.uncertain ? ` ${BOT_PROTECTION_NOTE}` : ""}`;
+              return {
+                kind: "ok",
+                message,
+                technical: [
+                  { label: "HTTP status", value: result.httpStatus ?? "—" },
+                  ...(result.error ? [{ label: "Error", value: result.error }] : []),
+                ],
+              };
             })
           }
         >
@@ -563,11 +645,19 @@ function LastDecision({
  * Ownership claims, with the two approvals ranked rather than presented as a pair.
  *
  * THEY ARE NOT PEERS. Approving transfers ownership of one listing; approving AND verifying hands
- * the organisation permanent publishing rights over its whole namespace, for every member it has or
+ * the organization permanent publishing rights over its whole namespace, for every member it has or
  * later gains. Two buttons side by side said those were comparable choices, and the more dangerous
  * one was the easier click because it came first.
  */
-function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin: string }) {
+function Claims({
+  claims,
+  me,
+  origin,
+}: {
+  claims: ResourceHandle<ClaimList>;
+  me: Me;
+  origin: string;
+}) {
   const api = useApi();
   const { note, busy, run } = useAction();
   const [panel, setPanel] = useState<{ id: number; kind: "verify" | "reject" } | null>(null);
@@ -577,8 +667,8 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
     <>
       <p className="muted footnote">
         Approving a claim transfers publisher ownership of that listing.{" "}
-        <strong>Verifying the organisation is a separate and much larger decision</strong> — it is
-        what unlocks auto-approval for everything that organisation publishes from then on. The API
+        <strong>Verifying the organization is a separate and much larger decision</strong> — it is
+        what unlocks auto-approval for everything that organization publishes from then on. The API
         returns a sentence saying which happened; it is shown verbatim.
       </p>
       <ActionNote note={note} />
@@ -587,7 +677,7 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
           list.items.length === 0 ? (
             <EmptyState
               title="No claims waiting."
-              detail="A claim is filed from a listing's own page by somebody who says it belongs to their organisation."
+              detail="A claim is filed from a listing's own page by somebody who says it belongs to their organization."
             />
           ) : (
             <div className="table-scroll">
@@ -618,6 +708,9 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                             {formatInstant(claim.createdAt)} by{" "}
                             <UntrustedText value={claim.claimedBy} />
                           </div>
+                          {claim.claimedByAccountId === me.accountId ? (
+                            <SelfReviewNotice kind="claim" compact />
+                          ) : null}
                         </th>
                         <td>
                           <UntrustedText value={claim.organizationSlug} />{" "}
@@ -630,7 +723,6 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                           <div className="row">
                             <button
                               type="button"
-                              className="button-primary"
                               disabled={busy}
                               onClick={() =>
                                 void run(async () => {
@@ -669,8 +761,8 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                               Reject…
                             </button>
                           </div>
-                          <p className="faint footnote">
-                            Approving alone transfers this listing; the organisation&rsquo;s future
+                          <p className="muted footnote">
+                            Approving alone transfers this listing; the organization&rsquo;s future
                             writes still wait for review.
                           </p>
                         </td>
@@ -694,6 +786,9 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                                   })
                                 }
                               >
+                                {claim.claimedByAccountId === me.accountId ? (
+                                  <SelfReviewNotice kind="claim" />
+                                ) : null}
                                 <p>
                                   Every member of{" "}
                                   <strong>
@@ -726,6 +821,9 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
                                   })
                                 }
                               >
+                                {claim.claimedByAccountId === me.accountId ? (
+                                  <SelfReviewNotice kind="claim" />
+                                ) : null}
                                 <p>
                                   Ownership stays where it is. The claimant is told the claim was
                                   refused.
@@ -764,10 +862,41 @@ function Claims({ claims, origin }: { claims: ResourceHandle<ClaimList>; origin:
 
 // ── duplicates ────────────────────────────────────────────────────────────────────
 
+interface DuplicateDecision {
+  pair: DuplicatePair;
+  mergeResult?: MergeResult;
+}
+
+function trackedDuplicatePairs(
+  loaded: DuplicatePair[],
+  decisions: Record<number, DuplicateDecision>,
+): DuplicatePair[] {
+  const loadedIds = new Set(loaded.map((pair) => pair.id));
+  return loaded
+    .map((pair) => decisions[pair.id]?.pair ?? pair)
+    .concat(
+      Object.values(decisions)
+        .map(({ pair }) => pair)
+        .filter((pair) => isOpenDuplicateStatus(pair.status) && !loadedIds.has(pair.id)),
+    );
+}
+
 function Duplicates({
   duplicates,
+  resolved,
+  decisions,
+  onDecision,
   origin,
-}: { duplicates: ResourceHandle<DuplicatePairList>; origin: string }) {
+}: {
+  duplicates: ResourceHandle<DuplicatePairList>;
+  resolved: ResourceHandle<DuplicatePairList>;
+  decisions: Record<number, DuplicateDecision>;
+  onDecision: (pair: DuplicatePair, mergeResult?: MergeResult) => void;
+  origin: string;
+}) {
+  const [minimumSimilarity, setMinimumSimilarity] = useState(85);
+  const [showBelowThreshold, setShowBelowThreshold] = useState(false);
+
   return (
     <>
       <p className="muted footnote">
@@ -780,20 +909,117 @@ function Duplicates({
         what="the duplicate queue"
         onRetry={duplicates.reload}
       >
-        {(list) =>
-          list.items.length === 0 ? (
+        {(list) => {
+          const tracked = trackedDuplicatePairs(list.items, decisions);
+          const sorted = [...tracked].sort(
+            (a, b) =>
+              (b.similarity ?? Number.NEGATIVE_INFINITY) -
+              (a.similarity ?? Number.NEGATIVE_INFINITY),
+          );
+          const shown = showBelowThreshold
+            ? sorted
+            : sorted.filter(
+                (pair) => pair.similarity !== null && pair.similarity * 100 >= minimumSimilarity,
+              );
+          const hidden = sorted.length - shown.length;
+          const open = sorted.filter((pair) => isOpenDuplicateStatus(pair.status));
+          const shownOpen = shown.filter((pair) => isOpenDuplicateStatus(pair.status));
+
+          return tracked.length === 0 ? (
             <EmptyState
-              title="No suspected pairs."
+              title="No open pairs."
               detail="Detection runs against published listings when something is submitted. An empty queue means nothing recent looked like anything already published."
             />
           ) : (
             <>
-              {list.items.map((pair) => (
-                <PairCard key={pair.id} pair={pair} onChanged={duplicates.reload} origin={origin} />
+              <div className="duplicate-filter">
+                <label htmlFor="minimum-similarity">Minimum similarity</label>
+                <input
+                  id="minimum-similarity"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={minimumSimilarity}
+                  onChange={(event) => {
+                    setMinimumSimilarity(Number(event.target.value));
+                    setShowBelowThreshold(false);
+                  }}
+                />
+                <strong>{minimumSimilarity}%</strong>
+              </div>
+              <p className="muted footnote">
+                {shownOpen.length} of {open.length} open pairs loaded on this page.
+                {hidden > 0 ? (
+                  <>
+                    {" "}
+                    <button type="button" onClick={() => setShowBelowThreshold(true)}>
+                      {hidden} below the threshold — show them
+                    </button>
+                  </>
+                ) : null}
+              </p>
+              {shown.length === 0 ? (
+                <EmptyState
+                  title={`No loaded pairs meet ${minimumSimilarity}%.`}
+                  detail="Lower the minimum similarity or show the pairs below the threshold."
+                  action={
+                    <button type="button" onClick={() => setShowBelowThreshold(true)}>
+                      Show all loaded pairs
+                    </button>
+                  }
+                />
+              ) : null}
+              {shown.map((pair) => (
+                <PairCard
+                  key={pair.id}
+                  pair={pair}
+                  mergeResult={decisions[pair.id]?.mergeResult}
+                  onDecision={onDecision}
+                  origin={origin}
+                />
               ))}
             </>
-          )
-        }
+          );
+        }}
+      </ResourceView>
+      <h2 className="section-head section-head-quiet">Recently resolved</h2>
+      <p className="muted footnote">
+        Showing up to 200 recently dismissed pairs and 200 recently merged pairs.
+      </p>
+      <ResourceView
+        resource={resolved.state}
+        what="recently resolved duplicate pairs"
+        onRetry={resolved.reload}
+      >
+        {(list) => {
+          const openIds =
+            duplicates.state.status === "ready"
+              ? new Set(duplicates.state.data.items.map((pair) => pair.id))
+              : new Set<number>();
+          const recent = list.items
+            .map((pair) => decisions[pair.id]?.pair ?? pair)
+            .filter(
+              (pair) =>
+                (pair.status === "dismissed" || pair.status === "merged") && !openIds.has(pair.id),
+            );
+          return recent.length === 0 ? (
+            <EmptyState
+              title="No recently resolved pairs."
+              detail="Dismissed and merged pairs remain available here after the queue is reloaded."
+            />
+          ) : (
+            recent.map((pair) => (
+              <PairCard
+                key={pair.id}
+                pair={decisions[pair.id]?.pair ?? pair}
+                mergeResult={decisions[pair.id]?.mergeResult}
+                onDecision={onDecision}
+                origin={origin}
+              />
+            ))
+          );
+        }}
       </ResourceView>
     </>
   );
@@ -801,51 +1027,52 @@ function Duplicates({
 
 function PairCard({
   pair,
-  onChanged,
+  mergeResult,
+  onDecision,
   origin,
-}: { pair: DuplicatePair; onChanged: () => void; origin: string }) {
+}: {
+  pair: DuplicatePair;
+  mergeResult?: MergeResult;
+  onDecision: (pair: DuplicatePair, mergeResult?: MergeResult) => void;
+  origin: string;
+}) {
   const api = useApi();
-  const { note, busy, run, setNote } = useAction();
+  const { note, busy, run } = useAction();
   const [survivor, setSurvivor] = useState<string>(pair.left.id);
-  const [confirming, setConfirming] = useState(false);
+  const [panel, setPanel] = useState<"comparison" | "merge" | null>(null);
   const [survivorElsewhere, setSurvivorElsewhere] = useState<string | null>(null);
 
+  const survivorListing = survivor === pair.left.id ? pair.left : pair.right;
   const loser = survivor === pair.left.id ? pair.right : pair.left;
 
   const merge = () =>
-    void (async () => {
+    void run(async () => {
       setSurvivorElsewhere(null);
-      setNote(null);
       try {
         const result = await api.review.mergeDuplicate(pair.id, { survivorId: survivor });
-        setConfirming(false);
-        onChanged();
-        setNote({
-          kind: "ok",
-          message: `Merged ${result.mergedId} into ${result.survivorId}. Copied fields: ${
-            result.copiedFields.length === 0 ? "none" : result.copiedFields.join(", ")
-          }.`,
-        });
+        setPanel(null);
+        onDecision(result.pair, result);
+        return `Merged ${result.mergedId} into ${result.survivorId}.`;
       } catch (error) {
         if (error instanceof ApiError && error.code === "survivor_already_merged") {
           setSurvivorElsewhere(error.survivorId ?? null);
-          setNote({ kind: "error", message: error.message });
-          return;
         }
-        setNote({
-          kind: "error",
-          message:
-            error instanceof ApiError ? `${error.message} (${error.code})` : "The merge failed.",
-        });
+        throw error;
       }
-    })();
+    });
+
+  const mergedInto = mergeResult?.survivorId ?? pair.left.mergedInto ?? pair.right.mergedInto;
+  const canConfirm = pair.status === "suspected";
+  const canDismiss = pair.status === "suspected" || pair.status === "confirmed";
+  const canMerge = pair.status === "suspected" || pair.status === "confirmed";
 
   return (
     <div className="card">
       <div className="row-between">
         <strong>{formatSimilarity(pair.similarity)}</strong>
         <span className="muted">
-          pair {pair.id} · {pair.status} · detected {formatInstant(pair.detectedAt)}
+          pair {pair.id} · {duplicateStatusLabel(pair.status)} · detected{" "}
+          {formatInstant(pair.detectedAt)}
         </span>
       </div>
       <div className="grid-2">
@@ -854,6 +1081,7 @@ function PairCard({
           group={`survivor-${pair.id}`}
           selected={survivor === pair.left.id}
           onSelect={setSurvivor}
+          selectable={canMerge}
           origin={origin}
         />
         <Side
@@ -861,66 +1089,140 @@ function PairCard({
           group={`survivor-${pair.id}`}
           selected={survivor === pair.right.id}
           onSelect={setSurvivor}
+          selectable={canMerge}
           origin={origin}
         />
       </div>
-      <div className="row">
+      <fieldset className="row duplicate-actions">
+        <legend className="visually-hidden">Actions for pair {pair.id}</legend>
         <button
+          className="duplicate-compare-control"
           type="button"
           disabled={busy}
+          onClick={() => setPanel((current) => (current === "comparison" ? null : "comparison"))}
+        >
+          {panel === "comparison" ? "Hide" : "Compare"}
+        </button>
+        <button
+          className="duplicate-confirm-control"
+          type="button"
+          aria-pressed={pair.status === "confirmed"}
+          disabled={busy || !canConfirm}
           onClick={() =>
             void run(async () => {
-              await api.review.confirmDuplicate(pair.id);
-              onChanged();
-              return "Recorded as the same programme. Neither listing was touched.";
+              const next = await api.review.confirmDuplicate(pair.id);
+              onDecision(next);
+              return "Confirmed. Neither listing was touched.";
             })
           }
         >
-          Confirm
+          {pair.status === "confirmed" ? "Confirmed" : "Confirm"}
         </button>
         <button
+          className="duplicate-dismiss-control"
           type="button"
-          disabled={busy}
+          aria-pressed={pair.status === "dismissed"}
+          disabled={busy || !canDismiss}
           onClick={() =>
             void run(async () => {
-              await api.review.dismissDuplicate(pair.id);
-              onChanged();
-              return "Dismissed. Re-running detection will not resurrect this pair.";
+              const wasConfirmed = pair.status === "confirmed";
+              const next = await api.review.dismissDuplicate(pair.id);
+              setPanel(null);
+              onDecision(next);
+              return wasConfirmed
+                ? "Decision saved. Undo returns this pair to Needs review, not to Confirmed."
+                : "Decision saved.";
             })
           }
         >
           Dismiss
         </button>
-        <button type="button" disabled={busy} onClick={() => setConfirming(!confirming)}>
+        <button
+          className="duplicate-merge-control"
+          type="button"
+          disabled={busy || !canMerge}
+          onClick={() => setPanel((current) => (current === "merge" ? null : "merge"))}
+        >
           Merge…
         </button>
-      </div>
+      </fieldset>
 
-      {confirming ? (
+      <ActionNote note={note} />
+
+      {pair.status === "confirmed" ? (
+        <p className="note">
+          <strong>Confirmed</strong> — Recorded as the same programme. Choose the survivor to merge
+          the listings, or leave both records unchanged.
+        </p>
+      ) : null}
+      {pair.status === "dismissed" ? (
+        <p className="note">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const next = await api.review.reopenDuplicate(pair.id);
+                onDecision(next);
+                return "Reopened for duplicate review.";
+              })
+            }
+          >
+            {busy ? "Reopening…" : "Undo"}
+          </button>{" "}
+          to return this pair to Needs review.
+        </p>
+      ) : null}
+      {pair.status === "merged" ? (
+        <div className="note">
+          <p>
+            <strong>
+              {mergedInto ? (
+                <>
+                  Merged into <code>{mergedInto}</code> ·{" "}
+                  <Link href={detailHref("/listings", mergedInto, origin)}>view</Link>
+                </>
+              ) : (
+                "Merged"
+              )}
+            </strong>
+          </p>
+          {mergeResult && mergeResult.copiedFields.length > 0 ? (
+            <p>Copied fields: {mergeResult.copiedFields.join(", ")}.</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {panel === "merge" ? (
         <ConfirmPanel
           title="Merge these two listings?"
           confirmLabel="Merge them"
           busyLabel="Merging…"
           busy={busy}
-          onCancel={() => setConfirming(false)}
+          onCancel={() => setPanel(null)}
           onConfirm={merge}
         >
           <p>
-            <code>{survivor}</code> survives and stays as it is — nothing is copied into it unless
-            you say so, and this screen does not offer to.
+            <strong>
+              <UntrustedText value={survivorListing.title} />
+            </strong>{" "}
+            — <code>{survivorListing.id}</code> survives and stays as it is — nothing is copied into
+            it unless you say so, and this screen does not offer to.
           </p>
           <p>
-            <code>{loser.id}</code> —{" "}
             <strong>
               <UntrustedText value={loser.title} />
             </strong>{" "}
-            — is <strong>rejected, unlisted, archived and pointed at the survivor</strong>. It
-            leaves the public directory. This is not undone by merging the other way afterwards.
+            — <code>{loser.id}</code> is{" "}
+            <strong>rejected, unlisted, archived and pointed at the survivor</strong>. It leaves the
+            public directory and its public link forwards to the survivor. This is not undone by
+            merging the other way afterwards.
           </p>
         </ConfirmPanel>
       ) : null}
 
-      <ActionNote note={note} />
+      {panel === "comparison" ? <PairComparison pair={pair} /> : null}
+
       {survivorElsewhere ? (
         <p className="note">
           That listing was already merged into{" "}
@@ -935,31 +1237,137 @@ function PairCard({
   );
 }
 
+function PairComparison({ pair }: { pair: DuplicatePair }) {
+  const api = useApi();
+  const load = useCallback(
+    () =>
+      Promise.all([api.review.opportunity(pair.left.id), api.review.opportunity(pair.right.id)]),
+    [api, pair.left.id, pair.right.id],
+  );
+  const comparison = useResource(load);
+
+  return (
+    <section className="duplicate-comparison" aria-label={`Comparison for pair ${pair.id}`}>
+      <ResourceView
+        resource={comparison.state}
+        what={`pair ${pair.id}'s descriptions`}
+        onRetry={comparison.reload}
+      >
+        {([left, right]) => <ComparisonFields left={left} right={right} />}
+      </ResourceView>
+    </section>
+  );
+}
+
+function ComparisonFields({ left, right }: { left: Opportunity; right: Opportunity }) {
+  const fields = useMemo(
+    () => [
+      {
+        label: "Title",
+        left: <UntrustedText value={left.title} />,
+        right: <UntrustedText value={right.title} />,
+        differs: left.title !== right.title,
+      },
+      {
+        label: "Funding type",
+        left: fundingTypeLabel(left.fundingType),
+        right: fundingTypeLabel(right.fundingType),
+        differs: left.fundingType !== right.fundingType,
+      },
+      {
+        label: "Application stage",
+        left: opportunityStatusLabel(left.status),
+        right: opportunityStatusLabel(right.status),
+        differs: left.status !== right.status,
+      },
+      {
+        label: "Summary",
+        left: <UntrustedBlock value={left.summary} fallback="No summary was provided." />,
+        right: <UntrustedBlock value={right.summary} fallback="No summary was provided." />,
+        differs: (left.summary ?? "") !== (right.summary ?? ""),
+      },
+      {
+        label: "Description",
+        left: <UntrustedBlock value={left.description} />,
+        right: <UntrustedBlock value={right.description} />,
+        differs: left.description !== right.description,
+      },
+      {
+        label: "Application URL",
+        left: <UntrustedLink href={left.applicationUrl} />,
+        right: <UntrustedLink href={right.applicationUrl} />,
+        differs: (left.applicationUrl ?? "") !== (right.applicationUrl ?? ""),
+      },
+    ],
+    [left, right],
+  );
+
+  return (
+    <div className="duplicate-comparison-scroll">
+      <div className="duplicate-comparison-grid">
+        <div aria-hidden="true" />
+        <h3>
+          <UntrustedText value={left.title} />
+        </h3>
+        <h3>
+          <UntrustedText value={right.title} />
+        </h3>
+        <div aria-hidden="true" />
+        {fields.map((field) => (
+          <ComparisonField key={field.label} {...field} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComparisonField({
+  label,
+  left,
+  right,
+  differs,
+}: { label: string; left: ReactNode; right: ReactNode; differs: boolean }) {
+  return (
+    <Fragment>
+      <h4 className={differs ? "duplicate-comparison-difference" : undefined}>{label}</h4>
+      <div className={differs ? "duplicate-comparison-difference" : undefined}>{left}</div>
+      <div className={differs ? "duplicate-comparison-difference" : undefined}>{right}</div>
+      <div
+        className={
+          differs
+            ? "duplicate-comparison-difference duplicate-comparison-difference-flag"
+            : "duplicate-comparison-difference-flag"
+        }
+      >
+        {differs ? <span className="badge">Different</span> : null}
+      </div>
+    </Fragment>
+  );
+}
+
 function Side({
   side,
   group,
   selected,
   onSelect,
+  selectable,
   origin,
 }: {
   side: DuplicateSide;
   group: string;
   selected: boolean;
   onSelect: (id: string) => void;
+  selectable: boolean;
   origin: string;
 }) {
   return (
     <div>
-      <label className="row">
-        <input
-          type="radio"
-          name={group}
-          checked={selected}
-          onChange={() => onSelect(side.id)}
-          style={{ width: "auto" }}
-        />
-        <span>keep this one</span>
-      </label>
+      {selectable ? (
+        <label className="choice-row">
+          <input type="radio" name={group} checked={selected} onChange={() => onSelect(side.id)} />
+          <span>keep this one</span>
+        </label>
+      ) : null}
       <p>
         <Link href={detailHref("/listings", side.id, origin)}>
           <UntrustedText value={side.title} />
@@ -968,7 +1376,8 @@ function Side({
       <p className="muted">
         <code>{side.id}</code>
         <br />
-        <ReviewStatusBadge status={side.reviewStatus} /> <ListedBadge isListed={side.isListed} />
+        <ReviewStatusBadge status={side.reviewStatus} />{" "}
+        <ListedBadge isListed={side.isListed} reviewStatus={side.reviewStatus} />
         {side.namespace ? (
           <>
             {" "}
@@ -988,13 +1397,13 @@ function Side({
   );
 }
 
-// ── organisations ─────────────────────────────────────────────────────────────────
+// ── organizations ─────────────────────────────────────────────────────────────────
 
 /**
- * Verifying an organisation, which is the single most consequential control in this application.
+ * Verifying an organization, which is the single most consequential control in this application.
  *
  * IT IS SEARCH-FIRST, and that is a safety property rather than a layout preference. The directory
- * auto-registers a stub for every organisation any listing merely NAMES, so an unfiltered list is
+ * auto-registers a stub for every organization any listing merely NAMES, so an unfiltered list is
  * hundreds of names nobody has ever vouched for, sorted alphabetically, with the one that matters
  * somewhere in the middle. Verifying the wrong row from a list like that grants publishing rights
  * over a namespace to whoever is added to it next.
@@ -1002,7 +1411,7 @@ function Side({
  * So the page shows what is already trusted or already peopled, and everything else is behind a
  * deliberate search.
  */
-function Organisations() {
+function Organizations({ memberships }: { memberships: Me["memberships"] }) {
   const api = useApi();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
@@ -1038,21 +1447,19 @@ function Organisations() {
   return (
     <>
       <form
-        className="row"
+        className="search-row"
         onSubmit={(event) => {
           event.preventDefault();
           setSearch(query.trim());
         }}
       >
         <input
-          aria-label="Search organisations by name or slug"
+          aria-label="Search organizations by name or slug"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search organisations by name or slug…"
+          placeholder="Search organizations by name or slug…"
         />
-        <button type="submit" className="button-primary">
-          Search
-        </button>
+        <button type="submit">Search</button>
         {search !== "" ? (
           <button
             type="button"
@@ -1067,7 +1474,7 @@ function Organisations() {
       </form>
       <p className="muted footnote">
         Verifying is not directory housekeeping — it grants publishing rights. The two lists below
-        are the organisations that are already verified or already have members; every other name in
+        are the organizations that are already verified or already have members; every other name in
         the corpus is a stub auto-registered from a listing that mentioned it, and lives behind the
         search.
       </p>
@@ -1079,17 +1486,23 @@ function Organisations() {
       </h2>
       <ResourceView
         resource={verified.state}
-        what="verified organisations"
+        what="verified organizations"
         onRetry={verified.reload}
       >
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState
-              title="No organisation is verified."
-              detail="Nothing publishes without review until one is. Find an organisation with members below, or by searching."
+              title="No organization is verified."
+              detail="Nothing publishes without review until one is. Find an organization with members below, or by searching."
             />
           ) : (
-            <OrgTable orgs={list.items} busy={busy} run={run} reload={reloadAll} />
+            <OrgTable
+              orgs={list.items}
+              memberships={memberships}
+              busy={busy}
+              run={run}
+              reload={reloadAll}
+            />
           )
         }
       </ResourceView>
@@ -1097,23 +1510,29 @@ function Organisations() {
       <h2 className="section-head">Has members, not verified{` · ${peopled.length}`}</h2>
       <ResourceView
         resource={unverified.state}
-        what="unverified organisations"
+        what="unverified organizations"
         onRetry={unverified.reload}
       >
         {(list) =>
           peopled.length === 0 ? (
             <EmptyState
-              title="No unverified organisation has members."
-              detail="A membership is granted from an approved claim, or directly by a reviewer. Verifying an organisation with no members grants nothing today and arms whoever is added next."
+              title="No unverified organization has members."
+              detail="A membership is granted from an approved claim, or directly by a reviewer. Verifying an organization with no members grants nothing today and arms whoever is added next."
             />
           ) : (
             <>
-              <OrgTable orgs={peopled} busy={busy} run={run} reload={reloadAll} />
+              <OrgTable
+                orgs={peopled}
+                memberships={memberships}
+                busy={busy}
+                run={run}
+                reload={reloadAll}
+              />
               {list.items.length >= 100 ? (
                 <p className="muted footnote">
-                  The API returns the first 100 unverified organisations by slug and there are at
-                  least that many, so this list may be incomplete — search for a specific one rather
-                  than assuming it is absent.
+                  Showing the first 100 unverified organizations by slug. There are at least that
+                  many, so this list may be incomplete — search for a specific one rather than
+                  assuming it is absent.
                 </p>
               ) : null}
             </>
@@ -1134,6 +1553,7 @@ function Organisations() {
               ) : (
                 <OrgTable
                   orgs={list.items}
+                  memberships={memberships}
                   busy={busy}
                   run={run}
                   reload={reloadAll}
@@ -1150,12 +1570,14 @@ function Organisations() {
 
 function OrgTable({
   orgs,
+  memberships,
   busy,
   run,
   reload,
   showStubGuard,
 }: {
   orgs: OrganizationSummary[];
+  memberships: Me["memberships"];
   busy: boolean;
   run: (work: () => Promise<string>) => Promise<void>;
   reload: () => void;
@@ -1167,7 +1589,7 @@ function OrgTable({
       <table>
         <thead>
           <tr>
-            <th scope="col">Organisation</th>
+            <th scope="col">Organization</th>
             <th scope="col">Members</th>
             <th scope="col">Publishing</th>
             <th scope="col">Decision</th>
@@ -1178,6 +1600,7 @@ function OrgTable({
             <OrgRow
               key={org.slug}
               org={org}
+              canOpen={memberships.some((membership) => membership.slug === org.slug)}
               busy={busy}
               run={run}
               reload={reload}
@@ -1192,12 +1615,14 @@ function OrgTable({
 
 function OrgRow({
   org,
+  canOpen,
   busy,
   run,
   reload,
   showStubGuard,
 }: {
   org: OrganizationSummary;
+  canOpen: boolean;
   busy: boolean;
   run: (work: () => Promise<string>) => Promise<void>;
   reload: () => void;
@@ -1212,7 +1637,13 @@ function OrgRow({
     <>
       <tr>
         <th scope="row">
-          <UntrustedText value={org.name} className="row-title" />
+          {canOpen ? (
+            <Link className="row-title" href={`/organizations/${encodeURIComponent(org.slug)}`}>
+              <UntrustedText value={org.name} />
+            </Link>
+          ) : (
+            <UntrustedText value={org.name} className="row-title" />
+          )}
           <div className="muted">
             <code>{org.slug}</code>
           </div>
@@ -1236,7 +1667,7 @@ function OrgRow({
             </button>
           </div>
           {showStubGuard && memberless && !org.verified ? (
-            <p className="faint footnote">
+            <p className="muted footnote">
               0 members — verifying grants nothing today and arms whoever is added next.
             </p>
           ) : null}
@@ -1287,7 +1718,7 @@ function OrgRow({
               </ConfirmPanel>
             ) : memberless ? (
               /*
-               * A MEMBERLESS ORGANISATION IS THE TRAP. Verifying it looks harmless — it grants
+               * A MEMBERLESS ORGANIZATION IS THE TRAP. Verifying it looks harmless — it grants
                * nothing to nobody today — and that is exactly why it gets done casually, months
                * before somebody is added and silently inherits the right to publish unreviewed.
                * So this is not a confirmation with a warning in it; it refuses and says what to do
@@ -1300,13 +1731,12 @@ function OrgRow({
                 <p>
                   Verifying it would grant nothing today and arm whoever is added next — the grant
                   would be made now and collected later, by somebody nobody has reviewed.{" "}
-                  <strong>Grant a membership first</strong>, then verify the organisation with its
+                  <strong>Grant a membership first</strong>, then verify the organization with its
                   members in front of you.
                 </p>
                 <p className="row">
                   <button
                     type="button"
-                    className="button-primary"
                     onClick={() => {
                       setConfirming(false);
                       setGranting(true);
@@ -1322,7 +1752,7 @@ function OrgRow({
             ) : (
               <ConfirmPanel
                 title={`Verify ${org.name}?`}
-                confirmLabel="Verify organisation"
+                confirmLabel="Verify organization"
                 busyLabel="Verifying…"
                 busy={busy}
                 onCancel={() => setConfirming(false)}
@@ -1331,7 +1761,7 @@ function OrgRow({
                     await api.review.verifyOrganization(org.slug);
                     setConfirming(false);
                     reload();
-                    return `${org.slug} is verified — its ${org.memberCount} member(s) now publish into that namespace without review.`;
+                    return `${org.slug} is verified — its ${org.memberCount} ${org.memberCount === 1 ? "member now publishes" : "members now publish"} into that namespace without review.`;
                   })
                 }
               >
@@ -1356,14 +1786,14 @@ function OrgRow({
 }
 
 /**
- * Granting an account publishing rights on an organisation.
+ * Granting an account publishing rights on an organization.
  *
  * THE API TAKES AN ACCOUNT ID, NOT A HANDLE — `POST /v1/review/organizations/:slug/members` with
  * `{ accountId, role? }`. A reviewer reading a claim knows the handle and never the integer, so this
  * resolves one to the other through the account directory rather than making somebody go and look it
  * up. A bare number is accepted too, because the one place the id IS to hand is the row above.
  *
- * IT MATTERS MORE ON A VERIFIED ORGANISATION, and the confirmation says which case it is: on a
+ * IT MATTERS MORE ON A VERIFIED ORGANIZATION, and the confirmation says which case it is: on a
  * verified one this grant is immediately a publishing right over the whole namespace, and on an
  * unverified one it is not — same button, two very different consequences, so they are never worded
  * the same way.
@@ -1394,37 +1824,30 @@ function GrantMembership({
    */
   const lookup = useAction();
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState("publisher");
+  const [role, setRole] = useState<OrgRole>("publisher");
   const [candidates, setCandidates] = useState<AccountSummary[] | null>(null);
   const [chosen, setChosen] = useState<AccountSummary | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const loadInvites = useCallback(() => api.review.membershipInvites(org.slug), [api, org.slug]);
+  const invites = useResource(loadInvites);
 
   const find = async () => {
     const typed = query.trim();
     if (typed === "") return;
     setCandidates(null);
     setChosen(null);
-    // A bare integer is an id. Anything else is a handle to look up.
-    if (/^\d+$/.test(typed)) {
-      setChosen({
-        id: Number(typed),
-        handle: null,
-        displayName: null,
-        globalRole: "submitter",
-        directCreate: false,
-        createdAt: "",
-      });
-      return;
-    }
+    setInviteEmail("");
     await lookup.run(async () => {
       const found = await api.review.accounts({ q: typed, limit: 10 });
       setCandidates(found.items);
+      if (found.items.length === 0 && typed.includes("@")) setInviteEmail(typed);
       return found.items.length === 0
         ? `No account matches “${typed}”.`
-        : `${found.items.length} account(s) match “${typed}”.`;
+        : `${found.items.length} ${found.items.length === 1 ? "account matches" : "accounts match"} “${typed}”.`;
     });
   };
 
-  const name = chosen?.handle ?? (chosen ? `account ${chosen.id}` : "");
+  const name = chosen ? accountIdentifier(chosen) : "";
 
   return (
     <div className="card">
@@ -1435,24 +1858,24 @@ function GrantMembership({
         A member may submit into the <code>{org.slug}:</code> namespace.{" "}
         {org.verified ? (
           <>
-            This organisation is <strong>verified</strong>, so a member also publishes there without
+            This organization is <strong>verified</strong>, so a member also publishes there without
             review.
           </>
         ) : (
           <>
-            This organisation is not verified, so a member&rsquo;s writes still wait for a reviewer.
+            This organization is not verified, so a member&rsquo;s writes still wait for a reviewer.
           </>
         )}
       </p>
 
-      <div className="row">
+      <div className="filters">
         <div className="field">
-          <label htmlFor={`grant-who-${org.slug}`}>Account handle or id</label>
+          <label htmlFor={`grant-who-${org.slug}`}>Account handle, name, email or id</label>
           <input
             id={`grant-who-${org.slug}`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="e.g. fil-ops, or 42"
+            placeholder="handle, name, email or id"
           />
         </div>
         <div className="field">
@@ -1460,11 +1883,11 @@ function GrantMembership({
           <select
             id={`grant-role-${org.slug}`}
             value={role}
-            onChange={(event) => setRole(event.target.value)}
+            onChange={(event) => setRole(event.target.value as OrgRole)}
           >
-            <option value="publisher">publisher</option>
-            <option value="admin">admin</option>
-            <option value="owner">owner</option>
+            <option value="publisher">{orgRoleLabel("publisher")}</option>
+            <option value="admin">{orgRoleLabel("admin")}</option>
+            <option value="owner">{orgRoleLabel("owner")}</option>
           </select>
         </div>
         <button
@@ -1478,7 +1901,7 @@ function GrantMembership({
 
       <ActionNote note={lookup.note} />
 
-      {candidates && !chosen ? (
+      {candidates && candidates.length > 0 && !chosen ? (
         <div className="table-scroll">
           <table>
             <thead>
@@ -1492,12 +1915,28 @@ function GrantMembership({
               {candidates.map((account) => (
                 <tr key={account.id}>
                   <th scope="row">
-                    <UntrustedText value={account.handle} fallback={`account ${account.id}`} />
+                    <span className="row-title">
+                      <UntrustedText
+                        value={account.handle ?? account.email}
+                        fallback={`account ${account.id}`}
+                      />
+                    </span>
                     <div className="muted">
+                      {account.handle && account.email ? (
+                        <>
+                          <UntrustedText value={account.email} />
+                          <br />
+                        </>
+                      ) : null}
+                      {account.displayName ? (
+                        <>
+                          <UntrustedText value={account.displayName} /> ·{" "}
+                        </>
+                      ) : null}
                       <code>#{account.id}</code>
                     </div>
                   </th>
-                  <td className="muted">{account.globalRole}</td>
+                  <td className="muted">{accountRoleLabel(account.globalRole)}</td>
                   <td>
                     <button type="button" onClick={() => setChosen(account)}>
                       Choose
@@ -1510,9 +1949,53 @@ function GrantMembership({
         </div>
       ) : null}
 
+      {candidates?.length === 0 ? (
+        <section aria-labelledby={`invite-heading-${org.slug}`}>
+          <p className="empty-title" id={`invite-heading-${org.slug}`}>
+            Invite by email instead
+          </p>
+          <p className="muted footnote">
+            No account exists for that search yet. The membership applies the first time they sign
+            in with this email.
+          </p>
+          <div className="field">
+            <label htmlFor={`invite-email-${org.slug}`}>Email</label>
+            <input
+              id={`invite-email-${org.slug}`}
+              type="email"
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              placeholder="person@example.org"
+            />
+          </div>
+          <p className="row">
+            <button
+              type="button"
+              className="button-primary"
+              disabled={busy || lookup.busy || !looksLikeEmail(inviteEmail)}
+              onClick={() =>
+                void run(async () => {
+                  const invite = await api.review.inviteMembership(org.slug, {
+                    email: inviteEmail.trim(),
+                    role,
+                  });
+                  setCandidates(null);
+                  setQuery("");
+                  setInviteEmail("");
+                  invites.reload();
+                  return `Invitation saved for ${invite.email}. The membership applies the first time they sign in with this email.`;
+                })
+              }
+            >
+              Invite by email instead
+            </button>
+          </p>
+        </section>
+      ) : null}
+
       {chosen ? (
         <ConfirmPanel
-          title={`Make ${name} ${role === "admin" || role === "owner" ? "an" : "a"} ${role} of ${org.name}?`}
+          title={`Make ${name} an ${orgRoleLabel(role).toLowerCase()} at ${org.name}?`}
           confirmLabel="Grant the membership"
           busyLabel="Granting…"
           busy={busy}
@@ -1524,7 +2007,7 @@ function GrantMembership({
                 role,
               });
               onDone();
-              return `${name} is now ${result.role ?? role} of ${org.slug}.`;
+              return `${name} is now an ${orgRoleLabel(result.role ?? role).toLowerCase()} at ${org.slug}.`;
             })
           }
         >
@@ -1534,22 +2017,36 @@ function GrantMembership({
                 They will publish into the <code>{org.slug}:</code> namespace immediately and
                 without review
               </strong>{" "}
-              — this organisation is verified, so the membership is the whole grant. Nothing else
+              — this organization is verified, so the membership is the whole grant. Nothing else
               has to happen for it to take effect.
             </p>
           ) : (
             <p>
               They may submit into the <code>{org.slug}:</code> namespace, and those submissions{" "}
-              <strong>still wait for a reviewer</strong> — this organisation is not verified.
+              <strong>still wait for a reviewer</strong> — this organization is not verified.
               Verifying it later grants publishing rights to them and to every member added after.
             </p>
           )}
           <p className="muted footnote">
-            An <strong>owner</strong> or <strong>admin</strong> may also edit the
-            organisation&rsquo;s public directory entry; a <strong>publisher</strong> may not.
+            An <strong>{orgRoleLabel("owner").toLowerCase()}</strong> or{" "}
+            <strong>{orgRoleLabel("admin").toLowerCase()}</strong> may also edit the
+            organization&rsquo;s public directory entry; an{" "}
+            <strong>{orgRoleLabel("publisher").toLowerCase()}</strong> may not.
           </p>
         </ConfirmPanel>
       ) : null}
+
+      <PendingMembershipInvites
+        resource={invites}
+        busy={busy}
+        onRevoke={(inviteId, email) =>
+          run(async () => {
+            await api.review.revokeMembershipInvite(org.slug, inviteId);
+            invites.reload();
+            return `The pending invitation for ${email} was revoked.`;
+          })
+        }
+      />
 
       <p className="row">
         <button type="button" disabled={busy || lookup.busy} onClick={onDone}>
@@ -1557,5 +2054,76 @@ function GrantMembership({
         </button>
       </p>
     </div>
+  );
+}
+
+function accountIdentifier(account: AccountSummary): string {
+  return account.handle ?? account.email ?? `account ${account.id}`;
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function PendingMembershipInvites({
+  resource,
+  busy,
+  onRevoke,
+}: {
+  resource: ResourceHandle<MembershipInviteList>;
+  busy: boolean;
+  onRevoke: (inviteId: number, email: string) => Promise<void>;
+}) {
+  return (
+    <>
+      <h3>Pending invites</h3>
+      <p className="muted footnote">
+        The membership applies the first time they sign in with this email.
+      </p>
+      <ResourceView
+        resource={resource.state}
+        what="pending membership invites"
+        onRetry={resource.reload}
+      >
+        {(list) =>
+          list.items.length === 0 ? (
+            <p className="muted">No pending invites.</p>
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Invited</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((invite) => (
+                    <tr key={invite.id}>
+                      <th scope="row">
+                        <UntrustedText value={invite.email} />
+                      </th>
+                      <td>{orgRoleLabel(invite.role)}</td>
+                      <td className="muted">{formatInstant(invite.createdAt)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onRevoke(invite.id, invite.email)}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </ResourceView>
+    </>
   );
 }

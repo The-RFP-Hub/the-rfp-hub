@@ -5,6 +5,7 @@ import { toAccountSummary } from "../../services/admin/admin.service.js";
 import { AccountService } from "../../services/auth/account.service.js";
 import { ClaimService } from "../../services/claims/claim.service.js";
 import { DedupeService } from "../../services/dedupe/dedupe.service.js";
+import { MembershipInviteService } from "../../services/memberships/membership-invite.service.js";
 import { ManagedOpportunityService } from "../../services/opportunities/managed-opportunity.service.js";
 import { type OrganizationMetadata, ReviewService } from "../../services/review/review.service.js";
 import { VerificationService } from "../../services/verification/verification.service.js";
@@ -13,6 +14,7 @@ import type {
   ClaimListView,
   DuplicatePairListView,
   ManagedOpportunityListView,
+  MembershipInviteListView,
   OrganizationListView,
 } from "../../shared/api-views.js";
 import { notFound } from "../../shared/http-error.js";
@@ -24,16 +26,20 @@ const managed = new ManagedOpportunityService();
 const accountsService = new AccountService();
 const dedupe = new DedupeService();
 const verification = new VerificationService();
+const membershipInvites = new MembershipInviteService();
 
 export const reviewController = {
   listOpportunities: handled(async (request: FastifyRequest) => {
     const query = queryOf<{
+      id?: string;
       reviewStatus?: "pending" | "approved" | "rejected";
       page?: number;
       limit?: number;
     }>(request);
     // The queue's default is the only status a reviewer has to act on.
-    const page = await managed.listForReview({ reviewStatus: "pending", ...query });
+    const page = await managed.listForReview(
+      query.id !== undefined ? query : { reviewStatus: "pending", ...query },
+    );
     return page satisfies ManagedOpportunityListView;
   }),
 
@@ -106,6 +112,12 @@ export const reviewController = {
     return dedupe.decide(principal.accountId, idParam(id, "duplicate pair"), "dismiss");
   }),
 
+  reopenDuplicate: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { pairId } = paramsOf<{ pairId: string }>(request);
+    return dedupe.reopen(principal.accountId, idParam(pairId, "duplicate pair"));
+  }),
+
   mergeDuplicate: handled(async (request: FastifyRequest) => {
     const principal = principalOf(request);
     const { id } = paramsOf<{ id: string }>(request);
@@ -175,10 +187,33 @@ export const reviewController = {
     return reviews.revokeMembership(principal.accountId, slug, idParam(accountId, "account"));
   }),
 
+  createMembershipInvite: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { slug } = paramsOf<{ slug: string }>(request);
+    const { email, role } = bodyOf<{ email: string; role?: string }>(request);
+    return membershipInvites.create(principal.accountId, slug, email, role);
+  }),
+
+  listMembershipInvites: handled(async (request: FastifyRequest) => {
+    const { slug } = paramsOf<{ slug: string }>(request);
+    const items = await membershipInvites.listPending(slug);
+    return { items } satisfies MembershipInviteListView;
+  }),
+
+  revokeMembershipInvite: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { slug, inviteId } = paramsOf<{ slug: string; inviteId: string }>(request);
+    return membershipInvites.revoke(
+      principal.accountId,
+      slug,
+      idParam(inviteId, "membership invite"),
+    );
+  }),
+
   searchAccounts: handled(async (request: FastifyRequest) => {
     const { q, limit } = queryOf<{ q?: string; limit?: number }>(request);
     const rows = await accountsService.search(q, limit);
-    return { items: rows.map(toAccountSummary) } satisfies AccountListView;
+    return { items: rows.map((row) => toAccountSummary(row, row.email)) } satisfies AccountListView;
   }),
 
   searchOrganizations: handled(async (request: FastifyRequest) => {

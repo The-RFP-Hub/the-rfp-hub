@@ -46,6 +46,7 @@ import {
 } from "@/lib/directory";
 import { describeDeadline, formatCount } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
+import { fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { OpportunitySummary } from "@/lib/types";
@@ -151,7 +152,7 @@ export function DirectoryList() {
               <option value="">Any type</option>
               {FUNDING_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {fundingTypeLabel(value)}
                 </option>
               ))}
             </select>
@@ -172,7 +173,7 @@ export function DirectoryList() {
               <option value="">Any status</option>
               {STATUSES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {opportunityStatusLabel(value)}
                 </option>
               ))}
             </select>
@@ -194,9 +195,7 @@ export function DirectoryList() {
           </div>
 
           <div className="field field-action">
-            <button type="submit" className="button-primary">
-              Search
-            </button>
+            <button type="submit">Search</button>
           </div>
         </form>
       </search>
@@ -240,7 +239,7 @@ export function DirectoryList() {
                     <thead>
                       <tr>
                         <th scope="col">Opportunity</th>
-                        <th scope="col">Organisation</th>
+                        <th scope="col">Organization</th>
                         <th scope="col">Type</th>
                         <th scope="col">Status</th>
                         <th scope="col" className="numeric">
@@ -305,7 +304,7 @@ function ResultLine({
   stale: boolean;
 }) {
   const noun = total === 1 ? "opportunity" : "opportunities";
-  const status = applied.status ? `${applied.status} ` : "";
+  const status = applied.status ? `${opportunityStatusLabel(applied.status).toLowerCase()} ` : "";
   const narrowed = applied.status === DEFAULT_SELECTION.status;
 
   return (
@@ -322,7 +321,7 @@ function ResultLine({
           </>
         ) : null}{" "}
         · page {page} of {totalPages}
-        {stale ? <span className="faint"> · refreshing…</span> : null}
+        {stale ? <span className="muted"> · refreshing…</span> : null}
       </p>
       {narrowed ? (
         <Link href={selectionToHref({ ...applied, status: "", page: 1 })}>
@@ -342,9 +341,9 @@ function ResultLine({
 /**
  * One row.
  *
- * `operatingOrganizations` is a required, order-significant array whose entry 0 is the organisation
+ * `operatingOrganizations` is a required, order-significant array whose entry 0 is the organization
  * to display — the party that actually runs the intake. Sponsors are a different array and are left
- * to the detail page: naming a backer in a column headed "Organisation" would misattribute who a
+ * to the detail page: naming a backer in a column headed "Organization" would misattribute who a
  * reader is applying to.
  *
  * THE RAW ID IS GONE FROM THE ROW and the publisher's own summary took its place. `acme:round-4`
@@ -370,7 +369,7 @@ export function DirectoryRow({ item }: { item: OpportunitySummary }) {
       <td className="muted">
         <UntrustedText value={operator?.name} />
       </td>
-      <td>{item.fundingType}</td>
+      <td>{fundingTypeLabel(item.fundingType)}</td>
       <td>
         <StatusBadge status={item.status} />
       </td>

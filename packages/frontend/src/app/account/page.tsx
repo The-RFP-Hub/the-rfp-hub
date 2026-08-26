@@ -13,16 +13,18 @@
 import { RequireSession } from "@/components/Chrome";
 import { UntrustedText } from "@/components/UntrustedText";
 import { VerifiedBadge } from "@/components/badges";
-import { ActionNote } from "@/components/states";
-import { ApiError } from "@/lib/api";
+import { ActionNote, actionErrorNote } from "@/components/states";
 import { formatInstant } from "@/lib/format";
+import { ROUTE_GATE_COPY, accountRoleLabel, orgRoleLabel } from "@/lib/presentation";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import Link from "next/link";
 import { useState } from "react";
 
 export default function AccountPage() {
-  return <RequireSession>{(me) => <Account me={me} />}</RequireSession>;
+  return (
+    <RequireSession gate={ROUTE_GATE_COPY.account}>{(me) => <Account me={me} />}</RequireSession>
+  );
 }
 
 function Account({ me }: { me: Me }) {
@@ -41,13 +43,7 @@ function Account({ me }: { me: Me }) {
       setNote({ kind: "ok", message: "Saved." });
       session.reloadMe();
     } catch (error) {
-      setNote({
-        kind: "error",
-        message:
-          error instanceof ApiError
-            ? `${error.message} (${error.code})`
-            : "Could not save changes.",
-      });
+      setNote(actionErrorNote(error, "Could not save changes."));
     } finally {
       setBusy(false);
     }
@@ -60,9 +56,8 @@ function Account({ me }: { me: Me }) {
       <div className="card">
         <h2>Identity</h2>
         <p className="muted footnote">
-          The handle is what appears as <code>source.submittedBy</code> on everything you publish.
-          Changing it changes future attribution; entries already published keep the attribution
-          they were stored with.
+          Your handle is the byline shown on listings. Changing it changes future attribution;
+          listings already published keep the byline they were stored with.
         </p>
         <div className="field">
           <label htmlFor="handle">Handle</label>
@@ -77,14 +72,19 @@ function Account({ me }: { me: Me }) {
             onChange={(event) => setDisplayName(event.target.value)}
           />
         </div>
-        <button type="button" onClick={() => void save()} disabled={busy}>
+        <button
+          type="button"
+          className="button-primary"
+          onClick={() => void save()}
+          disabled={busy}
+        >
           {busy ? "Saving…" : "Save"}
         </button>
         <ActionNote note={note} />
       </div>
 
       <div className="card">
-        <h2>What the API says this account may do</h2>
+        <h2>What this account may do</h2>
         <div className="table-scroll">
           <table>
             <tbody>
@@ -96,18 +96,18 @@ function Account({ me }: { me: Me }) {
               </tr>
               <tr>
                 <th scope="row">Global role</th>
-                <td>{me.role}</td>
+                <td>{accountRoleLabel(me.role)}</td>
               </tr>
               <tr>
                 <th scope="row">Credential in use</th>
                 <td>{me.credentialKind === "session" ? "browser session" : "API key"}</td>
               </tr>
               <tr>
-                <th scope="row">Direct create</th>
+                <th scope="row">Direct-create</th>
                 <td>
                   {me.directCreate
-                    ? "yes — may publish into any namespace without a membership"
-                    : "no"}
+                    ? "Yes — may publish into any namespace without a membership"
+                    : "No — this account publishes without review only through a verified organization membership; other submissions wait for review."}
                 </td>
               </tr>
               <tr>
@@ -132,19 +132,27 @@ function Account({ me }: { me: Me }) {
       </div>
 
       <div className="card">
-        <h2>Organisations</h2>
+        <div className="row-between">
+          <h2>Organizations</h2>
+          <Link href="/organizations">Browse organizations</Link>
+        </div>
         {me.memberships.length === 0 ? (
-          <p className="muted">
-            No memberships. Submissions from this account land pending, which is the normal path for
-            a community submission. Claiming an entry for an organisation you run is how that
-            changes.
-          </p>
+          <>
+            <p className="muted">
+              No memberships. Submissions from this account land pending, which is the normal path
+              for a community submission. Claiming a listing for an organization you run is how that
+              changes.
+            </p>
+            <p>
+              <Link href="/organizations">Browse organizations</Link>
+            </p>
+          </>
         ) : (
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th scope="col">Organisation</th>
+                  <th scope="col">Organization</th>
                   <th scope="col">Your role</th>
                   <th scope="col">Publishing</th>
                 </tr>
@@ -154,13 +162,13 @@ function Account({ me }: { me: Me }) {
                   <tr key={membership.slug}>
                     <th scope="row">
                       {/*
-                       * The membership is the entry point to the organisation's own page — what it
+                       * The membership is the entry point to the organization's own page — what it
                        * has published, and what is waiting in its name. Naming it here without
                        * linking made this table a dead end listing places the reader could not go.
                        */}
                       <Link
                         className="row-title"
-                        href={`/organisations/${encodeURIComponent(membership.slug)}`}
+                        href={`/organizations/${encodeURIComponent(membership.slug)}`}
                       >
                         <UntrustedText value={membership.name} />
                       </Link>
@@ -168,7 +176,7 @@ function Account({ me }: { me: Me }) {
                         <code>{membership.slug}</code>
                       </div>
                     </th>
-                    <td>{membership.role}</td>
+                    <td>{orgRoleLabel(membership.role)}</td>
                     <td>
                       <VerifiedBadge verified={membership.verified} gloss />
                     </td>

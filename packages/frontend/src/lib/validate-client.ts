@@ -32,13 +32,16 @@
  * it says so on screen and submits anyway, and the API's own humanized 400 lands in the same place.
  * Degraded, honest, and never a false all-clear.
  */
-import { humanizeErrors, validateOpportunity } from "rfphub-validate";
+import { humanizeErrors, humanizeIssues, validateOpportunity } from "rfphub-validate";
+import type { ValidationIssue } from "./types";
 
 export type ClientValidation =
   | {
       available: true;
       /** Hard schema violations, one human sentence each. Empty means conformant. */
       errors: string[];
+      /** Structured counterparts used to link the summary to form controls. */
+      issues: ValidationIssue[];
       /** Advisory check-tier findings. A conformant document may carry these. */
       warnings: string[];
     }
@@ -50,6 +53,7 @@ export function validateDocument(document: unknown): ClientValidation {
     return {
       available: true,
       errors: result.valid ? [] : humanizeErrors(result.errors, document),
+      issues: result.valid ? [] : humanizeIssues(result.errors, document),
       warnings: result.warnings.map((warning) => warning.message),
     };
   } catch (error) {

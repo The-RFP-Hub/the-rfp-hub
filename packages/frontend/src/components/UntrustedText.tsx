@@ -2,7 +2,7 @@
  * Publisher-supplied text, rendered as text.
  *
  * The Standard says `description` is untrusted and must be sanitised before rendering, and every
- * other string on a listing — title, summary, eligibility, an organisation's name — arrives by the
+ * other string on a listing — title, summary, eligibility, an organization's name — arrives by the
  * same route and deserves the same treatment. React escapes a text child, so the sanitisation is
  * simply never leaving that path: no `dangerouslySetInnerHTML`, no markdown-to-HTML step, no
  * "trusted publisher" exception. A unit test scans this package's source to keep it that way.
@@ -26,9 +26,9 @@ export function UntrustedText({
   fallback?: string;
 }) {
   if (value === null || value === undefined || value.trim() === "") {
-    return <span className="muted">{fallback}</span>;
+    return <span className="muted untrusted-text">{fallback}</span>;
   }
-  return <span className={className}>{value}</span>;
+  return <span className={[className, "untrusted-text"].filter(Boolean).join(" ")}>{value}</span>;
 }
 
 /** The multi-line variant, for descriptions and other long free text. */
@@ -55,7 +55,7 @@ export function UntrustedLink({
   href,
   label,
 }: { href: string | null | undefined; label?: string }) {
-  if (!href) return <span className="muted">—</span>;
+  if (!href) return <span className="muted untrusted-link">—</span>;
   let safe = false;
   try {
     const parsed = new URL(href);
@@ -65,13 +65,16 @@ export function UntrustedLink({
   }
   if (!safe) {
     return (
-      <span className="muted" title="Not an http(s) URL, so it is shown but not linked">
+      <span
+        className="muted untrusted-link"
+        title="Not an http(s) URL, so it is shown but not linked"
+      >
         {href}
       </span>
     );
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
+    <a className="untrusted-link" href={href} target="_blank" rel="noopener noreferrer">
       {label ?? href}
     </a>
   );

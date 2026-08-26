@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * One entry's traffic: four counters, a chart per selected metric, and the days behind it.
+ * One listing's traffic: four counters, a chart per selected metric, and the days behind it.
  *
  * THE BEST-EFFORT LABEL IS PART OF THE FEATURE, not a disclaimer somebody can trim. These numbers
  * are API reads and link-outs rather than page views; the project's own exporter and compliance
@@ -62,7 +62,7 @@ export function AnalyticsTab({ opportunityId }: { opportunityId: string }) {
         </fieldset>
       </div>
 
-      <ResourceView resource={state} what="this entry's traffic" onRetry={reload}>
+      <ResourceView resource={state} what="this listing's traffic" onRetry={reload}>
         {(series) => (
           <SeriesView series={series} metric={metric} onMetric={setMetric} days={days} />
         )}
@@ -88,6 +88,7 @@ export function SeriesView({
   days: number;
 }) {
   const points = seriesFor(series.days, metric);
+  const hasRecordedEvents = points.some((point) => point.value > 0);
   return (
     <>
       <p className="muted">
@@ -111,7 +112,16 @@ export function SeriesView({
         ))}
       </ul>
 
-      <BarChart points={points} metricLabel={METRIC_LABELS[metric]} />
+      {hasRecordedEvents ? (
+        <BarChart points={points} metricLabel={METRIC_LABELS[metric]} />
+      ) : (
+        <div className="state empty">
+          <p className="empty-title">
+            No {METRIC_LABELS[metric].toLowerCase()} were recorded in this period.
+          </p>
+          <p className="muted">Only public directory opens and outbound clicks are counted.</p>
+        </div>
+      )}
 
       <details>
         <summary>Day by day</summary>
@@ -119,15 +129,21 @@ export function SeriesView({
           <caption>{METRIC_LABELS[metric]} per day, UTC</caption>
           <thead>
             <tr>
-              <th scope="col">Day</th>
-              <th scope="col">{METRIC_LABELS[metric]}</th>
+              <th scope="col" className="numeric">
+                Day
+              </th>
+              <th scope="col" className="numeric">
+                {METRIC_LABELS[metric]}
+              </th>
             </tr>
           </thead>
           <tbody>
             {points.map((point) => (
               <tr key={point.day}>
-                <th scope="row">{formatDay(point.day)}</th>
-                <td>{formatCount(point.value)}</td>
+                <th scope="row" className="numeric">
+                  {formatDay(point.day)}
+                </th>
+                <td className="numeric">{formatCount(point.value)}</td>
               </tr>
             ))}
           </tbody>
@@ -135,11 +151,17 @@ export function SeriesView({
       </details>
 
       <p className="muted footnote">
-        Best-effort. These are API reads and link-outs, not page views: the project&rsquo;s own
-        automation is excluded by name, crawlers and <code>DNT: 1</code> are dropped, and capture is
-        buffered in memory, so a restart can lose the last couple of seconds. Days before today come
-        from the nightly rollup; today is aggregated live.
+        Counts are approximate and aggregate. They do not represent unique people.
       </p>
+      <details className="footnote">
+        <summary>How counting works</summary>
+        <p className="muted">
+          Directory opens and outbound clicks are counted as server-side events. The project&rsquo;s
+          own automation is excluded by name, crawlers and <code>DNT: 1</code> are dropped, and
+          capture is buffered in memory, so a restart can lose the last couple of seconds. Days
+          before today come from the nightly rollup; today is aggregated live.
+        </p>
+      </details>
     </>
   );
 }

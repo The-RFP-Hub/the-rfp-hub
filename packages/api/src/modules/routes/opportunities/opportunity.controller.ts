@@ -31,6 +31,10 @@ const find = async (req: FastifyRequest, res: FastifyReply) => {
   const service = new OpportunityService();
   const opportunity = await service.find(id);
   if (!opportunity) {
+    const mergedInto = await service.findMergedDestination(id);
+    if (mergedInto) {
+      return res.code(404).send({ error: "opportunity_merged", mergedInto });
+    }
     return res.code(404).send({ error: "not_found", message: `opportunity '${id}' not found` });
   }
   // Only a served record is counted: a 404 is not a read of anything.

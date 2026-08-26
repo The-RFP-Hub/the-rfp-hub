@@ -21,8 +21,8 @@ import { DirectoryList } from "@/components/DirectoryList";
 import { PublicOpportunity } from "@/components/PublicOpportunity";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
-import type { AuditTrail, Opportunity, PaginatedOpportunities } from "@/lib/types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { AuditTrail, Me, Opportunity, PaginatedOpportunities } from "@/lib/types";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -33,12 +33,33 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * the browser to navigate to. Together they are the whole contract: what the URL says is what is
  * shown, and what a control does is change the URL.
  */
-const { navigation } = vi.hoisted(() => ({
-  navigation: { params: new URLSearchParams(), push: vi.fn() },
+const { navigation, authSession } = vi.hoisted(() => ({
+  navigation: { params: new URLSearchParams(), push: vi.fn(), replace: vi.fn() },
+  authSession: {
+    data: null as { user: { id: string } } | null,
+    isPending: false,
+    error: null as { status?: number; message?: string } | null,
+  },
+}));
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: {
+    useSession: () => authSession,
+    signOut: vi.fn(),
+    getSession: vi.fn(),
+  },
+  clearSessionToken: vi.fn(),
+  refreshSession: vi.fn(),
+  readSessionToken: () => null,
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({
+    push: navigation.push,
+    replace: navigation.replace,
+    back: vi.fn(),
+    refresh: vi.fn(),
+  }),
   useSearchParams: () => navigation.params,
   usePathname: () => "/",
 }));
@@ -220,12 +241,12 @@ describe("the public directory list", () => {
     // position a scanning eye reads second, and telling a reader nothing about whether to click.
     expect(screen.queryByText("acme:round-4")).toBeNull();
 
-    // The operating organisation — entry 0, the party that runs the intake.
+    // The operating organization — entry 0, the party that runs the intake.
     expect(screen.getByText("Acme Foundation")).toBeTruthy();
 
     // Status is its own column now, as a word. Scoped to the badge, because "open" is also an
     // option in the Status control — which is exactly the point of that control being visible.
-    expect(screen.getAllByText("open", { selector: ".badge" })).toHaveLength(2);
+    expect(screen.getAllByText("Open", { selector: ".badge" })).toHaveLength(2);
 
     // The next FIXED deadline, derived from the array, not the last entry in it.
     expect(screen.getByText("30 Sep 23:59 UTC")).toBeTruthy();
@@ -246,7 +267,7 @@ describe("the public directory list", () => {
     const { client } = stub({ list: async () => closed });
     const { container } = mount(client, <DirectoryList />);
 
-    const badge = await screen.findByText("closed", { selector: ".badge" });
+    const badge = await screen.findByText("Closed", { selector: ".badge" });
     // The class is the whole carrier — the stylesheet turns it into a filled box, and a reader who
     // sees no colour at all reads the same word. No inline colour anywhere near it.
     expect(badge.className).toContain("badge-closed");
@@ -363,6 +384,10 @@ describe("the directory's filters", () => {
     expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("zk");
     expect((screen.getByLabelText("Ecosystem") as HTMLInputElement).value).toBe("Optimism");
     expect((screen.getByLabelText("Funding type") as HTMLSelectElement).value).toBe("grant");
+    expect(screen.getByLabelText("Funding type").closest(".field")?.className).toContain("is-set");
+    expect(screen.getByRole("button", { name: "Search" }).className).not.toContain(
+      "button-primary",
+    );
   });
 
   it("CARRIES EVERY LIVE CONTROL ON EVERY APPLY — the silently-discarded-draft bug", async () => {
@@ -446,6 +471,60 @@ describe("the directory's filters", () => {
 });
 
 describe("the public opportunity page", () => {
+  beforeEach(() => {
+    authSession.data = null;
+    authSession.isPending = false;
+    authSession.error = null;
+    navigation.params = new URLSearchParams();
+    navigation.replace.mockClear();
+    document.title = "acme:round-4 | RFP Hub";
+  });
+
+  it("canonicalizes a merged public id and preserves return-navigation query parameters", async () => {
+    navigation.params = new URLSearchParams("back=%2Freview%3Fpage%3D2");
+    const mergedInto = { id: "acme:round 5", title: "Round Five" };
+    const { client } = stub({
+      find: async () => {
+        throw new ApiError(404, "opportunity_merged", "Request failed with status 404.", {
+          mergedInto,
+        });
+      },
+    });
+
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith(
+        "/opportunities/acme%3Around%205?back=%2Freview%3Fpage%3D2&mergedRedirect=1",
+      ),
+    );
+  });
+
+  it("shows a dismissible one-shot notice on the merge survivor", async () => {
+    navigation.params = new URLSearchParams("back=%2Freview%3Fpage%3D2&mergedRedirect=1");
+    const { client } = stub();
+    const view = mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    const notice = await screen.findByText(
+      "You were redirected here: the listing you followed was merged into this one.",
+    );
+    expect(notice.closest("output")).toBeTruthy();
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith(
+        "/opportunities/acme%3Around-4?back=%2Freview%3Fpage%3D2",
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText(/You were redirected here/)).toBeNull();
+
+    view.unmount();
+    navigation.params = new URLSearchParams("back=%2Freview%3Fpage%3D2");
+    mount(stub().client, <PublicOpportunity id="acme:round-4" />);
+    await screen.findByRole("heading", { name: HOSTILE_TITLE });
+    expect(screen.queryByText(/You were redirected here/)).toBeNull();
+  });
+
   it("says it is loading before it says anything else", () => {
     const { client } = stub({ find: () => new Promise(() => {}) });
     mount(client, <PublicOpportunity id="acme:round-4" />);
@@ -459,6 +538,7 @@ describe("the public opportunity page", () => {
 
     await screen.findByText(HOSTILE_TITLE);
     expect(find).toHaveBeenCalledWith("acme:round-4");
+    expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`);
   });
 
   it("renders the record's public fields", async () => {
@@ -468,7 +548,7 @@ describe("the public opportunity page", () => {
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
     // The identity line: type as a word, status as a badge, the id in mono at the END of it — the
     // reader's questions in the order they ask them, with the join key last.
-    expect(screen.getByText("open", { selector: ".badge" }).className).toContain("badge-open");
+    expect(screen.getByText("Open", { selector: ".badge" }).className).toContain("badge-open");
     expect(screen.getByText("acme:round-4", { selector: "code" })).toBeTruthy();
     expect(screen.getByText(/Grants for public-goods infrastructure/)).toBeTruthy();
     expect(screen.getByText("Teams shipping open-source infrastructure.")).toBeTruthy();
@@ -482,7 +562,7 @@ describe("the public opportunity page", () => {
     expect(screen.getByText("5,000–50,000 USD per award")).toBeTruthy();
     expect(screen.getByText("120,000 USD")).toBeTruthy();
 
-    // Operating and sponsoring organisations, kept apart. The operator is named twice — in the
+    // Operating and sponsoring organizations, kept apart. The operator is named twice — in the
     // identity line and under "Runs this opportunity" — and the sponsor only in its own column.
     expect(screen.getAllByText("Acme Foundation")).toHaveLength(2);
     expect(screen.getByText("Beta Collective")).toBeTruthy();
@@ -490,6 +570,70 @@ describe("the public opportunity page", () => {
     // The milestone sequence, denominated in the document-wide currency.
     expect(screen.getByText("Testnet launch")).toBeTruthy();
     expect(screen.getByText("25,000 USD")).toBeTruthy();
+  });
+
+  it("keeps the public content visible while signed out and offers the claim control", async () => {
+    const { client } = stub();
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
+    const claim = screen.getByText("This is my programme — claim it");
+    expect(claim).toBeTruthy();
+    fireEvent.click(claim);
+    expect(screen.getByRole("button", { name: "Sign in to claim" })).toBeTruthy();
+  });
+
+  it("keeps the public content visible while the session is being restored", async () => {
+    authSession.isPending = true;
+    const { client } = stub();
+    mount(client, <PublicOpportunity id="acme:round-4" />);
+
+    expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
+    fireEvent.click(screen.getByText("This is my programme — claim it"));
+    expect(screen.getByText("Restoring your session…")).toBeTruthy();
+  });
+
+  it("claims the canonical id returned by the public detail read, not an aliased route id", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    const me: Me = {
+      accountId: 7,
+      handle: "acme-programmes",
+      displayName: null,
+      email: "programmes@acme.example.org",
+      role: "submitter",
+      directCreate: false,
+      credentialKind: "session",
+      scopes: [],
+      memberships: [{ slug: "acme", name: "Acme Foundation", role: "publisher", verified: true }],
+      canManageKeys: true,
+      canReview: false,
+      canAdmin: false,
+      createdAt: "2026-08-01T00:00:00Z",
+    };
+    const claim = vi.fn(async () => ({
+      outcome: "granted" as const,
+      claimId: 19,
+      opportunityId: entry.id,
+      organizationSlug: "acme",
+      message: "Future writes will publish under acme.",
+    }));
+    const { client: publicClient } = stub();
+    const client = {
+      ...publicClient,
+      me: { get: vi.fn(async () => me) },
+      opportunities: { ...publicClient.opportunities, claim },
+    } as unknown as ApiClient;
+
+    mount(client, <PublicOpportunity id="legacy:round-4" />);
+
+    fireEvent.click(await screen.findByText("This is my programme — claim it"));
+    fireEvent.click(await screen.findByRole("button", { name: "File the claim" }));
+    await waitFor(() =>
+      expect(claim).toHaveBeenCalledWith("acme:round-4", {
+        organizationSlug: "acme",
+        note: null,
+      }),
+    );
   });
 
   it("shows the provenance the public payload exposes, including the source check", async () => {
@@ -501,9 +645,36 @@ describe("the public opportunity page", () => {
     const badge = screen.getByText("link looks right");
     expect(badge.getAttribute("title")).toMatch(/not a fact-check/);
     expect(screen.getByText(/last checked 10 Aug 09:00 UTC/)).toBeTruthy();
-    expect(screen.getByText("publisher_api")).toBeTruthy();
+    expect(screen.getByText("Submitted with an API key")).toBeTruthy();
+    const machineDetails = screen
+      .getByText("Machine-readable details (for developers)")
+      .closest("details");
+    expect(machineDetails?.open).toBe(false);
+    expect(machineDetails?.textContent).toContain('"ingestedVia": "publisher_api"');
     expect(screen.getByText("R4")).toBeTruthy();
     expect(screen.getByText("1.0.0")).toBeTruthy();
+    expect(screen.getByText("Publisher")).toBeTruthy();
+    expect(screen.getByText("Namespace")).toBeTruthy();
+    const provenance = screen
+      .getByRole("heading", { name: "Where this listing came from" })
+      .closest("section");
+    expect(within(provenance as HTMLElement).getByText("acme", { selector: "code" })).toBeTruthy();
+    expect(provenance?.textContent).toContain("Conforms to RFP Hub Standard 1.0.0.");
+    expect(provenance?.textContent).not.toContain("1.0.0 .");
+  });
+
+  it("separates publisher attribution from the id namespace for an imported listing", async () => {
+    const imported: Opportunity = {
+      ...entry,
+      id: "curated:ethonline-2026",
+      source: { ...entry.source, publisher: undefined },
+    };
+    const { client } = stub({ find: async () => imported });
+    mount(client, <PublicOpportunity id={imported.id} />);
+
+    expect(await screen.findByText("Not claimed by a publisher")).toBeTruthy();
+    const namespace = screen.getByText("Namespace").closest("div") as HTMLElement;
+    expect(within(namespace).getByText("curated", { selector: "code" })).toBeTruthy();
   });
 
   it("sends the apply action through the API's counted redirect, in a new tab", async () => {
@@ -560,11 +731,17 @@ describe("the public opportunity page", () => {
 
   it("surfaces the public, redacted change history", async () => {
     const { client, audit } = stub();
-    mount(client, <PublicOpportunity id="acme:round-4" />);
+    mount(client, <PublicOpportunity id="legacy:round-4" />);
 
-    await screen.findByText("replace");
+    await screen.findByText("Replace");
+    // The route can be an alias. Subresources belong to the canonical id returned by the public
+    // detail read, which is also the id shown on the page.
     expect(audit).toHaveBeenCalledWith("acme:round-4");
-    expect(screen.getByText("deadlines, fundingInfo")).toBeTruthy();
+    expect(screen.getByText("Deadlines / Funding")).toBeTruthy();
+    const technical = screen.getByText("Technical record").closest("details");
+    expect(technical?.open).toBe(false);
+    expect(technical?.textContent).toContain('"action": "replace"');
+    expect(technical?.textContent).toContain('"changedFields"');
   });
 
   it("reports a 404 as the API's own answer rather than an empty page", async () => {
@@ -576,7 +753,11 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:nope" />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.getByText(/not found/)).toBeTruthy();
-    expect(screen.getByText(/404 · not_found/)).toBeTruthy();
+    expect(screen.getByText(/We couldn’t find this opportunity/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Search the directory" })).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(within(details).getByText("404")).toBeTruthy();
+    expect(within(details).getByText("not_found")).toBeTruthy();
   });
 });

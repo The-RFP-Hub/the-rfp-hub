@@ -46,7 +46,7 @@ const ALLOWED_CONTENT_TYPES = ["text/html", "application/xhtml+xml", "text/plain
 
 /** Identifies this project's own traffic to the sites it checks — and to our own analytics. */
 export const VERIFIER_USER_AGENT =
-  "rfphub-verifier/1.0 (+https://github.com/The-RFP-Hub/the-rfp-hub)";
+  "RFPHubVerifier/1.0 (+https://github.com/The-RFP-Hub/the-rfp-hub)";
 
 export interface TransportOptions {
   timeoutMs: number;

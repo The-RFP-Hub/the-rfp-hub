@@ -7,9 +7,9 @@ on:
     # `exports/` skips this workflow entirely, while a push that also touches anything else
     # deploys exactly as before. Tag pushes are unaffected — GitHub does not evaluate path filters
     # for them.
+    # Path filters only apply to branch pushes; there is no tag trigger here — staging tracks
+    # main, and the one-off escape hatch is workflow_dispatch, not a tag family.
     paths-ignore: ['exports/**']
-    tags:
-      - 'stage-*'
   workflow_dispatch:
 
 name: Staging API

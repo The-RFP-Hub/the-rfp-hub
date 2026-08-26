@@ -87,11 +87,13 @@ the product.
 
 | Which admin | How | Credential |
 |---|---|---|
-| the first one | `pnpm --filter @the-rfp-hub/api grant-admin -- --email <address> [--create] --yes` | the **migration** `DATABASE_URL` |
+| the first one | `pnpm --filter @the-rfp-hub/api grant-admin -- --email <address> --create --yes` | the **migration** `DATABASE_URL` |
 | every later one | `POST /v1/admin/accounts/:id/role` with `{"role": "admin"}` | an admin's session |
 | a lockout | the same script | the migration `DATABASE_URL` |
 
 The ceremony is a one-time install step, run with the same credential that creates the tables.
+Bring `--create` by default — the `accounts` row is provisioned lazily (see below), so running this
+right after sign-in, before the dashboard has made its first request, finds no account yet.
 
 **The address is a LOOKUP, never the stored value.** An operator knows an email address; the column
 stores the identity's opaque subject. So `--email` resolves through the identity table to that

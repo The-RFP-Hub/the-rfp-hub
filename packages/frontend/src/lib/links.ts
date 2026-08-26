@@ -15,6 +15,7 @@
 
 /** In-app. */
 export const HOW_IT_WORKS = "/how-it-works";
+export const HOW_IT_WORKS_ROLES = `${HOW_IT_WORKS}#roles`;
 export const DIRECTORY = "/";
 
 /**
