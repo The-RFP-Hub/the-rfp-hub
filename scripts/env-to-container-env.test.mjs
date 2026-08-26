@@ -320,6 +320,28 @@ describe("rendering the task definition", () => {
     ).toThrow(/both the container's secrets: array and the injected environment/);
   });
 
+  /**
+   * After the migration the deploy passes no `--env`. The previous revision's plaintext copy of
+   * anything now wired through `secrets:` must not be re-registered; operator-managed non-secret
+   * settings stay.
+   */
+  it("without an injected environment, drops plaintext entries that secrets: now covers", () => {
+    const { taskDefinition: out } = render(
+      taskDefinition({
+        environment: [
+          { name: "DATABASE_URL", value: "postgres://stale-plaintext" },
+          { name: "LOG_LEVEL", value: "info" },
+        ],
+        secrets: [{ name: "DATABASE_URL", valueFrom: "arn:…" }],
+      }),
+      undefined,
+    );
+    const container = out.containerDefinitions[0];
+    expect(container.environment).toEqual([{ name: "LOG_LEVEL", value: "info" }]);
+    expect(container.secrets).toEqual([{ name: "DATABASE_URL", valueFrom: "arn:…" }]);
+    expect(container.image).toBe("new-image");
+  });
+
   it("refuses a document ECS would reject for size", () => {
     const big = [{ name: "HUGE", value: "x".repeat(MAX_TASK_DEFINITION_BYTES) }];
     expect(() => render(taskDefinition(), big)).toThrow(/ECS accepts at most/);

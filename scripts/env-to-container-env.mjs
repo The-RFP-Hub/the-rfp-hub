@@ -305,6 +305,14 @@ export function injectContainerEnv(
   target.image = image;
   if (environment !== undefined) {
     target.environment = environment.map(({ name, value }) => ({ name, value }));
+  } else {
+    // No `--env` is the post-migration shape: the deploy no longer writes plaintext. What the
+    // previous revision carried in `environment` is then either an operator-managed non-secret
+    // setting (kept) or a leftover plaintext copy of something that now arrives through
+    // `secrets:` (dropped — re-registering it would keep the exposure this migration ends).
+    target.environment = (target.environment ?? []).filter(
+      (entry) => !secretNames.has(entry?.name),
+    );
   }
   for (const attribute of IGNORED_TASK_DEFINITION_ATTRIBUTES) delete doc[attribute];
 
