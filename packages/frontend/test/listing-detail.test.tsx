@@ -283,6 +283,32 @@ describe("merged listing detail and edit routes", () => {
     expect(duplicates).toHaveBeenCalledTimes(1);
   });
 
+  it("does not claim that a page is missing when the site blocks the automated check", async () => {
+    listingQuery.current = "tab=verification";
+    const api = client({ ...managed, mergedInto: null });
+    api.opportunities.verification = async () => ({
+      runAt: "2026-08-25T12:00:00Z",
+      requestedUrl: "https://ethglobal.com/events/ethonline2026/apply",
+      finalUrl: "https://ethglobal.com/events/ethonline2026/apply",
+      httpStatus: 403,
+      existsAtSource: false,
+      matched: false,
+      fieldDiff: null,
+      extracted: null,
+      snapshotSha256: null,
+      error: null,
+    });
+    mount(<ListingPage />, api);
+
+    expect(
+      await screen.findByText("Site refused or blocked the automated check (HTTP 403)."),
+    ).toBeTruthy();
+    expect(screen.getByText(/bot protection may block this check/i)).toBeTruthy();
+    const pageExists = screen.getByText("Page exists").closest("div") as HTMLElement;
+    expect(within(pageExists).getByText("unknown")).toBeTruthy();
+    expect(screen.queryByText("Page not found")).toBeNull();
+  });
+
   it("renders no detail navigation when the full listing fails to load", async () => {
     const failing = client();
     failing.me.opportunity = async () => {

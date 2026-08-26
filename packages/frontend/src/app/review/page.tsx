@@ -62,6 +62,7 @@ import type {
   OrgRole,
   OrganizationSummary,
 } from "@/lib/types";
+import { BOT_PROTECTION_NOTE, verificationPresentation } from "@/lib/verification";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
@@ -561,21 +562,14 @@ function SubmissionDetails({ item, origin }: { item: ManagedOpportunity; origin:
           onClick={() =>
             void run(async () => {
               const result = await api.review.verifySource(item.id);
+              const presentation = verificationPresentation(result);
               const message = `Source check: ${
                 result.matched === null
                   ? "no verdict"
                   : result.matched
                     ? "the linked page looks like this programme"
                     : "the linked page did not match"
-              }. Source response: ${
-                result.error
-                  ? "check failed"
-                  : result.existsAtSource === true
-                    ? "page found"
-                    : result.existsAtSource === false
-                      ? "page not found"
-                      : "no result"
-              }.`;
+              }. Source response: ${presentation.response}${presentation.uncertain ? ` ${BOT_PROTECTION_NOTE}` : ""}`;
               return {
                 kind: "ok",
                 message,

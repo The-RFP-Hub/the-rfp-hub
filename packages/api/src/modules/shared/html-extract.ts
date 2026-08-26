@@ -164,3 +164,33 @@ export function detectSoftNotFound(page: ExtractedPage): SoftNotFound {
   }
   return { suspected: false };
 }
+
+export interface BotChallenge {
+  suspected: boolean;
+  /** The visible signal that made this look like an automated-access challenge. */
+  heuristic?: string;
+}
+
+const BOT_CHALLENGE_TITLE =
+  /just a moment|attention required|checking your browser|security check|verify (?:you are|that you are) (?:a )?human/i;
+const BOT_CHALLENGE_TEXT =
+  /enable javascript and cookies to continue|cloudflare ray id|checking (?:if|whether) (?:you are human|your browser)|security service to protect itself from online attacks|verify (?:you are|that you are) (?:a )?human/i;
+
+/** Recognise a challenge page without pretending to know how to get around it. */
+export function detectBotChallenge(page: ExtractedPage): BotChallenge {
+  const title = page.ogTitle ?? page.title ?? "";
+  if (BOT_CHALLENGE_TITLE.test(title)) {
+    return {
+      suspected: true,
+      heuristic: `title looks like an automated-access challenge: ${JSON.stringify(title)}`,
+    };
+  }
+  const signal = BOT_CHALLENGE_TEXT.exec(page.text)?.[0];
+  if (signal) {
+    return {
+      suspected: true,
+      heuristic: `page text looks like an automated-access challenge: ${JSON.stringify(signal)}`,
+    };
+  }
+  return { suspected: false };
+}

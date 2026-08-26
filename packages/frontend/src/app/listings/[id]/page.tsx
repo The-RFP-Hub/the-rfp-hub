@@ -39,6 +39,7 @@ import {
 import { type ResourceHandle, useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { DuplicateList, ManagedOpportunity, Me, Opportunity } from "@/lib/types";
+import { BOT_PROTECTION_NOTE, verificationPresentation } from "@/lib/verification";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -308,71 +309,72 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
         />
       ) : (
         <ResourceView resource={state} what="the verification run" onRetry={reload}>
-          {(run) => (
-            <div className="card">
-              <p>
-                <MatchBadge matched={run.matched} existsAtSource={run.existsAtSource} />{" "}
-                <span className="muted">checked {formatInstant(run.runAt)}</span>
-              </p>
-              <p>
-                <strong>Source response:</strong>{" "}
-                {run.error
-                  ? "Check failed"
-                  : run.existsAtSource === true
-                    ? "Page found"
-                    : run.existsAtSource === false
-                      ? "Page not found"
-                      : "No result"}
-              </p>
-              <dl className="grid-2">
-                <div>
-                  <dt>Requested</dt>
-                  <dd>
-                    <UntrustedLink href={run.requestedUrl} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Ended at</dt>
-                  <dd>
-                    <UntrustedLink href={run.finalUrl} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Page exists</dt>
-                  <dd>
-                    {run.existsAtSource === null ? "unknown" : run.existsAtSource ? "yes" : "no"}
-                  </dd>
-                </div>
-              </dl>
-              <details>
-                <summary>Technical details</summary>
-                <dl>
-                  <div>
-                    <dt>HTTP status</dt>
-                    <dd>{run.httpStatus ?? "—"}</dd>
-                  </div>
-                  {run.error ? (
-                    <div>
-                      <dt>Error</dt>
-                      <dd>{run.error}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </details>
-              {run.fieldDiff ? (
-                <details>
-                  <summary>What the page said about each field</summary>
-                  <pre className="untrusted-block">{JSON.stringify(run.fieldDiff, null, 2)}</pre>
-                </details>
-              ) : null}
-              {run.snapshotSha256 ? (
-                <p className="muted">
-                  Snapshot digest <code>{run.snapshotSha256.slice(0, 16)}…</code> — the extracted
-                  text is stored with the run; the original bytes are not.
+          {(run) => {
+            const presentation = verificationPresentation(run);
+            return (
+              <div className="card">
+                <p>
+                  <MatchBadge matched={run.matched} existsAtSource={presentation.pageExists} />{" "}
+                  <span className="muted">checked {formatInstant(run.runAt)}</span>
                 </p>
-              ) : null}
-            </div>
-          )}
+                <p>
+                  <strong>Source response:</strong> {presentation.response}
+                </p>
+                {presentation.uncertain ? <p className="muted">{BOT_PROTECTION_NOTE}</p> : null}
+                <dl className="grid-2">
+                  <div>
+                    <dt>Requested</dt>
+                    <dd>
+                      <UntrustedLink href={run.requestedUrl} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Ended at</dt>
+                    <dd>
+                      <UntrustedLink href={run.finalUrl} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Page exists</dt>
+                    <dd>
+                      {presentation.pageExists === null
+                        ? "unknown"
+                        : presentation.pageExists
+                          ? "yes"
+                          : "no"}
+                    </dd>
+                  </div>
+                </dl>
+                <details>
+                  <summary>Technical details</summary>
+                  <dl>
+                    <div>
+                      <dt>HTTP status</dt>
+                      <dd>{run.httpStatus ?? "—"}</dd>
+                    </div>
+                    {run.error ? (
+                      <div>
+                        <dt>Error</dt>
+                        <dd>{run.error}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </details>
+                {run.fieldDiff ? (
+                  <details>
+                    <summary>What the page said about each field</summary>
+                    <pre className="untrusted-block">{JSON.stringify(run.fieldDiff, null, 2)}</pre>
+                  </details>
+                ) : null}
+                {run.snapshotSha256 ? (
+                  <p className="muted">
+                    Snapshot digest <code>{run.snapshotSha256.slice(0, 16)}…</code> — the extracted
+                    text is stored with the run; the original bytes are not.
+                  </p>
+                ) : null}
+              </div>
+            );
+          }}
         </ResourceView>
       )}
     </section>

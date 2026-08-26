@@ -365,7 +365,7 @@ describe("deciding a submission", () => {
     expect(screen.getAllByText("indie2").length).toBeGreaterThan(1);
     expect(screen.getAllByText("indie-collective").length).toBeGreaterThan(1);
     fireEvent.click(screen.getByRole("button", { name: /Check the source link/ }));
-    expect(await screen.findByText(/Source response: page found/)).toBeTruthy();
+    expect(await screen.findByText(/Source response: Page found \(HTTP 200\)/)).toBeTruthy();
     const technical = screen
       .getByText("Technical details")
       .closest("details") as HTMLDetailsElement;
