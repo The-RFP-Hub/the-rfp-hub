@@ -203,24 +203,16 @@ export class DedupeService {
     const current = stored[0];
     if (current && current.contentHash === hash) return current.embedding;
 
-    // Bounded by EMBEDDING_TIMEOUT_MS and taken OUTSIDE any transaction — a network call must never
-    // be what holds a database transaction open.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.config.embedding.timeoutMs);
-    let vector: number[];
-    try {
-      vector = await provider.embed(text, controller.signal);
-    } finally {
-      clearTimeout(timer);
-    }
+    const vector = await provider.embed(text);
 
     // COMPARE-AND-SET AGAINST THE ENTRY'S CURRENT CONTENT, not the snapshot this vector was
-    // computed from. `provider.embed` is a network round trip; if the entry was edited while it was
-    // in flight, an OLDER request finishing after a NEWER one would otherwise overwrite the fresh
-    // vector and content hash with the stale ones, and duplicate search / pair pruning would then
-    // run against content the entry no longer has, until the next backfill pass repairs it. The
-    // depth cap keeps a pathological edit-storm from recursing forever; past it the row is written
-    // anyway — the next `check()` or the backfill cursor corrects it.
+    // computed from — and NOT dead now that the featurizer is local. The awaits on either side of
+    // this block are database round trips, and two concurrent requests in one process can still
+    // interleave: an OLDER pass finishing after a NEWER one would overwrite the fresh vector and
+    // content hash with stale ones, and duplicate search / pair pruning would then run against
+    // content the entry no longer has, until the next backfill pass repairs it. The depth cap
+    // keeps a pathological edit-storm from recursing forever; past it the row is written anyway —
+    // the next `check()` or the backfill cursor corrects it.
     if (depth < 3) {
       const fresh = await this.loadRow(row.id);
       const freshHash = contentHash(embeddingTextFor(fresh), provider.model, provider.id);
@@ -338,12 +330,21 @@ export class DedupeService {
    * result: a pair can leave the top 20 while still being over the threshold, and deleting it then
    * would silently drop a real match. A counterpart with no stored vector is left alone — there is
    * nothing to compare it to, which is not the same as being dissimilar.
+   *
+   * "No stored vector" MEANS no vector in this provider's space. The join carries the same
+   * model-and-provider predicate as `search()`, because during a provider switch a counterpart's
+   * row may still hold the OLD space's coordinates: a cosine across spaces is a meaningless number
+   * that typically lands below any threshold, and without the predicate this method read it as
+   * "dissimilar" and deleted a pair that was never re-measured. The backfill re-embeds the
+   * counterpart eventually; until then its pairs are left exactly as the comment above promises.
    */
   private async pruneStalePairs(
     opportunityId: number,
     vector: number[],
     threshold: number,
   ): Promise<void> {
+    const provider = this.provider;
+    if (!provider) return;
     const counterpart = sql`case when ${opportunityDuplicates.opportunityId} = ${opportunityId} then ${opportunityDuplicates.duplicateOfId} else ${opportunityDuplicates.opportunityId} end`;
 
     const rows = await this.db
@@ -354,7 +355,11 @@ export class DedupeService {
       .from(opportunityDuplicates)
       .innerJoin(
         opportunityEmbeddings,
-        sql`${opportunityEmbeddings.opportunityId} = ${counterpart}`,
+        and(
+          sql`${opportunityEmbeddings.opportunityId} = ${counterpart}`,
+          eq(opportunityEmbeddings.model, provider.model),
+          eq(opportunityEmbeddings.providerId, provider.id),
+        ),
       )
       .where(
         and(
