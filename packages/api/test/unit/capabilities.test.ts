@@ -162,4 +162,21 @@ describe("claims", () => {
       effectiveCaps(principal({ credentialKind: "api_key", scopes: ["publish"] })).canClaimGrant,
     ).toBe(true);
   });
+
+  // …and the QUEUE path is not free either. A queued claim is a write on somebody else's entry
+  // with a reviewer decision in flight behind it, so `read` alone cannot start one.
+  it("filing at all requires write on a key credential", () => {
+    expect(effectiveCaps(principal()).canClaimFile).toBe(true);
+    expect(
+      effectiveCaps(principal({ credentialKind: "api_key", scopes: ["read"] })).canClaimFile,
+    ).toBe(false);
+    expect(
+      effectiveCaps(principal({ credentialKind: "api_key", scopes: ["read", "write"] }))
+        .canClaimFile,
+    ).toBe(true);
+    // `publish` implies `write`, so a publisher key needs only the one scope here too.
+    expect(
+      effectiveCaps(principal({ credentialKind: "api_key", scopes: ["publish"] })).canClaimFile,
+    ).toBe(true);
+  });
 });

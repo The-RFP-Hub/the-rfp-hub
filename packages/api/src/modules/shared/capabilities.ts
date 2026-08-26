@@ -53,6 +53,8 @@ export interface Capabilities {
   canSubmit: boolean;
   /** A write in this namespace is published immediately rather than queued for review. */
   canPublishImmediately: boolean;
+  /** May file a claim at all, whatever its outcome — including one that only reaches the queue. */
+  canClaimFile: boolean;
   /** A claim on this namespace's organization would be GRANTED rather than queued. */
   canClaimGrant: boolean;
   /** May list, mint and revoke this account's API keys. Session only, always. */
@@ -128,7 +130,11 @@ export function effectiveCaps(principal: Principal, namespace?: string): Capabil
     // publish; the credential half alone lets any key with `publish` publish into a namespace its
     // owner has no relationship with.
     canPublishImmediately: write && accountMayPublishHere && publishCredential,
-    // A claim is a grant of ownership, so it is held to the same credential bar as publication.
+    // FILING a claim is a write even when it only queues: it puts a reviewer decision in flight
+    // that can move publisher ownership of somebody else's entry. A `read`-only key is a reader,
+    // and a reader must not be able to start that — so the queue path is held to `write`.
+    canClaimFile: write,
+    // GRANTING is a grant of ownership, so it is held to the same credential bar as publication.
     // The membership and verification checks belong to the claim service, which must make them
     // inside the granting transaction against the row it is about to write — a decision computed
     // here, before that transaction, could be won by a revocation racing it.

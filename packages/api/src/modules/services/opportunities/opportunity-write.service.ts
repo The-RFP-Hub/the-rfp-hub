@@ -65,6 +65,7 @@ import {
   type Principal,
   canWriteWith,
   effectiveCaps,
+  hasMembership,
   hasVerifiedMembership,
 } from "../../shared/capabilities.js";
 import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
@@ -296,10 +297,7 @@ export class OpportunityWriteService {
 
     if (mode === "replace" && existing) {
       if (!mayWriteExisting(principal, caps, existing, namespace)) {
-        throw forbidden(
-          "not_your_entry",
-          "that entry was submitted by another account and you are not a verified publisher of its namespace.",
-        );
+        throw forbidden("not_your_entry", refusalReason(principal, existing, namespace));
       }
       // The CREATE-time containment rule, applied to the STORED publisher on replace — with a
       // narrow, PROVENANCE-SCOPED exemption for legacy imports.
@@ -900,8 +898,60 @@ function operatingSlugs(document: Opportunity): string[] {
 }
 
 /**
- * Whether this principal may write over an entry that already exists: the submitter, a verified
- * publisher of the namespace the row is filed under, or T3+.
+ * Why the replacement was refused — one error code, two situations that need different sentences.
+ *
+ * "That entry was submitted by another account" is actively wrong for the original submitter of a
+ * claimed entry: they DID submit it, and being told they did not sends them looking for a bug. The
+ * only useful thing to say is that ownership moved and who holds it now.
+ */
+function refusalReason(principal: Principal, existing: OpportunityRow, namespace: string): string {
+  if (existing.submittedBy === principal.accountId) {
+    return `you submitted this entry, but publisher ownership has since moved to \`${namespace}\` by a granted claim. Only a member of that organization, or a Hub reviewer, may replace it now.`;
+  }
+  return "that entry was submitted by another account and you are not a verified publisher of its namespace.";
+}
+
+/**
+ * The submitter arm of `mayWriteExisting`, and it is NOT simply "you filed it".
+ *
+ * A GRANTED CLAIM MOVES OWNERSHIP, and `submitted_by` does not move with it — it is a historical
+ * fact about who typed the entry in, not a standing authority over it. So an aggregator that filed
+ * `host:1459` used to keep `PUT` on it forever, including after the organisation that actually runs
+ * the programme claimed it and `source_publisher` became theirs: the entry was published in the
+ * claimant's name and edited by somebody with no relationship to them.
+ *
+ * WHAT "OWNERSHIP MOVED" IS DETECTED BY, and why it is not simply a non-null `source_publisher`:
+ * every entry created through this path has one — `applyProvenance` sets it from the namespace on
+ * the way in — so a null test would revoke the submitter arm from ordinary submissions, including
+ * the everyday case of somebody editing a pending entry they filed into a namespace they are not a
+ * member of. The signal is the DIVERGENCE between the publisher and the namespace the entry was
+ * CREATED under: a create pins the id to `<namespace>:<local>`, ids are immutable, and a granted
+ * claim reassigns the publisher while leaving the id behind. So publisher ≠ id prefix means, and
+ * only means, that the row has changed hands since it was filed.
+ *
+ * When it has, the arm survives only for a submitter who is a MEMBER of the organisation that now
+ * publishes it. That is the COMMON case and the reason the test is membership rather than a
+ * VERIFIED membership: somebody submits on their organisation's behalf, the organisation then
+ * claims the entry, and they must not lose write access to their own work over a change they asked
+ * for — nor regain it the day the organisation happens to get verified.
+ *
+ * `namespace` is the ROW's publisher on a replace (`authorizationNamespace` reads
+ * `source_publisher` first), which is exactly the organisation ownership moved to.
+ */
+function isOwningSubmitter(
+  principal: Principal,
+  existing: OpportunityRow,
+  namespace: string,
+): boolean {
+  if (existing.submittedBy !== principal.accountId) return false;
+  const publisher = existing.sourcePublisher;
+  if (publisher === null || publisher === namespaceOfPublicId(existing.publicId)) return true;
+  return hasMembership(principal, namespace);
+}
+
+/**
+ * Whether this principal may write over an entry that already exists: the submitter while they
+ * still own it, a verified publisher of the namespace the row is filed under, or T3+.
  *
  * `namespace` is the ROW's namespace (see `authorizationNamespace`), so the membership arm is a
  * question about the entry rather than about what the body claimed.
@@ -919,12 +969,20 @@ function mayWriteExisting(
   existing: OpportunityRow,
   namespace: string,
 ): boolean {
-  if (existing.submittedBy === principal.accountId) return true;
+  if (isOwningSubmitter(principal, existing, namespace)) return true;
   if (hasVerifiedMembership(principal, namespace)) return true;
   return caps.canReview;
 }
 
-/** A write over somebody else's entry, permitted only by the editorial role. */
+/**
+ * A write over somebody else's entry, permitted only by the editorial role.
+ *
+ * The submitter exemption is the SAME one `mayWriteExisting` grants, deliberately: a reviewer who
+ * filed an entry that has since been claimed away from them is writing over the claimant's entry
+ * now, not their own, and the write must carry the stored attribution rather than re-deriving it
+ * onto the reviewer. Testing `submitted_by` alone here would have kept the two functions'
+ * definitions of "mine" out of step.
+ */
 function isEditorialWrite(
   principal: Principal,
   caps: Capabilities,
@@ -932,7 +990,7 @@ function isEditorialWrite(
   namespace: string,
 ): boolean {
   if (!existing || !caps.canReview) return false;
-  if (existing.submittedBy === principal.accountId) return false;
+  if (isOwningSubmitter(principal, existing, namespace)) return false;
   return !hasVerifiedMembership(principal, namespace);
 }
 

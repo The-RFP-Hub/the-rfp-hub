@@ -15,9 +15,15 @@
  *    ENTRY, then organisation, then membership. Both paths here and the write path take the entry
  *    first, so a member retrying a claim and a reviewer deciding it cannot close a deadlock cycle.
  *
- * 3. **A grant is held to the publication bar.** On an API-key credential that means the `publish`
- *    scope, and its absence is a 403 naming the missing scope rather than a silent queue — a claim
- *    that quietly became a review request would be actively misleading.
+ * 3. **BOTH outcomes have a credential bar, and neither of them is `read`.** Filing a claim at all
+ *    requires `write` on an API-key credential, and a grant is additionally held to the publication
+ *    bar — `publish`. The queue path used to have NO scope check, on the reasoning that a queued
+ *    claim only asks a human for something; that was wrong. A queued claim is a write on somebody
+ *    else's entry with a reviewer decision in flight behind it, and a `read`-only key — the scope
+ *    an integration is given precisely so it cannot change anything — could file one. Each bar
+ *    fails LOUD with a 403 naming the scope it wanted: for the grant path a silent downgrade to a
+ *    queue would tell the caller their key is stronger than it is, and for the queue path there is
+ *    no weaker outcome to fall back to.
  *
  * 4. **Approval carries the verification decision explicitly.** A reviewer approving a claim on an
  *    UNVERIFIED organisation transfers ownership but does NOT unlock auto-approval, because that
@@ -70,6 +76,13 @@ export class ClaimService {
     // The credential half of the answer. The membership and verification halves are deliberately
     // NOT decided here — they are decided under the row lock below, where they cannot go stale.
     const caps = effectiveCaps(principal, slug);
+
+    // The floor: `read` is not enough to file a claim of any kind. Checked before the membership
+    // arm rather than beside the grant bar below, so an under-scoped key cannot use the ordering of
+    // the two refusals to learn which organisations the account it delegates belongs to.
+    if (!caps.canClaimFile) {
+      throw forbidden("missing_scope", "filing a claim requires the `write` scope on an API key.");
+    }
 
     // A membership is required to file a claim at all: a claim is the ORGANISATION's, and an
     // account with no relationship to it is not entitled to speak for it.

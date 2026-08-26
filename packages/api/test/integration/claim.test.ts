@@ -39,6 +39,14 @@ const OPERATOR = "m3claim-operator";
 const SPONSOR = "m3claim-sponsor";
 const RIVAL = "m3claim-rival";
 const UNVERIFIED = "m3claim-unverified";
+/**
+ * The organisation ownership MOVES TO in the PUT-after-claim cases, kept separate from `UNVERIFIED`
+ * on purpose: a later case in this file has a reviewer verify `UNVERIFIED` as part of an approval,
+ * and these cases need an organisation that is still unverified when they run. That is what makes
+ * them isolate the SUBMITTER arm of the write rule — a member of a VERIFIED organisation would pass
+ * on the T2 arm whatever the submitter arm said, and the test would prove nothing.
+ */
+const CLAIMED = "m3claim-claimed";
 const EMAILS = {
   host: "m3claim-host@rfphub.invalid",
   rival: "m3claim-rival@rfphub.invalid",
@@ -47,6 +55,10 @@ const EMAILS = {
   sponsor: "m3claim-sponsor@rfphub.invalid",
   unverified: "m3claim-unverified@rfphub.invalid",
   reviewer: "m3claim-reviewer@rfphub.invalid",
+  /** A member of nothing and a reviewer of nothing — the only shape that isolates the SUBMITTER arm. */
+  submitter: "m3claim-submitter@rfphub.invalid",
+  /** A member of `CLAIMED`: the submitter whose own organisation later claims their entry. */
+  insider: "m3claim-insider@rfphub.invalid",
 };
 
 const run = describeWithDb;
@@ -60,8 +72,11 @@ run("M3CLAIM ownership claims", () => {
   let sponsorToken: string;
   let unverifiedToken: string;
   let reviewerToken: string;
+  let submitterToken: string;
+  let insiderToken: string;
   let operatorId: number;
   let sponsorId: number;
+  let unverifiedId: number;
   let operatorOrgId: number;
   const userIds: string[] = [];
 
@@ -112,8 +127,11 @@ run("M3CLAIM ownership claims", () => {
       handle: "m3claim-reviewer",
       role: "reviewer",
     });
+    const submitter = await seedIdentity(EMAILS.submitter, { handle: "m3claim-submitter" });
+    const insider = await seedIdentity(EMAILS.insider, { handle: "m3claim-insider" });
     operatorId = operator.account.id;
     sponsorId = sponsor.account.id;
+    unverifiedId = unverified.account.id;
     userIds.push(
       rival.userId,
       operator.userId,
@@ -121,6 +139,8 @@ run("M3CLAIM ownership claims", () => {
       sponsor.userId,
       unverified.userId,
       reviewer.userId,
+      submitter.userId,
+      insider.userId,
     );
 
     await seedOrganization({ slug: HOST, verified: false });
@@ -128,6 +148,7 @@ run("M3CLAIM ownership claims", () => {
     const operatorOrg = await seedOrganization({ slug: OPERATOR, verified: true });
     const sponsorOrg = await seedOrganization({ slug: SPONSOR, verified: true });
     const unverifiedOrg = await seedOrganization({ slug: UNVERIFIED, verified: false });
+    const claimedOrg = await seedOrganization({ slug: CLAIMED, verified: false });
     operatorOrgId = operatorOrg.id;
 
     await grantMembership(rival.account.id, rivalOrg.id, "owner");
@@ -135,6 +156,7 @@ run("M3CLAIM ownership claims", () => {
     await grantMembership(colleague.account.id, operatorOrg.id, "publisher");
     await grantMembership(sponsor.account.id, sponsorOrg.id, "owner");
     await grantMembership(unverified.account.id, unverifiedOrg.id, "owner");
+    await grantMembership(insider.account.id, claimedOrg.id, "owner");
 
     rivalToken = rival.token;
     operatorToken = operator.token;
@@ -142,12 +164,14 @@ run("M3CLAIM ownership claims", () => {
     sponsorToken = sponsor.token;
     unverifiedToken = unverified.token;
     reviewerToken = reviewer.token;
+    submitterToken = submitter.token;
+    insiderToken = insider.token;
   });
 
   afterAll(async () => {
     await cleanupFixtures({
       opportunityPrefix: "m3claim-",
-      organizationSlugs: [HOST, OPERATOR, SPONSOR, RIVAL, UNVERIFIED],
+      organizationSlugs: [HOST, OPERATOR, SPONSOR, RIVAL, UNVERIFIED, CLAIMED],
       userIds,
       emails: Object.values(EMAILS),
     });
@@ -357,6 +381,55 @@ run("M3CLAIM ownership claims", () => {
     expect(res.json().error).toBe("missing_scope");
   });
 
+  it("refuses a READ-ONLY key even on the queue path, which used to be free", async () => {
+    // The hole this closes: the `publish` bar above only fires when the claim would be GRANTED, so
+    // a claim that merely queues had no scope check at all and a `read`-only key could file one.
+    // Queueing is not nothing — it is a write on somebody else's entry with a reviewer decision in
+    // flight behind it. SPONSOR only sponsors this entry, so this is unambiguously the queue path.
+    const id = await seedEntry("queue-scope");
+    const readOnly = await mintApiKeyFor(sponsorId, ["read"]);
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(readOnly),
+      payload: { organizationSlug: SPONSOR },
+    });
+    expect(res.statusCode, res.body).toBe(403);
+    expect(res.json().error).toBe("missing_scope");
+    expect(res.json().message).toMatch(/`write` scope/);
+
+    // …and nothing was filed. A 403 that still left a claim behind would be the worse bug.
+    const entry = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    const rows = await db
+      .select()
+      .from(opportunityClaims)
+      .where(eq(opportunityClaims.opportunityId, entry?.id ?? 0));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("queues for a `write` key — the queue path asks for `write`, not `publish`", async () => {
+    // The other side of the bar: `write` is the whole requirement on the queue path. Raising it to
+    // `publish` would stop an ordinary submission integration from asking a reviewer for anything.
+    const id = await seedEntry("queue-scope-write");
+    const key = await mintApiKeyFor(sponsorId, ["read", "write"]);
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/opportunities/${id}/claim`,
+      headers: bearer(key),
+      payload: { organizationSlug: SPONSOR },
+    });
+    expect(res.statusCode, res.body).toBe(202);
+    expect(res.json().outcome).toBe("queued");
+    expect(res.json().claimId).toEqual(expect.any(Number));
+
+    const row = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    expect(row?.sourcePublisher).toBe(HOST);
+  });
+
   it("is a 200 no-op when the caller's organisation already publishes it", async () => {
     const id = await seedEntry("noop");
     await claim(operatorToken, id, OPERATOR);
@@ -520,6 +593,108 @@ run("M3CLAIM ownership claims", () => {
       payload: submission(`${UNVERIFIED}:after-claim`, UNVERIFIED),
     });
     expect(write.json().reviewStatus).toBe("pending");
+  });
+
+  /**
+   * Submit an entry into the unverified `HOST` namespace, then move ownership of it to `CLAIMED`
+   * through a reviewer-approved claim. The entry ends up with `submitted_by = <the submitter>` and
+   * `source_publisher = CLAIMED`, which is the exact shape the write rule is about.
+   */
+  async function submitThenHandOver(localId: string, token: string) {
+    const id = `${HOST}:${localId}`;
+    const filed = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: bearer(token),
+      payload: submission(id, HOST, {
+        operatingOrganizations: [
+          { name: HOST, slug: HOST },
+          { name: CLAIMED, slug: CLAIMED },
+        ],
+      } as Record<string, unknown>),
+    });
+    expect(filed.statusCode, filed.body).toBe(201);
+
+    // A claim may only be filed against a PUBLIC entry — answering about a pending one would be an
+    // existence oracle over the review queue — so the submission goes through review first. The
+    // approval is a review decision and leaves `submitted_by` alone, which is the point.
+    const approved = await app.inject({
+      method: "POST",
+      url: `/v1/review/opportunities/${id}/approve`,
+      headers: bearer(reviewerToken),
+      payload: {},
+    });
+    expect(approved.statusCode, approved.body).toBe(200);
+
+    const queued = await claim(insiderToken, id, CLAIMED);
+    expect(queued.statusCode, queued.body).toBe(202);
+    const decided = await app.inject({
+      method: "POST",
+      url: `/v1/review/claims/${queued.json().claimId}/approve`,
+      headers: bearer(reviewerToken),
+      payload: { verifyOrganization: false },
+    });
+    expect(decided.statusCode, decided.body).toBe(200);
+
+    const row = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    expect(row?.sourcePublisher).toBe(CLAIMED);
+    return id;
+  }
+
+  const replace = (token: string, id: string, title: string) =>
+    app.inject({
+      method: "PUT",
+      url: `/v1/opportunities/${id}`,
+      headers: bearer(token),
+      payload: submission(id, HOST, {
+        title,
+        operatingOrganizations: [
+          { name: HOST, slug: HOST },
+          { name: CLAIMED, slug: CLAIMED },
+        ],
+      } as Record<string, unknown>),
+    });
+
+  it("takes PUT away from the original submitter once a claim has moved ownership", async () => {
+    // `submitted_by` is a historical fact about who typed the entry in, not a standing authority
+    // over it — and it does not move when a claim is granted. So an aggregator that filed the entry
+    // used to keep PUT on it forever, editing something now published in the claimant's name.
+    const id = await submitThenHandOver("submitter-loses-put", submitterToken);
+
+    const res = await replace(submitterToken, id, "Edited by the former owner");
+    expect(res.statusCode, res.body).toBe(403);
+    expect(res.json().error).toBe("not_your_entry");
+    // "submitted by another account" would be actively wrong here — they DID submit it.
+    expect(res.json().message).toMatch(/ownership has since moved/);
+    expect(res.json().message).toContain(CLAIMED);
+
+    const row = (
+      await db.select().from(opportunities).where(eq(opportunities.publicId, id)).limit(1)
+    )[0];
+    expect(row?.title).not.toBe("Edited by the former owner");
+
+    // …and the entry is not frozen, it has simply changed hands: a Hub reviewer still corrects it
+    // on the T3 arm, and that write is EDITORIAL — the same submitter exemption that no longer
+    // covers the former owner no longer exempts a reviewer who happens to have filed something,
+    // which is why the two functions share one definition of "mine".
+    const editorial = await replace(reviewerToken, id, "Corrected by a reviewer");
+    expect(editorial.statusCode, editorial.body).toBe(200);
+    expect(editorial.json().opportunity.title).toBe("Corrected by a reviewer");
+  });
+
+  it("keeps PUT for a submitter who is a member of the organisation that claimed it", async () => {
+    // THE COMMON CASE, and the reason the test is membership rather than VERIFIED membership:
+    // somebody submits on their organisation's behalf, the organisation then claims the entry, and
+    // they must not lose write access to their own work over a change they asked for. `CLAIMED` is
+    // deliberately unverified here, so the T2 arm cannot be what carries this — only the submitter
+    // arm can.
+    const id = await submitThenHandOver("member-keeps-put", insiderToken);
+
+    const res = await replace(insiderToken, id, "Still mine after the claim");
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().opportunity.title).toBe("Still mine after the claim");
   });
 
   it("unlocks auto-approval when the reviewer verifies the organisation as part of the approval", async () => {
