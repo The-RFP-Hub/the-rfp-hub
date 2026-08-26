@@ -146,6 +146,24 @@ export const JOBS: JobDefinition[] = [
 
 export const JOB_NAMES: string[] = JOBS.map((job) => job.name);
 
+/**
+ * The nightly chain, in the order one caller must run it. `jobs.js all` reads exactly this.
+ *
+ * Derived from `JOBS` rather than restated, because a second copy of an ordering is a copy that
+ * drifts — and the drift would be silent, since both lists look plausible on their own. What the
+ * derivation drops is the deprecated aliases: `retention` does work `analytics-rollup` already
+ * does, so running it here would prune twice for no one's benefit.
+ *
+ * The ORDER is the one rule the chain carries (`docs/jobs.md` §4d): everything before `staleness`
+ * writes nothing the others read, and `staleness` must come after `verification-backfill` has
+ * exited or it closes entries a successful check was about to prove alive. `test/unit/jobs.test.ts`
+ * pins the sequence literally, so adding a job to `JOBS` is a deliberate change to the chain rather
+ * than an accidental one.
+ */
+export const CHAIN: readonly string[] = JOBS.filter((job) => job.deprecatedFor === undefined).map(
+  (job) => job.name,
+);
+
 export function findJob(name: string): JobDefinition | undefined {
   return JOBS.find((job) => job.name === name);
 }

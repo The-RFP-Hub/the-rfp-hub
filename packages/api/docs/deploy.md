@@ -356,7 +356,9 @@ starts the same one-off task by hand ([`jobs.md`](./jobs.md) §4a). Either way t
 same:
 
 ```sh
-node packages/api/dist/jobs.js <job> --json      # inside the image, as a container override
+node packages/api/dist/jobs.js all --json        # inside the image, as a container override:
+                                                 # the whole chain, ordered in-process
+node packages/api/dist/jobs.js <job> --json      # or one job by name
 ```
 
 A job is the deployed image with a different command, so it inherits everything already assembled

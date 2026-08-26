@@ -249,9 +249,11 @@ database trigger, and the trail for any entry is publicly readable.
 
 The nightly maintenance jobs that close past-due and long-abandoned listings, roll up analytics and
 backfill source checks are documented, schedule and runbook, in
-[`packages/api/docs/jobs.md`](./packages/api/docs/jobs.md). The chain is scheduled outside this
-repository and runs before the open-data export, which publishes on its own cron; nothing here
-schedules it, and an operator who needs a job run outside that starts the same one-off task by hand.
+[`packages/api/docs/jobs.md`](./packages/api/docs/jobs.md). They run as one task on the deployed
+image — `node packages/api/dist/jobs.js all` runs the whole chain in order in one process — which
+is scheduled outside this repository and runs before the open-data export, which publishes on its
+own cron; nothing here schedules it, and an operator who needs a job run outside that starts the
+same one-off task by hand.
 
 ## Licensing
 

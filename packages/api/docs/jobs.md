@@ -18,6 +18,7 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 
 | Job | Shape | What it does |
 |---|---|---|
+| **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
@@ -26,7 +27,12 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 
 The list lives in exactly one place — `src/modules/services/jobs/registry.ts` — which the runner,
 the admin route and this table all read. A name that is not in it is refused by both callers rather
-than starting a container task that quietly does nothing.
+than starting a container task that quietly does nothing. `CHAIN`, exported from the same file, is
+that list minus the deprecated aliases, and is what `all` runs; `test/unit/jobs.test.ts` pins the
+sequence literally, so a new job joins the night deliberately rather than by being declared.
+
+`all` is not itself a job: it takes no lock of its own, appears in no catalogue, and is refused by
+`POST /v1/admin/jobs/{job}/run`. It is the entry point running the catalogue in order.
 
 ### `retention` is a deprecated alias, for one release
 
@@ -114,7 +120,12 @@ Running the five one at a time satisfies that rule; so does running the four tog
 `staleness` when the last of them exits. The rule is the contract (§4d); serialising is one way to
 meet it.
 
-**This repository schedules nothing, and no longer dispatches anything either.** There is no
+**A scheduler should not have to satisfy that rule by hand.** `node packages/api/dist/jobs.js all`
+runs the whole chain in one task, in `CHAIN` order, so the ordering is enforced in-process instead
+of by a caller in another repository remembering prose. That is the recommended invocation (§4d);
+the per-name advisory lock is unchanged and still applies per job.
+
+**This repository schedules nothing, and does not dispatch anything either.** There is no
 maintenance workflow here: the external scheduler is the only caller that runs nightly, and the
 manual path is an operator starting the same one-off task by hand (§4a) — a recovery after a failed
 external run, or a check that the wiring works.
@@ -349,10 +360,12 @@ outside and have completely different fixes.
 ### b. The image, or a checkout (an operator, by hand)
 
 ```sh
-# inside the deployed image
+# inside the deployed image — the whole chain, or one job
+node packages/api/dist/jobs.js all --json
 node packages/api/dist/jobs.js staleness --json
 
 # locally, against a database you own
+DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs all
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs staleness
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs embedding-backfill --limit 100 --passes 5
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs notification-dispatch --limit 100 --passes 5
@@ -379,13 +392,29 @@ runner, and so it does not quietly stop being true.
 **The entry point is the image's, and the argv is the whole interface.**
 
 ```sh
-node packages/api/dist/jobs.js <job> --json
+node packages/api/dist/jobs.js all --json     # RECOMMENDED: the whole chain, ordered in-process
+node packages/api/dist/jobs.js <job> --json   # one job, if you have a reason to
 ```
 
-`<job>` is one of the six names in §1 — the catalogue in
-`src/modules/services/jobs/registry.ts` is the one place a name is spelled, and a name that is not
-in it exits `2` rather than doing nothing. `--limit` and `--passes` are available and job-specific;
-neither is required.
+**Call `all`.** It runs `CHAIN` — `analytics-rollup`, `embedding-backfill`, `verification-backfill`,
+`notification-dispatch`, `staleness` — sequentially, in this process, so the ordering rule below is
+**enforced by the code that knows what it is for** rather than by a scheduler holding a rule written
+in prose in a repository it does not read. A caller that names the five tasks itself is still
+correct if it sequences them correctly; `all` is correct without having to.
+
+Two things `all` does NOT change. The **advisory lock is still per job**, taken by each job in turn
+under its own name (§3) — `all` takes no lock of its own, so two overlapping `all` runs still
+interleave exactly as two overlapping hand-rolled chains would. And **a job that throws does not
+stop the chain**: `staleness` has to run after the others have *exited*, which is not the same as
+after they have *succeeded*, and skipping the pass the 03:17 export reads because an unrelated
+backfill could not reach its provider would publish a dataset advertising programmes that are over.
+The failure is carried in the result and in the exit code instead.
+
+`<job>` is one of the names in §1 — the catalogue in `src/modules/services/jobs/registry.ts` is the
+one place a name is spelled, and a name that is not in it exits `2` rather than doing nothing.
+`retention` is a deprecated alias kept for one release (§1); drop it from your scheduler. `--limit`
+and `--passes` are available and job-specific; neither is required, and both apply to every job in
+an `all` run.
 
 **It runs on the API service's own task definition**, as a container command override and nothing
 else. The image, the runtime `DATABASE_URL`, every key of the `secrets:` array, the execution and
@@ -398,7 +427,7 @@ copy that goes stale in exactly the way that matters.
 | Code | Means |
 |---|---|
 | `0` | The job ran, **or declined** — another run held the lock, or its feature is not configured |
-| `1` | The job threw |
+| `1` | The job threw. For `all`: **any** job in the chain threw; the rest still ran |
 | `2` | The invocation was wrong — an unknown job name, or a bad flag |
 
 **A missing `DATABASE_URL` is `1`, not `2`.** `src/config.ts` refuses to load without one under
@@ -424,6 +453,19 @@ of per-job counters. Both keys are absent rather than null when they do not appl
 should treat `job`, `shape`, `processed`, `remaining`, `passes` and `elapsedMs` as always present
 and the other two as optional.
 
+**`all --json` writes exactly one ARRAY**, on one line, holding those same objects in the order they
+ran — so a parser written against a single job reads an element of it unchanged:
+
+```json
+[{"job":"analytics-rollup","shape":"sweep","processed":42,"remaining":0,"details":{"pruned":8140},"passes":1,"elapsedMs":950}, …]
+```
+
+A job that **threw** is in the array too, with `processed`, `remaining` and `passes` at `0` and one
+extra key, `error`, carrying its message. `error` is the only thing that distinguishes it, and it is
+absent everywhere else — a caller can treat the array as "every job, one entry each" and check the
+exit code, or read `error` per job to see which one went. Without `--json`, each job's human line is
+written as it finishes rather than at the end, so a task log shows where the chain has got to.
+
 **The lock makes overlap safe against double writes. It does NOT make overlap safe.** Every job
 takes a `pg_try_advisory_lock` keyed on **its own name**, in the database — the only thing every
 runner shares — so exclusion holds across processes, hosts, container tasks and repositories, and
@@ -444,27 +486,31 @@ therefore interleave, and the interleaving loses work while every single run rep
 > does **not** reopen them — it never writes `status`, and staleness only ever closes rows that are
 > still `open`. Both chains are green. The dataset is wrong.
 
-**So the ordering is the caller's to hold, and the lock will not arbitrate it.** As deployed:
+**So the ordering is the caller's to hold, and the lock will not arbitrate it — which is why `all`
+now holds it for you.** As deployed:
 
-> **One scheduler runs the whole chain. `analytics-rollup`, `retention`, `embedding-backfill`,
+> **One scheduler runs `jobs.js all`, once. `analytics-rollup`, `embedding-backfill`,
 > `verification-backfill` and `notification-dispatch` are INDEPENDENT — any order, or in parallel.
-> `staleness` runs AFTER ALL FIVE HAVE EXITED. The chain must finish before 03:17 UTC, when the
+> `staleness` runs AFTER ALL FOUR HAVE EXITED. The chain must finish before 03:17 UTC, when the
 > open-data export publishes, so the snapshot is a closed dataset rather than a half-maintained
 > one.**
 
 Each clause carries weight:
 
-* **The five are independent.** They write nothing the others read, so nothing is bought by
-  ordering them and a caller is free to run them concurrently. Serialising the whole chain is a
-  valid way to satisfy the rule below, not the rule.
-* **`staleness` after all five, by EXIT.** It reads what `verification-backfill` writes, and exit
+* **The four are independent.** They write nothing the others read, so nothing is bought by
+  ordering them and a caller running them itself is free to run them concurrently. `all` runs them
+  one at a time anyway: they share one database and one container's CPU, the chain has over two
+  hours of margin, and it does not need the minutes.
+* **`staleness` after all four, by EXIT.** It reads what `verification-backfill` writes, and exit
   code — not elapsed time — is what says a job is done: a caller that starts `staleness` on a timer
-  is racing the pass it depends on, and the race is silent (the walk-through above).
+  is racing the pass it depends on, and the race is silent (the walk-through above). Inside `all`
+  this is a `for` loop over `CHAIN` and cannot be got wrong.
 * **Finished before 03:17.** `nightly-export.yml` publishes on its own cron and waits for nothing
   (§2). A chain still running at 03:17 publishes a dataset maintained halfway.
 * **One caller.** Starting a job by hand (§4a) while the external chain is in flight is the one
   overlap nothing prevents; the lock will merely make the collided jobs no-ops rather than correct
-  runs.
+  runs. Moving to `all` shrinks this to a single task an operator can see is running, but does not
+  remove it.
 
 **Nothing about the chain publishes the open-data dataset.** `.github/workflows/nightly-export.yml`
 publishes on its **own cron**, `17 3 * * *` — nothing triggers it, from this repository or outside
@@ -501,10 +547,13 @@ Before the first M3 job run on any deployment, in order:
 5. Set `<ENV>_APP_BASE_URL` to the canonical frontend origin, then deploy once so the API workflow
    writes it into the service task definition inherited by background tasks.
 6. Prove the wiring by hand once per environment (§4a): start `notification-dispatch` as a one-off
-   task and read its `--json` line out of the task's log. A wrong cluster or an undeployed service
-   fails on the `describe-services` call, before anything is started.
-7. Point the **external scheduler** at the same entry point, with the ordering §4d requires, and
-   monitor it there: this repository schedules nothing and will not report its absence. Nothing
+   task and read its `--json` line out of the task's log, then `all` for the full chain, `staleness`
+   included. A wrong cluster or an undeployed service fails on the `describe-services` call, before
+   anything is started.
+7. Point the **external scheduler** at `node packages/api/dist/jobs.js all --json` — one task,
+   with the ordering §4d requires already held in-process — and monitor it there: this repository
+   schedules nothing and will not report its absence. A scheduler still naming the five jobs
+   individually keeps working; one still naming `retention` should drop it (§1). Nothing
    here triggers the export either — it runs on its own cron (§2) — so confirm it separately, by
    waiting for its 03:17 run or by dispatching *Nightly open-data export* directly.
 
