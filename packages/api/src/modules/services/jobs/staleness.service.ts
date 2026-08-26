@@ -31,6 +31,12 @@
  * with rolling deadlines that somebody touched last week — is *correctly* left alone, and is why
  * `processed` rather than `remaining` is what tells a runner whether to go round again.
  *
+ * A ROW THAT THROWS IS SKIPPED; A PASS IN WHICH EVERY ROW THREW IS A FAILED RUN. The walk catches
+ * per row so one poison entry does not abandon every candidate after it — the walk is ordered by
+ * id, so that would be the same tail every night. But a pass that settled NOTHING and failed
+ * everything it tried is not a poison row, it is a broken deployment, and `StalenessSettleFailure`
+ * makes it exit 1 instead of reporting a counter nobody reads.
+ *
  * `updated_at` IS DELIBERATELY NOT TOUCHED, by either pass. Two things read it:
  *   - this job's own inactivity clock is `coalesce(last_seen_at, updated_at)`, so bumping it would
  *     reset the very timer that selected the row;
@@ -64,6 +70,36 @@ export interface StalenessOptions {
 
 export interface StalenessLogger {
   error(payload: Record<string, unknown>, message: string): void;
+}
+
+/**
+ * Every settle in a pass failed. Thrown, so the run is RED.
+ *
+ * Per-row isolation is right for a poison row and wrong for a broken deployment, and the two are
+ * indistinguishable one row at a time. A pass that caught a failure for every row it tried and
+ * settled NOTHING has produced no evidence that writing works at all — a check constraint added to
+ * `audit_log`, a revoked grant, a full disk. Reporting that as `{processed: 0, failed: 380,
+ * remaining: 0}` and exiting 0 is a green nightly run in which the staleness pass has silently
+ * stopped happening, and the open-data export publishes programmes that are over until somebody
+ * reads the counters by hand.
+ *
+ * The mixed case keeps the row-local behaviour it was given: if anything settled, the failures are
+ * bad rows and the walk was right to carry on past them.
+ */
+export class StalenessSettleFailure extends Error {
+  constructor(
+    readonly failed: number,
+    readonly examined: number,
+    cause: unknown,
+  ) {
+    super(
+      `staleness settled nothing: all ${failed} of the ${examined} candidate(s) it tried failed. First cause: ${
+        cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause)
+      }`,
+      { cause },
+    );
+    this.name = "StalenessSettleFailure";
+  }
 }
 
 const consoleLogger: StalenessLogger = {
@@ -101,6 +137,7 @@ export class StalenessService {
     let examined = 0;
     let processed = 0;
     let failed = 0;
+    let firstCause: unknown;
     let cursor = 0;
     const closed: Record<StalenessReason, number> = { past_due: 0, inactive: 0 };
     let recomputed = 0;
@@ -122,6 +159,7 @@ export class StalenessService {
           // rows are abandoned every night. The row stays in the predicate for the next run, which
           // is precisely the cursor contract.
           failed++;
+          if (failed === 1) firstCause = error;
           this.logger.error(
             {
               job: "staleness",
@@ -138,6 +176,15 @@ export class StalenessService {
         if (outcome === "recomputed") recomputed++;
         else closed[outcome]++;
       }
+    }
+
+    // SYSTEMIC FAILURE IS NOT A COUNTER, IT IS AN EXIT CODE. `processed` is `closed + recomputed`,
+    // so `failed > 0 && processed === 0` is exactly "everything this pass tried to write, failed" —
+    // which is also the case where `failed` equals the number of rows that needed settling. One bad
+    // row among good ones leaves `processed > 0` and stays a counter, which is the whole point of
+    // catching per row in the first place.
+    if (failed > 0 && processed === 0) {
+      throw new StalenessSettleFailure(failed, examined, firstCause);
     }
 
     return {

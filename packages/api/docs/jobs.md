@@ -246,6 +246,14 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   counted in `details.failed` and skipped, exactly as both backfills already do: the walk is ordered
   by id, so letting one row out would abandon every candidate after it, and the same ones every
   night. A skipped row stays in the predicate for the next run.
+
+  **But a pass that settled NOTHING and failed everything it tried throws, and the run exits 1.**
+  Per-row isolation is right for a poison row and wrong for a broken deployment — a check constraint
+  added to `audit_log`, a revoked grant, a full disk — and one row at a time the two look identical.
+  Over a whole pass they do not: `processed === 0 && failed > 0` means nothing this run wrote
+  succeeded, so there is no evidence writing works at all. Reporting that as a counter and exiting 0
+  is a green nightly run in which the staleness pass has silently stopped happening, and the export
+  keeps publishing programmes that are over. Anything settling at all keeps the row-local behaviour.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
