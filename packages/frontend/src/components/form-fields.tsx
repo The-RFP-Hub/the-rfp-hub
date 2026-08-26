@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The form's building blocks: one input, one label, one hint, one problem.
+ * The form's building blocks: one label, one input, one hint, one problem.
  *
  * WHY THESE EXIST rather than a hundred hand-rolled `<div className="field">`s. Three things have
  * to be true of every single input on the submission form, and each of them is the kind of thing
@@ -39,7 +39,7 @@ interface FieldChromeBase {
    * validator's advisory warnings, and a field carrying one is conformant.
    */
   advisory?: string;
-  /** Rendered under the input, above the problem — the character counters live here. */
+  /** Rendered beside or just below the hint, above the problem — character counters live here. */
   meter?: ReactNode;
 }
 
@@ -104,22 +104,6 @@ export function Field({
           </span>
         ) : null}
       </div>
-      {hint ? (
-        <p className="hint" id={hintId}>
-          {hint}
-        </p>
-      ) : null}
-      {meter}
-      {problem ? (
-        <span className={styles.problem} id={problemId}>
-          {problem}
-        </span>
-      ) : null}
-      {advisory ? (
-        <span className={`callout ${styles.advisory}`} id={advisoryId}>
-          {advisory}
-        </span>
-      ) : null}
       <div className={styles.control}>
         {children({
           id,
@@ -130,6 +114,26 @@ export function Field({
           required: required ? true : undefined,
         })}
       </div>
+      {hint || meter ? (
+        <div className={styles.guidanceRow}>
+          {hint ? (
+            <p className="hint" id={hintId}>
+              {hint}
+            </p>
+          ) : null}
+          {meter}
+        </div>
+      ) : null}
+      {problem ? (
+        <span className={styles.problem} id={problemId}>
+          {problem}
+        </span>
+      ) : null}
+      {advisory ? (
+        <span className={`callout ${styles.advisory}`} id={advisoryId}>
+          {advisory}
+        </span>
+      ) : null}
     </div>
   );
 }

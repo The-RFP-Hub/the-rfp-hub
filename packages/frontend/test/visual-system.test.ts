@@ -103,10 +103,11 @@ describe("the visual-system token boundary", () => {
     );
   });
 
-  it("leaves the intrinsic form alignment rules semantic", () => {
+  it("aligns form controls from their label edge without reserving guidance height", () => {
     const css = readFileSync(stylesheets[1][1], "utf8");
-    expect(css).toMatch(/\.cols\s*\{[^}]*align-items:\s*stretch;/s);
-    expect(css).toMatch(/\.control\s*\{[^}]*margin-top:\s*auto;/s);
+    expect(css).toMatch(/\.cols\s*\{[^}]*align-items:\s*flex-start;/s);
+    expect(css).toMatch(/\.guidanceRow\s*\{[^}]*flex-wrap:\s*wrap;/s);
+    expect(css).not.toMatch(/\.control\s*\{[^}]*margin-top:\s*auto;/s);
   });
 
   it("gives both table scroll containers a local edge fade and contained scrolling", () => {

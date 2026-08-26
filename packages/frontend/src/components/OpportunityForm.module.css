@@ -76,21 +76,31 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0 var(--space-4);
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 /*
- * Every variable-height label, hint, counter and problem sits above the control. Stretching the
- * sibling fields and spending their remaining space before `.control` keeps inputs on one row at
- * every intrinsic wrap point — no viewport breakpoint and no reserved fixed height.
+ * Labels and controls are the first two pieces of every field, so sibling inputs align without a
+ * reserved height or an auto margin. Variable-height guidance and problems follow their own
+ * control and cannot move another field's input or appear to belong to it.
  */
 .fieldLayout {
   display: flex;
   flex-direction: column;
 }
 
-.control {
-  margin-top: auto;
+.guidanceRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.fieldLayout .guidanceRow > .hint {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
 }
 
 .momentControl {
@@ -131,6 +141,8 @@
 /* A character counter, sitting under the input it counts. */
 .counter {
   display: block;
+  flex: 0 0 auto;
+  margin-left: auto;
   text-align: right;
   color: var(--ink-soft);
   font-size: var(--text-xs);

@@ -692,7 +692,7 @@ describe("required fields and intrinsic alignment", () => {
     expect(screen.getByLabelText("Cap, tier 1").getAttribute("required")).toBeNull();
   });
 
-  it("aligns paired controls through intrinsic flex wrapping at every width", () => {
+  it("aligns paired label/control pairs before their variable-height guidance", () => {
     mount();
     const funding = screen.getByLabelText("Funding type");
     expect(funding.closest(`.${styles.control}`)).not.toBeNull();
@@ -702,10 +702,10 @@ describe("required fields and intrinsic alignment", () => {
       join(process.cwd(), "src", "components", "OpportunityForm.module.css"),
       "utf8",
     );
-    expect(css).toMatch(/\.cols\s*{[^}]*flex-wrap:\s*wrap;[^}]*align-items:\s*stretch;/s);
+    expect(css).toMatch(/\.cols\s*{[^}]*flex-wrap:\s*wrap;[^}]*align-items:\s*flex-start;/s);
     expect(css).toMatch(/\.cols\s*>\s*\*\s*{[^}]*flex:\s*1 1 12rem;/s);
     expect(css).toMatch(/\.fieldLayout\s*{[^}]*flex-direction:\s*column;/s);
-    expect(css).toMatch(/\.control\s*{[^}]*margin-top:\s*auto;/s);
+    expect(css).not.toMatch(/\.control\s*{[^}]*margin-top:\s*auto;/s);
     expect(css).not.toContain("@media");
   });
 
@@ -759,6 +759,27 @@ describe("when problems appear", () => {
     expect(screen.getByText(/full URL/)).toBeTruthy();
     // Still no summary panel: nothing has been submitted.
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps each helper, counter and problem below its own control", () => {
+    mount({ title: "" });
+    submit();
+
+    const title = screen.getByLabelText("Title") as HTMLInputElement;
+    const field = title.closest('[data-field-path="title"]') as HTMLElement;
+    const labelRow = title.labels?.[0]?.parentElement as HTMLElement;
+    const control = title.closest(`.${styles.control}`) as HTMLElement;
+    const helper = within(field).getByText("The name the programme is published under.");
+    const guidance = helper.closest(`.${styles.guidanceRow}`) as HTMLElement;
+    const counter = within(field).getByText("0 / 300");
+    const problem = within(field).getByText("A title is required.");
+    const children = Array.from(field.children);
+
+    expect(children.indexOf(labelRow)).toBeLessThan(children.indexOf(control));
+    expect(children.indexOf(control)).toBeLessThan(children.indexOf(guidance));
+    expect(children.indexOf(guidance)).toBeLessThan(children.indexOf(problem));
+    expect(guidance.contains(counter)).toBe(true);
+    expect(problem.closest("[data-field-path]")).toBe(field);
   });
 
   it("keeps Submit live, because a disabled button says nothing", () => {
