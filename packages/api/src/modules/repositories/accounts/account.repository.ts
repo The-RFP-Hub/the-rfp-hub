@@ -1,9 +1,14 @@
-import { eq, getTableColumns, ilike, or } from "drizzle-orm";
+import { eq, getTableColumns, ilike, inArray, or } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import { type AccountRow, accounts, authUser } from "../../../db/schema.js";
 
 /** The privileged directory projection. Email stays out of the public account row and `/v1/me`. */
 export interface AccountSearchRow extends AccountRow {
+  email: string | null;
+}
+
+export interface AccountRecipientRow {
+  accountId: number;
   email: string | null;
 }
 
@@ -88,5 +93,15 @@ export class AccountRepository {
       Number.isSafeInteger(accountId) ? eq(accounts.id, accountId) : undefined,
     );
     return select().where(match).orderBy(accounts.id).limit(limit);
+  }
+
+  /** Delivery address projection. Authentication identity data stays behind this repository. */
+  async notificationRecipients(accountIds: number[]): Promise<AccountRecipientRow[]> {
+    if (accountIds.length === 0) return [];
+    return this.exec
+      .select({ accountId: accounts.id, email: authUser.email })
+      .from(accounts)
+      .leftJoin(authUser, eq(accounts.authUserId, authUser.id))
+      .where(inArray(accounts.id, accountIds));
   }
 }

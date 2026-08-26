@@ -1,5 +1,6 @@
 export {
   AccountRepository,
+  type AccountRecipientRow,
   type AccountSearchRow,
   type AccountUpdate,
 } from "./accounts/account.repository.js";
@@ -23,6 +24,13 @@ export {
   MembershipRepository,
   type PublishAuthority,
 } from "./memberships/membership.repository.js";
+export {
+  type NotificationDispatchSelection,
+  type NotificationInboxPage,
+  type NotificationInsert,
+  NotificationRepository,
+  type NotificationRemainingSelection,
+} from "./notifications/notification.repository.js";
 export {
   type OwnershipColumns,
   ownedOpportunityPredicate,

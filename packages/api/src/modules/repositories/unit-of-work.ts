@@ -4,6 +4,7 @@ import { ApiKeyRepository } from "./api-keys/api-key.repository.js";
 import { AuditRepository } from "./audit/audit.repository.js";
 import { MembershipInviteRepository } from "./membership-invites/membership-invite.repository.js";
 import { MembershipRepository } from "./memberships/membership.repository.js";
+import { NotificationRepository } from "./notifications/notification.repository.js";
 import { OpportunityRepository } from "./opportunities/opportunity.repository.js";
 import { OrganizationRepository } from "./organizations/organization.repository.js";
 
@@ -14,6 +15,7 @@ export interface Repositories {
   readonly audit: AuditRepository;
   readonly membershipInvites: MembershipInviteRepository;
   readonly memberships: MembershipRepository;
+  readonly notifications: NotificationRepository;
   readonly opportunities: OpportunityRepository;
   readonly organizations: OrganizationRepository;
 }
@@ -25,6 +27,7 @@ export function repositories(exec: DbLike): Repositories {
   let audit: AuditRepository | undefined;
   let membershipInvites: MembershipInviteRepository | undefined;
   let memberships: MembershipRepository | undefined;
+  let notifications: NotificationRepository | undefined;
   let opportunities: OpportunityRepository | undefined;
   let organizations: OrganizationRepository | undefined;
 
@@ -48,6 +51,10 @@ export function repositories(exec: DbLike): Repositories {
     get memberships() {
       memberships ??= new MembershipRepository(exec);
       return memberships;
+    },
+    get notifications() {
+      notifications ??= new NotificationRepository(exec);
+      return notifications;
     },
     get opportunities() {
       opportunities ??= new OpportunityRepository(exec);

@@ -47,8 +47,6 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "src/modules/services/insights/insights.service.ts",
   "src/modules/services/insights/rollup.service.ts",
   "src/modules/services/jobs/staleness.service.ts",
-  "src/modules/services/notifications/notification-dispatch.service.ts",
-  "src/modules/services/notifications/notification.service.ts",
   "src/modules/services/opportunities/managed-opportunity.service.ts",
   "src/modules/services/opportunities/opportunity-meta.service.ts",
   "src/modules/services/opportunities/opportunity-write.service.ts",
@@ -57,7 +55,7 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "src/modules/services/stats/stats.service.ts",
   "src/modules/services/verification/verification.service.ts",
 ];
-const TEMPORARY_CEILING = 20;
+const TEMPORARY_CEILING = 18;
 
 type Violation = "drizzle-import" | "schema-value-import" | "transaction";
 

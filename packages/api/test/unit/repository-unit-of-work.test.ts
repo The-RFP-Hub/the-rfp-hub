@@ -6,6 +6,7 @@ import {
   AuditRepository,
   MembershipInviteRepository,
   MembershipRepository,
+  NotificationRepository,
   OpportunityRepository,
   OrganizationRepository,
   repositories,
@@ -28,6 +29,8 @@ describe("repository unit of work", () => {
     expect(bundle.membershipInvites).toBe(bundle.membershipInvites);
     expect(bundle.memberships).toBeInstanceOf(MembershipRepository);
     expect(bundle.memberships).toBe(bundle.memberships);
+    expect(bundle.notifications).toBeInstanceOf(NotificationRepository);
+    expect(bundle.notifications).toBe(bundle.notifications);
     expect(bundle.opportunities).toBeInstanceOf(OpportunityRepository);
     expect(bundle.opportunities).toBe(bundle.opportunities);
     expect(bundle.organizations).toBeInstanceOf(OrganizationRepository);
@@ -46,6 +49,7 @@ describe("repository unit of work", () => {
         "audit",
         "membershipInvites",
         "memberships",
+        "notifications",
         "opportunities",
         "organizations",
       ]);

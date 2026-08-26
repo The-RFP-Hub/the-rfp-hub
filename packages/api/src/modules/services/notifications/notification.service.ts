@@ -6,15 +6,14 @@
  * counterpart is named only while it is approved and listed at emission time; otherwise even an
  * owner-visible pending row is coarsened to an unnamed "other submission" by presentation.
  */
-import { and, count, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
-import {
-  type OpportunityDuplicateRow,
-  type OpportunityRow,
-  type notificationKind,
-  notifications,
+import type {
+  NotificationRow,
+  OpportunityDuplicateRow,
+  OpportunityRow,
+  notificationKind,
 } from "../../../db/schema.js";
-import { repositories } from "../../repositories/index.js";
+import { type Repositories, repositories } from "../../repositories/index.js";
 import type {
   DuplicateNotificationPayloadView,
   NotificationListView,
@@ -59,7 +58,11 @@ export interface NotificationListQuery {
 }
 
 export class NotificationService {
-  constructor(private readonly db: DB = defaultDb) {}
+  private readonly repos: Repositories;
+
+  constructor(private readonly db: DB = defaultDb) {
+    this.repos = repositories(db);
+  }
 
   /**
    * Record one or more owner-side views of a pair event.
@@ -67,9 +70,14 @@ export class NotificationService {
    * Takes the caller's handle rather than reaching for the pool, exactly like AuditService.record:
    * a rolled-back pair mutation cannot leave a notification claiming it happened. The unique
    * constraint remains the backstop, while the map makes recipient deduplication explicit.
+   *
+   * @deprecated transitional — call repos.notifications.recordDuplicate(values) after dedupe moves.
    */
-  async recordDuplicate(tx: DbLike, input: RecordDuplicateNotificationsInput): Promise<number[]> {
-    const repos = repositories(tx);
+  async recordDuplicate(
+    exec: DbLike | Repositories,
+    input: RecordDuplicateNotificationsInput,
+  ): Promise<number[]> {
+    const repos = "notifications" in exec ? exec : repositories(exec);
     const sides = new Map([
       [input.left.id, input.left],
       [input.right.id, input.right],
@@ -99,23 +107,15 @@ export class NotificationService {
     }
 
     if (recipients.size === 0) return [];
-    const inserted = await tx
-      .insert(notifications)
-      .values(
-        [...recipients.values()].map(({ accountId, kind, yours, other }) => ({
-          accountId,
-          kind,
-          subjectKind: "duplicate",
-          subjectId: input.pair.id,
-          payload: duplicatePayload(input, kind, yours, other) as unknown as Record<
-            string,
-            unknown
-          >,
-        })),
-      )
-      .onConflictDoNothing()
-      .returning({ id: notifications.id });
-    return inserted.map(({ id }) => id);
+    return repos.notifications.recordDuplicate(
+      [...recipients.values()].map(({ accountId, kind, yours, other }) => ({
+        accountId,
+        kind,
+        subjectKind: "duplicate",
+        subjectId: input.pair.id,
+        payload: duplicatePayload(input, kind, yours, other) as unknown as Record<string, unknown>,
+      })),
+    );
   }
 
   /** Account-scoped inbox, newest first, plus a count the chrome can render without a second API. */
@@ -124,61 +124,38 @@ export class NotificationService {
     query: NotificationListQuery = {},
   ): Promise<NotificationListView> {
     const { page, limit, offset } = paginate(query.page ?? 1, query.limit ?? 20);
-    const where = and(
-      eq(notifications.accountId, accountId),
-      query.unread === undefined
-        ? undefined
-        : query.unread
-          ? isNull(notifications.readAt)
-          : isNotNull(notifications.readAt),
+    const result = await this.repos.notifications.listForAccount(
+      accountId,
+      query.unread,
+      limit,
+      offset,
     );
-    const unreadWhere = and(eq(notifications.accountId, accountId), isNull(notifications.readAt));
-    const [rows, counted, unread] = await Promise.all([
-      this.db
-        .select()
-        .from(notifications)
-        .where(where)
-        .orderBy(desc(notifications.createdAt), desc(notifications.id))
-        .limit(limit)
-        .offset(offset),
-      this.db.select({ value: count() }).from(notifications).where(where),
-      this.db.select({ value: count() }).from(notifications).where(unreadWhere),
-    ]);
-    const total = counted[0]?.value ?? 0;
+    const total = result.total;
     return {
-      items: rows.map(toNotificationView),
+      items: result.rows.map(toNotificationView),
       page,
       limit,
       total,
       totalPages: Math.max(1, Math.ceil(total / limit)),
-      unreadCount: unread[0]?.value ?? 0,
+      unreadCount: result.unread,
     };
   }
 
   /** Idempotently mark one owned notification read without moving its original read timestamp. */
   async markRead(accountId: number, notificationId: number): Promise<NotificationView> {
-    const rows = await this.db
-      .update(notifications)
-      .set({ readAt: sql`coalesce(${notifications.readAt}, now())` })
-      .where(and(eq(notifications.id, notificationId), eq(notifications.accountId, accountId)))
-      .returning();
-    const row = rows[0];
+    const row = await this.repos.notifications.markRead(accountId, notificationId);
     if (!row) throw notFound(`no notification ${notificationId} of yours.`);
     return toNotificationView(row);
   }
 
   /** Settle every currently unread row for this account in one statement. */
   async markAllRead(accountId: number): Promise<NotificationReadAllView> {
-    const rows = await this.db
-      .update(notifications)
-      .set({ readAt: new Date() })
-      .where(and(eq(notifications.accountId, accountId), isNull(notifications.readAt)))
-      .returning({ id: notifications.id });
-    return { markedRead: rows.length, unreadCount: 0 };
+    const markedRead = await this.repos.notifications.markAllRead(accountId);
+    return { markedRead, unreadCount: 0 };
   }
 }
 
-function toNotificationView(row: typeof notifications.$inferSelect): NotificationView {
+function toNotificationView(row: NotificationRow): NotificationView {
   // Delivery attempts are operational state for the job, not part of the account-facing domain
   // payload. Keep the API response stable even while a failed email is waiting for its retry.
   const payload = Object.fromEntries(
