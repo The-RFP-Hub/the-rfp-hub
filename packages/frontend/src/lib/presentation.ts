@@ -32,7 +32,7 @@ const REVIEW_STATUS_LABELS: Readonly<Record<ReviewStatus, string>> = {
 const DUPLICATE_STATUS_LABELS: Readonly<Record<DuplicateStatus, string>> = {
   suspected: "Needs review",
   confirmed: "Confirmed match",
-  dismissed: "Different programmes",
+  dismissed: "Dismissed — different programmes",
   merged: "Merged",
 };
 
@@ -119,6 +119,12 @@ const AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
   role: "Role",
   directCreate: "Direct-create access",
   verified: "Organisation verification",
+  typeData: "Programme details",
+  httpStatus: "HTTP status",
+  publicId: "Public ID",
+  orgSlugs: "Organisation slugs",
+  ingestedVia: "Ingestion method",
+  specVersion: "Specification version",
 };
 
 /** Humanize an unknown future token deterministically while leaving its wire form available below. */
@@ -168,6 +174,10 @@ export function auditActionLabel(value: string): string {
 export function auditFieldLabel(value: string): string {
   const topLevel = value.split(/[./[]/, 1)[0] ?? value;
   return AUDIT_FIELD_LABELS[topLevel] ?? fallbackLabel(topLevel);
+}
+
+export function auditFieldLabels(values: readonly string[]): string[] {
+  return [...new Set(values.map(auditFieldLabel))].sort((a, b) => a.localeCompare(b, "en-GB"));
 }
 
 /** The actor's public label, without leaking the transport-shaped `actorKind` token into prose. */

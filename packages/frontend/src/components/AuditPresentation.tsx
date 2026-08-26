@@ -2,7 +2,7 @@ import { UntrustedText } from "@/components/UntrustedText";
 import {
   auditActionLabel,
   auditActorLabel,
-  auditFieldLabel,
+  auditFieldLabels,
   auditTechnicalRecord,
 } from "@/lib/presentation";
 import type { AuditEntry } from "@/lib/types";
@@ -26,6 +26,6 @@ export function AuditActor({ entry }: { entry: AuditEntry }) {
 
 export function AuditFields({ fields }: { fields: string[] }) {
   if (fields.length === 0) return <span className="muted">—</span>;
-  const labels = [...new Set(fields.map(auditFieldLabel))];
+  const labels = auditFieldLabels(fields);
   return <>{labels.join(" / ")}</>;
 }

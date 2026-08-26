@@ -6,8 +6,8 @@
  * projection over those server axes.
  *
  * THE FOUR SHAPES ARE THE VOCABULARY, and they are defined once in the stylesheet rather than
- * per-badge: a solid outline is live or included, filled ink is finished and terminal, a dashed
- * outline is provisional and waiting on somebody, and struck-through muted text is refused. A
+ * per-badge: filled ink is live, a quiet outline is finished or terminal, a dashed outline is
+ * provisional and waiting on somebody, and struck-through muted text is refused. A
  * reader who sees no colour at all, a printout, and a screenshot in a bug report all carry exactly
  * the same information as the screen does. That is the point of doing it this way rather than with
  * a green tick and a red cross.
@@ -127,7 +127,7 @@ export function ListedBadge({
   );
 }
 
-/** A merge is a terminal editorial state, so it uses the badge system's filled-ink shape. */
+/** A merge is a terminal editorial state, so it uses the badge system's quiet outline. */
 export function MergedBadge() {
   return (
     <span
@@ -179,7 +179,13 @@ export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: 
  * programme — and never a fact-check. The title text says that, because a tick that reads as
  * "these details are correct" would be the single most misleading thing on this frontend.
  */
-export function MatchBadge({ matched }: { matched: boolean | null }) {
+export function MatchBadge({
+  matched,
+  existsAtSource,
+}: {
+  matched: boolean | null;
+  existsAtSource?: boolean | null;
+}) {
   if (matched === null) {
     return (
       <span className="badge badge-unknown" title="This listing's link has not been checked yet">
@@ -187,16 +193,28 @@ export function MatchBadge({ matched }: { matched: boolean | null }) {
       </span>
     );
   }
+  const failedLabel =
+    existsAtSource === false
+      ? "link not reachable"
+      : existsAtSource === true
+        ? "content did not match"
+        : "link check failed";
+  const failedTitle =
+    existsAtSource === false
+      ? "The application link could not be reached"
+      : existsAtSource === true
+        ? "The linked page was reached, but its title does not look like this programme"
+        : "The link check failed; no more specific result is available";
   return (
     <span
       className={matched ? "badge badge-matched" : "badge badge-unmatched"}
       title={
         matched
           ? "The linked page exists and its title is about this programme. A low-bar anti-spam signal, not a fact-check."
-          : "The linked page did not resolve, or its title does not look like this programme"
+          : failedTitle
       }
     >
-      {matched ? "link looks right" : "link did not match"}
+      {matched ? "link looks right" : failedLabel}
     </span>
   );
 }

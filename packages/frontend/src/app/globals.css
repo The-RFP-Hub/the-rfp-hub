@@ -20,8 +20,8 @@
  *   --accent-ink   Textual links on paper — a title link in a table, an editorial link in prose.
  *                  The UNDERLINE STAYS. Colour is added to a link affordance, never substituted
  *                  for one; a reader who sees no colour must still see a link.
- *   --accent       THE primary action (the one filled button on a screen), the 2px focus ring, and
- *                  the current-navigation underline. Nothing else, ever.
+ *   --accent       THE primary action (the one filled button on a screen), native selected controls,
+ *                  the 2px focus ring, and the current-navigation underline. Nothing else, ever.
  *   --accent-soft  The hover and selected state of controls and rows. NEVER ALONE AS A SIGNAL —
  *                  it is 1.12:1 against paper, which is a tint, not a mark, so every use of it is
  *                  paired with a border or a weight change that carries the meaning on its own.
@@ -207,6 +207,13 @@ textarea {
   border-radius: var(--radius);
   padding: 0.35rem 0.5rem;
   width: 100%;
+}
+
+/* Native selection controls use the same rationed action colour as every other control. */
+input[type="range"],
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
 }
 
 /*
@@ -590,6 +597,11 @@ caption {
   border-left: 3px solid var(--bad);
 }
 
+.state.error a {
+  color: var(--bad);
+  text-decoration-thickness: 2px;
+}
+
 /*
  * LOADING RESERVES ITS HEIGHT. Without this the skeleton is one line tall, the content that
  * arrives is twenty, and everything below jumps — including whatever the reader was reaching for.
@@ -629,8 +641,8 @@ caption {
 
 /*
  * STATUS IS TYPOGRAPHIC. Four shapes, no hue, each one legible as a word before it is legible as a
- * shape: a bordered box is live, a filled box is finished, a dashed box is provisional, and struck
- * muted text is refused. Printed in black and white, or read by somebody who sees no colour at
+ * shape: a filled box is live, an outline is terminal, a dashed box is provisional, and struck muted
+ * text is refused. Printed in black and white, or read by somebody who sees no colour at
  * all, every one of them still says what it says.
  */
 .badge {
@@ -647,22 +659,27 @@ caption {
   color: var(--ink);
 }
 
-/* Live, current, included: an outline. */
+/* Current and included: a solid outline unless the state is the publisher-facing live state. */
 .badge-open,
 .badge-approved,
 .badge-listed,
-.badge-live,
 .badge-verified,
 .badge-matched {
   border-style: solid;
 }
 
-/* Finished, decided, closed: filled ink. The heaviest thing in the row, because it is terminal. */
+/* Live is the row's current, useful state and gets the strongest typographic shape. */
+.badge-live {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Finished and terminal: quiet outlines that do not dominate active listings. */
 .badge-closed,
 .badge-archived,
 .badge-merged {
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--line);
+  color: var(--ink-soft);
 }
 
 /* Provisional — waiting on somebody: a dashed outline in secondary ink. */
@@ -678,12 +695,17 @@ caption {
 /* Refused: struck through and quiet. Nothing is going to happen to it. */
 .badge-rejected,
 .badge-unlisted,
-.badge-hidden,
-.badge-unmatched {
+.badge-hidden {
   border-color: var(--line);
   color: var(--ink-soft);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
+}
+
+/* A failed check is a result, not a cancellation. */
+.badge-unmatched {
+  border-color: var(--line);
+  color: var(--ink-soft);
 }
 
 /* A badge that carries its explanation beside it rather than only in a tooltip. */
@@ -853,8 +875,8 @@ caption {
 
 .duplicate-comparison-grid {
   display: grid;
-  grid-template-columns: 9rem minmax(15rem, 1fr) minmax(15rem, 1fr);
-  min-width: 42rem;
+  grid-template-columns: minmax(11rem, 12rem) minmax(15rem, 1fr) minmax(15rem, 1fr) max-content;
+  min-width: 48rem;
 }
 
 .duplicate-comparison-grid > * {
@@ -865,7 +887,7 @@ caption {
   overflow-wrap: anywhere;
 }
 
-.duplicate-comparison-grid > :nth-child(-n + 3) {
+.duplicate-comparison-grid > :nth-child(-n + 4) {
   border-top: 0;
 }
 
@@ -874,12 +896,13 @@ caption {
 }
 
 .duplicate-comparison-grid h4 {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.4rem;
   font-size: 0.86rem;
   color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.duplicate-comparison-difference-flag {
+  text-align: right;
 }
 
 .duplicate-comparison-grid .untrusted-block {

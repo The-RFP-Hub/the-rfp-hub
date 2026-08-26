@@ -348,7 +348,7 @@ describe("a deadline", () => {
   it("takes local time and previews the stored UTC instant beside it", () => {
     mount({ opensAt: "2026-09-30T23:59" });
 
-    expect(screen.getByLabelText("Applications open", { exact: true })).toBeTruthy();
+    expect(screen.getByLabelText("Applications open — optional", { exact: true })).toBeTruthy();
     expect(screen.queryByLabelText(/Applications open.*UTC/)).toBeNull();
     expect(screen.getByText("= 2026-10-01 02:59 UTC")).toBeTruthy();
     expect(screen.getAllByText(/Enter local time \(America\/Sao_Paulo, UTC−03:00\)/)).toHaveLength(
@@ -637,6 +637,20 @@ describe("required fields and intrinsic alignment", () => {
     expect(screen.getByText(/Running organisations/).textContent).toContain(
       "Running organisations",
     );
+
+    for (const label of [
+      "Total budget — optional",
+      "Committed — optional",
+      "Min award — optional",
+      "Max award — optional",
+      "Applications open — optional",
+      "First announced — optional",
+      "Paid against milestones — optional",
+      "Runs in recurring rounds — optional",
+    ]) {
+      expect(screen.getByLabelText(label, { exact: true })).toBeTruthy();
+    }
+    expect(screen.getByRole("group", { name: "Funding mechanisms — optional" })).toBeTruthy();
   });
 
   it("marks each conditional row field that becomes required", () => {
@@ -760,7 +774,7 @@ describe("when problems appear", () => {
     ).toBe("#form-error-summary");
     expect(
       within(summary)
-        .getByRole("link", { name: /Program model/ })
+        .getByRole("link", { name: /Programme model/ })
         .getAttribute("href"),
     ).toBe("#f-details-grant-programModel");
     expect(
@@ -807,12 +821,21 @@ describe("when problems appear", () => {
 describe("drafts and dirty navigation", () => {
   it("offers an account's stored draft without silently replacing the blank form", () => {
     localStorage.clear();
-    writeOpportunityDraft(7, fill({ title: "Restored title" }));
+    writeOpportunityDraft(7, fill({ title: "Restored title" }), {
+      now: new Date("2026-08-25T20:50:37Z"),
+    });
 
     mount({}, { initial: emptyForm(), accountId: 7 });
 
     expect(valueIn(screen.getByLabelText("Title"))).toBe("");
-    expect(screen.getByText(/Draft saved on this device/)).toBeTruthy();
+    expect(
+      screen.getByText((_, node) =>
+        Boolean(
+          node?.tagName === "P" &&
+            node.textContent === "Draft saved on this device on 25 Aug 20:50 UTC.",
+        ),
+      ),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Restore draft" }));
     expect(valueIn(screen.getByLabelText("Title"))).toBe("Restored title");
     localStorage.clear();
@@ -929,7 +952,7 @@ describe("after a submission", () => {
     expect(api.create).toHaveBeenCalledTimes(1);
     const journey = screen.getByRole("list", { name: "Publishing journey" });
     expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("Live");
-    expect(within(journey).getByText("Review not required")).toBeTruthy();
+    expect(within(journey).getByText("(not required)")).toBeTruthy();
     // The whole form is gone — there is no second Submit to press.
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.queryByLabelText("Title")).toBeNull();
@@ -956,7 +979,7 @@ describe("after a submission", () => {
     expect(screen.getByText("Waiting for review", { selector: ".badge-pending" })).toBeTruthy();
     const journey = screen.getByRole("list", { name: "Publishing journey" });
     expect(journey.querySelector('[aria-current="step"]')?.textContent).toBe("In review");
-    expect(within(journey).queryByText("Review not required")).toBeNull();
+    expect(within(journey).queryByText("(not required)")).toBeNull();
     expect(screen.getByRole("link", { name: "Open this listing" }).getAttribute("href")).toBe(
       "/listings/acme%3Around-one",
     );

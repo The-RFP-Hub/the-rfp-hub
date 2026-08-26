@@ -306,7 +306,7 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
           {(run) => (
             <div className="card">
               <p>
-                <MatchBadge matched={run.matched} />{" "}
+                <MatchBadge matched={run.matched} existsAtSource={run.existsAtSource} />{" "}
                 <span className="muted">checked {formatInstant(run.runAt)}</span>
               </p>
               <p>

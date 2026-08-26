@@ -238,6 +238,27 @@ describe("the merged row on Your listings", () => {
     expect(await screen.findByText(/2 possible duplicates touch your listings/)).toBeTruthy();
     openView.unmount();
 
+    openApi.me.duplicates = async () => ({
+      items: [
+        {
+          id: "acme:suspected",
+          title: "Suspected",
+          isPublic: true,
+          similarity: 0.9,
+          status: "suspected",
+          detectedAt: "2026-08-20T00:00:00Z",
+          yourListing: { id: "acme:mine", title: "Mine" },
+        },
+      ],
+    });
+    const singularView = render(
+      <ApiClientProvider value={openApi}>
+        <ListingsPage />
+      </ApiClientProvider>,
+    );
+    expect(await screen.findByText(/1 possible duplicate touches your listings/)).toBeTruthy();
+    singularView.unmount();
+
     const resolvedApi = client();
     resolvedApi.me.duplicates = async () => ({
       items: [

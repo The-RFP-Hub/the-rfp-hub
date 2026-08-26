@@ -46,7 +46,7 @@ import {
 } from "@/components/form-fields";
 import { ActionNote, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { describeDuplicateCheck, formatSimilarity } from "@/lib/format";
+import { describeDuplicateCheck, formatInstant, formatSimilarity } from "@/lib/format";
 import {
   BEFORE_DRAFTS_CLEARED_EVENT,
   canonicalForm,
@@ -230,6 +230,9 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   maxAward: "Maximum award",
   opensAt: "Opens at",
   postedAt: "Posted at",
+  operatingOrganizations: "Running organisations",
+  sponsoringOrganizations: "Sponsoring organisations",
+  programModel: "Programme model",
 };
 
 function issueLabel(path: string | null): string | null {
@@ -237,7 +240,10 @@ function issueLabel(path: string | null): string | null {
   if (path === "(root)") return "Whole form";
   const parts = path.split(".");
   const leaf = parts.at(-1) ?? path;
-  const plain = FIELD_LABELS[path] ?? leaf.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  const plain =
+    FIELD_LABELS[path] ??
+    FIELD_LABELS[leaf] ??
+    leaf.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
   const index = parts.findIndex((part) => /^\d+$/.test(part));
   if (index > 0) {
     const row = Number(parts[index]) + 1;
@@ -251,7 +257,7 @@ function issueLabel(path: string | null): string | null {
     if (group === "prizes") return `Prize ${row} — ${plain}`;
     if (group === "rewardTiers") return `Reward tier ${row} — ${plain}`;
   }
-  return FIELD_LABELS[path] ?? plain.charAt(0).toUpperCase() + plain.slice(1);
+  return plain.charAt(0).toUpperCase() + plain.slice(1);
 }
 
 export function OpportunityForm({
@@ -606,8 +612,7 @@ export function OpportunityForm({
       {draftPrompt ? (
         <div className="state">
           <p>
-            <strong>Draft saved on this device</strong> on{" "}
-            {new Date(draftPrompt.savedAt).toLocaleString()}.
+            <strong>Draft saved on this device</strong> on {formatInstant(draftPrompt.savedAt)}.
           </p>
           <p className="row">
             <button
@@ -827,24 +832,28 @@ export function OpportunityForm({
           <NumberField
             {...at("budget")}
             label="Total budget"
+            optional
             value={form.budget}
             onChange={(value) => set("budget", value)}
           />
           <NumberField
             {...at("allocated")}
             label="Committed"
+            optional
             value={form.allocated}
             onChange={(value) => set("allocated", value)}
           />
           <NumberField
             {...at("minAward")}
             label="Min award"
+            optional
             value={form.minAward}
             onChange={(value) => set("minAward", value)}
           />
           <NumberField
             {...at("maxAward")}
             label="Max award"
+            optional
             value={form.maxAward}
             onChange={(value) => set("maxAward", value)}
           />
@@ -886,12 +895,14 @@ export function OpportunityForm({
           <MomentField
             {...at("opensAt")}
             label="Applications open"
+            optional
             value={form.opensAt}
             onChange={(value) => set("opensAt", value)}
           />
           <MomentField
             {...at("postedAt")}
             label="First announced"
+            optional
             value={form.postedAt}
             onChange={(value) => set("postedAt", value)}
           />
@@ -1043,6 +1054,7 @@ export function OpportunityForm({
             <CheckList
               path="details.grant.fundingMechanisms"
               legend="Funding mechanisms"
+              optional
               hint="More than one is normal: a funder can offer a fixed grant and a matching grant in the same programme."
               options={FUNDING_MECHANISMS}
               selected={details.grant.fundingMechanisms}
@@ -1050,7 +1062,7 @@ export function OpportunityForm({
             />
             <SuggestField
               {...at("details.grant.programModel")}
-              label="Program model"
+              label="Programme model"
               optional
               hint="The operating model, as distinct from the funding instrument. The listed values are conventional, not exhaustive — your own is valid."
               options={PROGRAM_MODELS}
@@ -1061,12 +1073,14 @@ export function OpportunityForm({
               <TriField2
                 {...at("details.grant.milestoneBased")}
                 label="Paid against milestones"
+                optional
                 value={details.grant.milestoneBased}
                 onChange={(milestoneBased) => setDetails("grant", { milestoneBased })}
               />
               <TriField2
                 {...at("details.grant.recurring")}
                 label="Runs in recurring rounds"
+                optional
                 value={details.grant.recurring}
                 onChange={(recurring) => setDetails("grant", { recurring })}
               />
@@ -1396,7 +1410,7 @@ export function OpportunityForm({
         </span>
         {mode === "create" && !draftPrompt && draftStatus?.kind === "saved" ? (
           <span className="muted footnote">
-            Draft saved on this device · {new Date(draftStatus.savedAt).toLocaleString()}
+            Draft saved on this device · {formatInstant(draftStatus.savedAt)}
           </span>
         ) : null}
         {mode === "create" && draftStatus?.kind === "error" ? (

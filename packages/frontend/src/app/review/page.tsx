@@ -1089,7 +1089,7 @@ function PairCard({
             void run(async () => {
               const next = await api.review.confirmDuplicate(pair.id);
               onDecision(next);
-              return "Recorded as the same programme. Neither listing was touched.";
+              return "Confirmed. Neither listing was touched.";
             })
           }
         >
@@ -1106,12 +1106,12 @@ function PairCard({
               const next = await api.review.dismissDuplicate(pair.id);
               onDecision(next);
               return wasConfirmed
-                ? "Dismissed. Undo returns this pair to Needs review, not to Confirmed."
-                : "Dismissed. You can undo this decision from Recently resolved.";
+                ? "Decision saved. Undo returns this pair to Needs review, not to Confirmed."
+                : "Decision saved. You can undo it from Recently resolved.";
             })
           }
         >
-          {pair.status === "dismissed" ? "Dismissed" : "Dismiss"}
+          Dismiss
         </button>
         <button
           className="duplicate-merge-control"
@@ -1131,7 +1131,6 @@ function PairCard({
       ) : null}
       {pair.status === "dismissed" ? (
         <p className="note">
-          <strong>Dismissed</strong> —{" "}
           <button
             type="button"
             disabled={busy}
@@ -1144,7 +1143,8 @@ function PairCard({
             }
           >
             {busy ? "Reopening…" : "Undo"}
-          </button>
+          </button>{" "}
+          to return this pair to Needs review.
         </p>
       ) : null}
       {pair.status === "merged" ? (
@@ -1284,6 +1284,7 @@ function ComparisonFields({ left, right }: { left: Opportunity; right: Opportuni
         <h3>
           <UntrustedText value={right.title} />
         </h3>
+        <div aria-hidden="true" />
         {fields.map((field) => (
           <ComparisonField key={field.label} {...field} />
         ))}
@@ -1300,12 +1301,18 @@ function ComparisonField({
 }: { label: string; left: ReactNode; right: ReactNode; differs: boolean }) {
   return (
     <Fragment>
-      <h4 className={differs ? "duplicate-comparison-difference" : undefined}>
-        {label}
-        {differs ? <span className="badge">Different</span> : null}
-      </h4>
+      <h4 className={differs ? "duplicate-comparison-difference" : undefined}>{label}</h4>
       <div className={differs ? "duplicate-comparison-difference" : undefined}>{left}</div>
       <div className={differs ? "duplicate-comparison-difference" : undefined}>{right}</div>
+      <div
+        className={
+          differs
+            ? "duplicate-comparison-difference duplicate-comparison-difference-flag"
+            : "duplicate-comparison-difference-flag"
+        }
+      >
+        {differs ? <span className="badge">Different</span> : null}
+      </div>
     </Fragment>
   );
 }

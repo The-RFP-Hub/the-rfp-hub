@@ -149,7 +149,7 @@ function Listings({ me }: { me: Me }) {
         <p className="note">
           <Link href="/duplicates">
             {openDuplicateCount} possible duplicate
-            {openDuplicateCount === 1 ? "" : "s"} touch your listings
+            {openDuplicateCount === 1 ? " touches" : "s touch"} your listings
           </Link>{" "}
           <span className="muted">
             — see which of your listings was matched and what it resembles.
@@ -384,5 +384,5 @@ function VerificationCell({ id }: { id: string }) {
     const notChecked = state.error instanceof ApiError && state.error.isNotFound;
     return notChecked ? <MatchBadge matched={null} /> : <span className="muted">—</span>;
   }
-  return <MatchBadge matched={state.data.matched} />;
+  return <MatchBadge matched={state.data.matched} existsAtSource={state.data.existsAtSource} />;
 }

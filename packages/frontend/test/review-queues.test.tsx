@@ -543,6 +543,7 @@ describe("merging duplicates", () => {
     expect(screen.getByText("Legacy programme description.")).toBeTruthy();
     expect(screen.getByText("https://acme.example/apply")).toBeTruthy();
     expect(screen.getAllByText("Different").length).toBeGreaterThan(0);
+    expect(screen.getByText("Description").querySelector(".badge")).toBeNull();
   });
 
   it("keeps a dismissed row in place and reopens it through Undo", async () => {
@@ -628,9 +629,13 @@ describe("merging duplicates", () => {
 
     fireEvent.click(within(actionGroup).getByRole("button", { name: "Dismiss" }));
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
-    expect(actionLabels()).toEqual(["Compare descriptions", "Confirm", "Dismissed", "Merge…"]);
+    expect(actionLabels()).toEqual(["Compare descriptions", "Confirm", "Dismiss", "Merge…"]);
+    expect(within(actionGroup).getByRole("button", { name: "Dismiss" })).toHaveProperty(
+      "disabled",
+      true,
+    );
     expect(
-      screen.getByText("Dismissed. Undo returns this pair to Needs review, not to Confirmed."),
+      screen.getByText("Decision saved. Undo returns this pair to Needs review, not to Confirmed."),
     ).toBeTruthy();
     expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
   });

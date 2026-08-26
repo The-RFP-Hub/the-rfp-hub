@@ -288,6 +288,25 @@ describe("badges carry meaning without colour", () => {
     expect(screen.getByText("link looks right").getAttribute("title")).toMatch(/not a fact-check/);
   });
 
+  it("names failed link checks by reachability without striking them through", () => {
+    const { rerender } = render(<MatchBadge matched={false} existsAtSource={false} />);
+    expect(screen.getByText("link not reachable").getAttribute("title")).toMatch(
+      /could not be reached/,
+    );
+
+    rerender(<MatchBadge matched={false} existsAtSource />);
+    expect(screen.getByText("content did not match").getAttribute("title")).toMatch(/was reached/);
+
+    rerender(<MatchBadge matched={false} />);
+    expect(screen.getByText("link check failed")).toBeTruthy();
+
+    const unmatchedRule = readFileSync(
+      join(process.cwd(), "src", "app", "globals.css"),
+      "utf8",
+    ).match(/\.badge-unmatched\s*\{([^}]*)\}/)?.[1];
+    expect(unmatchedRule).not.toContain("line-through");
+  });
+
   it("puts the consequence of verification ON SCREEN where a member has to act on it", () => {
     // A tooltip does not exist on a touch device and is not reliably announced. The account page
     // is where somebody works out what their membership actually gets them, so the sentence is
@@ -311,8 +330,8 @@ describe("badges carry meaning without colour", () => {
  * THE ACCENT IS RATIONED, AND THIS IS THE RATION, ENFORCED.
  *
  * One olive accent exists on this site and it means exactly one thing: HERE IS WHERE YOU CAN ACT.
- * The primary button, the focus ring, the current-section underline, the link colour, and the tint
- * under a hovered control or row. That is the whole list.
+ * The primary button, native selected controls, the focus ring, the current-section underline, the
+ * link colour, and the tint under a hovered control or row. That is the whole list.
  *
  * It is barred from every state, verdict and category — status, review status, listing,
  * verification, success, error, warning, chart bars — because those are read by people who cannot
@@ -356,6 +375,7 @@ describe("the accent never carries state", () => {
       'button[aria-pressed="true"],\nbutton[aria-selected="true"]',
       ".button-primary",
       ".button-primary:hover",
+      'input[type="range"],\ninput[type="radio"],\ninput[type="checkbox"]',
       '.shell-nav a[aria-current="page"]',
       ".shell-footer a",
       "tbody tr:hover",
@@ -369,6 +389,28 @@ describe("the accent never carries state", () => {
       .filter((selector) => !selector.includes("focus-visible"));
 
     for (const selector of used) expect([...allowlist]).toContain(selector);
+  });
+
+  it("uses the action accent for native range, radio and checkbox controls", () => {
+    const native = rules.find(
+      (rule) => rule.selector.includes('input[type="range"]') && rule.selector.includes("radio"),
+    );
+    expect(native?.selector).toContain('input[type="checkbox"]');
+    expect(native?.body).toContain("accent-color: var(--accent)");
+  });
+
+  it("emphasises live listings while terminal badges remain quiet outlines", () => {
+    const live = rules.find((rule) => rule.selector === ".badge-live");
+    const terminal = rules.find((rule) => rule.selector.includes(".badge-merged"));
+    expect(live?.body).toContain("background: var(--ink)");
+    expect(terminal?.body).toContain("border-color: var(--line)");
+    expect(terminal?.body).not.toContain("background:");
+  });
+
+  it("keeps links inside error summaries in the error hue", () => {
+    const errorLink = rules.find((rule) => rule.selector === ".state.error a");
+    expect(errorLink?.body).toContain("color: var(--bad)");
+    expect(errorLink?.body).toContain("text-decoration-thickness: 2px");
   });
 
   it("keeps the focus ring on the accent, at 2px, for everything focusable", () => {

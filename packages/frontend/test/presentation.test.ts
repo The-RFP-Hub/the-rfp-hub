@@ -3,6 +3,7 @@ import {
   accountRoleLabel,
   auditActionLabel,
   auditFieldLabel,
+  auditFieldLabels,
   duplicateStatusLabel,
   fundingTypeLabel,
   ingestionMethodLabel,
@@ -21,7 +22,7 @@ describe("presentation vocabulary", () => {
     expect(opportunityStatusLabel("open")).toBe("Open");
     expect(reviewStatusLabel("pending")).toBe("Waiting for review");
     expect(duplicateStatusLabel("suspected")).toBe("Needs review");
-    expect(duplicateStatusLabel("dismissed")).toBe("Different programmes");
+    expect(duplicateStatusLabel("dismissed")).toBe("Dismissed — different programmes");
     expect(ingestionMethodLabel("publisher_api")).toBe("Submitted with an API key");
   });
 
@@ -39,6 +40,26 @@ describe("presentation vocabulary", () => {
     expect(auditFieldLabel("operatingOrganizations/0/slug")).toBe("Running organisations");
     expect(auditFieldLabel("futureFieldName")).toBe("Future field name");
     expect(auditActionLabel("future_action")).toBe("Future action");
+  });
+
+  it("finishes database-shaped audit labels and sorts by the displayed words", () => {
+    expect(
+      auditFieldLabels([
+        "typeData",
+        "httpStatus",
+        "publicId",
+        "orgSlugs",
+        "ingestedVia",
+        "specVersion",
+      ]),
+    ).toEqual([
+      "HTTP status",
+      "Ingestion method",
+      "Organisation slugs",
+      "Programme details",
+      "Public ID",
+      "Specification version",
+    ]);
   });
 
   it("identifies duplicate states that still need attention", () => {

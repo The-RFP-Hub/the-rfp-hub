@@ -36,7 +36,7 @@ export function PublisherJourney({
           >
             <span>{step.label}</span>
             {step.id === "review" && reviewSkipped ? (
-              <span className="publisher-journey-note">Review not required</span>
+              <span className="publisher-journey-note"> (not required)</span>
             ) : null}
           </li>
         );

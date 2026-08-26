@@ -392,6 +392,7 @@ export function CheckField({
 export function CheckList({
   path,
   legend,
+  optional,
   hint,
   options,
   selected,
@@ -399,6 +400,7 @@ export function CheckList({
 }: {
   path: string;
   legend: ReactNode;
+  optional?: boolean;
   hint?: ReactNode;
   options: readonly string[];
   selected: string[];
@@ -406,7 +408,10 @@ export function CheckList({
 }) {
   return (
     <fieldset className="field" data-field-path={path}>
-      <legend>{legend}</legend>
+      <legend>
+        {legend}
+        {optional ? <span className="muted"> — optional</span> : null}
+      </legend>
       {hint ? <p className="hint">{hint}</p> : null}
       <div className={styles.checks}>
         {options.map((option) => {
