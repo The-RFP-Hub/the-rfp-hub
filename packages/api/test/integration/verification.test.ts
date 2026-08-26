@@ -692,6 +692,70 @@ run("M3VER verification", () => {
     );
   });
 
+  // ── a re-check that finds nothing moved ────────────────────────────────────────
+  /**
+   * The digest is over the RAW BYTES, so an equal digest is proof the page has not changed since
+   * the last check — which is what a monthly re-check finds almost every time.
+   *
+   * Two things are asserted, and the second is the one that would be easy to get wrong: the run is
+   * flagged as carrying nothing new, AND it still refreshes `verified_at` and `last_seen_at`,
+   * because "the page is exactly as it was and it still matches" is a stronger "still real" signal
+   * than a page that changed, not a weaker one.
+   */
+  it("marks a re-check of an unmoved page as unchanged, and still winds the clocks on", async () => {
+    const id = await seedEntry("unchanged", MATCH_URL);
+    const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
+
+    const first = await service.verify(id);
+    const firstRun = await latestRun(id);
+    expect((first.extracted as Record<string, unknown>).snapshotUnchanged).toBeUndefined();
+    expect(firstRun?.snapshotText).toContain("Superchain Builders Fund");
+
+    // A month passes and nothing at the source moves.
+    await db
+      .update(opportunities)
+      .set({ updatedAt: ago(41), verifiedAt: ago(40), lastSeenAt: ago(40) })
+      .where(eq(opportunities.id, id));
+
+    const second = await service.verify(id);
+    expect(second.snapshotSha256).toBe(first.snapshotSha256);
+    expect((second.extracted as Record<string, unknown>).snapshotUnchanged).toBe(true);
+    expect((second.extracted as Record<string, unknown>).snapshotUnchangedSince).toBe(
+      firstRun?.runAt.toISOString(),
+    );
+    expect(second.matched).toBe(true);
+
+    // The text is carried forward rather than dropped: retention deletes older runs, so a run whose
+    // snapshot lived only on a pruned ancestor would carry a digest of bytes nobody stores.
+    const secondRun = await latestRun(id);
+    expect(secondRun?.snapshotText).toBe(firstRun?.snapshotText);
+
+    const row = await load(id);
+    expect(row.verifiedAt?.getTime()).toBeGreaterThan(ago(40).getTime());
+    expect(row.lastSeenAt?.getTime()).toBeGreaterThan(ago(40).getTime());
+    expect(await service.pendingIds(10_000), "and the entry is settled again").not.toContain(id);
+  });
+
+  it("does not call a page unchanged when its bytes moved", async () => {
+    const id = await seedEntry("changed", MATCH_URL);
+    const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
+    await service.verify(id);
+
+    const edited = fixtureTransport({
+      ...PAGES,
+      [MATCH_URL]: {
+        body: sourcePage({
+          title: "Superchain Builders Fund",
+          organization: "Example Foundation",
+          amount: "75,000",
+        }),
+      },
+    });
+    const second = await serviceWith(edited, { recheckDays: 30 }).verify(id);
+    expect((second.extracted as Record<string, unknown>).snapshotUnchanged).toBeUndefined();
+    expect((await latestRun(id))?.snapshotText).toContain("75,000");
+  });
+
   // ── retention: the run log is bounded ──────────────────────────────────────────
   /**
    * A run carries up to 200 KB of `snapshot_text`. Left alone, an entry re-checked on a schedule

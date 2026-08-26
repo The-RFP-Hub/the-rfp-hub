@@ -32,6 +32,22 @@
  * is immutable in the database and is never pruned; this table is evidence for a reviewer looking at
  * a page NOW, and the retention bound says so.
  *
+ * THE BACKFILL IS PACED PER HOST (`host-pacer.ts`). A corpus clusters by publisher, so a serial
+ * pass over 500 entries is fifty requests to one foundation's domain in the two seconds it takes
+ * that domain to answer them — indistinguishable from a scraper, and a block reads back here as
+ * "every entry from this publisher stopped matching". A reviewer's own manual check is not paced:
+ * one request is not a crawl, and making it queue behind a batch charges politeness to the wrong
+ * person.
+ *
+ * A RE-CHECK THAT FINDS THE PAGE UNMOVED SAYS SO. The digest is over the raw bytes, so an equal
+ * digest is proof the page has not changed since the last check; the run still records a full
+ * assessment (the RECORD may have moved even though the page did not) but is flagged
+ * `snapshotUnchanged`, and carries the previous run's snapshot text forward rather than a second
+ * copy of a fresh extraction. Conditional requests — `If-None-Match` / `If-Modified-Since` — would
+ * save the transfer as well, and are NOT sent: neither `FetchedSource` nor `verification_runs`
+ * keeps a response's `ETag` or `Last-Modified`, so there is nothing to send them from without a
+ * migration.
+ *
  * THE SUBMIT-TIME QUEUE IS BOUNDED, AND THE BOUND IS THE BACKLOG, NOT THE PARALLELISM. A
  * concurrency limit of 2 caps how many fetches run at once; it does nothing about a submitter
  * queueing ten thousand. So the queue itself has a ceiling (`VERIFY_QUEUE_MAX`) and, when it is
@@ -54,6 +70,7 @@ import {
   type SourceTransport,
   fetchSource,
 } from "./fetcher.service.js";
+import { HOST_MIN_GAP_MS, HostPacer, type PacerClock } from "./host-pacer.js";
 
 /** How many source fetches may be in flight at once. Politeness, and a bound on sockets. */
 const CONCURRENCY = 2;
@@ -65,12 +82,15 @@ export interface VerificationOptions {
   config?: AppConfig;
   /** Injected by the fixture suites; a deployment uses the pinning transport. */
   transport?: SourceTransport;
+  /** Injected so the backfill's per-host spacing can be tested without spending the seconds. */
+  clock?: PacerClock;
 }
 
 export class VerificationService {
   private readonly config: AppConfig;
   private readonly repos: Repositories;
   private readonly transport: SourceTransport | undefined;
+  private readonly clock: PacerClock | undefined;
   /** Ids waiting for a submit-time check. Bounded by `VERIFY_QUEUE_MAX`; overflow drops to cron. */
   private readonly queue: number[] = [];
   private active = 0;
@@ -81,6 +101,7 @@ export class VerificationService {
   ) {
     this.config = options.config ?? defaultConfig;
     this.transport = options.transport;
+    this.clock = options.clock;
     this.repos = repositories(db);
   }
 
@@ -145,7 +166,8 @@ export class VerificationService {
   private async verifyOnce(
     opportunityId: number,
     actor: AuditActor,
-  ): Promise<{ view: VerificationRunView; applied: boolean }> {
+    pacer?: HostPacer,
+  ): Promise<{ view: VerificationRunView; applied: boolean; pacedMs: number }> {
     const row = await this.loadRow(opportunityId);
     const url = row.applicationUrl?.trim();
     if (!url) {
@@ -154,6 +176,13 @@ export class VerificationService {
         `${JSON.stringify(row.publicId)} carries no \`applicationUrl\`, so there is nothing to check it against.`,
       );
     }
+
+    // POLITENESS, and only where a queue exists to be polite with: the backfill passes a pacer, so
+    // fifty entries under one foundation's domain are fetched a second apart instead of as fast as
+    // that domain can answer. A reviewer pressing "verify" passes none — making one interactive
+    // check wait on an unrelated batch's reservations would be politeness charged to the wrong
+    // person, and one request is not a crawl.
+    const pacedMs = pacer ? await pacer.wait(url) : 0;
 
     // OUTSIDE any transaction. A source fetch is a network round trip to a stranger's server and
     // must never be what holds a database transaction open.
@@ -202,6 +231,22 @@ export class VerificationService {
         current.updatedAt.getTime() !== row.updatedAt.getTime() ||
         (current.applicationUrl?.trim() ?? null) !== url;
 
+      // SKIP-UNCHANGED. The previous run's digest is over the same raw bytes this one just read, so
+      // an equal digest means the page has not moved a byte since the last check. The run is still
+      // written and the assessment still recomputed — the RECORD may have changed even though the
+      // page did not, and the diff is against both — but the run is marked as carrying nothing new,
+      // which is what a reviewer comparing two checks actually wants to know.
+      //
+      // The snapshot text is COPIED FORWARD rather than left null. Retention deletes older runs
+      // (`pruneToLatest`), so a run whose text lived only on a pruned ancestor would carry a digest
+      // of bytes nobody stores any more — the snapshot of record has to be on the row that claims
+      // it. Nothing is re-fetched to do this; it is the row already in front of us.
+      const previous = fetched ? await repos.verificationRuns.latest(row.id) : undefined;
+      const unchanged =
+        fetched !== undefined &&
+        previous?.snapshotSha256 != null &&
+        previous.snapshotSha256 === fetched.sha256;
+
       const failureText = failure ? `${failure.category}: ${failure.message}` : null;
       const transientText = transient
         ? "not_a_verdict: the source could not be reached, so the previous verdict stands and the entry stays owed a check"
@@ -217,10 +262,19 @@ export class VerificationService {
         finalUrl: fetched?.finalUrl ?? failure?.url ?? null,
         httpStatus: fetched?.status ?? failure?.status ?? null,
         existsAtSource: assessed?.existsAtSource ?? false,
-        extracted: assessed?.extracted ?? null,
+        extracted: assessed
+          ? {
+              ...assessed.extracted,
+              ...(unchanged
+                ? { snapshotUnchanged: true, snapshotUnchangedSince: previous?.runAt.toISOString() }
+                : {}),
+            }
+          : null,
         fieldDiff: (assessed?.diff ?? null) as Record<string, unknown> | null,
         matched: assessed?.matched ?? false,
-        snapshotText: assessed?.snapshotText ?? null,
+        snapshotText: unchanged
+          ? (previous?.snapshotText ?? assessed?.snapshotText ?? null)
+          : (assessed?.snapshotText ?? null),
         snapshotSha256: fetched?.sha256 ?? null,
         error:
           [staleText, transientText, failureText].filter((part) => part !== null).join(" — ") ||
@@ -275,7 +329,7 @@ export class VerificationService {
             },
       });
 
-      return { view: toRunView(run), applied };
+      return { view: toRunView(run), applied, pacedMs };
     });
   }
 
@@ -300,12 +354,18 @@ export class VerificationService {
     }
     const limit = options.limit ?? this.config.verification.nightlyLimit;
     const ids = await this.pendingIds(limit);
+    // ONE PACER FOR THE WHOLE PASS, so the spacing is between this run's fetches rather than
+    // between each entry and itself. A seeded corpus clusters by host, and that clustering is the
+    // only reason this exists.
+    const pacer = new HostPacer(HOST_MIN_GAP_MS, this.clock);
     let processed = 0;
     let unsettled = 0;
+    let pacedMs = 0;
     for (const id of ids) {
       try {
-        const { applied } = await this.verifyOnce(id, SYSTEM_ACTOR);
-        if (applied) processed++;
+        const outcome = await this.verifyOnce(id, SYSTEM_ACTOR, pacer);
+        pacedMs += outcome.pacedMs;
+        if (outcome.applied) processed++;
         else unsettled++;
       } catch {
         // One unverifiable entry must not end the batch.
@@ -315,7 +375,14 @@ export class VerificationService {
     return {
       processed,
       remaining: await this.pendingCount(),
-      details: { selected: ids.length, unsettled, pruned: await this.pruneRuns(ids) },
+      details: {
+        selected: ids.length,
+        unsettled,
+        // What the politeness cost, so a pass that took an hour can be attributed to the spacing
+        // or to the sites rather than guessed at.
+        pacedMs,
+        pruned: await this.pruneRuns(ids),
+      },
     };
   }
 

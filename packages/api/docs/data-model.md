@@ -704,6 +704,13 @@ flow sets the opportunity's `snapshot_url`. M3 stores the snapshot **in the data
 Raw HTML is deliberately not stored: it is large, it is not what a reviewer reads, and it would be
 an XSS liability the moment any future surface rendered it.
 
+**A re-check of an unmoved page copies its snapshot forward.** `snapshot_sha256` is over the raw
+bytes, so an equal digest means the page has not changed; the new run is flagged
+`extracted.snapshotUnchanged` and stores the previous run's `snapshot_text` verbatim rather than a
+second extraction of identical bytes. It is copied rather than left NULL *because* of the retention
+rule below — a run whose text lived only on a pruned ancestor would carry a digest of bytes nobody
+stores any more, and the snapshot of record has to be on the row that claims it.
+
 **And the log is bounded.** 200 KB per run is small once and expensive forever: an entry re-checked
 on a schedule appends one row per check for as long as it exists, which is megabytes a year each for
 a history nobody reads past the most recent few. `verification-backfill` therefore prunes each entry

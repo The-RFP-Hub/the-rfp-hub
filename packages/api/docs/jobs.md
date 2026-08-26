@@ -353,6 +353,26 @@ the selection, at the head of it, indefinitely. The nightly cap bounds what that
 `staleness` closes such an entry at ninety days on its own, since nothing is refreshing its
 `last_seen_at`. Retrying a dead host is the price of not retiring a live one during an outage.
 
+**The pass is paced per host.** A corpus clusters by publisher, so a serial walk over 500 entries is
+fifty requests to one foundation's domain in the two seconds that domain takes to answer them —
+indistinguishable from a scraper, and a block reads back here as "every entry from this publisher
+stopped matching". The backfill therefore holds at least **one second between fetches to the same
+host**, in process, for the duration of one pass, and reports what that cost as `details.pacedMs`.
+A reviewer's own `POST .../verify` is **not** paced: one request is not a crawl, and making it queue
+behind a batch would charge politeness to the wrong person.
+
+**A re-check that finds the page unmoved says so.** The stored digest is over the raw bytes, so an
+equal digest is proof nothing changed since the last check — which is what a monthly re-check finds
+almost every time. The run is still written and the assessment still recomputed (the *record* may
+have moved even though the page did not), but it is flagged `extracted.snapshotUnchanged` and
+carries the previous run's snapshot text forward rather than a second extraction of identical bytes.
+It still refreshes `verified_at` and `last_seen_at` on a match: "unmoved and still matching" is a
+stronger still-real signal than a page that changed, not a weaker one.
+
+Conditional requests — `If-None-Match` / `If-Modified-Since`, which would save the transfer as well
+as the storage — are **not** sent. Neither the fetcher's result nor `verification_runs` keeps a
+response's `ETag` or `Last-Modified`, so there is nothing to send them from without a migration.
+
 ### What staleness deliberately does not touch
 
 `updated_at`. Two things read it, and both break if a maintenance pass moves it: this job's own
