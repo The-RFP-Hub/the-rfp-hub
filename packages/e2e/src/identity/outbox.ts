@@ -37,11 +37,11 @@ const OTP_PATTERN = /\b(\d{6})\b/;
 /**
  * The file the transport writes for one address.
  *
- * Mirrors `outboxFileFor` in `packages/api/src/auth/email-transport.ts`: one file per address, named
- * by a digest rather than the address itself, because file NAMES are the part that survives a
- * screenshot or a stray `ls` in a log. Mirrored rather than imported — that module lives in another
- * package's `src`, which is not an exported entry point — and the mirroring is self-checking: if the
- * naming drifted, no code would ever be found and every sign-in here would fail loudly.
+ * Mirrors `outboxFileFor` in the API's central email transport: one file per address, named by a
+ * digest rather than the address itself, because file NAMES are the part that survives a screenshot
+ * or a stray `ls` in a log. Mirrored rather than imported — that module lives in another package's
+ * `src`, which is not an exported entry point — and the mirroring is self-checking: if the naming
+ * drifted, no code would ever be found and every sign-in here would fail loudly.
  */
 export function outboxFileFor(dir: string, email: string): string {
   return join(dir, `${createHash("sha256").update(email.toLowerCase()).digest("hex")}.jsonl`);

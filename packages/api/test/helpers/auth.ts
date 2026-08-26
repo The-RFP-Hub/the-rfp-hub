@@ -21,7 +21,6 @@
 import { eq } from "drizzle-orm";
 import { type Auth, createAuth } from "../../src/auth/better-auth.js";
 import type { AuthConfig } from "../../src/auth/better-auth.js";
-import { type EmailTransport, createEmailTransport } from "../../src/auth/email-transport.js";
 import { db } from "../../src/db/client.js";
 import {
   type AccountRow,
@@ -32,6 +31,11 @@ import {
   orgMemberships,
   organizations,
 } from "../../src/db/schema.js";
+import {
+  type EmailTransport,
+  createEmailTransport,
+} from "../../src/modules/services/email/email-transport.js";
+import { EmailService } from "../../src/modules/services/email/email.service.js";
 import { mintApiKey as mintToken } from "../../src/modules/shared/api-key-token.js";
 import type { ApiKeyScope } from "../../src/modules/shared/capabilities.js";
 
@@ -82,7 +86,15 @@ function instance(): TestInstance {
   if (!shared) {
     const config = testConfig(TEST_SECRET);
     const transport = createEmailTransport(config.email);
-    shared = { auth: createAuth({ db, config, transport }), transport, config };
+    shared = {
+      auth: createAuth({
+        db,
+        config,
+        email: new EmailService({ config: config.email, transport }),
+      }),
+      transport,
+      config,
+    };
   }
   return shared;
 }
@@ -160,7 +172,11 @@ export async function unsignedToken(email: string): Promise<string> {
 export async function foreignToken(email: string): Promise<string> {
   const config = testConfig(FOREIGN_SECRET);
   const transport = createEmailTransport(config.email);
-  const foreign = createAuth({ db, config, transport });
+  const foreign = createAuth({
+    db,
+    config,
+    email: new EmailService({ config: config.email, transport }),
+  });
   await foreign.api.sendVerificationOTP({ body: { email, type: "sign-in" } });
   const messages = transport.drain?.(email) ?? [];
   const otp = /\b(\d{6})\b/.exec(messages[messages.length - 1]?.text ?? "")?.[1];
