@@ -211,9 +211,7 @@ export class EmbeddingRepository {
     opportunityId: number,
     vector: number[],
     identity: EmbeddingIdentity,
-  ): Promise<
-    { id: number; similarity: number; norm: number | null; tokenCount: number | null }[]
-  > {
+  ): Promise<{ id: number; similarity: number; norm: number | null; tokenCount: number | null }[]> {
     const counterpart = sql`case when ${opportunityDuplicates.opportunityId} = ${opportunityId} then ${opportunityDuplicates.duplicateOfId} else ${opportunityDuplicates.opportunityId} end`;
     const rows = await this.exec
       .select({

@@ -420,7 +420,10 @@ const amountKey = (doc: CorpusDocument): string | null => {
 };
 
 const normalizedTitle = (doc: CorpusDocument): string =>
-  (doc.title ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  (doc.title ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 
 /**
  * Every pair of distinct corpus documents, scored on BOTH arms and against every structural
@@ -496,8 +499,8 @@ export function scanCorpusPairs(
       const urlMatch =
         normalizedUrl(left.doc.applicationUrl) !== null &&
         normalizedUrl(left.doc.applicationUrl) === normalizedUrl(right.doc.applicationUrl);
-      const orgMatch = primaryOrgSlug(left.doc) !== null &&
-        primaryOrgSlug(left.doc) === primaryOrgSlug(right.doc);
+      const orgMatch =
+        primaryOrgSlug(left.doc) !== null && primaryOrgSlug(left.doc) === primaryOrgSlug(right.doc);
       const days = deadlineDays(left.doc);
       const fires = [
         urlMatch,
@@ -602,7 +605,6 @@ export function structuralNegatives(documents: CorpusDocument[]): DerivedPair[] 
   }
   return out;
 }
-
 
 // ── the stub attack ───────────────────────────────────────────────────────────────
 /**
@@ -961,7 +963,9 @@ if (isCliEntry) {
 
   console.log("\nwhy structural signals are NOT the gate (pairs firing / hardest cosine):");
   for (const row of result.structuralSignals) {
-    console.log(`  ${row.pairsFiring.toString().padStart(5)}  ${row.hardestCosine.toFixed(3)}  ${row.signal}`);
+    console.log(
+      `  ${row.pairsFiring.toString().padStart(5)}  ${row.hardestCosine.toFixed(3)}  ${row.signal}`,
+    );
   }
   console.log("\nthe named funder families (the corpus's genuinely hard negatives):");
   for (const n of result.structuralNegativeScores.slice(0, 6)) {
@@ -993,8 +997,7 @@ if (isCliEntry) {
   console.log(`  arm B, guard applied:    ${stub.armBWins}/${stub.targets}`);
   console.log(`  arm B, NO token guard:   ${stub.armBWinsWithoutTokenGuard}/${stub.targets}`);
   console.log(
-    `  arm-B-only MARGINAL:     ${stub.marginalWins}/${stub.targets}  ` +
-      "← the number this change owns; arm A's figure is a pre-existing property of the shipped detector and is filed separately",
+    `  arm-B-only MARGINAL:     ${stub.marginalWins}/${stub.targets}  ← the number this arm owns; arm A's figure is a pre-existing property of the shipped detector and is filed separately`,
   );
   // The exponent the model pins is a point on a curve, and the curve is printed so the choice
   // stays inspectable: 0 is the historical unweighted bag, 2 is what ships.

@@ -529,10 +529,7 @@ export const DEFAULT_OVERLAP_THRESHOLD: Record<EmbeddingProvider, number> = {
  * Out of range REFUSES rather than clamps: a clamped threshold is a detector running at a setting
  * nobody chose.
  */
-export function readOverlapThreshold(
-  raw: string | undefined,
-  provider: EmbeddingProvider,
-): number {
+export function readOverlapThreshold(raw: string | undefined, provider: EmbeddingProvider): number {
   const value = (raw ?? "").trim();
   if (value === "") return DEFAULT_OVERLAP_THRESHOLD[provider];
   const parsed = Number(value);
@@ -884,18 +881,12 @@ export const config: AppConfig = {
     ),
     maxMatches: readPositiveInt(process.env.DEDUPE_MAX_MATCHES, 5),
     overlapEnabled: readBoolean(process.env.DEDUPE_OVERLAP_ENABLED, true),
-    overlapThreshold: readOverlapThreshold(
-      process.env.DEDUPE_OVERLAP_THRESHOLD,
-      embeddingProvider,
-    ),
+    overlapThreshold: readOverlapThreshold(process.env.DEDUPE_OVERLAP_THRESHOLD, embeddingProvider),
     // 20 distinct tokens on the shorter side. The only guard measured to work against the stub
     // attack (142 → 3 wins of 160), and it costs nothing on real negatives — the hardest stays
     // 0.682 at every setting — while every mutation rung clears it with at least 16 tokens spare.
     overlapMinTokens: readPositiveInt(process.env.DEDUPE_OVERLAP_MIN_TOKENS, 20),
-    overlapMinSimilarity: readOverlapMinSimilarity(
-      process.env.DEDUPE_OVERLAP_MIN_SIMILARITY,
-      0.35,
-    ),
+    overlapMinSimilarity: readOverlapMinSimilarity(process.env.DEDUPE_OVERLAP_MIN_SIMILARITY, 0.35),
   },
 
   verification: {

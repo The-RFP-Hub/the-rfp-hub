@@ -66,8 +66,8 @@ import {
   type RecordDuplicateNotificationsInput,
   duplicateNotificationInserts,
 } from "../notifications/notification.service.js";
-import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import { matchReasons } from "./duplicate-reasons.js";
+import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
   type DuplicateRuleConfig,
   type DuplicateSignalRecord,
@@ -568,8 +568,12 @@ export class DedupeService {
    * always stranded pairs the same way.
    *
    * `shouldPrune` — not `!decidePair` — for the reason spelled out in `duplicate-signal.ts`.
+   *
+   * PUBLIC for the same reason `pendingEmbeddingIds` is: the cursor IS the queue, and being able to
+   * ask what one arm does without driving the whole job through a shared database is how the
+   * rollback stays testable rather than merely asserted.
    */
-  private async resweepStaleRules(limit: number): Promise<number> {
+  async resweepStaleRules(limit: number): Promise<number> {
     const provider = this.provider;
     if (!provider) return 0;
     const rule = this.ruleConfig(provider);

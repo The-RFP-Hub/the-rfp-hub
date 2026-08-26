@@ -65,9 +65,7 @@ describe("embedSyncDetailed", () => {
     expect(norm).toBeGreaterThan(0);
     const unitLength = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
     expect(unitLength).toBeCloseTo(1, 10);
-    const restored = Math.sqrt(
-      vector.reduce((sum, value) => sum + (value * norm) ** 2, 0),
-    );
+    const restored = Math.sqrt(vector.reduce((sum, value) => sum + (value * norm) ** 2, 0));
     expect(restored).toBeCloseTo(norm, 6);
   });
 

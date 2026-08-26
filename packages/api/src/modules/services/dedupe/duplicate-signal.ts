@@ -173,7 +173,12 @@ export function decidePair(
     return {
       accepted: true,
       arm: "lexical",
-      signal: { arm: "lexical", lexical: round3(similarity), overlap: nullableRound(value), minTokens: tokens },
+      signal: {
+        arm: "lexical",
+        lexical: round3(similarity),
+        overlap: nullableRound(value),
+        minTokens: tokens,
+      },
     };
   }
 
@@ -188,7 +193,12 @@ export function decidePair(
     return {
       accepted: true,
       arm: "overlap",
-      signal: { arm: "overlap", lexical: round3(similarity), overlap: round3(value), minTokens: tokens },
+      signal: {
+        arm: "overlap",
+        lexical: round3(similarity),
+        overlap: round3(value),
+        minTokens: tokens,
+      },
     };
   }
 
@@ -211,10 +221,7 @@ export function decidePair(
  * provider that supplies no norm — the decision is purely lexical and nothing about it is unknown,
  * so pruning must behave exactly as it did before this change existed.
  */
-export function shouldPrune(
-  inputs: DuplicateSignalInputs,
-  config: DuplicateRuleConfig,
-): boolean {
+export function shouldPrune(inputs: DuplicateSignalInputs, config: DuplicateRuleConfig): boolean {
   if (overlapArmLive(config)) {
     const { left, right } = inputs;
     if (left.norm === null || right.norm === null) return false;

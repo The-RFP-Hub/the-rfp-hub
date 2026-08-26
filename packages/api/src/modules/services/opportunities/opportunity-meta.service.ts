@@ -15,7 +15,6 @@
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityRow } from "../../../db/schema.js";
 import { type Repositories, repositories } from "../../repositories/unit-of-work.js";
-import { matchReasons } from "../dedupe/duplicate-reasons.js";
 import type {
   DuplicateMatchView,
   OwnedDuplicateMatchView,
@@ -23,6 +22,7 @@ import type {
 } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
+import { matchReasons } from "../dedupe/duplicate-reasons.js";
 import { isOpportunityOwnedBy } from "./opportunity-ownership.js";
 
 /** What a caller may see of one entry. */

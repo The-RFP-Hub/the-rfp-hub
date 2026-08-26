@@ -55,10 +55,7 @@ describe("overlap", () => {
 
 describe("decidePair", () => {
   it("accepts on the lexical arm and names it", () => {
-    const decision = decidePair(
-      { similarity: 0.8, left: side(1, 100), right: side(1, 100) },
-      RULE,
-    );
+    const decision = decidePair({ similarity: 0.8, left: side(1, 100), right: side(1, 100) }, RULE);
     expect(decision.accepted).toBe(true);
     expect(decision.arm).toBe("lexical");
     expect(decision.signal?.lexical).toBe(0.8);
@@ -70,19 +67,13 @@ describe("decidePair", () => {
    * inflate arm B's apparent contribution exactly where somebody is measuring it.
    */
   it("prefers the lexical arm when both would accept", () => {
-    const decision = decidePair(
-      { similarity: 0.9, left: side(1, 100), right: side(3, 100) },
-      RULE,
-    );
+    const decision = decidePair({ similarity: 0.9, left: side(1, 100), right: side(3, 100) }, RULE);
     expect(decision.arm).toBe("lexical");
   });
 
   it("accepts on the overlap arm when cosine alone would not", () => {
     // cos 0.5 (below 0.75), norms 1 and 2 ⇒ overlap 1.0, 60 tokens on the shorter side.
-    const decision = decidePair(
-      { similarity: 0.5, left: side(1, 60), right: side(2, 200) },
-      RULE,
-    );
+    const decision = decidePair({ similarity: 0.5, left: side(1, 60), right: side(2, 200) }, RULE);
     expect(decision.accepted).toBe(true);
     expect(decision.arm).toBe("overlap");
     expect(decision.signal).toEqual({
@@ -98,19 +89,13 @@ describe("decidePair", () => {
    * exactly the shape of the attack — and the arm does not fire.
    */
   it("refuses the overlap arm below MIN_TOKENS", () => {
-    const decision = decidePair(
-      { similarity: 0.5, left: side(1, 12), right: side(2, 200) },
-      RULE,
-    );
+    const decision = decidePair({ similarity: 0.5, left: side(1, 12), right: side(2, 200) }, RULE);
     expect(decision.accepted).toBe(false);
     expect(decision.signal).toBeNull();
   });
 
   it("refuses the overlap arm below the cosine floor", () => {
-    const decision = decidePair(
-      { similarity: 0.2, left: side(1, 60), right: side(9, 200) },
-      RULE,
-    );
+    const decision = decidePair({ similarity: 0.2, left: side(1, 60), right: side(9, 200) }, RULE);
     expect(decision.accepted).toBe(false);
   });
 
@@ -120,10 +105,7 @@ describe("decidePair", () => {
    * so nothing is clamped, and the recorded value is the measurement rather than a capped one.
    */
   it("accepts an overlap above 1 and records it unclamped", () => {
-    const decision = decidePair(
-      { similarity: 0.5, left: side(1, 60), right: side(3, 200) },
-      RULE,
-    );
+    const decision = decidePair({ similarity: 0.5, left: side(1, 60), right: side(3, 200) }, RULE);
     expect(decision.arm).toBe("overlap");
     expect(decision.signal?.overlap).toBe(1.5);
   });
@@ -145,15 +127,15 @@ describe("decidePair", () => {
 
 describe("shouldPrune", () => {
   it("prunes a pair neither arm accepts any more", () => {
-    expect(
-      shouldPrune({ similarity: 0.2, left: side(1, 100), right: side(1, 100) }, RULE),
-    ).toBe(true);
+    expect(shouldPrune({ similarity: 0.2, left: side(1, 100), right: side(1, 100) }, RULE)).toBe(
+      true,
+    );
   });
 
   it("leaves a pair the overlap arm still accepts", () => {
-    expect(
-      shouldPrune({ similarity: 0.5, left: side(1, 60), right: side(2, 200) }, RULE),
-    ).toBe(false);
+    expect(shouldPrune({ similarity: 0.5, left: side(1, 60), right: side(2, 200) }, RULE)).toBe(
+      false,
+    );
   });
 
   /**
