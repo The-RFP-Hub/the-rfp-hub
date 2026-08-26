@@ -170,11 +170,22 @@ run on its own** — nothing downstream will report its absence for you.
 **As stated by the operator** — these facts are not corroborable from this checkout, so they are
 attributed rather than asserted as fact this repository can verify: the external scheduler above is
 an Airflow DAG, owned by the operator's data-warehouse project. It is not a workflow in this
-repository. It runs the six jobs at **01:05 UTC** daily, `staleness` after the other five, exactly
-the ordering this section states, and it invokes them the same way `jobs-nightly.yml` and
-`run-ecs-job.sh` do: one-off `run-task` overrides against the deployed ECS image, on the API
-service's own task definition. Its **first production run was 2026-08-26**, against release
-`prod-1.3.0`.
+repository, and there is no longer a dispatch path here to compare it against — it starts the same
+one-off ECS tasks §4a describes: `run-task` overrides against the deployed image, on the API
+service's own task definition, the revision the service is actually running. It runs at **01:05
+UTC** daily, `staleness` after everything else, exactly the ordering this section states. Its
+**first production run was 2026-08-26**, against release `prod-1.3.0`.
+
+**That attestation is about a release older than this branch, and it describes six tasks.**
+`prod-1.3.0` shipped the six-name catalogue, so the DAG names `analytics-rollup`, `retention`,
+`embedding-backfill`, `verification-backfill`, `notification-dispatch` and then `staleness`, one
+task each. Nothing has to change for it to keep working: the prune now rides inside
+`analytics-rollup` and `retention` survives as a deprecated alias that prunes alone (§1), so a
+caller still naming six prunes twice, which deletes nothing the first pass left. What **should**
+change is the shape — **one maintenance task, `node packages/api/dist/jobs.js all --json`** (§4d,
+§5.7) — which holds the ordering in the process that knows what it is for instead of in a
+dependency graph in another repository. Until that move happens, what the footprints below record
+is six tasks that satisfied the rule, not one task that enforced it.
 
 That run's logs live in the Airflow deployment itself and are **not reachable from this
 repository** — there is no link to add here, and none this document can keep current if there were.
@@ -197,11 +208,23 @@ would have touched:**
   order by created_at;
   ```
 
-* **`verification_runs`** — every source check in the window, **from any origin**. The table has no
-  job/origin column: `VerificationService.verify()` writes the same row shape for a nightly
-  `verification-backfill` pass, a submit-time check and a reviewer's manual re-check from the
-  dashboard, so a row's mere existence proves a check happened, not that the job ran it. The signal
-  worth reading for is a **burst around 01:05 UTC**, not the rows' presence:
+* **`verification_runs`** — the checks in the window that **survived the retention bound**, from
+  **any origin**. Two things keep this from being a count of what the backfill did.
+
+  The table has no job/origin column: `VerificationService.verify()` writes the same row shape for a
+  nightly `verification-backfill` pass, a submit-time check and a reviewer's manual re-check from
+  the dashboard, so a row's mere existence proves a check happened, not that the job ran it. The
+  signal worth reading for is a **burst around 01:05 UTC**, not the rows' presence — and that burst
+  now has a ceiling, `VERIFY_NIGHTLY_LIMIT` (500 per invocation, §1), because the re-check TTL
+  keeps the selection permanently refilled rather than draining it.
+
+  And the log is **bounded, not a history**: every insert prunes its entry to the newest
+  `VERIFICATION_RUNS_KEEP` runs (5 by default) and the backfill prunes its whole selection again
+  afterwards. An often-checked entry therefore loses its older rows *inside* the window, so what
+  this query returns is a floor on the checks that happened, never the number. What is never pruned
+  is the `verify_source` row every check also appends to `audit_log` (§7) — `actor_kind = 'job'`
+  for the backfill and the submit-time queue alike, which separates a reviewer's check from an
+  unattended one and still does not say which unattended caller ran it.
 
   ```sql
   select id, opportunity_id, run_at, http_status, matched, error
@@ -238,14 +261,16 @@ auditor whether a scheduled run happened, only what the data currently says. Dir
 three tables above, run by someone with database access, is the only path that does not require
 reaching into Airflow.
 
-**These are the only in-database footprints, and reading them proves less than it looks like.**
-`retention`, `embedding-backfill` and `notification-dispatch` leave no comparable trace here: a
-healthy `retention` pass may have nothing past the window to delete, a healthy `embedding-backfill`
-may have no backlog, a healthy `notification-dispatch` may have no pending notification. Presence in
-the three tables above is **consistent with** a run having happened; **absence proves nothing** —
-not that a job failed, and not that it didn't run — because every one of these jobs is also
-reachable by hand (§4b) or via `workflow_dispatch` (§4a). None of it says anything about **ordering**
-either: the known gap stated above stands regardless of what these queries return.
+**These are the only in-database footprints, and reading them proves less than it looks like.** The
+prune inside `analytics-rollup`, `embedding-backfill` and `notification-dispatch` leave no
+comparable trace here: a healthy prune may have nothing past the retention window to delete, a
+healthy `embedding-backfill` may have no backlog, a healthy `notification-dispatch` may have no
+pending notification. Presence in the three tables above is **consistent with** a run having
+happened; **absence proves nothing** — not that a job failed, and not that it didn't run — because
+every one of these jobs is also reachable by hand, as a one-off task (§4a) or inside the image
+(§4b), and from the dashboard one pass at a time (§4c). None of it says anything about **ordering**
+either: the *Not enforced* note above stands regardless of what these queries return, and once the
+chain moves to `all`, the ordering is a property of the process that ran, which no row here records.
 
 ### Which deployment a run maintains
 
