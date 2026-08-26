@@ -35,16 +35,30 @@ function original(label: string) {
 }
 
 /**
- * The re-listing the OVERLAP arm exists for: the opening of the original and nothing else.
+ * A LONG original, and the leading fragment of it — the pair the OVERLAP arm exists for.
  *
- * Not a paraphrase — the lexical arm already catches those. This is the shape cosine cannot catch,
- * because normalisation erases the difference in length that IS the signal, and the pair it forms
- * therefore lands with a similarity BELOW `DEDUPE_SIMILARITY_THRESHOLD`.
+ * `original`/`paraphrase` above are a same-length rewrite, which is the shape the cosine arm
+ * already catches. This pair is the shape it CANNOT: normalisation erases the difference in length
+ * that IS the signal, so a copy of the opening lands with a cosine below the threshold no matter
+ * how verbatim it is.
+ *
+ * The margins are deliberate and were measured against the shipped featurizer before this fixture
+ * was written — cosine 0.664 against a 0.75 threshold, overlap 1.037 against 0.85, and 34 distinct
+ * tokens on the shorter side against a floor of 20. There is room in all three directions, so the
+ * test fails when the RULE changes rather than when the corpus breathes. If it ever does fail, the
+ * fixture text is what changes.
  */
+function longOriginal(label: string) {
+  return {
+    title: `Long-Form ${label} Archive Custody Fellowship`,
+    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive, document its provenance and handling history, and publish a machine-readable manifest of every stored section with its interval and collection season. Awards cover maintenance contracts, calibrated logging hardware and the technician time needed to re-inventory a collection that has outlived its original grant. Applicants must show that the archive is at genuine risk of loss through equipment failure or institutional reorganisation, and must commit to depositing the manifest under an open licence. Reviews run twice a year and are decided by working researchers rather than by programme staff.`,
+  };
+}
+
 function truncatedRelisting(label: string) {
   return {
-    title: `${label} Protocol Research Grants`,
-    description: `A grants programme funding open-source ${label} protocol research and public ${label} infrastructure.`,
+    title: `${label} Custody Fellowship`,
+    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive and publish a manifest of every stored section.`,
   };
 }
 
@@ -82,7 +96,7 @@ test.describe("@dedupe M3-3 detection", () => {
     const originalDoc = opportunityFixture(
       stack.namespaces.publisher,
       `dup-overlap-original-${stamp}`,
-      original("attestation"),
+      longOriginal("attestation"),
     );
     const originalId = originalDoc.id as string;
     expect((await publisher.post("/v1/opportunities", originalDoc)).status).toBe(201);
