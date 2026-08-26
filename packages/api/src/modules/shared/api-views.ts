@@ -94,6 +94,53 @@ export interface OwnedDuplicateListView {
   items: OwnedDuplicateMatchView[];
 }
 
+// ── notifications ──────────────────────────────────────────────────────────────
+export type NotificationKindView =
+  | "duplicate_suspected"
+  | "duplicate_confirmed"
+  | "duplicate_dismissed"
+  | "duplicate_merged_away"
+  | "duplicate_absorbed"
+  | "duplicate_reopened";
+
+/** Structured duplicate facts. Presentation copy is deliberately not persisted. */
+export interface DuplicateNotificationPayloadView {
+  pairId: number;
+  similarity: number | null;
+  yourListing: { id: string; title: string };
+  /** Present only when the counterpart was approved and listed at emission time. */
+  otherListing?: { id: string; title: string };
+  action: "review_match" | "view_match" | "view_survivor";
+  link: string;
+  /** A decision's capacity, never the deciding account's identity. Null for detection. */
+  decidedBy: "reviewer" | null;
+}
+
+export interface NotificationView {
+  id: number;
+  kind: NotificationKindView;
+  subjectKind: "duplicate";
+  subjectId: number;
+  payload: DuplicateNotificationPayloadView;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationListView {
+  items: NotificationView[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  /** All unread notifications for the account, independent of the current page/filter. */
+  unreadCount: number;
+}
+
+export interface NotificationReadAllView {
+  markedRead: number;
+  unreadCount: number;
+}
+
 /**
  * One side of a pair, as the REVIEW queue sees it.
  *
