@@ -43,9 +43,8 @@ const TEMPORARY_ALLOWLIST: string[] = [
   "src/modules/services/health/health.service.ts",
   "src/modules/services/opportunities/opportunity-meta.service.ts",
   "src/modules/services/opportunities/opportunity.service.ts",
-  "src/modules/services/review/review.service.ts",
 ];
-const TEMPORARY_CEILING = 8;
+const TEMPORARY_CEILING = 7;
 
 type Violation = "drizzle-import" | "schema-value-import" | "transaction";
 

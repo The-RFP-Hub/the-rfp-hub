@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DB, DbLike } from "../../src/db/client.js";
 import type { OrganizationRow } from "../../src/db/schema.js";
+import { type Repositories, repositories } from "../../src/modules/repositories/index.js";
 import { DedupeService } from "../../src/modules/services/dedupe/dedupe.service.js";
 import { ReviewService } from "../../src/modules/services/review/review.service.js";
 
@@ -28,11 +29,11 @@ describe("transaction-bound service helpers", () => {
     const exec = fakeExec([{ value: 3 }]);
     const summarize = (
       service as unknown as {
-        summarize(exec: DbLike, row: OrganizationRow): Promise<{ memberCount: number }>;
+        summarize(repos: Repositories, row: OrganizationRow): Promise<{ memberCount: number }>;
       }
     ).summarize.bind(service);
 
-    const summary = await summarize(exec, {
+    const summary = await summarize(repositories(exec), {
       id: 7,
       slug: "acme",
       name: "Acme",

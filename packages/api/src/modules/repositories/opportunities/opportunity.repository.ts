@@ -221,7 +221,10 @@ export class OpportunityRepository {
     return rows[0];
   }
 
-  async update(id: number, values: OpportunityInsert): Promise<OpportunityRow | undefined> {
+  async update(
+    id: number,
+    values: Partial<OpportunityInsert>,
+  ): Promise<OpportunityRow | undefined> {
     const rows = await this.exec
       .update(opportunities)
       .set(values)

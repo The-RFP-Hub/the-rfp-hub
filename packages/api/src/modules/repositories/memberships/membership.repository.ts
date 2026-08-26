@@ -34,7 +34,7 @@
  * The answer is DATA, not a decision: `effectiveCaps` in `modules/shared/capabilities.ts` stays the
  * single pure place where capabilities are derived, and this only replaces the facts underneath it.
  */
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
 import {
   type OrgMembershipRow,
@@ -131,6 +131,24 @@ export class MembershipRepository {
     return rows[0];
   }
 
+  async lockRoleForManagerCheck(
+    accountId: number,
+    organizationId: number,
+  ): Promise<OrgMembershipRow["role"] | undefined> {
+    const rows = await this.exec
+      .select({ role: orgMemberships.role })
+      .from(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.accountId, accountId),
+          eq(orgMemberships.organizationId, organizationId),
+        ),
+      )
+      .for("share")
+      .limit(1);
+    return rows[0]?.role;
+  }
+
   async updateRole(
     id: number,
     role: OrgMembershipRow["role"],
@@ -141,6 +159,51 @@ export class MembershipRepository {
       .where(eq(orgMemberships.id, id))
       .returning({ role: orgMemberships.role });
     return settled[0]?.role ?? null;
+  }
+
+  async insertRole(
+    accountId: number,
+    organizationId: number,
+    role: OrgMembershipRow["role"],
+  ): Promise<void> {
+    await this.exec.insert(orgMemberships).values({ accountId, organizationId, role });
+  }
+
+  async removeForAccountAndOrganization(
+    accountId: number,
+    organizationId: number,
+  ): Promise<OrgMembershipRow["role"] | null> {
+    const removed = await this.exec
+      .delete(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.accountId, accountId),
+          eq(orgMemberships.organizationId, organizationId),
+        ),
+      )
+      .returning({ role: orgMemberships.role });
+    return removed[0]?.role ?? null;
+  }
+
+  async roleForAccountAndOrganizationSlug(
+    accountId: number,
+    slug: string,
+  ): Promise<OrgMembershipRow["role"] | undefined> {
+    const rows = await this.exec
+      .select({ role: orgMemberships.role })
+      .from(orgMemberships)
+      .innerJoin(organizations, eq(organizations.id, orgMemberships.organizationId))
+      .where(and(eq(orgMemberships.accountId, accountId), eq(organizations.slug, slug)))
+      .limit(1);
+    return rows[0]?.role;
+  }
+
+  async countForOrganization(organizationId: number): Promise<number> {
+    const counted = await this.exec
+      .select({ value: count() })
+      .from(orgMemberships)
+      .where(eq(orgMemberships.organizationId, organizationId));
+    return counted[0]?.value ?? 0;
   }
 
   async upsertRole(
