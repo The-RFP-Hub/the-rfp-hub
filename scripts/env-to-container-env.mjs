@@ -109,7 +109,13 @@ export function escapeData(value) {
  */
 export function maskValue(value, mask) {
   for (const line of String(value ?? "").split("\n")) {
-    if (line.length > 0) mask(`::add-mask::${escapeData(line)}`);
+    if (line.length === 0) continue;
+    mask(`::add-mask::${escapeData(line)}`);
+    // The deploy action prints `JSON.stringify(taskDefinition)` at debug level when registration
+    // fails. A value holding a quote, a backslash or a tab appears there in its escaped form, which
+    // the raw mask no longer matches — so the escaped spelling is registered as well.
+    const escaped = JSON.stringify(line).slice(1, -1);
+    if (escaped !== line) mask(`::add-mask::${escapeData(escaped)}`);
   }
 }
 

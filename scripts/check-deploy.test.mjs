@@ -70,6 +70,15 @@ describe(".dockerignore", () => {
   it("accepts the full set, around comments and blank lines", () => {
     expect(scanDockerignore(`# secrets\n\n${REQUIRED_DOCKERIGNORE.join("\n")}\n`)).toEqual([]);
   });
+
+  it("rejects a negation that re-includes an env file after the exclusions", () => {
+    const text = `${REQUIRED_DOCKERIGNORE.join("\n")}\n!packages/api/.env\n!**/.env.local\n!dist\n`;
+    const hits = scanDockerignore(text);
+    expect(hits.map((h) => h.message)).toEqual([
+      expect.stringContaining("!packages/api/.env"),
+      expect.stringContaining("!**/.env.local"),
+    ]);
+  });
 });
 
 describe("the deploy workflows", () => {

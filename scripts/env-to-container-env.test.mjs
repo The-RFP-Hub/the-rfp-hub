@@ -163,6 +163,15 @@ describe("masking", () => {
     ]);
   });
 
+  it("also masks the JSON-escaped spelling the deploy action prints at debug level", () => {
+    const masked = [];
+    maskValue('pa"ss\\word\t1', (line) => masked.push(line));
+    expect(masked).toEqual(['::add-mask::pa"ss\\word\t1', '::add-mask::pa\\"ss\\\\word\\t1']);
+    const plain = [];
+    maskValue("plain", (line) => plain.push(line));
+    expect(plain).toEqual(["::add-mask::plain"]);
+  });
+
   it("masks EVERY non-empty value, including the short, numeric and skipped ones", () => {
     const { lines, mask } = collect();
     toContainerEnv(

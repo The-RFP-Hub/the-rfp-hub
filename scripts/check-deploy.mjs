@@ -94,16 +94,27 @@ export function scanDockerignore(text, file = ".dockerignore") {
       .map((l) => l.trim())
       .filter((l) => l && !l.startsWith("#")),
   );
+  const out = [];
   const missing = REQUIRED_DOCKERIGNORE.filter((p) => !patterns.has(p));
-  return missing.length === 0
-    ? []
-    : [
-        finding(
-          file,
-          0,
-          `missing the env exclusion(s) ${missing.map((p) => `\`${p}\``).join(", ")} — without them an env file can enter the build context`,
-        ),
-      ];
+  if (missing.length > 0) {
+    out.push(
+      finding(
+        file,
+        0,
+        `missing the env exclusion(s) ${missing.map((p) => `\`${p}\``).join(", ")} — without them an env file can enter the build context`,
+      ),
+    );
+  }
+  // Docker applies patterns in order and a later `!` re-includes: `!packages/api/.env` after the
+  // four exclusions puts that file straight back into the context. Any negation that can name an
+  // env file defeats the exclusions, so it is a finding regardless of where it sits.
+  text.split("\n").forEach((raw, i) => {
+    const line = raw.trim();
+    if (line.startsWith("!") && /(^|\/)\.env(\.|$|\*)/.test(line.slice(1))) {
+      out.push(finding(file, i + 1, `re-includes an env file after the exclusions: ${line}`));
+    }
+  });
+  return out;
 }
 
 /** No workflow may write a secret into a `.env` path in the build context. */
