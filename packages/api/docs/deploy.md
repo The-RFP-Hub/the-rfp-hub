@@ -149,9 +149,10 @@ All senders go through the central outbound-email port. Better-Auth composes OTP
 adapter; the duplicate domain composes notification content; neither selects a provider or controls
 the envelope sender. Newly committed duplicate notifications enter a bounded, best-effort
 in-process queue, which joins `auth_user` for the address and attempts delivery immediately without
-making the request wait. `notification-dispatch` is the daily backstop in `jobs-nightly.yml`; it
-retries temporary failures three times with a five-minute floor. Provider refusals are recorded on
-the durable row rather than thrown through either the request or nightly workflow.
+making the request wait. `notification-dispatch` is the daily backstop in the nightly maintenance
+chain ([`jobs.md`](./jobs.md) §2); it retries temporary failures three times with a five-minute
+floor. Provider refusals are recorded on the durable row rather than thrown through either the
+request or the job.
 
 ---
 
@@ -302,8 +303,9 @@ nobody discovers it during an incident.
 ## 6. Running the maintenance jobs
 
 The nightly maintenance work runs as **one-off tasks on the API service's own task definition** —
-not a dedicated one — started by `.github/workflows/jobs-nightly.yml` with the credentials the
-deploy workflows already hold:
+not a dedicated one. The nightly chain is scheduled **outside this repository**
+([`jobs.md`](./jobs.md) §2 and §4d); `.github/workflows/jobs-nightly.yml` is the operator's
+dispatch path to the same tasks, with the credentials the deploy workflows already hold:
 
 ```sh
 node packages/api/dist/jobs.js <job> --json      # inside the image, as a container override
@@ -328,17 +330,17 @@ credential.
 ### Operator prerequisites
 
 Two repository variables are configured **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
-from its `environment` input — which is empty on the schedule and therefore `production`, matching
-the deployment the open-data export reads. The credentials are picked the same way
-(`<ENV>_AWS_ACCESS_KEY_ID` / `<ENV>_AWS_SECRET_ACCESS_KEY`), so a scheduled maintenance chain
-authenticates exactly as `production.yml` does.
+from its `environment` input — which defaults to `production`, the deployment the open-data export
+reads. The credentials are picked the same way (`<ENV>_AWS_ACCESS_KEY_ID` /
+`<ENV>_AWS_SECRET_ACCESS_KEY`), so a maintenance run authenticates exactly as `production.yml`
+does.
 
 | Repository variable | What it names |
 |---|---|
 | `<ENV>_ECS_CLUSTER` | The cluster the one-off task runs in — the **same** variable `<env>.yml` already requires to deploy the service, so any deployed environment has already set it |
 | `<ENV>_APP_BASE_URL` | Canonical HTTPS frontend origin. The API deploy writes it into the service task definition; notification-dispatch reuses that definition |
 
-The scheduler reads only the cluster variable directly; `APP_BASE_URL` reaches it through the
+The workflow reads only the cluster variable directly; `APP_BASE_URL` reaches it through the
 service task definition. The task definition family
 (`rfp-hub-<env>`), the container name and the service (`rfp-hub-<env>-service`) are the names the
 deploy workflows already hardcode; `run-ecs-job.sh` derives them from `<env>` rather than reading a
@@ -350,12 +352,11 @@ Registering a task definition and updating a service — which the deploy workfl
 does not imply the right to start a task from it. This is likely already granted, since the same
 user is the one registering the task definition being started.
 
-Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, the
-scheduled run announces a `::warning::` and stays green — failing over a resource that has never
-existed would turn a not-yet-deployed environment into a nightly red build nobody can act on. A
-**manual `workflow_dispatch` fails instead**, so an operator validating the wiring gets a real
-answer, and the message names what is missing. Prove it with one dispatch per environment before
-relying on the schedule.
+Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, a
+**dispatch fails** and the message names what is missing — an operator validating the wiring gets a
+real answer rather than a green run that did nothing. (`run-ecs-job.sh` keeps a warn-and-stay-green
+branch for a caller that is a schedule; this workflow never takes it.) Prove it with one dispatch
+per environment before pointing the external scheduler at the same tasks.
 
 ### A dedicated task definition is optional
 

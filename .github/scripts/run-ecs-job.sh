@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Start one scheduled maintenance job as a one-off container task, wait for it, and exit with its
-# exit code. Called by the nightly maintenance workflow with $JOB set.
+# Start one maintenance job as a one-off container task, wait for it, and exit with its exit code.
+# Called by the nightly maintenance workflow — which an operator DISPATCHES; the nightly chain
+# itself is scheduled outside this repository — with $JOB set.
 #
 # It lives in a file rather than inline in the workflow for two reasons: the same lines would
 # otherwise be duplicated for every job in the matrix AND for the staleness job beside them, and a
@@ -50,11 +51,14 @@
 # Two things can be absent: the cluster variable, and the service itself (a deployment that has not
 # happened yet). Both are answered differently depending on who is asking:
 #
-#   * on the SCHEDULE, it is announced as a warning and the job succeeds. An environment that has
-#     never been deployed is not a reason to turn the nightly run red every night for nobody to act
-#     on. The warning is loud, appears in the run summary, and says what is missing.
-#   * on a `workflow_dispatch`, it FAILS. An operator dispatching this run is asking "is the wiring
-#     correct", and a green run that did nothing answers the wrong question.
+#   * with `DISPATCHED=true`, it FAILS. An operator dispatching this run is asking "is the wiring
+#     correct", and a green run that did nothing answers the wrong question. THIS IS THE ONLY CASE
+#     THAT OCCURS: the workflow sets `DISPATCHED=true` unconditionally, because dispatch is all it
+#     does now that the nightly chain is scheduled outside this repository.
+#   * otherwise it is announced as a warning and the job succeeds. That branch is UNUSED by this
+#     repository and kept for a caller that is a schedule: an environment that has never been
+#     deployed is not a reason to turn a nightly run red every night for nobody to act on. The
+#     warning is loud, appears in the run summary, and says what is missing.
 #
 # `DISPATCHED` carries which one it is. Either way the run first prints everything it read — the
 # `failures` array, the service's status and its placement — because a log read a night later is
@@ -62,7 +66,7 @@
 # cluster" have the same symptom and completely different fixes.
 #
 # Neither answer is available once the service is known to EXIST. From that point a call that fails
-# is a failed call, not an absent resource, and it is an error on the schedule too.
+# is a failed call, not an absent resource, and it is an error for every caller.
 
 set -euo pipefail
 
@@ -76,7 +80,8 @@ container="${ECS_CONTAINER:-${task_definition}}"
 service="${ECS_SERVICE:-${task_definition}-service}"
 cluster="${ECS_CLUSTER:-}"
 
-# Warn and succeed on a schedule; fail on a dispatch. Never returns.
+# Fail on a dispatch — which is every call from this repository's workflow; warn and succeed
+# otherwise, for a scheduled caller. Never returns.
 not_provisioned() {
   if [ "${DISPATCHED:-false}" = "true" ]; then
     echo "::error::$1"
@@ -96,8 +101,8 @@ fi
 # succeeds with an empty `services` array and the reason in `failures`. Only THAT answer may
 # soft-skip. A failed CALL — expired credentials, a revoked policy, an ECS outage — is a different
 # fact entirely: nothing was learned about the service, and treating ignorance as absence would let
-# the schedule report success while the maintenance quietly never runs again. So a call failure
-# fails the job, on the schedule too.
+# a caller report success while the maintenance quietly never runs again. So a call failure fails
+# the job for every caller.
 if ! service_json=$(
   aws ecs describe-services --cluster "$cluster" --services "$service" --output json
 ); then

@@ -249,9 +249,9 @@ database trigger, and the trail for any entry is publicly readable.
 
 The nightly maintenance jobs that close past-due and long-abandoned listings, roll up analytics and
 backfill source checks are documented, schedule and runbook, in
-[`packages/api/docs/jobs.md`](./packages/api/docs/jobs.md). The open-data export runs on their
-success rather than on a clock, so a published snapshot never advertises a programme the API has
-already closed.
+[`packages/api/docs/jobs.md`](./packages/api/docs/jobs.md). The chain is scheduled outside this
+repository and runs before the open-data export, which publishes on its own cron; the workflow in
+this repository is the operator's manual path to the same jobs.
 
 ## Licensing
 

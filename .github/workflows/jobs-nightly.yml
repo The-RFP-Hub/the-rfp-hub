@@ -1,43 +1,45 @@
 name: Nightly maintenance jobs
 
-# Runs the API's scheduled maintenance work as ONE-OFF CONTAINER TASKS on the deployed image, and
-# is the workflow the open-data export chains itself to.
+# Runs the API's maintenance work as ONE-OFF CONTAINER TASKS on the deployed image. It is the
+# OPERATOR'S PATH ONLY: this workflow has no cron and starts nothing by itself.
+#
+# THE NIGHTLY CHAIN IS SCHEDULED OUTSIDE THIS REPOSITORY. An external scheduler runs the whole
+# chain — analytics-rollup, retention, embedding-backfill, verification-backfill,
+# notification-dispatch, then staleness — SERIALLY at 01:05 UTC, against the same entry point this
+# workflow starts (`node packages/api/dist/jobs.js <job> --json`). One scheduler owns the ordering,
+# which is the point: per-job advisory locks exclude a job from ITSELF, never one job from another,
+# so two schedulers whose windows overlap interleave and silently lose work while every run reports
+# success. The contract that external caller relies on is packages/api/docs/jobs.md section 4d.
+#
+# WHAT IS LEFT HERE IS A DISPATCH. An operator runs the chain (`job` = `all`, in the same order) or
+# one job by name — a recovery after a failed external run, or a check that the wiring works. Every
+# step is guarded by that choice, so a dispatch starts exactly what was asked for and nothing else.
 #
 # WHY A CONTAINER TASK AND NOT AN ENDPOINT. Starting a job needs a credential. A public endpoint
 # would need one that lives somewhere a workflow can read — a shared token, in repository secrets,
 # accepted by the internet-facing API forever. The deploy workflows already hold AWS credentials
 # that can start ECS tasks, and the image already exposes the entry point
-# (`node packages/api/dist/jobs.js <job>`, built by tsup alongside migrate/seed/export). So the
-# schedule uses the credential that already exists, the API grows no machine-authenticated surface,
+# (`node packages/api/dist/jobs.js <job>`, built by tsup alongside migrate/seed/export). So a
+# dispatch uses the credential that already exists, the API grows no machine-authenticated surface,
 # and `POST /v1/admin/jobs/{job}/run` stays what it is: a signed-in administrator's convenience.
-#
-# STALENESS IS NOT PART OF THE SCHEDULED CHAIN. It runs daily at 22:00 UTC from an external
-# scheduler, outside this repository, and this workflow's `staleness` job therefore runs ONLY when
-# an operator dispatches it (`job` = `staleness` or `all`). On the schedule its steps are skipped.
-# The five jobs below have no ordering between them and no ordering with staleness beyond "not at
-# the same time", which the clock supplies: 22:00 is finished long before 01:05. See
-# packages/api/docs/jobs.md sections 2 and 4d for the rule and the reason it is a rule — the two
-# never overlap because per-job advisory locks exclude a job from ITSELF, never one job from
-# another, so an overlap silently loses work while every run reports success.
 #
 # THE OPEN-DATA EXPORT IS NOT CHAINED TO THIS WORKFLOW. `nightly-export.yml` runs on its OWN cron
 # (`17 3 * * *`); nothing here triggers it and a failure here does not hold it back. Ordering
-# between the two is by clock alone, which is a weaker guarantee than a dependency and is stated
-# here so nobody plans around one that does not exist.
+# between the export and the maintenance chain is by clock alone — which is why the external chain
+# has to finish before 03:17, and is stated here so nobody plans around a dependency that does not
+# exist.
 #
 # The runner exits 0 for every outcome that is not an error, including a job that declined because
 # another run held its advisory lock and a job whose feature is not configured, so only a real
 # failure reaches here.
 #
-# WHICH DEPLOYMENT IS MAINTAINED IS EXPLICIT, AND THE SCHEDULE MEANS PRODUCTION. The open-data
-# export reads the PRODUCTION API, so a scheduled chain that authenticated with staging credentials
-# would either fail outright or quietly maintain the wrong database, leaving the export to publish a
-# snapshot whose maintenance never touched it. So the environment is a first-class input:
-# blank (the schedule) means `production`, and an operator maintaining staging has to say so. The
-# credential and the cluster are then selected by that name — `PRODUCTION_AWS_*` with
-# `PRODUCTION_ECS_CLUSTER`, exactly the pairing production.yml uses — through an INDEX lookup rather
-# than an `&&`/`||` fallback, because a fallback would silently reach for the production cluster
-# whenever the staging variable was unset.
+# WHICH DEPLOYMENT IS MAINTAINED IS EXPLICIT. The open-data export reads the PRODUCTION API, so a
+# run that authenticated with staging credentials would either fail outright or quietly maintain the
+# wrong database. So the environment is a first-class input, `production` by default, and an
+# operator maintaining staging has to say so. The credential and the cluster are then selected by
+# that name — `PRODUCTION_AWS_*` with `PRODUCTION_ECS_CLUSTER`, exactly the pairing production.yml
+# uses — through an INDEX lookup rather than an `&&`/`||` fallback, because a fallback would
+# silently reach for the production cluster whenever the staging variable was unset.
 #
 # THIS WORKFLOW PROVISIONS NOTHING. A job is the deployed image with a different command, so it runs
 # on the API SERVICE'S OWN task definition (`rfp-hub-<env>`) and inherits its image, its secrets and
@@ -48,13 +50,10 @@ name: Nightly maintenance jobs
 # secret list, which is a copy that would eventually be stale in exactly the way that matters.
 
 on:
-  schedule:
-    # One cron for the whole chain. See packages/api/docs/jobs.md for the ordering it implies.
-    - cron: "5 1 * * *"
   workflow_dispatch:
     inputs:
       environment:
-        description: "Which deployment to maintain. The schedule always means production."
+        description: "Which deployment to maintain."
         required: true
         type: choice
         default: production
@@ -86,36 +85,35 @@ permissions:
 
 # One maintenance chain at a time. Two overlapping runs would be caught by the database advisory
 # lock each job takes — they would report `skipped: "locked"` and exit 0 — but a queue of skipped
-# runs is not a useful thing to have, and the second one would trigger a second export.
+# runs is not a useful thing to have, and a dispatch that races the external chain is a run that
+# did nothing rather than a recovery.
 concurrency:
   group: jobs-nightly
   cancel-in-progress: false
 
 env:
   # The environment this run maintains, and the prefix the credential and the cluster are selected
-  # by. `inputs.environment` is empty on a schedule, so a scheduled chain is PRODUCTION — the
-  # deployment the open-data export reads. The two literals here are non-empty, so the `&&`/`||`
-  # idiom is safe in this one place; the lookups it drives are index lookups precisely so an unset
-  # variable stays unset instead of falling back to the other environment's.
+  # by. The lookups it drives are index lookups precisely so an unset variable stays unset instead
+  # of falling back to the other environment's.
   TARGET_ENV: ${{ inputs.environment || 'production' }}
   ENV_PREFIX: ${{ inputs.environment == 'staging' && 'STAGING' || 'PRODUCTION' }}
   AWS_REGION: us-east-1
-  # Blank on a schedule (no `inputs` at all); `all` or a job name when an operator dispatched one
-  # deliberately. The five maintenance jobs below treat blank and `all` the same — "run the whole
-  # chain". `staleness` does NOT: it is scheduled externally, so blank must not start it and only an
-  # explicit `all` or `staleness` dispatch does.
-  SELECTED: ${{ github.event.inputs.job }}
+  # `all` or a single job name — the only two things a dispatch can mean now that nothing is
+  # scheduled here. `|| 'all'` so a caller that omits the input entirely still runs the chain
+  # rather than skipping every guarded step and reporting green.
+  SELECTED: ${{ inputs.job || 'all' }}
 
 jobs:
-  # The five jobs that depend on nothing and on each other: the two analytics sweeps, two
-  # backfills, and the notification-delivery backstop. Run in parallel, each with its own advisory
-  # lock, and `fail-fast: false` so one failing does not cancel the others mid-write.
+  # The five jobs before staleness, in the chain's order. `max-parallel: 1` runs them one at a time,
+  # so a `job=all` dispatch reproduces the order the external scheduler uses rather than a faster
+  # order nobody documented; `fail-fast: false` so one failing does not cancel the rest mid-write.
   maintenance:
     name: ${{ matrix.job }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         job:
           - analytics-rollup
@@ -127,13 +125,13 @@ jobs:
       # `persist-credentials: false`: nothing here pushes, and a credential left in `.git/config`
       # is inherited by every later step for no reason. Same rule as nightly-export.yml.
       - name: Checkout
-        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == matrix.job
+        if: env.SELECTED == 'all' || env.SELECTED == matrix.job
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Configure AWS credentials
-        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == matrix.job
+        if: env.SELECTED == 'all' || env.SELECTED == matrix.job
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets[format('{0}_AWS_ACCESS_KEY_ID', env.ENV_PREFIX)] }}
@@ -141,7 +139,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run ${{ matrix.job }}
-        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == matrix.job
+        if: env.SELECTED == 'all' || env.SELECTED == matrix.job
         env:
           # The cluster is the hosting account's own resource name rather than a fact about this
           # project, so it is a repository VARIABLE, not a literal in a public, source-neutral tree
@@ -153,19 +151,16 @@ jobs:
           ECS_CLUSTER: ${{ vars[format('{0}_ECS_CLUSTER', env.ENV_PREFIX)] }}
           TARGET_ENV: ${{ env.TARGET_ENV }}
           JOB: ${{ matrix.job }}
-          DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}
+          # Always true: this workflow only ever dispatches. An operator asking "is the wiring
+          # correct" gets a failure when the cluster variable or the service is missing, never the
+          # green warning the runner keeps for a scheduled caller.
+          DISPATCHED: "true"
         run: .github/scripts/run-ecs-job.sh
 
-  # Staleness is DISPATCH-ONLY. It closes past-due and long-inactive entries, and it moved to an
-  # external scheduler that runs it daily at 22:00 UTC; leaving it on this cron too would put two
-  # schedulers on the same job. The advisory lock would keep the second from double-writing, but it
-  # would NOT keep it from running while the five jobs above are in flight — and `staleness` racing
-  # `verification-backfill` loses entries that a successful check was about to keep open, with both
-  # runs green (packages/api/docs/jobs.md section 4d).
-  #
-  # It stays here, and keeps `needs: [maintenance]`, because an operator still needs to run it by
-  # hand — a recovery after a failed external run, or a `job=all` dispatch that deliberately means
-  # the whole chain. `needs` is what keeps that dispatch in the right order.
+  # Staleness runs LAST, which is what `needs: [maintenance]` is for: a successful source check
+  # writes `lastSeenAt` and resets the staleness clock, so staleness reading that state before
+  # verification finished closes entries a check was about to prove active — with both runs green
+  # (packages/api/docs/jobs.md section 4d). The external chain preserves the same order.
   staleness:
     name: staleness
     needs: [maintenance]
@@ -192,5 +187,5 @@ jobs:
           ECS_CLUSTER: ${{ vars[format('{0}_ECS_CLUSTER', env.ENV_PREFIX)] }}
           TARGET_ENV: ${{ env.TARGET_ENV }}
           JOB: staleness
-          DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}
+          DISPATCHED: "true"
         run: .github/scripts/run-ecs-job.sh
