@@ -13,6 +13,8 @@ const SLUG = "m3invite-org";
 const EMAILS = {
   reviewer: "m3invite-reviewer@rfphub.invalid",
   accepted: "m3invite-accepted@rfphub.invalid",
+  changedRole: "m3invite-changed-role@rfphub.invalid",
+  equalRole: "m3invite-equal-role@rfphub.invalid",
   failed: "m3invite-failed@rfphub.invalid",
   revoked: "m3invite-revoked@rfphub.invalid",
 };
@@ -135,7 +137,93 @@ describeWithDb("organisation membership invites", () => {
     expect(noLongerPending.json().items).toEqual([]);
   });
 
-  it("keeps the session live and the invite pending when redemption throws", async () => {
+  it.each([
+    {
+      branch: "replaces a different existing membership role",
+      email: EMAILS.changedRole,
+      handle: "m3invite-changed-role",
+      before: "publisher" as const,
+      invited: "owner" as const,
+    },
+    {
+      branch: "keeps an equal existing membership role as a no-op",
+      email: EMAILS.equalRole,
+      handle: "m3invite-equal-role",
+      before: "admin" as const,
+      invited: "admin" as const,
+    },
+  ])("$branch and audits the settled role", async ({ email, handle, before, invited }) => {
+    const identity = await seedIdentity(email, { handle });
+    userIds.push(identity.userId);
+    await db.insert(orgMemberships).values({
+      accountId: identity.account.id,
+      organizationId,
+      role: before,
+    });
+    const created = await app.inject({
+      method: "POST",
+      url: `/v1/review/organizations/${SLUG}/invites`,
+      headers: bearer(reviewerToken),
+      payload: { email, role: invited },
+    });
+    expect(created.statusCode, created.body).toBe(200);
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/v1/me",
+      headers: bearer(identity.token),
+    });
+    expect(me.statusCode, me.body).toBe(200);
+    expect(me.json().memberships).toContainEqual(
+      expect.objectContaining({ slug: SLUG, role: invited }),
+    );
+
+    const storedMembership = await db
+      .select({ role: orgMemberships.role })
+      .from(orgMemberships)
+      .where(
+        and(
+          eq(orgMemberships.organizationId, organizationId),
+          eq(orgMemberships.accountId, identity.account.id),
+        ),
+      );
+    expect(storedMembership).toEqual([{ role: invited }]);
+
+    const acceptedInvite = (
+      await db
+        .select()
+        .from(orgMembershipInvites)
+        .where(eq(orgMembershipInvites.id, created.json().id))
+        .limit(1)
+    )[0];
+    expect(acceptedInvite).toMatchObject({
+      acceptedAt: expect.any(Date),
+      acceptedAccountId: identity.account.id,
+    });
+
+    const acceptanceAudit = await db
+      .select({ patch: auditLog.patch })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "organization"),
+          eq(auditLog.subjectId, organizationId),
+          eq(auditLog.actorAccountId, identity.account.id),
+          eq(auditLog.action, "accept_member_invite"),
+        ),
+      );
+    expect(acceptanceAudit).toEqual([
+      {
+        patch: expect.objectContaining({
+          inviteId: created.json().id,
+          accountId: identity.account.id,
+          role: { before, after: invited },
+        }),
+      },
+    ]);
+  });
+
+  it("keeps the session live and invite pending without logging its email when redemption throws", async () => {
     const created = await app.inject({
       method: "POST",
       url: `/v1/review/organizations/${SLUG}/invites`,
@@ -149,7 +237,9 @@ describeWithDb("organisation membership invites", () => {
     const accountsService = app.auth.principals.accounts as unknown as {
       redeemMembershipInvites(...args: unknown[]): Promise<void>;
     };
-    const failure = new Error("simulated invite redemption failure");
+    const failure = new Error(`simulated invite redemption failure for ${EMAILS.failed}`, {
+      cause: { code: "40001", detail: `query parameter: ${EMAILS.failed}` },
+    });
     const redemption = vi
       .spyOn(accountsService, "redeemMembershipInvites")
       .mockRejectedValueOnce(failure);
@@ -169,14 +259,15 @@ describeWithDb("organisation membership invites", () => {
       )[0];
       expect(account).toBeTruthy();
       expect(logged).toHaveBeenCalledWith(
-        expect.objectContaining({
-          err: failure,
+        {
+          errorCategory: "database",
+          errorCode: "40001",
           operation: "redeem_membership_invites",
           accountId: account?.id,
-          authUserId: identity.userId,
-        }),
+        },
         "membership invite redemption failed; principal resolution will continue",
       );
+      expect(JSON.stringify(logged.mock.calls)).not.toContain(EMAILS.failed);
 
       const invite = (
         await db

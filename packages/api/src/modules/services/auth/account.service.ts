@@ -117,10 +117,9 @@ export class AccountService {
       } catch (error) {
         this.logger.error(
           {
-            err: error,
+            ...sanitizedInviteRedemptionError(error),
             operation: "redeem_membership_invites",
             accountId: account.id,
-            authUserId: subject,
           },
           "membership invite redemption failed; principal resolution will continue",
         );
@@ -145,14 +144,47 @@ export class AccountService {
       .for("update");
 
     for (const invite of invites) {
-      await tx
-        .insert(orgMemberships)
-        .values({
-          accountId: account.id,
-          organizationId: invite.organizationId,
-          role: invite.role,
-        })
-        .onConflictDoNothing({ target: [orgMemberships.accountId, orgMemberships.organizationId] });
+      const existing = await tx
+        .select({ id: orgMemberships.id, role: orgMemberships.role })
+        .from(orgMemberships)
+        .where(
+          and(
+            eq(orgMemberships.accountId, account.id),
+            eq(orgMemberships.organizationId, invite.organizationId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      const previousRole = existing[0]?.role ?? null;
+      let actualRole = previousRole;
+
+      if (existing[0] && existing[0].role !== invite.role) {
+        const settled = await tx
+          .update(orgMemberships)
+          .set({ role: invite.role })
+          .where(eq(orgMemberships.id, existing[0].id))
+          .returning({ role: orgMemberships.role });
+        actualRole = settled[0]?.role ?? null;
+      } else if (!existing[0]) {
+        // A direct grant can race this first redemption after the membership read. The upsert
+        // makes the invite's role authoritative in either ordering instead of reviving the old
+        // conflict-ignore behavior.
+        const settled = await tx
+          .insert(orgMemberships)
+          .values({
+            accountId: account.id,
+            organizationId: invite.organizationId,
+            role: invite.role,
+          })
+          .onConflictDoUpdate({
+            target: [orgMemberships.accountId, orgMemberships.organizationId],
+            set: { role: invite.role },
+          })
+          .returning({ role: orgMemberships.role });
+        actualRole = settled[0]?.role ?? null;
+      }
+      if (actualRole === null) throw new Error("membership vanished while accepting invite");
+
       const now = new Date();
       await tx
         .update(orgMembershipInvites)
@@ -171,7 +203,7 @@ export class AccountService {
           email,
           invitedBy: invite.invitedBy,
           accountId: account.id,
-          role: invite.role,
+          role: { before: previousRole, after: actualRole },
         },
       });
     }
@@ -423,6 +455,17 @@ function driverError(error: unknown): { code?: string; constraint?: string } | u
     current = named.cause;
   }
   return undefined;
+}
+
+/** The only error details safe to place beside principal-resolution context in production logs. */
+function sanitizedInviteRedemptionError(error: unknown): {
+  errorCategory: "database" | "unexpected";
+  errorCode: string;
+} {
+  const code = driverError(error)?.code;
+  return code === undefined
+    ? { errorCategory: "unexpected", errorCode: "unknown" }
+    : { errorCategory: "database", errorCode: code };
 }
 
 /** Postgres unique-violation SQLSTATE. */
