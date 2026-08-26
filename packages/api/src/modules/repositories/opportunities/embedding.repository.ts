@@ -52,7 +52,7 @@ export interface PendingEmbeddingRow {
   tokenCount: number | null;
 }
 
-/** One suspected pair carrying a stale rule version, with both sides' decision inputs. */
+/** One suspected pair carrying a stale rule key, with both sides' decision inputs. */
 export interface StaleRulesPair {
   id: number;
   similarity: number;
@@ -275,11 +275,11 @@ export class EmbeddingRepository {
    * re-embeds that side and re-records the pair with the current rule version. Every stale pair is
    * therefore reachable by exactly one arm, and both arms retire what they select.
    *
-   * `IS DISTINCT FROM` rather than `<>` so the NULL rule version every pre-versioning pair carries
-   * is selected too — those are precisely the rows a threshold change used to strand.
+   * `IS DISTINCT FROM` rather than `<>` so the NULL rule key every pre-versioning pair carries is
+   * selected too — those are precisely the rows a threshold change used to strand.
    */
   async staleRulesPairs(
-    rulesVersion: number,
+    rulesKey: string,
     identity: EmbeddingIdentity,
     limit: number,
   ): Promise<StaleRulesPair[]> {
@@ -314,7 +314,7 @@ export class EmbeddingRepository {
       .where(
         and(
           eq(opportunityDuplicates.status, "suspected"),
-          sql`${opportunityDuplicates.rulesVersion} is distinct from ${rulesVersion}`,
+          sql`${opportunityDuplicates.rulesKey} is distinct from ${rulesKey}`,
         ),
       )
       .orderBy(asc(opportunityDuplicates.id))

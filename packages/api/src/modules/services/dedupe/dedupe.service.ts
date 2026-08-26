@@ -31,11 +31,14 @@
  * 7. **Detection and pruning apply the SAME combined rule, and a pair records the rule version that
  *    produced it.** One predicate lives in `duplicate-signal.ts` and both paths call it, because an
  *    arm added to detection but not to pruning deletes its own output on the next nightly run. The
- *    `rules_version` stamp is what makes a threshold move — or `DEDUPE_OVERLAP_ENABLED=false` — an
+ *    `rules_key` stamp is what makes a threshold move — or `DEDUPE_OVERLAP_ENABLED=false` — an
  *    actual rollback: `runBatch`'s resweep arm selects every suspected pair the current rule did
- *    not write and re-judges it. Without the stamp, turning an arm off strands every row it wrote,
- *    because pruning only ever runs for entries the backfill selects and a drained backfill selects
- *    nothing. That was already true of `DEDUPE_SIMILARITY_THRESHOLD` before this arm existed.
+ *    not write and re-judges it. The key is DERIVED from the effective configuration, not a
+ *    hand-bumped version, because the moment it has to change is the moment an operator moves a
+ *    knob — and a rollback that waits for somebody to remember a constant is not one. Without the
+ *    stamp, turning an arm off strands every row it wrote, because pruning only ever runs for
+ *    entries the backfill selects and a drained backfill selects nothing. That was already true of
+ *    `DEDUPE_SIMILARITY_THRESHOLD` before this arm existed.
  */
 
 import { validateOpportunity } from "rfphub-validate";
@@ -43,6 +46,7 @@ import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import type { OpportunityDuplicateRow, OpportunityRow } from "../../../db/schema.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
+import type { ResweptPair } from "../../repositories/opportunities/duplicate-pair.repository.js";
 import {
   type Repositories,
   repositories,
@@ -71,8 +75,8 @@ import { duplicateReopenTransition } from "./duplicate-reopen.js";
 import {
   type DuplicateRuleConfig,
   type DuplicateSignalRecord,
-  RULES_VERSION,
   decidePair,
+  rulesKey,
   shouldPrune,
 } from "./duplicate-signal.js";
 import { type EmbeddingProvider, createEmbeddingProvider } from "./embedding-provider.js";
@@ -185,6 +189,20 @@ export class DedupeService {
     };
   }
 
+  /**
+   * The identity of the rule THIS service instance is running, as one opaque key.
+   *
+   * Derived from the same object the predicate is evaluated against, so the key and the behaviour
+   * cannot disagree: a deployment that changes a threshold gets a different key on its next write,
+   * and the resweep arm retires whatever the old one left behind without anybody bumping anything.
+   */
+  private rulesKeyFor(provider: EmbeddingProvider): string {
+    return rulesKey(this.ruleConfig(provider), {
+      providerId: provider.id,
+      model: provider.model,
+    });
+  }
+
   // ── the write path's after-commit call ─────────────────────────────────────────
   /**
    * Embed one entry, record its suspected pairs, and report what the submitter may see.
@@ -287,7 +305,7 @@ export class DedupeService {
     }
     const kept = accepted.slice(0, this.config.dedupe.maxMatches);
 
-    await this.recordPairs(row.id, kept);
+    await this.recordPairs(row.id, kept, this.rulesKeyFor(provider));
     await this.pruneStalePairs(row.id, subject, rule);
 
     // Structural labels come from the counterpart's LIVE row, which is why they are loaded here
@@ -417,6 +435,7 @@ export class DedupeService {
   private async recordPairs(
     opportunityId: number,
     matches: { match: { id: number; similarity: number }; signal: DuplicateSignalRecord }[],
+    ruleKey: string,
   ): Promise<void> {
     if (matches.length === 0) return;
     const notificationIds = await withTransaction(this.db, async (repos) => {
@@ -429,7 +448,7 @@ export class DedupeService {
         const similarity = round(match.similarity).toString();
         const evidence = {
           signal: signal as unknown as Record<string, unknown>,
-          rulesVersion: RULES_VERSION,
+          rulesKey: ruleKey,
         };
         const inserted = await repos.duplicatePairs.insertSuspected(
           low,
@@ -577,27 +596,46 @@ export class DedupeService {
     const provider = this.provider;
     if (!provider) return 0;
     const rule = this.ruleConfig(provider);
+    const ruleKey = this.rulesKeyFor(provider);
     const pairs = await this.repos.embeddings.staleRulesPairs(
-      RULES_VERSION,
+      ruleKey,
       { model: provider.model, providerId: provider.id },
       limit,
     );
     if (pairs.length === 0) return 0;
 
     const doomed: number[] = [];
-    const kept: number[] = [];
+    const kept: ResweptPair[] = [];
     for (const pair of pairs) {
       const inputs = {
         similarity: pair.similarity,
         left: { norm: pair.leftNorm, tokenCount: pair.leftTokenCount },
         right: { norm: pair.rightNorm, tokenCount: pair.rightTokenCount },
       };
-      if (shouldPrune(inputs, rule)) doomed.push(pair.id);
-      else kept.push(pair.id);
+      if (shouldPrune(inputs, rule)) {
+        doomed.push(pair.id);
+        continue;
+      }
+      const decision = decidePair(inputs, rule);
+      if (decision.accepted && decision.signal) {
+        // The re-judgement in full: the similarity recomputed from the two stored vectors, the
+        // signal the CURRENT rule produced, and the key naming that rule. Writing the key alone
+        // would leave a row claiming this rule accepted it on numbers this rule never saw.
+        kept.push({
+          id: pair.id,
+          similarity: round(pair.similarity).toString(),
+          signal: decision.signal as unknown as Record<string, unknown>,
+          rulesKey: ruleKey,
+        });
+      }
+      // Neither pruned nor re-judged: a counterpart whose scalars are unknown, which `shouldPrune`
+      // deliberately leaves alone. It is left un-stamped too, because stamping it would attribute a
+      // judgement nobody made. It cannot linger: an entry with unknown scalars is selected by the
+      // EMBEDDING arm, and the resweep only runs at all once that arm has drained.
     }
     await this.repos.duplicatePairs.deleteByIds(doomed);
-    await this.repos.duplicatePairs.restampRulesVersion(kept, RULES_VERSION);
-    return pairs.length;
+    await this.repos.duplicatePairs.recordResweep(kept);
+    return doomed.length + kept.length;
   }
 
   /** How much resweep work is left, for the same `remaining` contract the embedding arm has. */
@@ -605,7 +643,7 @@ export class DedupeService {
     const provider = this.provider;
     if (!provider) return 0;
     const pairs = await this.repos.embeddings.staleRulesPairs(
-      RULES_VERSION,
+      this.rulesKeyFor(provider),
       { model: provider.model, providerId: provider.id },
       limit,
     );

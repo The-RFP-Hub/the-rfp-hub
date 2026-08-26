@@ -135,9 +135,9 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `EMBEDDING_PROVIDER` | `lexical` \| `disabled` | Needs no key and no network — the in-process lexical featurizer is the default and the detector everywhere, CI included |
 | `DEDUPE_SIMILARITY_THRESHOLD` | per-provider default | Thresholds are **not** comparable between providers |
 | `DEDUPE_MAX_MATCHES` | `5` | |
-| `DEDUPE_OVERLAP_ENABLED` | `true` | The second arm — length-corrected term overlap, which catches a shortened re-listing that cosine cannot. `false` is a real rollback: pairs the arm wrote carry a `rules_version` and the nightly `embedding-backfill` retires them within a run or two |
+| `DEDUPE_OVERLAP_ENABLED` | `true` | The second arm — length-corrected term overlap, which catches a shortened re-listing that cosine cannot. `false` is a real rollback: pairs carry a `rules_key` derived from the effective configuration, so flipping this makes them stale and the nightly `embedding-backfill` retires them within a run or two — no constant to bump, no release to cut. The same is true of every row below |
 | `DEDUPE_OVERLAP_THRESHOLD` | per-provider default (`lexical` 0.85) | **Not bounded by 1** — cosine times a norm ratio, valid range (0, 4]. Not comparable between providers, for the same reason the similarity threshold is not |
-| `DEDUPE_OVERLAP_MIN_TOKENS` | `20` | Distinct tokens required on the shorter side. The only guard measured to blunt a stub built from a target's rarest terms (142 → 3 wins of 160). Lowering it buys recall on short entries with that exposure |
+| `DEDUPE_OVERLAP_MIN_TOKENS` | `20` | Distinct tokens required on the shorter side. The only guard measured to blunt a stub built from a target's rarest terms. Lowering it buys recall on short entries with a real exposure; `pnpm --filter @the-rfp-hub/api dedupe:threshold` prints the current trade rather than this row quoting a number that goes stale |
 | `DEDUPE_OVERLAP_MIN_SIMILARITY` | `0.35` | The overlap arm's cosine floor. **Not** a security control — the arm only sees cosine-ordered ANN candidates and this makes that explicit |
 | `NOTIFICATION_QUEUE_MAX` | `100` | Waiting immediate email ids; full → reject the newest id to the nightly durable sweep |
 | `VERIFICATION_ENABLED` | `true` | |

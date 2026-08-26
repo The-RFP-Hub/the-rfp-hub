@@ -883,8 +883,10 @@ export const config: AppConfig = {
     overlapEnabled: readBoolean(process.env.DEDUPE_OVERLAP_ENABLED, true),
     overlapThreshold: readOverlapThreshold(process.env.DEDUPE_OVERLAP_THRESHOLD, embeddingProvider),
     // 20 distinct tokens on the shorter side. The only guard measured to work against the stub
-    // attack (142 → 3 wins of 160), and it costs nothing on real negatives — the hardest stays
-    // 0.682 at every setting — while every mutation rung clears it with at least 16 tokens spare.
+    // attack, and it costs nothing on real negatives — the hardest stays 0.682 at every setting —
+    // while every mutation rung clears it with at least 16 tokens spare. The attack numbers are
+    // printed by `scripts/dedupe-threshold-report.ts` and pinned by `test/unit/
+    // dedupe-threshold.test.ts`, so they are measured on every run rather than quoted here.
     overlapMinTokens: readPositiveInt(process.env.DEDUPE_OVERLAP_MIN_TOKENS, 20),
     overlapMinSimilarity: readOverlapMinSimilarity(process.env.DEDUPE_OVERLAP_MIN_SIMILARITY, 0.35),
   },

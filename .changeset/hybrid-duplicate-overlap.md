@@ -39,7 +39,7 @@ harness measures at 160/160 at a median 5-token stub — a pre-existing property
 detector, filed as its own issue).
 
 New nullable columns: `opportunity_embeddings.norm` / `.token_count`, and
-`opportunity_duplicates.signal` / `.rules_version`. Four new environment variables:
+`opportunity_duplicates.signal` / `.rules_key`. Four new environment variables:
 `DEDUPE_OVERLAP_ENABLED` (default on), `DEDUPE_OVERLAP_THRESHOLD` (per provider; **not** bounded by
 1 — overlap is cosine times a norm ratio), `DEDUPE_OVERLAP_MIN_TOKENS` (20) and
 `DEDUPE_OVERLAP_MIN_SIMILARITY` (0.35).
@@ -50,7 +50,9 @@ the model string are untouched. The first `embedding-backfill` run after deploy 
 the whole table on the new norm predicate, to write those two scalars — run it to `remaining: 0` in
 the same maintenance step. Until it drains, the overlap arm does not fire for rows it has not
 reached: degraded detection, never wrong detection. Setting `DEDUPE_OVERLAP_ENABLED=false` is a
-real rollback rather than a switch that strands its own output — pairs carry the rule version that
-wrote them and the backfill's resweep arm retires the orphans within a run or two. That same
-mechanism fixes a latent bug of the same shape: changing `DEDUPE_SIMILARITY_THRESHOLD` used to
-strand every pair the old value wrote.
+real rollback rather than a switch that strands its own output — pairs carry a `rules_key` naming
+the rule that wrote them, and the backfill's resweep arm retires the orphans within a run or two.
+The key is DERIVED from the effective configuration (both thresholds, the token floor, the cosine
+floor, the switch, the provider/model), so changing any of those knobs is by itself enough: there is
+no constant to bump and no release to cut. That same mechanism fixes a latent bug of the same shape:
+changing `DEDUPE_SIMILARITY_THRESHOLD` used to strand every pair the old value wrote.

@@ -30,7 +30,14 @@ export interface DuplicatePairOtherRow {
  */
 export interface DuplicatePairEvidence {
   signal: Record<string, unknown> | null;
-  rulesVersion: number;
+  rulesKey: string;
+}
+
+/** One pair the resweep arm re-judged and kept, with everything the new judgement produced. */
+export interface ResweptPair extends DuplicatePairEvidence {
+  id: number;
+  /** The recomputed lexical cosine, in the same string form the column has always stored. */
+  similarity: string;
 }
 
 export interface DuplicatePairReviewUpdate {
@@ -57,7 +64,7 @@ export class DuplicatePairRepository {
         duplicateOfId,
         similarity,
         signal: evidence.signal,
-        rulesVersion: evidence.rulesVersion,
+        rulesKey: evidence.rulesKey,
         status: "suspected",
       })
       .onConflictDoNothing()
@@ -79,7 +86,7 @@ export class DuplicatePairRepository {
   ): Promise<void> {
     await this.exec
       .update(opportunityDuplicates)
-      .set({ similarity, signal: evidence.signal, rulesVersion: evidence.rulesVersion })
+      .set({ similarity, signal: evidence.signal, rulesKey: evidence.rulesKey })
       .where(
         and(
           eq(opportunityDuplicates.opportunityId, opportunityId),
@@ -90,18 +97,28 @@ export class DuplicatePairRepository {
   }
 
   /**
-   * Re-stamp pairs the resweep arm re-judged and kept.
+   * Record the resweep arm's re-judgement of the pairs it kept.
    *
-   * Retiring them from the cursor is the whole point: a resweep that deleted the pairs it rejected
-   * but left the accepted ones stamped with the old rule would select the same rows on the next
-   * run forever, which is precisely the non-retiring cursor `docs/jobs.md` forbids.
+   * ALL THREE FIELDS MOVE TOGETHER, and that is the same invariant the service header states about
+   * detection: a signal and the rule identity beside it are ONE fact. Stamping the new key while
+   * leaving the old `similarity` and `signal` would produce a row claiming the current rule
+   * accepted it on numbers the current rule never saw — and those numbers are what a reviewer reads
+   * to understand why a pair below the cosine threshold is in their queue at all.
+   *
+   * Retiring the rows from the cursor is the other half of the point: a resweep that deleted the
+   * pairs it rejected but left the accepted ones carrying the old key would select the same rows on
+   * every run for ever, which is precisely the non-retiring cursor `docs/jobs.md` forbids.
+   *
+   * One statement per row rather than a bulk `UPDATE`: each row carries its OWN recomputed
+   * similarity and signal, so there is nothing to batch. The caller bounds the count.
    */
-  async restampRulesVersion(ids: number[], rulesVersion: number): Promise<void> {
-    if (ids.length === 0) return;
-    await this.exec
-      .update(opportunityDuplicates)
-      .set({ rulesVersion })
-      .where(inArray(opportunityDuplicates.id, ids));
+  async recordResweep(pairs: ResweptPair[]): Promise<void> {
+    for (const pair of pairs) {
+      await this.exec
+        .update(opportunityDuplicates)
+        .set({ similarity: pair.similarity, signal: pair.signal, rulesKey: pair.rulesKey })
+        .where(eq(opportunityDuplicates.id, pair.id));
+    }
   }
 
   async deleteByIds(ids: number[]): Promise<void> {

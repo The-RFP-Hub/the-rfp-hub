@@ -1046,10 +1046,21 @@ held to containment on replace — a foreign-operated one is still rejected.
   **New columns.** `opportunity_embeddings.norm` and `.token_count` are nullable by design: a row
   written before them has a valid vector and an unknown magnitude, and unknown must degrade to "the
   overlap arm is not evaluated", never to "dissimilar". `opportunity_duplicates.signal` records the
-  numeric decision inputs (`arm`, `lexical`, `overlap`, `minTokens`) and `.rules_version` records
-  which rule wrote the row — the stamp that lets `embedding-backfill`'s resweep arm retire pairs a
+  numeric decision inputs (`arm`, `lexical`, `overlap`, `minTokens`) and `.rules_key` records which
+  rule wrote the row — the stamp that lets `embedding-backfill`'s resweep arm retire pairs a
   rollback or a threshold change orphaned. `similarity` remains the lexical cosine with unchanged
   semantics and rounding; an arm-B pair simply carries one below 0.75.
+
+  **`rules_key` is text and DERIVED, and that is the whole point of it.** It is a short digest of
+  the predicate's shape together with the effective configuration it ran under — both thresholds,
+  the token floor, the cosine floor, the enable switch, and the provider/model identity. A
+  hand-maintained version integer was the obvious first answer and it does not work: it cannot
+  change when an operator moves `DEDUPE_OVERLAP_THRESHOLD` or sets `DEDUPE_OVERLAP_ENABLED=false`,
+  which is precisely the moment the rows the old rule wrote need retiring, so the rollback would
+  depend on somebody bumping a constant in a release they are not making. Because the key is
+  derived, changing a knob is sufficient on its own. The three fields move together when the
+  resweep re-judges a pair — a row carrying a new key beside an old `signal` would claim the
+  current rule accepted it on numbers the current rule never saw.
 - **Public analytics beacon** — dropped from M3 on purpose: an unauthenticated event endpoint lets
   anyone fabricate a publisher's numbers, and rate limiting is not integrity. A beacon with
   short-lived signed event tokens is the M4 shape.

@@ -17,6 +17,7 @@ import {
   RULES_VERSION,
   decidePair,
   overlap,
+  rulesKey,
   shouldPrune,
 } from "../../src/modules/services/dedupe/duplicate-signal.js";
 
@@ -169,15 +170,65 @@ describe("shouldPrune", () => {
   });
 });
 
-describe("RULES_VERSION", () => {
+/**
+ * THE ROLLBACK'S ACTUAL MECHANISM.
+ *
+ * `rules_key` is written on every pair, and the backfill's resweep arm selects every suspected pair
+ * whose key IS DISTINCT FROM the current one. So the question this block answers is the only one
+ * that matters: does the key MOVE when an operator moves a knob? A hand-bumped version integer —
+ * the first, wrong answer — cannot, and a rollback that waits for somebody to remember a constant
+ * in a release they are not making is not a rollback at all.
+ */
+describe("rulesKey", () => {
+  const IDENTITY = { providerId: "lexical", model: "tfidf-hashed-v1+deadbeef" };
+  const key = (over: Partial<DuplicateRuleConfig> = {}) => rulesKey({ ...RULE, ...over }, IDENTITY);
+
+  it("is stable for the same rule", () => {
+    expect(key()).toBe(key());
+    // Property order in the caller's object must not matter: `JSON.stringify` follows insertion
+    // order, so a key built from a differently-assembled config would resweep its own pairs for
+    // ever. The canonical field order inside `rulesKey` is what prevents that.
+    const shuffled: DuplicateRuleConfig = {
+      suppliesNorm: RULE.suppliesNorm,
+      overlapMinSimilarity: RULE.overlapMinSimilarity,
+      overlapThreshold: RULE.overlapThreshold,
+      overlapMinTokens: RULE.overlapMinTokens,
+      overlapEnabled: RULE.overlapEnabled,
+      similarityThreshold: RULE.similarityThreshold,
+    };
+    expect(rulesKey(shuffled, IDENTITY)).toBe(key());
+  });
+
   /**
-   * A positive integer that fits `smallint`. It is the identity of the rule, written on every pair,
-   * and the backfill's resweep arm selects `rules_version IS DISTINCT FROM` it — so a NULL from
-   * before versioning existed is selected, re-judged and re-stamped exactly once.
+   * EVERY knob, one at a time. This is the assertion the constant-version design could not make:
+   * each of these is an operator action that leaves pairs the new rule would not write, and each
+   * must therefore change the identity stamped on a row.
    */
-  it("is a positive smallint", () => {
-    expect(Number.isInteger(RULES_VERSION)).toBe(true);
-    expect(RULES_VERSION).toBeGreaterThan(0);
-    expect(RULES_VERSION).toBeLessThan(32768);
+  it("moves when any effective setting moves", () => {
+    const base = key();
+    expect(key({ overlapEnabled: false }), "the rollback switch").not.toBe(base);
+    expect(key({ similarityThreshold: 0.8 }), "the cosine threshold").not.toBe(base);
+    expect(key({ overlapThreshold: 0.9 }), "the overlap threshold").not.toBe(base);
+    expect(key({ overlapMinTokens: 25 }), "the substance guard").not.toBe(base);
+    expect(key({ overlapMinSimilarity: 0.4 }), "the cosine floor").not.toBe(base);
+    expect(key({ suppliesNorm: false }), "the provider capability").not.toBe(base);
+    expect(rulesKey(RULE, { ...IDENTITY, model: "other-model" }), "the model").not.toBe(base);
+    expect(rulesKey(RULE, { ...IDENTITY, providerId: "other" }), "the provider").not.toBe(base);
+  });
+
+  /**
+   * A disabled arm makes its own thresholds irrelevant, so they must not split the key: otherwise
+   * two deployments that both have the arm OFF would each see the other's pairs as stale and churn
+   * them back and forth on every nightly run.
+   */
+  it("ignores the overlap thresholds once the arm cannot fire", () => {
+    const off = key({ overlapEnabled: false });
+    expect(key({ overlapEnabled: false, suppliesNorm: false })).toBe(off);
+    expect(key({ overlapEnabled: true, suppliesNorm: false })).toBe(off);
+  });
+
+  it("is a short opaque token carrying the predicate's shape", () => {
+    expect(key()).toMatch(/^v\d+:[0-9a-f]{16}$/);
+    expect(key().startsWith(`v${RULES_VERSION}:`)).toBe(true);
   });
 });

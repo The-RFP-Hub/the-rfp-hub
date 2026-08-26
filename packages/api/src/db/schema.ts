@@ -31,7 +31,6 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
-  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -723,15 +722,22 @@ export const opportunityDuplicates = pgTable(
      */
     signal: jsonb().$type<Record<string, unknown>>(),
     /**
-     * Which rule produced this row (`RULES_VERSION` in `services/dedupe/duplicate-signal.ts`).
+     * Which rule produced this row — `rulesKey()` in `services/dedupe/duplicate-signal.ts`.
      *
      * Without it, turning an arm off — or moving a threshold — strands every pair the old rule
      * wrote: pruning only ever runs for entries the backfill selects, so with nothing pending
      * those rows linger indefinitely. `embedding-backfill`'s resweep arm selects on
-     * `rules_version IS DISTINCT FROM <current>` and re-evaluates or deletes, which is what turns
-     * the feature switch into an actual rollback. NULL is every pre-versioning pair.
+     * `rules_key IS DISTINCT FROM <current>` and re-judges or deletes, which is what turns the
+     * feature switch into an actual rollback. NULL is every pre-versioning pair.
+     *
+     * TEXT, AND DERIVED, not a version integer. A hand-maintained number cannot change when an
+     * operator moves `DEDUPE_OVERLAP_THRESHOLD` or flips `DEDUPE_OVERLAP_ENABLED` — which is
+     * precisely the moment the rows need retiring — so a rollback would depend on somebody
+     * remembering to bump a constant in a release they are not making. The key is a digest of the
+     * predicate's shape AND the effective configuration, so it moves on its own. Opaque: compared
+     * for equality, never parsed, never ordered on.
      */
-    rulesVersion: smallint(),
+    rulesKey: text(),
     status: dupStatus().notNull().default("suspected"),
     reviewedBy: bigint({ mode: "number" }).references(() => accounts.id, { onDelete: "set null" }),
     detectedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

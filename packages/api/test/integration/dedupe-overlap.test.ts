@@ -32,7 +32,7 @@ const { DedupeService } = await import("../../src/modules/services/dedupe/dedupe
 const { LexicalEmbeddingProvider } = await import(
   "../../src/modules/services/dedupe/embedding-provider.js"
 );
-const { RULES_VERSION } = await import("../../src/modules/services/dedupe/duplicate-signal.js");
+const { rulesKey } = await import("../../src/modules/services/dedupe/duplicate-signal.js");
 const { OpportunityMetaService } = await import(
   "../../src/modules/services/opportunities/opportunity-meta.service.js"
 );
@@ -55,17 +55,20 @@ const NS = "m3ovl";
  * Long on purpose: the featurizer is a bag of words, and two short records are separated mostly by
  * noise.
  */
-const SUBJECT_BODY =
-  "The Antarctic Ice Core Custody Fellowship funds the physical transport, cold-chain storage and " +
-  "long-term curation of drilled ice cores held by university glaciology departments. Fellows " +
-  "audit an existing core archive, document its provenance and freezer history, and publish a " +
-  "machine-readable manifest of every stored section with its depth interval and drilling season. " +
-  "Awards cover freezer maintenance contracts, calibrated logging hardware and the technician time " +
-  "needed to re-inventory a collection that has outlived its original grant. Applicants must show " +
-  "that the archive is at genuine risk of loss through equipment failure or institutional " +
-  "reorganisation, and must commit to depositing the manifest under an open licence. Reviews run " +
-  "twice a year and are decided by working glaciologists rather than by programme staff. Fellows " +
-  "meet once during the term to compare curation practice across the participating archives.";
+/**
+ * PARAMETERISED BY A LABEL, and that is not cosmetic — it is the same hazard `duplicates.test.ts`
+ * documents about its own fixtures.
+ *
+ * Every test here creates a long entry and a truncation of it. If they all shared one subject, each
+ * truncation's nearest neighbours would be every OTHER test's long entry as much as its own, and
+ * with the candidate list capped at `DEDUPE_MAX_MATCHES` the intended counterpart gets crowded out
+ * — so a test fails for a reason that has nothing to do with what it asserts, and only once enough
+ * siblings have accumulated ahead of it. A distinct label keeps each pair's nearest neighbour its
+ * own partner. The label is unseen vocabulary, which the frozen idf table treats as maximally rare,
+ * so a handful of occurrences is enough to separate the families.
+ */
+const subjectBody = (label: string): string =>
+  `The ${label} Core Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of drilled ${label} cores held by university ${label} departments. Fellows audit an existing core archive, document its provenance and freezer history, and publish a machine-readable manifest of every stored section with its depth interval and drilling season. Awards cover freezer maintenance contracts, calibrated logging hardware and the technician time needed to re-inventory a collection that has outlived its original grant. Applicants must show that the ${label} archive is at genuine risk of loss through equipment failure or institutional reorganisation, and must commit to depositing the manifest under an open licence. Reviews run twice a year and are decided by working ${label} specialists rather than by programme staff. Fellows meet once during the term to compare curation practice across the archives.`;
 
 const OTHER_BODY =
   "This residency places textile conservators inside regional costume museums for eight months to " +
@@ -131,6 +134,28 @@ const pairBetween = async (left: number, right: number) => {
   return rows[0];
 };
 
+/**
+ * A detector with the candidate cap lifted, and the reason is worth stating.
+ *
+ * `DEDUPE_MAX_MATCHES` truncates the per-entry candidate list to five, ordered by descending
+ * cosine. Every test in this file creates a long entry and a truncation of it, so by the later
+ * tests the corpus holds several sibling TRUNCATIONS — and a truncation resembles another
+ * truncation (same length, same leading text) far more than it resembles its own long source. Those
+ * siblings score 0.88+ and fill all five slots, pushing each test's intended counterpart, at 0.74,
+ * off the end. The pair then never gets recorded and the test fails for a reason that has nothing
+ * to do with what it asserts.
+ *
+ * Lifting the cap here is honest rather than convenient: this file is about the RULE and the
+ * resweep, and the cap is a product decision about how many matches a submitter is shown, which
+ * `duplicates.test.ts` covers on its own. Tuning the fixture prose until the ranking came out right
+ * would have been the alternative, and it would have made every future edit to these bodies a
+ * silent tripwire.
+ */
+const detector = (over: Partial<typeof config.dedupe> = {}) =>
+  new DedupeService(db, {
+    config: { ...config, dedupe: { ...config.dedupe, maxMatches: 25, ...over } },
+  });
+
 describeWithDb("M3OVL the overlap arm", () => {
   afterAll(async () => {
     await cleanupFixtures({ opportunityPrefix: NS });
@@ -142,10 +167,10 @@ describeWithDb("M3OVL the overlap arm", () => {
    * plainly which arm decided — a cosine BELOW the lexical threshold beside `arm: "overlap"`.
    */
   it("detects a truncated re-listing that the lexical arm alone would miss", async () => {
-    const full = await insertOpportunity("full", SUBJECT_BODY);
-    const short = await insertOpportunity("truncated", truncate(SUBJECT_BODY, 0.4));
+    const full = await insertOpportunity("full", subjectBody("headline"));
+    const short = await insertOpportunity("truncated", truncate(subjectBody("headline"), 0.4));
 
-    const service = new DedupeService();
+    const service = detector();
     await service.embedAndDetect(full, "all");
     const matches = await service.embedAndDetect(short, "all");
 
@@ -161,7 +186,22 @@ describeWithDb("M3OVL the overlap arm", () => {
 
     const pair = await pairBetween(full, short);
     expect(pair?.status).toBe("suspected");
-    expect(pair?.rulesVersion).toBe(RULES_VERSION);
+    // Recomputed from the same inputs rather than pinned as a literal: the key is DERIVED, and a
+    // literal here would pass while silently accepting a key that no configuration change moves.
+    const live = new LexicalEmbeddingProvider();
+    expect(pair?.rulesKey).toBe(
+      rulesKey(
+        {
+          similarityThreshold: config.dedupe.similarityThreshold,
+          overlapEnabled: config.dedupe.overlapEnabled,
+          overlapThreshold: config.dedupe.overlapThreshold,
+          overlapMinTokens: config.dedupe.overlapMinTokens,
+          overlapMinSimilarity: config.dedupe.overlapMinSimilarity,
+          suppliesNorm: true,
+        },
+        { providerId: live.id, model: live.model },
+      ),
+    );
     const signal = pair?.signal as { arm: string; overlap: number; minTokens: number };
     expect(signal.arm).toBe("overlap");
     expect(signal.overlap).toBeGreaterThanOrEqual(config.dedupe.overlapThreshold);
@@ -176,10 +216,10 @@ describeWithDb("M3OVL the overlap arm", () => {
    * put it straight back, re-notifying both owners each time round.
    */
   it("does not prune the overlap-arm pair it just wrote", async () => {
-    const full = await insertOpportunity("survive-full", SUBJECT_BODY);
-    const short = await insertOpportunity("survive-short", truncate(SUBJECT_BODY, 0.4));
+    const full = await insertOpportunity("survive-full", subjectBody("survive"));
+    const short = await insertOpportunity("survive-short", truncate(subjectBody("survive"), 0.4));
 
-    const service = new DedupeService();
+    const service = detector();
     await service.embedAndDetect(full, "all");
     await service.embedAndDetect(short, "all");
     expect(await pairBetween(full, short)).toBeDefined();
@@ -196,10 +236,13 @@ describeWithDb("M3OVL the overlap arm", () => {
    * `!decidePair(...)` would have emptied the queue in.
    */
   it("leaves a pair alone when the counterpart's norm is still NULL", async () => {
-    const full = await insertOpportunity("null-norm-full", SUBJECT_BODY);
-    const short = await insertOpportunity("null-norm-short", truncate(SUBJECT_BODY, 0.4));
+    const full = await insertOpportunity("null-norm-full", subjectBody("nullnorm"));
+    const short = await insertOpportunity(
+      "null-norm-short",
+      truncate(subjectBody("nullnorm"), 0.4),
+    );
 
-    const service = new DedupeService();
+    const service = detector();
     await service.embedAndDetect(full, "all");
     await service.embedAndDetect(short, "all");
     expect(await pairBetween(full, short)).toBeDefined();
@@ -224,7 +267,7 @@ describeWithDb("M3OVL the overlap arm", () => {
    */
   it("selects a row with a current vector but no norm, and retires it in one pass", async () => {
     const id = await insertOpportunity("backfill", OTHER_BODY);
-    const service = new DedupeService();
+    const service = detector();
     await service.embedAndDetect(id, "all");
 
     await db
@@ -256,7 +299,7 @@ describeWithDb("M3OVL the overlap arm", () => {
   it("does not select missing scalars for a provider that supplies no norm", async () => {
     const id = await insertOpportunity("no-norm-provider", OTHER_BODY);
     const real = new LexicalEmbeddingProvider();
-    await new DedupeService().embedAndDetect(id, "all");
+    await detector().embedAndDetect(id, "all");
     await db
       .update(opportunityEmbeddings)
       .set({ norm: null, tokenCount: null })
@@ -275,43 +318,89 @@ describeWithDb("M3OVL the overlap arm", () => {
   });
 
   /**
-   * THE ROLLBACK, tested rather than asserted. With the arm switched off, the pairs it wrote carry
-   * a rule version the current rule does not recognise, and the backfill's resweep arm retires them
-   * — which is the whole reason `rules_version` exists. Without it, flipping the switch leaves the
-   * rows in the queue indefinitely, because pruning only runs for entries the backfill selects and
-   * a drained backfill selects nothing.
+   * THE ROLLBACK, tested by CHANGING THE CONFIGURATION AND NOTHING ELSE.
+   *
+   * Nothing here writes to `rules_key`. That matters more than it looks: an earlier version of this
+   * test hand-set the stored value to make the resweep select the row, which proved only that the
+   * `IS DISTINCT FROM` query works — it would have passed just as happily against a hard-coded
+   * constant that no operator action can ever change. The whole point of deriving the key from the
+   * effective configuration is that flipping the switch is, by itself, enough.
    */
-  it("retires overlap-arm pairs when the arm is switched off", async () => {
-    const full = await insertOpportunity("rollback-full", SUBJECT_BODY);
-    const short = await insertOpportunity("rollback-short", truncate(SUBJECT_BODY, 0.4));
+  it("retires overlap-arm pairs when the arm is switched off, with nothing hand-stamped", async () => {
+    const full = await insertOpportunity("rollback-full", subjectBody("rollback"));
+    const short = await insertOpportunity("rollback-short", truncate(subjectBody("rollback"), 0.4));
 
-    await new DedupeService().embedAndDetect(full, "all");
-    await new DedupeService().embedAndDetect(short, "all");
-    const pair = await pairBetween(full, short);
-    expect(pair).toBeDefined();
+    await detector().embedAndDetect(full, "all");
+    await detector().embedAndDetect(short, "all");
+    const before = await pairBetween(full, short);
+    expect(before).toBeDefined();
+    expect(before?.rulesKey).toBeTruthy();
 
-    // A deployment that has turned the arm off. Same rows, same vectors, a different rule — and the
-    // rule version on the row no longer matches, which is what the resweep arm selects on.
-    const off = new DedupeService(db, {
-      config: {
-        ...config,
-        dedupe: { ...config.dedupe, overlapEnabled: false },
-      },
-    });
-    await db
-      .update(opportunityDuplicates)
-      .set({ rulesVersion: RULES_VERSION - 1 })
-      .where(eq(opportunityDuplicates.id, pair?.id ?? -1));
+    // The ONLY change: a deployment that has turned the arm off. Same rows, same vectors, same
+    // stored key — a different rule, so a different derived key, so the row is stale.
+    const off = detector({ overlapEnabled: false });
+    // The resweep arm directly rather than through `runBatch`: inside `runBatch` it is gated on the
+    // embedding cursor being drained, and in a shared test database that cursor is whatever every
+    // other concurrent suite happens to have left pending.
+    expect(await off.resweepStaleRules(200)).toBeGreaterThan(0);
+    expect(await pairBetween(full, short), "the rollback retired the pair").toBeUndefined();
+  });
 
-    // The resweep arm directly, rather than through `runBatch`: inside `runBatch` it is gated on
-    // the embedding cursor being drained, and in a shared test database that cursor is whatever
-    // every other concurrent suite happens to have left pending.
-    const swept = await off.resweepStaleRules(200);
-    expect(swept).toBeGreaterThan(0);
-    expect(
-      await pairBetween(full, short),
-      "the rollback retired the orphaned pair",
-    ).toBeUndefined();
+  /**
+   * The same mechanism for a THRESHOLD move, which is the pre-existing bug this fixes: changing
+   * `DEDUPE_SIMILARITY_THRESHOLD` used to strand every pair the old value had written, because
+   * pruning only runs for entries the backfill selects and a drained backfill selects nothing.
+   */
+  it("retires pairs the new threshold no longer accepts, with nothing hand-stamped", async () => {
+    const full = await insertOpportunity("threshold-full", subjectBody("threshold"));
+    const short = await insertOpportunity(
+      "threshold-short",
+      truncate(subjectBody("threshold"), 0.4),
+    );
+
+    await detector().embedAndDetect(full, "all");
+    await detector().embedAndDetect(short, "all");
+    expect(await pairBetween(full, short)).toBeDefined();
+
+    // Above any overlap this corpus produces, so the arm is live but accepts nothing.
+    const stricter = detector({ overlapThreshold: 3.5 });
+    expect(await stricter.resweepStaleRules(200)).toBeGreaterThan(0);
+    expect(await pairBetween(full, short), "the threshold change retired the pair").toBeUndefined();
+  });
+
+  /**
+   * A pair the new rule STILL accepts is re-judged, not merely re-stamped.
+   *
+   * `similarity`, `signal` and `rules_key` are one fact — the service header says so about
+   * detection, and a resweep that moved only the key would leave a row claiming the current rule
+   * accepted it on numbers the current rule never saw. Those numbers are exactly what a reviewer
+   * reads to understand why a pair below the cosine threshold is in their queue.
+   */
+  it("re-judges a pair it keeps, writing similarity, signal and key together", async () => {
+    const full = await insertOpportunity("rejudge-full", subjectBody("rejudge"));
+    const short = await insertOpportunity("rejudge-short", truncate(subjectBody("rejudge"), 0.4));
+
+    await detector().embedAndDetect(full, "all");
+    await detector().embedAndDetect(short, "all");
+    const before = await pairBetween(full, short);
+    expect(before).toBeDefined();
+
+    // A knob that moves the KEY without moving the VERDICT: the cosine floor drops, the pair is
+    // still comfortably accepted by the overlap arm.
+    const relaxed = detector({ overlapMinSimilarity: 0.3 });
+    expect(await relaxed.resweepStaleRules(200)).toBeGreaterThan(0);
+
+    const after = await pairBetween(full, short);
+    expect(after, "a pair the new rule accepts is kept").toBeDefined();
+    expect(after?.rulesKey, "the key names the rule that just judged it").not.toBe(
+      before?.rulesKey,
+    );
+    // Not a stale record of an older judgement: the signal is the one THIS rule produced, and the
+    // similarity is the cosine recomputed from the two stored vectors.
+    const signal = after?.signal as { arm: string; overlap: number; lexical: number };
+    expect(signal.arm).toBe("overlap");
+    expect(signal.lexical).toBeCloseTo(Number(after?.similarity), 3);
+    expect(signal.overlap).toBeGreaterThanOrEqual(config.dedupe.overlapThreshold);
   });
 
   /**
@@ -320,7 +409,7 @@ describeWithDb("M3OVL the overlap arm", () => {
    * rows: a legacy row's decision inputs are genuinely unknown.
    */
   it("maps a legacy pair with a NULL signal to an empty matchedOn", async () => {
-    const left = await insertOpportunity("legacy-left", SUBJECT_BODY);
+    const left = await insertOpportunity("legacy-left", subjectBody("legacy"));
     const right = await insertOpportunity("legacy-right", OTHER_BODY);
     await db.insert(opportunityDuplicates).values({
       opportunityId: Math.min(left, right),

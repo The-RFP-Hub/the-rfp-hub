@@ -52,7 +52,7 @@
  *     ALREADY SHIPPED, not of the overlap arm, and it is filed as its own issue. Read the arm-B
  *     number below against this one, or arm B's small figure will be mistaken for the system's
  *     exposure.
- *   - **arm B wins 3/160** at `MIN_TOKENS = 20`. Without that guard it is 142/160, which is what
+ *   - **arm B wins 3/160** at `MIN_TOKENS = 20`. Without that guard it is 147/160, which is what
  *     makes the guard the only one worth having (a norm-ratio ceiling changed nothing at any
  *     setting; an `overlap` ceiling is evaded by padding the stub with filler).
  *   - **arm-B-only marginal exposure: 0/160** — every target reachable through arm B is already

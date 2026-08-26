@@ -375,12 +375,19 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   row missing `norm` / `token_count`** — the fourth predicate arm, which the overlap detection arm
   decides on and which is gated on the provider declaring it can supply them
   (`EmbeddingProvider.suppliesNorm`), so a provider that cannot never selects rows it could never
-  fix. The second arm runs only once the first has drained: suspected pairs whose
-  `rules_version` differs from the current rule are re-judged against both stored vectors and either
-  deleted or re-stamped. That is what makes `DEDUPE_OVERLAP_ENABLED=false` a real rollback — and it
-  fixes the same latent bug for `DEDUPE_SIMILARITY_THRESHOLD`, where a threshold change used to
-  strand every pair the old value wrote, because pruning only runs for entries the backfill selects
+  fix. The second arm runs only once the first has drained: suspected pairs whose `rules_key`
+  differs from the current rule's are re-judged against both stored vectors and either deleted or
+  rewritten with the new similarity, signal and key together. That is what makes
+  `DEDUPE_OVERLAP_ENABLED=false` a real rollback — and it fixes the same latent bug for
+  `DEDUPE_SIMILARITY_THRESHOLD`, where a threshold change used to strand every pair the old value
+  wrote, because pruning only runs for entries the backfill selects
   and a drained backfill selects nothing.
+
+  **`rules_key` is DERIVED, not a version somebody bumps.** It is a digest of the predicate's shape
+  and the effective configuration — both thresholds, the token floor, the cosine floor, the switch,
+  and the provider/model identity. So changing any of those four `DEDUPE_OVERLAP_*` variables, or
+  `DEDUPE_SIMILARITY_THRESHOLD`, is by itself enough to make the affected rows stale and get them
+  retired on the next nightly run. There is no constant to remember and no release to cut.
 
   **After deploying the overlap arm**, the first run selects the whole table on the norm predicate.
   It does **not** re-embed in the model sense — the vectors, the `content_hash`es and the model

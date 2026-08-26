@@ -1,5 +1,5 @@
 {
-  "id": "e01cdd0f-319f-4cf2-b17b-05cff04b1ba1",
+  "id": "831af1ad-1e99-4328-b04a-7abdef3c8156",
   "prevId": "0db858c3-d36c-458d-90da-e26388ef0985",
   "version": "7",
   "dialect": "postgresql",
@@ -1462,9 +1462,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "rules_version": {
-          "name": "rules_version",
-          "type": "smallint",
+        "rules_key": {
+          "name": "rules_key",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

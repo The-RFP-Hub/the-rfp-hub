@@ -31,8 +31,10 @@
  *
  * WHY `overlapMinTokens` EXISTS, and why it is the only guard that works. An attacker who wants a
  * target's entry flagged as their duplicate builds a stub out of the target's rarest terms. With
- * no substance guard that attack wins 142 of 160 corpus documents on arm B. At 20 distinct tokens
- * on the SHORTER side it wins 3. A norm-ratio ceiling was measured and deleted: it changed
+ * no substance guard that attack wins 147 of 160 corpus documents on arm B. At 20 distinct tokens
+ * on the SHORTER side it wins 3. Those figures are MEASURED, not quoted — `scripts/
+ * dedupe-threshold-report.ts` prints them on every run and `test/unit/dedupe-threshold.test.ts`
+ * pins them, so a stale number here is a number the build disagrees with. A norm-ratio ceiling was measured and deleted: it changed
  * nothing at any setting once `overlapMinSimilarity` was applied, and it would have clipped honest
  * truncations. An `overlap` CEILING is not proposed either — padding a stub with filler evades it.
  *
@@ -48,6 +50,7 @@
  * 0.598. Structural evidence is recorded as EXPLANATION at read time (`matchedOn`) and barred from
  * the decision. See `docs/data-model.md` for the measurements.
  */
+import { createHash } from "node:crypto";
 
 /** The two scalars one side of a pair contributes, either of which may be unknown. */
 export interface SignalSide {
@@ -108,17 +111,59 @@ export interface DuplicateDecision {
 }
 
 /**
- * The identity of the rule that produced a pair row.
+ * The SHAPE of the predicate, bumped when the rule gains or loses an arm.
  *
- * BUMP THIS whenever the predicate or any default threshold changes. `opportunity_duplicates.
- * rules_version` records it, and the `embedding-backfill` job's resweep arm re-evaluates and
- * retires every pair stamped with anything else. That is what makes `DEDUPE_OVERLAP_ENABLED=false`
- * a real rollback instead of a switch that strands the rows it already wrote — and it fixes the
- * identically-shaped pre-existing bug where changing `DEDUPE_SIMILARITY_THRESHOLD` stranded pairs
- * the same way. A NULL `rules_version` is every pair written before versioning existed; it is
- * "distinct from" the current version, so those are resweept once and re-stamped.
+ * Deliberately NOT the whole identity — see `rulesKey`. A version integer alone was the first,
+ * wrong answer here: a constant cannot change when an operator changes a threshold or flips
+ * `DEDUPE_OVERLAP_ENABLED`, which is exactly when the pairs a previous rule wrote need retiring.
+ * A rollback that depends on somebody remembering to bump a constant is not a rollback.
  */
 export const RULES_VERSION = 1;
+
+/**
+ * The identity of the rule that produced a pair row: the predicate's shape AND the effective
+ * configuration it ran under, as one opaque key.
+ *
+ * `opportunity_duplicates.rules_key` records it, and `embedding-backfill`'s resweep arm selects
+ * every suspected pair whose key IS DISTINCT FROM the current one, re-judges it against both stored
+ * vectors, and deletes or re-stamps it. THAT is what makes `DEDUPE_OVERLAP_ENABLED=false` a real
+ * rollback rather than a switch that strands its own output — and it fixes the identically-shaped
+ * pre-existing bug where changing `DEDUPE_SIMILARITY_THRESHOLD` stranded pairs the same way.
+ * Because the key is DERIVED, an operator moving any knob retires the affected rows automatically,
+ * with nothing to remember.
+ *
+ * The provider id and model are in it too. A model change already invalidates every vector through
+ * `content_hash`, so the embedding arm re-records these pairs first; including the identity here
+ * means anything the re-record misses is still visibly stale rather than silently attributed to a
+ * rule that never saw those coordinates.
+ *
+ * OPAQUE, and short. It is an equality token, never parsed and never ordered on, so a truncated
+ * digest is the right shape: 16 hex characters over a canonical field order. The `v1:` prefix keeps
+ * a shape change visible to a human reading the column. A NULL key is every pair written before the
+ * column existed — "distinct from" anything, so those are resweept exactly once.
+ */
+export function rulesKey(config: DuplicateRuleConfig, identity: RuleProviderIdentity): string {
+  // Field ORDER is fixed here, not taken from the object, because `JSON.stringify` follows
+  // insertion order: two callers building the config differently would otherwise produce two keys
+  // for one rule and resweep each other's pairs forever.
+  const canonical = JSON.stringify([
+    RULES_VERSION,
+    identity.providerId,
+    identity.model,
+    config.similarityThreshold,
+    config.overlapEnabled && config.suppliesNorm,
+    config.overlapThreshold,
+    config.overlapMinTokens,
+    config.overlapMinSimilarity,
+  ]);
+  return `v${RULES_VERSION}:${createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 16)}`;
+}
+
+/** Which embedding space a rule ran against. Part of the rule's identity, not of its predicate. */
+export interface RuleProviderIdentity {
+  providerId: string;
+  model: string;
+}
 
 const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
