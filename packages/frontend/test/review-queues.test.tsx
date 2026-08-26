@@ -1166,6 +1166,33 @@ describe("the organisations tab", () => {
     );
   });
 
+  it("clears a previous invite address before an empty handle search", async () => {
+    accounts.mockResolvedValueOnce({ items: [] }).mockResolvedValueOnce({ items: [] });
+    mount();
+    await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
+    const row = screen.getByText("Indie Collective").closest("tr") as HTMLElement;
+    fireEvent.click(within(row).getByRole("button", { name: "Grant a membership…" }));
+
+    const search = screen.getByLabelText("Account handle, name, email or id");
+    fireEvent.change(search, { target: { value: "first.person@example.org" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    expect(await screen.findByLabelText("Email")).toHaveProperty(
+      "value",
+      "first.person@example.org",
+    );
+
+    fireEvent.change(search, { target: { value: "missing-handle" } });
+    fireEvent.click(screen.getByRole("button", { name: "Find the account" }));
+    await waitFor(() =>
+      expect(screen.getByText("No account matches “missing-handle”.")).toBeTruthy(),
+    );
+    expect(screen.getByLabelText("Email")).toHaveProperty("value", "");
+    expect(screen.getByRole("button", { name: "Invite by email instead" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
   it("pluralises account matches and omits an empty candidate table", async () => {
     accounts
       .mockResolvedValueOnce({

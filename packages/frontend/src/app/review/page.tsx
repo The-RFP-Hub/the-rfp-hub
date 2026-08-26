@@ -1835,6 +1835,7 @@ function GrantMembership({
     if (typed === "") return;
     setCandidates(null);
     setChosen(null);
+    setInviteEmail("");
     await lookup.run(async () => {
       const found = await api.review.accounts({ q: typed, limit: 10 });
       setCandidates(found.items);
