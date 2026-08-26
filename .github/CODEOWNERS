@@ -1,0 +1,13 @@
+# Paths that either execute with deploy credentials (workflows, runner scripts, the nightly
+# jobs) or define what gets deployed (the image, its context, the guard scripts, the lockfile).
+# A change here needs a maintainer's review before it can merge — enforced by the main branch
+# ruleset's "require review from code owners", which reads this file.
+#
+# Membership lives in the org team, not here: add or remove people at
+# https://github.com/orgs/The-RFP-Hub/teams/maintainers. The team needs write access on this
+# repository for GitHub to honour it as an owner.
+.github/**       @The-RFP-Hub/maintainers
+Dockerfile       @The-RFP-Hub/maintainers
+.dockerignore    @The-RFP-Hub/maintainers
+scripts/**       @The-RFP-Hub/maintainers
+pnpm-lock.yaml   @The-RFP-Hub/maintainers
