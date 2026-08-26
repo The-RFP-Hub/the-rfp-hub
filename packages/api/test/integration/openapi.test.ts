@@ -116,6 +116,7 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "/v1/opportunities/{id}/audit",
       "/v1/opportunities/{id}/duplicates",
       "/v1/opportunities/{id}/verification",
+      "/v1/me/notifications",
       // The link-out redirects are PUBLISHED, deliberately: an undocumented public endpoint is
       // worse than a compliance checker that has to understand a 3xx (which it now does).
       "/v1/r/{id}/apply",
@@ -149,6 +150,10 @@ run("OpenAPI 3.1 live-spec contract", () => {
       "OwnedDuplicateList",
       "DuplicatePairList",
       "MergeResult",
+      "DuplicateNotificationPayload",
+      "Notification",
+      "NotificationList",
+      "NotificationReadAll",
       "InsightsSeries",
       "InsightsSummary",
     ]) {
@@ -162,6 +167,9 @@ run("OpenAPI 3.1 live-spec contract", () => {
       ["/v1/opportunities/{id}", "put"],
       ["/v1/opportunities/{id}/claim", "post"],
       ["/v1/me", "get"],
+      ["/v1/me/notifications", "get"],
+      ["/v1/me/notifications/{id}/read", "post"],
+      ["/v1/me/notifications/read-all", "post"],
       ["/v1/keys", "post"],
       ["/v1/review/opportunities", "get"],
       ["/v1/review/opportunities/{id}", "get"],

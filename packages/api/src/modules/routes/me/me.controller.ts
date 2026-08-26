@@ -2,6 +2,7 @@ import type { FastifyRequest } from "fastify";
 import { principalOf } from "../../../plugins/auth.js";
 import { toStandard } from "../../mappers/opportunity.mapper.js";
 import { AccountService } from "../../services/auth/account.service.js";
+import { NotificationService } from "../../services/notifications/notification.service.js";
 import {
   ManagedOpportunityService,
   type PublisherStatus,
@@ -10,15 +11,18 @@ import { OpportunityMetaService } from "../../services/opportunities/opportunity
 import type {
   ManagedOpportunityListView,
   MeView,
+  NotificationListView,
+  NotificationReadAllView,
   OwnedDuplicateListView,
 } from "../../shared/api-views.js";
 import { effectiveCaps } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
-import { bodyOf, handled, paramsOf, queryOf } from "../../shared/route-helpers.js";
+import { bodyOf, handled, idParam, paramsOf, queryOf } from "../../shared/route-helpers.js";
 
 const accountsService = new AccountService();
 const managed = new ManagedOpportunityService();
 const meta = new OpportunityMetaService();
+const notifications = new NotificationService();
 
 async function view(request: FastifyRequest): Promise<MeView> {
   const principal = principalOf(request);
@@ -90,5 +94,25 @@ export const meController = {
     const principal = principalOf(request);
     const items = await meta.duplicatesForOwner(principal);
     return { items } satisfies OwnedDuplicateListView;
+  }),
+
+  listNotifications: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const query = queryOf<{ unread?: boolean; page?: number; limit?: number }>(request);
+    return (await notifications.listForAccount(
+      principal.accountId,
+      query,
+    )) satisfies NotificationListView;
+  }),
+
+  markNotificationRead: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    const { id } = paramsOf<{ id: string }>(request);
+    return notifications.markRead(principal.accountId, idParam(id, "notification"));
+  }),
+
+  markAllNotificationsRead: handled(async (request: FastifyRequest) => {
+    const principal = principalOf(request);
+    return (await notifications.markAllRead(principal.accountId)) satisfies NotificationReadAllView;
   }),
 };

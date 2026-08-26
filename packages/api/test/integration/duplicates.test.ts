@@ -179,8 +179,10 @@ run("M3DUP duplicate detection", () => {
 
     const pair = await pairBetween(`${NS}:alpha`, `${NS}:alpha-copy`);
     expect(pair?.status).toBe("suspected");
+    if (!pair) throw new Error("missing alpha pair");
 
-    // …and the same pair is what the owner's queue and the entry's sub-resource serve.
+    // …and the same pair is what the owner's queue, notification inbox, and the entry's
+    // sub-resource serve.
     const mine = await app.inject({ url: "/v1/me/duplicates", headers: bearer(publisherToken) });
     expect(mine.statusCode).toBe(200);
     expect(mine.json().items.length).toBeGreaterThan(0);
@@ -198,6 +200,27 @@ run("M3DUP duplicate detection", () => {
         title: expect.any(String),
       });
     }
+
+    const inbox = await app.inject({
+      url: "/v1/me/notifications?limit=100",
+      headers: bearer(publisherToken),
+    });
+    expect(inbox.statusCode, inbox.body).toBe(200);
+    expect(inbox.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "duplicate_suspected",
+          subjectId: pair.id,
+          payload: expect.objectContaining({
+            pairId: pair.id,
+            yourListing: {
+              id: `${NS}:alpha`,
+              title: "Superchain Builders Fund",
+            },
+          }),
+        }),
+      ]),
+    );
 
     const sub = await app.inject({ url: `/v1/opportunities/${NS}:alpha-copy/duplicates` });
     expect(sub.statusCode).toBe(200);
