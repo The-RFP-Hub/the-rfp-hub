@@ -1,6 +1,10 @@
 import { count, eq } from "drizzle-orm";
 import type { DbLike } from "../../../db/client.js";
-import { type OrganizationRow, organizations } from "../../../db/schema.js";
+import {
+  type OrganizationInsert,
+  type OrganizationRow,
+  organizations,
+} from "../../../db/schema.js";
 
 export class OrganizationRepository {
   constructor(private readonly exec: DbLike) {}
@@ -28,5 +32,13 @@ export class OrganizationRepository {
       .from(organizations)
       .where(eq(organizations.verified, true));
     return counted[0]?.value ?? 0;
+  }
+
+  async insertStubs(values: OrganizationInsert[]): Promise<void> {
+    if (values.length === 0) return;
+    await this.exec
+      .insert(organizations)
+      .values(values)
+      .onConflictDoNothing({ target: organizations.slug });
   }
 }

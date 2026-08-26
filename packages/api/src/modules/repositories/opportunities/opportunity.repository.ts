@@ -20,7 +20,13 @@ import {
 } from "drizzle-orm";
 import { type AnyPgColumn, type PgColumn, alias } from "drizzle-orm/pg-core";
 import type { DbLike } from "../../../db/client.js";
-import { accounts, auditLog, opportunities } from "../../../db/schema.js";
+import {
+  type OpportunityInsert,
+  type OpportunityRow,
+  accounts,
+  auditLog,
+  opportunities,
+} from "../../../db/schema.js";
 import type { Principal } from "../../shared/capabilities.js";
 
 /**
@@ -158,6 +164,40 @@ export class OpportunityRepository {
       .from(opportunities)
       .where(eq(opportunities.publicId, publicId))
       .limit(1);
+    return rows[0];
+  }
+
+  async lockByPublicId(publicId: string): Promise<OpportunityRow | undefined> {
+    const rows = await this.exec
+      .select()
+      .from(opportunities)
+      .where(eq(opportunities.publicId, publicId))
+      .for("update")
+      .limit(1);
+    return rows[0];
+  }
+
+  async countPendingBySubmitter(accountId: number): Promise<number> {
+    const counted = await this.exec
+      .select({ value: count() })
+      .from(opportunities)
+      .where(
+        and(eq(opportunities.submittedBy, accountId), eq(opportunities.reviewStatus, "pending")),
+      );
+    return counted[0]?.value ?? 0;
+  }
+
+  async insert(values: OpportunityInsert): Promise<OpportunityRow | undefined> {
+    const rows = await this.exec.insert(opportunities).values(values).returning();
+    return rows[0];
+  }
+
+  async update(id: number, values: OpportunityInsert): Promise<OpportunityRow | undefined> {
+    const rows = await this.exec
+      .update(opportunities)
+      .set(values)
+      .where(eq(opportunities.id, id))
+      .returning();
     return rows[0];
   }
 
