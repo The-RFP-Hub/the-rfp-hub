@@ -43,6 +43,7 @@ describe("route metadata", () => {
       "/listings/[id]",
       "/listings/[id]/edit",
       "/listings/new",
+      "/notifications",
       "/opportunities/[id]",
       "/organisations/[[...rest]]",
       "/organizations",

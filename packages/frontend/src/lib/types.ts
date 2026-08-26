@@ -153,6 +153,50 @@ export interface OwnedDuplicateList {
   items: OwnedDuplicateMatch[];
 }
 
+// ── notifications ──────────────────────────────────────────────────────────────
+export type NotificationKind =
+  | "duplicate_suspected"
+  | "duplicate_confirmed"
+  | "duplicate_dismissed"
+  | "duplicate_merged_away"
+  | "duplicate_absorbed"
+  | "duplicate_reopened";
+
+export interface DuplicateNotificationPayload {
+  pairId: number;
+  similarity: number | null;
+  yourListing: { id: string; title: string };
+  /** Omitted unless the counterpart was approved and listed when the event was recorded. */
+  otherListing?: { id: string; title: string };
+  action: "review_match" | "view_match" | "view_survivor";
+  link: string;
+  decidedBy: "reviewer" | null;
+}
+
+export interface Notification {
+  id: number;
+  kind: NotificationKind;
+  subjectKind: "duplicate";
+  subjectId: number;
+  payload: DuplicateNotificationPayload;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationList {
+  items: Notification[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  unreadCount: number;
+}
+
+export interface NotificationReadAll {
+  markedRead: number;
+  unreadCount: number;
+}
+
 export interface DuplicateSide {
   id: string;
   title: string;
