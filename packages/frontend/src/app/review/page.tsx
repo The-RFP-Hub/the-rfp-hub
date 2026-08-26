@@ -126,15 +126,23 @@ function Review({ me }: { me: Me }) {
     ]);
     return { items: [...suspected.items, ...confirmed.items] } satisfies DuplicatePairList;
   }, [api]);
-  const loadMergedDuplicates = useCallback(
-    () => api.review.duplicates({ status: "merged", limit: 200 }),
-    [api],
-  );
+  const loadResolvedDuplicates = useCallback(async () => {
+    const [dismissed, merged] = await Promise.all([
+      api.review.duplicates({ status: "dismissed", limit: 200 }),
+      api.review.duplicates({ status: "merged", limit: 200 }),
+    ]);
+    return {
+      items: [...dismissed.items, ...merged.items].sort(
+        (a, b) =>
+          Date.parse(b.reviewedAt ?? b.detectedAt) - Date.parse(a.reviewedAt ?? a.detectedAt),
+      ),
+    } satisfies DuplicatePairList;
+  }, [api]);
 
   const queue = useResource(loadQueue);
   const claims = useResource(loadClaims);
   const duplicates = useResource(loadDuplicates);
-  const mergedDuplicates = useResource(loadMergedDuplicates, { enabled: tab === "duplicates" });
+  const resolvedDuplicates = useResource(loadResolvedDuplicates, { enabled: tab === "duplicates" });
 
   const recordDuplicateDecision = useCallback((pair: DuplicatePair, mergeResult?: MergeResult) => {
     setDuplicateDecisions((current) => ({
@@ -157,9 +165,9 @@ function Review({ me }: { me: Me }) {
     claims: claims.state.status === "ready" ? claims.state.data.items.length : null,
     duplicates:
       duplicates.state.status === "ready"
-        ? duplicates.state.data.items
-            .map((pair) => duplicateDecisions[pair.id]?.pair ?? pair)
-            .filter((pair) => isOpenDuplicateStatus(pair.status)).length
+        ? trackedDuplicatePairs(duplicates.state.data.items, duplicateDecisions).filter((pair) =>
+            isOpenDuplicateStatus(pair.status),
+          ).length
         : null,
     organisations: null,
   };
@@ -213,7 +221,7 @@ function Review({ me }: { me: Me }) {
       {tab === "duplicates" ? (
         <Duplicates
           duplicates={duplicates}
-          merged={mergedDuplicates}
+          resolved={resolvedDuplicates}
           decisions={duplicateDecisions}
           onDecision={recordDuplicateDecision}
           origin={returnHere}
@@ -838,15 +846,29 @@ interface DuplicateDecision {
   mergeResult?: MergeResult;
 }
 
+function trackedDuplicatePairs(
+  loaded: DuplicatePair[],
+  decisions: Record<number, DuplicateDecision>,
+): DuplicatePair[] {
+  const loadedIds = new Set(loaded.map((pair) => pair.id));
+  return loaded
+    .map((pair) => decisions[pair.id]?.pair ?? pair)
+    .concat(
+      Object.values(decisions)
+        .map(({ pair }) => pair)
+        .filter((pair) => isOpenDuplicateStatus(pair.status) && !loadedIds.has(pair.id)),
+    );
+}
+
 function Duplicates({
   duplicates,
-  merged,
+  resolved,
   decisions,
   onDecision,
   origin,
 }: {
   duplicates: ResourceHandle<DuplicatePairList>;
-  merged: ResourceHandle<DuplicatePairList>;
+  resolved: ResourceHandle<DuplicatePairList>;
   decisions: Record<number, DuplicateDecision>;
   onDecision: (pair: DuplicatePair, mergeResult?: MergeResult) => void;
   origin: string;
@@ -867,7 +889,7 @@ function Duplicates({
         onRetry={duplicates.reload}
       >
         {(list) => {
-          const tracked = list.items.map((pair) => decisions[pair.id]?.pair ?? pair);
+          const tracked = trackedDuplicatePairs(list.items, decisions);
           const sorted = [...tracked].sort(
             (a, b) =>
               (b.similarity ?? Number.NEGATIVE_INFINITY) -
@@ -941,22 +963,29 @@ function Duplicates({
         }}
       </ResourceView>
       <h2 className="section-head section-head-quiet">Recently resolved</h2>
-      <p className="muted footnote">Showing up to 200 recently merged pairs.</p>
+      <p className="muted footnote">
+        Showing up to 200 recently dismissed pairs and 200 recently merged pairs.
+      </p>
       <ResourceView
-        resource={merged.state}
-        what="recently merged duplicate pairs"
-        onRetry={merged.reload}
+        resource={resolved.state}
+        what="recently resolved duplicate pairs"
+        onRetry={resolved.reload}
       >
         {(list) => {
           const openIds =
             duplicates.state.status === "ready"
               ? new Set(duplicates.state.data.items.map((pair) => pair.id))
               : new Set<number>();
-          const recent = list.items.filter((pair) => !openIds.has(pair.id));
+          const recent = list.items
+            .map((pair) => decisions[pair.id]?.pair ?? pair)
+            .filter(
+              (pair) =>
+                (pair.status === "dismissed" || pair.status === "merged") && !openIds.has(pair.id),
+            );
           return recent.length === 0 ? (
             <EmptyState
-              title="No recent merges."
-              detail="Merged pairs will remain available here after the queue is reloaded."
+              title="No recently resolved pairs."
+              detail="Dismissed and merged pairs remain available here after the queue is reloaded."
             />
           ) : (
             recent.map((pair) => (
@@ -1041,46 +1070,58 @@ function PairCard({
           origin={origin}
         />
       </div>
-      <div className="row">
-        <button type="button" disabled={busy} onClick={() => setComparing((value) => !value)}>
+      <fieldset className="row duplicate-actions">
+        <legend className="visually-hidden">Actions for pair {pair.id}</legend>
+        <button
+          className="duplicate-compare-control"
+          type="button"
+          disabled={busy}
+          onClick={() => setComparing((value) => !value)}
+        >
           {comparing ? "Hide comparison" : "Compare descriptions"}
         </button>
-        {pair.status === "suspected" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const next = await api.review.confirmDuplicate(pair.id);
-                onDecision(next);
-                return "Recorded as the same programme. Neither listing was touched.";
-              })
-            }
-          >
-            Confirm
-          </button>
-        ) : null}
-        {canMerge ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const next = await api.review.dismissDuplicate(pair.id);
-                onDecision(next);
-                return "Dismissed. You can undo this decision while this row remains on the page.";
-              })
-            }
-          >
-            Dismiss
-          </button>
-        ) : null}
-        {canMerge ? (
-          <button type="button" disabled={busy} onClick={() => setConfirming(!confirming)}>
-            Merge…
-          </button>
-        ) : null}
-      </div>
+        <button
+          className="duplicate-confirm-control"
+          type="button"
+          aria-pressed={pair.status === "confirmed"}
+          disabled={busy || pair.status !== "suspected"}
+          onClick={() =>
+            void run(async () => {
+              const next = await api.review.confirmDuplicate(pair.id);
+              onDecision(next);
+              return "Recorded as the same programme. Neither listing was touched.";
+            })
+          }
+        >
+          {pair.status === "confirmed" ? "Confirmed" : "Confirm"}
+        </button>
+        <button
+          className="duplicate-dismiss-control"
+          type="button"
+          aria-pressed={pair.status === "dismissed"}
+          disabled={busy || !canMerge}
+          onClick={() =>
+            void run(async () => {
+              const wasConfirmed = pair.status === "confirmed";
+              const next = await api.review.dismissDuplicate(pair.id);
+              onDecision(next);
+              return wasConfirmed
+                ? "Dismissed. Undo returns this pair to Needs review, not to Confirmed."
+                : "Dismissed. You can undo this decision from Recently resolved.";
+            })
+          }
+        >
+          {pair.status === "dismissed" ? "Dismissed" : "Dismiss"}
+        </button>
+        <button
+          className="duplicate-merge-control"
+          type="button"
+          disabled={busy || !canMerge}
+          onClick={() => setConfirming(!confirming)}
+        >
+          Merge…
+        </button>
+      </fieldset>
 
       {pair.status === "confirmed" ? (
         <p className="note">

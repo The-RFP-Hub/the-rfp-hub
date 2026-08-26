@@ -582,7 +582,7 @@ describe("merging duplicates", () => {
     expect(reopen).toHaveBeenCalledWith(duplicatePair.id);
   });
 
-  it("keeps a confirmation visible while leaving the merge available", async () => {
+  it("keeps action slots stable across confirmation and dismissal", async () => {
     tab.current = "duplicates";
     const api = client();
     const confirm = vi.fn(async () => ({
@@ -606,16 +606,32 @@ describe("merging duplicates", () => {
       </ApiClientProvider>,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+    const actionGroup = await screen.findByRole("group", {
+      name: `Actions for pair ${duplicatePair.id}`,
+    });
+    const actionLabels = () =>
+      within(actionGroup)
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+
+    expect(actionLabels()).toEqual(["Compare descriptions", "Confirm", "Dismiss", "Merge…"]);
+    fireEvent.click(within(actionGroup).getByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByText("Confirmed", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Acme Grants")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Merge…" })).toBeTruthy();
+    expect(actionLabels()).toEqual(["Compare descriptions", "Confirmed", "Dismiss", "Merge…"]);
+    expect(within(actionGroup).getByRole("button", { name: "Confirmed" })).toHaveProperty(
+      "disabled",
+      true,
+    );
     expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    fireEvent.click(within(actionGroup).getByRole("button", { name: "Dismiss" }));
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(actionLabels()).toEqual(["Compare descriptions", "Confirm", "Dismissed", "Merge…"]);
+    expect(
+      screen.getByText("Dismissed. Undo returns this pair to Needs review, not to Confirmed."),
+    ).toBeTruthy();
     expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
   });
 
@@ -692,18 +708,29 @@ describe("merging duplicates", () => {
     expect(screen.getByRole("tab", { name: "Duplicates · 0" })).toBeTruthy();
   });
 
-  it("restores merged receipts from the explicitly bounded resolved page", async () => {
+  it("restores dismissed and merged receipts from the explicitly bounded resolved page", async () => {
     tab.current = "duplicates";
     const mergedPair: DuplicatePair = {
       ...duplicatePair,
       status: "merged",
       right: { ...duplicatePair.right, mergedInto: duplicatePair.left.id },
     };
+    const dismissedPair: DuplicatePair = {
+      ...duplicatePair,
+      id: 18,
+      status: "dismissed",
+      reviewedAt: "2026-08-25T13:00:00Z",
+      left: { ...duplicatePair.left, title: "Dismissed Acme Grants" },
+    };
     const requested: Array<{ status?: string; limit?: number } | undefined> = [];
     const api = client();
+    const reopen = vi.fn(async () => ({ ...dismissedPair, status: "suspected" as const }));
+    api.review.reopenDuplicate = reopen;
     api.review.duplicates = async (query) => {
       requested.push(query);
-      return { items: query?.status === "merged" ? [mergedPair] : [] };
+      if (query?.status === "dismissed") return { items: [dismissedPair] };
+      if (query?.status === "merged") return { items: [mergedPair] };
+      return { items: [] };
     };
     render(
       <ApiClientProvider value={api}>
@@ -720,6 +747,12 @@ describe("merging duplicates", () => {
         ),
       ),
     ).toBeTruthy();
+    expect(screen.getByText("Dismissed Acme Grants")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText(/pair 18 · Needs review/)).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Duplicates · 1" })).toBeTruthy();
+    expect(reopen).toHaveBeenCalledWith(dismissedPair.id);
+    expect(requested).toContainEqual({ status: "dismissed", limit: 200 });
     expect(requested).toContainEqual({ status: "merged", limit: 200 });
   });
 });
