@@ -342,8 +342,8 @@ does not imply the right to start a task from it. This is likely already granted
 user is the one registering the task definition being started.
 
 Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, the
-scheduled run announces a `::warning::` and stays green — the open-data export is chained to that
-workflow, and failing over a resource that has never existed would stop the dataset publishing. A
+scheduled run announces a `::warning::` and stays green — failing over a resource that has never
+existed would turn a not-yet-deployed environment into a nightly red build nobody can act on. A
 **manual `workflow_dispatch` fails instead**, so an operator validating the wiring gets a real
 answer, and the message names what is missing. Prove it with one dispatch per environment before
 relying on the schedule.

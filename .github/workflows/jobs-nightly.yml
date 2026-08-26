@@ -11,23 +11,28 @@ name: Nightly maintenance jobs
 # schedule uses the credential that already exists, the API grows no machine-authenticated surface,
 # and `POST /v1/admin/jobs/{job}/run` stays what it is: a signed-in administrator's convenience.
 #
-# ORDERING IS A DEPENDENCY, NOT A SECOND CRON. "Staleness at 03:00, export at 03:17" guarantees
-# nothing — scheduled workflows start late routinely, and a late staleness run would publish a
-# dataset still advertising closed programmes. So there is ONE cron here, the jobs are ordered by
-# `needs`, and `nightly-export.yml` triggers on THIS workflow completing successfully.
+# STALENESS IS NOT PART OF THE SCHEDULED CHAIN. It runs daily at 22:00 UTC from an external
+# scheduler, outside this repository, and this workflow's `staleness` job therefore runs ONLY when
+# an operator dispatches it (`job` = `staleness` or `all`). On the schedule its steps are skipped.
+# The four jobs below have no ordering between them and no ordering with staleness beyond "not at
+# the same time", which the clock supplies: 22:00 is finished long before 01:05. See
+# packages/api/docs/jobs.md sections 2 and 4d for the rule and the reason it is a rule — the two
+# never overlap because per-job advisory locks exclude a job from ITSELF, never one job from
+# another, so an overlap silently loses work while every run reports success.
 #
-# WHAT A FAILURE COSTS, stated plainly: because the export is chained to this workflow's
-# conclusion, a job that fails holds tonight's dataset publication. That is the deliberate trade —
-# publishing a snapshot whose staleness pass did not run is worse than publishing a day late, the
-# export is idempotent and the next night republishes, and `workflow_dispatch` on either workflow
-# recovers it immediately. The runner exits 0 for every outcome that is not an error, including a
-# job that declined because another run held its advisory lock and a job whose feature is not
-# configured, so only a real failure reaches here.
+# THE OPEN-DATA EXPORT IS NOT CHAINED TO THIS WORKFLOW. `nightly-export.yml` runs on its OWN cron
+# (`17 3 * * *`); nothing here triggers it and a failure here does not hold it back. Ordering
+# between the two is by clock alone, which is a weaker guarantee than a dependency and is stated
+# here so nobody plans around one that does not exist.
+#
+# The runner exits 0 for every outcome that is not an error, including a job that declined because
+# another run held its advisory lock and a job whose feature is not configured, so only a real
+# failure reaches here.
 #
 # WHICH DEPLOYMENT IS MAINTAINED IS EXPLICIT, AND THE SCHEDULE MEANS PRODUCTION. The open-data
-# export this workflow gates reads the PRODUCTION API, so a scheduled chain that authenticated with
-# staging credentials would either fail outright or quietly maintain the wrong database and publish
-# a snapshot whose staleness pass never touched it. So the environment is a first-class input:
+# export reads the PRODUCTION API, so a scheduled chain that authenticated with staging credentials
+# would either fail outright or quietly maintain the wrong database, leaving the export to publish a
+# snapshot whose maintenance never touched it. So the environment is a first-class input:
 # blank (the schedule) means `production`, and an operator maintaining staging has to say so. The
 # credential and the cluster are then selected by that name — `PRODUCTION_AWS_*` with
 # `PRODUCTION_ECS_CLUSTER`, exactly the pairing production.yml uses — through an INDEX lookup rather
@@ -96,7 +101,9 @@ env:
   ENV_PREFIX: ${{ inputs.environment == 'staging' && 'STAGING' || 'PRODUCTION' }}
   AWS_REGION: us-east-1
   # Blank on a schedule (no `inputs` at all); `all` or a job name when an operator dispatched one
-  # deliberately. Every `if:` below treats blank and `all` the same — "run the whole chain".
+  # deliberately. The four maintenance jobs below treat blank and `all` the same — "run the whole
+  # chain". `staleness` does NOT: it is scheduled externally, so blank must not start it and only an
+  # explicit `all` or `staleness` dispatch does.
   SELECTED: ${{ github.event.inputs.job }}
 
 jobs:
@@ -148,9 +155,16 @@ jobs:
           DISPATCHED: ${{ github.event_name == 'workflow_dispatch' }}
         run: .github/scripts/run-ecs-job.sh
 
-  # Staleness runs LAST and alone. It closes past-due and long-inactive entries, and the open-data
-  # export must observe that state rather than the state before it — which is the entire reason
-  # nightly-export.yml is chained to this workflow instead of to a clock.
+  # Staleness is DISPATCH-ONLY. It closes past-due and long-inactive entries, and it moved to an
+  # external scheduler that runs it daily at 22:00 UTC; leaving it on this cron too would put two
+  # schedulers on the same job. The advisory lock would keep the second from double-writing, but it
+  # would NOT keep it from running while the four jobs above are in flight — and `staleness` racing
+  # `verification-backfill` loses entries that a successful check was about to keep open, with both
+  # runs green (packages/api/docs/jobs.md section 4d).
+  #
+  # It stays here, and keeps `needs: [maintenance]`, because an operator still needs to run it by
+  # hand — a recovery after a failed external run, or a `job=all` dispatch that deliberately means
+  # the whole chain. `needs` is what keeps that dispatch in the right order.
   staleness:
     name: staleness
     needs: [maintenance]
@@ -158,13 +172,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == 'staleness'
+        if: env.SELECTED == 'all' || env.SELECTED == 'staleness'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
       - name: Configure AWS credentials
-        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == 'staleness'
+        if: env.SELECTED == 'all' || env.SELECTED == 'staleness'
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets[format('{0}_AWS_ACCESS_KEY_ID', env.ENV_PREFIX)] }}
@@ -172,7 +186,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run staleness
-        if: env.SELECTED == '' || env.SELECTED == 'all' || env.SELECTED == 'staleness'
+        if: env.SELECTED == 'all' || env.SELECTED == 'staleness'
         env:
           ECS_CLUSTER: ${{ vars[format('{0}_ECS_CLUSTER', env.ENV_PREFIX)] }}
           TARGET_ENV: ${{ env.TARGET_ENV }}

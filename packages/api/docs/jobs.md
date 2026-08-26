@@ -62,42 +62,54 @@ collapsed them would report a permanently unconfigured job as healthy contention
 
 ## 2. The schedule, and the ordering it exists to guarantee
 
-**One cron, `5 1 * * *`**, in `.github/workflows/jobs-nightly.yml`. The four independent jobs run in
-parallel; **`staleness` runs after them**; and the open-data export
-(`.github/workflows/nightly-export.yml`) is triggered by this workflow **completing successfully**.
+**The five jobs run on two schedules, in two places.** `.github/workflows/jobs-nightly.yml` runs the
+four maintenance jobs on one cron, `5 1 * * *`, in parallel. **`staleness` is not among them**: it
+runs daily at **22:00 UTC from an external scheduler**, outside this repository (§4d), and this
+workflow's `staleness` job is **dispatch-only** — its steps are skipped unless an operator asked for
+`job` = `staleness` or `all`.
 
 ```
-              ┌─ analytics-rollup ──────┐
-              ├─ retention ─────────────┤
-5 1 * * * ────┼─ embedding-backfill ────┼──> staleness ──(workflow_run: success)──> nightly export
-              └─ verification-backfill ─┘
+UTC
+01:05  jobs-nightly.yml ──┬─ analytics-rollup ──────┐
+                          ├─ retention ─────────────┤  in parallel,
+                          ├─ embedding-backfill ────┤  fail-fast: false
+                          └─ verification-backfill ─┘
+
+03:17  nightly-export.yml    publishes the dataset — its OWN cron, not chained (see below)
+
+22:00  staleness             external scheduler, outside this repository
 ```
 
-**Ordering is a dependency, not a second cron expression.** The export used to run on its own cron
-at 03:17, seventeen minutes after staleness was meant to have finished. Scheduled workflows start
-late routinely — a busy queue, a maintenance window, a runner shortage — so seventeen minutes
-guarantees nothing, and a late maintenance run published a dataset still advertising programmes the
-API had already closed. `workflow_run` is the only form of "after" that is actually after.
+**Why staleness sits alone, and why 22:00 is before 01:05 rather than after.** The advisory lock
+each job takes excludes a job from **itself**, never one job from another (§3). So two schedulers
+whose windows overlap do not double-write — but they do interleave, and `staleness` running while
+`verification-backfill` is still going closes entries that a successful check was about to keep
+open, with **both runs reporting success** (§4d has the walk-through). Separating them by clock is
+what prevents that, and 22:00 gives the external run more than three hours to finish before the
+chain starts. Within a day the order is then the useful one: verification refreshes at 01:05, and
+that state is what the next evening's staleness pass reads.
 
-**What that costs, stated plainly:** a failing job holds tonight's dataset publication, because the
-export is gated on the maintenance run succeeding. That is the deliberate trade — publishing a
-snapshot whose staleness pass did not run is worse than publishing a day late; the export is
-idempotent and the next night republishes; and `workflow_dispatch` on the export recovers it
-immediately.
+**The open-data export is NOT chained to this workflow.** `nightly-export.yml` runs on its own cron,
+`17 3 * * *`. Nothing triggers it from here; a failed maintenance job does not hold it back, and a
+green one is not a precondition it checks. Ordering between the three schedules is **by clock
+alone** — 22:00 staleness, 01:05 maintenance, 03:17 export — which is a weaker guarantee than a
+dependency, and is written down plainly here because it is easy to assume otherwise.
 
-**The export gate is "the SCHEDULED chain succeeded", not "a maintenance run went green".** A
-conclusion check alone would be satisfied by two runs that never touched the thing the export
-depends on:
+**What that costs, stated plainly:** scheduled workflows start late routinely — a busy queue, a
+maintenance window, a runner shortage — and the clock cannot notice. A staleness run that fails or
+never starts is not observed by the export, which publishes on time regardless; the dataset then
+advertises programmes the API would have closed. The snapshot the export publishes reflects the
+staleness pass from **22:00 the previous evening**, roughly five hours before it runs, so an entry
+that fell past-due inside that window is published as open and corrected the following night. The
+export is idempotent and `workflow_dispatch` on it republishes immediately once the cause is fixed.
 
-* a single-job dispatch — `job=analytics-rollup` skips every staleness step and still concludes
-  successfully;
-* a `environment=staging` dispatch, which maintains a database the production export never reads.
-
-So `nightly-export.yml` additionally requires `github.event.workflow_run.event == 'schedule'`. The
-schedule is the one trigger that always runs the whole chain against production — it leaves `job`
-blank and takes the `production` default for `environment`. A partial or staging dispatch therefore
-publishes nothing, and `workflow_dispatch` on the export remains the operator's way to say "the
-prerequisite is met, publish now".
+> **Known gap.** A `workflow_run` dependency from `nightly-export.yml` onto this workflow would
+> replace that clock with an actual "after", and would additionally have to require
+> `github.event.workflow_run.event == 'schedule'` — a bare conclusion check is satisfied by a
+> single-job dispatch that skipped everything the export depends on, and by an
+> `environment=staging` dispatch that maintained a database the production export never reads.
+> It is **not wired**, and with `staleness` now on a third schedule such a gate would cover only
+> part of the ordering anyway. Deciding it is an owner's call, not this document's.
 
 ### Which deployment a run maintains
 
@@ -239,10 +251,10 @@ is a worse somewhere than the deploy role that already exists.
 
 `.github/scripts/run-ecs-job.sh` is what does it, and it answers the *unprovisioned* case two ways
 on purpose. Two things can be absent — the cluster variable, and the service itself — and on the
-schedule either is a loud `::warning::` and a green job (the export is chained to this workflow, and
-failing over a resource that has never existed would stop the dataset publishing), while on a
-`workflow_dispatch` either **fails**, because an operator dispatching the run is asking whether the
-wiring works.
+schedule either is a loud `::warning::` and a green job — failing the run over a resource that has
+never existed would turn a not-yet-deployed environment into a nightly red build for no one to act
+on — while on a `workflow_dispatch` either **fails**, because an operator dispatching the run is
+asking whether the wiring works.
 
 Before it declines it **prints what it read** — the `failures` array, the service's status, launch
 type, capacity provider strategy and task definition ARN, and that task definition's `networkMode`
@@ -348,26 +360,37 @@ reports success:
 > later and does **not** reopen them — it never writes `status`, and staleness only ever closes rows
 > that are still `open`. Both chains are green. The dataset is wrong.
 
-**So the ordering requirement is the caller's, and the rule is: the chain must not run in two
-overlapping windows.** One of the following has to hold, and which one is an operator's choice:
+**So the ordering requirement is the caller's, and it is settled by the split below rather than by
+the lock.** As deployed:
 
-* the **external scheduler owns the whole chain** and the GitHub cron is disabled — comment out the
-  `schedule:` trigger in `jobs-nightly.yml`, leaving it `workflow_dispatch`-only; **or**
-* the external run is scheduled to **finish before the nightly chain starts**, with enough margin
-  for a slow pass. `5 1 * * *` is the nightly cron, and scheduled workflows start *late*, never
-  early — so the margin only has to cover the external run's own worst case.
+> **The external scheduler owns `staleness` and nothing else. It runs at 22:00 UTC and must FINISH
+> before the 01:05 UTC chain starts. The GitHub chain owns the other four and must NOT include
+> `staleness`.**
 
-Within a chain the requirement is the one §2 states: **`staleness` runs after the other four**,
-because it closes past-due and long-inactive entries and everything downstream must observe that
-state rather than the state before it. Running the five serially with `staleness` last satisfies it;
-running them in parallel does not.
+Both halves are load-bearing, and each fails differently:
 
-**An external run does not publish the open-data dataset.** The export is triggered by
-`.github/workflows/nightly-export.yml` on the **scheduled** run of `jobs-nightly.yml` completing
-successfully (§2), and by nothing else — not a dispatch of that workflow, and not a job started from
-outside GitHub Actions. So the nightly chain remains the gate: it still has to run, and still has to
-succeed, or the day's snapshot is not published. An external schedule is **additional** maintenance,
-never a replacement for the chain the export hangs off.
+* **The chain must not include `staleness`.** That is enforced in `jobs-nightly.yml`: the
+  `staleness` job's steps run only for `job` = `staleness` or `all`, so a **scheduled** run skips
+  them. Blank and `all` are deliberately *not* equivalent for this one job. Were it left on the
+  cron, the two schedulers would both run it — the lock would stop the double write, but not the
+  interleaving above.
+* **The external run must finish first.** 22:00 leaves more than three hours of margin, which only
+  has to cover the external run's own worst case: scheduled GitHub workflows start *late*, never
+  early, so the 01:05 end of the window drifts forward and never backward. If the external run ever
+  grows long enough to threaten that margin, move it earlier — do not rely on the lock to arbitrate.
+
+An operator dispatching `job=all` deliberately runs all five in the documented order — `needs:
+[maintenance]` keeps `staleness` after the other four — and that is a hand-run recovery, not a
+schedule. Dispatching it while the external run is in flight is the one overlap the rule does not
+cover, and the lock will merely make it a no-op rather than a correct run.
+
+**An external run does not publish the open-data dataset, and neither does the chain.**
+`.github/workflows/nightly-export.yml` publishes on its **own cron**, `17 3 * * *` — nothing
+triggers it, from this repository or outside it (§2). So an external `staleness` run has no effect
+on whether the day's snapshot appears, only on what it *says*: the export at 03:17 reflects the
+staleness pass from 22:00 the previous evening. A missed or failed external run is therefore
+invisible to the export, which publishes on time with a stale view. **Monitor the external run on
+its own** — nothing downstream will report its absence for you.
 
 ---
 
@@ -397,9 +420,10 @@ Before the first M3 job run on any deployment, in order:
    already exercised by the deploy workflow with the same credential. Nothing else is needed; the
    maintenance chain uses the **runtime** credential inside the container, not a DDL one.
 5. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
-   loudly if the cluster variable is unset or the service cannot be described. A dispatch does
-   **not** trigger the export (only the scheduled chain does), so confirm the export separately —
-   either wait for one scheduled run or dispatch *Nightly open-data export* directly.
+   loudly if the cluster variable is unset or the service cannot be described. Nothing here
+   triggers the export — it runs on its own cron (§2) — so confirm it separately, either by waiting
+   for its 03:17 run or by dispatching *Nightly open-data export* directly. A `job=all` dispatch
+   also runs `staleness`, which the schedule does not (§2, §4d).
 
 ---
 
