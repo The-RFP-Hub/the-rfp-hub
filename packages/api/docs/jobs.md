@@ -16,7 +16,7 @@ process; it calls the same dispatcher for the newly inserted row ids without inv
 
 | Job | Shape | What it does |
 |---|---|---|
-| `analytics-rollup` | sweep | Recomputes the last **three** days of `opportunity_stats_daily` from the raw events. |
+| `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events. |
 | `retention` | sweep | Deletes raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
@@ -39,11 +39,18 @@ means, and getting it wrong is the difference between a job that finishes and on
   matching "has no embedding"; a closed entry stops matching "is open". `remaining` falls, so the
   runner may go round again.
 * A **sweep** job deliberately **reprocesses a fixed window every time**. `analytics-rollup`
-  re-selects the last three days precisely so that an event written after its own day rolled over —
-  a buffer flushing on a timer, a deployment restarting mid-flush — is never permanently missing.
-  Its selection never empties, so it reports **`remaining: 0` always**, and that is what stops the
-  runner looping it. The rule is structural, not a list of exceptions in the runner: a job that
-  reports nothing remaining is not asked again.
+  re-selects the two days before today precisely so that an event written after its own day rolled
+  over — a buffer flushing on a timer, a deployment restarting mid-flush — is never permanently
+  missing. Its selection never empties, so it reports **`remaining: 0` always**, and that is what
+  stops the runner looping it. The rule is structural, not a list of exceptions in the runner: a job
+  that reports nothing remaining is not asked again.
+
+  **Today is deliberately outside the window.** `GET /v1/insights/…` takes days strictly *before*
+  today from `opportunity_stats_daily` and live-aggregates today's raw events instead, so that a
+  publisher who posts in the morning sees real numbers rather than zeros. A rollup row for today is
+  therefore a row nothing reads — a grouped scan of the busiest, still-growing day of the table
+  whose result the next night's sweep overwrites before anyone could. The two settled days that
+  remain are the late-arrival margin, and they are the whole reason the window is not one day.
 
 The runner's loop condition is `processed > 0 && remaining > 0`, bounded by `--passes`. The
 `processed > 0` half matters as much as the other: a row that cannot be embedded, a URL that
@@ -202,7 +209,10 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   the result looking wrong.
 * `staleness` closes only entries that are still `open`, re-checking under a row lock inside the
   transaction, so a publisher's edit racing the walk wins. A second run finds nothing to close and
-  writes no second audit row.
+  writes no second audit row. A row that *throws* — a deadlock victim, a lock timeout — is logged,
+  counted in `details.failed` and skipped, exactly as both backfills already do: the walk is ordered
+  by id, so letting one row out would abandon every candidate after it, and the same ones every
+  night. A skipped row stays in the predicate for the next run.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no

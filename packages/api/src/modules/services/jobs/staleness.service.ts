@@ -62,16 +62,28 @@ export interface StalenessOptions {
   now?: Date;
 }
 
+export interface StalenessLogger {
+  error(payload: Record<string, unknown>, message: string): void;
+}
+
+const consoleLogger: StalenessLogger = {
+  error(payload, message) {
+    console.error(message, JSON.stringify(payload));
+  },
+};
+
 export class StalenessService {
   private readonly config: AppConfig;
   private readonly repos: Repositories;
+  private readonly logger: StalenessLogger;
 
   constructor(
     private readonly db: DB = defaultDb,
-    options: { config?: AppConfig } = {},
+    options: { config?: AppConfig; logger?: StalenessLogger } = {},
   ) {
     this.config = options.config ?? defaultConfig;
     this.repos = repositories(db);
+    this.logger = options.logger ?? consoleLogger;
   }
 
   /**
@@ -88,6 +100,7 @@ export class StalenessService {
 
     let examined = 0;
     let processed = 0;
+    let failed = 0;
     let cursor = 0;
     const closed: Record<StalenessReason, number> = { past_due: 0, inactive: 0 };
     let recomputed = 0;
@@ -98,7 +111,28 @@ export class StalenessService {
       for (const row of page) {
         cursor = row.id;
         examined++;
-        const outcome = await this.settle(row, now, inactiveBefore);
+        let outcome: Awaited<ReturnType<StalenessService["settle"]>>;
+        try {
+          outcome = await this.settle(row, now, inactiveBefore);
+        } catch (error) {
+          // ONE POISON ROW MUST NOT END THE WALK — the same rule both backfills already keep, and
+          // it matters more here. `settle` opens a transaction per row, so a deadlock victim, a
+          // lock timeout or a constraint nobody anticipated is a per-row failure; letting it out
+          // abandons every candidate after it, and because the walk is ordered by id the SAME
+          // rows are abandoned every night. The row stays in the predicate for the next run, which
+          // is precisely the cursor contract.
+          failed++;
+          this.logger.error(
+            {
+              job: "staleness",
+              opportunityId: row.id,
+              error: error instanceof Error ? error.name : typeof error,
+              reason: error instanceof Error ? error.message : String(error),
+            },
+            "staleness could not settle an entry",
+          );
+          continue;
+        }
         if (outcome === "unchanged") continue;
         processed++;
         if (outcome === "recomputed") recomputed++;
@@ -116,6 +150,9 @@ export class StalenessService {
         closedPastDue: closed.past_due,
         closedInactive: closed.inactive,
         deadlinesRecomputed: recomputed,
+        // Rows that threw and were skipped. A run that swallowed them silently would report a
+        // clean `processed` while the same entries went unsettled indefinitely.
+        failed,
       },
     };
   }

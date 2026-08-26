@@ -11,8 +11,8 @@
  *   `cursor` — the run retires its own selection, so a runner may go round again while it is still
  *              making progress;
  *   `sweep`  — the run reprocesses a fixed window by design, always reports `remaining: 0`, and is
- *              therefore never looped. The rollup re-selects the last three days on purpose; a
- *              loop-to-zero contract applied to it would not terminate.
+ *              therefore never looped. The rollup re-selects the two days before today on purpose;
+ *              a loop-to-zero contract applied to it would not terminate.
  *
  * The lock is taken per NAME (see `lock.ts`), so `staleness` excludes another `staleness` and
  * nothing else. Two different jobs run concurrently quite happily.
@@ -54,16 +54,27 @@ function dbOf(options: JobRunOptions): DB {
 }
 
 /**
- * Maintenance definitions are in chain order: rollup and prune settle yesterday's traffic, the
- * backfills and notification delivery catch up, and `staleness` runs last because the nightly
- * export is chained to its success. Provider refusals are durable row state rather than thrown job
- * errors, so the notification backstop does not fail the chain merely because mail is unavailable.
+ * THE ARRAY ORDER IS THE CHAIN ORDER, and `staleness` is last in it because it has to be.
+ *
+ * The header above used to say so while the array said otherwise — `staleness` sat fifth, ahead of
+ * `notification-dispatch` — which is exactly the kind of drift a comment cannot be trusted to
+ * police. It matters now beyond tidiness: `--help`, the admin route's enum and (from here on) the
+ * `all` chain runner all read this array in order, so a reader who takes the listing as the running
+ * order is right rather than nearly right.
+ *
+ * Why `staleness` is last is the one real ordering rule the chain carries (`docs/jobs.md` §4d): a
+ * successful source check writes `lastSeenAt`, which is the input to staleness's own inactivity
+ * clock, so staleness running before `verification-backfill` has exited closes entries that check
+ * was about to prove alive — and both runs report success. Everything before it writes nothing the
+ * others read. Provider refusals are durable row state rather than thrown job errors, so the
+ * notification backstop does not fail the chain merely because mail is unavailable.
  */
 export const JOBS: JobDefinition[] = [
   {
     name: "analytics-rollup",
     shape: "sweep",
-    describes: "Recompute the last three days of daily per-entry traffic totals from raw events.",
+    describes:
+      "Recompute the two days before today of daily per-entry traffic totals from raw events.",
     run: (options) => new AnalyticsRollupService(dbOf(options)).runBatch({ now: options.now }),
   },
   {
@@ -97,13 +108,6 @@ export const JOBS: JobDefinition[] = [
     run: (options) => new VerificationService(dbOf(options)).runBatch({ limit: options.limit }),
   },
   {
-    name: "staleness",
-    shape: "cursor",
-    describes: "Close past-due and long-inactive entries, and recompute the derived deadline key.",
-    run: (options) =>
-      new StalenessService(dbOf(options)).runBatch({ limit: options.limit, now: options.now }),
-  },
-  {
     name: "notification-dispatch",
     shape: "cursor",
     describes: "Deliver pending account notifications by email, with bounded retries.",
@@ -112,6 +116,13 @@ export const JOBS: JobDefinition[] = [
         limit: options.limit,
         now: options.now,
       }),
+  },
+  {
+    name: "staleness",
+    shape: "cursor",
+    describes: "Close past-due and long-inactive entries, and recompute the derived deadline key.",
+    run: (options) =>
+      new StalenessService(dbOf(options)).runBatch({ limit: options.limit, now: options.now }),
   },
 ];
 

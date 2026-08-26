@@ -252,12 +252,21 @@ run("M3ANA insights", () => {
     expect(empty.json().opportunities).toEqual([]);
   });
 
-  it("rolls up idempotently, and does not double-count today", async () => {
+  it("rolls up the days before today idempotently, and never writes a row for today", async () => {
     const rollup = new AnalyticsRollupService(db);
     const before = await app.inject({
       url: `/v1/insights/opportunities/${PUBLIC_ID}`,
       headers: bearer(publisherToken),
     });
+    const todayTotals = before.json().totals;
+
+    // The window is the two days BEFORE today, so the sweep needs a settled day to settle. These go
+    // in as raw events rather than through the API, because the API can only make today's.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.insert(opportunityEvents).values([
+      { opportunityId: liveId, eventType: "detail_view" as const, occurredAt: yesterday },
+      { opportunityId: liveId, eventType: "detail_view" as const, occurredAt: yesterday },
+    ]);
 
     const first = await rollup.runBatch();
     expect(first.remaining, "a sweep is never looped to zero").toBe(0);
@@ -269,15 +278,27 @@ run("M3ANA insights", () => {
       .from(opportunityStatsDaily)
       .where(eq(opportunityStatsDaily.opportunityId, liveId));
     expect(stored.length).toBe(1);
-    expect(stored[0]?.detailViews).toBe(before.json().totals.detailViews);
+    expect(stored[0]?.day).toBe(utcDayOf(yesterday));
+    expect(stored[0]?.detailViews).toBe(2);
 
-    // Today is served from the LIVE aggregate, never from the rollup row — taking both would
-    // double every number the moment the job first ran.
+    // TODAY IS NEVER ROLLED, because nothing would ever read the row: the series takes days
+    // strictly before today from the rollup and live-aggregates today's raw events. Writing it
+    // would be a grouped scan of the busiest, still-growing day of the table for nobody.
+    expect(
+      stored.some((row) => row.day === utcDayOf(new Date())),
+      "the sweep must not write today",
+    ).toBe(false);
+
+    // Today's half of the series is unchanged — the rollup did not touch it — and yesterday's
+    // newly settled row now shows up in the window alongside it, counted exactly once.
     const after = await app.inject({
       url: `/v1/insights/opportunities/${PUBLIC_ID}`,
       headers: bearer(publisherToken),
     });
-    expect(after.json().totals).toEqual(before.json().totals);
+    expect(after.json().totals).toEqual({
+      ...todayTotals,
+      detailViews: todayTotals.detailViews + 2,
+    });
   });
 
   it("survives an entry deleted WHILE the sweep is running", async () => {

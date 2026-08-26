@@ -239,15 +239,17 @@ export class NotificationDispatchService {
 
     return {
       processed: candidates.length,
-      remaining: await this.remainingCount(notificationIds),
+      remaining: await this.remainingCount(retryBefore, notificationIds),
       details,
     };
   }
 
-  private async remainingCount(notificationIds?: number[]): Promise<number> {
+  /** `retryBefore` is the batch's own floor, so the count answers the selection's question. */
+  private async remainingCount(retryBefore: Date, notificationIds?: number[]): Promise<number> {
     return this.repos.notifications.remainingDispatchCount({
       accountId: this.accountId,
       notificationIds,
+      retryBefore,
       maxAttempts: NOTIFICATION_EMAIL_MAX_ATTEMPTS,
     });
   }

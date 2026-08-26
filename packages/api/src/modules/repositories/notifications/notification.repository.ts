@@ -28,6 +28,11 @@ export interface NotificationDispatchSelection {
 export interface NotificationRemainingSelection {
   accountId?: number;
   notificationIds?: number[];
+  /**
+   * The same cool-down floor `selectForDispatch` uses, and it must be the same VALUE: this count is
+   * the job's `remaining`, which the runner reads as "there is more of this to do".
+   */
+  retryBefore: Date;
   maxAttempts: number;
 }
 
@@ -170,6 +175,16 @@ export class NotificationRepository {
     return leased.sort((left, right) => left.id - right.id);
   }
 
+  /**
+   * How many rows `selectForDispatch` would still pick up — the SAME predicate, deliberately.
+   *
+   * It used to drop the `retryBefore` arm, and the two clauses disagreeing is not a cosmetic
+   * difference: a row that failed a minute ago is inside its five-minute cool-down, so the
+   * selection correctly will not take it, while this count did — and `remaining` is what the
+   * runner reads as "go round again". The next pass then selects nothing, and only the
+   * `processed > 0` half of the loop condition stopped it. A count that answers a different
+   * question from the selection is a count nobody can act on.
+   */
   async remainingDispatchCount(selection: NotificationRemainingSelection): Promise<number> {
     const rows = await this.exec
       .select({ value: count() })
@@ -185,7 +200,11 @@ export class NotificationRepository {
           isNull(notifications.emailDispatchedAt),
           or(
             isNull(notifications.emailFailedAt),
-            sql`${deliveryAttemptsSql()} < ${selection.maxAttempts}`,
+            and(
+              isNotNull(notifications.emailFailedAt),
+              lte(notifications.emailFailedAt, selection.retryBefore),
+              sql`${deliveryAttemptsSql()} < ${selection.maxAttempts}`,
+            ),
           ),
         ),
       );

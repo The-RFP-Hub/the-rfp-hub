@@ -11,8 +11,8 @@
  *   a no-progress pass stops it.
  *
  *   **Sweep jobs** (`analytics-rollup`, `retention`) deliberately reprocess a fixed window every
- *   time — the rollup recomputes the last three days precisely so a late-arriving event is never
- *   permanently missing. Their selection never empties, so they report `remaining: 0` ALWAYS, and
+ *   time — the rollup recomputes the two days before today precisely so a late-arriving event is
+ *   never permanently missing. Their selection never empties, so they report `remaining: 0` ALWAYS, and
  *   that value is what stops the runner looping them. The rule is structural rather than a special
  *   case in the runner: a job that reports 0 is not asked again.
  *
