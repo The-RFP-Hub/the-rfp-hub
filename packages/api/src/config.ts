@@ -98,6 +98,11 @@ export interface VerificationConfig {
   timeoutMs: number;
   maxBytes: number;
   queueMax: number;
+  /**
+   * How many runs per entry survive the backfill's prune. A run carries up to 200 KB of
+   * `snapshot_text`, so an unpruned log is the largest thing this feature writes.
+   */
+  runsKeep: number;
   /** SSRF escape hatch for one loopback test. Refused outright under NODE_ENV=production. */
   allowPrivateHosts: boolean;
   egressProxy: string | undefined;
@@ -768,6 +773,7 @@ export const config: AppConfig = {
     timeoutMs: readPositiveInt(process.env.VERIFY_TIMEOUT_MS, 10_000),
     maxBytes: readPositiveInt(process.env.VERIFY_MAX_BYTES, 2 * 1024 * 1024),
     queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
+    runsKeep: readPositiveInt(process.env.VERIFICATION_RUNS_KEEP, 5),
     allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
     egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
   },

@@ -136,7 +136,7 @@ export class OpportunityMetaService {
 
   /** The most recent run, or undefined when the entry has never been checked. */
   async latestVerification(scope: ViewerScope): Promise<VerificationRunView | undefined> {
-    const run = await this.repos.duplicatePairs.latestVerification(scope.row.id);
+    const run = await this.repos.verificationRuns.latest(scope.row.id);
     if (!run) return undefined;
     return {
       runAt: run.runAt.toISOString(),

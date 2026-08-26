@@ -109,7 +109,11 @@ Each ⏳ table/feature below is annotated inline where it appears.
    verification job's only fetch target. Verification history and source snapshots are
    append-only side tables.
 5. **Append-only history.** Audit trail, verification runs, analytics events, and dataset
-   snapshots are insert-only (no UPDATE/DELETE) — satisfies the M3 "append-only audit trail".
+   snapshots are insert-only (no UPDATE) — satisfies the M3 "append-only audit trail". The
+   AUDIT TRAIL additionally never deletes, and the database enforces it (`0004_audit_immutability`).
+   The three derived logs are bounded by retention instead: raw events by
+   `ANALYTICS_RETENTION_DAYS`, and `verification_runs` by `VERIFICATION_RUNS_KEEP` runs per entry —
+   see "Snapshots" below for why an unbounded run log is the largest thing verification writes.
 6. **Editorial state is server-side.** `review_status` (pending/approved/rejected) is a column,
    never exposed in the public object; public reads filter to approved + listed.
 7. **Idempotent ingestion.** M2 ingest (seed/upsert) keys on the unique `public_id`.
@@ -514,7 +518,7 @@ CREATE TABLE verification_runs (
   snapshot_url     TEXT,              -- ⏳ M4: optional external archive URL (IPFS/archive pinning)
   error            TEXT,              -- why a run produced no page (refused address, timeout, …)
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);  -- INSERT-only
+);  -- INSERT-only; never UPDATEd. Pruned to the newest VERIFICATION_RUNS_KEEP per entry.
 CREATE INDEX ix_verification_opp ON verification_runs (opportunity_id, run_at DESC);
 
 -- ✅ M3 append-only audit trail of every mutation, whatever it is about
@@ -699,6 +703,15 @@ flow sets the opportunity's `snapshot_url`. M3 stores the snapshot **in the data
 
 Raw HTML is deliberately not stored: it is large, it is not what a reviewer reads, and it would be
 an XSS liability the moment any future surface rendered it.
+
+**And the log is bounded.** 200 KB per run is small once and expensive forever: an entry re-checked
+on a schedule appends one row per check for as long as it exists, which is megabytes a year each for
+a history nobody reads past the most recent few. `verification-backfill` therefore prunes each entry
+it touches down to its newest `VERIFICATION_RUNS_KEEP` runs (5 by default), ordered exactly as the
+read path orders them (`run_at DESC, id DESC`) so **the latest run — the one
+`GET /v1/opportunities/{id}/verification` serves — is always among the survivors**. This is a
+retention rule on *evidence*, not a hole in the audit trail: every check also appends a
+`verify_source` row to `audit_log`, which is immutable in the database and is never pruned.
 
 This amends the milestone's "submissions produce a snapshot" criterion to: *an immutable
 in-database record of the extracted content, plus a digest of the original bytes; external

@@ -123,6 +123,15 @@ async function seedEntry(localId: string, applicationUrl: string | null): Promis
   return id;
 }
 
+/** Every run for an entry, newest first — the order the read path and the prune both use. */
+async function runsFor(opportunityId: number) {
+  return db
+    .select()
+    .from(verificationRuns)
+    .where(eq(verificationRuns.opportunityId, opportunityId))
+    .orderBy(desc(verificationRuns.runAt), desc(verificationRuns.id));
+}
+
 async function latestRun(opportunityId: number) {
   const rows = await db
     .select()
@@ -495,6 +504,56 @@ run("M3VER verification", () => {
 
     release();
     await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  // ── retention: the run log is bounded ──────────────────────────────────────────
+  /**
+   * A run carries up to 200 KB of `snapshot_text`. Left alone, an entry re-checked on a schedule
+   * grows an unbounded log of pages nobody reads past the most recent few — so the backfill prunes
+   * to the newest N per entry it touched, and the ONE run that must always survive is the latest,
+   * because that is what the public verification endpoint serves.
+   *
+   * Driven through `pruneRuns` rather than `runBatch` on purpose: `runBatch`'s selection is the
+   * whole table, and a test that ran it would verify — and stamp — entries belonging to every other
+   * suite sharing this database.
+   */
+  it("keeps the newest N runs per entry, prunes the rest, and still serves the latest", async () => {
+    const id = await seedEntry("retention", MATCH_URL);
+    const neighbour = await seedEntry("retention-neighbour", MATCH_URL);
+    const keep = 3;
+
+    // Eight checks of the same entry, plus two of a neighbour that must not be touched: the prune
+    // is scoped to the ids it was given, not to "every entry with too many runs".
+    const service = serviceWith(fixtureTransport(PAGES), { runsKeep: keep });
+    for (let i = 0; i < 8; i++) await service.verify(id);
+    for (let i = 0; i < 2; i++) await service.verify(neighbour);
+
+    const before = await runsFor(id);
+    expect(before.length, "eight checks, eight rows — the log really is append-only").toBe(8);
+    const newest = before.slice(0, keep).map((row) => row.id);
+
+    const pruned = await service.pruneRuns([id]);
+    expect(pruned).toBe(8 - keep);
+
+    const after = await runsFor(id);
+    expect(
+      after.map((row) => row.id),
+      "the newest N survive, in order",
+    ).toEqual(newest);
+    expect((await runsFor(neighbour)).length, "an id the prune was not given is untouched").toBe(2);
+
+    // The property the retention bound must never break: the endpoint still answers with the most
+    // recent run, and it is the same row the service just kept.
+    const res = await app.inject({
+      method: "GET",
+      url: `/v1/opportunities/${NS}:retention/verification`,
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().runAt).toBe(after[0]?.runAt.toISOString());
+    expect(res.json().matched).toBe(true);
+
+    // Pruning twice is not an error and removes nothing further.
+    expect(await service.pruneRuns([id])).toBe(0);
   });
 
   // ── who may ask ────────────────────────────────────────────────────────────────

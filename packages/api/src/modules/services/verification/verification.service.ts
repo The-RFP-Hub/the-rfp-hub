@@ -16,6 +16,13 @@
  * 404 all write a row, because "we tried and this is what happened" is the answer a reviewer needs
  * and silence is indistinguishable from never having checked.
  *
+ * THE RUN LOG IS APPEND-ONLY BUT NOT UNBOUNDED. Each row carries up to 200 KB of `snapshot_text`,
+ * and an entry re-checked on a schedule accumulates one per check forever — megabytes a year, for a
+ * history nobody reads past the most recent few. So the backfill prunes to the newest
+ * `VERIFICATION_RUNS_KEEP` runs per entry it touched. The trail an audit needs is `audit_log`, which
+ * is immutable in the database and is never pruned; this table is evidence for a reviewer looking at
+ * a page NOW, and the retention bound says so.
+ *
  * THE SUBMIT-TIME QUEUE IS BOUNDED, AND THE BOUND IS THE BACKLOG, NOT THE PARALLELISM. A
  * concurrency limit of 2 caps how many fetches run at once; it does nothing about a submitter
  * queueing ten thousand. So the queue itself has a ceiling (`VERIFY_QUEUE_MAX`) and, when it is
@@ -31,6 +38,7 @@ import { type FieldDiff, fieldDiff, isMatched } from "../../shared/field-diff.js
 import { detectBotChallenge, detectSoftNotFound, extractPage } from "../../shared/html-extract.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
 import { type AuditActor, SYSTEM_ACTOR } from "../audit/audit.service.js";
+import type { JobResult } from "../jobs/types.js";
 import {
   type FetchedSource,
   SourceFetchError,
@@ -233,17 +241,14 @@ export class VerificationService {
 
   // ── the backfill job's entry point ─────────────────────────────────────────────
   /**
-   * Check every entry whose source has not been looked at since it last changed, up to `limit`.
+   * Check every entry whose source has not been looked at since it last changed, up to `limit`,
+   * then prune the run log of the entries it touched.
    *
    * A CURSOR job: the run retires the rows it selects (it stamps `verified_at`), so `remaining`
    * decreases and the runner may loop to zero. NO QUEUE TABLE — the predicate below IS the queue,
    * which is also why the submit-time trigger can drop work without losing it.
    */
-  async runBatch(options: { limit?: number } = {}): Promise<{
-    processed: number;
-    remaining: number;
-    skipped?: string;
-  }> {
+  async runBatch(options: { limit?: number } = {}): Promise<JobResult> {
     if (!this.config.verification.enabled) {
       return { processed: 0, remaining: 0, skipped: "verification is disabled" };
     }
@@ -258,7 +263,28 @@ export class VerificationService {
         // One unverifiable entry must not end the batch.
       }
     }
-    return { processed, remaining: await this.pendingCount() };
+    return {
+      processed,
+      remaining: await this.pendingCount(),
+      details: { pruned: await this.pruneRuns(ids) },
+    };
+  }
+
+  /**
+   * RETENTION, run AFTER the batch over exactly the entries it touched.
+   *
+   * Scoped rather than a whole-table sweep for two reasons: a sweep would be a second job pretending
+   * to be this one, scanning rows this pass has no reason to look at; and runs are APPENDED here and
+   * nowhere else, so pruning what this pass just appended to is enough to keep the log bounded.
+   *
+   * Exposed as its own method so the retention rule can be driven — and tested — without an
+   * unscoped batch selecting every entry in the database.
+   */
+  async pruneRuns(opportunityIds: number[]): Promise<number> {
+    return this.repos.verificationRuns.pruneToLatest(
+      opportunityIds,
+      this.config.verification.runsKeep,
+    );
   }
 
   /**

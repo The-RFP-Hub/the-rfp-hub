@@ -199,14 +199,4 @@ export class DuplicatePairRepository {
       .where(inArray(opportunities.id, ids));
     return new Map(rows.map((row) => [row.id, row.publicId]));
   }
-
-  async latestVerification(opportunityId: number): Promise<VerificationRunRow | undefined> {
-    const rows = await this.exec
-      .select()
-      .from(verificationRuns)
-      .where(eq(verificationRuns.opportunityId, opportunityId))
-      .orderBy(desc(verificationRuns.runAt), desc(verificationRuns.id))
-      .limit(1);
-    return rows[0];
-  }
 }

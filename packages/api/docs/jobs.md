@@ -21,7 +21,7 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 | **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
-| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
+| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check, then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. |
 | `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
 
@@ -263,6 +263,8 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   asks the question the counters can answer. One bad row among writes that succeeded stays a
   counter, which is what catching per row is for.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
+  `verification-backfill`'s prune step is likewise idempotent: it keeps the newest
+  `VERIFICATION_RUNS_KEEP` runs of the entries the pass touched, so a second run deletes nothing.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
   sooner than five minutes after the completion of the last attempt — including retries within one
@@ -589,7 +591,7 @@ Before the first M3 job run on any deployment, in order:
 | `analytics-rollup` | `ANALYTICS_RETENTION_DAYS` (default 180), for the prune it ends with. The rollup half reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
 | `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
-| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
+| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFICATION_RUNS_KEEP` (default 5) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 | `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
 
