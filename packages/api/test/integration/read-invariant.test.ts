@@ -144,9 +144,9 @@ run("M3INV the public read invariant", () => {
     const byPublicId = new Map(rows.map((row) => [row.publicId, row.id]));
     const low = Math.min(byPublicId.get(survivorId) as number, byPublicId.get(loserId) as number);
     const high = Math.max(byPublicId.get(survivorId) as number, byPublicId.get(loserId) as number);
-    // With deterministic embeddings, submit-time detection has already inserted this pair. With
-    // embeddings disabled (the local default), the test must create it itself. Resolve either
-    // orientation before inserting so the invariant is proved in both environments without
+    // With the default lexical provider, submit-time detection has already inserted this pair.
+    // With embeddings explicitly disabled, the test must create it itself. Resolve either
+    // orientation before inserting so the invariant is proved in both configurations without
     // violating the unordered pair's expression-backed unique index.
     const existing = await db
       .select({ id: opportunityDuplicates.id })

@@ -25,9 +25,6 @@ Other entry points:
 ```sh
 pnpm --filter @the-rfp-hub/e2e e2e:check-m3   # boots the stack, then runs the milestone checker
                                                # (scripts/check-m3.mjs) against it with a real session
-OPENAI_API_KEY=... pnpm --filter @the-rfp-hub/e2e e2e:openai
-                                               # re-runs only the dedupe spec with a real embedding
-                                               # provider — an extra signal, never the pass/fail gate
 ```
 
 Every resource the runner creates is scoped to one run (`E2E_RUN_ID`, or 8 random hex if unset):
@@ -56,7 +53,6 @@ mail a live code to a real inbox), and the code is written by the API to a file 
 
 | Variable | When | What it does |
 |---|---|---|
-| `OPENAI_API_KEY` | optional | Only read for `e2e:openai`; threaded into the API child solely for that run. |
 | `E2E_OIDC_STUB` | optional | Opt-in for the social-provider lane (see below). Not implemented yet. |
 
 ## The lanes
@@ -93,7 +89,7 @@ What that leaves uncovered, stated plainly rather than buried:
 
 The fallback: drive the linking rules from an API integration test, supply `storageState` by hand for
 any dashboard spec that needs a signed-in social browser, and keep a manual checklist run against
-staging — never a pull-request gate, the posture `e2e:openai` already has.
+staging — never a pull-request gate.
 
 ## Identities are created by using them, and specs may create their own
 
@@ -127,7 +123,7 @@ only place in the run where hitting the limit is the point.
 ## The administrator is granted, not configured
 
 The API does not promote anyone named in its environment. Bring-up runs the shipped ceremony —
-`pnpm --filter @the-rfp-hub/api grant-admin -- --did <did> --create --yes`, with the **admin**
+`pnpm --filter @the-rfp-hub/api grant-admin -- --subject <id> --create --yes`, with the **admin**
 database URL in the child's environment — against whichever identity the rotation selected. That is
 a one-off audited event (`actor_kind: "job"`, `action: "assign_role"`, `reason:
 "operator_grant_admin"`), revocable afterwards over the ordinary admin route, rather than a standing
@@ -146,7 +142,6 @@ which the cross-run assertion in `tests/00-acceptance.setup.ts` checks rather th
 | `E2E_RUN_ID` | Names every resource this run creates. Defaults to 8 random hex characters. |
 | `E2E_TMP` | The PARENT directory to work under. The run's own private directory (mode `0700`) is always a fresh run-scoped child of it — holding the state file, the secret registry, `storageState` and the child logs — and only that child is ever removed, and only after its ownership marker is verified. Defaults to the OS temp location. Never inside the repository. |
 | `E2E_KEEP_TMP` | Leaves that directory in place after the run. A debugging escape hatch, announced loudly on the way out, because the directory holds session material. |
-| `E2E_EMBEDDING_PROVIDER` | `openai` switches the API child off deterministic embeddings for the optional `e2e:openai` run. Any other value leaves it deterministic. |
 | `E2E_ACTOR_SEED` | Rotates which identity plays which part. Deterministic; recorded in the run state. |
 | `E2E_ASSIGNMENT_RECORD` | Where the cross-run assignment record is kept, for the "a fresh database grants nothing" assertion. Opt-in, outside the repository. |
 

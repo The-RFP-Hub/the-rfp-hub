@@ -216,16 +216,32 @@ document points at itself with an atom `link rel="self"`.
 ## Local development
 
 ```bash
+# Something may already hold 5432 — a system Postgres, another checkout. Check first:
+#   docker ps --format 'table {{.Names}}\t{{.Ports}}'
+#   lsof -iTCP:5432 -sTCP:LISTEN
+# If it does, `docker compose up -d` fails with "port is already allocated" — the fix is to edit
+# the published port in docker-compose.yml AND the DATABASE_URL below TOGETHER, since they name
+# the same port twice.
 docker compose up -d                     # Postgres 15 + pgvector (see docker-compose.yml)
 export DATABASE_URL=postgres://rfphub:rfphub@localhost:5432/rfphub
+
+cp .env-example .env
+# Give BETTER_AUTH_SECRET a value that survives a restart: `openssl rand -base64 48` into .env.
+# .env-example explains why an unset one doesn't — a random per-boot secret is generated, so every
+# restart signs every local session out, which presents as "login broke".
+
 pnpm --filter @the-rfp-hub/api migrate       # apply Drizzle migrations (see the note below)
-pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # 142 entries, offline
+pnpm --filter @the-rfp-hub/api seed data/seed-corpus.json --strict   # the committed corpus, offline; --strict reports how many loaded
 pnpm --filter @the-rfp-hub/api dev           # start the server (http://localhost:3001)
 pnpm --filter @the-rfp-hub/api export        # write the open-data export to ./exports
 
 # the same six files, sourced from a running API instead of the database (no DATABASE_URL needed)
 EXPORT_API_URL=http://localhost:3001 pnpm --filter @the-rfp-hub/api export:api
 ```
+
+Pairing this with a local frontend needs one more thing: uncomment `TRUSTED_ORIGINS=http://localhost:3005`
+in this `.env`, or the browser's preflight for the sign-in calls is refused and nobody can log in —
+see [`packages/frontend/README.md`](../frontend/README.md#running-it-locally).
 
 ### Upgrading an existing dev database to the pgvector image
 
@@ -288,10 +304,10 @@ they reach a deployment, is in [`docs/deploy.md`](./docs/deploy.md).
 
 | Group | Variables | Notes |
 |---|---|---|
-| Authentication | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `PREVIEW_ORIGIN_PATTERN` | Sign-in is an email one-time code; the session is an opaque signed token, verified by HMAC **before** any database read, and revocable because it is a row. `BETTER_AUTH_SECRET` is required in production (≥32 chars) and **rotating it signs everyone out**. `TRUSTED_ORIGINS` is the exact-origin allowlist for `/api/auth/*` — `/v1` keeps its wide, credential-free policy. **No environment variable grants a role**: the first admin is made once by `pnpm --filter @the-rfp-hub/api grant-admin -- --email …`, and every later one by an admin over the audited route. |
+| Authentication | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `PREVIEW_ORIGIN_PATTERN` | Sign-in is an email one-time code; the session is an opaque signed token, verified by HMAC **before** any database read, and revocable because it is a row. `BETTER_AUTH_SECRET` is required in production (≥32 chars) and **rotating it signs everyone out**. `TRUSTED_ORIGINS` is the exact-origin allowlist for `/api/auth/*` — `/v1` keeps its wide, credential-free policy. **No environment variable grants a role**: the first admin is made once by `pnpm --filter @the-rfp-hub/api grant-admin -- --email … --create --yes`, and every later one by an admin over the audited route. `--create` matters even right after signing in: the identity exists the moment sign-in succeeds, but its `accounts` row is provisioned lazily, on the first authenticated `/v1` request (in practice `/v1/me`, since that is what opening the dashboard calls) — so a grant run before the dashboard has ever loaded finds an identity with no account yet, and needs `--create` to provision one for it. It cannot conjure an identity that has never signed in. |
 | Email delivery | `EMAIL_TRANSPORT`, `EMAIL_FROM`, `AWS_SES_REGION`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `EMAIL_OUTBOX_DIR` | On the critical path of every login. `ses` in deployments (no credential — task-role IAM), or `mailgun` where one is already operated; the transports that do not deliver refuse to boot under `NODE_ENV=production`. |
 | Google sign-in (optional) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Ships dark: absent → the provider is not registered and no button is rendered. |
-| Duplicate detection | `EMBEDDING_PROVIDER`, `OPENAI_API_KEY`, `EMBEDDING_MODEL`, `EMBEDDING_TIMEOUT_MS`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` | Provider defaults to `openai` with a key and `disabled` without one — never `deterministic`, which is the credential-free CI provider and is not a semantic model. The threshold's default is **per provider**: the same number means different things in different embedding spaces. |
+| Duplicate detection | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` | No credential and no vendor: detection runs on the in-process lexical featurizer and defaults to `lexical` — `disabled` must be asked for. The threshold's default is **per provider**: a cosine is a property of its space. |
 | Verification-assist | `VERIFICATION_ENABLED`, `VERIFY_ON_SUBMIT`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFY_QUEUE_MAX`, `VERIFY_ALLOW_PRIVATE_HOSTS`, `VERIFIER_EGRESS_PROXY` | `VERIFY_ALLOW_PRIVATE_HOSTS` disables the fetcher's SSRF address checks and exists for one loopback test: with `NODE_ENV=production` the process **refuses to start** rather than serving with the guard off. |
 | Analytics | `ANALYTICS_ENABLED`, `ANALYTICS_HMAC_KEY`, `ANALYTICS_RETENTION_DAYS` | The HMAC key is a secret injected at runtime. Unset degrades rather than fails: a random per-boot key keeps the hashes unlinkable to an address, and only session de-duplication across restarts is lost. |
 | Staleness | `STALENESS_INACTIVE_DAYS` | Days without a publisher touch after which an open entry carrying no future fixed deadline is auto-closed. |
@@ -790,6 +806,15 @@ registration lives in `routes/<module>/index.ts`.
 pnpm --filter @the-rfp-hub/api typecheck
 DATABASE_URL=… pnpm test     # integration tests run when DATABASE_URL is set; otherwise skipped
 ```
+
+**A green `pnpm test` with no `DATABASE_URL` exported has only run the unit surface.** Every
+DB-backed suite goes through `describeWithDb` (`test/integration/db-gate.ts`), which resolves to
+`describe.skip` — not a failure — when `process.env.DATABASE_URL` is unset, so the suite reports
+green with none of its integration coverage actually exercised. The gate does warn once per file on
+stderr when it skips, but nothing about the exit code says so. Running the integration suite for
+real needs a real Postgres — the throwaway compose file below locally, the equivalent service
+container in `.github/workflows/ci.yml` — **and** the exported variable pointed at it, which is the
+one part CI and a local run share exactly.
 
 ### Integration tests
 
