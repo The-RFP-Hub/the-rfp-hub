@@ -350,8 +350,10 @@ nobody discovers it during an incident.
 
 The nightly maintenance work runs as **one-off tasks on the API service's own task definition** —
 not a dedicated one. The nightly chain is scheduled **outside this repository**
-([`jobs.md`](./jobs.md) §2 and §4d); `.github/workflows/jobs-nightly.yml` is the operator's
-dispatch path to the same tasks, with the credentials the deploy workflows already hold:
+([`jobs.md`](./jobs.md) §2 and §4d), and **this repository holds no maintenance workflow**: the
+external scheduler is the only nightly caller, and an operator who needs a job run outside that
+starts the same one-off task by hand ([`jobs.md`](./jobs.md) §4a). Either way the command is the
+same:
 
 ```sh
 node packages/api/dist/jobs.js <job> --json      # inside the image, as a container override
@@ -361,11 +363,10 @@ A job is the deployed image with a different command, so it inherits everything 
 in the service's task definition — the image, the runtime `DATABASE_URL`, every secret in
 `secrets:` (§2), the execution and task roles — and the deploy workflows keep it current
 automatically; there is no second copy of that list to fall out of step. Placement is not configured
-either: `run-ecs-job.sh` reads the launch type (or capacity provider strategy) and the placement
-constraints off the running service with `aws ecs describe-services` at task-start time, and passes
-them verbatim, so the job lands exactly where the API lands. **The deployment runs EC2 with `bridge`
-networking and the runner assumes that** — it passes no `--network-configuration`, because there is
-none to pass.
+either: the launch type (or capacity provider strategy) and the placement constraints are read off
+the running service with `aws ecs describe-services` at task-start time and passed verbatim, so the
+job lands exactly where the API lands. **The deployment runs EC2 with `bridge` networking and a
+caller must assume that** — no `--network-configuration` is passed, because there is none to pass.
 
 There is **no public job endpoint and no shared job token**, deliberately: a credential that can
 start a job has to live somewhere, and a token in repository secrets that the internet-facing API
@@ -375,34 +376,32 @@ credential.
 
 ### Operator prerequisites
 
-Two repository variables are configured **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
-from its `environment` input — which defaults to `production`, the deployment the open-data export
-reads. The credentials are picked the same way (`<ENV>_AWS_ACCESS_KEY_ID` /
-`<ENV>_AWS_SECRET_ACCESS_KEY`), so a maintenance run authenticates exactly as `production.yml`
-does.
+Two repository variables are configured **per environment**, `<ENV>` being `PRODUCTION` or
+`STAGING`. Neither is read by a maintenance workflow any more — there is none — but both are still
+what a maintenance run depends on, because the deploy workflow writes their values into the service
+and the service is what a job inherits.
 
 | Repository variable | What it names |
 |---|---|
-| `<ENV>_ECS_CLUSTER` | The cluster the one-off task runs in — the **same** variable `<env>.yml` already requires to deploy the service, so any deployed environment has already set it |
+| `<ENV>_ECS_CLUSTER` | The cluster the service runs in, and therefore the one a one-off task runs in — the **same** variable `<env>.yml` already requires to deploy the service, so any deployed environment has already set it |
 | `<ENV>_APP_BASE_URL` | Canonical HTTPS frontend origin. The API deploy writes it into the service task definition; notification-dispatch reuses that definition |
 
-The workflow reads only the cluster variable directly; `APP_BASE_URL` reaches it through the
-service task definition. The task definition family
-(`rfp-hub-<env>`), the container name and the service (`rfp-hub-<env>-service`) are the names the
-deploy workflows already hardcode; `run-ecs-job.sh` derives them from `<env>` rather than reading a
-second copy of them from configuration.
+Neither reaches a job as a repository variable: the cluster is a name the caller passes on the
+`aws ecs` command line, and `APP_BASE_URL` reaches the job through the service task definition. The
+task definition family (`rfp-hub-<env>`), the container name and the service
+(`rfp-hub-<env>-service`) are the names the deploy workflows already hardcode, and a caller derives
+them from `<env>` rather than keeping a second copy of them in configuration.
 
-The one thing that may still be missing is **IAM**, not a repository variable: the deploy user
-needs `ecs:RunTask` on the task definition and `iam:PassRole` for its execution and task roles.
-Registering a task definition and updating a service — which the deploy workflow already does —
-does not imply the right to start a task from it. This is likely already granted, since the same
-user is the one registering the task definition being started.
+The one thing that may still be missing is **IAM**, not a repository variable: the identity that
+starts the task needs `ecs:RunTask` on the task definition and `iam:PassRole` for its execution and
+task roles. Registering a task definition and updating a service — which the deploy workflow
+already does — does not imply the right to start a task from it. For the deploy user this is likely
+already granted, since it is the one registering the task definition being started.
 
-Until `<ENV>_ECS_CLUSTER` is set, or before that environment has a deployed service to read, a
-**dispatch fails** and the message names what is missing — an operator validating the wiring gets a
-real answer rather than a green run that did nothing. (`run-ecs-job.sh` keeps a warn-and-stay-green
-branch for a caller that is a schedule; this workflow never takes it.) Prove it with one dispatch
-per environment before pointing the external scheduler at the same tasks.
+Before that environment has a deployed service to read, there is nothing to start a job from: the
+`describe-services` call fails and names it, which is the answer an operator validating the wiring
+wants rather than a green run that did nothing. Prove it by hand, once per environment, before
+pointing the external scheduler at the same tasks ([`jobs.md`](./jobs.md) §5).
 
 ### A dedicated task definition is optional
 

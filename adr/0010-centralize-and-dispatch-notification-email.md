@@ -84,10 +84,15 @@ same skipped/no-op path as the job. The database columns remain the source of tr
 queue overflow leaves rows undispatched rather than losing the event.
 
 The dedicated hourly workflow is removed. `notification-dispatch` remains a cursor job with its own
-advisory lock and now runs once daily in the independent matrix of `jobs-nightly.yml`, alongside the
-other bounded 30-minute nightly lanes. It is a backstop for missed immediate attempts and preserves
-the three-attempt cap and five-minute retry floor. Expected provider refusals are recorded as row
-state, not thrown as workflow failures.
+advisory lock and now runs once daily in the independent matrix of `jobs-nightly.yml`, alongside
+the other bounded 30-minute nightly lanes.<sup>†</sup> It is a backstop for missed immediate
+attempts and preserves the three-attempt cap and five-minute retry floor. Expected provider
+refusals are recorded as row state, not thrown as workflow failures.
+
+<sup>†</sup> **Superseded (2026-08-26).** That matrix no longer exists: the whole maintenance chain
+is scheduled and run from outside this repository, and `jobs-nightly.yml` was deleted with it. The
+job, its daily cadence and its ordering are unchanged — only the caller is. See
+[`packages/api/docs/jobs.md`](../packages/api/docs/jobs.md) §2 and §4d.
 
 ## Consequences
 
