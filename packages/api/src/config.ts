@@ -103,6 +103,13 @@ export interface VerificationConfig {
    * `snapshot_text`, so an unpruned log is the largest thing this feature writes.
    */
   runsKeep: number;
+  /**
+   * How old a `verified_at` may be before the backfill checks the entry again. Without it an entry
+   * is checked exactly once and the corpus's "still real" signal decays to nothing.
+   */
+  recheckDays: number;
+  /** Entries one backfill invocation will check. Bounds the nightly run's wall clock. */
+  nightlyLimit: number;
   /** SSRF escape hatch for one loopback test. Refused outright under NODE_ENV=production. */
   allowPrivateHosts: boolean;
   egressProxy: string | undefined;
@@ -774,6 +781,8 @@ export const config: AppConfig = {
     maxBytes: readPositiveInt(process.env.VERIFY_MAX_BYTES, 2 * 1024 * 1024),
     queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
     runsKeep: readPositiveInt(process.env.VERIFICATION_RUNS_KEEP, 5),
+    recheckDays: readPositiveInt(process.env.VERIFY_RECHECK_DAYS, 30),
+    nightlyLimit: readPositiveInt(process.env.VERIFY_NIGHTLY_LIMIT, 500),
     allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
     egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
   },

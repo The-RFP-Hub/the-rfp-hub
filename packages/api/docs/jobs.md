@@ -21,7 +21,7 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 | **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
-| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check, then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. |
+| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` a night — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. |
 | `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
 
@@ -262,9 +262,11 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   such a pass systemic the moment one unrelated row went bad. Judging by "did every attempt fail"
   asks the question the counters can answer. One bad row among writes that succeeded stays a
   counter, which is what catching per row is for.
-* `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
-  `verification-backfill`'s prune step is likewise idempotent: it keeps the newest
-  `VERIFICATION_RUNS_KEEP` runs of the entries the pass touched, so a second run deletes nothing.
+* `embedding-backfill` selects on the absence of the thing it produces. `verification-backfill`
+  selects on that **or on a check having expired**, so its selection refills on a rolling schedule
+  rather than draining to nothing — see "The re-check TTL" below. Its prune step is idempotent
+  too: it keeps the newest `VERIFICATION_RUNS_KEEP` runs of the entries the pass touched, so a
+  second run deletes nothing.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
   sooner than five minutes after the completion of the last attempt — including retries within one
@@ -313,6 +315,43 @@ attempt; it does not run the job loop or retry in memory. A transport failure st
 state, while queue overflow or process loss leaves the row unstamped. If the configured transport
 does not deliver, the service returns the same `email delivery is not configured` skip as the job.
 All of those states remain visible to the nightly unscoped sweep.
+
+### The re-check TTL, and why a failed fetch is not a check
+
+`verification-backfill` used to select `application_url IS NOT NULL AND merged_into_id IS NULL AND
+(verified_at IS NULL OR verified_at < updated_at)`, and that predicate **retires an entry
+permanently**. Applying a verdict deliberately does not bump `updated_at` (the section below says
+why), so the moment `verified_at` is stamped, `verified_at < updated_at` is false and stays false.
+A seeded entry nobody ever edits was checked once, in the week it was imported, and never again.
+
+That is not merely a stale flag. `staleness` closes an entry with no future fixed deadline once
+`coalesce(last_seen_at, updated_at)` is `STALENESS_INACTIVE_DAYS` old, and the only thing that
+refreshes `last_seen_at` is a **matched** check. One check, then silence, then the whole rolling and
+no-deadline half of the corpus auto-closing ninety days after it was seeded.
+
+So the predicate gains a third clause — `verified_at < now() - VERIFY_RECHECK_DAYS` — and with it
+three consequences worth stating:
+
+* **The selection no longer drains.** It refills on a rolling schedule, so `remaining` is not
+  "work still owed tonight". `limit` is therefore a **nightly cap** rather than a page size:
+  `VERIFY_NIGHTLY_LIMIT` (500) bounds one invocation's wall clock and its outbound traffic, and
+  `--limit` overrides it for an operator draining a backlog by hand.
+* **Never-checked entries come first.** The order is `verified_at ASC NULLS FIRST, id`, so when the
+  cap bites it drops a month-old re-check rather than an entry nobody has ever fetched.
+* **A failed fetch is not a check.** A run that never reached the source — `timeout`,
+  `dns_failure`, `transport_failure` — is still recorded, but it leaves `verified_at` and
+  `verified_against_source` exactly as they were, and `processed` does not count it. Stamping on a
+  timeout would suppress the entry for a further `VERIFY_RECHECK_DAYS`, and three suppressed months
+  are precisely the ninety days after which `staleness` closes it: a resolver hiccup would close
+  live listings. Everything else **is** a verdict and does stamp — any HTTP response at all
+  (a 404 is an answer, not an outage), and the refusals `scheme_not_allowed`, `address_refused:*`,
+  `content_type_not_allowed` and the redirect failures, which are facts about the URL a submitter
+  supplied and would learn nothing from being re-fetched nightly.
+
+The cost of that last rule, stated plainly: a domain that has genuinely stopped resolving stays in
+the selection, at the head of it, indefinitely. The nightly cap bounds what that costs, and
+`staleness` closes such an entry at ninety days on its own, since nothing is refreshing its
+`last_seen_at`. Retrying a dead host is the price of not retiring a live one during an outage.
 
 ### What staleness deliberately does not touch
 
@@ -531,7 +570,10 @@ Each clause carries weight:
   is racing the pass it depends on, and the race is silent (the walk-through above). Inside `all`
   this is a `for` loop over `CHAIN` and cannot be got wrong.
 * **Finished before 03:17.** `nightly-export.yml` publishes on its own cron and waits for nothing
-  (§2). A chain still running at 03:17 publishes a dataset maintained halfway.
+  (§2). A chain still running at 03:17 publishes a dataset maintained halfway. The one job whose
+  selection no longer drains is `verification-backfill`, and what keeps it inside that window is
+  `VERIFY_NIGHTLY_LIMIT`: the cap, not the predicate, is what bounds its runtime, so raising it
+  (or passing a larger `--limit`) is a decision about how long the chain may take.
 * **One caller.** Starting a job by hand (§4a) while the external chain is in flight is the one
   overlap nothing prevents; the lock will merely make the collided jobs no-ops rather than correct
   runs. Moving to `all` shrinks this to a single task an operator can see is running, but does not
@@ -591,7 +633,7 @@ Before the first M3 job run on any deployment, in order:
 | `analytics-rollup` | `ANALYTICS_RETENTION_DAYS` (default 180), for the prune it ends with. The rollup half reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
 | `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
-| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFICATION_RUNS_KEEP` (default 5) |
+| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFICATION_RUNS_KEEP` (default 5) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 | `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
 

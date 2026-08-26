@@ -14,7 +14,16 @@
  *
  * A FAILED RUN IS STILL A RUN. A refused address, a timeout, an unusable content type and a soft
  * 404 all write a row, because "we tried and this is what happened" is the answer a reviewer needs
- * and silence is indistinguishable from never having checked.
+ * and silence is indistinguishable from never having checked. BUT A FAILED RUN IS NOT A VERDICT:
+ * a run that never reached the source leaves `verified_at` alone, so the entry stays owed a check
+ * rather than being retired by an outage (`TRANSIENT_FETCH_FAILURES`, below).
+ *
+ * A CHECK EXPIRES. `verified_at` older than `VERIFY_RECHECK_DAYS` puts the entry back in the
+ * selection, because a page checked once in the week it was imported says nothing about whether the
+ * programme is still running today — and because a matched check is the ONLY thing that refreshes
+ * `last_seen_at` for an entry with no future deadline, without which `staleness` closes it after
+ * ninety quiet days. The selection is capped per invocation (`VERIFY_NIGHTLY_LIMIT`) and ordered
+ * never-checked first, so a corpus larger than the cap is worked through rather than half-ignored.
  *
  * THE RUN LOG IS APPEND-ONLY BUT NOT UNBOUNDED. Each row carries up to 200 KB of `snapshot_text`,
  * and an entry re-checked on a schedule accumulates one per check forever — megabytes a year, for a
@@ -123,6 +132,20 @@ export class VerificationService {
     opportunityId: number,
     actor: AuditActor = SYSTEM_ACTOR,
   ): Promise<VerificationRunView> {
+    return (await this.verifyOnce(opportunityId, actor)).view;
+  }
+
+  /**
+   * The same check, plus whether the verdict was APPLIED to the entry.
+   *
+   * The backfill needs that second half and a caller of the route does not: `processed` must count
+   * rows this pass actually settled, or a job that only met dead hosts would report progress and the
+   * runner would go round again over the very same selection.
+   */
+  private async verifyOnce(
+    opportunityId: number,
+    actor: AuditActor,
+  ): Promise<{ view: VerificationRunView; applied: boolean }> {
     const row = await this.loadRow(opportunityId);
     const url = row.applicationUrl?.trim();
     if (!url) {
@@ -155,6 +178,9 @@ export class VerificationService {
     }
 
     const assessed = fetched ? assess(row, fetched) : undefined;
+    // WHETHER THIS RUN IS AN ANSWER ABOUT THE ENTRY, or only about the network in the last ten
+    // seconds. See `isTransientFailure` — a timeout is not a verdict, and must not retire the row.
+    const transient = assessed === undefined && isTransientFailure(failure);
     const now = new Date();
 
     return withTransaction(this.db, async (repos) => {
@@ -177,6 +203,9 @@ export class VerificationService {
         (current.applicationUrl?.trim() ?? null) !== url;
 
       const failureText = failure ? `${failure.category}: ${failure.message}` : null;
+      const transientText = transient
+        ? "not_a_verdict: the source could not be reached, so the previous verdict stands and the entry stays owed a check"
+        : null;
       const staleText = stale
         ? "stale_result: the entry changed while its source was being fetched, so this verdict was recorded but not applied"
         : null;
@@ -193,12 +222,15 @@ export class VerificationService {
         matched: assessed?.matched ?? false,
         snapshotText: assessed?.snapshotText ?? null,
         snapshotSha256: fetched?.sha256 ?? null,
-        error: [staleText, failureText].filter((part) => part !== null).join(" — ") || null,
+        error:
+          [staleText, transientText, failureText].filter((part) => part !== null).join(" — ") ||
+          null,
       });
       if (!run) throw new Error(`failed to record a verification run for ${row.publicId}`);
 
       const matched = assessed?.matched ?? false;
-      if (!stale) {
+      const applied = !stale && !transient;
+      if (applied) {
         await repos.opportunities.applyVerification(row.id, {
           verifiedAgainstSource: matched,
           verifiedAt: now,
@@ -218,55 +250,72 @@ export class VerificationService {
         subjectKind: "opportunity",
         subjectId: row.id,
         action: "verify_source",
-        patch: stale
+        patch: applied
           ? {
-              // No before/after pair: nothing about the entry changed, and a trail that implied
-              // otherwise would be the same lie the update itself would have been.
-              discarded: "stale_result",
-              reason: "the entry changed while its source was being fetched",
-              url,
-            }
-          : {
               verifiedAgainstSource: { before: row.verifiedAgainstSource, after: matched },
               url,
               finalUrl: fetched?.finalUrl ?? null,
               httpStatus: fetched?.status ?? failure?.status ?? null,
               ...(failure ? { error: failure.category } : {}),
+            }
+          : {
+              // No before/after pair in either case: nothing about the entry changed, and a trail
+              // that implied otherwise would be the same lie the update itself would have been.
+              ...(stale
+                ? {
+                    discarded: "stale_result",
+                    reason: "the entry changed while its source was being fetched",
+                  }
+                : {
+                    discarded: "transient_fetch_failure",
+                    reason: "the source could not be reached, so no verdict was applied",
+                    error: failure?.category ?? "unknown",
+                  }),
+              url,
             },
       });
 
-      return toRunView(run);
+      return { view: toRunView(run), applied };
     });
   }
 
   // ── the backfill job's entry point ─────────────────────────────────────────────
   /**
-   * Check every entry whose source has not been looked at since it last changed, up to `limit`,
-   * then prune the run log of the entries it touched.
+   * Check the entries owed a look — never checked, edited since, or checked longer ago than
+   * `VERIFY_RECHECK_DAYS` — up to `limit`, then prune the run log of the ones it touched.
    *
-   * A CURSOR job: the run retires the rows it selects (it stamps `verified_at`), so `remaining`
-   * decreases and the runner may loop to zero. NO QUEUE TABLE — the predicate below IS the queue,
-   * which is also why the submit-time trigger can drop work without losing it.
+   * `limit` IS A NIGHTLY CAP, not a page size. The TTL clause means the predicate now matches the
+   * whole corpus on a rolling schedule rather than draining to nothing, so something has to bound
+   * one invocation's wall clock and its outbound traffic; `VERIFY_NIGHTLY_LIMIT` (500) is it, and
+   * `--limit` overrides it for an operator draining a backlog by hand. The selection is ordered
+   * never-checked first, so the cap drops re-checks before it drops anything unexamined.
+   *
+   * `processed` counts entries this pass SETTLED. A run whose fetch failed transiently, and a run
+   * whose entry was edited underneath it, are both recorded and both deliberately excluded — the
+   * runner's `processed > 0` rule is what stops it looping over a selection it cannot retire.
    */
   async runBatch(options: { limit?: number } = {}): Promise<JobResult> {
     if (!this.config.verification.enabled) {
       return { processed: 0, remaining: 0, skipped: "verification is disabled" };
     }
-    const limit = options.limit ?? 25;
+    const limit = options.limit ?? this.config.verification.nightlyLimit;
     const ids = await this.pendingIds(limit);
     let processed = 0;
+    let unsettled = 0;
     for (const id of ids) {
       try {
-        await this.verify(id, SYSTEM_ACTOR);
-        processed++;
+        const { applied } = await this.verifyOnce(id, SYSTEM_ACTOR);
+        if (applied) processed++;
+        else unsettled++;
       } catch {
         // One unverifiable entry must not end the batch.
+        unsettled++;
       }
     }
     return {
       processed,
       remaining: await this.pendingCount(),
-      details: { pruned: await this.pruneRuns(ids) },
+      details: { selected: ids.length, unsettled, pruned: await this.pruneRuns(ids) },
     };
   }
 
@@ -288,15 +337,20 @@ export class VerificationService {
   }
 
   /**
-   * The selection predicate, in one place: has a URL, and has either never been checked or has been
-   * edited since it last was.
+   * The selection, never-checked first: has a URL, and has either never been checked, been edited
+   * since it last was, or not been checked for `VERIFY_RECHECK_DAYS`.
    */
-  async pendingIds(limit: number): Promise<number[]> {
-    return this.repos.opportunities.listPendingVerificationIds(limit);
+  async pendingIds(limit: number, now: Date = new Date()): Promise<number[]> {
+    return this.repos.opportunities.listPendingVerificationIds(limit, this.recheckBefore(now));
   }
 
-  async pendingCount(): Promise<number> {
-    return this.repos.opportunities.countPendingVerification();
+  async pendingCount(now: Date = new Date()): Promise<number> {
+    return this.repos.opportunities.countPendingVerification(this.recheckBefore(now));
+  }
+
+  /** The TTL cutoff: a `verified_at` older than this is owed another look. */
+  private recheckBefore(now: Date): Date {
+    return new Date(now.getTime() - this.config.verification.recheckDays * 86_400_000);
   }
 
   private async loadRow(opportunityId: number): Promise<OpportunityRow> {
@@ -311,6 +365,33 @@ export class VerificationService {
     if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
     return row;
   }
+}
+
+/**
+ * Fetch failures that say something about the NETWORK rather than about the entry.
+ *
+ * A run in this set is recorded — it is still "we tried and this is what happened" — but it does not
+ * stamp `verified_at`, does not overwrite `verified_against_source`, and leaves the entry owed a
+ * check. WHY THAT MATTERS: with the re-check TTL, stamping on a timeout would not merely mislabel a
+ * run, it would suppress the entry for `VERIFY_RECHECK_DAYS`; and since only a MATCHED check
+ * refreshes `last_seen_at`, three consecutive suppressed months are exactly the ninety days after
+ * which `staleness` closes a rolling entry as inactive. A resolver hiccup would close listings.
+ *
+ * Everything NOT in this set is a verdict about the entry and does stamp `verified_at`, including
+ * the refusals: `scheme_not_allowed`, `address_refused:*`, `content_type_not_allowed` and the
+ * redirect failures are all facts about the URL a submitter supplied, and re-fetching them nightly
+ * would learn nothing. So is any HTTP response at all — a 404 is an answer, not an outage.
+ *
+ * THE TRADE-OFF, stated because it is real: a domain that has genuinely stopped resolving stays in
+ * the selection forever, at the head of it (never-checked and never-stamped sort first). The nightly
+ * cap bounds what that costs — a DNS refusal is cheap and there are only ever so many of them — and
+ * `staleness` closes such an entry at ninety days on its own, since nothing is refreshing its
+ * `last_seen_at`. Retrying a dead host is the price of not retiring a live one during an outage.
+ */
+const TRANSIENT_FETCH_FAILURES = new Set(["timeout", "transport_failure", "dns_failure"]);
+
+function isTransientFailure(failure: SourceFetchError | undefined): boolean {
+  return failure !== undefined && TRANSIENT_FETCH_FAILURES.has(failure.category);
 }
 
 interface Assessment {

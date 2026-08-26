@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SIMILARITY_THRESHOLD,
+  config,
   mailgunCredentialWarning,
   readAllowPrivateHosts,
   readAnalyticsHmacKey,
@@ -477,5 +478,19 @@ describe("readAnalyticsHmacKey", () => {
     expect(first.generated).toBe(true);
     expect(first.key).toMatch(/^[0-9a-f]{64}$/);
     expect(first.key).not.toBe(second.key);
+  });
+});
+
+/**
+ * The three knobs that decide how often the corpus is re-checked and what one night of it costs.
+ * They are asserted as SHIPPED VALUES rather than as readers because the defaults are the contract:
+ * a deployment that sets none of them still re-checks every entry monthly, 500 at a time, keeping
+ * at most five runs each — and `docs/deploy.md` publishes exactly these numbers.
+ */
+describe("the verification schedule's shipped defaults", () => {
+  it("re-checks monthly, caps a night at 500 entries, and keeps five runs", () => {
+    expect(config.verification.recheckDays).toBe(30);
+    expect(config.verification.nightlyLimit).toBe(500);
+    expect(config.verification.runsKeep).toBe(5);
   });
 });

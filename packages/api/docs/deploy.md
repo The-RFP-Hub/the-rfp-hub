@@ -141,6 +141,8 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `VERIFY_TIMEOUT_MS` | `10000` | |
 | `VERIFY_MAX_BYTES` | `2097152` | Streamed cap |
 | `VERIFY_QUEUE_MAX` | `100` | Full → the submit-time trigger is skipped and the entry stays in the job's predicate |
+| `VERIFY_RECHECK_DAYS` | `30` | How old a check may be before the entry is fetched again. Without a TTL an entry is checked exactly once, and `staleness` then closes the rolling half of the corpus 90 days later |
+| `VERIFY_NIGHTLY_LIMIT` | `500` | Entries one `verification-backfill` invocation checks. The TTL means the selection never drains, so this cap — not the predicate — is what bounds the nightly run |
 | `VERIFICATION_RUNS_KEEP` | `5` | Runs kept per entry by `verification-backfill`'s prune step. Each run carries up to 200 KB of `snapshot_text`, so this is what bounds the table |
 | `VERIFY_ALLOW_PRIVATE_HOSTS` | **never set in ANY deployed task definition** — service or maintenance, staging or production | A deliberate SSRF escape hatch that exists so one integration test can drive the real fetcher against a loopback server. Setting it in a deployment would let a submitted `applicationUrl` reach the instance metadata endpoint and the private network. The process **refuses to boot** with it enabled under `NODE_ENV=production`, so this row is defence in depth rather than the only control |
 | `VERIFIER_EGRESS_PROXY` | optional | The network-layer backstop; application-level address validation should not be the only control |

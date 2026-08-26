@@ -27,8 +27,12 @@ import { buildApp } from "../../src/app.js";
 import { type AppConfig, config } from "../../src/config.js";
 import { db, pool } from "../../src/db/client.js";
 import { opportunities, verificationRuns } from "../../src/db/schema.js";
+import { runJob } from "../../src/modules/services/jobs/runner.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
-import type { SourceTransport } from "../../src/modules/services/verification/fetcher.service.js";
+import {
+  SourceFetchError,
+  type SourceTransport,
+} from "../../src/modules/services/verification/fetcher.service.js";
 import { VerificationService } from "../../src/modules/services/verification/verification.service.js";
 import {
   bearer,
@@ -57,6 +61,8 @@ const OFFSITE_DESTINATION = "https://apply.elsewhere-example.net/superchain-buil
 const CHALLENGE_URL = "https://programmes.example.org/challenge";
 
 const DEADLINE = "2099-03-01T00:00:00.000Z";
+const DAY = 86_400_000;
+const ago = (days: number) => new Date(Date.now() - days * DAY);
 
 const PAGES = {
   [MATCH_URL]: {
@@ -93,7 +99,17 @@ function serviceWith(
   return new VerificationService(db, { transport, config: verifyConfig(over) });
 }
 
-async function seedEntry(localId: string, applicationUrl: string | null): Promise<number> {
+type Deadline = { deadlineType: "fixed" | "rolling"; date?: string; label?: string };
+
+const FIXED_DEADLINE: Deadline[] = [
+  { deadlineType: "fixed", date: DEADLINE, label: "application" },
+];
+
+async function seedEntry(
+  localId: string,
+  applicationUrl: string | null,
+  deadlines: Deadline[] = FIXED_DEADLINE,
+): Promise<number> {
   await ingest.upsertFromStandard(
     {
       specVersion: "1.0.0",
@@ -105,7 +121,7 @@ async function seedEntry(localId: string, applicationUrl: string | null): Promis
       operatingOrganizations: [{ name: "Example Foundation", slug: NS }],
       source: { publisher: NS, ingestedVia: "import", verifiedAgainstSource: null },
       ecosystems: ["M3VER"],
-      deadlines: [{ deadlineType: "fixed", date: DEADLINE, label: "application" }],
+      deadlines,
       fundingInfo: { currency: "USD", maxAward: 50000 },
       ...(applicationUrl ? { applicationUrl } : {}),
       fundingDetails: { fundingType: "grant" },
@@ -121,6 +137,17 @@ async function seedEntry(localId: string, applicationUrl: string | null): Promis
   const id = rows[0]?.id;
   if (id === undefined) throw new Error(`could not seed ${NS}:${localId}`);
   return id;
+}
+
+async function load(opportunityId: number) {
+  const rows = await db
+    .select()
+    .from(opportunities)
+    .where(eq(opportunities.id, opportunityId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw new Error(`no opportunity ${opportunityId}`);
+  return row;
 }
 
 /** Every run for an entry, newest first — the order the read path and the prune both use. */
@@ -140,6 +167,20 @@ async function latestRun(opportunityId: number) {
     .orderBy(desc(verificationRuns.runAt), desc(verificationRuns.id))
     .limit(1);
   return rows[0];
+}
+
+/**
+ * The real staleness job, through the runner so it takes the same advisory lock every other caller
+ * does. Another suite running it concurrently reports `skipped: "locked"` rather than walking the
+ * table twice, so this retries a few times rather than asserting against a pass that never ran.
+ */
+async function runStaleness(): Promise<void> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const report = await runJob("staleness", { maxPasses: 1 });
+    if (report.skipped !== "locked") return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("the staleness lock was held for every attempt");
 }
 
 run("M3VER verification", () => {
@@ -504,6 +545,151 @@ run("M3VER verification", () => {
 
     release();
     await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+
+  // ── the re-check TTL: a check expires ──────────────────────────────────────────
+  /**
+   * THE BUG THIS CLOSES. `applyVerification` deliberately does not touch `updated_at`, so once
+   * `verified_at` is stamped the old predicate's `verified_at < updated_at` is false and stays
+   * false: a seeded entry nobody ever edits was checked exactly once, on the day it was imported,
+   * and never again. The TTL clause is the only thing that brings it back.
+   */
+  it("re-selects an entry whose check has gone stale, and would not have without the TTL", async () => {
+    const id = await seedEntry("ttl", MATCH_URL);
+    const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
+
+    await service.verify(id);
+    expect(await service.pendingIds(10_000), "just checked, so nothing is owed").not.toContain(id);
+
+    // The shape a seeded corpus entry is actually in forty days on: imported, checked once shortly
+    // after, and never edited since — so `verified_at > updated_at` and nothing else has moved.
+    await db
+      .update(opportunities)
+      .set({ updatedAt: ago(41), verifiedAt: ago(40) })
+      .where(eq(opportunities.id, id));
+
+    expect(await service.pendingIds(10_000)).toContain(id);
+    // …and the old rules alone would have left it retired for good.
+    const noTtl = serviceWith(fixtureTransport(PAGES), { recheckDays: 36_500 });
+    expect(
+      await noTtl.pendingIds(10_000),
+      "the pre-TTL predicate never re-selects it",
+    ).not.toContain(id);
+  });
+
+  it("puts the never-checked ahead of the merely stale, and takes the cap off the head", async () => {
+    const never = await seedEntry("order-never", MATCH_URL);
+    const stale = await seedEntry("order-stale", MATCH_URL);
+    const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
+    await service.verify(stale);
+    await db
+      .update(opportunities)
+      .set({ updatedAt: ago(41), verifiedAt: ago(40) })
+      .where(eq(opportunities.id, stale));
+
+    const all = await service.pendingIds(10_000);
+    expect(all).toContain(never);
+    expect(all).toContain(stale);
+    // `verified_at ASC NULLS FIRST`: an entry nobody has ever fetched is worth more than one whose
+    // check is a month old, and when the cap bites it is the re-check that is dropped.
+    expect(all.indexOf(never)).toBeLessThan(all.indexOf(stale));
+
+    // The cap is a prefix of that order, not an arbitrary subset — a capped run must be
+    // deterministic, or two nights running would work through the corpus at random.
+    const capped = await service.pendingIds(3);
+    expect(capped.length).toBeLessThanOrEqual(3);
+    expect(capped).toEqual(all.slice(0, capped.length));
+  });
+
+  // ── a failed fetch is not a verdict ────────────────────────────────────────────
+  it("records a transport failure as a run without retiring the entry or its last verdict", async () => {
+    const timingOut: SourceTransport = async () => {
+      throw new SourceFetchError("connect ETIMEDOUT", "timeout", MATCH_URL);
+    };
+
+    // A never-checked entry stays never-checked: the run is recorded, the entry stays owed a check.
+    const fresh = await seedEntry("transient-fresh", MATCH_URL);
+    const view = await serviceWith(timingOut).verify(fresh);
+    expect(view.error).toMatch(/not_a_verdict/);
+    expect(view.error).toMatch(/timeout/);
+    expect(await latestRun(fresh), "we tried, and that is still evidence").toBeTruthy();
+
+    const freshRow = await load(fresh);
+    expect(freshRow.verifiedAt, "an outage must not count as a check").toBeNull();
+    expect(freshRow.verifiedAgainstSource).toBeNull();
+    expect(await serviceWith(fixtureTransport(PAGES)).pendingIds(10_000)).toContain(fresh);
+
+    // And an entry that HAS a verdict keeps it: a timeout is not evidence the page stopped matching.
+    const known = await seedEntry("transient-known", MATCH_URL);
+    await serviceWith(fixtureTransport(PAGES)).verify(known);
+    const before = await load(known);
+    expect(before.verifiedAgainstSource).toBe(true);
+
+    await serviceWith(timingOut).verify(known);
+    const after = await load(known);
+    expect(after.verifiedAt?.getTime()).toBe(before.verifiedAt?.getTime());
+    expect(after.verifiedAgainstSource).toBe(true);
+    expect(after.lastSeenAt?.getTime()).toBe(before.lastSeenAt?.getTime());
+  });
+
+  it("still retires an entry whose URL is refused, because that IS an answer about the URL", async () => {
+    // The contrast that makes the rule above a rule rather than "failures are ignored":
+    // `scheme_not_allowed` is a fact about what the submitter typed, and re-fetching it nightly
+    // would learn nothing.
+    const id = await seedEntry("refused-stamps", "file:///etc/passwd");
+    const view = await serviceWith(undefined, { allowPrivateHosts: false }).verify(id);
+    expect(view.error).toMatch(/scheme_not_allowed/);
+    expect(view.error).not.toMatch(/not_a_verdict/);
+
+    const row = await load(id);
+    expect(
+      row.verifiedAt,
+      "a refusal is a verdict and retires the entry until the TTL",
+    ).toBeTruthy();
+    expect(row.verifiedAgainstSource).toBe(false);
+  });
+
+  // ── the staleness clock the re-check exists to keep winding ────────────────────
+  /**
+   * The ninety-day hazard, end to end. A rolling entry has no `next_deadline_at`, so `staleness`
+   * closes it once `coalesce(last_seen_at, updated_at)` is 90 days old — and the ONLY thing that
+   * refreshes `last_seen_at` is a MATCHED check. One check at import time, then silence, and the
+   * whole rolling half of a seeded corpus auto-closes a quarter later.
+   *
+   * Both halves are asserted, because "it stayed open" means nothing without a neighbour that did
+   * not: the re-checked entry survives the same pass that closes the abandoned one.
+   */
+  it("keeps a rolling entry alive through the staleness pass — and closes its unchecked neighbour", async () => {
+    const rolling: Deadline[] = [{ deadlineType: "rolling", label: "rolling" }];
+    const kept = await seedEntry("rolling-rechecked", MATCH_URL, rolling);
+    const abandoned = await seedEntry("rolling-abandoned", MATCH_URL, rolling);
+
+    // Two hundred days of silence apiece: checked once when they were imported, never since.
+    const silent = ago(200);
+    for (const id of [kept, abandoned]) {
+      await db
+        .update(opportunities)
+        .set({ verifiedAt: silent, lastSeenAt: silent, updatedAt: silent, nextDeadlineAt: null })
+        .where(eq(opportunities.id, id));
+    }
+
+    const service = serviceWith(fixtureTransport(PAGES), { recheckDays: 30 });
+    expect(await service.pendingIds(10_000), "the TTL is what brings it back").toContain(kept);
+
+    const view = await service.verify(kept);
+    expect(view.matched, "a match is what resets the staleness clock").toBe(true);
+    expect((await load(kept)).lastSeenAt?.getTime()).toBeGreaterThan(silent.getTime());
+    expect(
+      (await load(kept)).updatedAt.getTime(),
+      "and it does so without bumping `updated_at`, which two other predicates read",
+    ).toBe(silent.getTime());
+
+    await runStaleness();
+
+    expect((await load(kept)).status, "re-checked, so still open").toBe("open");
+    expect((await load(abandoned)).status, "never re-checked, so closed as inactive").toBe(
+      "closed",
+    );
   });
 
   // ── retention: the run log is bounded ──────────────────────────────────────────
