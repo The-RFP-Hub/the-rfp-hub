@@ -71,6 +71,7 @@ test.describe("M3-7 the public directory", () => {
     const { context, page } = await anonymous(browser);
     try {
       await page.goto(stack.urls.frontend);
+      await expect(page).toHaveTitle("Directory | RFP Hub");
       await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
 
       // The filter is a parameter the endpoint declares — the list route validates its querystring
@@ -250,6 +251,7 @@ test.describe("M3-7 the public entry page", () => {
     const { context, page } = await anonymous(browser);
     try {
       await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
+      await expect(page).toHaveTitle(`Opportunity ${id} | RFP Hub`);
 
       await expect(page.getByRole("heading", { name: new RegExp(replacedTitle) })).toBeVisible();
       // The id and the description reach the page as text.

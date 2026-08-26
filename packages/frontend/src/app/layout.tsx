@@ -6,7 +6,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RFP Hub — funding opportunities",
+  title: {
+    default: "Directory | RFP Hub",
+    template: "%s | RFP Hub",
+  },
   description:
     "An open index of funding opportunities under one standard: read it without an account, and — for publishers — submit and maintain listings, read their traffic, and run the review queues.",
   /*
