@@ -7,8 +7,8 @@
  * THE SCHEDULE IS NOT WHAT THIS CHECKS. A compliance run cannot wait until 01:05 to find out
  * whether a cron fired. What it can establish is the half that matters and that a schedule cannot
  * fix if it is wrong: given the job runs, does it close the right entry, for the right reason,
- * leaving the right trail. That the job is SCHEDULED is a property of
- * `.github/workflows/jobs-nightly.yml`, and the schedule, ordering and runbook are documented in
+ * leaving the right trail. That the job is SCHEDULED is a property of a scheduler outside this
+ * repository, and the schedule, ordering and runbook are documented in
  * `packages/api/docs/jobs.md`.
  *
  * Running it on demand needs a T4 session (`--admin-token`). Without one this SKIPS, because a run

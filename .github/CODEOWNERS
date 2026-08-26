@@ -1,5 +1,5 @@
-# Paths that either execute with deploy credentials (workflows, runner scripts, the nightly
-# jobs) or define what gets deployed (the image, its context, the guard scripts, the lockfile).
+# Paths that either execute with deploy credentials (the workflows and any scripts they call) or
+# define what gets deployed (the image, its context, the guard scripts, the lockfile).
 # A change here needs a maintainer's review before it can merge — enforced by the main branch
 # ruleset's "require review from code owners", which reads this file.
 #

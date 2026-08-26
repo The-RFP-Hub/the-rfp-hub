@@ -6,9 +6,9 @@ durable notification email that the API's immediate in-process trigger missed.
 
 Everything here is implemented in `src/modules/services/jobs/*` and started by
 `scripts/jobs/run-job.ts` (built as `dist/jobs.js`). The nightly chain is **scheduled outside this
-repository** (§2); `.github/workflows/jobs-nightly.yml` is the operator's dispatch path to the same
-entry point. Notification email also has a bounded post-commit trigger in the API process; it calls
-the same dispatcher for the newly inserted row ids without invoking a job.
+repository** (§2), and this repository holds no maintenance workflow at all: every path in §4
+reaches the same entry point. Notification email also has a bounded post-commit trigger in the API
+process; it calls the same dispatcher for the newly inserted row ids without invoking a job.
 
 ---
 
@@ -86,9 +86,10 @@ Running the six one at a time satisfies that rule; so does running the five toge
 `staleness` when the last of them exits. The rule is the contract (§4d); serialising is one way to
 meet it.
 
-`.github/workflows/jobs-nightly.yml` has **no cron**. It is the manual path: a `workflow_dispatch`
-runs the same six under the same rule (`job` = `all`) or a single job by name — a recovery after a
-failed external run, or a check that the wiring works.
+**This repository schedules nothing, and no longer dispatches anything either.** There is no
+maintenance workflow here: the external scheduler is the only caller that runs nightly, and the
+manual path is an operator starting the same one-off task by hand (§4a) — a recovery after a failed
+external run, or a check that the wiring works.
 
 **Why `staleness` is last, and why one caller.** The advisory lock each job takes excludes a job
 from **itself**, never one job from another (§3). So two callers whose windows overlap do not
@@ -120,45 +121,50 @@ after that pass is published as open and corrected the following night. The expo
 `workflow_dispatch` on it republishes immediately once the cause is fixed. **Monitor the external
 run on its own** — nothing downstream will report its absence for you.
 
-> **Known gap.** Nothing enforces "the chain finished" before the export runs. A `workflow_run`
-> dependency cannot supply it: the chain is not a workflow in this repository. An actual "after"
-> would mean the external scheduler dispatching `nightly-export.yml` as its last step and that cron
-> coming off. It is **not wired**. Deciding it is an owner's call, not this document's.
+> **Not enforced.** Nothing makes the export wait for the chain to finish. An actual "after" would
+> mean the external scheduler starting `nightly-export.yml` as its last step and that cron coming
+> off. It is **not wired**. Deciding it is an owner's call, not this document's — until then the
+> two-hour margin is the whole of the guarantee.
 
 ### Which deployment a run maintains
 
-`environment` is a required `workflow_dispatch` input (`production` | `staging`) and defaults to
-**`production`** — the deployment the open-data export reads. The AWS credential and the cluster are
-selected from that name:
+**The nightly chain maintains production** — the deployment the open-data export reads. That is a
+property of the external scheduler, which is where the environment is chosen; nothing in this
+repository selects it.
 
-| Environment | Credentials | Cluster |
-|---|---|---|
-| `production` (the default) | `PRODUCTION_AWS_ACCESS_KEY_ID` / `PRODUCTION_AWS_SECRET_ACCESS_KEY` — the same pair `production.yml` deploys with | `PRODUCTION_ECS_CLUSTER` — the same variable |
-| `staging` | `STAGING_AWS_ACCESS_KEY_ID` / `STAGING_AWS_SECRET_ACCESS_KEY` | `STAGING_ECS_CLUSTER` |
+A manual run (§4a) maintains whichever deployment the operator names on the command line, and the
+names come in threes that must not be mixed:
 
-The lookups are `secrets[format(...)]` / `vars[format(...)]` **index** expressions rather than the
-`&&`/`||` fallback idiom: a fallback treats an unset staging variable as false and silently reaches
-for the production cluster, which is the exact accident this parameterisation exists to prevent. An
-unset variable stays unset and `run-ecs-job.sh` names it, with the environment in the message.
+| Environment | Cluster | Task definition family | Service |
+|---|---|---|---|
+| `production` | the production cluster | `rfp-hub-production` | `rfp-hub-production-service` |
+| `staging` | the staging cluster | `rfp-hub-staging` | `rfp-hub-staging-service` |
 
-### What the runner uses, and what it therefore does not need
+The cluster is the hosting account's own resource name rather than a fact about this project, so it
+is not written down here (see `scripts/check-neutral.mjs`); it is the same value the deploy workflow
+for that environment already reads from a repository variable. Half a pair is the accident worth
+naming: production credentials against a staging cluster fail outright, but a **staging** profile
+pointed at the production service quietly maintains the wrong database. Say the environment out
+loud, in all three names and in the credential profile, every time.
+
+### What a run uses, and what it therefore does not need
 
 **A job is the deployed image with a different command**, so it runs on the API **service's own
 task definition** and inherits everything already assembled there — the image, the runtime
 `DATABASE_URL`, every key of the `secrets:` array, the execution and task roles. Nothing about a
-job is different except `command`, which `run-ecs-job.sh` supplies as a container override.
+job is different except `command`, supplied as a container override.
 
-Everything else is derived from the names the deploy workflows already hardcode, or discovered at
-run time:
+Everything else is a name the deploy workflows already hardcode, or is discovered at run time:
 
 | What | Where it comes from |
 |---|---|
-| Cluster | `<ENV>_ECS_CLUSTER` — the only repository variable the workflow reads directly; the deploy workflow already requires it |
-| Task definition family, container name | `rfp-hub-<env>`, derived in `run-ecs-job.sh` (overridable via `ECS_TASK_DEFINITION` / `ECS_CONTAINER`) |
-| Service | `rfp-hub-<env>-service`, likewise (`ECS_SERVICE`) |
+| Cluster | The environment's cluster — the same repository variable the deploy workflow for it already requires |
+| Task definition family, container name | `rfp-hub-<env>` — the family the deploy workflow registers |
+| Service | `rfp-hub-<env>-service` |
+| Revision | The one the **service is actually running**, read off `describe-services` — not the family name, which resolves to the latest `ACTIVE` revision and can be one whose deploy failed |
 | Launch type / capacity provider strategy | **read from the service** with `aws ecs describe-services`, and reused verbatim |
 | Placement constraints | **read from the service** and reused verbatim, so a job cannot land on capacity the API is deliberately kept off |
-| Network configuration | **none.** The deployment runs EC2 with `bridge` networking, and `run-ecs-job.sh` assumes that: no `--network-configuration` is passed, and none is needed |
+| Network configuration | **none.** The deployment runs EC2 with `bridge` networking: no `--network-configuration` is passed, and none is needed |
 
 Placement is discovered rather than configured for the same reason the task definition is reused:
 restating it in repository variables is asking an operator to keep a copy in sync by hand, and a
@@ -174,8 +180,8 @@ host port** (`hostPort: 0`, the ordinary bridge-mode choice, which lets both tas
 there is **spare eligible capacity** the constraint expression still admits.
 
 The symptom when it is not met is a **placement** failure, not an application error, and it reads
-like an outage until somebody knows otherwise — so `run-ecs-job.sh` names this cause explicitly when
-a stopped task's `stoppedReason` mentions a resource or a port.
+like an outage until somebody knows otherwise: a task that stops with a `stoppedReason` naming a
+resource or a port has not crashed, it never started.
 
 There is consequently **no maintenance task definition to provision** and no second copy of the
 secret list to keep in step with the service's.
@@ -242,51 +248,52 @@ carries the time of the change, which is where that fact belongs.
 
 * **The external scheduler** — the primary one, and the only thing that runs nightly. The contract
   it depends on is (d).
-* **`workflow_dispatch`** — an operator, running the chain or one job by hand (a).
+* **A one-off ECS task, started by hand** — an operator, for staging or an emergency (a).
 * **`POST /v1/admin/jobs/{job}/run`** — a reviewer, one pass, from the dashboard (c).
 * **The image or a checkout** — by hand, locally or inside the container (b).
 
-### a. `workflow_dispatch` (an operator, from Actions)
+### a. A one-off ECS task, started by hand (an operator)
 
-`.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
-own task definition**, using the AWS credentials the deploy workflows already hold. It runs only
-when dispatched. A `job=all` dispatch runs the five independent jobs as a parallel matrix and
-`staleness` afterwards — `needs: [maintenance]`, the same one rule the external scheduler holds
-(§2). **Two calls** per job: read the service to learn where it runs, then start that task
-definition there with a different command.
+**This repository has no maintenance workflow.** The Actions dispatch that used to exist is gone
+along with the chain's schedule: the external scheduler runs the six nightly, and an operator who
+needs a job run outside that — staging, or a recovery after a failed external run — starts the same
+one-off task directly. It is **two calls**: read the service to learn where the API runs, then start
+its task definition there with a different command.
 
 ```sh
-# where the API runs — its own placement, reused verbatim
+# 1. where the API runs — its own revision and placement, to be reused verbatim
 svc=$(aws ecs describe-services --cluster "$CLUSTER" --services rfp-hub-<env>-service)
 
-aws ecs run-task --cluster "$CLUSTER" --task-definition rfp-hub-<env> \
+# 2. the same task definition, one different command
+aws ecs run-task --cluster "$CLUSTER" \
+  --task-definition "$(jq -r '.services[0].taskDefinition' <<<"$svc")" \
   --launch-type "$(jq -r '.services[0].launchType' <<<"$svc")" \
   --overrides '{"containerOverrides":[{"name":"rfp-hub-<env>","command":["node","packages/api/dist/jobs.js","staleness","--json"]}]}'
 ```
 
-No `--network-configuration`: the deployment is EC2 with `bridge` networking, so there is none to
-pass and ECS would reject one anyway.
+Three things about those two calls are the point rather than the ceremony:
 
-That is the sketch. `run-ecs-job.sh` is the same two calls plus the cases a sketch omits: a service
-on a **capacity provider** reports no `launchType` and needs `--capacity-provider-strategy` instead,
-placement constraints are carried across too, and every branch that declines prints what it read
-first.
+* **The revision comes from the service**, not from the family name — `run-task` would resolve
+  `rfp-hub-<env>` to the latest `ACTIVE` revision, which can be one whose deploy failed. A job on a
+  different revision than the API is a job with different configuration than the API.
+* **No `--network-configuration`.** The deployment is EC2 with `bridge` networking, so there is none
+  to pass and ECS would reject one anyway.
+* **Placement is the service's.** A service on a capacity provider reports no `launchType` and takes
+  `--capacity-provider-strategy` instead; a service with `placementConstraints` needs them passed
+  through, or the job lands on capacity the API is deliberately kept off. Both are on the
+  `describe-services` output above — copy them across rather than restating them from memory.
+
+Run one job at a time and in the order §4d states, and **not while the external chain is in flight**
+(§2): the advisory lock keeps a collided job from double-writing, but it makes the second run a
+no-op rather than a correct one.
 
 **There is no public job endpoint and no shared job token.** A credential that can start a job has
 to live somewhere, and "a token in repository secrets that the internet-facing API accepts forever"
 is a worse somewhere than the deploy role that already exists.
 
-`.github/scripts/run-ecs-job.sh` is what does it. Two things can be absent — the cluster variable,
-and the service itself — and either **fails the run**, because an operator dispatching it is asking
-whether the wiring works and a green run that did nothing answers the wrong question. The script
-keeps a second branch, a loud `::warning::` and a green job, for a caller that is a schedule; the
-workflow sets `DISPATCHED=true` unconditionally, so nothing in this repository takes it.
-
-Before it declines it **prints what it read** — the `failures` array, the service's ARN, status and
-task definition ARN, and its launch type, capacity provider strategy and placement constraints — and
-names the case in the message: *service missing (failures: …)*. An absent service and a cluster
-variable pointing at the wrong cluster look identical from outside and have completely different
-fixes, and the log is all an operator has a night later.
+If `describe-services` returns a `failures` array instead of a service, stop and read it before
+retrying: an absent service and a cluster name pointing at the wrong cluster look identical from
+outside and have completely different fixes.
 
 ### b. The image, or a checkout (an operator, by hand)
 
@@ -404,7 +411,7 @@ Each clause carries weight:
   is racing the pass it depends on, and the race is silent (the walk-through above).
 * **Finished before 03:17.** `nightly-export.yml` publishes on its own cron and waits for nothing
   (§2). A chain still running at 03:17 publishes a dataset maintained halfway.
-* **One caller.** Dispatching `jobs-nightly.yml` while the external chain is in flight is the one
+* **One caller.** Starting a job by hand (§4a) while the external chain is in flight is the one
   overlap nothing prevents; the lock will merely make the collided jobs no-ops rather than correct
   runs.
 
@@ -431,21 +438,20 @@ Before the first M3 job run on any deployment, in order:
 2. Apply the migrations with the **DDL-capable** credential:
    `node packages/api/dist/migrate.js` — see [`deploy.md` §5](./deploy.md).
 3. Deploy the API to that environment at least once, so `rfp-hub-<env>` and
-   `rfp-hub-<env>-service` exist and `<ENV>_ECS_CLUSTER` is set. Both are prerequisites of the
-   deploy workflow itself, so this is nearly always already true; the runner reads the service for
-   its placement and prints everything it read when the service is not there yet.
-4. Grant the deploy IAM user **`ecs:RunTask` on the task definition and `iam:PassRole` for the
-   task's execution and task roles**. This is the one permission that may be missing: registering a
-   task definition and updating a service — which the deploy workflow already does — does not imply
-   the right to start a task from it. `ecs:DescribeServices` is already exercised by the deploy
-   workflow with the same credential. Nothing else is needed; the maintenance chain uses the
-   **runtime** credential inside the container, not a DDL one.
+   `rfp-hub-<env>-service` exist and the environment's cluster variable is set. Both are
+   prerequisites of the deploy workflow itself, so this is nearly always already true; a caller
+   reads the service for its revision and its placement, and has nothing to read until then.
+4. Grant the identity that starts tasks **`ecs:RunTask` on the task definition and `iam:PassRole`
+   for the task's execution and task roles**. This is the one permission that may be missing:
+   registering a task definition and updating a service — which the deploy workflow already does —
+   does not imply the right to start a task from it. `ecs:DescribeServices` is already exercised by
+   the deploy workflow with the same credential. Nothing else is needed; the maintenance chain uses
+   the **runtime** credential inside the container, not a DDL one.
 5. Set `<ENV>_APP_BASE_URL` to the canonical frontend origin, then deploy once so the API workflow
    writes it into the service task definition inherited by background tasks.
-6. Prove the wiring with one `workflow_dispatch` of *Nightly maintenance jobs* per environment,
-   once with `job=notification-dispatch` and once with `job=all` — the full chain, `staleness`
-   included. Either fails loudly if the cluster variable is unset or the service cannot be
-   described.
+6. Prove the wiring by hand once per environment (§4a): start `notification-dispatch` as a one-off
+   task and read its `--json` line out of the task's log. A wrong cluster or an undeployed service
+   fails on the `describe-services` call, before anything is started.
 7. Point the **external scheduler** at the same entry point, with the ordering §4d requires, and
    monitor it there: this repository schedules nothing and will not report its absence. Nothing
    here triggers the export either — it runs on its own cron (§2) — so confirm it separately, by

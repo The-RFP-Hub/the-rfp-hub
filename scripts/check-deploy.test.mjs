@@ -125,12 +125,8 @@ describe("this repository, as it stands", () => {
     expect(scanDockerignore(read(".dockerignore"))).toEqual([]);
   });
 
-  it("fetches no secret into the build context, in either deploy workflow or in the scripts they call", () => {
-    for (const rel of [
-      ".github/workflows/staging.yml",
-      ".github/workflows/production.yml",
-      ".github/scripts/run-ecs-job.sh",
-    ]) {
+  it("fetches no secret into the build context, in either deploy workflow", () => {
+    for (const rel of [".github/workflows/staging.yml", ".github/workflows/production.yml"]) {
       expect(scanRunnerSource(read(rel), rel), rel).toEqual([]);
     }
   });
