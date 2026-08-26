@@ -7,6 +7,8 @@ import { MembershipInviteRepository } from "./membership-invites/membership-invi
 import { MembershipRepository } from "./memberships/membership.repository.js";
 import { NotificationRepository } from "./notifications/notification.repository.js";
 import { ClaimRepository } from "./opportunities/claim.repository.js";
+import { DuplicatePairRepository } from "./opportunities/duplicate-pair.repository.js";
+import { EmbeddingRepository } from "./opportunities/embedding.repository.js";
 import { OpportunityRepository } from "./opportunities/opportunity.repository.js";
 import { OrganizationRepository } from "./organizations/organization.repository.js";
 import { VerificationRunRepository } from "./verification/verification-run.repository.js";
@@ -18,6 +20,8 @@ export interface Repositories {
   readonly audit: AuditRepository;
   readonly analytics: AnalyticsRepository;
   readonly claims: ClaimRepository;
+  readonly duplicatePairs: DuplicatePairRepository;
+  readonly embeddings: EmbeddingRepository;
   readonly membershipInvites: MembershipInviteRepository;
   readonly memberships: MembershipRepository;
   readonly notifications: NotificationRepository;
@@ -33,6 +37,8 @@ export function repositories(exec: DbLike): Repositories {
   let audit: AuditRepository | undefined;
   let analytics: AnalyticsRepository | undefined;
   let claims: ClaimRepository | undefined;
+  let duplicatePairs: DuplicatePairRepository | undefined;
+  let embeddings: EmbeddingRepository | undefined;
   let membershipInvites: MembershipInviteRepository | undefined;
   let memberships: MembershipRepository | undefined;
   let notifications: NotificationRepository | undefined;
@@ -60,6 +66,14 @@ export function repositories(exec: DbLike): Repositories {
     get claims() {
       claims ??= new ClaimRepository(exec);
       return claims;
+    },
+    get duplicatePairs() {
+      duplicatePairs ??= new DuplicatePairRepository(exec);
+      return duplicatePairs;
+    },
+    get embeddings() {
+      embeddings ??= new EmbeddingRepository(exec);
+      return embeddings;
     },
     get membershipInvites() {
       membershipInvites ??= new MembershipInviteRepository(exec);

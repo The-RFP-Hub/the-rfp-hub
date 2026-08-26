@@ -58,6 +58,8 @@ describe("repository unit of work", () => {
         "audit",
         "analytics",
         "claims",
+        "duplicatePairs",
+        "embeddings",
         "membershipInvites",
         "memberships",
         "notifications",
