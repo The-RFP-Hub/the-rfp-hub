@@ -6,7 +6,7 @@
  * counterpart is named only while it is approved and listed at emission time; otherwise even an
  * owner-visible pending row is coarsened to an unnamed "other submission" by presentation.
  */
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { type DB, type DbLike, db as defaultDb } from "../../../db/client.js";
 import {
   type OpportunityDuplicateRow,
@@ -118,7 +118,11 @@ export class NotificationService {
     const { page, limit, offset } = paginate(query.page ?? 1, query.limit ?? 20);
     const where = and(
       eq(notifications.accountId, accountId),
-      query.unread === true ? isNull(notifications.readAt) : undefined,
+      query.unread === undefined
+        ? undefined
+        : query.unread
+          ? isNull(notifications.readAt)
+          : isNotNull(notifications.readAt),
     );
     const unreadWhere = and(eq(notifications.accountId, accountId), isNull(notifications.readAt));
     const [rows, counted, unread] = await Promise.all([
