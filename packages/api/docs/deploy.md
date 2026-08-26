@@ -9,11 +9,12 @@ database roles, Actions caches — is **operator work**. The repository holds th
 (`scripts/check-deploy.mjs`, `.dockerignore`, the `Dockerfile`) and this runbook; it cannot and
 must not hold the values.
 
-> **Until the deploy-hygiene change lands**, the legacy baked-`.env` path is still how configuration
-> reaches the image: the deploy workflows fetch the Secrets Manager value into the build context and
-> the Dockerfile copies it in. This page describes the destination state — task-definition
-> injection, nothing in any layer — and every value that travels the legacy path must be **rotated
-> once the clean path is live**, because the layer cache it passed through is readable history.
+> **Nothing is baked into the image any more.** The deploy workflows fetch nothing into the build
+> context and the Dockerfile copies no `.env`; configuration is assembled into the ECS task
+> definition by the deploy job instead. §2 describes both where that stands today — every value in
+> the container's `environment` array, readable in-account — and where it is going, the `secrets:`
+> array, which needs AWS-side wiring. Every value that travelled the old baked-`.env` path must
+> still be **rotated** (§7): the layer cache it passed through is readable history.
 
 ---
 
@@ -33,7 +34,10 @@ Three things enforce this, and CI fails if any of them is undone:
 
 `pnpm check:deploy` (`scripts/check-deploy.mjs`) reads all three and runs in CI before the build.
 
-Configuration reaches the container **at task start**, from the ECS task definition.
+Configuration reaches the container **at task start**, from the ECS task definition. The DEPLOY job
+is what assembles that definition: it reads the environment's Secrets Manager value, parses it with
+`scripts/env-to-container-env.mjs`, and registers a revision carrying the values — after the image
+is built, in a different job, with nothing written next to the Dockerfile.
 
 ---
 
@@ -56,6 +60,48 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
   makes every rotation a task-definition revision and hides operational settings from the people
   who have to reason about them.
 
+### Interim: everything is in `environment`
+
+**The two lists above are the destination, not the present.** Today the deploy job puts every value
+— including the ones this page marks secret — in the container's `environment` array, because
+moving them into `secrets` is work only an operator with AWS access can do: reshape the Secrets
+Manager entry into JSON keys, write the `secrets` array, grant the execution role
+`secretsmanager:GetSecretValue` on it. The repository's own alternative was leaving the values in a
+public repository's layer cache, so the interim was taken deliberately.
+
+One entry is the workflow's rather than the secret's: `APP_BASE_URL` comes from the
+`<ENV>_APP_BASE_URL` repository variable and is written on top of the secret's entries (`--set` in
+the render step), so the value in the task definition is always the one the variable holds.
+
+What it costs:
+
+* every value is readable by any principal that can call `ecs:DescribeTaskDefinition` in the
+  account, and by anyone looking at the task definition in the ECS console;
+* `RegisterTaskDefinition` sends the values as request parameters, so assume **CloudTrail** holds
+  them for its retention period;
+* a revision is immutable, so it **freezes** the values it was registered with: rotating a secret
+  changes nothing that is running until a deploy runs, and rolling the service back to an older
+  revision restores that revision's credentials along with its image.
+
+What it does not cost: nothing is in the image, in a build layer, or in the `mode=max` layer cache
+this **public** repository stores — which is the exposure this replaced, and the larger one.
+
+`PORT` and `NODE_ENV` are **skipped**, not injected (`--skip PORT,NODE_ENV`). The `Dockerfile` sets
+both, and a task definition's `environment` outranks the image's `ENV`: injecting them would let an
+edit to the secret move the port away from the container port and target group wired up in AWS, or
+turn production into development. Everything else in the secret is injected, and a name whose value
+is blank there is dropped — `readOptional` in `src/config.ts` already treats a blank value as unset.
+`DATABASE_URL` and a ≥32-character `BETTER_AUTH_SECRET` are required: missing either, the deploy
+fails before registering anything and the old revision keeps serving.
+
+**Migrating to `secrets` is the deletion of one workflow step.** Once the `secrets` array exists and
+the execution role can read it, delete the "Read configuration from Secrets Manager" step from both
+workflows and drop the `--env` argument from "Render the task definition"; that step then sets only
+the image, which is all the action it replaced ever did. The deploy gate accepts a `DATABASE_URL`
+from **either** list, so it keeps passing throughout. A partial move is caught rather than deployed:
+`scripts/env-to-container-env.mjs` refuses to render a name that appears in both `environment` and
+`secrets`, because ECS resolves one of them and silently ignores the other.
+
 ### Secret values → `secrets`
 
 | Variable | Secret key | What it is |
@@ -63,7 +109,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `DATABASE_URL` | `DATABASE_URL` | **Runtime** connection string — the low-privilege role of §3, never the DDL role |
 | `BETTER_AUTH_SECRET` | `BETTER_AUTH_SECRET` | Signs every session token, and is checked before any database access. **≥32 random characters, different per environment** — the process refuses to boot without it under `NODE_ENV=production`. **Rotating it signs everyone out**: there is no dual-secret verification, so plan a rotation as a deliberate global sign-out |
 | `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | Only when Google sign-in is enabled. Absent → the provider is not registered at all |
-| `MAILGUN_API_KEY` | `MAILGUN_API_KEY` | Only when `EMAIL_TRANSPORT=mailgun`. The HTTP Basic password for the send (the user is the literal `api`). Missing → **refuses to boot** in production, because a mail transport that cannot authenticate delivers nothing to anyone |
+| `MAILGUN_API_KEY` | `MAILGUN_API_KEY` | Only when `EMAIL_TRANSPORT=mailgun`. The HTTP Basic password for the send (the user is the literal `api`). Missing → the service boots **degraded**: a loud warning, the four code-sending routes answering 503 until the pair is complete, everything that sends nothing serving normally |
 | `ANALYTICS_HMAC_KEY` | `ANALYTICS_HMAC_KEY` | Keys the session/IP HMAC. **Never baked**: a leaked key makes the whole IPv4 space brute-forceable against the stored hashes. Unset → a random per-boot key and a warning |
 
 ### Non-secret settings → `environment`
@@ -78,7 +124,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 | `EMAIL_TRANSPORT` | `ses` or `mailgun` | How sign-in codes are delivered. Those two are the delivering transports; `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
 | `EMAIL_FROM` | `no-reply@ethrfps.app` | The envelope sender. Its domain needs SPF/DKIM/DMARC, or the codes land in spam |
 | `AWS_SES_REGION` | the SES region | `ses` only. **No credential** — the task role carries it. That is why SES was chosen over an API-key provider |
-| `MAILGUN_DOMAIN` | the sending domain, e.g. `mg.ethrfps.app` | `mailgun` only. A path segment of the send URL, not a property of the message: it is the domain whose DKIM records Mailgun holds, and it is normally a **subdomain** of `EMAIL_FROM`'s domain. Missing → **refuses to boot** in production, with the key above |
+| `MAILGUN_DOMAIN` | the sending domain, e.g. `mg.ethrfps.app` | `mailgun` only. A path segment of the send URL, not a property of the message: it is the domain whose DKIM records Mailgun holds, and it is normally a **subdomain** of `EMAIL_FROM`'s domain. Missing → same **degraded** boot as the key above: sign-in code delivery disabled with an explicit 503, never a dead service |
 | `MAILGUN_API_BASE` | unset (US), or `https://api.eu.mailgun.net` | `mailgun` only. The regional endpoints are different hosts holding different accounts, so the wrong one is a 401 on every message rather than a slow path. Must be https for any host that is not loopback — every send carries the key in an `Authorization` header |
 | `GOOGLE_CLIENT_ID` | per environment | Absent → no Google provider, no button. Pairs with the secret above |
 | `PORT` | `3004` | Set in the `Dockerfile` so it always matches the container port and target group |
@@ -389,16 +435,25 @@ Removing the mechanism does not un-disclose anything already published. In order
 1. **Rotate every value** in `staging/rfp-hub` and `production/rfp-hub` — database passwords,
    identity-provider app secrets, third-party API keys, the analytics HMAC key. Rotate at the
    source system (issue a new key, then revoke the old one), not only in Secrets Manager.
-2. **Move each value into the task definition** per §2 and roll the service onto a new revision.
-3. **Purge the Actions caches** so the cached layers are gone:
+2. **Run a deploy.** Rotating in Secrets Manager alone changes nothing while §2's interim is in
+   force: the running configuration lives in the task definition revision, and only a deploy
+   registers a new one.
+3. **Delete the Actions caches** — every one of them, on the default branch especially, since that
+   is the set a pull request from a fork can read:
    ```sh
    gh cache list  --limit 100
    gh cache delete --all
    ```
-   The cache keys to be sure of are the buildx ones (`…-buildx-*`, `…-buildx-prod-*`).
-4. **Delete or expire the affected image tags** in the registry, or at minimum stop treating any
-   pre-remediation tag as deployable. A lifecycle policy that expires untagged images does not
-   remove a tagged one.
+   The keys to be sure of are the buildx ones (`…-buildx-*`, `…-buildx-prod-*`). The key prefixes
+   have been bumped to `…-buildx-v2-` / `…-buildx-prod-v2-` so a restore cannot quietly pull an old
+   entry back, but a changed prefix is not a deletion: the old entries stay readable until deleted.
+4. **Delete the affected image DIGESTS**, not just their tags. Untagging leaves the manifest
+   pullable by digest, and a lifecycle policy that expires untagged images does not remove a tagged
+   one:
+   ```sh
+   aws ecr batch-delete-image --repository-name staging-rfp-hub \
+     --image-ids imageDigest=sha256:…
+   ```
 5. **Review access logs** for the window the values were exposed — registry pulls and database
    authentication failures are the two that show use of a leaked credential.
 6. **Re-check** with `pnpm check:deploy` and by inspecting the newly built image:
@@ -410,55 +465,41 @@ Rotation is step 1 for a reason: every later step is worthless while the old val
 
 ---
 
-## 8. `pnpm.overrides`, and why `better-auth` needs three of them
+## 8. `pnpm.overrides` — the inventory, and how to retire an entry
 
 The root `package.json`'s `pnpm.overrides` block exists to keep `pnpm audit --prod --audit-level
-moderate` — the gate `.github/workflows/security-audit.yml` runs weekly — clean. Most entries pin a
-single transitive package past a known advisory (`@fastify/static`, `brace-expansion`, `fast-uri`,
-`fastify>find-my-way`, `postcss>nanoid`) and are self-explanatory from the pin alone. Three exist for
-a less obvious reason, worth recording so the next `better-auth` bump does not silently reopen them:
+moderate` — the gate `.github/workflows/security-audit.yml` runs weekly — clean. **Every entry is
+debt**: it pins a fact about somebody else's dependency graph, and the graph moves. The block is
+kept to the entries an empirical check still proves load-bearing — *delete the override, `pnpm
+install`, `pnpm audit --prod`*: if the advisory does not come back, the entry was dead weight and
+stays out.
 
-**`better-auth@1.7.1` declares `vitest` and `drizzle-kit` as PEER dependencies, not real ones** — a
-correct choice for a library that must not version-lock its host's test runner or migration tool.
-But this project's own root `vitest` devDependency satisfies that peer, and pnpm's peer resolution
-wires it into the graph under `better-auth`'s node. `pnpm audit --prod` walks that graph from a
-production dependency (`better-auth` itself, a real `dependencies` entry in both `packages/api` and
-`packages/frontend`) and counts everything reachable from it — including the peer-satisfied
-`vitest` and everything transitively beneath it (`vite`, `postcss`, `esbuild`) — as production
-exposure. None of it is runtime-reachable; the audit gate cannot tell the difference.
+Why any of this is audit-visible at all: `better-auth` declares `vitest` and `drizzle-kit` as PEER
+dependencies, this workspace's own devDependencies satisfy them, and pnpm wires the satisfied peers
+into the graph under `better-auth`'s node — a real `dependencies` entry of both `packages/api` and
+`packages/frontend`. `pnpm audit --prod` counts everything reachable from there (`vite`, `esbuild`,
+`drizzle-kit`'s loader chain) as production exposure, runtime-reachable or not.
 
-**A scoped override (`"better-auth>vitest": ">=X"`) does NOT work for this.** It was tried first, and
-`pnpm install` accepted it silently but left the actually-installed peer untouched (confirmed via
-`pnpm -r why --prod vitest` before and after) — pnpm's override rewriting targets real dependency
-edges, and a peer satisfied by the workspace's own hoisted devDependency has no such edge for the
-scoped path to rewrite. The only fix that actually moves the installed version is bumping the real
-devDependency: **root `vitest` and `packages/frontend`'s `vitest` both went from `^2.1.8` to
-`^3.2.7`**, which is a real (if incidental) test-runner upgrade, not a pin. It was regression-verified
-against every suite that uses `testAuth`/`testUtils` plus the full root and frontend runs before
-being treated as safe — see the validation trail in this change's report.
+| Override | Forces | Advisories | Why it is reachable | Remove when |
+|---|---|---|---|---|
+| `@esbuild-kit/core-utils>esbuild` | `>=0.28.1` | GHSA-67mh-4wv8-2f99, GHSA-g7r4-m6w7-qqqr | `better-auth` (prod) → peer `drizzle-kit` → legacy `@esbuild-kit` loader → its own `esbuild` | `drizzle-kit` drops `@esbuild-kit` (its changelog has promised to). Verify by deletion: remove the line, `pnpm install`, `pnpm audit --prod` — clean means gone for good |
+| `vite>esbuild` | `>=0.28.1` | same pair | `better-auth` (prod) → peer `vitest` → `vite` → its bundled `esbuild` | `vite` ships `esbuild >=0.28.1` in its own range. Same verify-by-deletion |
 
-**`vite` still needed a global override.** Bumping `vitest` alone left its own `vite` peer resolving
-to the newest 5.x patch available (`5.4.21`), which the advisory covers (fixed only from `6.4.3`).
-`"vite": "7.3.6"` pins it inside both `vitest@3.2.7`'s accepted peer range (`^5 || ^6 || ^7.0.0-0`)
-and `@vitejs/plugin-react@4.7.0`'s (`^4.2 || ^5 || ^6 || ^7`). The override alone was **not
-sufficient for `@vitejs/plugin-react`'s own peer slot** — it kept resolving to whatever the latest
-published `vite` was (`8.x`, itself unaffected but outside both accepted ranges) until `vite` was
-also added as an explicit `packages/frontend` devDependency pinned to the same `7.3.6`, giving that
-peer a real edge to anchor on. Confirmed stable across three consecutive `rm -rf node_modules &&
-pnpm install` cycles before being treated as deterministic.
+Both pin `>=0.28.1`, not the advisory's stated `>=0.25.0` floor: `>=0.25.0` re-resolved to
+`0.27.x`, which a second, lower-severity esbuild advisory also covers; `>=0.28.1` clears both.
+They are two entries because they are two unrelated dependency paths that share a package name.
 
-**Two separate `esbuild` chains needed their own pins**, because they are unrelated dependency paths
-that happen to share a package name: `vite>esbuild` (vite's own bundled copy) and
-`@esbuild-kit/core-utils>esbuild` (pulled in by `drizzle-kit`'s legacy `@esbuild-kit` loader, a
-different peer chain entirely). Both are pinned to `>=0.28.1` — not the advisory's stated `>=0.25.0`
-floor, because `>=0.25.0` alone re-resolved to `0.27.x`, which a *second*, lower-severity esbuild
-advisory (Windows dev-server file read) also covers; `>=0.28.1` clears both in one pin.
+**Retired entries, and why** (recorded so a red weekly audit has its history in one place): the
+empirical remove-all-and-re-resolve check showed upstream caught up on `brace-expansion`,
+`fast-uri`, `fastify>find-my-way` and `postcss>nanoid` — today's default resolution satisfies all
+four advisories with no pin. `@fastify/static: 10.1.2` was needed only while `swagger-ui` was v5;
+the API's `@fastify/swagger-ui@^6` pulls a fixed `static` in its own range. The global
+`vite: 7.3.6` override was redundant with the real `packages/frontend` devDependency pinned to the
+same version — the devDependency is what gives `@vitejs/plugin-react`'s peer slot a real edge to
+anchor on, which is the part an override alone was proven not to reach.
 
-**Recheck all three on every `better-auth` version bump.** They are pinned to what `1.7.1`'s peer
-ranges currently accept; a future `better-auth` release can shift those ranges (or drop the `vitest`/
-`drizzle-kit` peers entirely) and make some or all of this unnecessary — or insufficient. Re-verify
-with `pnpm -r why --prod vitest`, `pnpm -r why --prod vite`, `pnpm -r why --prod esbuild`, then
-`pnpm audit --prod --audit-level moderate`, before assuming the pins still apply.
+**Recheck on every `better-auth` bump**: its peer ranges are what make the whole chain reachable.
+`pnpm -r why --prod esbuild`, then the audit, before assuming anything still applies.
 
 Five other, older overrides (`@coinbase/cdp-sdk>axios`, `viem>ws`, `@metamask/utils>uuid`,
 `@metamask/sdk>uuid`, `@metamask/sdk-communication-layer>uuid`) were removed in the same change:

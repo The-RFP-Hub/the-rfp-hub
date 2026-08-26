@@ -6,9 +6,30 @@ coverage/
 .DS_Store
 *.log
 
-# local env + API data exports (M2)
+# Local env files, in every spelling and at every depth. `.env` + `.env.local` was the whole rule,
+# which left `.env.production`, `.env.staging` and every `packages/*/.env` untracked but NOT
+# ignored — one `git add -A` during a deploy debugging session away from being published, in a
+# repository that is public. Four patterns because gitignore matching is path-based the same way
+# Docker's is: a bare `.env` covers the repo root, `**/.env` the nested ones, and the `.env.*`
+# pair the suffixed spellings.
+#
+# The negations are what keeps `.env-example` — the file that exists to be read and committed —
+# out of the rule. It is `.env-example`, not `.env.example`, so `.env.*` does not reach it today;
+# the negations are stated anyway so that renaming it does not silently un-track it.
 .env
-.env.local
+.env.*
+**/.env
+**/.env.*
+!.env-example
+!**/.env-example
+
+# The deploy job's plaintext scratch files: the downloaded ECS task definition (which carries the
+# previous revision's environment) and the parsed pairs. They are written under $RUNNER_TEMP and
+# deleted there — these lines are for the local reproduction of a deploy, so a debugging session
+# cannot leave one staged. .dockerignore carries the same two patterns for the build context.
+task-definition*.json
+container-env*.json
+
 # The exporter's LOCAL output directory, and only that one: the pattern is deliberately anchored
 # to this path rather than written as a bare `exports/`, because the repo-root `exports/` is the
 # PUBLISHED dataset and has to stay tracked (see .github/workflows/nightly-export.yml).

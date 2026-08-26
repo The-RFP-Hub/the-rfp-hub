@@ -77,16 +77,24 @@ COPY --from=builder /app/packages/api/data/seed-corpus.json packages/api/data/se
 # this path; the ordinary run leaves it in the container's own layer.
 RUN mkdir -p /app/exports && chown node:node /app/exports
 
-# Bake `.env` into the image. The CI workflow pulls the file from AWS
-# Secrets Manager (staging/rfp-hub or production/rfp-hub) before the
-# Docker build so this COPY picks it up. Glob form (`.env*`) means the
-# build doesn't fail when no .env is present (e.g. local `docker build`
-# during dev). `src/config.ts` loads it with dotenv, and the CMD also
-# passes Node's --env-file-if-exists; both paths leave real environment
-# variables winning over .env values, so a task definition that supplies
-# DATABASE_URL overrides whatever was baked in. That is what lets the
-# one-off tasks below run as a bare `node …` with no flag of their own.
-COPY .env* ./
+# NO SECRETS ARE BAKED INTO THIS IMAGE. There is deliberately no `COPY .env*`
+# here and `.env`/`.env.*` are excluded from the build context by
+# `.dockerignore`, which `scripts/check-deploy.mjs` enforces in CI.
+#
+# An image is not a secret store: anyone who can pull it — and, when the build
+# uses a `mode=max` layer cache in a public repository, anyone who can read
+# that cache — can read every value inside it. Every runtime variable is
+# therefore injected by the ECS task definition, which the DEPLOY job assembles
+# from Secrets Manager on its way past: interim in the container definition's
+# `environment` array, and eventually in its `secrets:` array, each entry
+# resolving a Secrets Manager JSON key at task start. See packages/api/docs/deploy.md
+# for the variable→secret table, what the interim step exposes and to whom, the
+# split migration/runtime credentials, and the rotation runbook for values that
+# were baked into earlier images.
+#
+# `src/config.ts` still calls dotenv, so a developer's local `packages/api/.env`
+# keeps working; in the image there is no such file and the real environment is
+# the only source.
 
 # PORT is fixed here rather than in the secret so it always matches the
 # container_port/back_end_port wired into the ECS task and ALB target group.
@@ -94,4 +102,4 @@ ENV PORT=3004
 EXPOSE 3004
 USER node
 
-CMD ["node", "--env-file-if-exists=.env", "packages/api/dist/server.js"]
+CMD ["node", "packages/api/dist/server.js"]

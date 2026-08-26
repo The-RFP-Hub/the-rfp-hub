@@ -171,11 +171,22 @@ overrides=$(
     '{containerOverrides: [{name: $name, command: ["node", "packages/api/dist/jobs.js", $job, "--json"]}]}'
 )
 
-echo "starting ${JOB} on ${task_definition} in ${cluster} (${TARGET_ENV}), placed like ${service}"
+# The revision to run: the one the service is ACTUALLY running, straight off the describe call
+# above — not the family name, which `run-task` would resolve to the latest ACTIVE revision, and
+# that can be a revision whose deploy failed or one registered out of band. A job started on a
+# different revision than the API is a job with different configuration than the API. An explicit
+# ECS_TASK_DEFINITION override still wins, because it was typed on purpose.
+run_task_definition="${ECS_TASK_DEFINITION:-$service_task_definition}"
+if [ -z "$run_task_definition" ]; then
+  print_discovery
+  not_provisioned "service ${service} names no task definition: deploy the ${TARGET_ENV} API first, so '${JOB}' did not run"
+fi
+
+echo "starting ${JOB} on ${run_task_definition} in ${cluster} (${TARGET_ENV}), placed like ${service}"
 task_arn=$(
   aws ecs run-task \
     --cluster "$cluster" \
-    --task-definition "$task_definition" \
+    --task-definition "$run_task_definition" \
     "${run_args[@]}" \
     --overrides "$overrides" \
     --started-by "scheduled-jobs/${JOB}" \

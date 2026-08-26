@@ -16,9 +16,21 @@ name: Nightly open-data export
 # the run rather than publishing anything if the API disagrees with itself or serves a record the
 # Standard rejects.
 #
-# A green run means PUBLISHED AND INDEPENDENTLY VERIFIED, never merely "ran": the last two steps
-# re-download what was pushed from the public URL and hold the deployment plus the published files
-# to the M2 compliance criteria.
+# A green run means PUBLISHED AND INDEPENDENTLY VERIFIED, never merely "ran": the `verify` job
+# re-downloads what was pushed from the public URL and holds the deployment plus the published
+# files to the M2 compliance criteria.
+#
+# THE RUN IS SPLIT IN THREE JOBS, AND THE SPLIT IS THE SECURITY BOUNDARY. Building the export
+# means `pnpm install --frozen-lockfile` and then running the workspace, which is a few hundred
+# third-party packages plus their lifecycle scripts. If that happened in the same job as the write
+# token, any one of them could reach it: a job's steps share a process environment that earlier
+# steps can extend through $GITHUB_ENV and $GITHUB_PATH, so a compromised dependency does not need
+# to read `.git/config` — it can arrange for a later step to hand it whatever the runner has. So the
+# token lives in a job that runs NOTHING from node_modules and nothing from this repository: it
+# downloads an artifact, checks the file names against an allowlist, copies them into place and
+# commits. `build` produces that artifact with `contents: read`; `verify` re-installs to run the
+# compliance checker, also with `contents: read`, because that checker needs ajv and the built
+# workspace validator and therefore must not sit in the publishing job either.
 #
 # Every action is pinned to a full commit SHA, with the release it belongs to in the trailing
 # comment. This is the one workflow in the repository that can WRITE to the default branch, so
@@ -35,9 +47,10 @@ on:
   schedule:
     - cron: "17 3 * * *"
 
-# The whole point of the job: it writes a commit to the default branch.
+# The floor for every job in this file. `publish` raises its own to `contents: write` — it is the
+# one job that writes a commit to the default branch, and the only one that can.
 permissions:
-  contents: write
+  contents: read
 
 # One publisher at a time, and never cancelled part-way. Two overlapping runs would race on the
 # same six file names and push two snapshots at each other; a run cancelled between the commit and
@@ -50,26 +63,29 @@ env:
   API_BASE_URL: https://api.ethrfps.app
   EXPORT_ROOT_URL: https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main/exports
 
+
 jobs:
-  publish:
-    name: Publish and verify
+  # ── BUILD ───────────────────────────────────────────────────────────────────────────────────────
+  # Installs, builds and runs the export. This is the job that executes third-party code, so it is
+  # also the job that holds no write token: `contents: read`, and a checkout that leaves no
+  # credential behind for a lifecycle script to find. Its whole output is one artifact.
+  build:
+    name: Build the export
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
 
     steps:
-      # Full history: the push below rebases onto whatever main has become, which a shallow clone
-      # cannot do.
+      # `persist-credentials: false` matters even at `contents: read`: the default checkout leaves a
+      # credential for the job's token in `.git/config`, where every later step inherits it —
+      # including `pnpm install`, which runs third-party lifecycle scripts, and the export, which
+      # parses data fetched from the network. Nothing here needs one.
       #
-      # `persist-credentials: false` is the load-bearing setting on this job. By default the
-      # checkout leaves a credential for the job's token in `.git/config`, where every later step
-      # inherits it — including `pnpm install`, which runs third-party lifecycle scripts, and the
-      # export, which parses data fetched from the network. THE INVARIANT: no credential exists in
-      # the working copy while any of that runs; the push step below is the only place a token is
-      # present, and it supplies one explicitly for the length of one command.
+      # No `fetch-depth: 0`: the rebase that needed full history is in `publish` now.
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          fetch-depth: 0
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -87,30 +103,114 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Writes to a scratch directory rather than straight into the working tree, so a failed or
-      # short run cannot leave a half-replaced `exports/` behind for the commit step to find. The
-      # exporter's own floor (EXPORT_MIN_COUNT, default 100) means an empty or half-loaded API
-      # publishes NOTHING and fails here instead.
+      # Writes to a scratch directory rather than into the working tree, so a failed or short run
+      # cannot leave a half-replaced `exports/` behind. The exporter's own floor (EXPORT_MIN_COUNT,
+      # default 100) means an empty or half-loaded API publishes NOTHING and fails here instead.
       - name: Export the dataset from the live API
         env:
           EXPORT_API_URL: ${{ env.API_BASE_URL }}
           EXPORT_OUT_DIR: ${{ runner.temp }}/export
         run: pnpm --filter @the-rfp-hub/api export:api
 
+      # The handover. Everything downstream of this point sees these files and nothing else from
+      # this job — not the checkout, not node_modules, not $GITHUB_PATH.
+      - name: Upload the snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: export-snapshot
+          path: ${{ runner.temp }}/export
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── PUBLISH ─────────────────────────────────────────────────────────────────────────────────────
+  # The only job with `contents: write`, and deliberately the emptiest one: a checkout, a download,
+  # a name check, a copy and a commit. It runs no `pnpm install` and nothing out of this repository,
+  # so there is no third-party code in the process tree that holds the token.
+  publish:
+    name: Publish to main
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+
+    steps:
+      # Full history: the push below rebases onto whatever main has become, which a shallow clone
+      # cannot do. The checkout keeps its credential here — that is what this job is FOR, and the
+      # reason the old single-job version had to refuse one (a credential in `.git/config` that
+      # `pnpm install` could reach) does not exist in a job that never installs anything.
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Download the snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: export-snapshot
+          path: ${{ runner.temp }}/snapshot
+
+      # An artifact is INPUT, and this job is the one that can write to main — so its contents are
+      # checked before anything is copied out of it, by name, against the six files the exporter
+      # produces (packages/api/scripts/export-writer.ts). An allowlist rather than a denylist:
+      # anything the build job did not mean to produce, a nested directory, a symlink, a stray
+      # `.js`, stops the run instead of being committed. `find` rather than a glob so entries inside
+      # subdirectories are seen as the paths they are.
+      - name: Check the snapshot against the allowlist
+        env:
+          SNAPSHOT: ${{ runner.temp }}/snapshot
+        run: |
+          set -euo pipefail
+          cd "$SNAPSHOT"
+          bad=0
+          while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+            if [ ! -f "$entry" ] || [ -L "$entry" ]; then
+              echo "::error::not a regular file: $entry"
+              bad=1
+              continue
+            fi
+            case "$entry" in
+              LICENSE|latest.json|latest.csv|latest.manifest.json) ;;
+              opportunities-*.json|opportunities-*.csv) ;;
+              *) echo "::error::the export artifact carries an unexpected file: $entry"; bad=1 ;;
+            esac
+          done < <(find . -mindepth 1 -printf '%P\n')
+
+          # And the other direction: the six have to all be there. A manifest that named archives
+          # the artifact did not carry would publish a dataset that cannot be verified.
+          for required in LICENSE latest.json latest.csv latest.manifest.json; do
+            [ -f "$required" ] || { echo "::error::the export artifact is missing $required"; bad=1; }
+          done
+          for pattern in 'opportunities-*.json' 'opportunities-*.csv'; do
+            # Unquoted on purpose: this is the one place the value is MEANT to expand as a glob.
+            # With no match it stays literal and the -f test below fails, which is the answer.
+            # shellcheck disable=SC2086
+            set -- $pattern
+            [ -f "$1" ] || { echo "::error::the export artifact carries no ${pattern} archive"; bad=1; }
+            # Exactly one: a second archive of the same format would be copied and committed too,
+            # and the manifest-driven verifier never enumerates the export root to notice it.
+            [ "$#" -eq 1 ] || { echo "::error::the export artifact carries $# ${pattern} archives; expected exactly one"; bad=1; }
+          done
+
+          [ "$bad" -eq 0 ] || exit 1
+          ls -l
+
       # `exports/` holds exactly ONE run: this run's six files, replacing the six before them. The
       # superseded snapshots are not lost — every one of them is in git history, which is a better
       # archive than a directory that grows by two files a day and that every clone has to carry.
       - name: Stage the snapshot
+        env:
+          SNAPSHOT: ${{ runner.temp }}/snapshot
         run: |
           set -euo pipefail
           mkdir -p exports
           find exports -maxdepth 1 -type f ! -name README.md -delete
-          cp "$RUNNER_TEMP"/export/* exports/
+          cp "$SNAPSHOT"/* exports/
           ls -l exports
 
-      # The ONLY step that holds a credential. The checkout deliberately left none behind, so the
-      # token is supplied here, to this step, and reaches nothing that ran before it. The runner
-      # masks it in logs, so a git error quoting the remote URL cannot print it.
+      # The token is supplied here, to this step. The runner masks it in logs, so a git error
+      # quoting the remote URL cannot print it.
       - name: Commit and push to main
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -136,8 +236,7 @@ jobs:
           # rather than resolving blind.
           #
           # The fetch names a URL rather than the `origin` remote, so it updates FETCH_HEAD instead
-          # of a remote-tracking ref — which is what the rebase targets. Nothing here depends on
-          # the working copy carrying a configured credential, which is the point.
+          # of a remote-tracking ref — which is what the rebase targets.
           for attempt in 1 2 3 4 5; do
             if git push "$remote" HEAD:main; then
               exit 0
@@ -160,6 +259,9 @@ jobs:
       # deliberately with no cache-busting query parameter, which would prove something no consumer
       # can observe. The manifest is the right thing to poll: it is the run's single authoritative
       # pointer, replaced with one rename, so matching it means the whole file set is this run's.
+      #
+      # It stays in this job because it is `curl` and `sha256sum` — no repository code, no
+      # node_modules, nothing that the token's presence here makes riskier.
       - name: Wait for the published manifest to be served
         run: |
           set -euo pipefail
@@ -178,11 +280,45 @@ jobs:
           echo "the published manifest was still not being served after 10 minutes"
           exit 1
 
-      # The gate. Downloads the export from its public URL and exercises the deployed API against
-      # the M2 criteria: liveness, every published OpenAPI operation, every served document against
-      # the Standard, and the export's own freshness, licence and manifest — re-hashing the archives
-      # the manifest names rather than believing the counts it states. Non-zero fails the job, so a
-      # green run cannot mean "published something nobody looked at".
+  # ── VERIFY ──────────────────────────────────────────────────────────────────────────────────────
+  # The gate, and a THIRD job only because of what it needs: `scripts/check-m2.mjs` imports ajv and
+  # loads the workspace validator, so running it means node_modules — which is exactly what must not
+  # share a job with the write token. It therefore cannot live in `publish`, and it cannot live in
+  # `build` either, because there is nothing to verify until the push has happened.
+  #
+  # It downloads the export from its public URL and exercises the deployed API against the M2
+  # criteria: liveness, every published OpenAPI operation, every served document against the
+  # Standard, and the export's own freshness, licence and manifest — re-hashing the archives the
+  # manifest names rather than believing the counts it states. Non-zero fails the run, so a green
+  # run still cannot mean "published something nobody looked at".
+  verify:
+    name: Verify the publication
+    needs: [publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The checker loads the workspace validator, which resolves to its built `dist`.
+      - name: Build
+        run: pnpm build
+
       - name: Verify the publication with the compliance checker
         run: node scripts/check-m2.mjs --base-url "$API_BASE_URL" --export-url "$EXPORT_ROOT_URL"
 

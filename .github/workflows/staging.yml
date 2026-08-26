@@ -14,13 +14,42 @@ on:
 
 name: Staging API
 
-# Mirrors the operator's existing service deployment: pull `.env` from
-# AWS Secrets Manager into the build context, bake it into the Docker
-# image, push to ECR, then update the ECS task definition and service.
+# Build the image, push to ECR, then update the ECS task definition and
+# service. The image carries NO configuration: the DEPLOY job reads the
+# `staging/rfp-hub` Secrets Manager value and writes it into the task
+# definition before registering it, so no secret ever enters the build
+# context, a layer, or this public repository's layer cache.
+#
+# INTERIM: those values go into the container definition's `environment`
+# array, which is plaintext to any principal that can describe the task
+# definition and is recorded in CloudTrail's RegisterTaskDefinition request
+# parameters. The destination is the `secrets:` array, which needs AWS-side
+# wiring; packages/api/docs/deploy.md §2 has both, and the migration is the
+# deletion of one workflow step.
 #
 # No DB migration job — Drizzle migrations (`pnpm migrate` in
-# packages/api) are a manual operator step against the staging RDS,
-# not a per-deploy task.
+# packages/api, or `node packages/api/dist/migrate.js` in this image) are
+# a manual operator step against the staging RDS, not a per-deploy task.
+# Gating the deploy on a migration one-off task is designed in
+# docs/deploy.md ("Gating deploys on migrations") and needs a task
+# definition, subnets/security groups and a DDL-capable credential that
+# must exist before it can be wired in.
+
+# EVERY `uses:` in this file is pinned to a full commit SHA, with the release it belongs to in the
+# trailing comment. A tag is a mutable pointer and a branch is more mutable still: whoever controls
+# an action's repository can move `v4`, or push to `master`, onto new code and the next run of this
+# workflow fetches it. What makes that worth aiming at is the job it would land in:
+# `configure-aws-credentials` exports AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY through
+# $GITHUB_ENV, so they sit in the environment of every LATER STEP IN THE SAME JOB, whatever that
+# step turns out to be. A push to someone else's repository would otherwise run code here holding
+# the deploy keys. Upgrading is a deliberate edit to this file: read the release notes, change the
+# SHA and the trailing comment together.
+
+# Nothing here reads or writes the repository beyond the checkout the deploy job needs, so the
+# token is narrowed to that. The privileges that matter are the AWS ones, and they arrive as
+# environment secrets, not as GITHUB_TOKEN scopes.
+permissions:
+  contents: read
 
 env:
   # The cluster is the hosting account's own resource name, not a fact about this project, so
@@ -43,44 +72,51 @@ jobs:
       image: ${{ steps.build-image.outputs.image }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # WAS `@master` — a mutable BRANCH, not even a tag: every run of this job fetched whatever
+      # had last been pushed to that branch of somebody else's repository, into a job holding the
+      # deploy credential. Pinned to the commit v4.3.0 points at, the latest release at the time of
+      # writing; the branch happened to be the same commit, which is luck, not a property.
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@master
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
           install: true
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        # The aws-actions/* steps are pinned by commit SHA, not by a moving tag: they hold the
+        # deploy credential and, in the deploy job, a task definition carrying plaintext
+        # configuration. "Whatever @v4 points at today" is a supply-chain decision somebody else
+        # makes; bump these deliberately.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # Pulls the full env file out of Secrets Manager. The secret value
-      # is expected to be the raw .env contents (KEY=VALUE per line).
-      # Variables baked into the image at build time via `COPY .env*` in
-      # the Dockerfile.
-      - name: Get .env from Secret Manager
-        run: |
-          aws secretsmanager get-secret-value --secret-id staging/rfp-hub --query SecretString --output text >> .env
+      # NOTE: nothing is fetched into the build context here. The step that used to write the
+      # `staging/rfp-hub` secret into `.env` next to the Dockerfile MOVED to the deploy job below,
+      # where it lands in the task definition instead: the layer cache underneath is `mode=max` and
+      # is stored in this PUBLIC repository's Actions cache, so every secret that reached a build
+      # layer was readable by anyone who could read that cache. It went together with the
+      # Dockerfile's `COPY .env*`, and `scripts/check-deploy.mjs` guards that half in CI.
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
 
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-v2-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-buildx
+            ${{ runner.os }}-buildx-v2
 
       - name: Build image
         id: build-image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY_MAIN }}
@@ -105,12 +141,6 @@ jobs:
             echo "No new Buildx cache generated; skipping cache move."
           fi
 
-      - name: Discord notification
-        uses: sarisia/actions-status-discord@v1
-        if: failure()
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-
   deploy-ecs-service:
     name: Deploy ECS service
     needs: [build_image]
@@ -120,7 +150,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Fail before touching AWS rather than after: `cluster:` empty is not an error to the
       # deploy action, it is a request for the account's `default` cluster.
@@ -136,7 +166,11 @@ jobs:
           fi
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        # The aws-actions/* steps are pinned by commit SHA, not by a moving tag: they hold the
+        # deploy credential and, in the deploy job, a task definition carrying plaintext
+        # configuration. "Whatever @v4 points at today" is a supply-chain decision somebody else
+        # makes; bump these deliberately.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-access-key-id: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
@@ -144,7 +178,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
 
       - name: Download task definition
         id: download-task
@@ -153,37 +187,109 @@ jobs:
           ECR_REPOSITORY: ${{ env.ECR_REPOSITORY_MAIN }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws ecs describe-task-definition --task-definition ${{ env.ECS_CONTAINER }} --query taskDefinition > task-definition.json
-          echo "revision=$(cat task-definition.json | jq .revision)" >> "$GITHUB_OUTPUT"
+          # The downloaded document carries the PREVIOUS revision's `environment` array, so it is
+          # plaintext configuration from the moment it exists. `umask 077` makes it 0600 instead of
+          # 0644, and it is written under $RUNNER_TEMP rather than the checkout root so that nothing
+          # which walks the working tree — an artifact upload, a `git add`, a build context — can
+          # pick it up by accident.
+          umask 077
+          aws ecs describe-task-definition --task-definition ${{ env.ECS_CONTAINER }} --query taskDefinition > "$RUNNER_TEMP/task-definition.json"
+          echo "revision=$(jq .revision "$RUNNER_TEMP/task-definition.json")" >> "$GITHUB_OUTPUT"
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Fill in the new image ID in the Amazon ECS task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ env.ECS_CONTAINER }}
-          image: ${{ steps.download-task.outputs.image }}
-          environment-variables: |
-            APP_BASE_URL=${{ env.APP_BASE_URL }}
+      # Configuration is read HERE, in the deploy job, and travels into the task definition —
+      # never into the build context, and so never into a layer or the public layer cache. `set +x`
+      # and the pipe keep it off the log: the value exists as a stream between two processes and as
+      # a 0600 file under $RUNNER_TEMP that the cleanup step below deletes. The script registers an
+      # `::add-mask::` for every value it parses BEFORE printing anything, and prints names only.
+      #
+      # PORT and NODE_ENV are deliberately left out (`--skip`): the image sets both, a task
+      # definition's `environment` OUTRANKS the image's `ENV`, and PORT in particular has to keep
+      # matching the container port and target group wired up in AWS.
+      - name: Read configuration from Secrets Manager
+        env:
+          SECRET_ID: staging/rfp-hub
+        run: |
+          set -euo pipefail
+          set +x
+          # 0600 on everything this step writes: the parsed pairs are the secret in another shape.
+          umask 077
+          aws secretsmanager get-secret-value --secret-id "$SECRET_ID" --query SecretString --output text \
+            | node scripts/env-to-container-env.mjs \
+                --out "$RUNNER_TEMP/container-env.json" \
+                --skip PORT,NODE_ENV \
+                --require DATABASE_URL,BETTER_AUTH_SECRET
+
+      # This replaces `aws-actions/amazon-ecs-render-task-definition`, which set the image and
+      # nothing else — and wrote the whole document through `core.debug` on the way. Once the
+      # document carries configuration, a run with step debugging enabled would print the PREVIOUS
+      # revision's values, which after a rotation are not the strings this run masked. One pass
+      # here sets the image and the environment together, and no third-party action ever reads a
+      # task definition with plaintext in it.
+      # APP_BASE_URL is the one setting the WORKFLOW owns rather than the secret: a repository
+      # variable (checked non-empty above), written on top of the secret's entries with `--set`.
+      # The notification dispatcher inherits it from this same task definition.
+      - name: Render the task definition
+        env:
+          IMAGE: ${{ steps.download-task.outputs.image }}
+        run: |
+          set -euo pipefail
+          # The rendered document is the plaintext one that gets registered; 0600 like its inputs.
+          umask 077
+          node scripts/env-to-container-env.mjs \
+            --inject "$RUNNER_TEMP/task-definition.json" \
+            --container "$ECS_CONTAINER" \
+            --image "$IMAGE" \
+            --env "$RUNNER_TEMP/container-env.json" \
+            --set "APP_BASE_URL=$APP_BASE_URL" \
+            --out "$RUNNER_TEMP/task-definition.rendered.json"
+
+      # The clean path's one hard prerequisite, checked where it bites: a container shipped without
+      # a database URL boots into nothing at all — the image no longer bakes configuration, so this
+      # is the exact first-deploy crash the ordering exists to prevent. Refusing HERE keeps the old
+      # revision serving instead of shipping a crash-loop. EITHER list satisfies it: `secrets:` is
+      # the destination state, the injected `environment` is the interim one. The match goes to
+      # /dev/null because jq would otherwise print the object it selected, value and all.
+      - name: Require a database URL in the rendered task definition
+        run: |
+          if ! jq -e --arg container "$ECS_CONTAINER" '
+                .containerDefinitions[]
+                | select(.name == $container)
+                | ((.secrets // []) + (.environment // []))[]
+                | select(.name == "DATABASE_URL")
+                | select(((.value // .valueFrom) // "") != "")
+              ' "$RUNNER_TEMP/task-definition.rendered.json" > /dev/null; then
+            echo "::error::the $ECS_CONTAINER task definition would ship with no DATABASE_URL in either secrets: or environment: — see packages/api/docs/deploy.md."
+            exit 1
+          fi
 
       - name: Deploy Amazon ECS task definition and service
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2.6.3
         with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          task-definition: ${{ runner.temp }}/task-definition.rendered.json
           service: ${{ env.ECS_CONTAINER }}-service
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
 
+      # ROLLBACK HAZARD, now that the revision carries configuration. A task definition revision is
+      # immutable, so it freezes the secret values as they were when it was registered: rolling a
+      # service back to an older revision restores its CONFIGURATION too, including a credential
+      # that has since been rotated. The corollary is that rotating a value in Secrets Manager
+      # changes nothing until a deploy runs. Deregistering the revision this one replaces is the
+      # same fact from the other side — it is the copy an immediate rollback would have used.
       - name: Deregister previous revision
         run: |
           aws ecs deregister-task-definition --task-definition ${{ env.ECS_CONTAINER }}:${{ steps.download-task.outputs.revision }} >> /dev/null
 
-      - name: Discord notification
-        uses: sarisia/actions-status-discord@v1
-        if: failure()
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+      # All three files this job wrote carry plaintext: the downloaded definition (the previous
+      # revision's environment), the parsed pairs, and the rendered document. All three live under
+      # $RUNNER_TEMP and were created 0600, so this is the last of three layers rather than the only
+      # one. A GitHub-hosted runner is destroyed either way; a self-hosted one is one repository
+      # setting away, and `if: always()` is what makes the failure path delete them too.
+      - name: Remove the plaintext configuration files
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/container-env.json" "$RUNNER_TEMP/task-definition.rendered.json" "$RUNNER_TEMP/task-definition.json"
 
   notification:
     needs: [build_image, deploy-ecs-service]
@@ -193,8 +299,32 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Discord success notification
-        uses: sarisia/actions-status-discord@v1
+        uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           title: 'Staging RFP Hub API deployed'
           description: 'Image: ${{ needs.build_image.outputs.image }}'
+
+  # The FAILURE notification lives in its own job, holding only DISCORD_WEBHOOK. It used to be an
+  # `if: failure()` step at the end of `build_image` and of `deploy-ecs-service`, both of which run
+  # `configure-aws-credentials` — which exports AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY through
+  # $GITHUB_ENV. Every later step in those jobs therefore starts with the deploy keys in its
+  # environment, this third-party action's node process included, for no reason other than where the
+  # step happened to sit. Here it can read the webhook and nothing else.
+  #
+  # `needs:` names both jobs so it still fires when `build_image` fails and `deploy-ecs-service` is
+  # skipped. `status` has to be stated: the action defaults it to THIS job's status, which is a
+  # success — the run that failed is the one upstream.
+  failure-notification:
+    name: Notify on failure
+    needs: [build_image, deploy-ecs-service]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Discord failure notification
+        uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: failure
+          title: 'Staging RFP Hub API deploy failed'
