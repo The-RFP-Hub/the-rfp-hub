@@ -16,13 +16,61 @@
  * The allowlist itself is asserted in the frontend unit suite, where every rejected shape can be
  * enumerated cheaply. What is here is the part that needs the whole application running.
  */
-import { expect, skipUnlessActor, skipUnlessBrowserSession, test } from "../src/fixtures.js";
+import {
+  DESKTOP_UA,
+  expect,
+  skipUnlessActor,
+  skipUnlessBrowserSession,
+  test,
+} from "../src/fixtures.js";
 
 test.describe.configure({ mode: "serial" });
 
 test.describe("M3-9 opening a listing from a queue, and getting back to it", () => {
   test.beforeEach(({ stack }) => {
     skipUnlessActor(stack, "publisher", "otherPublisher", "reviewer");
+  });
+
+  test("the modal sign-in surface keeps focus out of the background and restores its opener", async ({
+    browser,
+    stack,
+  }) => {
+    const context = await browser.newContext({ userAgent: DESKTOP_UA, storageState: undefined });
+    try {
+      const page = await context.newPage();
+      await page.goto(stack.urls.frontend);
+
+      const opener = page.getByRole("button", { name: "Log in" }).first();
+      await opener.focus();
+      await opener.click();
+
+      const dialog = page.getByRole("dialog", { name: "Sign in" });
+      const email = page.getByLabel("Email address", { exact: true });
+      await expect(dialog).toBeVisible();
+      await expect(email).toBeFocused();
+
+      const close = dialog.getByRole("button", { name: "Close" });
+      await close.focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        page.locator(".shell :focus"),
+        "Tab from the last control never reaches the inert application shell",
+      ).toHaveCount(0);
+      await page.keyboard.press("Shift+Tab");
+      await expect(close).toBeFocused();
+
+      await page.getByRole("link", { name: "Directory", exact: true }).focus();
+      await expect(
+        page.locator(".shell :focus"),
+        "the page behind a modal dialog is inert",
+      ).toHaveCount(0);
+
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      await expect(opener).toBeFocused();
+    } finally {
+      await context.close();
+    }
   });
 
   test("from the review queue's claims tab, and back to the claims tab", async ({

@@ -1244,35 +1244,21 @@ pre.untrusted-block {
   overflow-x: auto;
 }
 
-/*
- * The sign-in panel. Positioned in the stylesheet rather than with inline styles, because
- * `style-src 'unsafe-inline'` is the one relaxation left in the policy and nothing new should lean
- * on it.
- */
-.overlay {
+/* The real modal sits in the browser's top layer; its backdrop makes the page behind it inert. */
+.overlay-panel {
   position: fixed;
   inset: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: var(--space-8) var(--space-4);
-  overflow-y: auto;
-  background: rgba(26, 25, 23, 0.45);
-  z-index: 10;
-}
-
-/*
- * A non-modal `<dialog open>` is `position: absolute` with its own border and margins in the user
- * agent stylesheet, which would take it straight out of the flex centring above. These four
- * declarations are undoing that, not decorating — the `.card` rules supply the actual look.
- */
-.overlay-panel {
-  position: static;
-  width: 100%;
+  width: calc(100% - (var(--space-4) * 2));
   max-width: 26rem;
+  max-height: calc(100dvh - (var(--space-8) * 2));
   background: var(--paper);
   color: inherit;
-  margin: 0;
+  margin: var(--space-8) auto auto;
+  overflow-y: auto;
+}
+
+.overlay-panel::backdrop {
+  background: rgba(26, 25, 23, 0.45);
 }
 
 .signin h2 {
