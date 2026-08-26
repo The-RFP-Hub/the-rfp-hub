@@ -10,6 +10,7 @@ import {
   NotificationRepository,
   OpportunityRepository,
   OrganizationRepository,
+  VerificationRunRepository,
   repositories,
   withTransaction,
 } from "../../src/modules/repositories/index.js";
@@ -38,6 +39,8 @@ describe("repository unit of work", () => {
     expect(bundle.opportunities).toBe(bundle.opportunities);
     expect(bundle.organizations).toBeInstanceOf(OrganizationRepository);
     expect(bundle.organizations).toBe(bundle.organizations);
+    expect(bundle.verificationRuns).toBeInstanceOf(VerificationRunRepository);
+    expect(bundle.verificationRuns).toBe(bundle.verificationRuns);
   });
 
   it("gives a transaction callback only the repository bundle", async () => {
@@ -56,6 +59,7 @@ describe("repository unit of work", () => {
         "notifications",
         "opportunities",
         "organizations",
+        "verificationRuns",
       ]);
       expect(bundle).not.toBe(tx);
       expect("transaction" in bundle).toBe(false);

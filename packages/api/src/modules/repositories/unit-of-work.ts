@@ -8,6 +8,7 @@ import { MembershipRepository } from "./memberships/membership.repository.js";
 import { NotificationRepository } from "./notifications/notification.repository.js";
 import { OpportunityRepository } from "./opportunities/opportunity.repository.js";
 import { OrganizationRepository } from "./organizations/organization.repository.js";
+import { VerificationRunRepository } from "./verification/verification-run.repository.js";
 
 /** The repositories a service may compose. Add domain repositories here as migrations land. */
 export interface Repositories {
@@ -20,6 +21,7 @@ export interface Repositories {
   readonly notifications: NotificationRepository;
   readonly opportunities: OpportunityRepository;
   readonly organizations: OrganizationRepository;
+  readonly verificationRuns: VerificationRunRepository;
 }
 
 /** Build one executor-bound bundle. Repositories are constructed only when first requested. */
@@ -33,6 +35,7 @@ export function repositories(exec: DbLike): Repositories {
   let notifications: NotificationRepository | undefined;
   let opportunities: OpportunityRepository | undefined;
   let organizations: OrganizationRepository | undefined;
+  let verificationRuns: VerificationRunRepository | undefined;
 
   return {
     get accounts() {
@@ -70,6 +73,10 @@ export function repositories(exec: DbLike): Repositories {
     get organizations() {
       organizations ??= new OrganizationRepository(exec);
       return organizations;
+    },
+    get verificationRuns() {
+      verificationRuns ??= new VerificationRunRepository(exec);
+      return verificationRuns;
     },
   };
 }

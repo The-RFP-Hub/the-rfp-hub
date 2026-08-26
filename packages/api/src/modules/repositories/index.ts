@@ -48,6 +48,7 @@ export {
   type PublisherStatus,
 } from "./opportunities/opportunity.repository.js";
 export { OrganizationRepository } from "./organizations/organization.repository.js";
+export { VerificationRunRepository } from "./verification/verification-run.repository.js";
 export {
   type Repositories,
   repositories,

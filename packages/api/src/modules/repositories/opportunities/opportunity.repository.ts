@@ -167,6 +167,25 @@ export class OpportunityRepository {
     return rows[0];
   }
 
+  async findById(id: number): Promise<OpportunityRow | undefined> {
+    const rows = await this.exec
+      .select()
+      .from(opportunities)
+      .where(eq(opportunities.id, id))
+      .limit(1);
+    return rows[0];
+  }
+
+  async lockById(id: number): Promise<OpportunityRow | undefined> {
+    const rows = await this.exec
+      .select()
+      .from(opportunities)
+      .where(eq(opportunities.id, id))
+      .for("update")
+      .limit(1);
+    return rows[0];
+  }
+
   async lockByPublicId(publicId: string): Promise<OpportunityRow | undefined> {
     const rows = await this.exec
       .select()
@@ -199,6 +218,68 @@ export class OpportunityRepository {
       .where(eq(opportunities.id, id))
       .returning();
     return rows[0];
+  }
+
+  async applyVerification(
+    id: number,
+    values: {
+      verifiedAgainstSource: boolean;
+      verifiedAt: Date;
+      lastSeenAt: Date | null;
+    },
+  ): Promise<void> {
+    await this.exec.update(opportunities).set(values).where(eq(opportunities.id, id));
+  }
+
+  async listPendingVerificationIds(limit: number): Promise<number[]> {
+    const rows = await this.exec
+      .select({ id: opportunities.id })
+      .from(opportunities)
+      .where(this.pendingVerificationFilter())
+      .orderBy(asc(opportunities.id))
+      .limit(limit);
+    return rows.map((row) => row.id);
+  }
+
+  async countPendingVerification(): Promise<number> {
+    const rows = await this.exec
+      .select({ value: count() })
+      .from(opportunities)
+      .where(this.pendingVerificationFilter());
+    return rows[0]?.value ?? 0;
+  }
+
+  async listStalenessCandidates(
+    now: Date,
+    afterId: number,
+    limit: number,
+  ): Promise<OpportunityRow[]> {
+    return this.exec
+      .select()
+      .from(opportunities)
+      .where(this.stalenessCandidateFilter(now, afterId))
+      .orderBy(asc(opportunities.id))
+      .limit(limit);
+  }
+
+  async countStalenessCandidates(now: Date, afterId: number): Promise<number> {
+    const rows = await this.exec
+      .select({ value: sql<number>`count(*)::int` })
+      .from(opportunities)
+      .where(this.stalenessCandidateFilter(now, afterId));
+    return rows[0]?.value ?? 0;
+  }
+
+  async updateNextDeadline(id: number, nextDeadlineAt: Date | null): Promise<void> {
+    await this.exec.update(opportunities).set({ nextDeadlineAt }).where(eq(opportunities.id, id));
+  }
+
+  async closeForStaleness(id: number, nextDeadlineAt: Date | null): Promise<void> {
+    await this.exec
+      .update(opportunities)
+      // `updated_at` deliberately absent — see StalenessService's header.
+      .set({ status: "closed", nextDeadlineAt })
+      .where(eq(opportunities.id, id));
   }
 
   async findPublicDetailByPublicId(publicId: string) {
@@ -422,6 +503,26 @@ export class OpportunityRepository {
       case "namespace":
         return eq(opportunities.sourcePublisher, scope.slug);
     }
+  }
+
+  private pendingVerificationFilter(): SQL | undefined {
+    return and(
+      isNotNull(opportunities.applicationUrl),
+      isNull(opportunities.mergedIntoId),
+      or(
+        isNull(opportunities.verifiedAt),
+        sql`${opportunities.verifiedAt} < ${opportunities.updatedAt}`,
+      ),
+    );
+  }
+
+  private stalenessCandidateFilter(now: Date, afterId: number): SQL | undefined {
+    return and(
+      eq(opportunities.status, "open"),
+      isNull(opportunities.mergedIntoId),
+      or(isNull(opportunities.nextDeadlineAt), lte(opportunities.nextDeadlineAt, now)),
+      gt(opportunities.id, afterId),
+    );
   }
 }
 

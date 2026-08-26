@@ -22,15 +22,15 @@
  * full, the submit-time trigger is simply SKIPPED — the entry still satisfies the cron predicate
  * below, so nothing is lost, it is only later.
  */
-import { and, asc, count, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { type OpportunityRow, opportunities, verificationRuns } from "../../../db/schema.js";
+import type { OpportunityRow, VerificationRunRow } from "../../../db/schema.js";
+import { type Repositories, repositories, withTransaction } from "../../repositories/index.js";
 import type { VerificationRunView } from "../../shared/api-views.js";
 import { type FieldDiff, fieldDiff, isMatched } from "../../shared/field-diff.js";
 import { detectBotChallenge, detectSoftNotFound, extractPage } from "../../shared/html-extract.js";
 import { badRequest, notFound } from "../../shared/http-error.js";
-import { type AuditActor, AuditService, SYSTEM_ACTOR } from "../audit/audit.service.js";
+import { type AuditActor, SYSTEM_ACTOR } from "../audit/audit.service.js";
 import {
   type FetchedSource,
   SourceFetchError,
@@ -52,7 +52,7 @@ export interface VerificationOptions {
 
 export class VerificationService {
   private readonly config: AppConfig;
-  private readonly audit: AuditService;
+  private readonly repos: Repositories;
   private readonly transport: SourceTransport | undefined;
   /** Ids waiting for a submit-time check. Bounded by `VERIFY_QUEUE_MAX`; overflow drops to cron. */
   private readonly queue: number[] = [];
@@ -64,7 +64,7 @@ export class VerificationService {
   ) {
     this.config = options.config ?? defaultConfig;
     this.transport = options.transport;
-    this.audit = new AuditService(db);
+    this.repos = repositories(db);
   }
 
   /** Waiting plus in flight — what a test asserts against `VERIFY_QUEUE_MAX`. */
@@ -149,7 +149,7 @@ export class VerificationService {
     const assessed = fetched ? assess(row, fetched) : undefined;
     const now = new Date();
 
-    return this.db.transaction(async (tx) => {
+    return withTransaction(this.db, async (repos) => {
       // COMPARE-AND-SET AGAINST THE ROW THIS VERDICT IS ABOUT.
       //
       // The fetch above is a network round trip, and a `PUT` landing during it replaces the very
@@ -162,13 +162,7 @@ export class VerificationService {
       // `updated_at` unchanged and the URL still the one that was fetched. Otherwise the RUN IS
       // STILL RECORDED — a fetch happened and its result is evidence — flagged stale, and the
       // opportunity is left exactly as it is, which leaves it in the predicate for the next pass.
-      const locked = await tx
-        .select()
-        .from(opportunities)
-        .where(eq(opportunities.id, row.id))
-        .for("update")
-        .limit(1);
-      const current = locked[0];
+      const current = await repos.opportunities.lockById(row.id);
       const stale =
         current === undefined ||
         current.updatedAt.getTime() !== row.updatedAt.getTime() ||
@@ -179,46 +173,39 @@ export class VerificationService {
         ? "stale_result: the entry changed while its source was being fetched, so this verdict was recorded but not applied"
         : null;
 
-      const inserted = await tx
-        .insert(verificationRuns)
-        .values({
-          opportunityId: row.id,
-          runAt: now,
-          requestedUrl: url,
-          finalUrl: fetched?.finalUrl ?? failure?.url ?? null,
-          httpStatus: fetched?.status ?? failure?.status ?? null,
-          existsAtSource: assessed?.existsAtSource ?? false,
-          extracted: assessed?.extracted ?? null,
-          fieldDiff: (assessed?.diff ?? null) as Record<string, unknown> | null,
-          matched: assessed?.matched ?? false,
-          snapshotText: assessed?.snapshotText ?? null,
-          snapshotSha256: fetched?.sha256 ?? null,
-          error: [staleText, failureText].filter((part) => part !== null).join(" — ") || null,
-        })
-        .returning();
-      const run = inserted[0];
+      const run = await repos.verificationRuns.insert({
+        opportunityId: row.id,
+        runAt: now,
+        requestedUrl: url,
+        finalUrl: fetched?.finalUrl ?? failure?.url ?? null,
+        httpStatus: fetched?.status ?? failure?.status ?? null,
+        existsAtSource: assessed?.existsAtSource ?? false,
+        extracted: assessed?.extracted ?? null,
+        fieldDiff: (assessed?.diff ?? null) as Record<string, unknown> | null,
+        matched: assessed?.matched ?? false,
+        snapshotText: assessed?.snapshotText ?? null,
+        snapshotSha256: fetched?.sha256 ?? null,
+        error: [staleText, failureText].filter((part) => part !== null).join(" — ") || null,
+      });
       if (!run) throw new Error(`failed to record a verification run for ${row.publicId}`);
 
       const matched = assessed?.matched ?? false;
       if (!stale) {
-        await tx
-          .update(opportunities)
-          .set({
-            verifiedAgainstSource: matched,
-            verifiedAt: now,
-            // A SUCCESSFUL check is a "still real" signal and resets the staleness clock. A failed
-            // one is the opposite of evidence, so it deliberately does not — but it must not
-            // regress the clock either: this update does not touch `updatedAt`, so a second
-            // overlapping run's staleness check (above) cannot detect a `lastSeenAt` some OTHER
-            // run committed in between. Write back the LOCKED row's value, never the pre-fetch
-            // snapshot, or a failed run finishing after a concurrent successful one silently
-            // reverts it. (`current` is always defined here: `stale` is true whenever it is not.)
-            lastSeenAt: matched ? now : (current?.lastSeenAt ?? row.lastSeenAt),
-          })
-          .where(eq(opportunities.id, row.id));
+        await repos.opportunities.applyVerification(row.id, {
+          verifiedAgainstSource: matched,
+          verifiedAt: now,
+          // A SUCCESSFUL check is a "still real" signal and resets the staleness clock. A failed
+          // one is the opposite of evidence, so it deliberately does not — but it must not
+          // regress the clock either: this update does not touch `updatedAt`, so a second
+          // overlapping run's staleness check (above) cannot detect a `lastSeenAt` some OTHER
+          // run committed in between. Write back the LOCKED row's value, never the pre-fetch
+          // snapshot, or a failed run finishing after a concurrent successful one silently
+          // reverts it. (`current` is always defined here: `stale` is true whenever it is not.)
+          lastSeenAt: matched ? now : (current?.lastSeenAt ?? row.lastSeenAt),
+        });
       }
 
-      await this.audit.record(tx, {
+      await repos.audit.record({
         ...actor,
         subjectKind: "opportunity",
         subjectId: row.id,
@@ -278,54 +265,23 @@ export class VerificationService {
    * The selection predicate, in one place: has a URL, and has either never been checked or has been
    * edited since it last was.
    */
-  private stalePredicate() {
-    return and(
-      isNotNull(opportunities.applicationUrl),
-      isNull(opportunities.mergedIntoId),
-      or(
-        isNull(opportunities.verifiedAt),
-        sql`${opportunities.verifiedAt} < ${opportunities.updatedAt}`,
-      ),
-    );
-  }
-
   async pendingIds(limit: number): Promise<number[]> {
-    const rows = await this.db
-      .select({ id: opportunities.id })
-      .from(opportunities)
-      .where(this.stalePredicate())
-      .orderBy(asc(opportunities.id))
-      .limit(limit);
-    return rows.map((row) => row.id);
+    return this.repos.opportunities.listPendingVerificationIds(limit);
   }
 
   async pendingCount(): Promise<number> {
-    const rows = await this.db
-      .select({ value: count() })
-      .from(opportunities)
-      .where(this.stalePredicate());
-    return rows[0]?.value ?? 0;
+    return this.repos.opportunities.countPendingVerification();
   }
 
   private async loadRow(opportunityId: number): Promise<OpportunityRow> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(eq(opportunities.id, opportunityId))
-      .limit(1);
-    const row = rows[0];
+    const row = await this.repos.opportunities.findById(opportunityId);
     if (!row) throw notFound(`no opportunity ${opportunityId}.`);
     return row;
   }
 
   /** Resolve a public id to the row id, for the routes that name an entry the way callers do. */
   async resolvePublicId(publicId: string): Promise<OpportunityRow> {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(eq(opportunities.publicId, publicId))
-      .limit(1);
-    const row = rows[0];
+    const row = await this.repos.opportunities.findByPublicId(publicId);
     if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
     return row;
   }
@@ -399,7 +355,7 @@ function numeric(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function toRunView(run: typeof verificationRuns.$inferSelect): VerificationRunView {
+export function toRunView(run: VerificationRunRow): VerificationRunView {
   return {
     runAt: run.runAt.toISOString(),
     requestedUrl: run.requestedUrl,
