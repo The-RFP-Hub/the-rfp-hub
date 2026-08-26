@@ -661,6 +661,76 @@ describe("merging duplicates", () => {
     expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
   });
 
+  it("makes every enabled action on a directly loaded confirmed pair visibly act", async () => {
+    tab.current = "duplicates";
+    const confirmedPair: DuplicatePair = { ...duplicatePair, status: "confirmed" };
+    const api = client();
+    const dismiss = vi.fn(async () => ({ ...confirmedPair, status: "dismissed" as const }));
+    api.review.dismissDuplicate = dismiss;
+    api.review.opportunity = async (id) => opportunity(id);
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "confirmed" ? [confirmedPair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const actions = await screen.findByRole("group", {
+      name: `Actions for pair ${duplicatePair.id}`,
+    });
+    expect(within(actions).getByRole("button", { name: "Confirmed" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    for (const name of ["Compare", "Dismiss", "Merge…"]) {
+      expect(within(actions).getByRole("button", { name })).toHaveProperty("disabled", false);
+    }
+
+    fireEvent.click(within(actions).getByRole("button", { name: "Compare" }));
+    expect(await screen.findByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeTruthy();
+    fireEvent.click(within(actions).getByRole("button", { name: "Hide" }));
+    expect(screen.queryByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeNull();
+    fireEvent.click(within(actions).getByRole("button", { name: "Compare" }));
+    expect(await screen.findByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeTruthy();
+    fireEvent.click(within(actions).getByRole("button", { name: "Merge…" }));
+
+    expect(await screen.findByRole("group", { name: "Merge these two listings?" })).toBeTruthy();
+    expect(screen.queryByLabelText(`Comparison for pair ${duplicatePair.id}`)).toBeNull();
+    expect(within(actions).getByRole("button", { name: "Compare" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(actions).getByRole("button", { name: "Dismiss" }));
+    expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(dismiss).toHaveBeenCalledWith(duplicatePair.id);
+  });
+
+  it("renders unavailable terminal-pair actions with native disabled attributes", async () => {
+    tab.current = "duplicates";
+    const dismissedPair: DuplicatePair = { ...duplicatePair, status: "dismissed" };
+    const api = client();
+    api.review.duplicates = async (query) => ({
+      items: query?.status === "dismissed" ? [dismissedPair] : [],
+    });
+    render(
+      <ApiClientProvider value={api}>
+        <ReviewPage />
+      </ApiClientProvider>,
+    );
+
+    const actions = await screen.findByRole("group", {
+      name: `Actions for pair ${duplicatePair.id}`,
+    });
+    expect(within(actions).getByRole("button", { name: "Compare" })).toHaveProperty(
+      "disabled",
+      false,
+    );
+    for (const name of ["Confirm", "Dismiss", "Merge…"]) {
+      expect(within(actions).getByRole("button", { name })).toHaveProperty("disabled", true);
+    }
+  });
+
   it("marks merge busy, then keeps a receipt without inventing copied fields", async () => {
     tab.current = "duplicates";
     const api = client();

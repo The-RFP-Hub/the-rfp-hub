@@ -1010,8 +1010,7 @@ function PairCard({
   const api = useApi();
   const { note, busy, run } = useAction();
   const [survivor, setSurvivor] = useState<string>(pair.left.id);
-  const [confirming, setConfirming] = useState(false);
-  const [comparing, setComparing] = useState(false);
+  const [panel, setPanel] = useState<"comparison" | "merge" | null>(null);
   const [survivorElsewhere, setSurvivorElsewhere] = useState<string | null>(null);
 
   const survivorListing = survivor === pair.left.id ? pair.left : pair.right;
@@ -1022,7 +1021,7 @@ function PairCard({
       setSurvivorElsewhere(null);
       try {
         const result = await api.review.mergeDuplicate(pair.id, { survivorId: survivor });
-        setConfirming(false);
+        setPanel(null);
         onDecision(result.pair, result);
         return `Merged ${result.mergedId} into ${result.survivorId}.`;
       } catch (error) {
@@ -1034,6 +1033,8 @@ function PairCard({
     });
 
   const mergedInto = mergeResult?.survivorId ?? pair.left.mergedInto ?? pair.right.mergedInto;
+  const canConfirm = pair.status === "suspected";
+  const canDismiss = pair.status === "suspected" || pair.status === "confirmed";
   const canMerge = pair.status === "suspected" || pair.status === "confirmed";
 
   return (
@@ -1069,15 +1070,15 @@ function PairCard({
           className="duplicate-compare-control"
           type="button"
           disabled={busy}
-          onClick={() => setComparing((value) => !value)}
+          onClick={() => setPanel((current) => (current === "comparison" ? null : "comparison"))}
         >
-          {comparing ? "Hide" : "Compare"}
+          {panel === "comparison" ? "Hide" : "Compare"}
         </button>
         <button
           className="duplicate-confirm-control"
           type="button"
           aria-pressed={pair.status === "confirmed"}
-          disabled={busy || pair.status !== "suspected"}
+          disabled={busy || !canConfirm}
           onClick={() =>
             void run(async () => {
               const next = await api.review.confirmDuplicate(pair.id);
@@ -1092,11 +1093,12 @@ function PairCard({
           className="duplicate-dismiss-control"
           type="button"
           aria-pressed={pair.status === "dismissed"}
-          disabled={busy || !canMerge}
+          disabled={busy || !canDismiss}
           onClick={() =>
             void run(async () => {
               const wasConfirmed = pair.status === "confirmed";
               const next = await api.review.dismissDuplicate(pair.id);
+              setPanel(null);
               onDecision(next);
               return wasConfirmed
                 ? "Decision saved. Undo returns this pair to Needs review, not to Confirmed."
@@ -1110,11 +1112,13 @@ function PairCard({
           className="duplicate-merge-control"
           type="button"
           disabled={busy || !canMerge}
-          onClick={() => setConfirming(!confirming)}
+          onClick={() => setPanel((current) => (current === "merge" ? null : "merge"))}
         >
           Merge…
         </button>
       </fieldset>
+
+      <ActionNote note={note} />
 
       {pair.status === "confirmed" ? (
         <p className="note">
@@ -1160,15 +1164,13 @@ function PairCard({
         </div>
       ) : null}
 
-      {comparing ? <PairComparison pair={pair} /> : null}
-
-      {confirming ? (
+      {panel === "merge" ? (
         <ConfirmPanel
           title="Merge these two listings?"
           confirmLabel="Merge them"
           busyLabel="Merging…"
           busy={busy}
-          onCancel={() => setConfirming(false)}
+          onCancel={() => setPanel(null)}
           onConfirm={merge}
         >
           <p>
@@ -1190,7 +1192,8 @@ function PairCard({
         </ConfirmPanel>
       ) : null}
 
-      <ActionNote note={note} />
+      {panel === "comparison" ? <PairComparison pair={pair} /> : null}
+
       {survivorElsewhere ? (
         <p className="note">
           That listing was already merged into{" "}
