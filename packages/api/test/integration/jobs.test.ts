@@ -449,6 +449,8 @@ run("M3JOB scheduled jobs", () => {
 
       expect(result.details?.failed, "the poisoned row is counted, not swallowed").toBe(1);
       expect(result.processed, "and the rest of the walk still settled").toBeGreaterThan(0);
+      // Not thrown, because the pass attempted more writes than it lost: at least this row's
+      // close and the healthy one's, and only one of them was refused.
       expect(errors).toContain("staleness could not settle an entry");
       expect((await load("poison-one")).status, "rolled back with its audit row").toBe("open");
       expect((await load("healthy-one")).status).toBe("closed");
@@ -456,6 +458,53 @@ run("M3JOB scheduled jobs", () => {
       await db.execute(sql.raw("drop trigger if exists m3job_refuse_audit on audit_log"));
       await db.execute(sql.raw("drop function if exists m3job_refuse_audit()"));
     }
+  });
+
+  it("does not throw when a write was attempted, changed nothing, and did not fail", async () => {
+    // THE CASE THE DENOMINATOR EXISTS FOR, and the one "did anything settle?" gets wrong.
+    //
+    // A transaction can open, take its row lock, find that a publisher already resolved the entry,
+    // and commit having changed nothing. That is a SUCCESSFUL write attempt — the database took the
+    // work — but it moves no counter: `processed` stays where it was. Judge the pass by
+    // `processed === 0` and a single unrelated poison row alongside it looks systemic and reds the
+    // run. Judge it by `failed === attemptedWrites` and it is what it is: one bad row, carried in
+    // `details.failed`, with the pass continuing.
+    //
+    // Stubbed rather than seeded: producing "the locked re-read found it resolved" for real needs a
+    // write COMMITTED by another connection in the window between the walk's page SELECT and that
+    // row's transaction, and the only committed writes inside a walk are its own successful
+    // settles — which would put `processed` above zero and destroy the very case under test. The
+    // loop, its counters and the rule are the subject here, so the page and the per-row outcome are
+    // what get faked; `settle` itself is covered against a real database by the two cases around
+    // this one.
+    const [quiet, poisoned] = [await load("recompute"), await load("rolling-fresh")];
+    const errors: string[] = [];
+    const service = new StalenessService(db, {
+      logger: { error: (_payload, message) => errors.push(message) },
+    });
+    const internals = service as unknown as {
+      candidates(now: Date, afterId: number, limit: number): Promise<OpportunityRow[]>;
+      settle(
+        row: OpportunityRow,
+        now: Date,
+        inactiveBefore: Date,
+        noteWriteAttempt: () => void,
+      ): Promise<string>;
+    };
+    internals.candidates = async (_now, afterId) => (afterId === 0 ? [quiet, poisoned] : []);
+    internals.settle = async (row, _now, _inactiveBefore, noteWriteAttempt) => {
+      // BOTH open a transaction — that is what makes them attempted writes — and only one fails.
+      noteWriteAttempt();
+      if (row.id === poisoned.id) throw new Error("m3job: this row is poison");
+      return "unchanged";
+    };
+
+    const result = await service.runBatch({ now: NOW });
+
+    expect(result.processed, "nothing settled, and that is not the question").toBe(0);
+    expect(result.details?.failed, "the bad row stays a counter").toBe(1);
+    expect(result.details?.examined).toBe(2);
+    expect(errors).toContain("staleness could not settle an entry");
   });
 
   it("THROWS when every settle in the pass failed, so the run is red", async () => {
@@ -487,7 +536,7 @@ run("M3JOB scheduled jobs", () => {
         now: NOW,
       }),
     ).rejects.toThrow(
-      /staleness settled nothing: all \d+ of the \d+ candidate\(s\).*writes are refused/s,
+      /staleness wrote nothing: all \d+ of the \d+ write\(s\) it attempted failed.*writes are refused/s,
     );
   });
 

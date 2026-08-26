@@ -247,13 +247,21 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   by id, so letting one row out would abandon every candidate after it, and the same ones every
   night. A skipped row stays in the predicate for the next run.
 
-  **But a pass that settled NOTHING and failed everything it tried throws, and the run exits 1.**
-  Per-row isolation is right for a poison row and wrong for a broken deployment — a check constraint
-  added to `audit_log`, a revoked grant, a full disk — and one row at a time the two look identical.
-  Over a whole pass they do not: `processed === 0 && failed > 0` means nothing this run wrote
-  succeeded, so there is no evidence writing works at all. Reporting that as a counter and exiting 0
-  is a green nightly run in which the staleness pass has silently stopped happening, and the export
-  keeps publishing programmes that are over. Anything settling at all keeps the row-local behaviour.
+  **But a pass in which EVERY WRITE IT ATTEMPTED failed throws, and the run exits 1.** Per-row
+  isolation is right for a poison row and wrong for a broken deployment — a check constraint added
+  to `audit_log`, a revoked grant, a full disk — and one row at a time the two look identical. Over
+  a whole pass they do not: `failed > 0 && failed === attemptedWrites` means nothing this run tried
+  to write was accepted, so there is no evidence writing works at all. Reporting that as a counter
+  and exiting 0 is a green nightly run in which the staleness pass has silently stopped happening,
+  while the export keeps publishing programmes that are over.
+
+  The denominator is **attempted writes**, not rows settled, and that is deliberate. Most candidates
+  on a given night need no change and open no transaction at all; and a transaction can open, take
+  its row lock, find that a publisher already resolved the entry, and commit having changed nothing
+  — a successful write attempt that moves no counter. Judging by "did anything settle" would call
+  such a pass systemic the moment one unrelated row went bad. Judging by "did every attempt fail"
+  asks the question the counters can answer. One bad row among writes that succeeded stays a
+  counter, which is what catching per row is for.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
 * `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
   so a normal second run sends nothing. Transport failures retry at most three total attempts, no
