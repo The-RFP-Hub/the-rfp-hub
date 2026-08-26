@@ -18,22 +18,14 @@
  * nothing about the resulting figure looks wrong. Assignment makes a second run a no-op, which is
  * what makes the job safe to re-run at all.
  */
-import { and, gte, inArray, lt, sql } from "drizzle-orm";
 import { type AppConfig, config as defaultConfig } from "../../../config.js";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { opportunities, opportunityEvents, opportunityStatsDaily } from "../../../db/schema.js";
+import {
+  type AnalyticsStatsWrite,
+  type Repositories,
+  repositories,
+} from "../../repositories/index.js";
 import { COLUMN_OF, utcDay } from "./insights.service.js";
-
-/** One day's counters for one entry — the shape the upsert writes. */
-interface StatsRow {
-  opportunityId: number;
-  day: string;
-  listViews: number;
-  detailViews: number;
-  sourceClicks: number;
-  applyClicks: number;
-  updatedAt: Date;
-}
 
 /**
  * Postgres foreign-key violation, read through the driver error the ORM wraps.
@@ -65,11 +57,10 @@ export interface RollupResult {
 
 export class AnalyticsRollupService {
   private readonly config: AppConfig;
+  private readonly repos: Repositories;
 
-  constructor(
-    private readonly db: DB = defaultDb,
-    options: { config?: AppConfig } = {},
-  ) {
+  constructor(db: DB = defaultDb, options: { config?: AppConfig } = {}) {
+    this.repos = repositories(db);
     this.config = options.config ?? defaultConfig;
   }
 
@@ -97,24 +88,7 @@ export class AnalyticsRollupService {
     const start = new Date(`${day}T00:00:00.000Z`);
     const end = new Date(`${shift(day, 1)}T00:00:00.000Z`);
 
-    const rows = await this.db
-      .select({
-        opportunityId: opportunityEvents.opportunityId,
-        eventType: opportunityEvents.eventType,
-        total: sql<number>`count(*)::int`,
-      })
-      .from(opportunityEvents)
-      .where(
-        and(
-          gte(opportunityEvents.occurredAt, start),
-          lt(opportunityEvents.occurredAt, end),
-          // Only entries that still exist. Redundant while `opportunity_events` cascades from
-          // `opportunities` (it does, and `0003` says so) — kept because this sweep should not
-          // depend on that cascade to avoid computing statistics for a row nobody can look at.
-          sql`exists (select 1 from ${opportunities} where ${opportunities.id} = ${opportunityEvents.opportunityId})`,
-        ),
-      )
-      .groupBy(opportunityEvents.opportunityId, opportunityEvents.eventType);
+    const rows = await this.repos.analytics.aggregateDay(start, end);
 
     const byOpportunity = new Map<
       number,
@@ -156,39 +130,26 @@ export class AnalyticsRollupService {
    * ONE retry, deliberately. A second failure means something other than a racing delete, and a
    * sweep that retried indefinitely would hide it.
    */
-  private async upsert(values: StatsRow[], now: Date, retrying = false): Promise<number> {
+  private async upsert(
+    values: AnalyticsStatsWrite[],
+    now: Date,
+    retrying = false,
+  ): Promise<number> {
     try {
       await this.write(values, now);
       return values.length;
     } catch (error) {
       if (retrying || !isForeignKeyViolation(error)) throw error;
       const ids = values.map((row) => row.opportunityId);
-      const alive = await this.db
-        .select({ id: opportunities.id })
-        .from(opportunities)
-        .where(inArray(opportunities.id, ids));
-      const surviving = new Set(alive.map((row) => row.id));
+      const surviving = new Set(await this.repos.analytics.aliveOpportunityIds(ids));
       const remaining = values.filter((row) => surviving.has(row.opportunityId));
       if (remaining.length === 0) return 0;
       return this.upsert(remaining, now, true);
     }
   }
 
-  private async write(values: StatsRow[], now: Date): Promise<void> {
-    await this.db
-      .insert(opportunityStatsDaily)
-      .values(values)
-      .onConflictDoUpdate({
-        target: [opportunityStatsDaily.opportunityId, opportunityStatsDaily.day],
-        set: {
-          // ASSIGNED from the excluded row, not added to the stored one. See the header.
-          listViews: sql`excluded.list_views`,
-          detailViews: sql`excluded.detail_views`,
-          sourceClicks: sql`excluded.source_clicks`,
-          applyClicks: sql`excluded.apply_clicks`,
-          updatedAt: now,
-        },
-      });
+  private async write(values: AnalyticsStatsWrite[], now: Date): Promise<void> {
+    await this.repos.analytics.upsertDailyStats(values, now);
   }
 
   /**
@@ -202,11 +163,8 @@ export class AnalyticsRollupService {
   async pruneRetention(options: { now?: Date } = {}): Promise<{ processed: number; remaining: 0 }> {
     const cutoff = new Date(options.now ?? new Date());
     cutoff.setUTCDate(cutoff.getUTCDate() - this.config.analytics.retentionDays);
-    const deleted = await this.db
-      .delete(opportunityEvents)
-      .where(lt(opportunityEvents.occurredAt, cutoff))
-      .returning({ id: opportunityEvents.id });
-    return { processed: deleted.length, remaining: 0 };
+    const deleted = await this.repos.analytics.deleteEventsBefore(cutoff);
+    return { processed: deleted, remaining: 0 };
   }
 }
 

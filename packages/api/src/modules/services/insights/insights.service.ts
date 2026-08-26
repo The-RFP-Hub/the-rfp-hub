@@ -19,9 +19,8 @@
  * otherwise credit every entry in the corpus with a view, which would make the metric meaningless
  * for everybody at once.
  */
-import { type SQL, and, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { type DB, db as defaultDb } from "../../../db/client.js";
-import { opportunities, opportunityEvents, opportunityStatsDaily } from "../../../db/schema.js";
+import { type Repositories, repositories } from "../../repositories/index.js";
 import type {
   InsightsEntryView,
   InsightsPointView,
@@ -54,7 +53,11 @@ export interface WindowOptions {
 }
 
 export class InsightsService {
-  constructor(private readonly db: DB = defaultDb) {}
+  private readonly repos: Repositories;
+
+  constructor(db: DB = defaultDb) {
+    this.repos = repositories(db);
+  }
 
   /**
    * One entry's daily series, rollups for the past and a live aggregate for today.
@@ -67,18 +70,13 @@ export class InsightsService {
     const row = await this.resolve(publicId);
     const { days, today, from } = this.window(options);
 
-    const rolled = await this.db
-      .select()
-      .from(opportunityStatsDaily)
-      .where(
-        and(
-          eq(opportunityStatsDaily.opportunityId, row.id),
-          gte(opportunityStatsDaily.day, from),
-          // Strictly before today: today's numbers come from the live aggregate, and taking both
-          // would double-count every event the rollup has already absorbed.
-          lte(opportunityStatsDaily.day, dayBefore(today, 1)),
-        ),
-      );
+    // Strictly before today: today's numbers come from the live aggregate, and taking both would
+    // double-count every event the rollup has already absorbed.
+    const rolled = await this.repos.analytics.listDailyStatsForOpportunity(
+      row.id,
+      from,
+      dayBefore(today, 1),
+    );
 
     const byDay = new Map<string, InsightsTotalsView>();
     for (const day of rolled) {
@@ -122,29 +120,13 @@ export class InsightsService {
   ): Promise<InsightsSummaryView> {
     const { days, today, from } = this.window(options);
 
-    const owned = await this.db
-      .select({
-        id: opportunities.id,
-        publicId: opportunities.publicId,
-        title: opportunities.title,
-      })
-      .from(opportunities)
-      .where(ownedBy(owner));
+    const owned = await this.repos.analytics.listOwnedOpportunities(owner);
     if (owned.length === 0) {
       return { from, to: today, totals: ZERO, opportunities: [] };
     }
 
     const ids = owned.map((row) => row.id);
-    const rolled = await this.db
-      .select()
-      .from(opportunityStatsDaily)
-      .where(
-        and(
-          inArray(opportunityStatsDaily.opportunityId, ids),
-          gte(opportunityStatsDaily.day, from),
-          lte(opportunityStatsDaily.day, dayBefore(today, 1)),
-        ),
-      );
+    const rolled = await this.repos.analytics.listDailyStats(ids, from, dayBefore(today, 1));
 
     const totals = new Map<number, InsightsTotalsView>();
     const add = (id: number, values: InsightsTotalsView) => {
@@ -199,21 +181,7 @@ export class InsightsService {
     const start = new Date(`${day}T00:00:00.000Z`);
     const end = new Date(`${dayBefore(day, -1)}T00:00:00.000Z`);
 
-    const rows = await this.db
-      .select({
-        opportunityId: opportunityEvents.opportunityId,
-        eventType: opportunityEvents.eventType,
-        total: sql<number>`count(*)::int`,
-      })
-      .from(opportunityEvents)
-      .where(
-        and(
-          inArray(opportunityEvents.opportunityId, opportunityIds),
-          gte(opportunityEvents.occurredAt, start),
-          sql`${opportunityEvents.occurredAt} < ${end}`,
-        ),
-      )
-      .groupBy(opportunityEvents.opportunityId, opportunityEvents.eventType);
+    const rows = await this.repos.analytics.aggregateEvents(opportunityIds, start, end);
 
     const out = new Map<number, InsightsTotalsView>();
     for (const row of rows) {
@@ -234,12 +202,7 @@ export class InsightsService {
   }
 
   private async resolve(publicId: string) {
-    const rows = await this.db
-      .select()
-      .from(opportunities)
-      .where(eq(opportunities.publicId, publicId))
-      .limit(1);
-    const row = rows[0];
+    const row = await this.repos.analytics.findOpportunityByPublicId(publicId);
     if (!row) throw notFound(`no opportunity ${JSON.stringify(publicId)}.`);
     return row;
   }
@@ -256,12 +219,7 @@ export const COLUMN_OF: Record<
   apply_click: "applyClicks",
 };
 
-/** Submitted by this account, or published under a namespace it belongs to. */
-export function ownedBy(owner: { accountId: number; namespaces: string[] }): SQL | undefined {
-  const mine = eq(opportunities.submittedBy, owner.accountId);
-  if (owner.namespaces.length === 0) return mine;
-  return or(mine, inArray(opportunities.sourcePublisher, owner.namespaces));
-}
+export { ownedBy } from "../../repositories/index.js";
 
 function sum(values: InsightsTotalsView[]): InsightsTotalsView {
   return values.reduce<InsightsTotalsView>(

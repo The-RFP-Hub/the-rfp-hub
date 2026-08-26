@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DB, DbLike } from "../../src/db/client.js";
 import {
   AccountRepository,
+  AnalyticsRepository,
   ApiKeyRepository,
   AuditRepository,
   MembershipInviteRepository,
@@ -25,6 +26,8 @@ describe("repository unit of work", () => {
     expect(bundle.apiKeys).toBe(bundle.apiKeys);
     expect(bundle.audit).toBeInstanceOf(AuditRepository);
     expect(bundle.audit).toBe(bundle.audit);
+    expect(bundle.analytics).toBeInstanceOf(AnalyticsRepository);
+    expect(bundle.analytics).toBe(bundle.analytics);
     expect(bundle.membershipInvites).toBeInstanceOf(MembershipInviteRepository);
     expect(bundle.membershipInvites).toBe(bundle.membershipInvites);
     expect(bundle.memberships).toBeInstanceOf(MembershipRepository);
@@ -47,6 +50,7 @@ describe("repository unit of work", () => {
         "accounts",
         "apiKeys",
         "audit",
+        "analytics",
         "membershipInvites",
         "memberships",
         "notifications",

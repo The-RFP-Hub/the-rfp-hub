@@ -17,6 +17,11 @@ export {
   type AuditSubjectKind,
 } from "./audit/audit.repository.js";
 export {
+  AnalyticsRepository,
+  type AnalyticsStatsWrite,
+  ownedBy,
+} from "./insights/analytics.repository.js";
+export {
   type CreateMembershipInviteInput,
   MembershipInviteRepository,
 } from "./membership-invites/membership-invite.repository.js";
