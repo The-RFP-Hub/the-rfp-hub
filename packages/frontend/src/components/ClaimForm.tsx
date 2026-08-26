@@ -8,7 +8,7 @@
  * unlocking auto-approval. That sentence is rendered verbatim rather than paraphrased, because the
  * paraphrase is exactly where a dashboard would start promising something the API did not.
  */
-import { ActionNote, actionErrorNote } from "@/components/states";
+import { ActionNote, type ActionNoteValue, actionErrorNote } from "@/components/states";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { type ReactNode, useState } from "react";
@@ -18,9 +18,11 @@ const CLAIM_SUMMARY = "This is my programme — claim it";
 export function ClaimForm({ id, me }: { id: string; me: Me }) {
   const [open, setOpen] = useState(false);
   const [draftKey, setDraftKey] = useState(0);
+  const submission = useClaimSubmission(id);
   const cancel = () => {
     setOpen(false);
     setDraftKey((current) => current + 1);
+    submission.reset();
   };
 
   return (
@@ -38,17 +40,51 @@ export function ClaimForm({ id, me }: { id: string; me: Me }) {
       >
         {CLAIM_SUMMARY}
       </summary>
-      <ClaimFields key={draftKey} id={id} me={me} onCancel={cancel} />
+      <ClaimFields key={draftKey} me={me} submission={submission} onCancel={cancel} />
+      <ActionNote note={submission.result} />
     </details>
   );
 }
 
-function ClaimFields({ id, me, onCancel }: { id: string; me: Me; onCancel: () => void }) {
+interface ClaimSubmission {
+  busy: boolean;
+  result: ActionNoteValue | null;
+  submit: (body: { organizationSlug: string; note: string | null }) => Promise<void>;
+  reset: () => void;
+}
+
+function useClaimSubmission(id: string): ClaimSubmission {
   const api = useApi();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ActionNoteValue | null>(null);
+
+  const submit = async (body: { organizationSlug: string; note: string | null }) => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const claim = await api.opportunities.claim(id, body);
+      setResult({ kind: "ok", message: `${claim.outcome}: ${claim.message}` });
+    } catch (error) {
+      setResult(actionErrorNote(error, "The claim could not be filed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { busy, result, submit, reset: () => setResult(null) };
+}
+
+function ClaimFields({
+  me,
+  submission,
+  onCancel,
+}: {
+  me: Me;
+  submission: ClaimSubmission;
+  onCancel: () => void;
+}) {
   const [slug, setSlug] = useState(me.memberships[0]?.slug ?? "");
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
 
   if (me.memberships.length === 0) {
     return (
@@ -58,22 +94,6 @@ function ClaimFields({ id, me, onCancel }: { id: string; me: Me; onCancel: () =>
       </p>
     );
   }
-
-  const submit = async () => {
-    setBusy(true);
-    setResult(null);
-    try {
-      const claim = await api.opportunities.claim(id, {
-        organizationSlug: slug,
-        note: note || null,
-      });
-      setResult({ kind: "ok", message: `${claim.outcome}: ${claim.message}` });
-    } catch (error) {
-      setResult(actionErrorNote(error, "The claim could not be filed."));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <>
@@ -103,14 +123,17 @@ function ClaimFields({ id, me, onCancel }: { id: string; me: Me; onCancel: () =>
         />
       </div>
       <div className="row">
-        <button type="button" onClick={() => void submit()} disabled={busy || !slug}>
-          {busy ? "Filing…" : "File the claim"}
+        <button
+          type="button"
+          onClick={() => void submission.submit({ organizationSlug: slug, note: note || null })}
+          disabled={submission.busy || !slug}
+        >
+          {submission.busy ? "Filing…" : "File the claim"}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy}>
+        <button type="button" onClick={onCancel} disabled={submission.busy}>
           Cancel
         </button>
       </div>
-      <ActionNote note={result} />
     </>
   );
 }
@@ -124,9 +147,11 @@ export function PublicClaimControl({ id }: { id: string }) {
   const session = useSession();
   const [open, setOpen] = useState(false);
   const [draftKey, setDraftKey] = useState(0);
+  const submission = useClaimSubmission(id);
   const cancel = () => {
     setOpen(false);
     setDraftKey((current) => current + 1);
+    submission.reset();
   };
   let content: ReactNode;
 
@@ -163,7 +188,9 @@ export function PublicClaimControl({ id }: { id: string }) {
       </>
     );
   } else {
-    content = <ClaimFields key={draftKey} id={id} me={session.me.data} onCancel={cancel} />;
+    content = (
+      <ClaimFields key={draftKey} me={session.me.data} submission={submission} onCancel={cancel} />
+    );
   }
 
   return (
@@ -182,6 +209,7 @@ export function PublicClaimControl({ id }: { id: string }) {
         {CLAIM_SUMMARY}
       </summary>
       {content}
+      <ActionNote note={submission.result} />
     </details>
   );
 }

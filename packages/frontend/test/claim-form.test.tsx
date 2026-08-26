@@ -8,11 +8,11 @@ import { join } from "node:path";
  * authenticated account and explaining why an account with no organisation cannot file a claim.
  */
 import { ClaimForm, PublicClaimControl } from "@/components/ClaimForm";
-import { type ApiClient, ApiError } from "@/lib/api";
+import { type ApiClient, ApiError, createApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import { AuthRoot } from "@/lib/auth-root";
 import type { ClaimResult, Me, MeMembership } from "@/lib/types";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { authSession } = vi.hoisted(() => ({
@@ -202,6 +202,62 @@ describe("the public claim control", () => {
     expect(
       (screen.getByLabelText("Note for the reviewer (optional)") as HTMLInputElement).value,
     ).toBe("");
+  });
+
+  it("shows the first queued HTTP 202 outcome even when the session refreshes in flight", async () => {
+    authSession.data = { user: { id: "user_7" } };
+    let answerClaim: ((response: Response) => void) | undefined;
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/v1/me")) {
+        return new Response(JSON.stringify(account()), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (init?.method === "POST") {
+        return new Promise<Response>((resolve) => {
+          answerClaim = resolve;
+        });
+      }
+      throw new Error(`Unexpected request: ${init?.method} ${String(input)}`);
+    });
+    const client = createApiClient({ baseUrl: "https://api.example.com", fetchImpl: fetch });
+    const view = render(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    fireEvent.click(await screen.findByText("This is my programme — claim it"));
+    fireEvent.click(await screen.findByRole("button", { name: "File the claim" }));
+
+    const filing = await screen.findByRole("button", { name: "Filing…" });
+    expect(filing).toHaveProperty("disabled", true);
+    await waitFor(() => expect(answerClaim).toBeTypeOf("function"));
+
+    authSession.isPending = true;
+    view.rerender(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    await act(async () => {
+      answerClaim?.(
+        new Response(JSON.stringify(result("queued", "A reviewer will decide this claim.")), {
+          status: 202,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+    authSession.isPending = false;
+    view.rerender(
+      <ApiClientProvider value={client}>
+        <PublicClaimControl id="acme:round-4" />
+      </ApiClientProvider>,
+    );
+
+    expect(await screen.findByText("queued: A reviewer will decide this claim.")).toBeTruthy();
   });
 });
 
