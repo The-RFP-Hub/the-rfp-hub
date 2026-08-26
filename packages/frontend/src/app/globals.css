@@ -913,6 +913,8 @@ caption {
 
 .section-nav a {
   display: inline-block;
+  min-block-size: var(--control-touch);
+  min-inline-size: var(--control-touch);
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -1246,8 +1248,15 @@ ul.plain {
 .pagination {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-4);
+}
+
+.pagination button,
+.pagination a {
+  min-block-size: var(--control-touch);
+  min-inline-size: var(--control-touch);
 }
 
 .untrusted-text,
@@ -1308,6 +1317,23 @@ pre.untrusted-block {
 }
 
 /* ---------------------------------------------------------------- narrow --- */
+
+@media (pointer: coarse) {
+  button,
+  input,
+  select,
+  textarea,
+  summary {
+    min-block-size: var(--control-touch);
+  }
+
+  button,
+  input[type="range"],
+  input[type="radio"],
+  input[type="checkbox"] {
+    min-inline-size: var(--control-touch);
+  }
+}
 
 @media (max-width: 40rem) {
   .shell {

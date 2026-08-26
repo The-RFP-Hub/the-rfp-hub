@@ -62,11 +62,25 @@ describe("the visual-system token boundary", () => {
       { declaration: "margin-left: -0.35rem;", name: "globals.css" },
       { declaration: "margin-top: 2px;", name: "globals.css" },
       { declaration: "margin-top: 2px;", name: "globals.css" },
-      {
-        declaration: "padding: 0.1rem 0.45rem;",
-        name: "OpportunityForm.module.css",
-      },
     ]);
+  });
+
+  it("keeps navigation, pagination and repeater targets usable with touch", () => {
+    const [globalCss, formCss] = stylesheets.map(([, path]) => readFileSync(path, "utf8"));
+    expect(globalCss).toMatch(
+      /\.section-nav a\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*min-inline-size:\s*var\(--control-touch\);/s,
+    );
+    expect(globalCss).toMatch(/\.pagination\s*\{[^}]*flex-wrap:\s*wrap;/s);
+    expect(globalCss).toMatch(
+      /\.pagination button,\s*\.pagination a\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*min-inline-size:\s*var\(--control-touch\);/s,
+    );
+    expect(globalCss).toMatch(
+      /@media \(pointer: coarse\)\s*\{[\s\S]*?button,[\s\S]*?summary\s*\{[^}]*min-block-size:\s*var\(--control-touch\);/s,
+    );
+    expect(formCss).toMatch(/\.itemHead\s*\{[^}]*flex-wrap:\s*wrap;/s);
+    expect(formCss).toMatch(
+      /\.small\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*min-inline-size:\s*var\(--control-touch\);[^}]*padding:\s*var\(--space-2\);/s,
+    );
   });
 
   it("leaves the intrinsic form alignment rules semantic", () => {

@@ -240,6 +240,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
 }
 
@@ -258,7 +259,9 @@
 
 /* Add / remove / reorder: actions on the form, not submissions of it. */
 .small {
-  padding: 0.1rem 0.45rem;
+  min-block-size: var(--control-touch);
+  min-inline-size: var(--control-touch);
+  padding: var(--space-2);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
