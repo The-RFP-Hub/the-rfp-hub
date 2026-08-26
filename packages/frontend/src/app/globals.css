@@ -498,6 +498,22 @@ caption {
   border-bottom-color: var(--accent);
 }
 
+/* A count, not a coloured status badge: it stays compact without disturbing the wrapping nav. */
+.shell-nav-count {
+  display: inline-block;
+  margin-inline-start: var(--space-1);
+  min-inline-size: var(--space-6);
+  padding-inline: var(--space-1);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .shell-session {
   display: flex;
   align-items: center;
@@ -573,6 +589,70 @@ caption {
 .footnote {
   font-size: var(--text-md);
   max-width: 68ch;
+}
+
+/* ------------------------------------------------------------ notifications --- */
+
+.notification-count {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--ink);
+}
+
+.notification-item {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.notification-head,
+.notification-heading,
+.notification-actions {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.notification-head {
+  justify-content: space-between;
+}
+
+.notification-title {
+  margin: 0;
+  font-size: var(--text-h3);
+  font-weight: 600;
+}
+
+.notification-item[data-unread="true"] .notification-title,
+.notification-item[data-unread="true"] .notification-state {
+  font-weight: 800;
+}
+
+.notification-state {
+  min-inline-size: var(--space-12);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.notification-message {
+  max-width: 72ch;
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.notification-meta {
+  font-size: var(--text-sm);
+}
+
+.notification-actions {
+  margin-top: var(--space-3);
 }
 
 .prose {

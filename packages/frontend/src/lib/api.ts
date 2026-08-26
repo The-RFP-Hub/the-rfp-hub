@@ -43,6 +43,9 @@ import type {
   MembershipInviteList,
   MembershipResult,
   MergeResult,
+  Notification,
+  NotificationList,
+  NotificationReadAll,
   Opportunity,
   OrganizationList,
   OrganizationSummary,
@@ -278,6 +281,12 @@ export function createApiClient(options: ApiClientOptions) {
       opportunity: (id: string) =>
         request<Opportunity>("GET", `/v1/me/opportunities/${encodeURIComponent(id)}`),
       duplicates: () => request<OwnedDuplicateList>("GET", "/v1/me/duplicates"),
+      notifications: (query?: { unread?: boolean; page?: number; limit?: number }) =>
+        request<NotificationList>("GET", "/v1/me/notifications", { query }),
+      readNotification: (id: number) =>
+        request<Notification>("POST", `/v1/me/notifications/${id}/read`),
+      readAllNotifications: () =>
+        request<NotificationReadAll>("POST", "/v1/me/notifications/read-all"),
     },
 
     keys: {
