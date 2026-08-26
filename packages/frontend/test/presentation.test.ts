@@ -2,6 +2,7 @@ import {
   PUBLISHER_STATUS_LABELS,
   accountRoleLabel,
   auditActionLabel,
+  auditActorLabel,
   auditFieldLabel,
   auditFieldLabels,
   duplicateStatusLabel,
@@ -62,6 +63,17 @@ describe("presentation vocabulary", () => {
       "Public ID",
       "Specification version",
     ]);
+  });
+
+  it("names the machine-written trail rows as facts about the writer, not fields of the entry", () => {
+    // The corpus import writes `create`/`update` rows carrying these keys, so they are now the
+    // most common thing in the trail — the bare fallback ("Job") would read as an entry field.
+    expect(auditFieldLabels(["job", "sourceSystem", "backfill"])).toEqual([
+      "Automated task",
+      "Backfilled history",
+      "Source system",
+    ]);
+    expect(auditActorLabel("job", "job")).toBe("Automated job");
   });
 
   it("identifies duplicate states that still need attention", () => {

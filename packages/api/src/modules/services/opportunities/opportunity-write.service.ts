@@ -70,6 +70,7 @@ import {
 } from "../../shared/capabilities.js";
 import { HttpError, badRequest, conflict, forbidden, notFound } from "../../shared/http-error.js";
 import { checkPublicId, namespaceOfPublicId, resolveNamespace } from "../../shared/namespace.js";
+import { comparableOpportunity as comparable } from "../../shared/opportunity-content.js";
 import { diffFields } from "../../shared/patch.js";
 import { violatedConstraint } from "../auth/account.service.js";
 import type { RequestPrincipal } from "../auth/principal.service.js";
@@ -1015,41 +1016,11 @@ function isEditorialWrite(
   return !hasVerifiedMembership(principal, namespace);
 }
 
-/** The comparable projection of a row or an insert: content only, no server-owned bookkeeping. */
-const NON_CONTENT = new Set([
-  "id",
-  "createdAt",
-  "updatedAt",
-  "reviewStatus",
-  "isListed",
-  "submittedBy",
-  "approvedBy",
-  "approvedAt",
-  "lastSeenAt",
-  "mergedIntoId",
-  "mergedFromPublic",
-  "sourceSubmittedAt",
-  "verifiedAgainstSource",
-  "verifiedAt",
-  "snapshotUrl",
-  "nextDeadlineAt",
-  "sourceSystem",
-]);
-
 function opportunityMerged(publicId: string): HttpError {
   return conflict(
     "opportunity_merged",
     `opportunity ${JSON.stringify(publicId)} has been merged and cannot be changed.`,
   );
-}
-
-function comparable(row: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(row)) {
-    if (NON_CONTENT.has(key)) continue;
-    out[key] = value === undefined ? null : value;
-  }
-  return out;
 }
 
 /**

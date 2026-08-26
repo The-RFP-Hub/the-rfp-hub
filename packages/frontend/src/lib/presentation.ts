@@ -132,6 +132,15 @@ const AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
   orgSlugs: "Organization slugs",
   ingestedVia: "Ingestion method",
   specVersion: "Specification version",
+  // Written by the machine paths — the staleness job's auto-close rows and the corpus import's
+  // create/update rows — to say WHICH job acted, since `action` only says what it did. Labelled
+  // explicitly because the fallback renders the bare token "Job", which reads like a field of the
+  // opportunity rather than a fact about the writer.
+  job: "Automated task",
+  sourceSystem: "Source system",
+  // Only on rows written by the 0010 backfill: history reconstructed for entries imported before
+  // the import path audited itself. Named so a reader can tell it from a row observed at the time.
+  backfill: "Backfilled history",
 };
 
 /** Humanize an unknown future token deterministically while leaving its wire form available below. */

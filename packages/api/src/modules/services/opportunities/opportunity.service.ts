@@ -13,7 +13,10 @@ import {
   type Repositories,
   repositories,
 } from "../../repositories/index.js";
+import { comparableOpportunity } from "../../shared/opportunity-content.js";
 import { paginate } from "../../shared/pagination.js";
+import { diffFields, isEmptyPatch } from "../../shared/patch.js";
+import { SYSTEM_ACTOR } from "../audit/audit.service.js";
 
 /**
  * Sortable fields. `closesAt` is gone with the re-cut — `nextDeadlineAt` (the derived, denormalized
@@ -107,8 +110,9 @@ export class OpportunityService {
   /**
    * Ingest one Standard object. Stores `fundingDetails` tag-free as `type_data` (the read path
    * reattaches the tag from the `funding_type` column, so a mismatched inner tag cannot survive
-   * ingest), keeps the organization directory in sync, and derives `next_deadline_at` from
-   * `deadlines[]` on the way in. Callers validate upstream (the seed's `gateForSeed`).
+   * ingest), keeps the organization directory in sync, derives `next_deadline_at` from
+   * `deadlines[]` on the way in, and APPENDS AN AUDIT ROW when the write actually changed
+   * something. Callers validate upstream (the seed's `gateForSeed`).
    */
   async upsertFromStandard(
     std: Opportunity,
@@ -122,6 +126,19 @@ export class OpportunityService {
   }
 }
 
+/**
+ * The `patch` key every row written by this path carries, and the reason it is a patch key rather
+ * than an `audit_action` of its own.
+ *
+ * `audit_action` is a closed vocabulary (see its comment in `db/schema.ts`), and an `import` verb
+ * cannot be added to it without breaking the backfill migration that ships with this change:
+ * Drizzle's migrator runs every pending migration in ONE transaction, and PostgreSQL refuses to use
+ * an enum value added by the transaction still adding it. So the path is named in the patch, the
+ * same way the staleness job names itself — `patch->>'job'` identifies the writer, `action` stays
+ * the verb.
+ */
+const IMPORT_JOB = "import";
+
 /** Repository-bundle form used by the atomic seed batch and the pool-bound service method. */
 export async function upsertOpportunityFromStandard(
   repos: Repositories,
@@ -134,14 +151,62 @@ export async function upsertOpportunityFromStandard(
 ): Promise<void> {
   const { orgs, opp } = fromStandard(std);
   for (const org of orgs) await repos.organizations.upsertFromIngest(org);
+  const sourceSystem = opts.sourceSystem ?? null;
   const row: OpportunityInsert = {
     ...opp,
-    sourceSystem: opts.sourceSystem ?? null,
+    sourceSystem,
     reviewStatus: opts.reviewStatus ?? "approved",
     isListed: opts.isListed ?? true,
     updatedAt: new Date(),
   };
-  await repos.opportunities.upsertByPublicId(row);
+
+  /**
+   * The pre-image, read UNDER A ROW LOCK and with the same handle the upsert will use.
+   *
+   * The lock is what makes "read the old content, write the new, diff the two" a single decision.
+   * Without it two concurrent re-imports of the same id both read the same pre-image, both upsert,
+   * and both append a row claiming to be the one that changed it. `FOR UPDATE` cannot lock a row
+   * that does not exist yet, so two concurrent FIRST imports can still both read nothing — but there
+   * the upsert's `ON CONFLICT` collapses them and the worst outcome is two `create` rows for one
+   * entry, which over-reports rather than lying.
+   */
+  const before = await repos.opportunities.lockByPublicId(std.id);
+  const stored = await repos.opportunities.upsertByPublicId(row);
+  if (!stored) throw new Error(`failed to persist ${std.id}`);
+
+  /**
+   * NOTHING CHANGED, NOTHING RECORDED.
+   *
+   * The seed is re-run whenever the corpus file moves, and the corpus is mostly unchanged every
+   * time. A history row per entry per run would bury the handful of real edits under thousands of
+   * rows saying nothing happened — and `audit_log` is append-only, so that is not a mistake anyone
+   * can tidy up afterwards.
+   *
+   * "Changed" is the same content projection the submission path uses, so the two paths cannot
+   * disagree about whether a document was edited. It deliberately excludes `next_deadline_at`, which
+   * this upsert recomputes from `now()` on every run and which would otherwise report the whole
+   * corpus as edited every time a deadline elapsed.
+   */
+  const patch = diffFields(
+    before ? comparableOpportunity(before) : {},
+    comparableOpportunity(stored),
+  );
+  if (before && isEmptyPatch(patch)) return;
+
+  await repos.audit.record({
+    // The seed loader and the offline importers act on nobody's behalf: there is no account behind
+    // a corpus file, and attributing one would be an invention.
+    ...SYSTEM_ACTOR,
+    subjectKind: "opportunity",
+    subjectId: stored.id,
+    // `create` for the first sighting, `update` for a content-changing re-import — the verbs the
+    // closed enum already has. `IMPORT_JOB` above says why there is no `import` verb.
+    action: before ? "update" : "create",
+    // `sourceSystem` is deliberately restated here even though it is excluded from the content
+    // diff: it is the origin of the document, which is the first thing a reader of an unattributed
+    // machine-written row wants to know.
+    patch: { ...patch, job: IMPORT_JOB, sourceSystem },
+  });
 }
 
 export type { OpportunityInsertData };

@@ -222,13 +222,22 @@ export class OpportunityRepository {
     return rows[0];
   }
 
-  /** Idempotent seed ingest; preserve the Hub's original creation timestamp on conflict. */
-  async upsertByPublicId(values: OpportunityInsert): Promise<void> {
+  /**
+   * Idempotent seed ingest; preserve the Hub's original creation timestamp on conflict.
+   *
+   * RETURNS THE STORED ROW, on both arms of the conflict. The caller has to audit what it wrote,
+   * and it cannot: it does not know the surrogate id of a row it may have just inserted, and
+   * re-reading afterwards would be a second round trip answering a question this statement already
+   * has the answer to.
+   */
+  async upsertByPublicId(values: OpportunityInsert): Promise<OpportunityRow | undefined> {
     const { createdAt, ...onUpdate } = values;
-    await this.exec
+    const rows = await this.exec
       .insert(opportunities)
       .values(values)
-      .onConflictDoUpdate({ target: opportunities.publicId, set: onUpdate });
+      .onConflictDoUpdate({ target: opportunities.publicId, set: onUpdate })
+      .returning();
+    return rows[0];
   }
 
   async update(

@@ -682,6 +682,30 @@ Three properties are load-bearing:
   operator ran it. The `REVOKE UPDATE, DELETE` in `scripts/sql/harden-audit.sql` is defence in
   depth on top, and is not a migration because it names a deployment-specific role.
 
+**The import path is audited too, and it is the reason the trail is complete.** The seed loader
+(`upsertOpportunityFromStandard`) writes most of the corpus and used to write no history at all, so
+"every write is audited" was true of every path except the one that produced the majority of rows.
+It now appends its row inside the same transaction as the upsert, attributed to the SYSTEM
+(`actor_kind='job'`, no account), with `patch.job='import'` naming the path and `patch.sourceSystem`
+naming the origin. Three rules:
+
+* **`create` on the first sighting, `update` on a content-changing re-import.** No new
+  `audit_action` value: the enum is closed (see above), and adding one is not just convention —
+  Drizzle runs every pending migration in ONE transaction, and PostgreSQL refuses to *use* an enum
+  value added by the transaction that is still adding it, so an `import` verb would have made the
+  backfill below fail on every already-migrated deployment. The job is named in the patch instead,
+  exactly as the staleness job names itself.
+* **A re-import that changed nothing writes nothing.** The seed re-runs whenever the corpus file
+  moves. "Changed" is the same content projection the submission path uses
+  (`modules/shared/opportunity-content.ts`), which excludes server bookkeeping — `updated_at`,
+  `last_seen_at` and the recomputed `next_deadline_at` above all move on every upsert, and counting
+  them would mark the whole corpus as edited on every run, in a table nothing can delete from.
+* **Entries imported before this existed were backfilled** by migration
+  `0010_audit_backfill_import`, which inserts one `create` row per opportunity that has *no*
+  `subject_kind='opportunity'` history, stamped with the row's own `created_at` and carrying
+  `patch.backfill=true`. It is insert-only (so the 0004 triggers never fire) and idempotent (its
+  `NOT EXISTS` predicate sees what it wrote). An entry that already had history is left alone.
+
 **Visibility.** `GET /v1/opportunities/:id/audit` reads `subject_kind='opportunity'`. Public callers
 get `{action, at, actorKind, actor, changedFields[]}` — field **names** only, since a pending entry's
 contents are not public and neither is a publisher's contact address. The entry's submitter, its
