@@ -146,15 +146,19 @@ export function rulesKey(config: DuplicateRuleConfig, identity: RuleProviderIden
   // Field ORDER is fixed here, not taken from the object, because `JSON.stringify` follows
   // insertion order: two callers building the config differently would otherwise produce two keys
   // for one rule and resweep each other's pairs forever.
+  // The overlap thresholds enter the digest ONLY while the arm can fire. A disabled arm makes them
+  // irrelevant, and hashing an irrelevant number would split the key between two deployments that
+  // both run with the arm off — each resweeping the other's pairs on every nightly run.
+  const overlapLive = config.overlapEnabled && config.suppliesNorm;
   const canonical = JSON.stringify([
     RULES_VERSION,
     identity.providerId,
     identity.model,
     config.similarityThreshold,
-    config.overlapEnabled && config.suppliesNorm,
-    config.overlapThreshold,
-    config.overlapMinTokens,
-    config.overlapMinSimilarity,
+    overlapLive,
+    ...(overlapLive
+      ? [config.overlapThreshold, config.overlapMinTokens, config.overlapMinSimilarity]
+      : []),
   ]);
   return `v${RULES_VERSION}:${createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 16)}`;
 }

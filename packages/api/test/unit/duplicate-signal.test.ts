@@ -225,6 +225,17 @@ describe("rulesKey", () => {
     const off = key({ overlapEnabled: false });
     expect(key({ overlapEnabled: false, suppliesNorm: false })).toBe(off);
     expect(key({ overlapEnabled: true, suppliesNorm: false })).toBe(off);
+    // Each threshold, under each of the two ways the arm can be off, leaves the key alone.
+    for (const inactive of [
+      { overlapEnabled: false },
+      { overlapEnabled: true, suppliesNorm: false },
+    ] as const) {
+      expect(key({ ...inactive, overlapThreshold: 0.9 }), "overlap threshold").toBe(off);
+      expect(key({ ...inactive, overlapMinTokens: 25 }), "substance guard").toBe(off);
+      expect(key({ ...inactive, overlapMinSimilarity: 0.4 }), "cosine floor").toBe(off);
+    }
+    // But the cosine threshold still splits it: arm A is live either way.
+    expect(key({ overlapEnabled: false, similarityThreshold: 0.8 })).not.toBe(off);
   });
 
   it("is a short opaque token carrying the predicate's shape", () => {

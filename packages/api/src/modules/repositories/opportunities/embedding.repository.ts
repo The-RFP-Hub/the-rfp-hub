@@ -285,6 +285,8 @@ export class EmbeddingRepository {
   ): Promise<StaleRulesPair[]> {
     const left = alias(opportunityEmbeddings, "dup_left_embedding");
     const right = alias(opportunityEmbeddings, "dup_right_embedding");
+    const leftOpp = alias(opportunities, "dup_left_opportunity");
+    const rightOpp = alias(opportunities, "dup_right_opportunity");
     const rows = await this.exec
       .select({
         id: opportunityDuplicates.id,
@@ -311,10 +313,19 @@ export class EmbeddingRepository {
           eq(right.providerId, identity.providerId),
         ),
       )
+      .innerJoin(leftOpp, eq(leftOpp.id, opportunityDuplicates.opportunityId))
+      .innerJoin(rightOpp, eq(rightOpp.id, opportunityDuplicates.duplicateOfId))
       .where(
         and(
           eq(opportunityDuplicates.status, "suspected"),
           sql`${opportunityDuplicates.rulesKey} is distinct from ${rulesKey}`,
+          // MIRRORS `pendingPage`. A merged-away entry is never re-embedded by the first arm, so a
+          // pair on one whose scalars are unknown could be neither pruned, nor re-judged, nor
+          // repaired — selected every night and retired by nobody, and at the head of the id order
+          // it would eventually crowd every later stale pair out of the LIMIT. Such a pair is out
+          // of the resweep's reach by construction, so it is out of its predicate too.
+          isNull(leftOpp.mergedIntoId),
+          isNull(rightOpp.mergedIntoId),
         ),
       )
       .orderBy(asc(opportunityDuplicates.id))
