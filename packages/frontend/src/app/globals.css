@@ -68,6 +68,36 @@
 
   --radius: 6px;
 
+  /*
+   * TYPE SCALE. The map records the pre-tokenisation source lines so every replacement is
+   * reviewable: xs g251/365/546/650/1001/1093 + f64/132/240/285; sm
+   * g442/719/781/803/944/1031/1052/1071 + f154/169/255/309; md
+   * g382/426/482/518/755/839/899/957/1137 + f28/109/195/265; base g86;
+   * h1 g104; h2 g110/g352; h3 g116; h3-compact g895; lede g463; metric g747/g1162.
+   * `g` is this file and `f` is OpportunityForm.module.css. Inline `code` at g138 remains em so
+   * it tracks badges, row summaries and headings rather than escaping its container's scale.
+   */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-base: 0.9375rem;
+  --text-h3-compact: 1rem;
+  --text-h3: 1.05rem;
+  --text-lede: 1.05rem;
+  --text-h2: 1.25rem;
+  --text-h1: 1.95rem;
+  --text-metric: 1.6rem;
+
+  /* A 4px-unit spacing scale. Zero and auto remain layout semantics, not design tokens. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --control-touch: 2.75rem;
+
   /* Kept as aliases so a rule written against the old names still resolves while pages migrate. */
   --bg: var(--paper);
   --bg-soft: var(--panel);
@@ -83,7 +113,7 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--paper);
-  font-size: 15px;
+  font-size: var(--text-base);
   line-height: 1.5;
 }
 
@@ -101,19 +131,19 @@ h3 {
 
 h1 {
   font-weight: 800;
-  font-size: 1.95rem;
-  margin: 0 0 0.5rem;
+  font-size: var(--text-h1);
+  margin: 0 0 var(--space-2);
 }
 
 h2 {
   font-weight: 700;
-  font-size: 1.25rem;
-  margin: 1.6rem 0 0.5rem;
+  font-size: var(--text-h2);
+  margin: var(--space-6) 0 var(--space-2);
 }
 
 h3 {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: var(--text-h3);
 }
 
 /*
@@ -147,7 +177,7 @@ button {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 0.35rem 0.8rem;
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
 }
 
@@ -185,7 +215,7 @@ button:disabled {
   color: var(--paper);
   border-color: var(--accent);
   font-weight: 700;
-  padding: 0.55rem 1.15rem;
+  padding: var(--space-2) var(--space-4);
   text-decoration: none;
   display: inline-block;
 }
@@ -205,7 +235,7 @@ textarea {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 0.35rem 0.5rem;
+  padding: var(--space-2);
   width: 100%;
 }
 
@@ -240,7 +270,7 @@ textarea {
 table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0.75rem 0;
+  margin: var(--space-3) 0;
 }
 
 /*
@@ -248,19 +278,19 @@ table {
  * The heavy rule under the head and the hairline between rows is the whole table idiom here.
  */
 thead th {
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ink-soft);
   border-bottom: 2px solid var(--ink);
-  padding-bottom: 0.5rem;
+  padding-bottom: var(--space-2);
 }
 
 th,
 td {
   text-align: left;
-  padding: 0.65rem 0.75rem;
+  padding: var(--space-3);
   border-bottom: 1px solid var(--line-faint);
   vertical-align: top;
 }
@@ -309,7 +339,7 @@ td:last-child {
 caption {
   text-align: left;
   color: var(--ink-soft);
-  padding-bottom: 0.4rem;
+  padding-bottom: var(--space-2);
 }
 
 /*
@@ -329,15 +359,15 @@ caption {
 .shell {
   max-width: 1240px;
   margin: 0 auto;
-  padding: 0 2rem 3rem;
+  padding: 0 var(--space-8) var(--space-12);
 }
 
 .shell-header {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 1rem 1.75rem;
-  padding: 1.25rem 0;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-6) 0;
   border-bottom: 1px solid var(--ink);
 }
 
@@ -349,7 +379,7 @@ caption {
 .brand {
   font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 800;
-  font-size: 1.25rem;
+  font-size: var(--text-h2);
   letter-spacing: -0.01em;
   color: var(--ink);
   text-decoration: none;
@@ -362,7 +392,7 @@ caption {
 .brand-tagline {
   display: block;
   font-family: var(--font-body), sans-serif;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 400;
   letter-spacing: 0;
   color: var(--ink-soft);
@@ -378,16 +408,16 @@ caption {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 0 1.1rem;
-  font-size: 14px;
+  gap: 0 var(--space-4);
+  font-size: var(--text-md);
   flex: 1;
 }
 
 .shell-nav-group {
   display: flex;
   align-items: baseline;
-  gap: 1.1rem;
-  padding-right: 1.1rem;
+  gap: var(--space-4);
+  padding-right: var(--space-4);
   border-right: 1px solid var(--line);
 }
 
@@ -422,24 +452,24 @@ caption {
 .shell-session {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 14px;
+  gap: var(--space-3);
+  font-size: var(--text-md);
   margin-left: auto;
 }
 
 .shell-main {
-  padding: 2rem 0 0;
+  padding: var(--space-8) 0 0;
 }
 
 .shell-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.5rem 1.5rem;
+  gap: var(--space-2) var(--space-6);
   border-top: 1px solid var(--line);
-  margin-top: 3rem;
-  padding-top: 1.25rem;
-  font-size: 13px;
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  font-size: var(--text-sm);
   color: var(--ink-soft);
 }
 
@@ -460,9 +490,9 @@ caption {
 
 .lede {
   max-width: 68ch;
-  font-size: 1.05rem;
+  font-size: var(--text-lede);
   color: var(--ink-soft);
-  margin: 0 0 1.75rem;
+  margin: 0 0 var(--space-6);
 }
 
 .lede strong {
@@ -479,7 +509,7 @@ caption {
 }
 
 .footnote {
-  font-size: 0.9em;
+  font-size: var(--text-md);
   max-width: 68ch;
 }
 
@@ -491,13 +521,13 @@ caption {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .row {
   display: flex;
-  gap: 0.6rem;
+  gap: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -511,17 +541,17 @@ caption {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: var(--space-2);
   padding: 0;
-  margin: 0.55rem 0 1.2rem;
+  margin: var(--space-2) 0 var(--space-6);
   list-style: none;
-  font-size: 0.85rem;
+  font-size: var(--text-md);
 }
 
 .publisher-journey li {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.35rem;
+  gap: var(--space-2);
   color: var(--ink-soft);
 }
 
@@ -543,20 +573,20 @@ caption {
 }
 
 .publisher-journey-note {
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   font-weight: 400;
 }
 
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--space-3);
   align-items: flex-start;
 }
 
 .segmented {
   display: inline-flex;
-  gap: 0.3rem;
+  gap: var(--space-1);
   border: 0;
   padding: 0;
   margin: 0;
@@ -582,7 +612,7 @@ caption {
 /* -------------------------------------------------------------------- states --- */
 
 .state {
-  padding: 1rem;
+  padding: var(--space-4);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -613,7 +643,7 @@ caption {
 
 .empty-title {
   font-weight: 700;
-  margin: 0 0 0.25rem;
+  margin: 0 0 var(--space-1);
 }
 
 .state p:last-child {
@@ -621,7 +651,7 @@ caption {
 }
 
 .note {
-  margin: 0.4rem 0;
+  margin: var(--space-2) 0;
   display: block;
 }
 
@@ -634,7 +664,7 @@ caption {
   background: var(--bad-soft);
   font-weight: 600;
   border-left: 3px solid var(--bad);
-  padding-left: 0.6rem;
+  padding-left: var(--space-3);
 }
 
 /* -------------------------------------------------------------------- badges --- */
@@ -647,13 +677,13 @@ caption {
  */
 .badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   border: 1px solid var(--ink);
   border-radius: 3px;
-  padding: 2px 8px;
+  padding: 2px var(--space-2);
   white-space: nowrap;
   background: transparent;
   color: var(--ink);
@@ -712,11 +742,11 @@ caption {
 .badge-labelled {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.4rem;
+  gap: var(--space-2);
 }
 
 .badge-labelled .badge-gloss {
-  font-size: 0.85em;
+  font-size: var(--text-sm);
   color: var(--ink-soft);
   text-transform: none;
   letter-spacing: 0;
@@ -727,10 +757,10 @@ caption {
 .tiles {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: var(--space-3);
   list-style: none;
   padding: 0;
-  margin: 1rem 0;
+  margin: var(--space-4) 0;
 }
 
 .tile {
@@ -738,13 +768,13 @@ caption {
   flex-direction: column;
   align-items: flex-start;
   min-width: 9rem;
-  padding: 0.6rem 0.8rem;
+  padding: var(--space-3);
   text-align: left;
 }
 
 .tile-value {
   font-family: var(--font-display), sans-serif;
-  font-size: 1.6rem;
+  font-size: var(--text-metric);
   font-weight: 800;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -752,11 +782,11 @@ caption {
 
 .tile-label {
   color: var(--ink-soft);
-  font-size: 0.9em;
+  font-size: var(--text-md);
 }
 
 .chart {
-  margin: 1rem 0;
+  margin: var(--space-4) 0;
 }
 
 .chart-svg {
@@ -778,16 +808,16 @@ caption {
 .chart-axis {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85em;
-  padding-top: 0.3rem;
+  font-size: var(--text-sm);
+  padding-top: var(--space-1);
 }
 
 .tabs {
   display: flex;
-  gap: 0.4rem;
+  gap: var(--space-2);
   border-bottom: 1px solid var(--line);
-  margin: 1rem 0;
-  padding-bottom: 0.5rem;
+  margin: var(--space-4) 0;
+  padding-bottom: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -800,12 +830,12 @@ caption {
  * one above it (search results under the curated lists) rather than its peer.
  */
 .section-head {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin: 1.75rem 0 0.6rem;
-  padding-bottom: 0.5rem;
+  margin: var(--space-6) 0 var(--space-3);
+  padding-bottom: var(--space-2);
   border-bottom: 2px solid var(--ink);
 }
 
@@ -817,8 +847,8 @@ caption {
 .card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 0.9rem 1rem;
-  margin: 0.75rem 0;
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
 }
 
 /* The one card that is an instruction rather than a container: two solid pixels, per the mock. */
@@ -830,13 +860,13 @@ caption {
   display: grid;
   grid-template-columns: max-content minmax(12rem, 24rem) max-content;
   align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin-top: 1rem;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .duplicate-filter label,
 .duplicate-filter strong {
-  font-size: 0.9rem;
+  font-size: var(--text-md);
 }
 
 /*
@@ -865,8 +895,8 @@ caption {
 
 .duplicate-comparison {
   border-top: 1px solid var(--line);
-  margin-top: 1rem;
-  padding-top: 0.25rem;
+  margin-top: var(--space-4);
+  padding-top: var(--space-1);
 }
 
 .duplicate-comparison-scroll {
@@ -882,7 +912,7 @@ caption {
 .duplicate-comparison-grid > * {
   min-width: 0;
   border-top: 1px solid var(--line);
-  padding: 0.7rem 0.75rem;
+  padding: var(--space-3);
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -892,11 +922,11 @@ caption {
 }
 
 .duplicate-comparison-grid h3 {
-  font-size: 1rem;
+  font-size: var(--text-h3-compact);
 }
 
 .duplicate-comparison-grid h4 {
-  font-size: 0.86rem;
+  font-size: var(--text-md);
   color: var(--ink-soft);
   white-space: nowrap;
 }
@@ -924,39 +954,39 @@ caption {
 }
 
 .confirm > legend {
-  padding: 0 0.35rem;
+  padding: 0 var(--space-2);
   margin-left: -0.35rem;
 }
 
 .field {
-  margin: 0.75rem 0;
+  margin: var(--space-3) 0;
   max-width: 46rem;
 }
 
 .field label {
   display: block;
   font-weight: 600;
-  margin-bottom: 0.2rem;
+  margin-bottom: var(--space-1);
 }
 
 .field .hint {
   color: var(--ink-soft);
-  font-size: 0.88em;
-  margin: 0.2rem 0 0.35rem;
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 var(--space-2);
 }
 
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: 0 1rem;
+  gap: 0 var(--space-4);
 }
 
 /* Definition lists are how every fact table in this package is marked up; give them a shape. */
 .grid-2 dt {
   font-weight: 600;
-  font-size: 0.9em;
+  font-size: var(--text-md);
   color: var(--ink-soft);
-  margin-top: 0.6rem;
+  margin-top: var(--space-3);
 }
 
 .grid-2 dd {
@@ -980,9 +1010,9 @@ ul.plain {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.5rem 1rem;
-  margin: 0 0 0.5rem;
-  padding: 1rem;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-4);
   border-radius: var(--radius);
   background: var(--panel);
 }
@@ -998,7 +1028,7 @@ ul.plain {
  * axis, not the value.
  */
 .filters label {
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -1025,10 +1055,10 @@ ul.plain {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 1rem;
+  gap: var(--space-4);
   flex-wrap: wrap;
-  padding: 0.4rem 0 0.6rem;
-  font-size: 13px;
+  padding: var(--space-2) 0 var(--space-3);
+  font-size: var(--text-sm);
   color: var(--ink-soft);
 }
 
@@ -1049,7 +1079,7 @@ ul.plain {
 }
 
 .row-summary {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 400;
   color: var(--ink-soft);
   margin-top: 2px;
@@ -1068,7 +1098,7 @@ ul.plain {
  * the clamp doing exactly the wrong thing.
  */
 .cell-note {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 400;
   color: var(--ink-soft);
   margin-top: 2px;
@@ -1078,8 +1108,8 @@ ul.plain {
 .pagination {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  margin-top: 1rem;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .untrusted-block {
@@ -1090,10 +1120,10 @@ ul.plain {
 
 pre.untrusted-block {
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   background: var(--panel);
   border-radius: var(--radius);
-  padding: 0.75rem;
+  padding: var(--space-3);
   overflow-x: auto;
 }
 
@@ -1108,7 +1138,7 @@ pre.untrusted-block {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: var(--space-8) var(--space-4);
   overflow-y: auto;
   background: rgba(26, 25, 23, 0.45);
   z-index: 10;
@@ -1133,8 +1163,8 @@ pre.untrusted-block {
 }
 
 .signin-or {
-  margin: 0.9rem 0 0.4rem;
-  font-size: 0.9em;
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-md);
 }
 
 .secret {
@@ -1143,14 +1173,14 @@ pre.untrusted-block {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 0.6rem;
+  padding: var(--space-3);
 }
 
 /* ---------------------------------------------------------------- narrow --- */
 
 @media (max-width: 40rem) {
   .shell {
-    padding: 0 1rem 3rem;
+    padding: 0 var(--space-4) var(--space-12);
   }
 
   .shell-nav-group {
@@ -1159,6 +1189,6 @@ pre.untrusted-block {
   }
 
   h1 {
-    font-size: 1.6rem;
+    font-size: var(--text-metric);
   }
 }
