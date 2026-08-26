@@ -2,6 +2,14 @@
  * The nightly analytics rollup, and the retention prune that is the reason the raw table is not
  * partitioned.
  *
+ * ONE JOB, NOT TWO. `runBatch` settles the window and then prunes, in the same invocation, because
+ * they were never independent: both walk `opportunity_events`, both are sweeps over a window keyed
+ * on `occurred_at`, and the prune's correctness DEPENDS on the rollup having already absorbed the
+ * days it is about to delete. Running them as two scheduled tasks made that dependency the
+ * scheduler's to remember, unwritten anywhere it could be checked — and a prune that ran first, on
+ * a night the rollup failed, would delete raw events whose totals were never recorded. In one
+ * invocation the order cannot be got wrong, and a rollup that throws never reaches the delete.
+ *
  * A SWEEP JOB, NOT A CURSOR JOB, and the distinction is not bookkeeping. A cursor job selects rows
  * by a predicate that the run itself retires, so `remaining` falls and a runner may loop it to zero.
  * This one deliberately REPROCESSES a fixed window every time — the two days before today — so its
@@ -60,11 +68,13 @@ function isForeignKeyViolation(error: unknown): boolean {
 export const ROLLUP_WINDOW_DAYS = 2;
 
 export interface RollupResult {
-  /** Day-rows written. */
+  /** Day-rows written. The prune's own count is in `details.pruned`, not added in here. */
   processed: number;
   /** Always 0: a sweep reprocesses a fixed window and is never looped. */
   remaining: number;
   days: string[];
+  /** `pruned` — raw events deleted for age by the same invocation. */
+  details: { pruned: number };
 }
 
 export class AnalyticsRollupService {
@@ -77,9 +87,15 @@ export class AnalyticsRollupService {
   }
 
   /**
-   * Recompute the `days` days BEFORE today in `opportunity_stats_daily` from the raw events.
+   * Recompute the `days` days BEFORE today in `opportunity_stats_daily`, then prune raw events
+   * past `ANALYTICS_RETENTION_DAYS`.
    *
-   * Idempotent by construction (see the header): running it twice writes the same numbers.
+   * Idempotent by construction (see the header): running it twice writes the same numbers and
+   * deletes nothing the first run left behind.
+   *
+   * THE PRUNE IS LAST, AND ONLY REACHED ON SUCCESS. A rollup that throws propagates from here
+   * without deleting anything — which is the point of putting the two in one invocation: the day
+   * the rollup fails is exactly the day its raw events must survive to be re-rolled tomorrow.
    */
   async runBatch(options: { days?: number; now?: Date } = {}): Promise<RollupResult> {
     const days = options.days ?? ROLLUP_WINDOW_DAYS;
@@ -93,7 +109,9 @@ export class AnalyticsRollupService {
       processed += await this.rollDay(day);
       written.push(day);
     }
-    return { processed, remaining: 0, days: written };
+
+    const { processed: pruned } = await this.pruneRetention({ now: options.now });
+    return { processed, remaining: 0, days: written, details: { pruned } };
   }
 
   /** One day, one grouped scan, one upsert per entry that had any traffic. */
@@ -167,6 +185,10 @@ export class AnalyticsRollupService {
 
   /**
    * Delete raw events older than `ANALYTICS_RETENTION_DAYS`.
+   *
+   * `runBatch` calls this as its last step; it stays a separate method because the deprecated
+   * `retention` job name still runs it alone (see `registry.ts`), and because a test that wants to
+   * exercise the prune should not have to roll two days first.
    *
    * This is what `PARTITION BY RANGE` would have bought, and the reason it was deferred: at this
    * volume a bounded `DELETE` by age over an index on `occurred_at` is enough, and it needs no DDL

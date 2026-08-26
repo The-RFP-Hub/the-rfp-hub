@@ -23,7 +23,7 @@
  */
 import { config } from "../../src/config.js";
 import { pool } from "../../src/db/client.js";
-import { JOBS, JOB_NAMES } from "../../src/modules/services/jobs/registry.js";
+import { JOBS, JOB_NAMES, findJob } from "../../src/modules/services/jobs/registry.js";
 import { UnknownJobError, runJob } from "../../src/modules/services/jobs/runner.js";
 
 const USAGE = `RFP Hub scheduled jobs
@@ -105,6 +105,15 @@ async function main(): Promise<number> {
   if (!config.databaseUrl) {
     process.stderr.write("DATABASE_URL is required to run a job.\n");
     return 2;
+  }
+
+  // A deprecated name still does its work — the whole reason it is kept — but says so on stderr,
+  // which is where an operator reading a task log will see it and stdout's `--json` will not.
+  const deprecatedFor = findJob(opts.job)?.deprecatedFor;
+  if (deprecatedFor !== undefined) {
+    process.stderr.write(
+      `${opts.job} is deprecated and will be removed: ${deprecatedFor} now does this work. See packages/api/docs/jobs.md §1.\n`,
+    );
   }
 
   try {

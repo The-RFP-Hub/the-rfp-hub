@@ -349,15 +349,23 @@ run("M3ANA insights", () => {
     expect(survivorRow.length, "the entries that still exist are still rolled up").toBe(1);
   });
 
-  it("prunes raw events past the retention window and keeps the rollup", async () => {
+  it("prunes raw events past the retention window in the same invocation as the rollup", async () => {
     const rollup = new AnalyticsRollupService(db);
     // A cutoff far in the future makes every event "old", which is the branch under test; the
     // retention days themselves are a config reader with its own unit test.
     const future = new Date();
     future.setUTCFullYear(future.getUTCFullYear() + 5);
-    const pruned = await rollup.pruneRetention({ now: future });
-    expect(pruned.processed).toBeGreaterThan(0);
-    expect(pruned.remaining).toBe(0);
+
+    // ONE INVOCATION, BOTH HALVES. `retention` used to be a second scheduled job, which made
+    // "roll up before you delete" the scheduler's to remember and nothing's to enforce; a prune
+    // that ran on a night the rollup failed would delete events whose totals were never recorded.
+    const swept = await rollup.runBatch({ now: future });
+    expect(swept.remaining).toBe(0);
+    expect(swept.details.pruned, "the sweep prunes as its last step").toBeGreaterThan(0);
+
+    // Idempotent: a second run finds nothing left to delete and says so.
+    const again = await rollup.runBatch({ now: future });
+    expect(again.details.pruned).toBe(0);
 
     const remainingRollup = await db
       .select()

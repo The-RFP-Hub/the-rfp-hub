@@ -43,6 +43,18 @@ describe("the job catalogue", () => {
     expect(sweeps.sort()).toEqual(["analytics-rollup", "retention"]);
   });
 
+  /**
+   * `retention` is no longer a job of its own — the prune runs inside `analytics-rollup`. The name
+   * is kept for one release because the nightly chain is scheduled OUTSIDE this repository, and a
+   * caller still naming it would otherwise exit 2 rather than get its work done.
+   */
+  it("keeps `retention` as a deprecated alias, and marks nothing else deprecated", () => {
+    expect(findJob("retention")?.deprecatedFor).toBe("analytics-rollup");
+    expect(JOBS.filter((job) => job.deprecatedFor !== undefined).map((job) => job.name)).toEqual([
+      "retention",
+    ]);
+  });
+
   it("resolves a known name and refuses an unknown one", () => {
     expect(findJob("staleness")?.shape).toBe("cursor");
     expect(findJob("Staleness")).toBeUndefined();

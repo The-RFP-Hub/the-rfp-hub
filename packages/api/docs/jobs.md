@@ -14,18 +14,40 @@ process; it calls the same dispatcher for the newly inserted row ids without inv
 
 ## 1. The catalogue
 
+The five jobs, **in the order `registry.ts` lists them, which is the order the chain runs them**:
+
 | Job | Shape | What it does |
 |---|---|---|
-| `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events. |
-| `retention` | sweep | Deletes raw events older than `ANALYTICS_RETENTION_DAYS`. |
+| `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
-| `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. |
 | `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
+| `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
 
 The list lives in exactly one place — `src/modules/services/jobs/registry.ts` — which the runner,
 the admin route and this table all read. A name that is not in it is refused by both callers rather
 than starting a container task that quietly does nothing.
+
+### `retention` is a deprecated alias, for one release
+
+| Job | Shape | What it does |
+|---|---|---|
+| `retention` | sweep | **Deprecated.** Runs the retention prune alone. Exits `0`, with a notice on stderr. |
+
+**The prune now runs inside `analytics-rollup`, in the same invocation.** They were never
+independent: both sweep `opportunity_events` over a window keyed on `occurred_at`, and the prune is
+only correct once the rollup has absorbed the days it is about to delete. As two scheduled tasks
+that dependency was the *scheduler's* to remember and nothing's to enforce — a prune that ran on a
+night the rollup failed would delete raw events whose totals were never recorded. In one invocation
+the order cannot be got wrong, and a rollup that throws never reaches the delete. The count comes
+back as `details.pruned` on the rollup's result.
+
+The `retention` NAME is kept because the nightly chain is scheduled **outside this repository**
+(§2): a caller still passing it would otherwise exit `2` — a maintenance run failing loudly, at
+night, for a reason nobody at the console can act on. It does the prune alone, so the old six-name
+chain and the new five-name one have the same outcome, and a caller that runs **both** simply
+prunes twice, which deletes nothing the first pass left. `jobs.js all` never runs it, so it is not
+double-work for anyone who has moved. **Drop it from your scheduler**; it will be removed.
 
 These names, and the exit codes and `--json` shape that go with them, are what a caller outside this
 repository depends on; §4d states that contract in one place.
@@ -73,23 +95,22 @@ collapsed them would report a permanently unconfigured job as healthy contention
 ## 2. The schedule, and the ordering it exists to guarantee
 
 **One schedule owns the whole chain, and it is not in this repository.** An external scheduler runs
-the six jobs at **01:05 UTC**. They carry **one ordering rule** between them: the five below are
+the five jobs at **01:05 UTC**. They carry **one ordering rule** between them: the four below are
 independent and may run in any order or in parallel; `staleness` runs **after all of them**.
 
 ```
 UTC
-01:05  external scheduler ──┬─ analytics-rollup ──────┐
-                            ├─ retention ─────────────┤
+01:05  external scheduler ──┬─ analytics-rollup ──────┐  (rolls up, then prunes)
                             ├─ embedding-backfill ────┤  independent of each other:
                             ├─ verification-backfill ─┤  any order, or in parallel
                             └─ notification-dispatch ─┘
                                        │
-                                       └──> staleness   ← after ALL five, always
+                                       └──> staleness   ← after ALL four, always
 
 03:17  nightly-export.yml     publishes the dataset — its OWN cron, not chained (see below)
 ```
 
-Running the six one at a time satisfies that rule; so does running the five together and
+Running the five one at a time satisfies that rule; so does running the four together and
 `staleness` when the last of them exits. The rule is the contract (§4d); serialising is one way to
 meet it.
 
@@ -104,7 +125,7 @@ double-write — but they do interleave, and `staleness` running while `verifica
 still going closes entries that a successful check was about to keep open, with **both runs
 reporting success** (§4d has the walk-through). Putting `staleness` after everything, under a single
 caller, is what prevents that: a successful check writes `lastSeenAt`, and staleness reads that
-state after it has settled instead of underneath it. The other five write nothing each other reads,
+state after it has settled instead of underneath it. The other four write nothing each other reads,
 which is why they carry no ordering at all.
 
 There is no notification-only cron or workflow. Normal delivery starts immediately after the
@@ -206,7 +227,8 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
 * `analytics-rollup` **assigns** `count(*)` for a day, never `existing + n`. An increment is only
   correct if the job runs exactly once per day forever, and the first retry, the first manual run
   and the first overlapping schedule each silently double a publisher's numbers with nothing about
-  the result looking wrong.
+  the result looking wrong. Its retention prune deletes by age, so a second run finds nothing left
+  to delete and reports `details.pruned: 0`.
 * `staleness` closes only entries that are still `open`, re-checking under a row lock inside the
   transaction, so a publisher's edit racing the walk wins. A second run finds nothing to close and
   writes no second audit row. A row that *throws* — a deadlock victim, a lock timeout — is logged,
@@ -284,7 +306,7 @@ carries the time of the change, which is where that fact belongs.
 ### a. A one-off ECS task, started by hand (an operator)
 
 **This repository has no maintenance workflow.** The Actions dispatch that used to exist is gone
-along with the chain's schedule: the external scheduler runs the six nightly, and an operator who
+along with the chain's schedule: the external scheduler runs the five nightly, and an operator who
 needs a job run outside that — staging, or a recovery after a failed external run — starts the same
 one-off task directly. It is **two calls**: read the service to learn where the API runs, then start
 its task definition there with a different command.
@@ -492,8 +514,8 @@ Before the first M3 job run on any deployment, in order:
 
 | Job | Variables |
 |---|---|
-| `analytics-rollup` | none. It reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
-| `retention` | `ANALYTICS_RETENTION_DAYS` (default 180) |
+| `analytics-rollup` | `ANALYTICS_RETENTION_DAYS` (default 180), for the prune it ends with. The rollup half reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
+| `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |

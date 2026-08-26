@@ -36,6 +36,12 @@ export interface JobDefinition {
   shape: JobShape;
   /** One line, used by `--help`, the OpenAPI description and `docs/jobs.md`. */
   describes: string;
+  /**
+   * The name that replaced this one. Present only on an alias kept alive for one release so an
+   * external scheduler still naming it gets its work done instead of an exit 2 — see `retention`.
+   * Aliases are not in `CHAIN`, so `jobs.js all` never runs one.
+   */
+  deprecatedFor?: string;
   run(options: JobRunOptions): Promise<JobResult>;
 }
 
@@ -74,13 +80,25 @@ export const JOBS: JobDefinition[] = [
     name: "analytics-rollup",
     shape: "sweep",
     describes:
-      "Recompute the two days before today of daily per-entry traffic totals from raw events.",
+      "Recompute the two days before today of per-entry traffic totals, then prune raw events past retention.",
     run: (options) => new AnalyticsRollupService(dbOf(options)).runBatch({ now: options.now }),
   },
   {
+    /**
+     * DEPRECATED, AND KEPT ONLY SO A SCHEDULER OUTSIDE THIS REPOSITORY DOES NOT BREAK.
+     *
+     * The prune runs inside `analytics-rollup` now (`rollup.service.ts` explains why). The name
+     * lives on for one release because the nightly chain is scheduled elsewhere and a caller still
+     * naming `retention` would otherwise exit 2 — a maintenance run that fails loudly for a reason
+     * nobody at the console can act on that night. It does the prune, alone, so a caller running
+     * the old six-job chain gets the same outcome as the new one; a caller running BOTH names
+     * simply prunes twice, which deletes nothing the first pass left.
+     */
     name: "retention",
     shape: "sweep",
-    describes: "Delete raw analytics events older than ANALYTICS_RETENTION_DAYS.",
+    deprecatedFor: "analytics-rollup",
+    describes:
+      "DEPRECATED alias for analytics-rollup, which now prunes. Runs the retention prune alone.",
     run: (options) =>
       new AnalyticsRollupService(dbOf(options)).pruneRetention({ now: options.now }),
   },
