@@ -20,6 +20,24 @@
  * Negative checks are derived the same way: every query parameter the document constrains is
  * probed with a value that violates the published constraint, and the strict contract says that is
  * a 400 — never a silently unfiltered 200.
+ *
+ * WHO MAY CALL AN OPERATION IS PART OF THAT DOCUMENT TOO, and it is read here rather than assumed.
+ * An operation whose every published security alternative names a scheme — its own `security`, or
+ * the document's, since an operation-level `security: []` is how one opts back out — cannot be
+ * exercised by a checker that holds no credential: its documented 200 is not on offer. So it is
+ * held to the other thing the document promises, the one that IS addressed to a caller without a
+ * credential: a 401, in a media type the operation declares, whose body validates against the
+ * error schema declared for that status. A secured operation that documents no 401 at all is
+ * reported as the documentation defect it is. That probe needs no representative path or query
+ * value, and does not wait for one — the refusal is issued before the route's own parameters are
+ * read, so a route-shaped placeholder reaches it.
+ *
+ * The negative half is SKIPPED for those operations, out loud, one skip each. This API
+ * authenticates in an `onRequest` hook, which runs before query validation, so an anonymous
+ * `?page=0` is refused as unauthenticated and never reaches the schema — deliberately, so that a
+ * caller without a credential learns nothing about the shape of the query. Reading that 401 as a
+ * missing 400 would be the checker misreporting a security property as a defect. The strict-query
+ * contract of a secured operation is real, and it has to be verified with a credential.
  */
 import { url, asJson, mediaType, request } from "../http.mjs";
 import { OpenApiBundle } from "../schema.mjs";
@@ -27,6 +45,17 @@ import { checkWellFormed } from "../xml.mjs";
 
 const DOC_PATHS = ["/v1/docs/json", "/v1/docs/openapi.json", "/v1/openapi.json"];
 const UNKNOWN_PARAM = "definitely_not_a_documented_parameter";
+
+/**
+ * The path segment a secured operation's anonymous probe travels through. It only has to be
+ * route-shaped: authentication answers before the parameter is read, so nothing about the record
+ * is being asked, and a name that says so keeps the request out of anyone's logs as a lookup.
+ */
+const ANONYMOUS_PLACEHOLDER = "m2-compliance-anonymous";
+
+/** Why a secured operation's strict-query probes are deferred rather than run. See the header. */
+const SECURED_NEGATIVE_REASON =
+  "authentication precedes validation by design; the strict-query contract of a secured operation must be verified with a credential";
 
 export async function checkOpenApi(report, ctx) {
   const c = report.criterion(
@@ -200,6 +229,29 @@ function parametersOf(operation) {
 }
 
 /**
+ * Does the document say this operation needs a credential?
+ *
+ * The effective requirement is the operation's own `security` when it declares one and the
+ * document's top-level `security` otherwise — an override, not a merge. Both levels use the same
+ * spelling for "no credential needed": the empty array. An operation-level `security: []` is
+ * therefore how a single public operation opts out of a document-level requirement, and it has to
+ * mean public here or every operation under such a document would be probed as though it were
+ * closed.
+ *
+ * The entries WITHIN a requirement are alternatives, not conjuncts — the caller satisfies the
+ * operation by satisfying any ONE of them. So an entry naming no scheme (`{}`) is the published
+ * way of saying the credential is OPTIONAL, and `[{}, {bearerAuth: []}]` admits an anonymous
+ * caller just as surely as `[]` does. A credential is required only when EVERY alternative on
+ * offer names a scheme; one empty alternative anywhere in the list opens the operation, which is
+ * why this reads `every` and not `some`.
+ */
+export function requiresCredential(document, operation) {
+  const effective = operation?.security ?? document?.security;
+  if (!Array.isArray(effective) || effective.length === 0) return false;
+  return effective.every((entry) => entry && Object.keys(entry).length > 0);
+}
+
+/**
  * A value for a REQUIRED parameter, taken from what the document itself says is acceptable.
  * Optional parameters are deliberately left off: the representative request is the one a consumer
  * makes, and the documented defaults are part of what is being verified.
@@ -226,28 +278,45 @@ async function exerciseOperation(c, ctx, bundle, { path, method, operation, path
     return;
   }
 
-  // Path parameters: every `{name}` in the template needs a live value.
+  // What this checker can even ask of the operation, given that it carries no credential. A
+  // secured operation's documented 200 is not on offer to it; its documented 401 is.
+  const secured = requiresCredential(bundle.doc, operation);
+  const name = secured
+    ? `${label} refuses an anonymous caller as documented`
+    : `${label} conforms to its published contract`;
+
+  // Path parameters: every `{name}` in the template needs a value.
+  //
+  // A PUBLIC operation needs a real one — the question being asked of it is about a record, and
+  // there is no answer without one. A SECURED operation does not, and insisting on one is how
+  // `/v1/organizations/{slug}/opportunities` went unchecked: the refusal happens in an `onRequest`
+  // hook, before the route's own parameters are ever looked at, so any route-SHAPED segment
+  // reaches the same 401. The placeholder is deliberately not a plausible identifier — nothing
+  // about the record is being asked, and the report should not read as though it were.
   let resolved = path;
-  for (const name of [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1])) {
-    const value = pathValues[name];
-    if (value === undefined) {
-      c.skip(
-        `${label} conforms to its published contract`,
-        `no representative value is available for path parameter {${name}}`,
-      );
+  for (const key of [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1])) {
+    const value = pathValues[key];
+    if (value === undefined && !secured) {
+      c.skip(name, `no representative value is available for path parameter {${key}}`);
       return;
     }
-    resolved = resolved.replace(`{${name}}`, encodeURIComponent(value));
+    resolved = resolved.replace(
+      `{${key}}`,
+      value === undefined ? ANONYMOUS_PLACEHOLDER : encodeURIComponent(value),
+    );
   }
 
-  // Required query parameters, from the document's own examples/defaults/enums.
+  // Required query parameters, from the document's own examples/defaults/enums. Same reasoning:
+  // an unbuildable one stops a public operation from being exercised at all, but cannot change
+  // what a secured operation answers a caller who never gets as far as query validation.
   const qs = new URLSearchParams();
   for (const param of parametersOf(operation)) {
     if (param.in !== "query" || !param.required) continue;
     const value = representativeValue(param);
     if (value === undefined) {
+      if (secured) continue;
       c.skip(
-        `${label} conforms to its published contract`,
+        name,
         `required query parameter "${param.name}" declares no example, default or enum to build a request from`,
       );
       return;
@@ -258,7 +327,17 @@ async function exerciseOperation(c, ctx, bundle, { path, method, operation, path
   const target = url(ctx.baseUrl, resolved) + (qs.toString() ? `?${qs}` : "");
   const res = await request(target, { timeoutMs: ctx.timeoutMs });
   if (!res.ok) {
-    c.fail(`${label} conforms to its published contract`, `${target}: ${res.error}`);
+    c.fail(name, `${target}: ${res.error}`);
+    return;
+  }
+
+  if (secured) {
+    expectAnonymousRefusal(c, bundle, operation, {
+      label,
+      name,
+      res,
+      why: "the document declares a security requirement for this operation, so the answer to a caller without a credential is the 401 it publishes — a 200 here would mean the published requirement is not enforced",
+    });
     return;
   }
 
@@ -266,7 +345,7 @@ async function exerciseOperation(c, ctx, bundle, { path, method, operation, path
   const response = responseFor(declared, res.status);
   if (!response) {
     c.fail(
-      `${label} conforms to its published contract`,
+      name,
       `answered ${res.status}, which the operation does not document (it declares ${Object.keys(declared).join(", ") || "nothing"})`,
     );
     return;
@@ -274,13 +353,55 @@ async function exerciseOperation(c, ctx, bundle, { path, method, operation, path
 
   const detail = validateAgainstResponse(bundle, response, res);
   if (detail.ok) {
-    c.pass(
-      `${label} conforms to its published contract`,
-      `→ ${res.status} ${res.contentType} in ${res.elapsedMs} ms, ${summarize(detail)}`,
-    );
+    c.pass(name, `→ ${res.status} ${res.contentType} in ${res.elapsedMs} ms, ${summarize(detail)}`);
   } else {
-    c.fail(`${label} conforms to its published contract`, `→ ${res.status}: ${detail.problem}`);
+    c.fail(name, `→ ${res.status}: ${detail.problem}`);
   }
+}
+
+/**
+ * Hold a secured operation to what its document promises a caller WITHOUT a credential.
+ *
+ * The status is the security property: 401, and nothing else. A 200 here is the worse defect of
+ * the two this function can report — it means the published security requirement is decoration —
+ * so it is a failure of the operation's own check rather than a note beside a pass.
+ *
+ * The body is then held to the operation's declared 401 exactly as any other status would be:
+ * declared media type, declared schema. Where the operation declares no 401 the check falls back
+ * to the document's shared `ErrorResponse` so the body is still verified, and records the omission
+ * as its own failure — a secured operation that never mentions 401 leaves every generated client
+ * without a description of the one answer an unauthenticated caller is guaranteed to get.
+ */
+function expectAnonymousRefusal(c, bundle, operation, { label, name, res, why }) {
+  if (res.status !== 401) {
+    c.fail(name, `→ ${res.status}, expected 401 — ${why}. Body: ${res.body.slice(0, 160)}`);
+    return;
+  }
+
+  // `responseFor` rather than a bare lookup: a `4XX` range or a `default` IS the operation
+  // describing this answer, and holding the body to it is holding it to the published contract.
+  let declared = responseFor(operation.responses ?? {}, 401);
+  if (!declared) {
+    c.fail(
+      `${label} documents a 401 response`,
+      "the operation declares a security requirement, so 401 is part of its published contract for every caller without a credential — but its responses do not describe one. The refusal body was validated against the document's shared ErrorResponse instead.",
+    );
+    declared = bundle.component("ErrorResponse")
+      ? {
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } },
+          },
+        }
+      : {};
+  }
+
+  const detail = validateAgainstResponse(bundle, declared, res);
+  c.expect(
+    detail.ok,
+    name,
+    `→ 401 ${res.contentType} in ${res.elapsedMs} ms, ${summarize(detail)}`,
+    `→ 401 as documented, but ${detail.problem}`,
+  );
 }
 
 /** The response object a status resolves to: exact, then `4XX`-style range, then `default`. */
@@ -466,22 +587,42 @@ function summarize(detail) {
  *   - a path template whose operation documents a 404 actually answers 404 for a missing id;
  *
  * and in every case the error body validates against the error schema the operation declares.
+ *
+ * None of that is addressable without a credential on a secured operation, and pretending
+ * otherwise is how this check reads a security property as a bug: see `SECURED_NEGATIVE_REASON`.
  */
 async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
   let probed = 0;
+  let deferred = 0;
 
   for (const { path, method, operation } of operations) {
     if (method !== "get") continue;
     const queryParams = parametersOf(operation).filter((p) => p.in === "query");
-    let resolved = path;
-    let resolvable = true;
-    for (const name of [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1])) {
-      if (pathValues[name] === undefined) resolvable = false;
-      else resolved = resolved.replace(`{${name}}`, encodeURIComponent(pathValues[name]));
-    }
-    if (!resolvable || queryParams.length === 0) continue;
+    if (queryParams.length === 0) continue;
 
     const label = `GET ${path}`;
+
+    // One skip per secured operation, not a silent `continue`: the strict-query contract of these
+    // operations is unverified by this run, and the report has to say so by name.
+    //
+    // AHEAD of the resolvability gate below, and that ordering is the promise. Whether a
+    // representative path value happens to exist has nothing to do with why these probes are not
+    // issued; letting the gate swallow the operation first would drop the named skip for exactly
+    // the secured operations the run knows least about.
+    if (requiresCredential(bundle.doc, operation)) {
+      c.skip(`${label} is held to the strict-query negative contract`, SECURED_NEGATIVE_REASON);
+      deferred++;
+      continue;
+    }
+
+    let resolved = path;
+    let resolvable = true;
+    for (const key of [...path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1])) {
+      if (pathValues[key] === undefined) resolvable = false;
+      else resolved = resolved.replace(`{${key}}`, encodeURIComponent(pathValues[key]));
+    }
+    if (!resolvable) continue;
+
     probed++;
 
     // 1. An unknown parameter. The strict contract's headline case: a misspelled filter must fail
@@ -504,38 +645,49 @@ async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
     }
   }
 
-  if (probed === 0) {
+  if (probed === 0 && deferred === 0) {
     c.skip(
       "the strict-query negative contract",
       "no documented operation declares query parameters to probe",
     );
   }
 
-  // 3. A path template that documents a 404 must answer 404 for an id that does not exist.
+  // 3. A path template that documents a 404 must answer 404 for an id that does not exist — unless
+  //    it is secured, in which case the anonymous probe never gets far enough to learn whether the
+  //    record exists, and 401 is the documented answer.
   for (const { path, method, operation } of operations) {
     if (method !== "get" || !path.includes("{")) continue;
     if (!operation.responses?.["404"]) continue;
+    const secured = requiresCredential(bundle.doc, operation);
+    const label = `GET ${path}`;
+    // Deliberately not the same name the positive half gives this operation: that check asked
+    // about a record that exists, this one asks about one that does not, and a report that lists
+    // the same sentence twice has stopped saying which question was answered.
+    const name = secured
+      ? `${label} refuses an anonymous caller as documented, for a record that does not exist`
+      : `${label} answers 404 for a record that does not exist`;
     const missing = path.replace(/\{[^}]+\}/g, `m2-compliance:no-such-record-${Date.now()}`);
     const target = url(ctx.baseUrl, missing);
     const res = await request(target, { timeoutMs: ctx.timeoutMs });
     if (!res.ok) {
-      c.fail(`GET ${path} answers 404 for a record that does not exist`, `${target}: ${res.error}`);
+      c.fail(name, `${target}: ${res.error}`);
+      continue;
+    }
+    if (secured) {
+      expectAnonymousRefusal(c, bundle, operation, {
+        label,
+        name,
+        res,
+        why: "the operation is secured, so an anonymous caller is refused before the record is ever looked up — the existence of an id is not something this operation tells an unauthenticated caller",
+      });
       continue;
     }
     if (res.status !== 404) {
-      c.fail(
-        `GET ${path} answers 404 for a record that does not exist`,
-        `→ ${res.status} (body: ${res.body.slice(0, 160)})`,
-      );
+      c.fail(name, `→ ${res.status} (body: ${res.body.slice(0, 160)})`);
       continue;
     }
     const detail = validateAgainstResponse(bundle, operation.responses["404"], res);
-    c.expect(
-      detail.ok,
-      `GET ${path} answers 404 for a record that does not exist`,
-      `→ 404, ${summarize(detail)}`,
-      `→ 404, but ${detail.problem}`,
-    );
+    c.expect(detail.ok, name, `→ 404, ${summarize(detail)}`, `→ 404, but ${detail.problem}`);
   }
 }
 
