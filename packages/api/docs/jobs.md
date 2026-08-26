@@ -1,12 +1,12 @@
 # Scheduled jobs — schedule, guarantees and runbook
 
-The maintenance work the request path deliberately does not do: settling yesterday's analytics,
-catching up on embeddings and source checks, and closing listings that have stopped being
-opportunities.
+The background work the request path deliberately does not do: settling yesterday's analytics,
+catching up on embeddings and source checks, closing stale listings, and dispatching durable
+notification email.
 
 Everything here is implemented in `src/modules/services/jobs/*`, started by
 `scripts/jobs/run-job.ts` (built as `dist/jobs.js`) and scheduled by
-`.github/workflows/jobs-nightly.yml`.
+`.github/workflows/jobs-nightly.yml` and `.github/workflows/notifications-dispatch.yml`.
 
 ---
 
@@ -19,6 +19,7 @@ Everything here is implemented in `src/modules/services/jobs/*`, started by
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, or edited since their last check. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. |
+| `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 
 The list lives in exactly one place — `src/modules/services/jobs/registry.ts` — which the runner,
 the admin route and this table all read. A name that is not in it is refused by both callers rather
@@ -53,7 +54,7 @@ stop and let tomorrow's run try again.
 | Value | Means |
 |---|---|
 | `locked` | Another run of the **same** job holds the database advisory lock. Added by the runner. |
-| anything else | The job's **feature** is not configured — no embedding provider, `VERIFICATION_ENABLED=false`. Reported by the job itself. |
+| anything else | The job's **feature** is not configured — no embedding provider, `VERIFICATION_ENABLED=false`, or no delivering email transport. Reported by the job itself. |
 
 Both exit `0`. Only one of them is a statement about configuration, which is why a runner that
 collapsed them would report a permanently unconfigured job as healthy contention.
@@ -79,6 +80,10 @@ UTC
 
 22:00  staleness             external scheduler, outside this repository
 ```
+
+`notification-dispatch` is intentionally **not a node in that graph**. Its own workflow runs hourly
+at minute 17 and may be dispatched independently, so an email-provider outage can fail notification
+delivery without holding the nightly maintenance chain — or the open-data snapshot — hostage.
 
 **Why staleness sits alone, and why 22:00 is before 01:05 rather than after.** The advisory lock
 each job takes excludes a job from **itself**, never one job from another (§3). So two schedulers
@@ -139,7 +144,7 @@ run time:
 
 | What | Where it comes from |
 |---|---|
-| Cluster | `<ENV>_ECS_CLUSTER` — **the only repository variable**, and the deploy workflow for that environment already requires it |
+| Cluster | `<ENV>_ECS_CLUSTER` — the only repository variable the scheduler reads directly; the deploy workflow already requires it |
 | Task definition family, container name | `rfp-hub-<env>`, derived in `run-ecs-job.sh` (overridable via `ECS_TASK_DEFINITION` / `ECS_CONTAINER`) |
 | Service | `rfp-hub-<env>-service`, likewise (`ECS_SERVICE`) |
 | Launch type / capacity provider strategy | **read from the service** with `aws ecs describe-services`, and reused verbatim |
@@ -180,6 +185,10 @@ secret list to keep in step with the service's.
   transaction, so a publisher's edit racing the walk wins. A second run finds nothing to close and
   writes no second audit row.
 * `embedding-backfill` and `verification-backfill` select on the absence of the thing they produce.
+* `notification-dispatch` selects rows without `email_dispatched_at`. A successful send stamps it,
+  so a normal second run sends nothing. Transport failures retry at most three total attempts, no
+  sooner than five minutes after the last attempt; an account with no identity email is a terminal
+  `recipient_unavailable` failure rather than a poison row retried forever.
 
 **Concurrency is excluded by `pg_try_advisory_lock`, taken on a dedicated connection.** Three
 decisions, each closing something real:
@@ -209,10 +218,10 @@ carries the time of the change, which is where that fact belongs.
 
 ### a. The schedule (how it actually runs)
 
-`.github/workflows/jobs-nightly.yml` starts each job as a **one-off ECS task on the API service's
-own task definition**, using the AWS credentials the deploy workflows already hold. **Two calls**:
-read the service to learn where it runs, then start that task definition there with a different
-command.
+`.github/workflows/jobs-nightly.yml` and the independent notification workflow start each job as a
+**one-off ECS task on the API service's own task definition**, using the AWS credentials the deploy
+workflows already hold. **Two calls**: read the service to learn where it runs, then start that task
+definition there with a different command.
 
 ```sh
 # where the API runs — its own placement, reused verbatim
@@ -257,6 +266,7 @@ node packages/api/dist/jobs.js staleness --json
 # locally, against a database you own
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs staleness
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs embedding-backfill --limit 100 --passes 5
+DATABASE_URL=… pnpm --filter @the-rfp-hub/api jobs notification-dispatch --limit 100 --passes 5
 pnpm --filter @the-rfp-hub/api jobs --help
 ```
 
@@ -404,11 +414,14 @@ Before the first M3 job run on any deployment, in order:
    the right to start a task from it. `ecs:DescribeServices` is already exercised by the deploy
    workflow with the same credential. Nothing else is needed; the maintenance chain uses the
    **runtime** credential inside the container, not a DDL one.
-5. Prove it with one `workflow_dispatch` of *Nightly maintenance jobs* per environment, which fails
-   loudly if the cluster variable is unset or the service cannot be described. Nothing here
-   triggers the export — it runs on its own cron (§2) — so confirm it separately, either by waiting
-   for its 03:17 run or by dispatching *Nightly open-data export* directly. A `job=all` dispatch
-   also runs `staleness`, which the schedule does not (§2, §4d).
+5. Set `<ENV>_APP_BASE_URL` to the canonical frontend origin, then deploy once so the API workflow
+   writes it into the service task definition inherited by background tasks.
+6. Prove both schedules with one `workflow_dispatch` each of *Nightly maintenance jobs* and
+   *Notification email dispatch* per environment. Either fails loudly if the cluster variable is
+   unset or the service cannot be described. Nothing here triggers the export — it runs on its own
+   cron (§2) — so confirm it separately, either by waiting for its 03:17 run or by dispatching
+   *Nightly open-data export* directly. A `job=all` dispatch also runs `staleness`, which the
+   schedule does not (§2, §4d).
 
 ---
 
@@ -421,6 +434,7 @@ Before the first M3 job run on any deployment, in order:
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
 | `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY` |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
+| `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM` |
 
 After a **model-string change** (a new featurizer weighting or a refreshed idf table), every stored
 vector is stale by content-hash design and `embedding-backfill`'s first pass selects the whole
@@ -439,7 +453,7 @@ under `NODE_ENV=production`.
 
 ## 7. What a job writes to the audit trail
 
-Every mutation a job makes is an `audit_log` row with `actor_kind='job'`,
+Every authority-bearing data mutation a maintenance job makes is an `audit_log` row with `actor_kind='job'`,
 `actor_account_id = NULL` and `actor_api_key_id = NULL`, in the **same transaction** as the
 mutation. The patch names the job and its reason:
 
@@ -451,3 +465,8 @@ mutation. The patch names the job and its reason:
 has passed" and "nobody has re-asserted this listing in ninety days" — which are different things to
 tell a publisher. The public trail shows the changed field names and the actor `job`; the entry's
 submitter, its publisher and T3+ see the full patch.
+
+Notification delivery is operational telemetry, not an authority-bearing change, so it does not
+append an audit action. The notification row itself carries `email_dispatched_at` or
+`email_failed_at`; the payload's private `emailDelivery` member records a bounded attempt count and
+safe failure code while a retry is pending, and is stripped from account-facing API responses.

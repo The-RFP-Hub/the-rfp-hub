@@ -171,12 +171,17 @@ export class NotificationService {
 }
 
 function toNotificationView(row: typeof notifications.$inferSelect): NotificationView {
+  // Delivery attempts are operational state for the job, not part of the account-facing domain
+  // payload. Keep the API response stable even while a failed email is waiting for its retry.
+  const payload = Object.fromEntries(
+    Object.entries(row.payload).filter(([key]) => key !== "emailDelivery"),
+  );
   return {
     id: row.id,
     kind: row.kind,
     subjectKind: "duplicate",
     subjectId: row.subjectId,
-    payload: row.payload as unknown as DuplicateNotificationPayloadView,
+    payload: payload as unknown as DuplicateNotificationPayloadView,
     createdAt: row.createdAt.toISOString(),
     readAt: row.readAt?.toISOString() ?? null,
   };

@@ -1,6 +1,6 @@
 # 0009. Land duplicate notifications in-app first
 
-- **Status:** accepted
+- **Status:** accepted; email deferral superseded by [0010](./0010-centralize-and-dispatch-notification-email.md)
 - **Deciders:** project maintainers
 - **Date:** 2026-08-26
 - **Supersedes:** —

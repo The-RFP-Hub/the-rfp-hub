@@ -36,7 +36,7 @@ export interface EmailServiceOptions {
   /** Test seam: hold a memory transport outside the service and drain it after a send. */
   transport?: EmailTransport;
   /** Factory seam for proving configuration-driven transport selection without exposing a drain. */
-  transportFactory?: typeof createEmailTransport;
+  transportFactory?: (config: EmailConfig, production: boolean) => EmailTransport;
 }
 
 export class EmailService implements OutboundEmailPort {

@@ -22,6 +22,7 @@ total, not one per commit.
 | [0007](./0007-canonical-domain-and-spec-identity.md) | Adopt `ethrfps.app` as the canonical domain, and mint spec v1.0.0's identity on it | accepted | 2026-08-10 |
 | [0008](./0008-security-bounty-payout-tiers.md) | Split `bounty` into task and security kinds, and give the security kind a payout table | accepted | 2026-08-10 |
 | [0009](./0009-land-duplicate-notifications-in-app-first.md) | Land duplicate notifications in-app first | accepted | 2026-08-26 |
+| [0010](./0010-centralize-and-dispatch-notification-email.md) | Centralize outbound email and dispatch duplicate notifications | accepted | 2026-08-26 |
 
 ## When to write one
 

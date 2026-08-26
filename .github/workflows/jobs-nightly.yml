@@ -66,9 +66,9 @@ on:
         required: false
         type: choice
         default: all
-        # The exact names in `packages/api/src/modules/services/jobs/registry.ts` (`JOB_NAMES`),
-        # the one place a job name is spelled — plus `all` for "the whole chain" (`choice` options
-        # cannot be an empty string). A free-form string here meant a typo silently matched neither
+        # The maintenance-chain names from `packages/api/src/modules/services/jobs/registry.ts`;
+        # `notification-dispatch` has its own workflow so mail cannot gate export. `all` means this
+        # whole chain (`choice` options cannot be empty). A free-form string meant a typo matched neither
         # `matrix.job` nor `'staleness'` in every step's `if:` below, skipping every guarded step
         # and leaving a green run that did nothing.
         options:

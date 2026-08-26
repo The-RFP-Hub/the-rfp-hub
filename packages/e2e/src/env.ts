@@ -122,6 +122,8 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   // Exact origins, never a wildcard: this list is the CSRF check, the `callbackURL` allowlist, the
   // handoff redirect allowlist and the `/api/auth/*` CORS allowlist all at once.
   env.TRUSTED_ORIGINS = [input.frontendOrigin, `http://127.0.0.1:${input.port}`].join(",");
+  // Absolute links in notification email point at the frontend, never at the API origin above.
+  env.APP_BASE_URL = input.frontendOrigin;
 
   // Codes are written to a file inside the run's own directory rather than sent anywhere. This is
   // the whole reason the suite needs no external configuration — and `config.ts` refuses to boot a

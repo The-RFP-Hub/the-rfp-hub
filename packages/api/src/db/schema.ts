@@ -170,7 +170,7 @@ export const claimStatus = pgEnum("claim_status", ["pending", "approved", "rejec
 
 export const dupStatus = pgEnum("dup_status", ["suspected", "confirmed", "dismissed", "merged"]);
 
-/** In-app events emitted by the duplicate workflow. Email delivery is deliberately deferred. */
+/** Durable events emitted by the duplicate workflow and rendered by in-app and email channels. */
 export const notificationKind = pgEnum("notification_kind", [
   "duplicate_suspected",
   "duplicate_confirmed",
@@ -716,15 +716,15 @@ export const opportunityDuplicates = pgTable(
   ],
 );
 
-// ── notifications (account inbox + pre-provisioned email delivery state) ────────
+// ── notifications (account inbox + email delivery state) ───────────────────────
 /**
  * One durable account-scoped notification.
  *
  * The payload is structured data, never presentation copy. `subject_kind` remains text because it
  * is a polymorphic extension seam; this first slice writes only `duplicate`. The four-column
  * unique key is the final idempotency guard when a detector re-runs or a reviewer repeats an
- * action. Email timestamps are present now so a later dispatcher can land without another schema
- * migration, but no request path writes them in this release.
+ * action. Email timestamps are written by the independent notification-dispatch job; no request
+ * path performs provider I/O.
  */
 export const notifications = pgTable(
   "notifications",

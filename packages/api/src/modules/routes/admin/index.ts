@@ -108,7 +108,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
         operationId: "runMaintenanceJob",
         tags: ["admin"],
         summary: "Start one scheduled maintenance job now",
-        description: `A CONVENIENCE, NOT THE SCHEDULE. The nightly runs start each job as a one-off container task with the deployment's own credentials (\`node packages/api/dist/jobs.js <job>\`); this route exists so a reviewer can kick one from the dashboard without shell access, and it is a signed-in administrator session only — never a machine credential. It runs ONE pass: a full catch-up is what the task runner is for.\n\nEvery job takes a database advisory lock on its own name, so calling this while the scheduled run is in flight answers \`skipped: "locked"\` rather than doing the work twice.\n\nJobs: ${JOB_NAMES.join(", ")}. See packages/api/docs/jobs.md.`,
+        description: `A CONVENIENCE, NOT THE SCHEDULE. Scheduled runs start each job as a one-off container task with the deployment's own credentials (\`node packages/api/dist/jobs.js <job>\`); this route exists so a reviewer can kick one from the dashboard without shell access, and it is a signed-in administrator session only — never a machine credential. It runs ONE pass: a full catch-up is what the task runner is for.\n\nEvery job takes a database advisory lock on its own name, so calling this while the scheduled run is in flight answers \`skipped: "locked"\` rather than doing the work twice.\n\nJobs: ${JOB_NAMES.join(", ")}. See packages/api/docs/jobs.md.`,
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",

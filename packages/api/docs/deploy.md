@@ -72,6 +72,7 @@ are visible to anyone who can `describe-task-definition`, and `secrets` values a
 |---|---|---|
 | `NODE_ENV` | `production` | Also what makes `VERIFY_ALLOW_PRIVATE_HOSTS` and the non-delivering email transports refuse to boot |
 | `BETTER_AUTH_URL` | the API's own origin | The base every auth route and OAuth callback is built from. **Not** `PUBLIC_BASE_URL`, which is the OpenAPI document's `servers[0].url` and may legitimately differ |
+| `APP_BASE_URL` | the frontend's canonical origin | Required in production. The one origin placed in notification-email links; never inferred from the API's `PUBLIC_BASE_URL` or the preview-capable `TRUSTED_ORIGINS` list. The deploy workflows read `<ENV>_APP_BASE_URL` from repository variables and write it into the ECS task definition, which the dispatcher task then inherits |
 | `TRUSTED_ORIGINS` | the frontend's origin(s) — `https://ethrfps.app` in production, `https://staging.ethrfps.app` in staging | Comma-separated, **exact** origins. Backs CSRF, the `callbackURL`, the handoff redirect target and the `/api/auth/*` CORS allowlist — one list so they cannot drift apart. The production frontend is the **apex**: it is the spec's site, and it proxies `/schemas/`, `/meta/`, `/registries/` and `/ns/` back to this service ([`adr/0007`](../../../adr/0007-canonical-domain-and-spec-identity.md)) |
 | `PREVIEW_ORIGIN_PATTERN` | staging only | An **anchored** regular expression for preview origins, tied to our project *and* team slug. Never `*.vercel.app`. Unanchored → refuses to boot |
 | `EMAIL_TRANSPORT` | `ses` or `mailgun` | How sign-in codes are delivered. Those two are the delivering transports; `file`/`stdout`/`memory`/`null` **refuse to boot** in production: nothing would be delivered and every sign-in would stall at the code prompt, for everyone at once, with nothing in the logs |
@@ -142,6 +143,12 @@ and DMARC records. Then, whichever one you run:
   (`mg.ethrfps.app`), not `EMAIL_FROM`'s domain — an unverified or merely mistyped domain is a 401
   on every message. Set `MAILGUN_API_BASE` if the account is in the EU region; the endpoints are
   different hosts holding different accounts, and the default is the US one.
+
+All senders go through the central outbound-email port. Better-Auth composes OTP content in its
+adapter; the duplicate domain composes notification content; neither selects a provider or controls
+the envelope sender. `notification-dispatch` runs hourly in its own workflow, joins `auth_user` for
+the address at send time, and retries temporary failures three times with a five-minute floor. It is
+separate from the nightly maintenance workflow so mail availability cannot gate dataset export.
 
 ---
 
@@ -317,7 +324,7 @@ credential.
 
 ### Operator prerequisites
 
-One variable **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
+Two repository variables are configured **per environment**: `<ENV>` is `PRODUCTION` or `STAGING`, and the workflow picks it
 from its `environment` input — which is empty on the schedule and therefore `production`, matching
 the deployment the open-data export reads. The credentials are picked the same way
 (`<ENV>_AWS_ACCESS_KEY_ID` / `<ENV>_AWS_SECRET_ACCESS_KEY`), so a scheduled maintenance chain
@@ -326,8 +333,10 @@ authenticates exactly as `production.yml` does.
 | Repository variable | What it names |
 |---|---|
 | `<ENV>_ECS_CLUSTER` | The cluster the one-off task runs in — the **same** variable `<env>.yml` already requires to deploy the service, so any deployed environment has already set it |
+| `<ENV>_APP_BASE_URL` | Canonical HTTPS frontend origin. The API deploy writes it into the service task definition; notification-dispatch reuses that definition |
 
-That is the only repository variable the chain needs. The task definition family
+The scheduler reads only the cluster variable directly; `APP_BASE_URL` reaches it through the
+service task definition. The task definition family
 (`rfp-hub-<env>`), the container name and the service (`rfp-hub-<env>-service`) are the names the
 deploy workflows already hardcode; `run-ecs-job.sh` derives them from `<env>` rather than reading a
 second copy of them from configuration.
