@@ -20,6 +20,7 @@
 import { type DB, db as defaultDb } from "../../../db/client.js";
 import { DedupeService } from "../dedupe/dedupe.service.js";
 import { AnalyticsRollupService } from "../insights/rollup.service.js";
+import { noopNotificationDispatchQueue } from "../notifications/notification-dispatch.queue.js";
 import {
   type NotificationDispatchOptions,
   NotificationDispatchService,
@@ -76,7 +77,17 @@ export const JOBS: JobDefinition[] = [
     name: "embedding-backfill",
     shape: "cursor",
     describes: "Embed entries that have no vector for the configured provider, and pair them.",
-    run: (options) => new DedupeService(dbOf(options)).runBatch({ limit: options.limit }),
+    // The immediate-email accelerator is switched OFF here, and only here: a job container tears
+    // its pool down as soon as the job resolves, which would strand the fire-and-forget sends this
+    // backfill's new notifications trigger. `notification-dispatch` in the same nightly matrix
+    // delivers them. See `noopNotificationDispatchQueue`. This catalogue is also what the admin
+    // job route runs, so an admin-triggered backfill takes the same durable path rather than the
+    // accelerator — the alternative was a per-caller mode flag on a job definition, which is a
+    // worse thing to own than a backfill's mail arriving on the nightly cycle.
+    run: (options) =>
+      new DedupeService(dbOf(options), {
+        notificationQueue: noopNotificationDispatchQueue,
+      }).runBatch({ limit: options.limit }),
   },
   {
     name: "verification-backfill",

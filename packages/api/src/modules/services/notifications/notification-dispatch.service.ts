@@ -16,7 +16,15 @@ export const NOTIFICATION_EMAIL_RETRY_DELAY_MS = 5 * 60_000;
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 1000;
 
-type FailureReason = "recipient_unavailable" | "transport_failure" | "invalid_notification";
+/**
+ * `in_flight` is written by the lease, never by this service: it is the state of an attempt whose
+ * outcome nobody has observed yet, and every path below replaces it with a real one.
+ */
+type FailureReason =
+  | "recipient_unavailable"
+  | "transport_failure"
+  | "invalid_notification"
+  | "in_flight";
 
 interface DeliveryState {
   attempts: number;
@@ -93,6 +101,9 @@ export class NotificationDispatchService {
     if (notificationIds !== undefined && notificationIds.length === 0) {
       return { processed: 0, remaining: 0 };
     }
+    // Leased, not merely read: every row that comes back is already stamped in flight with its
+    // attempt counted, so no other dispatcher can pick it up while this loop is talking to the
+    // provider. See `NotificationRepository.selectForDispatch`.
     const candidates = await this.repos.notifications.selectForDispatch({
       accountId: this.accountId,
       notificationIds,
@@ -118,8 +129,10 @@ export class NotificationDispatchService {
 
     for (const notification of candidates) {
       const recipientEmail = recipients.get(notification.accountId) ?? null;
-      const priorAttempts = deliveryAttempts(notification.payload);
-      if (priorAttempts > 0) details.retried++;
+      // The lease already incremented this, so it counts THIS attempt, not the ones before it —
+      // hence `> 1` for "we have been here before" and no `+ 1` at the failure stamp below.
+      const attempts = deliveryAttempts(notification.payload);
+      if (attempts > 1) details.retried++;
 
       if (!recipientEmail) {
         const attemptCompletedAt = completedAt();
@@ -165,7 +178,7 @@ export class NotificationDispatchService {
         await this.markFailure(
           notification.id,
           notification.payload,
-          priorAttempts + 1,
+          attempts,
           "transport_failure",
           attemptCompletedAt,
         );

@@ -184,7 +184,11 @@ secret list to keep in step with the service's.
 
 ## 3. Idempotency and locking
 
-**Every job is safe to run twice.** Not "unlikely to be run twice" — safe:
+**Every job is safe to run twice.** Not "unlikely to be run twice" — safe. Read that as
+*sequentially*: run a job, let it finish, run it again, and nothing is double-counted or double-sent.
+Two runs **overlapping in time** are a different claim, and the advisory lock below is what supplies
+it — but only against another run of the **same job name**. Nothing stops a different caller from
+touching the same rows, which is why `notification-dispatch` does not rely on the lock alone.
 
 * `analytics-rollup` **assigns** `count(*)` for a day, never `existing + n`. An increment is only
   correct if the job runs exactly once per day forever, and the first retry, the first manual run
@@ -199,6 +203,14 @@ secret list to keep in step with the service's.
   sooner than five minutes after the completion of the last attempt — including retries within one
   long sweep run; an account with no identity email is a terminal `recipient_unavailable` failure
   rather than a poison row retried forever.
+  **It also leases every row it is about to send, in the selecting statement itself** — a single
+  `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING *` that counts the attempt and
+  stamps `email_failed_at` before any mail leaves. That is deliberately more than the job lock
+  gives: this job's rows are also dispatched by the API process's in-process queue at event time, so
+  the two can be in flight at once by design and only a row-level claim separates them. The visible
+  consequence is that a dispatcher that dies mid-send **burns one of the row's three attempts**
+  rather than leaving it in flight forever; the payload records that attempt as `in_flight`, meaning
+  nothing ever observed how it ended.
 
 **Concurrency is excluded by `pg_try_advisory_lock`, taken on a dedicated connection.** Three
 decisions, each closing something real:

@@ -101,6 +101,17 @@ state, not thrown as workflow failures.
 - **Bad:** delivery is at-least-once around the provider/stamp boundary; a crash in that narrow gap
   may send the same notification again on retry. Exactly-once external email is not available from
   a database transaction.
+
+  *Annotation (2026-08-26).* Two things sharpen this. **First, `transport_failure` is ambiguous.**
+  A refusal we can name is one thing; a timeout is another — the provider may have accepted the
+  message and answered too slowly, so the retry that follows is a second delivery of mail that
+  already went out. The retry bound is therefore a bound on *duplicates*, not only on wasted
+  attempts, and nothing short of a provider-side idempotency key changes that. **Second, the gap
+  is now narrow on purpose rather than by luck.** A dispatcher leases its rows in the statement
+  that selects them (`UPDATE … FOR UPDATE SKIP LOCKED`, attempt counted and `email_failed_at`
+  stamped before the send), so concurrent dispatchers — the in-process queue and the nightly job —
+  can no longer both claim one row. What remains is exactly the crash-in-the-gap case named above,
+  and a lost dispatcher now spends one of the three attempts instead of holding the row forever.
 - **Bad:** retry metadata is internal JSON rather than a query-friendly column. A future delivery
   analytics product should introduce a dedicated attempt table instead of growing that object.
 - **Neutral:** dispatch timestamps remain operational telemetry and do not add an audit enum value.
