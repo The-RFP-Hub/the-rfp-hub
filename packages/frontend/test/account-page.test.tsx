@@ -50,7 +50,7 @@ beforeEach(() => {
   session.data = { user: { id: "u1" } };
 });
 
-describe("account organisation links", () => {
+describe("account organization links", () => {
   it("makes Save the account page's primary action", async () => {
     mount(account);
 
@@ -59,12 +59,12 @@ describe("account organisation links", () => {
     );
   });
 
-  it("links the organisation index beside the heading and from the empty state", async () => {
+  it("links the organization index beside the heading and from the empty state", async () => {
     mount(account);
 
-    const links = await screen.findAllByRole("link", { name: "Browse organisations" });
+    const links = await screen.findAllByRole("link", { name: "Browse organizations" });
     expect(links).toHaveLength(2);
-    expect(links.every((link) => link.getAttribute("href") === "/organisations")).toBe(true);
+    expect(links.every((link) => link.getAttribute("href") === "/organizations")).toBe(true);
   });
 
   it("explains how an account without Direct-create can still publish without review", async () => {
@@ -72,11 +72,11 @@ describe("account organisation links", () => {
 
     const label = await screen.findByRole("rowheader", { name: "Direct-create" });
     expect(label.nextElementSibling?.textContent).toBe(
-      "No — this account publishes without review only through a verified organisation membership; other submissions wait for review.",
+      "No — this account publishes without review only through a verified organization membership; other submissions wait for review.",
     );
   });
 
-  it("keeps membership names direct while exposing the organisation index", async () => {
+  it("keeps membership names direct while exposing the organization index", async () => {
     mount({
       ...account,
       memberships: [
@@ -86,9 +86,9 @@ describe("account organisation links", () => {
 
     expect(
       (await screen.findByRole("link", { name: "Acme Foundation" })).getAttribute("href"),
-    ).toBe("/organisations/acme%20collective");
-    expect(screen.getByRole("link", { name: "Browse organisations" }).getAttribute("href")).toBe(
-      "/organisations",
+    ).toBe("/organizations/acme%20collective");
+    expect(screen.getByRole("link", { name: "Browse organizations" }).getAttribute("href")).toBe(
+      "/organizations",
     );
   });
 });

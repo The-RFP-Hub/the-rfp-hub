@@ -13,7 +13,7 @@
  * the swap verbatim, which is the evidence that `SessionState` really did keep its contract:
  * `RequireSession` runs its real logic and calls the real `GET /v1/me` through an injected client.
  */
-import { Chrome, RequireSession, organisationNav } from "@/components/Chrome";
+import { Chrome, RequireSession, organizationNav } from "@/components/Chrome";
 import { NavigationBlockerProvider, useNavigationBlocker } from "@/components/NavigationBlocker";
 import type { ApiClient } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
@@ -139,18 +139,18 @@ describe("RequireSession", () => {
       "/account",
       ROUTE_GATE_COPY.account,
       "Sign in to view your account.",
-      "See your Hub role and verified organisation memberships.",
+      "See your Hub role and verified organization memberships.",
     ],
     [
-      "/organisations",
-      ROUTE_GATE_COPY.organisations,
-      "Sign in to view your organisations.",
-      "See the organisations where this account has publishing rights.",
+      "/organizations",
+      ROUTE_GATE_COPY.organizations,
+      "Sign in to view your organizations.",
+      "See the organizations where this account has publishing rights.",
     ],
     [
-      "/organisations/[slug]",
-      ROUTE_GATE_COPY.organisation,
-      "Sign in to view this organisation.",
+      "/organizations/[slug]",
+      ROUTE_GATE_COPY.organization,
+      "Sign in to view this organization.",
       "Check your membership and manage the listings in its namespace.",
     ],
     [
@@ -169,7 +169,7 @@ describe("RequireSession", () => {
       "/review",
       ROUTE_GATE_COPY.review,
       "Sign in with a Hub reviewer account.",
-      "Review submissions, claims, organisations, and duplicate matches.",
+      "Review submissions, claims, organizations, and duplicate matches.",
     ],
     [
       "/admin",
@@ -228,7 +228,7 @@ describe("RequireSession", () => {
   });
 });
 
-describe("organisation navigation", () => {
+describe("organization navigation", () => {
   const acme: Me["memberships"][number] = {
     slug: "acme",
     name: "Acme Foundation",
@@ -243,13 +243,13 @@ describe("organisation navigation", () => {
   };
 
   it.each([
-    ["zero memberships", [], "/organisations", "Organisations"],
-    ["one membership", [acme], "/organisations/acme", "Acme Foundation"],
-    ["multiple memberships", [acme, beta], "/organisations", "Organisations"],
+    ["zero memberships", [], "/organizations", "Organizations"],
+    ["one membership", [acme], "/organizations/acme", "Acme Foundation"],
+    ["multiple memberships", [acme, beta], "/organizations", "Organizations"],
   ] as const)(
-    "links %s to the useful organisation destination",
+    "links %s to the useful organization destination",
     (_case, memberships, href, label) => {
-      expect(organisationNav({ ...me, memberships: [...memberships] })).toEqual({ href, label });
+      expect(organizationNav({ ...me, memberships: [...memberships] })).toEqual({ href, label });
     },
   );
 
@@ -277,8 +277,8 @@ describe("organisation navigation", () => {
     expect(screen.getByRole("main").getAttribute("tabindex")).toBe("-1");
   });
 
-  it("keeps all nine admin destinations in three semantic groups with a long organisation name", async () => {
-    const longName = "AnExtraordinarilyLongPublisherOrganisationNameWithoutConvenientBreaks";
+  it("keeps all nine admin destinations in three semantic groups with a long organization name", async () => {
+    const longName = "AnExtraordinarilyLongPublisherOrganizationNameWithoutConvenientBreaks";
     const admin: Me = {
       ...me,
       role: "admin",

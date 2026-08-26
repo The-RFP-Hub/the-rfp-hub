@@ -48,7 +48,7 @@ export default function PrivacyPage() {
       </p>
       <p>
         An account also carries what you create on it: an optional public handle (the byline shown
-        on listings), roles and organisation memberships, API-key records (name, prefix, a hash of
+        on listings), roles and organization memberships, API-key records (name, prefix, a hash of
         the key, scopes, last-use — never the secret itself), your submissions, and an append-only
         history of changes and decisions.
       </p>
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
         content, which become part of the public dataset.
       </p>
       <p>
-        If you choose a public handle, submissions you make outside an organisation carry it as
+        If you choose a public handle, submissions you make outside an organization carry it as
         their <code>submittedBy</code> attribution — displayed on the listing and included in the
         exports. Without a handle, they are attributed to &ldquo;community&rdquo;. For listings that
         are currently public, a coarsened change history is also publicly readable: which fields

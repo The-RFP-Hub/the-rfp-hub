@@ -107,7 +107,7 @@ function Account({ me }: { me: Me }) {
                 <td>
                   {me.directCreate
                     ? "Yes — may publish into any namespace without a membership"
-                    : "No — this account publishes without review only through a verified organisation membership; other submissions wait for review."}
+                    : "No — this account publishes without review only through a verified organization membership; other submissions wait for review."}
                 </td>
               </tr>
               <tr>
@@ -133,18 +133,18 @@ function Account({ me }: { me: Me }) {
 
       <div className="card">
         <div className="row-between">
-          <h2>Organisations</h2>
-          <Link href="/organisations">Browse organisations</Link>
+          <h2>Organizations</h2>
+          <Link href="/organizations">Browse organizations</Link>
         </div>
         {me.memberships.length === 0 ? (
           <>
             <p className="muted">
               No memberships. Submissions from this account land pending, which is the normal path
-              for a community submission. Claiming a listing for an organisation you run is how that
+              for a community submission. Claiming a listing for an organization you run is how that
               changes.
             </p>
             <p>
-              <Link href="/organisations">Browse organisations</Link>
+              <Link href="/organizations">Browse organizations</Link>
             </p>
           </>
         ) : (
@@ -152,7 +152,7 @@ function Account({ me }: { me: Me }) {
             <table>
               <thead>
                 <tr>
-                  <th scope="col">Organisation</th>
+                  <th scope="col">Organization</th>
                   <th scope="col">Your role</th>
                   <th scope="col">Publishing</th>
                 </tr>
@@ -162,13 +162,13 @@ function Account({ me }: { me: Me }) {
                   <tr key={membership.slug}>
                     <th scope="row">
                       {/*
-                       * The membership is the entry point to the organisation's own page — what it
+                       * The membership is the entry point to the organization's own page — what it
                        * has published, and what is waiting in its name. Naming it here without
                        * linking made this table a dead end listing places the reader could not go.
                        */}
                       <Link
                         className="row-title"
-                        href={`/organisations/${encodeURIComponent(membership.slug)}`}
+                        href={`/organizations/${encodeURIComponent(membership.slug)}`}
                       >
                         <UntrustedText value={membership.name} />
                       </Link>

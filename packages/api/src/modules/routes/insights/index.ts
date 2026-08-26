@@ -62,7 +62,7 @@ export const insights = async (router: FastifyInstance): Promise<void> => {
         tags: ["insights"],
         summary: "Every entry this account submitted or publishes, totalled",
         description:
-          "Same window and the same best-effort caveat as the per-entry series. Ownership is the same union the account's own listings use — submitted by this account, or published under a namespace it belongs to — so a publisher sees their organisation's entries even when a colleague filed them.",
+          "Same window and the same best-effort caveat as the per-entry series. Ownership is the same union the account's own listings use — submitted by this account, or published under a namespace it belongs to — so a publisher sees their organization's entries even when a colleague filed them.",
         security: [{ bearerAuth: [] }],
         querystring: { type: "object", additionalProperties: false, properties: window },
         response: { 200: { $ref: "InsightsSummary#" }, ...errors },

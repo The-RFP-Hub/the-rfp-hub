@@ -2,7 +2,7 @@
  * Publisher-supplied text, rendered as text.
  *
  * The Standard says `description` is untrusted and must be sanitised before rendering, and every
- * other string on a listing — title, summary, eligibility, an organisation's name — arrives by the
+ * other string on a listing — title, summary, eligibility, an organization's name — arrives by the
  * same route and deserves the same treatment. React escapes a text child, so the sanitisation is
  * simply never leaving that path: no `dangerouslySetInnerHTML`, no markdown-to-HTML step, no
  * "trusted publisher" exception. A unit test scans this package's source to keep it that way.

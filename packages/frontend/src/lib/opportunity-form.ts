@@ -141,7 +141,7 @@ export interface OrganizationRow {
   slug: string;
   orgType: string;
   website: string;
-  /** The stored organisation this row was loaded from. Its unmodelled members ride along. */
+  /** The stored organization this row was loaded from. Its unmodelled members ride along. */
   base: Rec;
 }
 
@@ -767,7 +767,7 @@ export function slugifyTitle(title: string): string {
 }
 
 /**
- * The id the form proposes: the primary operating organisation's slug, then the slugified title.
+ * The id the form proposes: the primary operating organization's slug, then the slugified title.
  *
  * A proposal rather than a rule — the field stays editable, because the local half is the
  * publisher's own key and they may already have one. Empty when either half is missing, so the
@@ -797,7 +797,7 @@ export function idProblem(id: string): string | null {
   }
   const colon = trimmed.indexOf(":");
   if (colon <= 0 || colon === trimmed.length - 1) {
-    return "Start the id with the organisation slug and a colon, for example acme-foundation:2026-round-1.";
+    return "Start the id with the organization slug and a colon, for example acme-foundation:2026-round-1.";
   }
   return null;
 }
@@ -814,7 +814,7 @@ export function namespaceOf(id: string): string | null {
 
 /** What the API says this account may publish. Absent when the form has not been told. */
 export interface PublishAuthority {
-  /** Slugs of the verified organisations this account belongs to. */
+  /** Slugs of the verified organizations this account belongs to. */
   verifiedNamespaces: string[];
   /** An account-level grant that publishes immediately whatever the namespace. */
   directCreate: boolean;
@@ -843,7 +843,7 @@ export function describePublish(
    *
    * Absent on a create, where the namespace is the id's own prefix. On a replace the id is
    * immutable and says nothing about authority — a claimed listing keeps the id it was imported
-   * with (`host:123`) while being published under the organisation that claimed it — so predicting
+   * with (`host:123`) while being published under the organization that claimed it — so predicting
    * the outcome from the prefix predicts the wrong one.
    */
   storedNamespace?: string | null,
@@ -856,7 +856,7 @@ export function describePublish(
   // it, and saying so would send a publisher off to edit an immutable field.
   const how =
     stored !== "" && stored !== namespaceOf(id)
-      ? `This listing is published under the organisation prefix ${namespace}, which decides replacement access — not the id.`
+      ? `This listing is published under the organization prefix ${namespace}, which decides replacement access — not the id.`
       : "The part before the colon decides this.";
 
   if (!authority) {
@@ -865,7 +865,7 @@ export function describePublish(
       immediate: null,
       because:
         stored !== ""
-          ? `${namespace} is the organisation prefix this listing is published under, and membership of that organisation decides whether a replacement publishes immediately or waits for a Hub reviewer.`
+          ? `${namespace} is the organization prefix this listing is published under, and membership of that organization decides whether a replacement publishes immediately or waits for a Hub reviewer.`
           : "the part before the colon decides whether it publishes immediately or waits for a Hub reviewer.",
     };
   }
@@ -873,7 +873,7 @@ export function describePublish(
     return {
       id: shown,
       immediate: true,
-      because: "this account publishes directly, whichever organisation prefix it uses.",
+      because: "this account publishes directly, whichever organization prefix it uses.",
     };
   }
   if (authority.verifiedNamespaces.includes(namespace)) {
@@ -887,14 +887,14 @@ export function describePublish(
     return {
       id: shown,
       immediate: false,
-      because: `${namespace} is not one of your verified organisations (${authority.verifiedNamespaces.join(", ")}). ${how}`,
+      because: `${namespace} is not one of your verified organizations (${authority.verifiedNamespaces.join(", ")}). ${how}`,
     };
   }
   return {
     id: shown,
     immediate: false,
     because:
-      "this account is not a member of a verified organisation, which is the normal path for a community submission.",
+      "this account is not a member of a verified organization, which is the normal path for a community submission.",
   };
 }
 
@@ -917,7 +917,7 @@ const LEGACY_INGEST_ORIGINS: ReadonlySet<string> = new Set(["import", "scrape", 
  * stored publisher still appears somewhere in `operatingOrganizations`.
  *
  * That distinction is not academic. A claimed or imported listing legitimately carries an id from
- * the system it came from (`host:123`) while being published under the organisation that operates
+ * the system it came from (`host:123`) while being published under the organization that operates
  * it (`acme`). Holding the id to the primary operator on edit refused a PUT the API would have
  * accepted, and — worse — told the publisher to fix a field they cannot change.
  */
@@ -1163,7 +1163,7 @@ function buildDetails(form: OpportunityFormState, base: unknown): Rec {
  *
  * `base` IS WHAT MAKES A REPLACE SAFE, and it goes deeper than the top level. `PUT` replaces the
  * stored record, so anything this form does not rebuild has to arrive unchanged. The form now
- * models far more than it did, but "models" still is not "owns": an organisation carries contacts,
+ * models far more than it did, but "models" still is not "owns": an organization carries contacts,
  * a description, a logo and social links this form never renders, and `source` carries attribution
  * the server owns outright.
  *
@@ -1365,8 +1365,8 @@ export function fieldProblems(
       fail(
         "id",
         elsewhere
-          ? `${namespace} runs this opportunity but is not the primary organisation. Move it to the top of Who runs it, or start the id with ${primary}.`
-          : `The part before the colon must be the primary operating organisation's slug — ${primary}.`,
+          ? `${namespace} runs this opportunity but is not the primary organization. Move it to the top of Who runs it, or start the id with ${primary}.`
+          : `The part before the colon must be the primary operating organization's slug — ${primary}.`,
       );
     }
   }
@@ -1378,7 +1378,7 @@ export function fieldProblems(
     if (!kept) {
       fail(
         "operatingOrganizations",
-        `This listing is published under ${authority.namespace}. A replacement must keep that organisation in the list — removing it would leave the listing published under an organisation that no longer operates it.`,
+        `This listing is published under ${authority.namespace}. A replacement must keep that organization in the list — removing it would leave the listing published under an organization that no longer operates it.`,
       );
     }
   }
@@ -1389,17 +1389,17 @@ export function fieldProblems(
   limit("currency", form.currency, "The currency", 16);
 
   if (form.operatingOrganizations.length === 0) {
-    fail("operatingOrganizations", "At least one operating organisation is required.");
+    fail("operatingOrganizations", "At least one operating organization is required.");
   }
   const organizations = (rows: OrganizationRow[], prefix: string) => {
     rows.forEach((row, index) => {
-      requireText(`${prefix}.${index}.name`, row.name, "The organisation name", 256);
+      requireText(`${prefix}.${index}.name`, row.name, "The organization name", 256);
       const slug = row.slug.trim();
-      if (slug === "") fail(`${prefix}.${index}.slug`, "The organisation slug is required.");
+      if (slug === "") fail(`${prefix}.${index}.slug`, "The organization slug is required.");
       else if (!ORG_SLUG.test(slug)) {
         fail(`${prefix}.${index}.slug`, "A slug is lowercase letters, digits and hyphens only.");
       }
-      uri(`${prefix}.${index}.website`, row.website, "The organisation website");
+      uri(`${prefix}.${index}.website`, row.website, "The organization website");
     });
   };
   organizations(form.operatingOrganizations, "operatingOrganizations");
@@ -1768,7 +1768,7 @@ export function replaceRow<T>(rows: T[], index: number, row: T): T[] {
 
 /**
  * Move a row one place, for the two lists whose ORDER IS SEMANTIC: `operatingOrganizations[0]` is
- * the primary organisation and the one displayed, and `milestones` is a sequence with no index
+ * the primary organization and the one displayed, and `milestones` is a sequence with no index
  * field of its own. Everywhere else order is presentational and there are no arrows.
  */
 export function moveRow<T>(rows: T[], index: number, direction: -1 | 1): T[] {

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The reviewer surface: submissions, ownership claims, duplicates, and the organisations whose
+ * The reviewer surface: submissions, ownership claims, duplicates, and the organizations whose
  * verification decides who may publish without any of this.
  *
  * Every action here is enforced on the API as a session-only reviewer capability — a reviewer's own
@@ -17,7 +17,7 @@
  * reloads after a decision, or presses Back — and every one of those used to land on Submissions.
  *
  * EVERY CONSEQUENTIAL BUTTON IS BEHIND A STATED CONSEQUENCE. Approving publishes somebody's listing
- * to the world; verifying an organisation grants publishing power to everyone in it, including
+ * to the world; verifying an organization grants publishing power to everyone in it, including
  * people added later; merging rejects and archives a record. None of them is undone by clicking
  * again, so none of them fires on the first click.
  */
@@ -69,14 +69,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
-type Tab = "submissions" | "claims" | "duplicates" | "organisations";
-const TABS: Tab[] = ["submissions", "claims", "duplicates", "organisations"];
+type Tab = "submissions" | "claims" | "duplicates" | "organizations";
+const TABS: Tab[] = ["submissions", "claims", "duplicates", "organizations"];
 const SUBMISSION_PAGE_SIZE = 50;
 const LABELS: Record<Tab, string> = {
   submissions: "Submissions",
   claims: "Claims",
   duplicates: "Duplicates",
-  organisations: "Organisations",
+  organizations: "Organizations",
 };
 
 function submissionPageFromUrl(raw: string | null | undefined): number {
@@ -107,7 +107,8 @@ function Review({ me }: { me: Me }) {
   const router = useRouter();
   const params = useSearchParams();
   const requested = params?.get("tab");
-  const tab: Tab = TABS.includes(requested as Tab) ? (requested as Tab) : "submissions";
+  const normalizedTab = requested === "organisations" ? "organizations" : requested;
+  const tab: Tab = TABS.includes(normalizedTab as Tab) ? (normalizedTab as Tab) : "submissions";
   const [queuePage, setQueuePage] = useState(() => submissionPageFromUrl(params?.get("page")));
   const [duplicateDecisions, setDuplicateDecisions] = useState<Record<number, DuplicateDecision>>(
     {},
@@ -173,7 +174,7 @@ function Review({ me }: { me: Me }) {
             isOpenDuplicateStatus(pair.status),
           ).length
         : null,
-    organisations: null,
+    organizations: null,
   };
 
   /**
@@ -229,7 +230,7 @@ function Review({ me }: { me: Me }) {
           origin={returnHere}
         />
       ) : null}
-      {tab === "organisations" ? <Organisations memberships={me.memberships} /> : null}
+      {tab === "organizations" ? <Organizations memberships={me.memberships} /> : null}
     </section>
   );
 }
@@ -644,7 +645,7 @@ function LastDecision({
  * Ownership claims, with the two approvals ranked rather than presented as a pair.
  *
  * THEY ARE NOT PEERS. Approving transfers ownership of one listing; approving AND verifying hands
- * the organisation permanent publishing rights over its whole namespace, for every member it has or
+ * the organization permanent publishing rights over its whole namespace, for every member it has or
  * later gains. Two buttons side by side said those were comparable choices, and the more dangerous
  * one was the easier click because it came first.
  */
@@ -666,8 +667,8 @@ function Claims({
     <>
       <p className="muted footnote">
         Approving a claim transfers publisher ownership of that listing.{" "}
-        <strong>Verifying the organisation is a separate and much larger decision</strong> — it is
-        what unlocks auto-approval for everything that organisation publishes from then on. The API
+        <strong>Verifying the organization is a separate and much larger decision</strong> — it is
+        what unlocks auto-approval for everything that organization publishes from then on. The API
         returns a sentence saying which happened; it is shown verbatim.
       </p>
       <ActionNote note={note} />
@@ -676,7 +677,7 @@ function Claims({
           list.items.length === 0 ? (
             <EmptyState
               title="No claims waiting."
-              detail="A claim is filed from a listing's own page by somebody who says it belongs to their organisation."
+              detail="A claim is filed from a listing's own page by somebody who says it belongs to their organization."
             />
           ) : (
             <div className="table-scroll">
@@ -761,7 +762,7 @@ function Claims({
                             </button>
                           </div>
                           <p className="muted footnote">
-                            Approving alone transfers this listing; the organisation&rsquo;s future
+                            Approving alone transfers this listing; the organization&rsquo;s future
                             writes still wait for review.
                           </p>
                         </td>
@@ -1396,13 +1397,13 @@ function Side({
   );
 }
 
-// ── organisations ─────────────────────────────────────────────────────────────────
+// ── organizations ─────────────────────────────────────────────────────────────────
 
 /**
- * Verifying an organisation, which is the single most consequential control in this application.
+ * Verifying an organization, which is the single most consequential control in this application.
  *
  * IT IS SEARCH-FIRST, and that is a safety property rather than a layout preference. The directory
- * auto-registers a stub for every organisation any listing merely NAMES, so an unfiltered list is
+ * auto-registers a stub for every organization any listing merely NAMES, so an unfiltered list is
  * hundreds of names nobody has ever vouched for, sorted alphabetically, with the one that matters
  * somewhere in the middle. Verifying the wrong row from a list like that grants publishing rights
  * over a namespace to whoever is added to it next.
@@ -1410,7 +1411,7 @@ function Side({
  * So the page shows what is already trusted or already peopled, and everything else is behind a
  * deliberate search.
  */
-function Organisations({ memberships }: { memberships: Me["memberships"] }) {
+function Organizations({ memberships }: { memberships: Me["memberships"] }) {
   const api = useApi();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
@@ -1453,10 +1454,10 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
         }}
       >
         <input
-          aria-label="Search organisations by name or slug"
+          aria-label="Search organizations by name or slug"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search organisations by name or slug…"
+          placeholder="Search organizations by name or slug…"
         />
         <button type="submit">Search</button>
         {search !== "" ? (
@@ -1473,7 +1474,7 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
       </form>
       <p className="muted footnote">
         Verifying is not directory housekeeping — it grants publishing rights. The two lists below
-        are the organisations that are already verified or already have members; every other name in
+        are the organizations that are already verified or already have members; every other name in
         the corpus is a stub auto-registered from a listing that mentioned it, and lives behind the
         search.
       </p>
@@ -1485,14 +1486,14 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
       </h2>
       <ResourceView
         resource={verified.state}
-        what="verified organisations"
+        what="verified organizations"
         onRetry={verified.reload}
       >
         {(list) =>
           list.items.length === 0 ? (
             <EmptyState
-              title="No organisation is verified."
-              detail="Nothing publishes without review until one is. Find an organisation with members below, or by searching."
+              title="No organization is verified."
+              detail="Nothing publishes without review until one is. Find an organization with members below, or by searching."
             />
           ) : (
             <OrgTable
@@ -1509,14 +1510,14 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
       <h2 className="section-head">Has members, not verified{` · ${peopled.length}`}</h2>
       <ResourceView
         resource={unverified.state}
-        what="unverified organisations"
+        what="unverified organizations"
         onRetry={unverified.reload}
       >
         {(list) =>
           peopled.length === 0 ? (
             <EmptyState
-              title="No unverified organisation has members."
-              detail="A membership is granted from an approved claim, or directly by a reviewer. Verifying an organisation with no members grants nothing today and arms whoever is added next."
+              title="No unverified organization has members."
+              detail="A membership is granted from an approved claim, or directly by a reviewer. Verifying an organization with no members grants nothing today and arms whoever is added next."
             />
           ) : (
             <>
@@ -1529,7 +1530,7 @@ function Organisations({ memberships }: { memberships: Me["memberships"] }) {
               />
               {list.items.length >= 100 ? (
                 <p className="muted footnote">
-                  Showing the first 100 unverified organisations by slug. There are at least that
+                  Showing the first 100 unverified organizations by slug. There are at least that
                   many, so this list may be incomplete — search for a specific one rather than
                   assuming it is absent.
                 </p>
@@ -1588,7 +1589,7 @@ function OrgTable({
       <table>
         <thead>
           <tr>
-            <th scope="col">Organisation</th>
+            <th scope="col">Organization</th>
             <th scope="col">Members</th>
             <th scope="col">Publishing</th>
             <th scope="col">Decision</th>
@@ -1637,7 +1638,7 @@ function OrgRow({
       <tr>
         <th scope="row">
           {canOpen ? (
-            <Link className="row-title" href={`/organisations/${encodeURIComponent(org.slug)}`}>
+            <Link className="row-title" href={`/organizations/${encodeURIComponent(org.slug)}`}>
               <UntrustedText value={org.name} />
             </Link>
           ) : (
@@ -1717,7 +1718,7 @@ function OrgRow({
               </ConfirmPanel>
             ) : memberless ? (
               /*
-               * A MEMBERLESS ORGANISATION IS THE TRAP. Verifying it looks harmless — it grants
+               * A MEMBERLESS ORGANIZATION IS THE TRAP. Verifying it looks harmless — it grants
                * nothing to nobody today — and that is exactly why it gets done casually, months
                * before somebody is added and silently inherits the right to publish unreviewed.
                * So this is not a confirmation with a warning in it; it refuses and says what to do
@@ -1730,7 +1731,7 @@ function OrgRow({
                 <p>
                   Verifying it would grant nothing today and arm whoever is added next — the grant
                   would be made now and collected later, by somebody nobody has reviewed.{" "}
-                  <strong>Grant a membership first</strong>, then verify the organisation with its
+                  <strong>Grant a membership first</strong>, then verify the organization with its
                   members in front of you.
                 </p>
                 <p className="row">
@@ -1751,7 +1752,7 @@ function OrgRow({
             ) : (
               <ConfirmPanel
                 title={`Verify ${org.name}?`}
-                confirmLabel="Verify organisation"
+                confirmLabel="Verify organization"
                 busyLabel="Verifying…"
                 busy={busy}
                 onCancel={() => setConfirming(false)}
@@ -1785,14 +1786,14 @@ function OrgRow({
 }
 
 /**
- * Granting an account publishing rights on an organisation.
+ * Granting an account publishing rights on an organization.
  *
  * THE API TAKES AN ACCOUNT ID, NOT A HANDLE — `POST /v1/review/organizations/:slug/members` with
  * `{ accountId, role? }`. A reviewer reading a claim knows the handle and never the integer, so this
  * resolves one to the other through the account directory rather than making somebody go and look it
  * up. A bare number is accepted too, because the one place the id IS to hand is the row above.
  *
- * IT MATTERS MORE ON A VERIFIED ORGANISATION, and the confirmation says which case it is: on a
+ * IT MATTERS MORE ON A VERIFIED ORGANIZATION, and the confirmation says which case it is: on a
  * verified one this grant is immediately a publishing right over the whole namespace, and on an
  * unverified one it is not — same button, two very different consequences, so they are never worded
  * the same way.
@@ -1857,12 +1858,12 @@ function GrantMembership({
         A member may submit into the <code>{org.slug}:</code> namespace.{" "}
         {org.verified ? (
           <>
-            This organisation is <strong>verified</strong>, so a member also publishes there without
+            This organization is <strong>verified</strong>, so a member also publishes there without
             review.
           </>
         ) : (
           <>
-            This organisation is not verified, so a member&rsquo;s writes still wait for a reviewer.
+            This organization is not verified, so a member&rsquo;s writes still wait for a reviewer.
           </>
         )}
       </p>
@@ -2016,20 +2017,20 @@ function GrantMembership({
                 They will publish into the <code>{org.slug}:</code> namespace immediately and
                 without review
               </strong>{" "}
-              — this organisation is verified, so the membership is the whole grant. Nothing else
+              — this organization is verified, so the membership is the whole grant. Nothing else
               has to happen for it to take effect.
             </p>
           ) : (
             <p>
               They may submit into the <code>{org.slug}:</code> namespace, and those submissions{" "}
-              <strong>still wait for a reviewer</strong> — this organisation is not verified.
+              <strong>still wait for a reviewer</strong> — this organization is not verified.
               Verifying it later grants publishing rights to them and to every member added after.
             </p>
           )}
           <p className="muted footnote">
             An <strong>{orgRoleLabel("owner").toLowerCase()}</strong> or{" "}
             <strong>{orgRoleLabel("admin").toLowerCase()}</strong> may also edit the
-            organisation&rsquo;s public directory entry; an{" "}
+            organization&rsquo;s public directory entry; an{" "}
             <strong>{orgRoleLabel("publisher").toLowerCase()}</strong> may not.
           </p>
         </ConfirmPanel>

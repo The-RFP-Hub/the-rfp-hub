@@ -459,7 +459,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
  * A repeating group: a list of rows, each removable, with an add button under it.
  *
  * `onMove` is passed ONLY by the two lists whose order means something — the primary operating
- * organisation and the milestone sequence. Arrows on a list whose order is presentational would
+ * organization and the milestone sequence. Arrows on a list whose order is presentational would
  * imply a meaning that is not there.
  */
 export function Repeatable<T extends { key: string }>({

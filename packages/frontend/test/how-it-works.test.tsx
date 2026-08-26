@@ -58,10 +58,10 @@ describe("the how-it-works reference page", () => {
     expect(
       within(pathway as HTMLElement)
         .getByRole("link", {
-          name: "Get your organisation verified — optional, and it is what removes the wait.",
+          name: "Get your organization verified — optional, and it is what removes the wait.",
         })
         .getAttribute("href"),
-    ).toBe("/organisations");
+    ).toBe("/organizations");
     expect(
       within(pathway as HTMLElement)
         .getByRole("link", { name: "Open it in the directory" })

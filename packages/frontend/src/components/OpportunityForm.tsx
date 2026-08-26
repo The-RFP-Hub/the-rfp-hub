@@ -155,7 +155,7 @@ const LABELS: Readonly<Record<string, string>> = {
  * and a reviewer quoting a field name is talking about something the form does not name. So the
  * envelope section is "Funding information" (`fundingInfo`), the date section names `deadlines`
  * outright, and the type-specific section is "Funding details — <type>" (`fundingDetails`). The
- * purely organisational sections — what it is, who runs it, identity, reach — map to no single
+ * purely organizational sections — what it is, who runs it, identity, reach — map to no single
  * field and keep descriptive names.
  */
 const DETAILS_SUFFIX: Record<FundingType, string> = {
@@ -230,8 +230,8 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   maxAward: "Maximum award",
   opensAt: "Opens at",
   postedAt: "Posted at",
-  operatingOrganizations: "Running organisations",
-  sponsoringOrganizations: "Sponsoring organisations",
+  operatingOrganizations: "Running organizations",
+  sponsoringOrganizations: "Sponsoring organizations",
   programModel: "Programme model",
 };
 
@@ -249,7 +249,7 @@ function issueLabel(path: string | null): string | null {
     const row = Number(parts[index]) + 1;
     const group = parts[index - 1];
     if (group === "operatingOrganizations" || group === "sponsoringOrganizations") {
-      return `Organisation ${row} — ${plain}`;
+      return `Organization ${row} — ${plain}`;
     }
     if (group === "deadlines") return `Deadline ${row} — ${plain}`;
     if (group === "socialLinks") return `Social link ${row} — ${plain}`;
@@ -479,11 +479,11 @@ export function OpportunityForm({
     }));
 
   /**
-   * EVERY change to the operating organisations goes through here, and that is the point.
+   * EVERY change to the operating organizations goes through here, and that is the point.
    *
-   * The primary organisation names the namespace, and it changes on a move or a remove exactly as
+   * The primary organization names the namespace, and it changes on a move or a remove exactly as
    * surely as on a keystroke in row 0. An earlier version regenerated the derived id only on the
-   * keystroke, so promoting another organisation left the id under the old namespace — and the
+   * keystroke, so promoting another organization left the id under the old namespace — and the
    * form's own error then told the publisher to do the thing they had just done.
    *
    * A hand-typed id is never touched: `idDirty` is the whole guard, and it is set the moment
@@ -702,22 +702,22 @@ export function OpportunityForm({
 
       <Section title="Who runs it">
         <p className={styles.requiredLegend}>
-          Running organisations <span aria-hidden="true">*</span>
+          Running organizations <span aria-hidden="true">*</span>
         </p>
         <p className="hint">
-          The organisations that actually run the intake — not necessarily who pays. The first one
+          The organizations that actually run the intake — not necessarily who pays. The first one
           is the primary: it is the one displayed, and its slug is the namespace this listing
           publishes under.
         </p>
         <Repeatable
-          name="operating organisations"
+          name="operating organizations"
           rows={form.operatingOrganizations}
-          addLabel="+ Add an operating organisation"
+          addLabel="+ Add an operating organization"
           onAdd={() => withOperating((rows) => [...rows, emptyOrganization()])}
           onRemove={(index) => withOperating((rows) => removeRow(rows, index))}
           onMove={(index, direction) => withOperating((rows) => moveRow(rows, index, direction))}
           rowLabel={(row, index) =>
-            index === 0 ? "Primary organisation" : row.name.trim() || `Organisation ${index + 1}`
+            index === 0 ? "Primary organization" : row.name.trim() || `Organization ${index + 1}`
           }
         >
           {(row, index) => (
@@ -734,14 +734,14 @@ export function OpportunityForm({
         ) : null}
 
         <p className="hint">
-          Sponsoring organisations issue or back the opportunity. Leave this empty when the operator
+          Sponsoring organizations issue or back the opportunity. Leave this empty when the operator
           is the only party to name.
         </p>
         <Repeatable
-          name="sponsoring organisations"
+          name="sponsoring organizations"
           rows={form.sponsoringOrganizations}
-          addLabel="+ Add a sponsoring organisation"
-          emptyLabel="No sponsoring organisation named."
+          addLabel="+ Add a sponsoring organization"
+          emptyLabel="No sponsoring organization named."
           onAdd={() =>
             set("sponsoringOrganizations", [...form.sponsoringOrganizations, emptyOrganization()])
           }
@@ -784,7 +784,7 @@ export function OpportunityForm({
           hint={
             mode === "edit"
               ? "An id is immutable. Everything that has ever linked to this listing links to this string."
-              : "Proposed from the primary organisation's slug and the title. Edit it if you already have a key for this programme."
+              : "Proposed from the primary organization's slug and the title. Edit it if you already have a key for this programme."
           }
           readOnly={mode === "edit"}
           maxLength={128}
@@ -1467,7 +1467,7 @@ function OrganizationFields({
           {...at(`${prefix}.slug`)}
           required
           label="Slug"
-          hint="Lowercase, URL-safe. Also this organisation's namespace."
+          hint="Lowercase, URL-safe. Also this organization's namespace."
           value={row.slug}
           onChange={(slug) => onChange({ ...row, slug })}
         />
@@ -1475,7 +1475,7 @@ function OrganizationFields({
       <div className={styles.cols}>
         <SelectField
           {...at(`${prefix}.orgType`)}
-          label="Organisation kind"
+          label="Organization kind"
           optional
           options={ORG_TYPES}
           blank="not stated"
@@ -2110,7 +2110,7 @@ function SubmissionOutcome({
         {status === "live"
           ? "Published — it is in the public directory now."
           : status === "pending"
-            ? "Stored as a pending submission. It is hidden from the public directory until a Hub reviewer approves it; publishing immediately requires membership of a verified organisation for this organisation prefix."
+            ? "Stored as a pending submission. It is hidden from the public directory until a Hub reviewer approves it; publishing immediately requires membership of a verified organization for this organization prefix."
             : status === "hidden"
               ? "Approved, but hidden from the public directory."
               : status === "rejected"

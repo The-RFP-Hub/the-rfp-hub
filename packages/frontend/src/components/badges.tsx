@@ -1,7 +1,7 @@
 /**
  * Editorial state, shown as a WORD and a SHAPE, never as a hue.
  *
- * Every badge here is grounded in server state — review status, listing, organisation verification,
+ * Every badge here is grounded in server state — review status, listing, organization verification,
  * and the publisher's own `status`. The publisher-facing listing badge is the one deterministic
  * projection over those server axes.
  *
@@ -14,7 +14,7 @@
  *
  * THE TOOLTIP IS NEVER THE ONLY EXPLANATION where the badge is load-bearing. A `title` does not
  * exist on a touch device and is not reliably announced; where a badge decides what happens to
- * somebody's work — the account page's organisation table above all — `gloss` puts the sentence on
+ * somebody's work — the account page's organization table above all — `gloss` puts the sentence on
  * screen beside it and the tooltip stays as the longer form.
  */
 import {
@@ -140,7 +140,7 @@ export function MergedBadge() {
 }
 
 /**
- * Organisation verification, which is what auto-approval hangs off: writes from a verified
+ * Organization verification, which is what auto-approval hangs off: writes from a verified
  * namespace publish immediately, writes from an unverified one land pending.
  *
  * `gloss` puts that consequence on screen. "Verified" on its own reads as a vanity tick, and the
@@ -149,8 +149,8 @@ export function MergedBadge() {
  */
 export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: boolean }) {
   const explanation = verified
-    ? "Verified organisation — its members' listings publish without review"
-    : "Not verified — listings published under this organisation prefix wait for review";
+    ? "Verified organization — its members' listings publish without review"
+    : "Not verified — listings published under this organization prefix wait for review";
   const badge = (
     <span
       className={verified ? "badge badge-verified" : "badge badge-unverified"}

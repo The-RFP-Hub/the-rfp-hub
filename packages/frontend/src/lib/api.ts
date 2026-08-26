@@ -161,7 +161,7 @@ export type DirectoryQuery = {
   status?: string;
   ecosystem?: string;
   category?: string;
-  /** Organisation slug — matches any operating OR sponsoring organisation. */
+  /** Organization slug — matches any operating OR sponsoring organization. */
   organization?: string;
   minAward?: number;
   maxAward?: number;
@@ -410,17 +410,17 @@ export function createApiClient(options: ApiClientOptions) {
     },
 
     /**
-     * AN ORGANISATION ACTING ON ITSELF — a different authority from `review` above, and the reason
+     * AN ORGANIZATION ACTING ON ITSELF — a different authority from `review` above, and the reason
      * these four are their own group rather than more members of it.
      *
      * `review.*` is Hub staff deciding about anybody. These are a MEMBER deciding about their own
-     * namespace, and the API scopes them accordingly: an id filed under another organisation answers
+     * namespace, and the API scopes them accordingly: an id filed under another organization answers
      * 404 rather than 403, so this cannot be used to enumerate somebody else's queue.
      *
      * The two gates differ on purpose and the difference is the whole model:
      *   - `opportunities` needs ANY membership. Verification governs publishing, not visibility, so
-     *     an unverified organisation can still see what has been filed in its name.
-     *   - `approve` and `reject` need a membership on a VERIFIED organisation, and are SESSION-ONLY.
+     *     an unverified organization can still see what has been filed in its name.
+     *   - `approve` and `reject` need a membership on a VERIFIED organization, and are SESSION-ONLY.
      *     Approving publishes unreviewed content to the world, which is exactly the power a leaked
      *     API key must never hold.
      */
@@ -438,8 +438,8 @@ export function createApiClient(options: ApiClientOptions) {
         ),
       /**
        * `reason` is REQUIRED by the API, not optional-with-a-default, and the asymmetry with
-       * `approve` is deliberate on their side: anyone may submit a listing ABOUT an organisation, so
-       * an organisation refusing one in its own namespace is a conflict of interest. The written
+       * `approve` is deliberate on their side: anyone may submit a listing ABOUT an organization, so
+       * an organization refusing one in its own namespace is a conflict of interest. The written
        * reason is the counterweight — it is shown to the submitter, and the decision is attributed
        * to the deciding member by handle rather than coarsened to "reviewer".
        */
@@ -450,9 +450,9 @@ export function createApiClient(options: ApiClientOptions) {
           { body: { reason } },
         ),
       /**
-       * The organisation's own directory entry. Owner or admin, session only.
+       * The organization's own directory entry. Owner or admin, session only.
        *
-       * `verified` is deliberately absent from the patch contract: an organisation verifying itself
+       * `verified` is deliberately absent from the patch contract: an organization verifying itself
        * would make the flag meaningless. Every member below is optional — send only what changed.
        */
       update: (slug: string, patch: OrganizationPatch) =>

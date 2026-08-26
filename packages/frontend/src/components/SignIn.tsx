@@ -207,7 +207,7 @@ export function SignIn({
       <p className="muted footnote">
         We email you a {OTP_LENGTH}-digit code. There is no password. The first time you sign in,
         this creates your account; publishing without review additionally requires membership of a
-        verified organisation, which a reviewer grants.{" "}
+        verified organization, which a reviewer grants.{" "}
         <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it — including
         everything you can already do here without an account.
       </p>

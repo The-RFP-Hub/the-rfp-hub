@@ -44,25 +44,25 @@ const PUBLIC_NAV: NavItem[] = [
  * a credential belonging to the account — even though it keeps its own route.
  *
  * A FUNCTION RATHER THAN A CONSTANT, because one of these items is derived from the account: an
- * organisation is a place this account can act, and it belongs beside its listings rather than
+ * organization is a place this account can act, and it belongs beside its listings rather than
  * behind two clicks on the account page.
  */
 function accountNav(me: Me): NavItem[] {
-  const organisation = organisationNav(me);
+  const organization = organizationNav(me);
   return [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/listings", label: "Your listings" },
-    organisation,
+    organization,
     { href: "/account", label: "Account" },
     { href: "/keys", label: "API keys", requires: (item) => item.canManageKeys },
   ];
 }
 
 /**
- * The organisation link.
+ * The organization link.
  *
  * ONE MEMBERSHIP GETS ITS OWN NAME AND ITS OWN ADDRESS. A landing page listing exactly one row is a
- * click that answers nothing, and "Organisations" as a label for a single named thing is vaguer than
+ * click that answers nothing, and "Organizations" as a label for a single named thing is vaguer than
  * the thing itself. Several memberships need somewhere to choose between them. An account with no
  * memberships still gets the index: its empty state explains how publishing rights are granted,
  * and keeping that route in the signed-in navigation makes it discoverable before the first grant.
@@ -70,13 +70,13 @@ function accountNav(me: Me): NavItem[] {
  * The label for the single case is publisher-supplied text. It is rendered as a text child like
  * every other untrusted string in this package, never as markup.
  */
-export function organisationNav(me: Me): NavItem {
+export function organizationNav(me: Me): NavItem {
   const [only] = me.memberships;
-  if (!only) return { href: "/organisations", label: "Organisations" };
+  if (!only) return { href: "/organizations", label: "Organizations" };
   if (me.memberships.length === 1) {
-    return { href: `/organisations/${encodeURIComponent(only.slug)}`, label: only.name };
+    return { href: `/organizations/${encodeURIComponent(only.slug)}`, label: only.name };
   }
-  return { href: "/organisations", label: "Organisations" };
+  return { href: "/organizations", label: "Organizations" };
 }
 
 /**

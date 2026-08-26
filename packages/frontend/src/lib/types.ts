@@ -9,7 +9,7 @@
  * `undefined` on a page.
  *
  * EVERY STRING IN HERE IS UNTRUSTED unless the comment says otherwise. Titles, descriptions,
- * handles and organisation names are publisher-supplied; they are rendered as text nodes and never
+ * handles and organization names are publisher-supplied; they are rendered as text nodes and never
  * as markup. See `components/UntrustedText.tsx`.
  */
 import type {

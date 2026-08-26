@@ -4,13 +4,13 @@
  * Three properties are worth holding here, and none of them is visible in an API test:
  *
  *   1. NOTHING CONSEQUENTIAL FIRES ON THE FIRST CLICK. Approving publishes a stranger's listing to
- *      the world; verifying an organisation hands publishing rights to everyone in it, including
+ *      the world; verifying an organization hands publishing rights to everyone in it, including
  *      people added later. The confirmations are asserted for their WORDS — "this is not a badge; it
  *      is a grant of publishing power" is the entire reason the panel exists.
  *   2. A REFUSAL CARRIES A REASON. The API allows a reviewer to refuse without one; this UI does
  *      not, because the reason is the only thing that tells a submitter what to fix.
- *   3. THE ORGANISATIONS TAB IS SEARCH-FIRST. The directory auto-registers a stub for every
- *      organisation any listing merely names, so an unfiltered list is hundreds of names nobody
+ *   3. THE ORGANIZATIONS TAB IS SEARCH-FIRST. The directory auto-registers a stub for every
+ *      organization any listing merely names, so an unfiltered list is hundreds of names nobody
  *      vouched for — and verifying the wrong row from it grants a namespace to whoever is added
  *      next. Stubs must not appear until somebody searches for one.
  */
@@ -286,23 +286,35 @@ describe("the section navigation", () => {
   });
 
   it("reads the open tab from the URL, so a link to one lands on it", async () => {
-    tab.current = "organisations";
+    tab.current = "organizations";
     mount();
 
     expect(
-      await screen.findByRole("link", { name: "Organisations", current: "page" }),
+      await screen.findByRole("link", { name: "Organizations", current: "page" }),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: /Submissions/ }).hasAttribute("aria-current")).toBe(
       false,
     );
   });
 
+  it("accepts the old British tab value as an alias", async () => {
+    tab.current = "organisations";
+    mount();
+
+    expect(
+      await screen.findByRole("link", { name: "Organizations", current: "page" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Organizations" }).getAttribute("href")).toBe(
+      "/review?tab=organizations",
+    );
+  });
+
   it("puts the section in the address and replaces rather than extending history", async () => {
     mount();
 
-    const organisations = await screen.findByRole("link", { name: "Organisations" });
-    expect(organisations.getAttribute("href")).toBe("/review?tab=organisations");
-    expect(organisations.getAttribute("data-replace")).toBe("true");
+    const organizations = await screen.findByRole("link", { name: "Organizations" });
+    expect(organizations.getAttribute("href")).toBe("/review?tab=organizations");
+    expect(organizations.getAttribute("data-replace")).toBe("true");
   });
 });
 
@@ -978,9 +990,9 @@ describe("merging duplicates", () => {
   });
 });
 
-describe("the organisations tab", () => {
+describe("the organizations tab", () => {
   beforeEach(() => {
-    tab.current = "organisations";
+    tab.current = "organizations";
   });
 
   it("separates what is verified from what merely has members", async () => {
@@ -992,7 +1004,7 @@ describe("the organisations tab", () => {
     expect(screen.getByText("Indie Collective")).toBeTruthy();
   });
 
-  it("links only organisations this reviewer belongs to", async () => {
+  it("links only organizations this reviewer belongs to", async () => {
     mount({
       ...me,
       memberships: [
@@ -1001,7 +1013,7 @@ describe("the organisations tab", () => {
     });
 
     const memberLink = await screen.findByRole("link", { name: "Filecoin Foundation" });
-    expect(memberLink.getAttribute("href")).toBe("/organisations/filecoin");
+    expect(memberLink.getAttribute("href")).toBe("/organizations/filecoin");
     expect(screen.getByText("Indie Collective").closest("a")).toBeNull();
   });
 
@@ -1009,13 +1021,13 @@ describe("the organisations tab", () => {
     mount();
 
     await waitFor(() => expect(screen.getByText("Indie Collective")).toBeTruthy());
-    expect(screen.getByLabelText(/Search organisations/).closest("form")?.className).toBe(
+    expect(screen.getByLabelText(/Search organizations/).closest("form")?.className).toBe(
       "search-row",
     );
     // The stub is in the corpus and the API would return it — it must not be on screen unasked.
     expect(screen.queryByText("0G")).toBeNull();
 
-    fireEvent.change(screen.getByLabelText(/Search organisations/), { target: { value: "0g" } });
+    fireEvent.change(screen.getByLabelText(/Search organizations/), { target: { value: "0g" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => expect(screen.getByText("0G")).toBeTruthy());
@@ -1035,7 +1047,7 @@ describe("the organisations tab", () => {
     expect(within(panel).getByText(/already-published listings stay published/)).toBeTruthy();
     expect(verifyOrganization).not.toHaveBeenCalled();
 
-    fireEvent.click(within(panel).getByRole("button", { name: "Verify organisation" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Verify organization" }));
     await waitFor(() => expect(verifyOrganization).toHaveBeenCalledWith("indie-collective"));
     expect(
       await screen.findByText(
@@ -1081,7 +1093,7 @@ describe("the organisations tab", () => {
      * only visible outcome is a member count going up by one.
      */
     expect(
-      await screen.findByText("fil-ops is now an organisation publisher at indie-collective."),
+      await screen.findByText("fil-ops is now an organization publisher at indie-collective."),
     ).toBeTruthy();
     // The panel is gone; the note is not.
     expect(screen.queryByText("Grant a membership on")).toBeNull();
@@ -1155,7 +1167,7 @@ describe("the organisations tab", () => {
     );
     const pendingEmail = await screen.findByText("new.person@example.org");
     const pendingRow = pendingEmail.closest("tr") as HTMLElement;
-    expect(within(pendingRow).getByText("Organisation owner")).toBeTruthy();
+    expect(within(pendingRow).getByText("Organization owner")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
     await waitFor(() =>
@@ -1236,7 +1248,7 @@ describe("the organisations tab", () => {
     expect(screen.queryByRole("columnheader", { name: "Account" })).toBeNull();
   });
 
-  it("states the consequence differently for a verified organisation", async () => {
+  it("states the consequence differently for a verified organization", async () => {
     mount();
     await waitFor(() => expect(screen.getByText("Filecoin Foundation")).toBeTruthy());
 
@@ -1249,9 +1261,9 @@ describe("the organisations tab", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Choose" }));
 
     const panel = await screen.findByRole("group", {
-      name: /Make fil-ops an organisation publisher/,
+      name: /Make fil-ops an organization publisher/,
     });
-    // On a verified organisation the membership IS the grant — nothing else has to happen.
+    // On a verified organization the membership IS the grant — nothing else has to happen.
     expect(
       within(panel).getByText(/publish into the[\s\S]*immediately and without\s+review/),
     ).toBeTruthy();
@@ -1261,7 +1273,7 @@ describe("the organisations tab", () => {
     mount();
 
     // The search box only exists once the account read has come back and the tab has rendered.
-    fireEvent.change(await screen.findByLabelText(/Search organisations/), {
+    fireEvent.change(await screen.findByLabelText(/Search organizations/), {
       target: { value: "0g" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
@@ -1275,6 +1287,6 @@ describe("the organisations tab", () => {
 
     // Not a confirmation with a warning in it — a refusal with an instruction.
     expect(screen.getByText(/Grant a membership first/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Verify organisation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Verify organization" })).toBeNull();
   });
 });

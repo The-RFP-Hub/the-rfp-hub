@@ -131,7 +131,7 @@ function Listings({ me }: { me: Me }) {
           <span className="muted">
             {pendingTotal >= PENDING_LIMIT
               ? "You may not be able to submit another until one of them is decided — a slot frees as soon as a Hub reviewer approves or refuses one, and the submission explains the limit if you try."
-              : "A slot frees as soon as a Hub reviewer approves or refuses one. The limit applies to accounts without a membership in a verified organisation."}
+              : "A slot frees as soon as a Hub reviewer approves or refuses one. The limit applies to accounts without a membership in a verified organization."}
           </span>
         </p>
       ) : null}
@@ -355,7 +355,7 @@ function Outcome({ item }: { item: ManagedOpportunity }) {
   if (decision?.reason === "verified_publisher_namespace") {
     return (
       <div className="cell-note muted">
-        Published without review — your organisation is verified for this organisation prefix.
+        Published without review — your organization is verified for this organization prefix.
       </div>
     );
   }

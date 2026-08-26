@@ -4,12 +4,12 @@
  * A CONSEQUENCE, STATED, BEFORE THE THING HAPPENS.
  *
  * Every use of this sits in front of an action that changes what the public can see or what an
- * account may do: publishing somebody's listing, refusing one, granting an organisation the right to
+ * account may do: publishing somebody's listing, refusing one, granting an organization the right to
  * publish without review, merging two records into one. None of them is undoable by pressing the
  * button again.
  *
  * WHY A PANEL RATHER THAN `window.confirm`. A native dialog cannot say the thing that matters here.
- * The consequence is specific — WHICH organisation, HOW MANY members it arms, WHOSE name the
+ * The consequence is specific — WHICH organization, HOW MANY members it arms, WHOSE name the
  * decision is recorded under — and it usually needs a second control beside it (a required reason).
  * A one-line browser prompt flattens all of that to "Are you sure?", which is the question nobody
  * has ever answered informatively. It is also unstyleable, unreadable to a screen reader in the way

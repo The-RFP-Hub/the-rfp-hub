@@ -9,8 +9,8 @@
  * elevates an API key: a `write`-only key on a direct-create account still lands its submissions
  * pending.
  *
- * ORGANISATIONS ARE NOT HERE ANY MORE. This page used to carry a read-only copy of the organisation
- * directory, which taught the wrong thing twice over: it implied organisation management was an
+ * ORGANIZATIONS ARE NOT HERE ANY MORE. This page used to carry a read-only copy of the organization
+ * directory, which taught the wrong thing twice over: it implied organization management was an
  * administrator's job when verification is a REVIEWER capability, and a table with no controls on
  * the page named "administration" reads as a control somebody has forgotten to add. It lives on
  * Review, with the claims it usually accompanies.
@@ -37,7 +37,7 @@ const ROLE_MEANING: Record<AccountRole, string> = {
   submitter:
     "may submit listings and manage their own. No queues, no decisions about anybody else.",
   reviewer:
-    "may approve, refuse and merge anybody's listings, decide claims, and verify organisations — which grants publishing rights over a whole namespace.",
+    "may approve, refuse and merge anybody's listings, decide claims, and verify organizations — which grants publishing rights over a whole namespace.",
   admin: "everything a Hub reviewer may do, plus changing roles and granting direct-create.",
 };
 
@@ -52,8 +52,8 @@ export default function AdminPage() {
           <h1>Accounts &amp; roles</h1>
           <p className="lede">
             Roles decide who may review. Direct-create decides who may publish without a membership.
-            Organisation verification is a reviewer capability and lives on{" "}
-            <Link href="/review?tab=organisations">Review queues → Organisations</Link>.
+            Organization verification is a reviewer capability and lives on{" "}
+            <Link href="/review?tab=organizations">Review queues → Organizations</Link>.
           </p>
           <Accounts me={me} />
         </section>
@@ -306,16 +306,16 @@ function AccountRow({
               {account.directCreate ? (
                 <p>
                   Their submissions go back to landing pending, unless they hold a membership on a
-                  verified organisation. Listings they have already published stay published.
+                  verified organization. Listings they have already published stay published.
                 </p>
               ) : (
                 <p>
                   They will publish into <strong>any namespace</strong> — including one belonging to
-                  an organisation they are not a member of — immediately and without review, from a
+                  an organization they are not a member of — immediately and without review, from a
                   browser session. It is the widest grant on this page and it is not scoped to
                   anything.{" "}
                   <strong>
-                    A membership on a verified organisation is the narrower way to give somebody
+                    A membership on a verified organization is the narrower way to give somebody
                     publishing rights
                   </strong>{" "}
                   and is almost always the one that is meant.

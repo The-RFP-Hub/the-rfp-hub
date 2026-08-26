@@ -19,7 +19,7 @@ export const publishers = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "listPublishers",
         tags: ["publishers"],
-        summary: "Verified publishing organisations",
+        summary: "Verified publishing organizations",
         description:
           "A row here means writes from that namespace are published without review, so a consumer can weigh an entry's provenance. It is not an endorsement of the programmes themselves.",
         response: { 200: { $ref: "PublisherList#" } },

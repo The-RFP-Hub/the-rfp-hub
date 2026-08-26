@@ -358,9 +358,9 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "approveClaim",
         tags: ["review"],
-        summary: "Approve a claim, deciding explicitly whether to verify the organisation",
+        summary: "Approve a claim, deciding explicitly whether to verify the organization",
         description:
-          "`verifyOrganization: false` transfers publisher ownership but does NOT unlock auto-approval — that requires a verified organisation, so the publisher's future writes keep landing pending. The response states which of the two happened.",
+          "`verifyOrganization: false` transfers publisher ownership but does NOT unlock auto-approval — that requires a verified organization, so the publisher's future writes keep landing pending. The response states which of the two happened.",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -406,7 +406,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "verifyOrganization",
         tags: ["review"],
-        summary: "Verify an organisation — every member becomes a publisher of its namespace",
+        summary: "Verify an organization — every member becomes a publisher of its namespace",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         response: { 200: { $ref: "OrganizationSummary#" }, ...errors },
@@ -438,7 +438,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "updateOrganizationAsReviewer",
         tags: ["review"],
-        summary: "Edit an organisation's directory entry",
+        summary: "Edit an organization's directory entry",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         body: organizationMetadataSchema,
@@ -459,7 +459,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "grantOrganizationMembership",
         tags: ["review"],
-        summary: "Grant an account publishing rights on an organisation",
+        summary: "Grant an account publishing rights on an organization",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         body: {
@@ -488,7 +488,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "revokeOrganizationMembership",
         tags: ["review"],
-        summary: "Revoke an account's publishing rights on an organisation",
+        summary: "Revoke an account's publishing rights on an organization",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -511,7 +511,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "createOrganizationMembershipInvite",
         tags: ["review"],
-        summary: "Invite an email address to receive an organisation membership on sign-in",
+        summary: "Invite an email address to receive an organization membership on sign-in",
         description:
           "The membership is not active yet. It is applied the first time a person signs in with, and proves ownership of, this email address.",
         security: [{ bearerAuth: [] }],
@@ -542,7 +542,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "listOrganizationMembershipInvites",
         tags: ["review"],
-        summary: "List pending membership invites for an organisation",
+        summary: "List pending membership invites for an organization",
         security: [{ bearerAuth: [] }],
         params: slugParams,
         response: { 200: { $ref: "MembershipInviteList#" }, ...errors },
@@ -558,7 +558,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "revokeOrganizationMembershipInvite",
         tags: ["review"],
-        summary: "Revoke a pending organisation membership invite",
+        summary: "Revoke a pending organization membership invite",
         security: [{ bearerAuth: [] }],
         params: {
           type: "object",
@@ -604,7 +604,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "searchOrganizations",
         tags: ["review"],
-        summary: "Find organisations, optionally filtered by verification",
+        summary: "Find organizations, optionally filtered by verification",
         security: [{ bearerAuth: [] }],
         querystring: {
           type: "object",

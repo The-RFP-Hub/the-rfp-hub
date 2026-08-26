@@ -37,7 +37,7 @@ export default function DashboardPage() {
         <p className="footnote">
           Submit funding opportunities to the RFP Hub, keep them current, and see what they get read
           and applied for. Signing in creates an account the first time; publishing without review
-          additionally requires membership of a verified organisation, which a reviewer grants —{" "}
+          additionally requires membership of a verified organization, which a reviewer grants —{" "}
           <Link href={HOW_IT_WORKS}>who can do what</Link> sets out the whole of it.
         </p>
         <p>

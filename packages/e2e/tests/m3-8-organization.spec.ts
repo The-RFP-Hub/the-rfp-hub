@@ -1,20 +1,20 @@
 /**
- * M3-8 — an organisation deciding about its own namespace.
+ * M3-8 — an organization deciding about its own namespace.
  *
  * WHAT IS NEW HERE, AND WHY IT IS NOT `/review`. A Hub reviewer decides about anybody. A VERIFIED
- * MEMBER decides about entries filed under their own organisation's slug, and the API scopes them
+ * MEMBER decides about entries filed under their own organization's slug, and the API scopes them
  * differently on purpose: an entry published under some other namespace answers **404** rather than
  * 403, so nothing on this surface can be used to find out what is queued elsewhere. That difference
  * is invisible from a component test — it is a property of the route, the row and the membership
  * together — which is why it is asserted here over real HTTP.
  *
- * THE CONFLICT OF INTEREST IS THE WHOLE DESIGN. Anybody may file a listing ABOUT an organisation,
- * so an organisation refusing one in its own name is exactly the decision that has to answer for
+ * THE CONFLICT OF INTEREST IS THE WHOLE DESIGN. Anybody may file a listing ABOUT an organization,
+ * so an organization refusing one in its own name is exactly the decision that has to answer for
  * itself. The API enforces the counterweight — a written reason is required, and the decision is
  * attributed to the deciding member BY HANDLE rather than coarsened to "reviewer" — and this file
  * pins both halves: the UI refusing to send an empty reason, and the audit row naming the person.
  *
- * WHO PLAYS WHOM. The organisation's member is the `publisher` actor, because the browser session
+ * WHO PLAYS WHOM. The organization's member is the `publisher` actor, because the browser session
  * belongs to it (see `skipUnlessBrowserSession`). The OUTSIDER who files into that namespace is
  * `otherPublisher`: it is a genuinely different account, and — being verified in its own
  * namespace — it is exempt from the pending cap, so seeding two submissions here cannot be
@@ -56,13 +56,28 @@ async function ensureHandle(client: ApiClient, wanted: string): Promise<string> 
   return wanted;
 }
 
-test.describe("M3-8 the organisation's own page", () => {
+test.describe("M3-8 the organization's own page", () => {
   test.beforeEach(({ stack }) => {
     skipUnlessActor(stack, "publisher", "otherPublisher");
     skipUnlessBrowserSession(stack, "publisher");
   });
 
-  test("a member approves a submission filed in the organisation's name, and it publishes", async ({
+  test("the old British route redirects without losing its slug, query, or hash", async ({
+    page,
+    stack,
+  }) => {
+    const slug = stack.namespaces.publisher;
+    await page.goto(
+      `${stack.urls.frontend}/organisations/${encodeURIComponent(slug)}?publishedPage=2#published`,
+    );
+
+    await expect(page).toHaveURL(
+      `${stack.urls.frontend}/organizations/${encodeURIComponent(slug)}?publishedPage=2#published`,
+    );
+    await expect(page.getByRole("heading", { name: slug, exact: true }).first()).toBeVisible();
+  });
+
+  test("a member approves a submission filed in the organization's name, and it publishes", async ({
     page,
     browser,
     stack,
@@ -74,7 +89,7 @@ test.describe("M3-8 the organisation's own page", () => {
     const stamp = Date.now();
     const token = `orgapprove${stamp}`;
 
-    // FILED BY SOMEBODY ELSE, INTO THIS ORGANISATION'S NAMESPACE. `otherPublisher` publishes in its
+    // FILED BY SOMEBODY ELSE, INTO THIS ORGANIZATION'S NAMESPACE. `otherPublisher` publishes in its
     // own namespace and has no membership here, so this lands pending — which is the state the
     // whole page is about.
     const document = opportunityFixture(slug, `org-approve-${stamp}`, {
@@ -88,15 +103,15 @@ test.describe("M3-8 the organisation's own page", () => {
       "pending",
     );
 
-    await page.goto(`${stack.urls.frontend}/organisations/${encodeURIComponent(slug)}`);
-    await expect(page).toHaveTitle(`Organisation ${slug} | RFP Hub`);
+    await page.goto(`${stack.urls.frontend}/organizations/${encodeURIComponent(slug)}`);
+    await expect(page).toHaveTitle(`Organization ${slug} | RFP Hub`);
 
     // ANY membership is enough to SEE this page; verification is what adds the decision controls.
     // This actor has both, and the page says which of the two it is being shown.
     await expect(page.getByRole("heading", { name: slug, exact: true }).first()).toBeVisible();
     await expect(page.getByText("You publish directly.")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: /Awaiting review for this organisation/ }),
+      page.getByRole("heading", { name: /Awaiting review for this organization/ }),
     ).toBeVisible();
 
     const row = page.locator("tr").filter({ hasText: id });
@@ -106,12 +121,12 @@ test.describe("M3-8 the organisation's own page", () => {
     await row.getByRole("button", { name: "Approve…" }).click();
 
     // THE CONSEQUENCE IS STATED BEFORE THE BUTTON THAT CAUSES IT. Approving publishes a stranger's
-    // account of this programme to the world in this organisation's name, and it is not undone by
+    // account of this programme to the world in this organization's name, and it is not undone by
     // clicking again — so it does not fire on the first click.
     const confirm = page.getByRole("group", { name: `Publish “${title}”?` });
     await expect(confirm).toBeVisible();
     await expect(
-      confirm.getByText(/anyone reading the Hub will see it as this organisation/i),
+      confirm.getByText(/anyone reading the Hub will see it as this organization/i),
     ).toBeVisible();
     await confirm.getByRole("button", { name: "Publish it" }).click();
 
@@ -131,7 +146,7 @@ test.describe("M3-8 the organisation's own page", () => {
     // A row here carries no decision controls, which is what tells the two tables apart.
     await page.reload();
     await expect(
-      page.getByRole("heading", { name: /Published for this organisation/ }),
+      page.getByRole("heading", { name: /Published for this organization/ }),
     ).toBeVisible();
     const published = page.locator("tr").filter({ hasText: id });
     await expect(published).toHaveCount(1);
@@ -172,7 +187,7 @@ test.describe("M3-8 the organisation's own page", () => {
     const id = document.id as string;
     expect((await outsider.post("/v1/opportunities", document)).status).toBe(201);
 
-    await page.goto(`${stack.urls.frontend}/organisations/${encodeURIComponent(slug)}`);
+    await page.goto(`${stack.urls.frontend}/organizations/${encodeURIComponent(slug)}`);
     const row = page.locator("tr").filter({ hasText: id });
     await expect(row).toHaveCount(1);
     await row.getByRole("button", { name: "Reject…" }).click();
@@ -214,7 +229,7 @@ test.describe("M3-8 the organisation's own page", () => {
     // THE SUBMITTER IS TOLD WHY, IN THEIR OWN LIST. A refusal with no reason attached to it was the
     // worst state this product had: the word `rejected` on a listing and nothing that said what to
     // fix. `lastDecision` carries the sentence and `/listings` is where its author reads it — which
-    // needs a browser signed in as THAT account, not as the organisation that refused it.
+    // needs a browser signed in as THAT account, not as the organization that refused it.
     const submitterContext = await contextAs("otherPublisher");
     const submitterPage = await submitterContext.newPage();
     await submitterPage.goto(`${stack.urls.frontend}/listings`);
@@ -223,7 +238,7 @@ test.describe("M3-8 the organisation's own page", () => {
     await expect(refused.getByText("Not published.")).toBeVisible();
     await expect(
       refused.getByText(reason, { exact: false }),
-      "the reason the organisation wrote is the reason its author reads",
+      "the reason the organization wrote is the reason its author reads",
     ).toBeVisible();
   });
 });
@@ -240,7 +255,7 @@ test.describe("M3-8 what a member may decide, and about what", () => {
     skipUnlessActor(stack, "publisher", "otherPublisher", "reviewer");
   });
 
-  test("a listing in another organisation's namespace is not there, rather than forbidden", async ({
+  test("a listing in another organization's namespace is not there, rather than forbidden", async ({
     stack,
     api,
     opportunityFixture,
@@ -250,14 +265,14 @@ test.describe("M3-8 what a member may decide, and about what", () => {
     const publisher = await api("publisher");
     const outsider = await api("otherPublisher");
 
-    // A real row, published under the OTHER organisation's namespace by its own verified member.
+    // A real row, published under the OTHER organization's namespace by its own verified member.
     const elsewhere = opportunityFixture(theirs, `org-elsewhere-${Date.now()}`);
     const elsewhereId = elsewhere.id as string;
     expect((await outsider.post("/v1/opportunities", elsewhere)).status).toBe(201);
 
     // 404, NOT 403. The publisher IS a verified member of `mine`, so the membership gate passes and
     // the route still refuses — because the row is not published under `mine`. A 403 here would
-    // confirm the id exists, which is an existence oracle over another organisation's queue, one
+    // confirm the id exists, which is an existence oracle over another organization's queue, one
     // guess at a time.
     const crossNamespace = await publisher.post<{ error: string }>(
       `/v1/organizations/${encodeURIComponent(mine)}/opportunities/${encodeURIComponent(elsewhereId)}/approve`,
@@ -267,9 +282,9 @@ test.describe("M3-8 what a member may decide, and about what", () => {
       "a row under another namespace is not there, as far as this route is concerned",
     ).toBe(404);
 
-    // …and the other spelling of the same attempt — asking the OTHER organisation directly — is a
+    // …and the other spelling of the same attempt — asking the OTHER organization directly — is a
     // 403 about the membership rather than a 404 about the row. The two refusals answer different
-    // questions and must not be collapsed: organisations are a public directory, their queues are
+    // questions and must not be collapsed: organizations are a public directory, their queues are
     // not.
     const notAMember = await publisher.post<{ error: string }>(
       `/v1/organizations/${encodeURIComponent(theirs)}/opportunities/${encodeURIComponent(elsewhereId)}/approve`,
@@ -286,7 +301,7 @@ test.describe("M3-8 what a member may decide, and about what", () => {
     expect(rejectCross.status).toBe(404);
   });
 
-  test("the decision names the member who made it, and is marked as the organisation's own", async ({
+  test("the decision names the member who made it, and is marked as the organization's own", async ({
     stack,
     api,
     db,
@@ -320,13 +335,13 @@ test.describe("M3-8 what a member may decide, and about what", () => {
     expect(approval, "the approval is in the trail").toBeDefined();
 
     // NAMED, NOT COARSENED. A Hub reviewer's decision is attributed to "reviewer" because the
-    // person behind it is acting as the Hub. A member deciding in their own organisation's name is
+    // person behind it is acting as the Hub. A member deciding in their own organization's name is
     // the opposite case: the whole counterweight to the conflict of interest is that it is THEIR
     // decision, so the trail carries their handle.
-    expect(approval?.actor, "an organisation's own decision names the member").toBe(handle);
+    expect(approval?.actor, "an organization's own decision names the member").toBe(handle);
     expect(
       (approval?.patch as { via?: string } | undefined)?.via,
-      "…and is marked as the organisation's own act rather than the Hub's",
+      "…and is marked as the organization's own act rather than the Hub's",
     ).toBe("operating_org");
 
     // The database agrees about WHO, independently of how the view renders it — a handle can be
@@ -379,7 +394,7 @@ test.describe("M3-8 what a member may decide, and about what", () => {
     expect((await outsider.post("/v1/opportunities", filed)).status).toBe(201);
 
     // The membership is the gate, and a plain account holds none — so it is refused about a row it
-    // can otherwise see nothing of. 403 rather than 404 here because the ORGANISATION exists and is
+    // can otherwise see nothing of. 403 rather than 404 here because the ORGANIZATION exists and is
     // public; it is its queue that is not.
     const refused = await submitter.post<{ error: string }>(
       `/v1/organizations/${encodeURIComponent(slug)}/opportunities/${encodeURIComponent(filedId)}/approve`,
@@ -387,7 +402,7 @@ test.describe("M3-8 what a member may decide, and about what", () => {
     expect(refused.status).toBe(403);
     expect(refused.body.error).toBe("not_a_verified_member");
 
-    // …and it cannot read the queue either, which is the gate on the list route. Same organisation,
+    // …and it cannot read the queue either, which is the gate on the list route. Same organization,
     // different capability: ANY membership would be enough to look, and this account has none.
     const cannotLook = await submitter.get<{ error: string }>(
       `/v1/organizations/${encodeURIComponent(slug)}/opportunities?reviewStatus=pending`,
@@ -403,10 +418,10 @@ test.describe("M3-8 what a member may decide, and about what", () => {
  * EVERYTHING ELSE IN THIS FILE PRESUPPOSES ONE, and the suite's own bring-up grants them over HTTP.
  * That is fine for provisioning and useless as evidence: the control a reviewer actually uses is on
  * the review surface, it resolves a HANDLE to the account id the API wants, and it states a
- * different consequence depending on whether the organisation is verified. None of that is
+ * different consequence depending on whether the organization is verified. None of that is
  * exercised by a POST from a provisioning script.
  *
- * THE ORGANISATION HERE IS DELIBERATELY UNVERIFIED. Granting on a verified one would hand the
+ * THE ORGANIZATION HERE IS DELIBERATELY UNVERIFIED. Granting on a verified one would hand the
  * grantee publish authority over a namespace and change what later assertions in this run mean; on
  * an unverified one the grant is real and its consequence is the narrower of the two, which is also
  * the wording this test pins.
@@ -425,12 +440,12 @@ test.describe("M3-8 a reviewer grants a membership", () => {
     const stamp = Date.now();
     const publisher = await api("publisher");
 
-    // An organisation comes into existence as a directory STUB when an entry naming it is
-    // submitted — there is no organisation-creation endpoint, and that is the product's design
+    // An organization comes into existence as a directory STUB when an entry naming it is
+    // submitted — there is no organization-creation endpoint, and that is the product's design
     // rather than this harness's shortcut. This one has no members and is not verified.
     const slug = `${stack.namespaces.publisher}-grant`;
     const seed = opportunityFixture(slug, `grant-seed-${stamp}`, {
-      title: `Stub organisation seed ${stamp}`,
+      title: `Stub organization seed ${stamp}`,
     });
     expect((await publisher.post("/v1/opportunities", seed)).status).toBe(201);
 
@@ -451,12 +466,12 @@ test.describe("M3-8 a reviewer grants a membership", () => {
 
     const context = await contextAs("reviewer");
     const page = await context.newPage();
-    await page.goto(`${stack.urls.frontend}/review?tab=organisations`);
+    await page.goto(`${stack.urls.frontend}/review?tab=organizations`);
 
     // SEARCH-FIRST, AND THAT IS A SAFETY PROPERTY. The directory auto-registers a stub for every
-    // organisation any listing merely names, so an unfiltered list is hundreds of names nobody has
+    // organization any listing merely names, so an unfiltered list is hundreds of names nobody has
     // vouched for. A stub is reachable only through a deliberate search.
-    await page.getByLabel("Search organisations by name or slug").fill(slug);
+    await page.getByLabel("Search organizations by name or slug").fill(slug);
     await page.getByRole("button", { name: "Search", exact: true }).click();
 
     const row = page.locator("tr").filter({ hasText: slug });
@@ -466,8 +481,8 @@ test.describe("M3-8 a reviewer grants a membership", () => {
       "a memberless stub says what verifying it would really do",
     ).toBeVisible();
 
-    // The grant panel opens in a table row of ITS OWN, under the organisation's row — so its
-    // controls are addressed page-wide rather than through `row`, which is the organisation's row
+    // The grant panel opens in a table row of ITS OWN, under the organization's row — so its
+    // controls are addressed page-wide rather than through `row`, which is the organization's row
     // and does not contain them.
     await row.getByRole("button", { name: "Grant a membership…" }).click();
     await expect(page.getByText("Grant a membership on")).toBeVisible();
@@ -478,10 +493,10 @@ test.describe("M3-8 a reviewer grants a membership", () => {
     await page.getByRole("button", { name: "Choose" }).first().click();
 
     // SAME BUTTON, TWO VERY DIFFERENT CONSEQUENCES, and they are never worded the same way. This
-    // organisation is not verified, so the grant is permission to submit into the namespace and
+    // organization is not verified, so the grant is permission to submit into the namespace and
     // nothing more — and the panel says exactly that before it is confirmed.
     const confirm = page.getByRole("group", {
-      name: `Make ${handle} an organisation publisher at ${slug}?`,
+      name: `Make ${handle} an organization publisher at ${slug}?`,
     });
     await expect(confirm).toBeVisible();
     await expect(confirm.getByText(/still wait for a reviewer/i)).toBeVisible();
@@ -498,7 +513,7 @@ test.describe("M3-8 a reviewer grants a membership", () => {
       "the panel closes once the grant is made",
     ).toHaveCount(0);
     await expect(
-      page.getByText(`${handle} is now an organisation publisher at ${slug}.`),
+      page.getByText(`${handle} is now an organization publisher at ${slug}.`),
       "the API's confirmation outlives the panel that triggered it",
     ).toBeVisible();
     await expect(
@@ -507,12 +522,12 @@ test.describe("M3-8 a reviewer grants a membership", () => {
         .filter({ hasText: slug })
         .first()
         .getByRole("cell", { name: "1", exact: true }),
-      "the organisation is no longer memberless, which is the reviewer's visible outcome",
+      "the organization is no longer memberless, which is the reviewer's visible outcome",
     ).toBeVisible();
 
     // THE ACCOUNT SEES IT, which is the only version of "granted" that matters: `/v1/me` is what
     // every capability decision downstream is made from, and what the frontend renders navigation
-    // from. Unverified, because the organisation is — the membership is real and the publishing
+    // from. Unverified, because the organization is — the membership is real and the publishing
     // right is not.
     const after = await granteeClient.get<{
       memberships: Array<{ slug: string; role: string; verified: boolean }>;

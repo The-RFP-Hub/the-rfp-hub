@@ -51,11 +51,11 @@ const ACCOUNT_ROLE_LABELS: Readonly<Record<AccountRole, string>> = {
   admin: "Hub admin",
 };
 
-/** Organisation roles are disambiguated, not re-ranked or renamed into a new hierarchy. */
+/** Organization roles are disambiguated, not re-ranked or renamed into a new hierarchy. */
 const ORG_ROLE_LABELS: Readonly<Record<OrgRole, string>> = {
-  owner: "Organisation owner",
-  admin: "Organisation admin",
-  publisher: "Organisation publisher",
+  owner: "Organization owner",
+  admin: "Organization admin",
+  publisher: "Organization publisher",
 };
 
 const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
@@ -71,11 +71,11 @@ const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
   confirm_duplicate: "Confirmed as a match",
   dismiss_duplicate: "Marked as different programmes",
   verify_source: "Checked the source",
-  verify_organization: "Verified the organisation",
-  unverify_organization: "Removed organisation verification",
-  update_organization: "Updated the organisation",
-  grant_publisher: "Granted organisation membership",
-  revoke_publisher: "Revoked organisation membership",
+  verify_organization: "Verified the organization",
+  unverify_organization: "Removed organization verification",
+  update_organization: "Updated the organization",
+  grant_publisher: "Granted organization membership",
+  revoke_publisher: "Revoked organization membership",
   assign_role: "Changed the account role",
   create_api_key: "Created an API key",
   revoke_api_key: "Revoked an API key",
@@ -91,7 +91,7 @@ const AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
   fundingDetails: "Funding details",
   deadlines: "Deadlines",
   milestones: "Milestones",
-  operatingOrganizations: "Running organisations",
+  operatingOrganizations: "Running organizations",
   sponsors: "Sponsors",
   status: "Application stage",
   applicationUrl: "Application link",
@@ -118,11 +118,11 @@ const AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
   copiedFields: "Copied fields",
   role: "Role",
   directCreate: "Direct-create access",
-  verified: "Organisation verification",
+  verified: "Organization verification",
   typeData: "Programme details",
   httpStatus: "HTTP status",
   publicId: "Public ID",
-  orgSlugs: "Organisation slugs",
+  orgSlugs: "Organization slugs",
   ingestedVia: "Ingestion method",
   specVersion: "Specification version",
 };
@@ -249,14 +249,14 @@ export const ROUTE_GATE_COPY = {
   },
   account: {
     title: "Sign in to view your account.",
-    detail: "See your Hub role and verified organisation memberships.",
+    detail: "See your Hub role and verified organization memberships.",
   },
-  organisations: {
-    title: "Sign in to view your organisations.",
-    detail: "See the organisations where this account has publishing rights.",
+  organizations: {
+    title: "Sign in to view your organizations.",
+    detail: "See the organizations where this account has publishing rights.",
   },
-  organisation: {
-    title: "Sign in to view this organisation.",
+  organization: {
+    title: "Sign in to view this organization.",
     detail: "Check your membership and manage the listings in its namespace.",
   },
   duplicates: {
@@ -269,7 +269,7 @@ export const ROUTE_GATE_COPY = {
   },
   review: {
     title: "Sign in with a Hub reviewer account.",
-    detail: "Review submissions, claims, organisations, and duplicate matches.",
+    detail: "Review submissions, claims, organizations, and duplicate matches.",
   },
   admin: {
     title: "Sign in with a Hub administrator account.",
@@ -287,7 +287,7 @@ export const DASHBOARD_GATE_COPY: GateCopy = {
 export const CAPABILITY_DENIAL_COPY = {
   reviewer: {
     title: "This account does not have Hub reviewer access.",
-    detail: "Review submissions, claims, organisations, and duplicate matches requires that role.",
+    detail: "Review submissions, claims, organizations, and duplicate matches requires that role.",
   },
   admin: {
     title: "This account does not have Hub administrator access.",

@@ -2,7 +2,7 @@
  * HOW THE HUB WORKS, ordered as a lookup surface and readable as a short essay.
  *
  * The page now leads with the shortest useful path: what the Hub is, then the three steps from
- * sign-in to optional organisation verification. Somebody ready to publish can leave from there;
+ * sign-in to optional organization verification. Somebody ready to publish can leave from there;
  * everybody else gets a five-link contents strip before the reference material begins.
  *
  * TERMS COME BEFORE ROLES, so opportunity, listing, submission and namespace are defined before
@@ -94,12 +94,12 @@ const BANDS: { label: string; actions: Action[] }[] = [
       },
       {
         what: "Publish without review",
-        note: "A listing whose id is in a verified organisation's namespace goes live on submission.",
+        note: "A listing whose id is in a verified organization's namespace goes live on submission.",
         can: { member: "own namespace", reviewer: true, admin: true },
       },
       {
         what: "Approve a pending submission",
-        note: "In its own namespace, that is the organisation endorsing it, in its own name.",
+        note: "In its own namespace, that is the organization endorsing it, in its own name.",
         can: { member: "own namespace", reviewer: true, admin: true },
       },
       {
@@ -108,8 +108,8 @@ const BANDS: { label: string; actions: Action[] }[] = [
         can: { member: "own namespace", reviewer: true, admin: true },
       },
       {
-        what: "Claim a listing for an organisation",
-        note: "Asks for an existing listing to move into your organisation.",
+        what: "Claim a listing for an organization",
+        note: "Asks for an existing listing to move into your organization.",
         can: { submitter: true, member: true, reviewer: true, admin: true },
       },
     ],
@@ -127,12 +127,12 @@ const BANDS: { label: string; actions: Action[] }[] = [
         can: { reviewer: true, admin: true },
       },
       {
-        what: "Verify an organisation",
-        note: "The decision that turns an organisation's submissions into instant publications.",
+        what: "Verify an organization",
+        note: "The decision that turns an organization's submissions into instant publications.",
         can: { reviewer: true, admin: true },
       },
       {
-        what: "Grant somebody membership of an organisation",
+        what: "Grant somebody membership of an organization",
         can: { reviewer: true, admin: true },
       },
       {
@@ -168,11 +168,11 @@ export default function HowItWorksPage() {
           </li>
           <li>
             <Link href="/listings/new">Submit the opportunity.</Link> It waits for a Hub reviewer
-            unless your organisation is already verified.
+            unless your organization is already verified.
           </li>
           <li>
-            <Link href="/organisations">
-              Get your organisation verified — optional, and it is what removes the wait.
+            <Link href="/organizations">
+              Get your organization verified — optional, and it is what removes the wait.
             </Link>{" "}
             A reviewer grants membership and verification. After that, your listings publish the
             moment you submit them.
@@ -209,14 +209,14 @@ export default function HowItWorksPage() {
           <dt>Submission</dt>
           <dd>
             A listing that has been filed but not yet published. Only its submitter, its
-            organisation and Hub staff can see one.
+            organization and Hub staff can see one.
           </dd>
         </div>
         <div>
           <dt>Namespace</dt>
           <dd>
             The part of an id before the colon — <code>acme:round-4</code> is in <code>acme</code>.
-            It names the organisation a listing is published under.
+            It names the organization a listing is published under.
           </dd>
         </div>
       </dl>
@@ -239,10 +239,10 @@ export default function HowItWorksPage() {
           </dd>
         </div>
         <div>
-          <dt>Organisation member</dt>
+          <dt>Organization member</dt>
           <dd>
-            An account a reviewer has attached to an organisation. Sees everything filed in that
-            organisation&rsquo;s name, published or not. If the organisation is{" "}
+            An account a reviewer has attached to an organization. Sees everything filed in that
+            organization&rsquo;s name, published or not. If the organization is{" "}
             <strong>verified</strong>, its members publish into its namespace instantly and decide —
             approve or reject — what anybody else files there.
           </dd>
@@ -250,9 +250,9 @@ export default function HowItWorksPage() {
         <div>
           <dt>Hub reviewer</dt>
           <dd>
-            Staff, and deliberately <strong>organisation-agnostic</strong>: works every queue, in
+            Staff, and deliberately <strong>organization-agnostic</strong>: works every queue, in
             every namespace, including the ones they belong to and the ones they compete with. The
-            only role that verifies organisations, grants memberships, and settles claims and
+            only role that verifies organizations, grants memberships, and settles claims and
             duplicates.
           </dd>
         </div>
@@ -330,7 +330,7 @@ export default function HowItWorksPage() {
 
       <h2 id="verified">What &ldquo;verified&rdquo; means, and what it does not</h2>
       <p className="prose">
-        Verification says a reviewer is satisfied that an organisation&rsquo;s members speak for it.
+        Verification says a reviewer is satisfied that an organization&rsquo;s members speak for it.
         It is <strong>not</strong> an endorsement of the programme, a check that its amounts are
         real, or a statement that it is a good place to apply.
       </p>
@@ -343,30 +343,30 @@ export default function HowItWorksPage() {
 
       <h2 id="why">Why it works this way</h2>
       <p className="prose">
-        A verified organisation decides what publishes in its own namespace — approving or rejecting
+        A verified organization decides what publishes in its own namespace — approving or rejecting
         whatever anybody files there. Everything past its own namespace stays with Hub staff.
       </p>
       <details>
-        <summary>Why an organisation decides in its own namespace</summary>
+        <summary>Why an organization decides in its own namespace</summary>
         <p className="prose">
-          A verified organisation decides what publishes in its own namespace. Somebody outside the
-          organisation files a listing about your programme; a member approves it — the organisation
+          A verified organization decides what publishes in its own namespace. Somebody outside the
+          organization files a listing about your programme; a member approves it — the organization
           saying <em>yes, this is ours and it is right</em> — or rejects it. Nobody is better placed
           to know.
         </p>
         <p className="prose">
-          <strong>Decisions in your organisation&rsquo;s name carry your name.</strong> A rejection
+          <strong>Decisions in your organization&rsquo;s name carry your name.</strong> A rejection
           needs a written reason, and both the reason and the handle of the member who wrote it go
           into the listing&rsquo;s history, which anybody can read. That is the whole safeguard, and
-          it is deliberately the only one: an organisation that can quietly bury an accurate listing
-          about itself is a problem, and an organisation that has to say why, in public, under a
+          it is deliberately the only one: an organization that can quietly bury an accurate listing
+          about itself is a problem, and an organization that has to say why, in public, under a
           name, is not.
         </p>
       </details>
       <details>
         <summary>Why four powers stay with Hub staff</summary>
         <p className="prose">
-          Everything past your own namespace stays with Hub staff. Verifying an organisation,
+          Everything past your own namespace stays with Hub staff. Verifying an organization,
           granting somebody membership of one, settling a claim over who owns a listing, deciding
           which of two near-identical listings survives — those are the four powers that could be
           used to widen a namespace&rsquo;s own reach, so they sit with people who have no stake in
@@ -380,7 +380,7 @@ export default function HowItWorksPage() {
         <p className="prose">
           An account with no verified membership can hold <strong>five</strong> submissions awaiting
           a decision. A slot frees as soon as one is decided — by a Hub reviewer, or by the
-          organisation the listing names.
+          organization the listing names.
         </p>
         <p className="muted prose">
           It keeps the queue honest. A queue anybody can fill without limit is a queue where the

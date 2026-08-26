@@ -171,7 +171,7 @@ describe("createApiClient", () => {
     expect(calls[0]?.init.body).toBeUndefined();
   });
 
-  it("lists, creates and revokes membership invites on the reviewer organisation route", async () => {
+  it("lists, creates and revokes membership invites on the reviewer organization route", async () => {
     const { fetchImpl, calls } = stubFetch(() => json({ items: [] }));
     const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
 
@@ -406,13 +406,13 @@ describe("loadManagedOpportunity", () => {
 });
 
 /**
- * AN ORGANISATION ACTING ON ITSELF — four routes whose URLs carry the authorisation.
+ * AN ORGANIZATION ACTING ON ITSELF — four routes whose URLs carry the authorisation.
  *
  * The slug and the id are both in the path, and the API scopes the decision by BOTH: a listing filed
- * under another organisation answers 404 rather than 403, so a mis-encoded slug does not silently
+ * under another organization answers 404 rather than 403, so a mis-encoded slug does not silently
  * decide somebody else's queue. That makes the exact path worth pinning.
  */
-describe("the organisation routes", () => {
+describe("the organization routes", () => {
   it("lists a namespace's own listings, filtered and paginated", async () => {
     const { fetchImpl, calls } = stubFetch(() =>
       json({ items: [], page: 1, limit: 20, total: 0, totalPages: 1 }),
