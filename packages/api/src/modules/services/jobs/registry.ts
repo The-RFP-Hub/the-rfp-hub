@@ -108,8 +108,9 @@ export const JOBS: JobDefinition[] = [
     describes: "Embed entries that have no vector for the configured provider, and pair them.",
     // The immediate-email accelerator is switched OFF here, and only here: a job container tears
     // its pool down as soon as the job resolves, which would strand the fire-and-forget sends this
-    // backfill's new notifications trigger. `notification-dispatch` in the same nightly matrix
-    // delivers them. See `noopNotificationDispatchQueue`. This catalogue is also what the admin
+    // backfill's new notifications trigger. `notification-dispatch` delivers them instead, and
+    // `CHAIN` runs it AFTER this job for that reason — see the note there.
+    // See `noopNotificationDispatchQueue`. This catalogue is also what the admin
     // job route runs, so an admin-triggered backfill takes the same durable path rather than the
     // accelerator — the alternative was a per-caller mode flag on a job definition, which is a
     // worse thing to own than a backfill's mail arriving on the nightly cycle.
@@ -154,11 +155,19 @@ export const JOB_NAMES: string[] = JOBS.map((job) => job.name);
  * derivation drops is the deprecated aliases: `retention` does work `analytics-rollup` already
  * does, so running it here would prune twice for no one's benefit.
  *
- * The ORDER is the one rule the chain carries (`docs/jobs.md` §4d): everything before `staleness`
- * writes nothing the others read, and `staleness` must come after `verification-backfill` has
- * exited or it closes entries a successful check was about to prove alive. `test/unit/jobs.test.ts`
- * pins the sequence literally, so adding a job to `JOBS` is a deliberate change to the chain rather
- * than an accidental one.
+ * THE ORDER CARRIES TWO THINGS, one hard and one worth having.
+ *
+ *   - `staleness` LAST, and this is the rule `docs/jobs.md` §4d states: it must come after
+ *     `verification-backfill` has exited, or it closes entries a successful check was about to
+ *     prove alive — with both runs reporting success.
+ *   - `notification-dispatch` AFTER `embedding-backfill`, which is softer but real. The backfill
+ *     runs with the immediate-email accelerator switched off (see its entry), so the notifications
+ *     it inserts wait for the dispatcher. Ordering it later means they go out the SAME night
+ *     instead of the next one. Nothing breaks if a caller reverses them — the rows are durable and
+ *     the next sweep takes them — so this is latency, not correctness.
+ *
+ * `test/unit/jobs.test.ts` pins the sequence literally, so adding a job to `JOBS` is a deliberate
+ * change to the chain rather than an accidental one.
  */
 export const CHAIN: readonly string[] = JOBS.filter((job) => job.deprecatedFor === undefined).map(
   (job) => job.name,

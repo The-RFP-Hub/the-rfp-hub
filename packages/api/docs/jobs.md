@@ -513,10 +513,17 @@ now holds it for you.** As deployed:
 
 Each clause carries weight:
 
-* **The four are independent.** They write nothing the others read, so nothing is bought by
-  ordering them and a caller running them itself is free to run them concurrently. `all` runs them
-  one at a time anyway: they share one database and one container's CPU, the chain has over two
-  hours of margin, and it does not need the minutes.
+* **The four are independent**, in the sense that matters: none of them needs another to have run
+  for its own result to be right, so a caller running them itself is free to run them in any order
+  or concurrently. `all` runs them one at a time anyway — they share one database and one
+  container's CPU, the chain has over two hours of margin, and it does not need the minutes.
+
+  One soft preference rides along with that order, and it is latency rather than correctness:
+  `embedding-backfill` runs with the immediate-email accelerator switched off (a job container
+  tears its pool down as soon as the job resolves, which would strand a fire-and-forget send), so
+  the notifications it inserts wait for the dispatcher. `CHAIN` puts `notification-dispatch` after
+  it, which gets them out the SAME night. Reverse them and nothing breaks: the rows are durable and
+  the next sweep takes them.
 * **`staleness` after all four, by EXIT.** It reads what `verification-backfill` writes, and exit
   code — not elapsed time — is what says a job is done: a caller that starts `staleness` on a timer
   is racing the pass it depends on, and the race is silent (the walk-through above). Inside `all`
