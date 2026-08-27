@@ -306,20 +306,28 @@ quietly redesigning the standard.
 | `held-for-next-cut` | Real defect, but fixing it would change what validates. Cannot ship inside the current version. | Stays open, labelled, and is picked up when the next spec version opens. Say so on the issue — a defect parked without a label reads as ignored. |
 | `redesign` | The report is not a defect at all: it asks the standard to mean something different. | Not an erratum. Becomes a `proposed` feature, and if accepted an ADR. |
 
+These four are real GitHub labels, not just names in this table:
+[`.github/labels.yml`](../../.github/labels.yml) is the manifest, with the `gh label create` block
+that applies it. Naming a label in prose does not create it, and a triage step whose labels do not
+exist is a step nobody can perform.
+
 ---
 
 ## RFC process
 
 There is no separate RFC document and no RFC number series. What other projects call an RFC, this
 project already has, split across this file and [`GOVERNANCE.md`](../../GOVERNANCE.md) — so this
-section is a routing table, not a new process. Start from what you want to change:
+section is a routing table, not a new process. Start from what you want to change.
+
+Blank issues are disabled, so every door below is a **form** — that is deliberate, because each one
+asks for exactly what the review it feeds on actually needs:
 
 | You want to… | Go to | Opens as |
 |---|---|---|
-| **Propose a new field**, or move one between stages | [Feature stages](#feature-stages) above | An issue or PR with a use case and at least one real document that needs it — that is the `proposed` stage |
-| **Register a vocabulary value** in any of the four registries — `deadline-labels`, `program-models`, `bounty-severities`, `bounty-asset-types` | [Registering a value in a registry](#registering-a-value-in-a-registry) above | An issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
-| **Report a defect** in something already published | [Errata](#errata) above | An issue, triaged into exactly one of `erratum-editorial`, `erratum-technical`, `held-for-next-cut`, `redesign` |
-| **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) | An issue. The answer goes on the issue, in public |
+| **Propose a new field**, or move one between stages | [Feature stages](#feature-stages) above · [**RFC / proposal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=rfc-proposal.yml) | An `rfc` issue with a use case and at least one real document that needs it — that is the `proposed` stage |
+| **Register a vocabulary value** in any of the four registries — `deadline-labels`, `program-models`, `bounty-severities`, `bounty-asset-types` | [Registering a value in a registry](#registering-a-value-in-a-registry) above · [**RFC / proposal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=rfc-proposal.yml) | An `rfc` issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
+| **Report a defect** in something already published | [Errata](#errata) above · [**bug report form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=bug_report.yml) | An issue, triaged into exactly one of `erratum-editorial`, `erratum-technical`, `held-for-next-cut`, `redesign` |
+| **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) · [**appeal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=appeal.yml) | An `appeal` issue. The answer goes on the issue, in public |
 | **Make a structural decision** — the data model, the versioning policy, the process itself | [`adr/`](../../adr), starting from [`template.md`](../../adr/template.md) | A PR adding the ADR, including the options considered and rejected |
 
 Whichever door you came through, the same review windows apply, and

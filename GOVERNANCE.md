@@ -73,7 +73,10 @@ Notes on the windows:
 
 ## Appeals
 
-**Open an issue.** That is the appeal path, and it is the whole appeal path.
+**Open an issue** — there is an
+[appeal form](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=appeal.yml) for it,
+because blank issues are disabled and a path with no door is not a path. That is the appeal path,
+and it is the whole appeal path.
 
 If a change was declined, a registry entry rejected, or a decision made that you think is wrong,
 open an issue saying so and why. It gets an answer on the issue — not in a private channel, not
@@ -117,7 +120,10 @@ deadline first, records with no upcoming fixed deadline last — with the row id
 the same query returns the same page twice. Every other order is a **parameter the caller chooses**,
 never a judgment the server makes, and the sort keys are a **closed set** published in the OpenAPI
 document: `nextDeadlineAt`, `opensAt`, `postedAt`, `updatedAt`, `createdAt`, each `asc` or `desc`.
-A key outside that set is a `400`, not a silent fallback to something else. `GET /v1/publishers`
+Over the public API a key outside that set is a `400`, not a silent
+fallback to something else — the querystring schema rejects it before any handler runs. (The
+in-process parser behind it does fall back to the default for a bad key; that is a defensive guard
+for direct callers inside the server, and nothing a client can reach.) `GET /v1/publishers`
 orders by slug. There is no relevance score, no per-entry weight, and no operator thumb.
 
 **No paid placement.** No featured tier, no boost, no promoted entry, no recommendation surface.

@@ -1,0 +1,68 @@
+name: Appeal a decision
+description: A change was declined, a registry entry rejected, or a listing refused, and you think it is wrong
+labels: ["appeal"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        [`GOVERNANCE.md` § Appeals](https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/GOVERNANCE.md#appeals)
+        is the whole appeal path, and this form is it. It gets an answer here, on the issue — not
+        in a private channel and not in a call summary. If the decision stands, the reasoning goes
+        on the record; if the reasoning is already in an ADR, the answer points at it. There is no
+        escalation body above this, because there is no organization above this.
+
+
+        Appealing is free and it is not held against you. Anything filed here is public, including
+        a rejection reason that was only visible to you before — that is the trade, and it is the
+        mechanism by which a decision that cannot be explained in public becomes visible as one.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of decision is being appealed?
+      options:
+        - "A submitted opportunity was rejected"
+        - "A publisher application was declined"
+        - "A verification or membership was revoked"
+        - "A proposed change to the standard was declined"
+        - "A registry value was rejected"
+        - "A duplicate pair was confirmed or merged"
+        - "Something else"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link to the decision
+      description: >
+        The issue, PR, or entry id it concerns — e.g. `my-org:1459`, or the URL of the application
+        issue. If the decision reached you privately and there is nothing to link, say so here and
+        quote it below instead.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: What was decided, and what reason were you given
+      description: >
+        Quote it if you have it in writing. A written reason is required of an organization
+        rejecting an entry in its own namespace, so if you received none, say that — it is itself
+        part of the appeal.
+    validations:
+      required: true
+  - type: textarea
+    id: why-wrong
+    attributes:
+      label: Why you think it is wrong
+      description: >
+        The substance. What the decision got factually wrong, or which criterion you believe was
+        applied that is not one — the criteria for a single listing are in `REVIEW-CRITERIA.md`,
+        and what is explicitly *not* a criterion is in the same file.
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What outcome are you asking for
+      description: Reinstate the entry, reopen the application, register the value, reverse the merge — say which.
+    validations:
+      required: false
