@@ -291,8 +291,12 @@ is the "spin it up separately, as plainly as possible" path, and it is proven me
 `npm install`s and `npm run build`s it with no monorepo present, then starts the standalone server
 it produces and requests `/`, `/publishers` and a filtered `/`. Read that script's own header
 before running it — it documents both a "published" mode and a "local tarball" mode, and today only
-the tarball mode succeeds (see the note below). `.github/workflows/external-deploy-smoke.yml` runs
-it in CI on every push touching this package.
+the tarball mode succeeds (see the note below). That HTTP request is only a fast pre-check, though:
+`DirectoryList` fetches its data from a `useEffect` after hydration, so a build whose client-side
+fetch cannot actually reach the API would still return a 200 shell and pass it. **`--browser`
+is the real proof** — it drives a real headless Chromium through `/` and `/?q=<term>` and waits for
+an opportunity row to actually render from a live request, and is what
+`.github/workflows/external-deploy-smoke.yml` runs on every push touching this package.
 
 > **`rfphub-validate` note.** `packages/frontend/src/lib/validate-client.ts` imports
 > `humanizeIssues` from `rfphub-validate`, which is exported by the package's source but missing
