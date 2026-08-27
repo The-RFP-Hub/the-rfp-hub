@@ -70,6 +70,23 @@ Controls what `mcp.mjs` spawns:
 3. Otherwise, `npx -y @the-rfp-hub/mcp@next` as a last resort. Before the package is published this
    fails loudly (`npm error 404 ...`) and the check reports that verbatim — it does not swallow it.
 
+The local-build path (2) resolves the `dist/cli.js` path through `fs.realpathSync` before spawning
+it, not merely `path.join`. Found by actually spawning a real built `packages/mcp` for the first
+time (unit tests and every pre-publish run before that only ever exercised the npx-404 fallback):
+`cli.ts`'s own entrypoint guard compares `fileURLToPath(import.meta.url)` (which Node resolves
+through any symlink) against `path.resolve(process.argv[1])` (which does not), and a `--repo-root`
+under `os.tmpdir()` — `/tmp` → `/private/tmp` on macOS — made the two disagree. `isEntrypoint` came
+back false, `main()` never ran, and the process exited 0 having done nothing at all: no banner, no
+error, no response, indistinguishable from "hung" until this checker's own timeout fired. Not
+specific to this one package — any CLI using that common idiom hits the same thing under a
+symlinked repo root.
+
+Every server process this check spawns also gets its own disposable `RFPHUB_MCP_HOME` (an
+`mkdtemp` directory, removed afterward): a real server's `guard()` wrapper writes an audit-log line
+for every tool call — read or write — so without the override, even the read-only cases would leave
+entries in whoever is running this checker's own `~/.rfphub/audit.log`, and the submit-enabled
+case's preview would land in `~/.rfphub/pending/`, indistinguishable from a real pending submission.
+
 ## The `sh`-block marker convention (`docs/**`)
 
 Defined by the docs stream itself (`docs/README.md` on `brunodmsi/m4-handoff-docs`), not by this

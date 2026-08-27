@@ -38,6 +38,13 @@ export function parseArgs(argv, env = process.env) {
       if (value === undefined) throw new Error(`${arg} needs a value`);
       return value;
     };
+    const number = (raw) => {
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`${arg} must be a non-negative number, got "${raw}"`);
+      }
+      return value;
+    };
     switch (arg) {
       case "-h":
       case "--help":
@@ -62,7 +69,7 @@ export function parseArgs(argv, env = process.env) {
         opts.json = next();
         break;
       case "--timeout":
-        opts.timeoutMs = Number(next());
+        opts.timeoutMs = number(next());
         break;
       case "--no-color":
         opts.color = false;

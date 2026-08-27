@@ -25,8 +25,10 @@
  *   RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
  *     node scripts/accept-m4.mjs --api https://api.staging.example.org
  *
- * Exit codes: 0 the cycle completed, landed pending, and was torn down · 1 any phase failed ·
- * 2 the run could not be made (refused, or a programmer error).
+ * Exit codes: 0 the cycle completed, landed pending, AND was torn down · 1 any phase failed, OR
+ * teardown itself failed, OR `--keep-fixture` deliberately left a fixture behind (teardown is its
+ * own criterion — see below — so a run that leaves a fixture in place is never reported as a
+ * clean pass) · 2 the run could not be made (refused, or a programmer error).
  */
 import { writeFileSync } from "node:fs";
 import { normalizeBase } from "./m2-compliance/http.mjs";
@@ -117,6 +119,19 @@ async function main() {
     "Real 3-phase MCP submission interlock",
     "preview → out-of-band approval → commit lands a fixture pending, verified via /v1/me/opportunities, then torn down.",
   );
+  // A SEPARATE criterion, on purpose — the same reasoning as `m3-compliance/cleanup.mjs`'s own
+  // "M3-T" criterion. If teardown were just another CHECK inside "M4-ACCEPT", a `--keep-fixture`
+  // run would still be reported PASS: `Criterion.status` is only SKIP when EVERY check in it is
+  // skip/info, and the submission-cycle checks above it would still have passed. Making teardown
+  // its own criterion means a `--keep-fixture` run (or one where nothing to tear down was ever
+  // established) makes THIS criterion SKIP, which makes the overall run `incomplete` — not green,
+  // and not exit 0 — exactly the property "a run that deliberately leaves a fixture behind must
+  // not report success" needs.
+  const t = report.criterion(
+    "M4-ACCEPT-T",
+    "Fixture teardown",
+    "The fixture this run created is rejected and unlisted. A hygiene criterion, reported at the same level as the submission cycle on purpose, so --keep-fixture (or a teardown failure) cannot be green.",
+  );
 
   try {
     c.info("MCP server under test", "resolved at run time — see the next check's detail");
@@ -165,26 +180,27 @@ async function main() {
       c.fail("preview → approve → commit completes", err.message);
     }
   } finally {
+    c.finish();
     if (opts.keepFixture) {
-      c.skip(
+      t.skip(
         "teardown",
         `--keep-fixture: leaving ${state.opportunityId ?? "(nothing created)"} in place`,
       );
     } else if (!state.opportunityId) {
-      c.skip("teardown", "no fixture was created — nothing to tear down");
+      t.skip("teardown", "no fixture was created — nothing to tear down");
     } else {
       try {
         await teardown(ctx, state.opportunityId);
-        c.pass("teardown", `${state.opportunityId} rejected and unlisted`);
+        t.pass("teardown", `${state.opportunityId} rejected and unlisted`);
       } catch (err) {
         // A teardown failure leaves a real (if prefixed) entry behind in the deployment this tool
         // just wrote to — that is a FAILED run, not a warning on an otherwise-green one. Silently
         // downgrading it would let `accept-m4` exit 0 while a fixture sits in staging unreviewed.
-        c.fail("teardown", err.message);
+        t.fail("teardown", err.message);
       }
     }
+    t.finish();
   }
-  c.finish();
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 
