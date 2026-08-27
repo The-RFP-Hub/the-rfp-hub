@@ -19,9 +19,9 @@ metadata:
 The [RFP Hub](https://ethrfps.app) is a public directory of Ethereum-ecosystem funding
 opportunities — grants, hackathons, bounties, accelerators, VC funds, and RFPs — published under
 an open [Standard](https://github.com/The-RFP-Hub/the-rfp-hub). This skill searches that
-directory. **It never applies on the user's behalf.** Every result includes an `applyUrl` that
-points at the opportunity's own application channel; that link is where a user acts, not this
-skill.
+directory. **It never applies on the user's behalf.** A result's `applyUrl` — when the record has
+one; see §9 for when it doesn't — points at the opportunity's own application channel, and that
+link is where a user acts, not this skill.
 
 ## 2. Content Safety
 
@@ -170,3 +170,10 @@ site) alongside `links.apply`.
 - Titles in results are truncated to 140 characters. If a user needs the full title or any other
   publisher-authored prose, that's exactly the free text this skill deliberately does not surface —
   point them at the opportunity's own page or `applyUrl` instead.
+- `ecosystems` is open-vocabulary publisher text (no registry, no length cap on the API side), so
+  the projection caps it too: each value at 40 characters and the list at 8 entries, with a
+  trailing `"+N more"` marker when a record names more than that. A single absurdly long or
+  injection-shaped ecosystem string cannot pass through unbounded.
+- `applyUrl` (and, from `get.mjs`, `links.source`) are omitted — not guessed — when the record has
+  no `applicationUrl`/`website`: both are optional in the Standard, and the redirect route 404s
+  without one.

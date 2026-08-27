@@ -229,62 +229,80 @@ export function parseArgs(argv) {
  */
 export async function fetchJson(url, { invocationId = newInvocationId() } = {}) {
   const controller = new AbortController();
+  // The timer stays live for the WHOLE request, including reading the body: a server that
+  // accepts the connection and headers instantly but then stalls mid-body would otherwise hang
+  // forever, because clearing the timer right after the headers arrive (in a `finally` on just
+  // the `fetch()` call) disarms the one thing that could ever abort a stuck `res.text()`.
   const timer = setTimeout(() => controller.abort(), timeoutMs());
-  let res;
   try {
-    res = await fetch(url, {
-      method: "GET",
-      headers: trackingHeaders(invocationId),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err.name === "AbortError") {
-      throw new RequestError("timeout", `Request to ${url} timed out after ${timeoutMs()}ms.`);
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "GET",
+        headers: trackingHeaders(invocationId),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        throw new RequestError("timeout", `Request to ${url} timed out after ${timeoutMs()}ms.`);
+      }
+      throw new RequestError("network", `Could not reach ${url}: ${err.message}`);
     }
-    throw new RequestError("network", `Could not reach ${url}: ${err.message}`);
+
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("retry-after");
+      throw new RequestError(
+        "rate_limited",
+        retryAfter
+          ? `Rate limited (429). Retry after ${retryAfter} seconds.`
+          : "Rate limited (429). Wait a moment and try again.",
+        { status: 429, retryAfter: retryAfter ? Number(retryAfter) : null },
+      );
+    }
+    if (res.status >= 500) {
+      throw new RequestError(
+        "server_error",
+        `The RFP Hub API returned a server error (${res.status}). Try again shortly.`,
+        { status: res.status },
+      );
+    }
+
+    let text;
+    try {
+      text = await res.text();
+    } catch (err) {
+      if (err.name === "AbortError") {
+        throw new RequestError(
+          "timeout",
+          `Request to ${url} timed out after ${timeoutMs()}ms while reading the response body.`,
+        );
+      }
+      throw new RequestError("network", `Could not read the response from ${url}: ${err.message}`);
+    }
+
+    let body;
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch {
+      throw new RequestError(
+        "malformed_response",
+        `The RFP Hub API returned a response that was not valid JSON (status ${res.status}).`,
+        { status: res.status },
+      );
+    }
+
+    if (!res.ok) {
+      const message =
+        typeof body?.message === "string"
+          ? body.message
+          : `Request failed with status ${res.status}.`;
+      throw new RequestError("client_error", message, { status: res.status, body });
+    }
+
+    return body;
   } finally {
     clearTimeout(timer);
   }
-
-  if (res.status === 429) {
-    const retryAfter = res.headers.get("retry-after");
-    throw new RequestError(
-      "rate_limited",
-      retryAfter
-        ? `Rate limited (429). Retry after ${retryAfter} seconds.`
-        : "Rate limited (429). Wait a moment and try again.",
-      { status: 429, retryAfter: retryAfter ? Number(retryAfter) : null },
-    );
-  }
-  if (res.status >= 500) {
-    throw new RequestError(
-      "server_error",
-      `The RFP Hub API returned a server error (${res.status}). Try again shortly.`,
-      { status: res.status },
-    );
-  }
-
-  const text = await res.text();
-  let body;
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    throw new RequestError(
-      "malformed_response",
-      `The RFP Hub API returned a response that was not valid JSON (status ${res.status}).`,
-      { status: res.status },
-    );
-  }
-
-  if (!res.ok) {
-    const message =
-      typeof body?.message === "string"
-        ? body.message
-        : `Request failed with status ${res.status}.`;
-    throw new RequestError("client_error", message, { status: res.status, body });
-  }
-
-  return body;
 }
 
 // ── projection: the security boundary ───────────────────────────────────────────
@@ -346,11 +364,53 @@ export function linkOut(base, id, kind) {
   return `${base}/v1/r/${encodeURIComponent(id)}/${kind}`;
 }
 
+/** A non-empty string — the presence test the Standard uses for its optional URL fields. */
+function isUsableUrl(v) {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+/**
+ * Per-value and aggregate limits on the (open-vocabulary, publisher-supplied) `ecosystems` list.
+ * A publisher can name anything here — it's free text with no registry (see
+ * references/api-reference.md) — so, unlike the enum-backed `fundingType`/`status`, it needs the
+ * same truncation discipline as `title`: a short per-value cap so one absurdly long or
+ * injection-shaped entry can't smuggle a paragraph past the projection, and a small aggregate cap
+ * so a record padded with dozens of ecosystem strings can't inflate every result in a page.
+ */
+const MAX_ECOSYSTEM_VALUE_LEN = 40;
+const MAX_ECOSYSTEMS = 8;
+
+/** Truncate one ecosystem string to `MAX_ECOSYSTEM_VALUE_LEN`, with the same `…` convention as
+ * `truncateTitle`. Reused here rather than calling `truncateTitle` because the two limits are
+ * independent and documented separately — this list's cap must be able to change without moving
+ * the title's. */
+function truncateEcosystem(value) {
+  if (value.length <= MAX_ECOSYSTEM_VALUE_LEN) return value;
+  return `${value.slice(0, Math.max(0, MAX_ECOSYSTEM_VALUE_LEN - 1))}…`;
+}
+
+/** Project `ecosystems[]`: drop non-strings, cap each value's length, cap the list length, and
+ * say so with a trailing `"+N more"` marker rather than silently dropping the tail. */
+export function projectEcosystems(ecosystems) {
+  if (!Array.isArray(ecosystems)) return [];
+  const strings = ecosystems.filter((e) => typeof e === "string" && e.length > 0);
+  const kept = strings.slice(0, MAX_ECOSYSTEMS).map(truncateEcosystem);
+  if (strings.length > MAX_ECOSYSTEMS) {
+    kept.push(`+${strings.length - MAX_ECOSYSTEMS} more`);
+  }
+  return kept;
+}
+
 /**
  * The projected shape for one opportunity — used for both a list row (search.mjs) and, extended
  * with `links`, a single record (get.mjs). This is the ENTIRE allow-list: id, a truncated title,
- * two enums, a derived ecosystem list, a derived deadline, a derived award summary, and a
+ * two enums, a bounded ecosystem list, a derived deadline, a derived award summary, and a
  * constructed link. Nothing else from the API response is ever read into the output.
+ *
+ * `applyUrl` (and, in `projectDetail`, `links.source`) are gated on the underlying
+ * `applicationUrl`/`website` actually being present: both are OPTIONAL in the Standard, and
+ * `/v1/r/{id}/apply` and `/v1/r/{id}/source` 404 when the record carries no such link — handing
+ * out a link that's guaranteed to 404 is worse than omitting it and saying so.
  */
 export function project(o, base) {
   return {
@@ -359,22 +419,22 @@ export function project(o, base) {
     fundingType: typeof o?.fundingType === "string" ? o.fundingType : null,
     status: typeof o?.status === "string" ? o.status : null,
     organization: primaryOrganization(o),
-    ecosystems: Array.isArray(o?.ecosystems)
-      ? o.ecosystems.filter((e) => typeof e === "string")
-      : [],
+    ecosystems: projectEcosystems(o?.ecosystems),
     nextDeadlineAt: nextDeadlineAt(o?.deadlines),
     awardSummary: awardSummary(o?.fundingInfo),
-    applyUrl: o?.id ? linkOut(base, o.id, "apply") : null,
+    applyUrl: o?.id && isUsableUrl(o?.applicationUrl) ? linkOut(base, o.id, "apply") : null,
   };
 }
 
-/** `project()` plus both link-outs — for a single fetched record (get.mjs). */
+/** `project()` plus both link-outs — for a single fetched record (get.mjs). Each link is gated
+ * on its own source field, independently of the other (a record can have one URL and not the
+ * other). */
 export function projectDetail(o, base) {
   return {
     ...project(o, base),
     links: {
-      apply: o?.id ? linkOut(base, o.id, "apply") : null,
-      source: o?.id ? linkOut(base, o.id, "source") : null,
+      apply: o?.id && isUsableUrl(o?.applicationUrl) ? linkOut(base, o.id, "apply") : null,
+      source: o?.id && isUsableUrl(o?.website) ? linkOut(base, o.id, "source") : null,
     },
   };
 }
@@ -393,13 +453,16 @@ export function projectPage(page, base) {
 
 // ── presentation ─────────────────────────────────────────────────────────────────
 
-function formatRow(item) {
+/** One result row. Exported so `formatDetailTable` can extend it with a source line without
+ * duplicating the base formatting. */
+export function formatRow(item) {
   const deadline = item.nextDeadlineAt
     ? new Date(item.nextDeadlineAt).toISOString().slice(0, 10)
     : "rolling/none";
   const award = item.awardSummary ?? "n/a";
   const org = item.organization ?? "n/a";
-  return `[${item.fundingType ?? "?"}] ${item.title} — ${org}\n  award: ${award} | deadline: ${deadline}\n  apply: ${item.applyUrl}`;
+  const apply = item.applyUrl ?? "not available (no application URL on this record)";
+  return `[${item.fundingType ?? "?"}] ${item.title} — ${org}\n  award: ${award} | deadline: ${deadline}\n  apply: ${apply}`;
 }
 
 export function formatTable(projected) {
@@ -411,4 +474,12 @@ export function formatTable(projected) {
       ? `\n\n${projected.total} total, page ${projected.page} of ${projected.totalPages}.`
       : "";
   return `${lines.join("\n\n")}${footer}`;
+}
+
+/** Table rendering for a SINGLE fetched record (get.mjs): the base row plus the source link-out,
+ * which `formatTable` has no way to show since a list row has no `links` object at all. */
+export function formatDetailTable(detail) {
+  const base = formatRow(detail);
+  const source = detail?.links?.source ?? "not available (no website on this record)";
+  return `${base}\n  source: ${source}`;
 }

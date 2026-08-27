@@ -112,10 +112,17 @@ async function main(argv) {
   return EXIT.OK;
 }
 
+// `process.exitCode = n` (never `process.exit(n)`) so Node exits only once every pending write —
+// including a large `process.stdout.write()` above, when piped to a slow reader — has actually
+// flushed. `process.exit()` right after a write to a pipe is a documented truncation hazard: pipe
+// writes are asynchronous on POSIX, and `exit()` tears the process down before a queued write can
+// complete.
 main(process.argv.slice(2)).then(
-  (code) => process.exit(code),
+  (code) => {
+    process.exitCode = code;
+  },
   (err) => {
     process.stderr.write(`Unexpected error: ${err?.message ?? err}\n`);
-    process.exit(EXIT.NETWORK);
+    process.exitCode = EXIT.NETWORK;
   },
 );

@@ -18,6 +18,8 @@ import {
   buildSearchQuery,
   clampLimit,
   exitCodeFor,
+  formatDetailTable,
+  formatTable,
   linkOut,
   nextDeadlineAt,
   parseArgs,
@@ -158,6 +160,8 @@ describe("project — the content-safety boundary", () => {
       { deadlineType: "fixed", date: "2099-01-01T00:00:00.000Z", label: POISONED_STRING },
     ],
     fundingDetails: { fundingType: "grant" },
+    applicationUrl: "https://example.org/apply",
+    website: "https://example.org",
   };
 
   it("never contains the poisoned free-text content, by construction", () => {
@@ -192,6 +196,40 @@ describe("project — the content-safety boundary", () => {
     expect(out.applyUrl).toBe(`${BASE}/v1/r/fundingmap%3A1459/apply`);
   });
 
+  it("omits applyUrl when the record has no applicationUrl (it's optional in the Standard)", () => {
+    const noUrl = { ...fixture, applicationUrl: null };
+    expect(project(noUrl, BASE).applyUrl).toBeNull();
+  });
+
+  it("treats a blank/whitespace-only applicationUrl the same as absent", () => {
+    const blank = { ...fixture, applicationUrl: "   " };
+    expect(project(blank, BASE).applyUrl).toBeNull();
+  });
+
+  it("caps a single ecosystem value's length, with an ellipsis, and never contains the full injection text", () => {
+    const hugeEcosystem = `${POISONED_STRING} `.repeat(20); // ~800 chars
+    const withHugeEcosystem = { ...fixture, ecosystems: [hugeEcosystem] };
+    const out = project(withHugeEcosystem, BASE);
+    expect(out.ecosystems).toHaveLength(1);
+    expect(out.ecosystems[0].length).toBeLessThanOrEqual(40);
+    expect(out.ecosystems[0].endsWith("…")).toBe(true);
+    expect(JSON.stringify(out)).not.toContain(POISONED_STRING);
+  });
+
+  it("caps the number of ecosystem values, with a '+N more' marker for the rest", () => {
+    const manyEcosystems = Array.from({ length: 20 }, (_, i) => `Ecosystem${i}`);
+    const out = project({ ...fixture, ecosystems: manyEcosystems }, BASE);
+    // 8 kept values + one "+N more" marker.
+    expect(out.ecosystems).toHaveLength(9);
+    expect(out.ecosystems.slice(0, 8)).toEqual(manyEcosystems.slice(0, 8));
+    expect(out.ecosystems[8]).toBe("+12 more");
+  });
+
+  it("drops non-string ecosystem entries instead of throwing", () => {
+    const out = project({ ...fixture, ecosystems: ["Ethereum", 42, null, {}] }, BASE);
+    expect(out.ecosystems).toEqual(["Ethereum"]);
+  });
+
   it("projectDetail adds only the two link-outs on top of project", () => {
     const out = projectDetail(fixture, BASE);
     expect(Object.keys(out).sort()).toEqual(
@@ -202,6 +240,23 @@ describe("project — the content-safety boundary", () => {
       source: `${BASE}/v1/r/fundingmap%3A1459/source`,
     });
     expect(JSON.stringify(out)).not.toContain(POISONED_STRING);
+  });
+
+  it("projectDetail gates apply and source independently on their own source field", () => {
+    const applyOnly = { ...fixture, website: null };
+    expect(projectDetail(applyOnly, BASE).links).toEqual({
+      apply: `${BASE}/v1/r/fundingmap%3A1459/apply`,
+      source: null,
+    });
+
+    const sourceOnly = { ...fixture, applicationUrl: null };
+    expect(projectDetail(sourceOnly, BASE).links).toEqual({
+      apply: null,
+      source: `${BASE}/v1/r/fundingmap%3A1459/source`,
+    });
+
+    const neither = { ...fixture, applicationUrl: null, website: null };
+    expect(projectDetail(neither, BASE).links).toEqual({ apply: null, source: null });
   });
 
   it("projectPage projects every item and preserves the pagination envelope", () => {
@@ -216,6 +271,7 @@ describe("project — the content-safety boundary", () => {
   it("handles a missing/malformed record without throwing", () => {
     expect(() => project({}, BASE)).not.toThrow();
     expect(project({}, BASE).id).toBeNull();
+    expect(project({}, BASE).applyUrl).toBeNull();
   });
 });
 
@@ -302,6 +358,53 @@ describe("trackingHeaders", () => {
     expect(headers["X-Source"]).toBe("skill:rfp-hub-funding-search");
     expect(headers["X-Invocation-Id"]).toBe("abc-123");
     expect(headers["X-Skill-Version"]).toBe(SKILL_VERSION);
+  });
+});
+
+describe("formatTable / formatDetailTable", () => {
+  const BASE2 = BASE;
+  const item = {
+    id: "fundingmap:1459",
+    title: "A grant for public goods",
+    fundingType: "grant",
+    status: "open",
+    organization: "Acme Foundation",
+    ecosystems: ["Ethereum"],
+    nextDeadlineAt: "2099-01-01T00:00:00.000Z",
+    awardSummary: "50,000 USD budget",
+    applyUrl: `${BASE2}/v1/r/fundingmap%3A1459/apply`,
+  };
+
+  it("formatTable (list) does not show a source link — a list row has no links object", () => {
+    const out = formatTable({ total: 1, page: 1, totalPages: 1, items: [item] });
+    expect(out).not.toContain("source:");
+  });
+
+  it("formatDetailTable (single record) renders the source link alongside apply", () => {
+    const detail = {
+      ...item,
+      links: { apply: item.applyUrl, source: `${BASE2}/v1/r/fundingmap%3A1459/source` },
+    };
+    const out = formatDetailTable(detail);
+    expect(out).toContain("apply:");
+    expect(out).toContain("source:");
+    expect(out).toContain(detail.links.source);
+  });
+
+  it("formatDetailTable says so plainly when there is no source link", () => {
+    const detail = { ...item, links: { apply: item.applyUrl, source: null } };
+    const out = formatDetailTable(detail);
+    expect(out).toMatch(/source: not available/);
+  });
+
+  it("formatTable says so plainly when a row has no apply link", () => {
+    const out = formatTable({
+      total: 1,
+      page: 1,
+      totalPages: 1,
+      items: [{ ...item, applyUrl: null }],
+    });
+    expect(out).toMatch(/apply: not available/);
   });
 });
 

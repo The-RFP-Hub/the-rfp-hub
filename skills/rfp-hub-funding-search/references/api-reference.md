@@ -74,7 +74,9 @@ agent — the API itself does not.
 The full Standard document, including `fundingDetails` (which carries additional free-text fields
 depending on `fundingType` — e.g. `rfp.scopeOfWork`, `vcFund.thesis`, `bounty.task.skills`).
 `404` with `{ "error": "not_found" }`, or, for an id that used to be public and was merged into
-another entry, `{ "error": "opportunity_merged", "mergedInto": "<id>" }`.
+another entry, `{ "error": "opportunity_merged", "mergedInto": { "id": "<id>", "title": "<title>" } }`
+— `mergedInto` is an object (`OpportunityService#findMergedDestination`'s
+`{ id: string; title: string }`), never a bare id string.
 
 ## Link-outs
 

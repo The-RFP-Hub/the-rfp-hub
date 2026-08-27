@@ -19,7 +19,7 @@ import {
   apiBase,
   exitCodeFor,
   fetchJson,
-  formatTable,
+  formatDetailTable,
   newInvocationId,
   parseArgs,
   projectDetail,
@@ -63,8 +63,14 @@ async function main(argv) {
   } catch (err) {
     if (err instanceof RequestError) {
       if (err.status === 404 && err.body?.error === "opportunity_merged") {
+        // The API's contract for this field is `{ id, title }` (see
+        // OpportunityService#findMergedDestination), never a bare string — read `.id`.
+        const merged = err.body.mergedInto;
+        const mergedId = merged && typeof merged === "object" ? merged.id : merged;
+        const mergedTitle = merged && typeof merged === "object" ? merged.title : undefined;
+        const suffix = mergedTitle ? ` ("${mergedTitle}")` : "";
         process.stderr.write(
-          `'${id}' was merged into '${err.body.mergedInto}'. Try fetching that id instead.\n`,
+          `'${id}' was merged into '${mergedId}'${suffix}. Try fetching that id instead.\n`,
         );
         return EXIT.CLIENT_ERROR;
       }
@@ -77,17 +83,24 @@ async function main(argv) {
 
   const projected = projectDetail(opportunity, base);
   if (format === "table") {
-    process.stdout.write(`${formatTable(projected)}\n`);
+    process.stdout.write(`${formatDetailTable(projected)}\n`);
   } else {
     process.stdout.write(`${JSON.stringify(projected, null, 2)}\n`);
   }
   return EXIT.OK;
 }
 
+// `process.exitCode = n` (never `process.exit(n)`) so Node exits only once every pending write —
+// including a large `process.stdout.write()` above, when piped to a slow reader — has actually
+// flushed. `process.exit()` right after a write to a pipe is a documented truncation hazard: pipe
+// writes are asynchronous on POSIX, and `exit()` tears the process down before a queued write can
+// complete.
 main(process.argv.slice(2)).then(
-  (code) => process.exit(code),
+  (code) => {
+    process.exitCode = code;
+  },
   (err) => {
     process.stderr.write(`Unexpected error: ${err?.message ?? err}\n`);
-    process.exit(EXIT.NETWORK);
+    process.exitCode = EXIT.NETWORK;
   },
 );
