@@ -1,0 +1,100 @@
+# The mobile-responsive evidence, gated: `packages/e2e/tests/m4-responsive.spec.ts` asserts the
+# three breakpoints the M4 criterion requires (no horizontal scroll, touch targets >= 44px, a
+# usable nav) on `/`, `/opportunities/[id]` and `/publishers`, but nothing ran it — the root
+# `vitest.config.ts` excludes `packages/e2e/**` on purpose (it is a Playwright suite driven by its
+# own external runner, not a `vitest` file), and no CI workflow ever invoked `pnpm e2e`. This file
+# is the minimal fix: it runs ONLY that one spec, via the real runner, so the evidence is a gate
+# rather than something only ever executed by hand.
+#
+# WHY THE REAL RUNNER, NOT A BARE `playwright test`. `packages/e2e` is not a config on top of an
+# already-running app: `src/run.ts` is a runner that owns the whole stack for one disposable run —
+# a run-scoped Postgres via `docker-compose.e2e.yml` (safe to tear down; never the shared
+# `rfphub-postgres` this repo's other tests use), the API on a restricted role, and the frontend via
+# `next dev --webpack` — and only then execs Playwright as its child, pointed at that run's state
+# file. A bare `playwright test` fails immediately with "E2E_STATE_FILE is not set" (verified
+# locally) — there is no config that skips the runner.
+#
+# WHY ONE SPEC, MECHANICALLY. `src/run.ts` forwards its own argv (minus its one recognised flag,
+# `--check-m3`) straight through to `playwright test`, and Playwright's own CLI takes a positional
+# `[test-filter...]` — any test FILE whose path contains one of those strings runs, everything else
+# is skipped (`playwright test --help`, confirmed against the version this package pins). So
+# `pnpm e2e -- m4-responsive.spec.ts` runs exactly this one file without touching the ~99 specs
+# beside it, while still paying the full stack bring-up cost the runner requires regardless of how
+# many tests are selected — there is no cheaper way to exercise a real browser against a real build
+# of this frontend.
+#
+# WHAT THE OPERATOR MUST SUPPLY: nothing. `packages/e2e/README.md`'s own headline — identities are
+# minted per run against a `.invalid` domain the runner's own outbox intercepts, so this needs no
+# secret, no account and no environment file, which is what makes it safe to run unattended on every
+# PR.
+name: Frontend responsive E2E
+
+on:
+  push:
+    branches: [main]
+    paths: &responsive-e2e-paths
+      - "packages/frontend/**"
+      - "packages/e2e/**"
+      - "packages/validate/**"
+      - "packages/standard/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/frontend-e2e-responsive.yml"
+  pull_request:
+    branches: [main]
+    paths: *responsive-e2e-paths
+  workflow_dispatch:
+
+# The workflow token, narrowed to reading the checkout. Without a `permissions:` block a job gets
+# whatever the repository's default Workflow permissions setting says — see ci.yml for the same
+# reasoning stated once.
+permissions:
+  contents: read
+
+jobs:
+  responsive:
+    name: m4-responsive.spec.ts (real stack, one spec)
+    runs-on: ubuntu-latest
+    # Cold Docker pull (pgvector/pgvector:pg15) + a cold `next dev` compile + the full identity
+    # bring-up, ALL of which this suite pays regardless of how many specs are selected, ahead of one
+    # spec's own runtime. 20 minutes is headroom over a warm local run, not the expected time.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # This job never pushes; no credential should outlive the checkout for `npm`/`pnpm`
+        # lifecycle scripts, or the Playwright browser installer, to inherit.
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The frontend's `next.config.ts` sets `transpilePackages` for both, but that only tells Next
+      # to run its OWN loader over whatever file Node resolution finds — it does not change which
+      # file that is. Both packages' `package.json` still resolves through `dist/`, so `next dev`
+      # fails to resolve them exactly as `next build` does (see `scripts/frontend-clean-room.mjs`'s
+      # own header) unless their dist exists first. `rfphub-validate...` builds it and its one
+      # workspace dependency, `@the-rfp-hub/standard`, in the correct order.
+      - name: Build workspace dependencies (@the-rfp-hub/standard, rfphub-validate)
+        run: pnpm --filter rfphub-validate... build
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @the-rfp-hub/e2e exec playwright install --with-deps chromium
+
+      - name: Run m4-responsive.spec.ts through the real E2E runner
+        run: pnpm e2e -- m4-responsive.spec.ts
+
+      - name: Upload the Playwright report (only on failure)
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: m4-responsive-playwright-report
+          path: packages/e2e/playwright-report/
+          retention-days: 7
