@@ -72,6 +72,27 @@ The standard is governed by written process, not by whoever is around:
   checklist.
 - [`adr/`](./adr) — the decision records behind the shape of the data model.
 
+## Guides
+
+[`docs/`](./docs) holds the handoff guides — four documents, each written for one person doing one
+job, linking to the per-package detail rather than duplicating it:
+
+- [`docs/deployment.md`](./docs/deployment.md) — what runs where, what must exist in the cloud
+  account **before** the first deploy (there is no infrastructure-as-code), the required variables,
+  the first-deploy sequence, rollback, the manual npm release runbook, and the three ways to deploy
+  a copy of the frontend.
+- [`docs/api-integration.md`](./docs/api-integration.md) — a five-minute read-only quickstart, the
+  write flow from an email address to a publishing key, the scope table, and the nine contracts
+  that surprise integrators.
+- [`docs/publisher-onboarding.md`](./docs/publisher-onboarding.md) — for whoever operates the Hub:
+  running a publisher application end to end, refusing one, revoking verification, and deciding a
+  disputed claim.
+- [`docs/external-deploy-test.md`](./docs/external-deploy-test.md) — the two-hour protocol that
+  proves an outside developer can deploy a frontend against the public API from the docs alone.
+
+Every shell block in those guides is marked `no-run`, `safe-read` or `staging-write`; the
+convention is defined in [`docs/README.md`](./docs/README.md).
+
 ## Repo topology
 
 Developed as one pnpm workspace for fast iteration (the schema and its generated types move
