@@ -10,6 +10,7 @@
  * that account has ever published.
  */
 import type { FastifyInstance } from "fastify";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { meController } from "./me.controller.js";
 
 export const me = async (router: FastifyInstance): Promise<void> => {
@@ -36,8 +37,10 @@ export const me = async (router: FastifyInstance): Promise<void> => {
     "/",
     {
       prefixTrailingSlash: "no-slash",
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 20,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "updateMe",
         tags: ["account"],

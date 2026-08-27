@@ -309,6 +309,57 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `POST /v1/admin/opportunities/:id/verify` | T4, **session** | the same action as the review route, kept for bulk/scripted runs |
 | `POST /v1/admin/jobs/:job/run` | T4, **session** | a convenience only — the schedule starts jobs as container tasks ([`jobs.md`](./jobs.md)) |
 
+### Rate limits
+
+**Keyed per credential-holder, not per address.** A metered route counts against
+`acct:<accountId>` whenever the request proved an account, and falls back to the caller's address
+only when it proved nothing. Two people behind one office egress are two budgets; one account
+calling from a laptop and from CI is one budget. Nothing is stored: the key lives in an in-memory
+counter that expires with its window and never reaches a row, a log line or an analytics event.
+
+**The address fallback is grouped by /64 for IPv6**, IPv4 unchanged. The smallest allocation an
+IPv6 customer receives is a /64, so a key on the full address would hand a fresh bucket to anyone
+willing to increment the host bits — no limit at all for the caller best equipped to abuse it.
+(An IPv4-mapped address is folded back to the IPv4 address it carries, or every mapped caller would
+share one bucket instead.)
+
+**An invalid credential is metered by address, and is refused for being over the limit before it is
+refused for being invalid.** Resolving the credential is split from rejecting it
+(`plugins/auth.ts`): a route runs `resolvePrincipal` → limiter → gate, so a caller hammering
+`POST /v1/opportunities` with a junk Bearer sees `401` for the whole budget and `429` once it is
+spent. Before the split the gate answered inside the same `onRequest` chain and ended it, so the
+limiter never ran and anonymous write traffic was unlimited.
+
+**A failure to CHECK a credential is never metered.** A `503 auth_unavailable` — the session
+lookup could not be performed — is answered by the resolver before the limiter runs, so an outage
+does not spend the caller's budget and is never replaced by a `429`. Only genuine `401`/`403`
+refusals go quietly past and are counted.
+
+**Metered routes** are the write, credential and link-out surfaces: `POST`/`PUT /v1/opportunities`
+and `POST /v1/opportunities/:id/claim` (60/min), `POST /v1/review/opportunities/:id/verify`,
+`DELETE /v1/keys/:id` and the two organization decisions (30/min), `PATCH /v1/me` and
+`PATCH /v1/organizations/:slug` (20/min), `POST /v1/keys` (10/min), and the two redirects
+`GET /v1/r/:id/{apply,source}` (120/min). The redirects stay **address-keyed**: they accept no
+credential, so there is no account to meter. The public read surface — the list, the detail, the
+feeds, the export — is deliberately **uncapped** (`global: false` in `app.ts`); it is the traffic
+this project exists to serve, and an address-keyed cap on it would be one number for a whole
+organization.
+
+A `429` carries `retry-after` in seconds, plus `x-ratelimit-limit`/`-remaining`/`-reset`.
+
+**Two operational facts a limit is meaningless without:**
+
+- **The ceilings are per PROCESS.** The store is in this process's memory, so with *N* tasks behind
+  a load balancer every number above is multiplied by *N* — "60/min per account" across 3 tasks is
+  180/min in practice. A shared store (Redis) would fix it and is not built. Size the numbers, and
+  any statement made to an integrator, against the task count actually running.
+- **`TRUST_PROXY` decides whether the address half works at all.** `request.ip` is the socket peer
+  unless it is set, so behind a load balancer *every* anonymous caller shares one bucket — a
+  self-inflicted denial of service that looks like a working rate limit. It is **not a boolean**
+  (`true` is rejected at boot): use a hop count (`1`) or a comma-separated list of proxy
+  addresses/CIDRs. See `config.ts` (`readTrustProxy`) and the config table in
+  [`../README.md`](../README.md).
+
 ---
 
 ## 6. What the server owns on a write

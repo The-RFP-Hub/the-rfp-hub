@@ -13,6 +13,7 @@
  * two calls do not already do, in an order the caller controls.
  */
 import type { FastifyInstance } from "fastify";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { keysController } from "./keys.controller.js";
 
 export const keys = async (router: FastifyInstance): Promise<void> => {
@@ -40,8 +41,10 @@ export const keys = async (router: FastifyInstance): Promise<void> => {
     "/",
     {
       prefixTrailingSlash: "no-slash",
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 10,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "createApiKey",
         tags: ["auth"],
@@ -75,8 +78,10 @@ export const keys = async (router: FastifyInstance): Promise<void> => {
   router.delete(
     "/:id",
     {
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 30,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "revokeApiKey",
         tags: ["auth"],

@@ -8,6 +8,7 @@
  * the system has. The T4 route survives alongside it for bulk and scripted use.
  */
 import type { FastifyInstance } from "fastify";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { reviewController } from "./review.controller.js";
 
 export const review = async (router: FastifyInstance): Promise<void> => {
@@ -190,10 +191,9 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/verify",
     {
-      onRequest: guard,
       // The one review action that reaches the network. Rate-limited so a reviewer holding the
       // button down cannot turn this service into a request amplifier against somebody's site.
-      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, guard, { max: 30, timeWindow: "1 minute" }),
       schema: {
         operationId: "verifyOpportunitySource",
         tags: ["review"],

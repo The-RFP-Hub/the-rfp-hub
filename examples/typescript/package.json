@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@the-rfp-hub/standard": "^2.0.0"
+    "@the-rfp-hub/standard": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

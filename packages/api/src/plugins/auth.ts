@@ -18,8 +18,35 @@
  * A PRESENTED-BUT-INVALID credential is always a 401, including on the optional gate. Ignoring one
  * and serving the anonymous view would mean a caller with an expired token silently sees less than
  * they asked for, and never learns why.
+ *
+ * RESOLVING IS SPLIT FROM REJECTING, and the split is what makes anonymous traffic meterable.
+ * Every gate above ANSWERS — `reply.send(401)` — and answering ends the hook chain it is running
+ * in, so anything registered after it never runs. A rate limiter registered after `requireAuth`
+ * therefore never saw a request with a bad credential: hammering a write route with a junk Bearer
+ * cost nothing. `resolvePrincipal` is the same resolution WITHOUT the answer — it populates
+ * `request.principal` when the credential is good, records why it was refused when it is not, and
+ * replies to nothing. Put it first, meter second, gate third, and the refusal still happens, one
+ * hook later, after the request has been counted. See `modules/routes/shared/rate-limit-key.ts`.
+ *
+ * WITH ONE EXCEPTION, AND IT IS THE POINT OF THE SPLIT RATHER THAN A HOLE IN IT: a 5xx is OUR
+ * failure, not a verdict on the caller. `SessionService.verify` answers 503 `auth_unavailable`
+ * when the lookup could not be PERFORMED, deliberately, so that a database outage does not appear
+ * as every signed-in user's session being invalid. Metering that would re-collapse the same
+ * distinction one layer up: the outage would spend the address's budget and, past the ceiling, be
+ * served as 429 — an outage disguised as the caller's own fault, and one that suppresses the 503
+ * an operator is watching for. So `resolvePrincipal` ANSWERS a 5xx immediately, before the
+ * limiter, and it is never counted. Only genuine credential refusals (401/403) go quietly past.
+ *
+ * The outcome is cached on the request (`request.principalResolution`), so a chain that resolves
+ * and then gates verifies the credential ONCE — one session lookup or one key hash, as before.
  */
-import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  onRequestAsyncHookHandler,
+  preHandlerHookHandler,
+} from "fastify";
 import { type Auth, type AuthConfig, defaultAuth } from "../auth/better-auth.js";
 import { type DB, db as defaultDb } from "../db/client.js";
 import { AccountService } from "../modules/services/auth/account.service.js";
@@ -56,6 +83,17 @@ export interface AuthDecorators {
    */
   auth: Auth;
   principals: PrincipalService;
+  /**
+   * Resolve the request's credential and answer nothing the caller is responsible for — the half of
+   * a gate that is safe to run before a rate limiter. Sets `request.principal` when a valid Bearer
+   * is presented; leaves it `null` for an absent or invalid one, without a 401, a 403 or a throw. A
+   * gate placed after it still refuses; it just refuses one hook later, with the request counted.
+   *
+   * It DOES answer a 5xx immediately — a lookup that could not be performed is not a credential
+   * that failed, and metering it would let an outage spend the caller's budget and then be served
+   * as a 429. See the header for why that distinction is worth a branch here.
+   */
+  resolvePrincipal: onRequestAsyncHookHandler;
   requireAuth: preHandlerHookHandler;
   requireSession: preHandlerHookHandler;
   optionalAuth: preHandlerHookHandler;
@@ -86,6 +124,23 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
   void reply.code(status).send({ error, message });
 }
 
+/**
+ * What resolving this request's credential concluded — computed once, then reused.
+ *
+ * The two failing arms carry the answer a gate WOULD have sent rather than the error itself,
+ * because the refusal has to survive the resolver returning quietly: the gate that runs later must
+ * reproduce exactly the status, code and message the un-split `resolve()` produced, without
+ * verifying the credential a second time. They are SEPARATE arms because only one of them may be
+ * counted — see the header.
+ */
+export type PrincipalResolution =
+  | { kind: "anonymous" }
+  | { kind: "principal" }
+  /** The credential was PRESENTED AND REFUSED — a 4xx. Meterable: the caller caused it. */
+  | { kind: "refused"; status: number; code: string; message: string }
+  /** The credential could not be CHECKED — a 5xx. Never metered: we caused it. */
+  | { kind: "unavailable"; status: number; code: string; message: string };
+
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
   const db = options.db ?? defaultDb;
   const auth = options.auth ?? defaultAuth();
@@ -100,6 +155,41 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   // Declared so `request.principal` exists on every request object rather than being added as a
   // property later, which would deoptimise the shared shape Fastify allocates per request.
   app.decorateRequest("principal", null);
+  // The cache slot for the resolution above. Declared for the same reason, and so a chain of
+  // [resolvePrincipal, limiter, gate] costs ONE credential verification rather than two.
+  app.decorateRequest("principalResolution", null);
+
+  /** Verify the credential. Populates `request.principal`; answers nothing, throws nothing. */
+  async function computeResolution(request: FastifyRequest): Promise<PrincipalResolution> {
+    const token = bearerOf(request);
+    if (token === undefined) return { kind: "anonymous" };
+    try {
+      request.principal = await principals.fromBearer(token);
+      return { kind: "principal" };
+    } catch (error) {
+      if (isHttpError(error)) {
+        // The 4xx/5xx split is the whole decision: a refusal is the caller's, an outage is ours.
+        const kind = error.status >= 500 ? "unavailable" : "refused";
+        return { kind, status: error.status, code: error.code, message: error.message };
+      }
+      request.log.error(error);
+      return {
+        kind: "unavailable",
+        status: 500,
+        code: "internal_error",
+        message: "internal server error",
+      };
+    }
+  }
+
+  /** The cached form. Every gate and the quiet resolver go through this one. */
+  async function resolveOnce(request: FastifyRequest): Promise<PrincipalResolution> {
+    const cached = request.principalResolution;
+    if (cached) return cached;
+    const outcome = await computeResolution(request);
+    request.principalResolution = outcome;
+    return outcome;
+  }
 
   /** Resolve, or answer. Returns true when the request may continue. */
   async function resolve(
@@ -107,9 +197,12 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     reply: FastifyReply,
     required: boolean,
   ): Promise<boolean> {
-    const token = bearerOf(request);
-    if (token === undefined) {
-      if (!required) return true;
+    const outcome = await resolveOnce(request);
+    if (outcome.kind === "refused" || outcome.kind === "unavailable") {
+      send(reply, outcome.status, outcome.code, outcome.message);
+      return false;
+    }
+    if (outcome.kind === "anonymous" && required) {
       send(
         reply,
         401,
@@ -118,19 +211,17 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
       );
       return false;
     }
-    try {
-      request.principal = await principals.fromBearer(token);
-      return true;
-    } catch (error) {
-      if (isHttpError(error)) {
-        send(reply, error.status, error.code, error.message);
-        return false;
-      }
-      request.log.error(error);
-      send(reply, 500, "internal_error", "internal server error");
-      return false;
-    }
+    return true;
   }
+
+  const resolvePrincipal: onRequestAsyncHookHandler = async (request, reply) => {
+    const outcome = await resolveOnce(request);
+    // The one thing this resolver refuses to stay quiet about. Answering here ends the chain BEFORE
+    // the limiter, so an outage costs the caller nothing and reaches them as itself.
+    if (outcome.kind === "unavailable") {
+      send(reply, outcome.status, outcome.code, outcome.message);
+    }
+  };
 
   const requireAuth: preHandlerHookHandler = async (request, reply) => {
     await resolve(request, reply, true);
@@ -190,6 +281,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   const decorators: AuthDecorators = {
     auth,
     principals,
+    resolvePrincipal,
     requireAuth,
     requireSession,
     optionalAuth,
