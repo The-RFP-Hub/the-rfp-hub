@@ -8,10 +8,12 @@
  * calls the front door: the directory (`/`), one entry (`/opportunities/{id}`), and the publisher
  * directory (`/publishers`).
  *
- * `/publishers` MAY NOT EXIST YET in every worktree — it is another M4 stream's route. Its checks are
- * SOFT: a 404 there is reported with a clear message and skipped, while `/` and `/opportunities/{id}`
- * are always asserted. A worktree that has landed `/publishers` gets full coverage automatically, with
- * no flag to flip.
+ * `/publishers` MAY NOT EXIST YET in every checkout — it is another M4 stream's route. Its checks
+ * SOFT-SKIP, but only on an EXACT 404: that response is reported with a clear message and skipped,
+ * while `/` and `/opportunities/{id}` are always asserted. Anything else the route could answer — no
+ * response at all, a non-404 error status, or a 200 that renders no heading naming publishers — is a
+ * hard failure, never folded into the same skip; a checkout that has landed `/publishers` gets full
+ * coverage automatically, with no flag to flip.
  *
  * EVERY CASE RUNS IN A CONTEXT BUILT FRESH, sized to the viewport under test and with no stored
  * session — these are public, unauthenticated pages, and the project's shared `storageState` would
@@ -158,19 +160,36 @@ test.describe("M4 responsive layout", () => {
           await expectTouchTarget(source, "the Programme site (source) link");
         }
 
-        // ── `/publishers` — soft: this route belongs to another M4 stream ───────────────────
+        // "/publishers" soft-skips ONLY on an exact 404: this route belongs to another M4
+        // stream and may not exist yet in this checkout. Anything else -- no response at all, a
+        // non-404 error status, or a 200 that does not actually render the page -- is a hard
+        // failure and must never be folded into the same skip.
         const response = await page.goto(`${stack.urls.frontend}/publishers`);
-        if (!response || response.status() === 404) {
+        if (response?.status() === 404) {
           test.info().annotations.push({
             type: "skip-reason",
             description:
-              "SKIPPED /publishers: the route answers 404 in this worktree (another M4 stream owns " +
-              "it). The directory and the entry page above were still asserted at this viewport.",
+              "SKIPPED /publishers: the route answers 404 here (another M4 stream owns it). " +
+              "The directory and the entry page above were still asserted at this viewport.",
           });
           console.log(
-            `[m4-responsive] ${viewport.name}: /publishers is not present in this worktree (404) — skipping its assertions, not the whole test.`,
+            `[m4-responsive] ${viewport.name}: /publishers answers 404 here -- skipping its assertions, not the whole test.`,
           );
         } else {
+          expect(
+            response,
+            "/publishers: the navigation produced no response at all (a network or connection " +
+              "failure) -- that is a hard failure, not the same thing as the route being absent",
+          ).not.toBeNull();
+          expect(
+            response?.status(),
+            `/publishers: expected either a 404 (route absent here) or a successful response; got ${response?.status()}`,
+          ).toBeLessThan(400);
+          await expect(
+            page.getByRole("heading", { name: /publisher/i }).first(),
+            "/publishers: responded, but no heading naming publishers was found -- a blank or " +
+              "broken page must fail this test, not be treated as the route being absent",
+          ).toBeVisible();
           await expectNoHorizontalOverflow(page, "/publishers");
         }
       } finally {
