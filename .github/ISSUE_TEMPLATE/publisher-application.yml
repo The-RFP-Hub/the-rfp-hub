@@ -137,8 +137,8 @@ body:
     id: anything-else
     attributes:
       label: Anything else
-      validations:
-        required: false
+    validations:
+      required: false
 
   - type: checkboxes
     id: terms
