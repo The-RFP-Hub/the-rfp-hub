@@ -24,6 +24,19 @@ Shell blocks are marked `no-run`, `safe-read` or `staging-write` — see
   to ask is a finding; answering it destroys the finding and inflates the result. Collect the
   questions at the end.
 
+### Check this before you start the timer
+
+```sh no-run
+npm view rfphub-validate version      # must be >= 0.3.1
+npm view @the-rfp-hub/standard version
+```
+
+**Block 2 is not runnable while `rfphub-validate` is 0.3.0** — the published tarball predates an
+export the frontend imports, so the build fails with a `TS2305` that has nothing to do with the
+tester or the documentation. Running the protocol before the release burns forty minutes of
+somebody's time on a known defect and produces a finding you already have. Either wait for the
+release, or hand the tester the protocol with block 2 struck out and say why.
+
 ### What the tester needs to have
 
 Node 20 or newer, git, a free Vercel account, and a terminal. No AWS, no database, no credential of
@@ -45,7 +58,7 @@ note about where it stopped is a result; a block that ran over and ate the next 
 |---|---|---|---|
 | **0** | 5 min | Read **only** [`api-integration.md` §1](./api-integration.md#1-five-minute-quickstart) and run one `safe-read` command against the API | Did it work first try? If not, what did you have to guess? |
 | **1** | 20 min | **Path A** — the Vercel Deploy Button from [`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy), with `NEXT_PUBLIC_API_URL=https://api.ethrfps.app` | The deployment URL. Where it stalled, if it did |
-| **2** | 40 min | **Path B** — copy only `packages/frontend`, swap the two workspace dependencies for published versions, `npm install`, `npm run build`, run the standalone server locally | Did the build pass? Did the server answer? What did you have to guess? |
+| **2** | 40 min | **Path B** — copy only `packages/frontend`, swap the two workspace dependencies for the versions `npm view` reports, `npm install`, build **with the API URL set**, run the standalone server locally | The two versions used. Did the build pass? Did the server answer with data? What did you have to guess? |
 | **3** | 20 min | Exercise whichever deployment you got: search, two filters, paging, a detail page, both deep-links, and `/publishers` | A screenshot of each |
 | **4** | 15 min | Try to **sign in**. Confirm it fails, and confirm the documentation warned you it would | Where did you look for that warning, and was it there? |
 | **5** | 20 min | Write the report | Every point at which you wanted to ask somebody a question, numbered |
@@ -77,21 +90,42 @@ last — and move on when the time is up.
 The point of this block is that it uses no monorepo tooling at all: `npm`, and published packages
 from the registry.
 
+**Ask the registry what the current versions are — do not paste a version out of a document.** A
+range written down here is a range that was true when it was written:
+
+```sh no-run
+npm view @the-rfp-hub/standard version
+npm view rfphub-validate version
+```
+
+> **Gate on `rfphub-validate`.** This block is only runnable once `rfphub-validate` is at **0.3.1
+> or higher**. The published 0.3.0 does not contain an export the frontend imports, so the build
+> fails with `TS2305` through no fault of yours or of the docs. If `npm view` prints `0.3.0`, stop
+> here, write down "blocked: rfphub-validate 0.3.0 predates the required export", and move to
+> block 3 with whatever block 1 produced. **Whoever handed you this protocol should have checked
+> that before starting the timer.**
+
 ```sh no-run
 # copy ONLY the frontend package out of a clone
 cp -r the-rfp-hub/packages/frontend ./rfphub-frontend && cd ./rfphub-frontend
 
-# in package.json, replace the two workspace dependencies with published ranges:
-#   "@the-rfp-hub/standard": "^3.1.0"
-#   "rfphub-validate":       "^0.3.1"
+# in package.json, replace the two workspace dependencies with the versions `npm view` just printed:
+#   "@the-rfp-hub/standard": "^<version>"
+#   "rfphub-validate":       "^<version>"     # must be >= 0.3.1
 
 npm install
-npm run build
+
+# NEXT_PUBLIC_API_URL is inlined at BUILD time. It belongs here and nowhere else — setting it in
+# front of `node server.js` later does nothing, and the page renders "no API configured".
+NEXT_PUBLIC_API_URL=https://api.ethrfps.app npm run build
 
 # server.js is NOT at .next/standalone/server.js in a stand-alone copy — find it.
-find .next/standalone -name server.js
-# .next/static is not inside the standalone output either; copy it beside server.js first.
-NEXT_PUBLIC_API_URL=https://api.ethrfps.app node <the path that printed>
+SERVER=$(find .next/standalone -name server.js)
+
+# .next/static is not inside the standalone output either; copy it beside server.js.
+mkdir -p "$(dirname "$SERVER")/.next" && cp -r .next/static "$(dirname "$SERVER")/.next/static"
+
+node "$SERVER"
 ```
 
 Then open the port it prints. **A build that produces `.next/standalone` is not the result** — the
@@ -159,6 +193,7 @@ BLOCK 1 — Path A, Deploy Button (20 min)
   Where it stalled:
 
 BLOCK 2 — Path B, package copy (40 min)
+  Versions used:              @the-rfp-hub/standard __._._  rfphub-validate __._._
   npm install:                ok / failed —
   npm run build:              ok / failed —
   standalone server answered: yes / no —
