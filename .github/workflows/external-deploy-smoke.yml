@@ -23,7 +23,8 @@
 # nobody trusts. Switch the default to `published` in the same PR that bumps it in
 # `.changeset/validate-humanize-issues-export.md` past pre-release, once 0.3.1 (and, if needed, a
 # `@the-rfp-hub/standard` ahead of the one already on the registry) are actually on npm — see that
-# changeset and `M4-PLANO-TECNICO.md` §2.1 for why `@the-rfp-hub/standard` must publish first.
+# changeset for why `@the-rfp-hub/standard` must publish first: `rfphub-validate` depends on it via
+# `workspace:*`, which pnpm rewrites to the exact workspace version at publish time.
 name: External deploy smoke test
 
 on:
@@ -54,6 +55,10 @@ on:
         description: "Only used in 'published' mode. Range for rfphub-validate — set to ^0.3.1 once published."
         type: string
         default: ""
+      require-publishers:
+        description: "Fail (rather than warn) if /publishers 404s. Flip once that route ships."
+        type: boolean
+        default: false
 
 # The workflow token, narrowed to reading the checkout. Without a `permissions:` block a job gets
 # whatever the repository's default Workflow permissions setting says — see ci.yml for the same
@@ -106,12 +111,23 @@ jobs:
           mkdir -p "$RUNNER_TEMP/rfphub-pack"
           pnpm --filter rfphub-validate pack --pack-destination "$RUNNER_TEMP/rfphub-pack"
 
+      # `--browser` is required here, even though it is opt-in for a local run: the plain HTTP
+      # checks alone would pass on a build whose client-side fetch never reaches the API at all
+      # (DirectoryList fetches from a post-hydration `useEffect` — see the script's own "WHY A
+      # BROWSER TOO"), which is exactly the class of regression this job exists to catch. Chromium
+      # is not preinstalled on the runner, so it is fetched once here — pinned to whatever
+      # `@playwright/test` resolves to in the lockfile, the same way every other dependency here is
+      # pinned, rather than to a floating "latest".
+      - name: Install Chromium for the browser-driven check
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Run the clean-room script
         env:
           MODE: ${{ steps.mode.outputs.mode }}
           API_URL_INPUT: ${{ github.event.inputs.api-url }}
           STANDARD_SPEC_INPUT: ${{ github.event.inputs.standard-spec }}
           VALIDATE_SPEC_INPUT: ${{ github.event.inputs.validate-spec }}
+          REQUIRE_PUBLISHERS: ${{ github.event.inputs.require-publishers }}
         run: |
           set -euo pipefail
           export NEXT_PUBLIC_API_URL="${API_URL_INPUT:-https://api.ethrfps.app}"
@@ -128,4 +144,4 @@ jobs:
           else
             echo "published mode: using the script's own default range (currently fails — see this file's header)"
           fi
-          node scripts/frontend-clean-room.mjs
+          node scripts/frontend-clean-room.mjs --browser

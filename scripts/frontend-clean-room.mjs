@@ -21,7 +21,11 @@
 //      directory existing on disk proves Next wrote *something*, not that the modules and assets
 //      it needs at runtime were traced and packaged correctly — only a response proves that. See
 //      "WHERE server.js LANDS" below for why this can't be a hard-coded path.
-//   5. Requests `/`, `/publishers` and `/?q=<term>` against the running server and checks them.
+//   5. Requests `/`, `/publishers` and `/?q=<term>` against the running server — a FAST HTTP
+//      pre-check that only reads server-rendered HTML (see "WHY A BROWSER TOO" below for why that
+//      is not the whole proof).
+//   6. With `--browser`, additionally drives a real headless Chromium through `/` and `/?q=<term>`
+//      and waits for the client-side fetch to actually resolve into rendered rows or an error state.
 //
 // MODES — per-dependency, via environment variable, so CI can move one dependency at a time:
 //
@@ -61,18 +65,44 @@
 // this package — nothing to copy there) has to be copied alongside it for the server to find its
 // own assets.
 //
+// WHY A BROWSER TOO: `DirectoryList` (packages/frontend/src/components/DirectoryList.tsx) fetches
+// its data from a `useEffect` AFTER hydration — the server-rendered HTML the plain HTTP check reads
+// is the loading shell, not the data. A wrong or unreachable `NEXT_PUBLIC_API_URL`, a CORS
+// rejection, or a CSP `connect-src` that blocks the request would all still leave that shell 200 and
+// looking like the app — the HTTP check would pass on a build that cannot actually talk to its API.
+// `--browser` closes that gap: it opens a real headless Chromium, watches the DOM for either a
+// rendered opportunity row (`a.row-title` — `DirectoryRow`'s link) or the shared error state
+// (`.state.error[role="alert"]` — `ErrorState`/`ResourceView` in `components/states.tsx`), and
+// separately confirms a request actually reached `NEXT_PUBLIC_API_URL`'s own origin. Both selectors
+// are read off those two files' own markup; if that markup changes, update the selectors here too.
+// ONE ERROR STATE IS FILTERED OUT BY NAME: `/` also renders an independent sign-in/session card
+// (`PublisherInvitation` in `src/app/page.tsx`) that calls the API's session endpoint directly,
+// which `TRUSTED_ORIGINS` — an exact allowlist — refuses for any clean-room copy's ephemeral
+// origin. That panel's `AuthUnavailable` state uses the SAME error markup as the directory's own
+// and renders on every run against a real API, on its own schedule, regardless of whether the
+// directory succeeded — so it is excluded by its own copy ("Sign-in is unavailable", unique to
+// `AuthUnavailable`) rather than by which one appears first, since the two race independently.
+//
 // Usage:
-//   node scripts/frontend-clean-room.mjs [--api-url <url>] [--port <n>] [--keep]
+//   node scripts/frontend-clean-room.mjs [--api-url <url>] [--port <n>] [--keep] [--browser]
+//                                         [--require-publishers]
 //
 // Env (all optional):
 //   NEXT_PUBLIC_API_URL     Same as --api-url. Default: https://api.ethrfps.app
 //   RFPHUB_STANDARD_SPEC    See MODES above.
 //   RFPHUB_VALIDATE_SPEC    See MODES above.
 //   RFPHUB_CLEAN_ROOM_PORT  Same as --port. Default: an OS-assigned free port.
+//   REQUIRE_PUBLISHERS      Same as --require-publishers when "1" or "true". Default: unset — a
+//                           `/publishers` 404 is a WARNING (the route may not exist in this
+//                           checkout yet). Flip once that route ships so its regression is a FAILURE.
 //
-// Exit codes: 0 every check passed (a `/publishers` 404 is a WARNING, not a failure — the route
-// may not exist yet in this checkout); 1 a check failed (a non-2xx/404 status, missing app shell,
-// or the server never came up); 2 install or build itself failed.
+// `--browser` is a fast-check OPT-IN here (Playwright is a real dependency to spin up), but
+// `external-deploy-smoke.yml` always passes it — the HTTP-only run is a quick local smoke test, not
+// the full proof this criterion needs.
+//
+// Exit codes: 0 every check passed; 1 a check failed (wrong status, missing app shell, a client-side
+// error state, a required route missing, or the server never came up); 2 install or build itself
+// failed.
 import { spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -92,12 +122,20 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const frontendSrc = join(repoRoot, "packages", "frontend");
 
 function parseArgs(argv) {
-  const out = { apiUrl: undefined, port: undefined, keep: false };
+  const out = {
+    apiUrl: undefined,
+    port: undefined,
+    keep: false,
+    browser: false,
+    requirePublishers: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--api-url") out.apiUrl = argv[++i];
     else if (a === "--port") out.port = Number(argv[++i]);
     else if (a === "--keep") out.keep = true;
+    else if (a === "--browser") out.browser = true;
+    else if (a === "--require-publishers") out.requirePublishers = true;
     else if (a === "--help" || a === "-h") {
       console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\nimport")[0]);
       process.exit(0);
@@ -107,6 +145,10 @@ function parseArgs(argv) {
     }
   }
   return out;
+}
+
+function truthyEnv(value) {
+  return /^(1|true)$/i.test(value ?? "");
 }
 
 /** A dependency spec that names a `.tgz` file becomes `file:<absolute path>`; anything else passes through as a registry range. */
@@ -170,7 +212,13 @@ function looksLikeAppShell(html) {
   return /<title>[^<]*RFP Hub[^<]*<\/title>/i.test(html) || /RFP Hub/i.test(html);
 }
 
-async function checkRoute(base, path, { label }) {
+/**
+ * The fast HTTP pre-check: status and server-rendered shell only. `allow404` is per-route — only
+ * `/publishers` (and only until `REQUIRE_PUBLISHERS` says otherwise) may be missing without failing
+ * the run; `/` and a filtered `/` are the contract's own minimum and a 404 on either is a failure,
+ * not a warning.
+ */
+async function checkRoute(base, path, { label, allow404 }) {
   const url = `${base}${path}`;
   let res;
   try {
@@ -180,12 +228,21 @@ async function checkRoute(base, path, { label }) {
   }
   const body = await res.text();
   if (res.status === 404) {
+    if (allow404) {
+      return {
+        path,
+        label,
+        ok: true,
+        level: "warn",
+        detail: "404 (route not present in this checkout yet — not a portability failure)",
+      };
+    }
     return {
       path,
       label,
-      ok: true,
-      level: "warn",
-      detail: "404 (route not present in this checkout yet — not a portability failure)",
+      ok: false,
+      level: "fail",
+      detail: "404, but this route is required (not eligible for the 404 allowance)",
     };
   }
   if (res.status >= 500) {
@@ -197,7 +254,7 @@ async function checkRoute(base, path, { label }) {
       label,
       ok: false,
       level: "fail",
-      detail: `expected 200 or 404, got ${res.status}`,
+      detail: `expected 200${allow404 ? " or 404" : ""}, got ${res.status}`,
     };
   }
   if (!looksLikeAppShell(body)) {
@@ -212,6 +269,119 @@ async function checkRoute(base, path, { label }) {
   return { path, label, ok: true, level: "pass", detail: "200, app shell present" };
 }
 
+/**
+ * The browser-driven check. See "WHY A BROWSER TOO" at the top of this file for what this catches
+ * that `checkRoute` cannot: a client-side fetch that never reaches, or never returns from, the
+ * configured API origin.
+ *
+ * Waits for the DOM to reach one of two states — at least one rendered opportunity row, or the
+ * shared error callout — and separately asserts a request actually reached
+ * `NEXT_PUBLIC_API_URL`'s own origin at `/v1/opportunities*`. A CORS rejection or a CSP-blocked
+ * fetch both surface as the error callout (the client's fetch wrapper turns any unreachable-API
+ * failure into the same `ApiError`), so that branch alone already catches most of what a browser is
+ * for here; the origin check on top of it catches a fetch that quietly went to the SSR shell's own
+ * origin instead of the configured API, which would look identical if it happened to still error.
+ *
+ * Neither state appearing within the timeout — a stuck loading spinner, or a legitimately empty
+ * result set for a search term this script did not choose at random — is reported as a failure
+ * rather than silently accepted: this script chose "grant" because the production corpus is known
+ * to have matches for it, so an empty result here means something is wrong, not that the search
+ * genuinely found nothing.
+ */
+async function checkRouteInBrowser(browser, base, apiUrl, path, { label }) {
+  const apiOrigin = new URL(apiUrl).origin;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const apiRequests = [];
+  page.on("request", (req) => {
+    try {
+      const u = new URL(req.url());
+      if (u.origin === apiOrigin && u.pathname.startsWith("/v1/opportunities")) {
+        apiRequests.push(req.url());
+      }
+    } catch {
+      // not a URL worth tracking
+    }
+  });
+
+  try {
+    await page.goto(`${base}${path}`, { waitUntil: "domcontentloaded", timeout: 15_000 });
+
+    let outcome;
+    try {
+      const handle = await page.waitForFunction(
+        () => {
+          // `/` renders DirectoryList AND, below it, a sign-in/session card
+          // (`PublisherInvitation` in `src/app/page.tsx`) that calls the API's OWN session
+          // endpoint directly. That endpoint is gated by `TRUSTED_ORIGINS` — an exact allowlist an
+          // ephemeral clean-room origin is never on — so its `AuthUnavailable` panel is EXPECTED to
+          // render the same `.state.error[role="alert"]` markup used here on EVERY run, on its own
+          // schedule, regardless of whether the directory succeeds. It is filtered out by its own
+          // copy (`"Sign-in is unavailable"`, unique to `AuthUnavailable` in
+          // `components/states.tsx`) rather than by poll ordering: the session check and the
+          // opportunities fetch race independently, so a poll tick can see the auth panel's error
+          // rendered before the directory's own rows have — ignoring it only on the FIRST tick
+          // would still misreport a slower-loading directory as failed.
+          const items = document.querySelectorAll("a.row-title").length;
+          if (items > 0) return { kind: "items", count: items };
+          const errors = Array.from(document.querySelectorAll(".state.error[role='alert']"));
+          const directoryError = errors.find(
+            (el) => !(el.textContent ?? "").includes("Sign-in is unavailable"),
+          );
+          if (directoryError) {
+            return { kind: "error", text: (directoryError.textContent ?? "").trim().slice(0, 300) };
+          }
+          return false;
+        },
+        undefined,
+        { timeout: 20_000, polling: 250 },
+      );
+      outcome = await handle.jsonValue();
+    } catch {
+      return {
+        path,
+        label,
+        ok: false,
+        level: "fail",
+        detail:
+          "timed out waiting for a rendered opportunity row or an error state — the client-side fetch may be stuck or silently blocked",
+      };
+    }
+
+    if (outcome.kind === "error") {
+      return {
+        path,
+        label,
+        ok: false,
+        level: "fail",
+        detail: `client rendered an error state: "${outcome.text}"`,
+      };
+    }
+
+    if (apiRequests.length === 0) {
+      return {
+        path,
+        label,
+        ok: false,
+        level: "fail",
+        detail: `${outcome.count} item(s) rendered, but no request to ${apiOrigin}/v1/opportunities* was observed`,
+      };
+    }
+
+    return {
+      path,
+      label,
+      ok: true,
+      level: "pass",
+      detail: `${outcome.count} item(s) rendered, from a request to ${apiOrigin}`,
+    };
+  } catch (err) {
+    return { path, label, ok: false, level: "fail", detail: `navigation failed: ${err.message}` };
+  } finally {
+    await context.close();
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const apiUrl = args.apiUrl ?? process.env.NEXT_PUBLIC_API_URL ?? "https://api.ethrfps.app";
@@ -222,15 +392,19 @@ async function main() {
     (process.env.RFPHUB_CLEAN_ROOM_PORT
       ? Number(process.env.RFPHUB_CLEAN_ROOM_PORT)
       : await freePort());
+  const requirePublishers = args.requirePublishers || truthyEnv(process.env.REQUIRE_PUBLISHERS);
 
   console.log("frontend-clean-room: copying packages/frontend, then building against");
   console.log(`  @the-rfp-hub/standard -> ${standardSpec}`);
   console.log(`  rfphub-validate       -> ${validateSpec}`);
   console.log(`  NEXT_PUBLIC_API_URL   -> ${apiUrl}`);
+  console.log(`  browser checks        -> ${args.browser ? "on" : "off (HTTP pre-check only)"}`);
+  console.log(`  /publishers required  -> ${requirePublishers}`);
 
   const tmpRoot = mkdtempSync(join(tmpdir(), "rfphub-frontend-clean-room-"));
   const appDir = join(tmpRoot, "frontend");
   let serverProcess;
+  let browserHandle;
   let exitCode = 0;
 
   try {
@@ -306,12 +480,31 @@ async function main() {
     const base = `http://127.0.0.1:${port}`;
     await waitUntilUp(`${base}/`, 20_000);
 
-    // 5. The three checks.
+    // 5. The fast HTTP pre-check. `/` and the filtered `/` are required; `/publishers` may 404
+    // unless REQUIRE_PUBLISHERS says otherwise.
     const results = await Promise.all([
-      checkRoute(base, "/", { label: "directory" }),
-      checkRoute(base, "/publishers", { label: "publishers (may not exist yet in this checkout)" }),
-      checkRoute(base, "/?q=grant", { label: "directory, filtered by search" }),
+      checkRoute(base, "/", { label: "directory", allow404: false }),
+      checkRoute(base, "/publishers", {
+        label: "publishers (may not exist yet in this checkout, unless required)",
+        allow404: !requirePublishers,
+      }),
+      checkRoute(base, "/?q=grant", { label: "directory, filtered by search", allow404: false }),
     ]);
+
+    // 6. The browser-driven check — opt-in here, always on in external-deploy-smoke.yml.
+    if (args.browser) {
+      const { chromium } = await import("@playwright/test");
+      browserHandle = await chromium.launch();
+      const browserResults = await Promise.all([
+        checkRouteInBrowser(browserHandle, base, apiUrl, "/", {
+          label: "directory, rendered from a real request",
+        }),
+        checkRouteInBrowser(browserHandle, base, apiUrl, "/?q=grant", {
+          label: "directory filtered by search, rendered from a real request",
+        }),
+      ]);
+      results.push(...browserResults);
+    }
 
     console.log("\nResults:");
     for (const r of results) {
@@ -323,6 +516,7 @@ async function main() {
     console.error(`\nfrontend-clean-room FAILED: ${err.message}`);
     exitCode = exitCode || 2;
   } finally {
+    if (browserHandle) await browserHandle.close().catch(() => {});
     if (serverProcess && !serverProcess.killed) serverProcess.kill();
     if (args.keep) {
       console.log(`\n--keep set: leaving ${tmpRoot} in place for inspection.`);
