@@ -24,7 +24,13 @@ function pageRoutes(directory = appRoot): string[] {
 
 describe("route metadata", () => {
   it("uses the directory title as the root default and templates every child title", () => {
-    const source = readFileSync(join(appRoot, "layout.tsx"), "utf8");
+    // The literal moved out of layout.tsx and into lib/root-metadata.ts (see that file's own
+    // comment): generateMetadata there needs no import from the font/provider tree that has no
+    // transform under this package's test runner. Either file carrying the literal satisfies the
+    // invariant this test exists to pin.
+    const source =
+      readFileSync(join(appRoot, "layout.tsx"), "utf8") +
+      readFileSync(join(process.cwd(), "src", "lib", "root-metadata.ts"), "utf8");
     expect(source).toContain('default: "Directory | RFP Hub"');
     expect(source).toContain('template: "%s | RFP Hub"');
   });

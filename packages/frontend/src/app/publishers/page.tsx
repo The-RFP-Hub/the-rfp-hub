@@ -78,7 +78,15 @@ export default function PublishersPage() {
 function PublisherCard({ publisher }: { publisher: Publisher }) {
   const directoryHref = `/?organization=${encodeURIComponent(publisher.slug)}`;
   return (
-    <article className="card publisher-card">
+    // `data-testid`/`data-publisher-slug`: this package otherwise has no test-hook attribute
+    // convention (its own tests select by role and text, like the rest of the codebase) — these two
+    // exist so an external checker can extract the rendered slug set without depending on prose or
+    // markup that is free to change.
+    <article
+      className="card publisher-card"
+      data-testid="publisher-card"
+      data-publisher-slug={publisher.slug}
+    >
       <h2>
         <UntrustedText value={publisher.name} fallback={publisher.slug} />
       </h2>

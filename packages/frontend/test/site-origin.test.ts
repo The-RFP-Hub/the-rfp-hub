@@ -1,15 +1,25 @@
 /**
- * `sitemap.ts` and `robots.ts` need one absolute origin, and it must be THIS DEPLOYMENT'S — not
- * `NEXT_PUBLIC_API_URL` (that names the API) and not a literal (that would make every self-hosted
- * fork's sitemap describe production's address). These are the pure rules for deriving it from the
- * request headers a reverse proxy or platform edge actually sets.
+ * `sitemap.ts` and `robots.ts` need two facts: the absolute origin this request landed on (never
+ * `NEXT_PUBLIC_API_URL`, which names the API, and never a literal, which would make every
+ * self-hosted fork's sitemap describe production's address) and whether that origin is the ONE
+ * origin this deployment declares itself canonical for. These are the pure rules for both, plus the
+ * one call that actually reads a request and an environment variable.
  */
-import { originFromHeaders, requestOrigin } from "@/lib/site-origin";
-import { describe, expect, it, vi } from "vitest";
+import {
+  canonicalSiteOrigin,
+  isCanonicalRequest,
+  originFromHeaders,
+  requestOrigin,
+} from "@/lib/site-origin";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
 }));
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("originFromHeaders", () => {
   it("combines the forwarded protocol with the host", () => {
@@ -40,5 +50,54 @@ describe("requestOrigin", () => {
     vi.mocked(headers).mockResolvedValue({ get } as unknown as Awaited<ReturnType<typeof headers>>);
 
     await expect(requestOrigin()).resolves.toBe("https://staging.ethrfps.app");
+  });
+});
+
+describe("canonicalSiteOrigin", () => {
+  it("is undefined when the operator has declared nothing — the normal state off production", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    expect(canonicalSiteOrigin()).toBeUndefined();
+  });
+
+  it("normalises through URL().origin, dropping a trailing slash or stray path", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app/");
+    expect(canonicalSiteOrigin()).toBe("https://ethrfps.app");
+  });
+
+  it("is undefined for an unparsable value — never throws, never guesses", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "not a url");
+    expect(canonicalSiteOrigin()).toBeUndefined();
+  });
+});
+
+describe("isCanonicalRequest", () => {
+  function mockHost(host: string | null) {
+    return import("next/headers").then(({ headers }) => {
+      vi.mocked(headers).mockResolvedValue({
+        get: (key: string) =>
+          key === "host" ? host : key === "x-forwarded-proto" ? "https" : null,
+      } as unknown as Awaited<ReturnType<typeof headers>>);
+    });
+  }
+
+  it("is false when NEXT_PUBLIC_SITE_ORIGIN is unset, whatever the request's own origin is", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    await mockHost("ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(false);
+  });
+
+  it("is true when the request origin matches the declared canonical origin exactly", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(true);
+  });
+
+  it("is false for a staging alias or a preview, even with the variable set on production", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("staging.ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(false);
   });
 });

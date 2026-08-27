@@ -48,10 +48,21 @@ export const GOVERNANCE = `${REPOSITORY}/blob/main/GOVERNANCE.md`;
 /** How an organization becomes a verified publisher, and what that changes. */
 export const PUBLISHERS_DOC = `${REPOSITORY}/blob/main/PUBLISHERS.md`;
 
-/** What is checked on one listing, what is not a criterion, and who decides. */
+/**
+ * What is checked on one listing, what is not a criterion, and who decides.
+ *
+ * The document itself lands in a separate PR (the governance-framework stream); this link is
+ * correct on merge day but 404s until that PR is in `main`.
+ */
 export const REVIEW_CRITERIA = `${REPOSITORY}/blob/main/REVIEW-CRITERIA.md`;
 
-/** How a change to the Standard itself gets proposed, reviewed and released. */
+/**
+ * How a change to the Standard itself gets proposed, reviewed and released.
+ *
+ * The `#rfc-process` section lands in a separate PR (the governance-framework stream, same one as
+ * `REVIEW_CRITERIA` above); this link is correct on merge day but resolves to the top of `PROCESS.md`
+ * rather than the section until that PR is in `main`.
+ */
 export const RFC_PROCESS = `${REPOSITORY}/blob/main/packages/standard/PROCESS.md#rfc-process`;
 
 /** The API's interactive documentation, on whichever API this build talks to. */

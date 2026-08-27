@@ -139,6 +139,16 @@ describe("the public publishers page", () => {
     expect(hrefs).toContain("/?organization=beta");
   });
 
+  it("stamps a stable, checkable slug on each card's root element", async () => {
+    const { client: c } = client();
+    mount(c);
+
+    await screen.findByText(HOSTILE);
+    const cards = document.querySelectorAll('[data-testid="publisher-card"]');
+    const slugs = [...cards].map((card) => card.getAttribute("data-publisher-slug"));
+    expect(slugs.sort()).toEqual(["beta", "filecoin"]);
+  });
+
   it("shows an honest empty state, linking to how a publisher gets verified", async () => {
     const { client: c } = client({ list: async () => ({ items: [], total: 0 }) });
     mount(c);
