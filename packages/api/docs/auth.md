@@ -317,12 +317,23 @@ only when it proved nothing. Two people behind one office egress are two budgets
 calling from a laptop and from CI is one budget. Nothing is stored: the key lives in an in-memory
 counter that expires with its window and never reaches a row, a log line or an analytics event.
 
+**The address fallback is grouped by /64 for IPv6**, IPv4 unchanged. The smallest allocation an
+IPv6 customer receives is a /64, so a key on the full address would hand a fresh bucket to anyone
+willing to increment the host bits — no limit at all for the caller best equipped to abuse it.
+(An IPv4-mapped address is folded back to the IPv4 address it carries, or every mapped caller would
+share one bucket instead.)
+
 **An invalid credential is metered by address, and is refused for being over the limit before it is
 refused for being invalid.** Resolving the credential is split from rejecting it
 (`plugins/auth.ts`): a route runs `resolvePrincipal` → limiter → gate, so a caller hammering
 `POST /v1/opportunities` with a junk Bearer sees `401` for the whole budget and `429` once it is
 spent. Before the split the gate answered inside the same `onRequest` chain and ended it, so the
 limiter never ran and anonymous write traffic was unlimited.
+
+**A failure to CHECK a credential is never metered.** A `503 auth_unavailable` — the session
+lookup could not be performed — is answered by the resolver before the limiter runs, so an outage
+does not spend the caller's budget and is never replaced by a `429`. Only genuine `401`/`403`
+refusals go quietly past and are counted.
 
 **Metered routes** are the write, credential and link-out surfaces: `POST`/`PUT /v1/opportunities`
 and `POST /v1/opportunities/:id/claim` (60/min), `POST /v1/review/opportunities/:id/verify`,

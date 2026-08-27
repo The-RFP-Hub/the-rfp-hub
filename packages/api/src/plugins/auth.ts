@@ -28,6 +28,15 @@
  * replies to nothing. Put it first, meter second, gate third, and the refusal still happens, one
  * hook later, after the request has been counted. See `modules/routes/shared/rate-limit-key.ts`.
  *
+ * WITH ONE EXCEPTION, AND IT IS THE POINT OF THE SPLIT RATHER THAN A HOLE IN IT: a 5xx is OUR
+ * failure, not a verdict on the caller. `SessionService.verify` answers 503 `auth_unavailable`
+ * when the lookup could not be PERFORMED, deliberately, so that a database outage does not appear
+ * as every signed-in user's session being invalid. Metering that would re-collapse the same
+ * distinction one layer up: the outage would spend the address's budget and, past the ceiling, be
+ * served as 429 — an outage disguised as the caller's own fault, and one that suppresses the 503
+ * an operator is watching for. So `resolvePrincipal` ANSWERS a 5xx immediately, before the
+ * limiter, and it is never counted. Only genuine credential refusals (401/403) go quietly past.
+ *
  * The outcome is cached on the request (`request.principalResolution`), so a chain that resolves
  * and then gates verifies the credential ONCE — one session lookup or one key hash, as before.
  */
@@ -75,10 +84,14 @@ export interface AuthDecorators {
   auth: Auth;
   principals: PrincipalService;
   /**
-   * Resolve the request's credential and ANSWER NOTHING — the half of a gate that is safe to run
-   * before a rate limiter. Sets `request.principal` when a valid Bearer is presented; leaves it
-   * `null` for an absent or invalid one, without a 401, a 403 or a throw. A gate placed after it
-   * still refuses; it just refuses one hook later, with the request already counted.
+   * Resolve the request's credential and answer nothing the caller is responsible for — the half of
+   * a gate that is safe to run before a rate limiter. Sets `request.principal` when a valid Bearer
+   * is presented; leaves it `null` for an absent or invalid one, without a 401, a 403 or a throw. A
+   * gate placed after it still refuses; it just refuses one hook later, with the request counted.
+   *
+   * It DOES answer a 5xx immediately — a lookup that could not be performed is not a credential
+   * that failed, and metering it would let an outage spend the caller's budget and then be served
+   * as a 429. See the header for why that distinction is worth a branch here.
    */
   resolvePrincipal: onRequestAsyncHookHandler;
   requireAuth: preHandlerHookHandler;
@@ -114,15 +127,19 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
 /**
  * What resolving this request's credential concluded — computed once, then reused.
  *
- * `rejected` carries the answer a gate WOULD have sent rather than the error itself, because the
- * refusal has to survive the resolver returning quietly: the gate that runs later must be able to
+ * The two failing arms carry the answer a gate WOULD have sent rather than the error itself,
+ * because the refusal has to survive the resolver returning quietly: the gate that runs later must
  * reproduce exactly the status, code and message the un-split `resolve()` produced, without
- * verifying the credential a second time.
+ * verifying the credential a second time. They are SEPARATE arms because only one of them may be
+ * counted — see the header.
  */
 export type PrincipalResolution =
   | { kind: "anonymous" }
   | { kind: "principal" }
-  | { kind: "rejected"; status: number; code: string; message: string };
+  /** The credential was PRESENTED AND REFUSED — a 4xx. Meterable: the caller caused it. */
+  | { kind: "refused"; status: number; code: string; message: string }
+  /** The credential could not be CHECKED — a 5xx. Never metered: we caused it. */
+  | { kind: "unavailable"; status: number; code: string; message: string };
 
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
   const db = options.db ?? defaultDb;
@@ -151,11 +168,13 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
       return { kind: "principal" };
     } catch (error) {
       if (isHttpError(error)) {
-        return { kind: "rejected", status: error.status, code: error.code, message: error.message };
+        // The 4xx/5xx split is the whole decision: a refusal is the caller's, an outage is ours.
+        const kind = error.status >= 500 ? "unavailable" : "refused";
+        return { kind, status: error.status, code: error.code, message: error.message };
       }
       request.log.error(error);
       return {
-        kind: "rejected",
+        kind: "unavailable",
         status: 500,
         code: "internal_error",
         message: "internal server error",
@@ -179,7 +198,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     required: boolean,
   ): Promise<boolean> {
     const outcome = await resolveOnce(request);
-    if (outcome.kind === "rejected") {
+    if (outcome.kind === "refused" || outcome.kind === "unavailable") {
       send(reply, outcome.status, outcome.code, outcome.message);
       return false;
     }
@@ -195,8 +214,13 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     return true;
   }
 
-  const resolvePrincipal: onRequestAsyncHookHandler = async (request) => {
-    await resolveOnce(request);
+  const resolvePrincipal: onRequestAsyncHookHandler = async (request, reply) => {
+    const outcome = await resolveOnce(request);
+    // The one thing this resolver refuses to stay quiet about. Answering here ends the chain BEFORE
+    // the limiter, so an outage costs the caller nothing and reaches them as itself.
+    if (outcome.kind === "unavailable") {
+      send(reply, outcome.status, outcome.code, outcome.message);
+    }
   };
 
   const requireAuth: preHandlerHookHandler = async (request, reply) => {

@@ -27,6 +27,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
+import type { Auth } from "../../src/auth/better-auth.js";
 import { pool } from "../../src/db/client.js";
 import { bearer, seedIdentity, testAuth } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
@@ -42,6 +43,20 @@ const SECOND_HANDLE = "m4rate-second";
 /** Two addresses that are unmistakably distinct, and neither of them the inject default. */
 const IP_A = "198.51.100.11";
 const IP_B = "203.0.113.22";
+/** A third, for the outage case, so it starts on an untouched budget. */
+const IP_C = "198.51.100.33";
+/** Three IPv6 hosts: the first two are one customer's, the third is somebody else's. */
+const IPV6_HOST = "2001:db8:5:5::1";
+const IPV6_SAME_64 = "2001:db8:5:5:ffff:ffff:ffff:ffff";
+const IPV6_OTHER_64 = "2001:db8:5:6::1";
+
+/**
+ * Synthetic bearers. Neither is a credential of any kind — what matters is which PATH each takes:
+ * the `rfph_` marker routes to the API-key verifier (a plain 401 refusal), anything else routes to
+ * the session verifier, which is the one the outage case breaks.
+ */
+const JUNK_KEY = "rfph_aaaaaaaa_this-is-not-a-real-secret";
+const JUNK_SESSION = "m4rate-not-a-real-credential";
 
 /** A key id no account owns: the route answers 404 having changed nothing, and still counts. */
 const ABSENT_KEY_ID = "999999999";
@@ -124,7 +139,7 @@ run("M4RATE rate-limit keys", () => {
     // 401 for the whole budget and 429 the moment it is spent. The 429 REPLACES the 401 rather
     // than following it — once the limiter answers, the gate behind it never runs — which is the
     // right way round: a caller over its ceiling learns it is over its ceiling.
-    const junk = bearer("m4rate-not-a-real-credential");
+    const junk = bearer(JUNK_SESSION);
     const statuses: number[] = [];
     for (let i = 0; i < SUBMIT_MAX; i++) {
       const res = await app.inject({
@@ -171,6 +186,76 @@ run("M4RATE rate-limit keys", () => {
     expect(credentialed.statusCode).not.toBe(429);
   }, 120_000);
 
+  it("meters an IPv6 caller by /64, not by the address they picked this second", async () => {
+    // The bucket an attacker would otherwise never share with themselves. A residential or cloud
+    // IPv6 customer is assigned a /64 and may use any of its 2^64 addresses, so a key on the full
+    // address is a free reset on every request — the limit would be no limit at all for exactly
+    // the caller best equipped to abuse it. `@fastify/rate-limit`'s default generator groups by
+    // /64 for this reason; supplying a `keyGenerator` replaces that generator, so the grouping has
+    // to be carried across with it.
+    const junk = bearer(JUNK_SESSION);
+    const spend = async (ip: string) => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: junk,
+        remoteAddress: ip,
+      });
+      expect(res.statusCode).toBe(401);
+      return Number(res.headers["x-ratelimit-remaining"]);
+    };
+
+    expect(await spend(IPV6_HOST)).toBe(SUBMIT_MAX - 1);
+    // Same allocation, every host bit different: the same caller, and the same budget.
+    expect(await spend(IPV6_SAME_64)).toBe(SUBMIT_MAX - 2);
+    // A different /64 is a different customer, and must NOT inherit the two above.
+    expect(await spend(IPV6_OTHER_64)).toBe(SUBMIT_MAX - 1);
+  }, 60_000);
+
+  it("never meters — or masks — a failure to CHECK the credential", async () => {
+    // `SessionService.verify` answers 503 `auth_unavailable` when the lookup could not be performed,
+    // deliberately, so an outage does not appear as every signed-in user's session being invalid.
+    // Metering that would undo the distinction one layer up: the outage would spend the address's
+    // budget and then be served as 429 — the operator's 503 signal replaced by one that reads as
+    // the caller's own fault. So the resolver answers a 5xx BEFORE the limiter, uncounted.
+    const broken = await buildApp({ auth: { auth: brokenSessionAuth(await testAuth()) } });
+    await broken.ready();
+    try {
+      const call = (token: string) =>
+        broken.inject({
+          method: "DELETE",
+          url: `/v1/keys/${ABSENT_KEY_ID}`,
+          headers: bearer(token),
+          remoteAddress: IP_C,
+        });
+
+      const outage = await call(JUNK_SESSION);
+      expect(outage.statusCode).toBe(503);
+      expect(outage.json()).toMatchObject({ error: "auth_unavailable" });
+      // The limiter never ran, so it never wrote its headers — the visible form of "not counted".
+      expect(outage.headers["x-ratelimit-remaining"]).toBeUndefined();
+
+      // And the budget really is untouched: the next real refusal is the FIRST charge, not the
+      // second. This is the assertion an `allowList` or a post-hoc refund could not satisfy.
+      const first = await call(JUNK_KEY);
+      expect(first.statusCode).toBe(401);
+      expect(Number(first.headers["x-ratelimit-remaining"])).toBe(KEYS_MAX - 1);
+
+      // Spend the rest of the address's budget on genuine refusals, then confirm it is spent.
+      for (let i = 1; i < KEYS_MAX; i++) expect((await call(JUNK_KEY)).statusCode).toBe(401);
+      expect((await call(JUNK_KEY)).statusCode).toBe(429);
+
+      // The case the split exists for: with the bucket exhausted, an outage is STILL a 503. A 429
+      // here would tell an operator watching for auth failures that a database outage was a caller
+      // exceeding its quota.
+      const stillOutage = await call(JUNK_SESSION);
+      expect(stillOutage.statusCode).toBe(503);
+      expect(stillOutage.json()).toMatchObject({ error: "auth_unavailable" });
+    } finally {
+      await broken.close();
+    }
+  }, 120_000);
+
   it("leaves the public read uncapped, which is the point of `global: false`", async () => {
     // The list, the feeds and the export are the traffic this project exists to serve, and they are
     // measured per address — which behind a shared egress is one number for a whole organization.
@@ -188,3 +273,26 @@ run("M4RATE rate-limit keys", () => {
     }
   }, 60_000);
 });
+
+/**
+ * The same auth instance with ONE thing broken: the session lookup throws, exactly as it would if
+ * the database behind it stopped answering. A proxy rather than a stub because everything else —
+ * the mount, the cookie name, the context — has to keep working, or the case would be testing a
+ * half-built app instead of an outage.
+ */
+function brokenSessionAuth(real: Auth): Auth {
+  return new Proxy(real, {
+    get(target, property) {
+      const value = Reflect.get(target, property);
+      if (property !== "api") return value;
+      return new Proxy(value as object, {
+        get(api, method) {
+          if (method !== "getSession") return Reflect.get(api, method);
+          return async () => {
+            throw new Error("m4rate: simulated session-store outage");
+          };
+        },
+      });
+    },
+  }) as Auth;
+}
