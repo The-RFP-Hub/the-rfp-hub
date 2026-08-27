@@ -30,7 +30,7 @@ name: External deploy smoke test
 on:
   push:
     branches: [main]
-    paths:
+    paths: &clean-room-paths
       - "packages/frontend/**"
       - "packages/validate/**"
       - "packages/standard/**"
@@ -38,6 +38,12 @@ on:
       - "pnpm-lock.yaml"
       - "scripts/frontend-clean-room.mjs"
       - ".github/workflows/external-deploy-smoke.yml"
+  # Gates PRs, not only pushes to main: a regression in any of the paths above should be caught
+  # before it merges, not after — F3 (this job) is the only mechanical guard against the two
+  # portability bugs a real clean-room attempt hit before this milestone.
+  pull_request:
+    branches: [main]
+    paths: *clean-room-paths
   workflow_dispatch:
     inputs:
       mode:
