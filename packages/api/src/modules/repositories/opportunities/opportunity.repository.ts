@@ -2,7 +2,6 @@ import type { FundingType, OpportunityStatus } from "@the-rfp-hub/standard";
 import {
   type SQL,
   and,
-  arrayOverlaps,
   asc,
   count,
   desc,
@@ -487,17 +486,19 @@ export class OpportunityRepository {
     ];
     if (q.fundingType?.length) where.push(inArray(opportunities.fundingType, q.fundingType));
     if (q.status?.length) where.push(inArray(opportunities.status, q.status));
-    // CASE-INSENSITIVE, unlike the two filters around it, and the difference is not stylistic: an
-    // ecosystem name is free text a publisher types, so the corpus really does hold `Ethereum`,
-    // `ethereum` and `EVM`/`evm` side by side, and a case-sensitive `&&` answered a query for one of
-    // them with a fraction of the rows and no indication that it had. A filter that silently returns
-    // a subset is worse than one that returns nothing.
+    // CASE-INSENSITIVE, unlike `fundingType`/`status` above (closed, validated enums, so an exact
+    // match is correct there): an ecosystem name is free text a publisher types, so the corpus
+    // really does hold `Ethereum`, `ethereum` and `EVM`/`evm` side by side, and a case-sensitive
+    // `&&` answered a query for one of them with a fraction of the rows and no indication that it
+    // had. A filter that silently returns a subset is worse than one that returns nothing.
     if (q.ecosystem?.length)
       where.push(arrayMatchesInsensitive(opportunities.ecosystems, q.ecosystem));
-    // `category` stays case-SENSITIVE on purpose: it is a closed vocabulary defined by the Standard
-    // and validated on the way in, so its values are already canonical. Loosening it would only
-    // widen what an exact, checked value matches.
-    if (q.category?.length) where.push(arrayOverlaps(opportunities.categories, q.category));
+    // CASE-INSENSITIVE, same reasoning as ecosystem above. `categories[]` is explicitly "Free text"
+    // in the Standard (schemas/v1.0.0/opportunity.schema.json) — NOT a closed, registry-governed
+    // vocabulary — so the corpus holds `Infrastructure` and `infrastructure` side by side just like
+    // an ecosystem name does, and a case-sensitive `&&` silently returned a subset for one spelling.
+    if (q.category?.length)
+      where.push(arrayMatchesInsensitive(opportunities.categories, q.category));
     // ANY operating OR sponsoring organization, via the denormalized slug array — also
     // case-insensitively, because a slug arrives in a URL a human typed as often as from a link.
     if (q.organization) {
