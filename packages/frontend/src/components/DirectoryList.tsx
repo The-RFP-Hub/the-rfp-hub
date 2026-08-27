@@ -30,7 +30,7 @@
  */
 import { UntrustedText } from "@/components/UntrustedText";
 import { StatusBadge } from "@/components/badges";
-import { EmptyState, ResourceView } from "@/components/states";
+import { EmptyState, ResourceView, TechnicalDetails } from "@/components/states";
 import {
   DEFAULT_SELECTION,
   type DirectorySelection,
@@ -39,6 +39,7 @@ import {
   type Ordering,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
+  dateInputValue,
   directoryQuery,
   isFiltered,
   selectionFromParams,
@@ -194,91 +195,226 @@ export function DirectoryList() {
             </select>
           </div>
 
+          <div className={`field${draft.category.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-category">Category</label>
+            <input
+              id="directory-category"
+              value={draft.category}
+              onChange={(event) => setDraft({ ...draft, category: event.target.value })}
+              placeholder="Any category"
+            />
+          </div>
+
+          {/*
+           * A slug, not a name — the field the endpoint actually filters on — and the hint says
+           * exactly what it matches, because the API's `organization` param is wider than the label
+           * alone would suggest: it hits `operatingOrganizations` (who runs the intake) AND
+           * `sponsoringOrganizations` (who backs it), not only the one named in the "Organization"
+           * column. This is also the exact param name and value a `/publishers` card links here with
+           * (`/?organization=<slug>`), so a shared or bookmarked link round-trips through this box.
+           */}
+          <div className={`field${draft.organization.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-organization">Organization</label>
+            <input
+              id="directory-organization"
+              value={draft.organization}
+              onChange={(event) => setDraft({ ...draft, organization: event.target.value })}
+              placeholder="Organization slug"
+            />
+            <p className="hint">Matches the operating OR the sponsoring organization.</p>
+          </div>
+
+          <div className={`field${draft.minAward.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-min-award">Min award</label>
+            <input
+              id="directory-min-award"
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={draft.minAward}
+              onChange={(event) => setDraft({ ...draft, minAward: event.target.value })}
+              placeholder="No minimum"
+            />
+          </div>
+
+          <div className={`field${draft.maxAward.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-max-award">Max award</label>
+            <input
+              id="directory-max-award"
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={draft.maxAward}
+              onChange={(event) => setDraft({ ...draft, maxAward: event.target.value })}
+              placeholder="No maximum"
+            />
+          </div>
+
+          {/*
+           * `nextDeadlineAt` — the derived, earliest-upcoming-fixed-deadline field these two compare
+           * against, exactly as `sort`'s default already does. An entry with no upcoming fixed
+           * deadline (rolling-only, all past, or none at all) has a NULL there and is excluded by
+           * either bound — the same rule the API's own parameter docs state.
+           */}
+          <div className={`field${draft.deadlineAfter.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-deadline-after">Deadline after</label>
+            <input
+              id="directory-deadline-after"
+              type="date"
+              value={dateInputValue(draft.deadlineAfter)}
+              onChange={(event) => setDraft({ ...draft, deadlineAfter: event.target.value })}
+            />
+            {/*
+             * A value carried in from a shared or hand-edited URL can be a full instant
+             * (`2026-09-01T12:00:00Z`), not the bare day this picker can display — and the picker
+             * silently shows blank for anything it cannot parse. That would make an ACTIVE filter
+             * look like no filter at all, so the exact, untouched value stays visible as text
+             * whenever it carries more than the day the control shows. Submitting the form again
+             * without touching this field still sends this exact value, not the truncated day.
+             */}
+            {draft.deadlineAfter.trim() &&
+            dateInputValue(draft.deadlineAfter) !== draft.deadlineAfter.trim() ? (
+              <p className="hint">
+                Filtering on the exact value from the link:{" "}
+                <code>{draft.deadlineAfter.trim()}</code>
+              </p>
+            ) : null}
+          </div>
+
+          <div className={`field${draft.deadlineBefore.trim() ? " is-set" : ""}`}>
+            <label htmlFor="directory-deadline-before">Deadline before</label>
+            <input
+              id="directory-deadline-before"
+              type="date"
+              value={dateInputValue(draft.deadlineBefore)}
+              onChange={(event) => setDraft({ ...draft, deadlineBefore: event.target.value })}
+            />
+            {draft.deadlineBefore.trim() &&
+            dateInputValue(draft.deadlineBefore) !== draft.deadlineBefore.trim() ? (
+              <p className="hint">
+                Filtering on the exact value from the link:{" "}
+                <code>{draft.deadlineBefore.trim()}</code>
+              </p>
+            ) : null}
+          </div>
+
           <div className="field field-action">
             <button type="submit">Search</button>
           </div>
         </form>
       </search>
 
-      <ResourceView resource={state} what="the directory" onRetry={reload}>
-        {(list) => (
-          <>
-            <ResultLine
-              applied={applied}
-              total={list.total}
-              page={list.page}
-              totalPages={list.totalPages}
-              stale={state.status === "ready" && state.stale}
-            />
-
-            {list.items.length === 0 ? (
-              <EmptyState
-                title={
-                  isFiltered(applied) ? "Nothing matches those filters." : "Nothing published yet."
-                }
-                detail={
-                  isFiltered(applied)
-                    ? "Funding type and status match exactly; the search box matches words in the title, summary and description."
-                    : "This directory lists opportunities a reviewer has approved and listed. There are none yet."
-                }
-                action={
-                  isFiltered(applied) ? (
-                    <>
-                      <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
-                      <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
-                    </>
-                  ) : (
-                    <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
-                  )
-                }
+      {/*
+       * A 400 HERE IS ALWAYS THIS PAGE'S OWN QUERYSTRING, so it gets its own state rather than the
+       * generic "we couldn't load the directory" panel: retrying an invalid filter combination fails
+       * the same way every time, and a reader who typed `2026-13-40` into a date box needs to be told
+       * WHICH filter is wrong, not invited to try again. `additionalProperties: false` means the
+       * endpoint's own message already names the offending parameter for most cases (a bad type or
+       * format carries its field in `instancePath`); an unrecognised param name is the one case where
+       * it does not, and `issues` (empty here — this is a querystring rejection, not a document
+       * validation one) would carry it structurally if the API ever adds that.
+       */}
+      {state.status === "error" && state.error.status === 400 ? (
+        <div className="callout state error" role="alert">
+          <p className="empty-title">These filters aren&rsquo;t valid.</p>
+          <p className="muted">{state.error.message}</p>
+          {state.error.issues.length > 0 ? (
+            <ul>
+              {state.error.issues.map((issue) => (
+                <li key={`${issue.path}:${issue.message}`}>
+                  <code>{issue.path}</code> {issue.message}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="row">
+            <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
+          </p>
+          <TechnicalDetails error={state.error} />
+        </div>
+      ) : (
+        <ResourceView resource={state} what="the directory" onRetry={reload}>
+          {(list) => (
+            <>
+              <ResultLine
+                applied={applied}
+                total={list.total}
+                page={list.page}
+                totalPages={list.totalPages}
+                stale={state.status === "ready" && state.stale}
               />
-            ) : (
-              <>
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Opportunity</th>
-                        <th scope="col">Organization</th>
-                        <th scope="col">Type</th>
-                        <th scope="col">Status</th>
-                        <th scope="col" className="numeric">
-                          Next deadline
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.items.map((item) => (
-                        <DirectoryRow key={item.id} item={item} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
 
-                <nav className="pagination" aria-label="Directory pages">
-                  <button
-                    type="button"
-                    disabled={list.page <= 1}
-                    onClick={() => commit({ page: list.page - 1 })}
-                  >
-                    Previous
-                  </button>
-                  <span className="muted">
-                    Page {list.page} of {list.totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={list.page >= list.totalPages}
-                    onClick={() => commit({ page: list.page + 1 })}
-                  >
-                    Next
-                  </button>
-                </nav>
-              </>
-            )}
-          </>
-        )}
-      </ResourceView>
+              {list.items.length === 0 ? (
+                <EmptyState
+                  title={
+                    isFiltered(applied)
+                      ? "Nothing matches those filters."
+                      : "Nothing published yet."
+                  }
+                  detail={
+                    isFiltered(applied)
+                      ? "Funding type and status match exactly; the search box matches words in the title, summary and description."
+                      : "This directory lists opportunities a reviewer has approved and listed. There are none yet."
+                  }
+                  action={
+                    isFiltered(applied) ? (
+                      <>
+                        <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
+                        <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
+                      </>
+                    ) : (
+                      <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
+                    )
+                  }
+                />
+              ) : (
+                <>
+                  <div className="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col">Opportunity</th>
+                          <th scope="col">Organization</th>
+                          <th scope="col">Type</th>
+                          <th scope="col">Status</th>
+                          <th scope="col" className="numeric">
+                            Next deadline
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {list.items.map((item) => (
+                          <DirectoryRow key={item.id} item={item} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <nav className="pagination" aria-label="Directory pages">
+                    <button
+                      type="button"
+                      disabled={list.page <= 1}
+                      onClick={() => commit({ page: list.page - 1 })}
+                    >
+                      Previous
+                    </button>
+                    <span className="muted">
+                      Page {list.page} of {list.totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={list.page >= list.totalPages}
+                      onClick={() => commit({ page: list.page + 1 })}
+                    >
+                      Next
+                    </button>
+                  </nav>
+                </>
+              )}
+            </>
+          )}
+        </ResourceView>
+      )}
     </>
   );
 }
