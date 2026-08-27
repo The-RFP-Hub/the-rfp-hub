@@ -1,0 +1,285 @@
+# @the-rfp-hub/mcp
+
+A [Model Context Protocol](https://modelcontextprotocol.io) server for the
+[RFP Hub](https://github.com/The-RFP-Hub/the-rfp-hub) — search Ethereum-ecosystem funding
+opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) from any MCP client, and
+optionally submit one, with a human approval step that lives outside the tool channel. MIT licensed.
+
+Search is **anonymous**: no credential, no account, nothing to configure beyond the client entry.
+A credential is needed only to submit, and only when submitting is explicitly turned on.
+
+---
+
+## Install
+
+Every example below pins an **exact version**. An npm version is immutable; `@latest` is not, and
+an MCP server is code your agent runs with your permissions. Pin it, and bump it deliberately.
+
+### Claude Code
+
+```sh
+claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
+
+# project-scoped instead of user-scoped — writes .mcp.json in the repo
+claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
+```
+
+### Claude Desktop and Cursor
+
+Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
+
+```jsonc
+{
+  "mcpServers": {
+    "rfp-hub": {
+      "command": "npx",
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.0"]
+    }
+  }
+}
+```
+
+### VS Code
+
+Root key `servers`, in `.vscode/mcp.json`:
+
+```jsonc
+{
+  "servers": {
+    "rfp-hub": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.0"]
+    }
+  }
+}
+```
+
+### Codex CLI
+
+```sh
+codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
+```
+
+---
+
+## Configuration
+
+| Variable | Default | What it does |
+|---|---|---|
+| `RFPHUB_API_BASE` | `https://api.ethrfps.app` | Which deployment to talk to. The **origin** of this URL is bound into every write approval. |
+| `RFPHUB_API_KEY` | *(none)* | Credential, needed **only** to submit. Never sent on a read. |
+| `RFPHUB_MCP_ENABLE_SUBMIT` | *(unset)* | `1` registers the write tool. Without it the tool does not exist. |
+| `RFPHUB_MCP_HOME` | `~/.rfphub` | Where approvals, rate-limit counters and the audit log live. Must be **writable**. |
+
+**The key goes in the client's `env` block. Never in a prompt, and never as a tool argument** —
+there is no parameter on any tool through which one could be passed, and a test asserts that.
+
+```jsonc
+{
+  "mcpServers": {
+    "rfp-hub": {
+      "command": "npx",
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.0"],
+      "env": {
+        "RFPHUB_API_KEY": "rfph_…",
+        "RFPHUB_MCP_ENABLE_SUBMIT": "1"
+      }
+    }
+  }
+}
+```
+
+Use a **`write`-scoped** key, not a `publish`-scoped one. With `write` alone, a submission lands
+pending a reviewer's decision by construction — the safe mode needs no extra configuration.
+
+---
+
+## Tools
+
+### `search_opportunities` *(read)*
+
+Filters: `q`, `fundingType[]`, `status[]`, `ecosystem[]`, `category[]`, `organization`, `minAward`,
+`maxAward`, `deadlineAfter`, `deadlineBefore`, `sort`, `order`, `page`, `limit` (max 25). An
+unknown parameter is an error, never a filter that silently does nothing.
+
+Each result row carries the id, namespace, title, funding type, status, operating organizations,
+ecosystems, a rendered award line, the next fixed deadline, and two link-out URLs.
+
+**It does not return `description` or `summary`.** That is deliberate and it is the main safety
+property of this server: those are the longest free-text fields a publisher controls, they are
+where an instruction addressed to your agent would live, and twenty of them would dominate the
+context window. Ask for a full record by id when you actually need the prose.
+
+### `fetch_opportunity` *(read)*
+
+One record in full, as an RFP Hub Standard document, inside an envelope of
+`{ notice, opportunity, links }`. The document is **structurally unmodified** — no field removed,
+none added, no value changed. Not byte-identical: it is parsed and re-serialized on the way
+through, so key order and whitespace are the transport's business.
+
+### `submit_opportunity` *(write — off by default)*
+
+Two calls with a person in between. See the next section.
+
+---
+
+## Submitting, and the approval step
+
+```
+1. call submit_opportunity { document }
+     → validates locally, writes nothing, returns:
+       { status: "pending", approvalId: "<64 hex>", preview: {...}, instruction: "..." }
+
+2. a person runs, in their own terminal:
+     npx @the-rfp-hub/mcp@0.1.0 approve <approvalId>
+     → prints the destination, the credential fingerprint, the operation, the protocol
+       revision and the whole document, then asks for confirmation
+
+3. call submit_opportunity { document, approvalId }
+     → claims the approval (single-use), POSTs, returns the result
+```
+
+`rfphub-mcp pending` lists what is waiting. `rfphub-mcp revoke <id>` deletes one.
+
+### What the approval binds to
+
+An approval is not merely "this document was approved". Its id is a hash over **five** things, and
+`approve` prints all five before asking:
+
+| | |
+|---|---|
+| **destination** | the canonical origin of `RFPHUB_API_BASE` |
+| **credential** | the first 8 hex characters of the key's SHA-256 — never the key, and not a prefix of it |
+| **operation** | `submit_opportunity` |
+| **protocol** | the MCP revision this server speaks |
+| **document** | SHA-256 over the document's canonical form |
+
+Change any one of them and the approval no longer applies, and the refusal names which one moved.
+An approval granted against staging cannot be spent against production; one granted under a key
+you have since rotated cannot be spent under the new one.
+
+The approval is **single-use**, claimed by an atomic rename *before* the request goes out, and it
+is **never restored** — including after a timeout. If a submission's outcome is ambiguous, check
+`GET /v1/me/opportunities` (the public read hides entries awaiting review) before doing anything
+else. Approvals expire 15 minutes after the preview.
+
+### What this does — and what it does not
+
+**What it does.** Approving leaves the MCP channel entirely. No tool response ever carries an
+approval secret, so a model cannot read one out of its own context and spend it in the same turn.
+Approving becomes a deliberate act at a terminal, in front of a screen showing exactly where the
+write is going and with which credential.
+
+**What it does not do.** This is *not* a boundary against an agent that holds a shell and a
+filesystem as the same operating-system user. Coding agents routinely hold both. Such an agent can
+run this CLI in a pseudo-terminal, or write the approval file directly; the `0600`/`0700`
+permissions do not stop it, because it *is* that user. Nothing here should be read as "the model
+cannot approve".
+
+If you need a boundary that really is separate, the options are outside this package: an approval
+UI provided by the host application, a distinct OS identity for the agent's process, or a signing
+key the agent cannot reach. See
+[`adr/0012`](https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/adr/0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md).
+
+---
+
+## Errors
+
+Every failure carries one of seven codes.
+
+| Code | Means |
+|---|---|
+| `tool_not_found` | No such tool. With submitting disabled, the write tool is genuinely not registered. |
+| `invalid_input` | The arguments or the document did not validate. A schema failure is reported field by field. |
+| `policy_denied` | Refused by configuration or by the API's authorization: no credential, a missing scope, or the pending-submission ceiling. |
+| `rate_limited` | A local per-kind budget, or the API's own limiter. |
+| `confirmation_required` | The document was previewed but not approved. Nothing was sent. |
+| `confirmation_invalid` | The approval does not apply: expired, already used, or bound to a different destination, credential, protocol or document. Nothing was sent. |
+| `exec_failed` | The API failed, was unreachable, answered with something that is not JSON, or answered with more than 1 MB. |
+
+A response over **1 MB fails rather than truncating**, and the cap is applied while the body is
+being read, so an enormous response costs bounded memory. Half a JSON document is not a smaller
+answer, it is a wrong one; narrow the request instead.
+
+**A submission whose outcome cannot be known says so.** Any failure once the request has left —
+a dropped connection, a body that stops mid-stream, a body that is not JSON or is over the cap —
+is reported as *may have landed*, never as a plain failure, and points at
+`GET /v1/me/opportunities`. A *coded* refusal from the API is different: the API decided, the
+answer was no, and nothing was written. The approval is spent either way.
+
+**Arguments are validated against the published schema**, and a malformed call comes back with the
+same codes as everything else. An unknown parameter is an error rather than a filter that silently
+does nothing.
+
+---
+
+## Local state
+
+Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`, files `0600`:
+
+| Path | Contents |
+|---|---|
+| `pending/<id>.json` | A preview awaiting approval, with the document so the terminal can print it |
+| `approvals/<id>.json` | A granted approval |
+| `approvals/claimed/<id>.json` | A spent approval. Never reusable. |
+| `policy-counters.json` | Per-kind rate counters |
+| `audit.log` | One JSON line per call |
+
+**Rate limits fail closed.** If the counter store cannot be read or written, calls are refused — a
+budget that cannot be counted cannot be enforced. Keep `RFPHUB_MCP_HOME` writable.
+
+**The counters are correct across processes.** Check-and-increment runs under a lock directory
+(`policy-counters.lock`), because an MCP client and a terminal running this same package share one
+home directory by design, and an unlocked read-modify-write lets two processes through a cap of
+one. A lock left behind by a process that died is broken after five seconds.
+
+**The write budget is reserved before the approval is claimed.** A local refusal — an exhausted
+daily budget, a lost race for the approval — gives the budget back and leaves the approval intact,
+so nobody has to be asked to approve the same submission twice.
+
+**The audit log records argument key names and byte counts, never values.** A log that stored
+values would be a second copy of every document and every search term. Failing to write it never
+fails a call.
+
+Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per day**.
+
+---
+
+## Security notes
+
+- **The credential is environment-only.** No tool takes one; reads never send one.
+- **A key-shaped string anywhere in a submitted document is refused before any request is made.**
+  The API stores the text it is given, so a key inside `description` would be persisted and only
+  then redacted out of the reply — redaction of output cannot help with that.
+- **Redaction is a backstop, not the control.** Every outbound surface — text, structured content,
+  error messages, the audit log — is scanned recursively for key-shaped strings.
+- **URLs are inert.** This server never follows a URL from any record, and the notice attached to
+  every result says the client should not either.
+- **Every third-party string is bounded.** Titles are cut at 140 characters, ecosystem labels at
+  40 characters and 8 values (the row says how many were dropped). `ecosystems` is an open list in
+  the standard — no registry, no enum — so leaving it unbounded would have made it the obvious
+  place to park a payload.
+- **Residual risk, stated plainly:** `title`, organization names and ecosystem labels are
+  third-party text and they do reach the model. They are delimited and labelled. Labelling is a
+  hint, not a control, and a hostile title is not made harmless by it. The projection — the missing
+  `description` — is the control.
+- **A preview refuses what the API would refuse.** The API's admission limits (title 256, summary
+  1 000, description 50 000, any array 100 entries, body 256 KiB) are checked locally, so nobody is
+  asked to approve a submission that could never have been accepted.
+- **`structuredContent` is not a safety boundary.** It is delivered to the model like any other
+  output. It exists here for contract and validation.
+- **Pin exact versions**, as every example above does. That is the only real defense against a
+  future version of any npm package behaving differently from the one you reviewed.
+
+---
+
+## Development
+
+```sh
+pnpm --filter @the-rfp-hub/mcp build   # required before the test suite: it drives dist/cli.js
+pnpm --filter @the-rfp-hub/mcp test
+```
+
+The transport is chosen in `src/cli.ts`; `src/server.ts` registers the tools and knows nothing
+about it. Adding an HTTP entry point is a new file, not a refactor.
