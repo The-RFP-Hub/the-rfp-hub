@@ -17,6 +17,7 @@
 export const HOW_IT_WORKS = "/how-it-works";
 export const HOW_IT_WORKS_ROLES = `${HOW_IT_WORKS}#roles`;
 export const DIRECTORY = "/";
+export const PUBLISHERS = "/publishers";
 
 /**
  * The project's source, and the Standard that lives inside it.
@@ -35,6 +36,23 @@ export const REPOSITORY = "https://github.com/The-RFP-Hub/the-rfp-hub";
  * which is what somebody clicking "The Standard" in a footer is actually after.
  */
 export const STANDARD = `${REPOSITORY}/tree/main/packages/standard`;
+
+/**
+ * The governance framework: who decides what, and how a reader appeals or disagrees.
+ *
+ * Also a literal for the same reason as `REPOSITORY` and `STANDARD` above — one file at one path in
+ * this project's own repository, not something a deployment's environment could sensibly vary.
+ */
+export const GOVERNANCE = `${REPOSITORY}/blob/main/GOVERNANCE.md`;
+
+/** How an organization becomes a verified publisher, and what that changes. */
+export const PUBLISHERS_DOC = `${REPOSITORY}/blob/main/PUBLISHERS.md`;
+
+/** What is checked on one listing, what is not a criterion, and who decides. */
+export const REVIEW_CRITERIA = `${REPOSITORY}/blob/main/REVIEW-CRITERIA.md`;
+
+/** How a change to the Standard itself gets proposed, reviewed and released. */
+export const RFC_PROCESS = `${REPOSITORY}/blob/main/packages/standard/PROCESS.md#rfc-process`;
 
 /** The API's interactive documentation, on whichever API this build talks to. */
 export function apiDocsUrl(apiBaseUrl: string): string {

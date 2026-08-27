@@ -95,6 +95,14 @@ export interface DirectorySelection {
   ecosystem: string;
   ordering: Ordering;
   page: number;
+  /**
+   * Organization slug — matches any operating OR sponsoring organization on the endpoint.
+   *
+   * Optional and read-only here: there is no filter control for it yet (that is a separate piece of
+   * work), but the `/publishers` page links to `/?organization=<slug>`, so the URL parameter has to
+   * round-trip through a page reload or a page-forward click rather than being silently dropped.
+   */
+  organization?: string;
 }
 
 /**
@@ -143,6 +151,7 @@ export function directoryQuery(
     fundingType: filled(selection.fundingType),
     status: filled(selection.status),
     ecosystem: filled(selection.ecosystem),
+    organization: filled(selection.organization ?? ""),
     sort,
     order: order === "desc" ? "desc" : "asc",
     page: selection.page,
@@ -156,7 +165,8 @@ export function isFiltered(selection: DirectorySelection): boolean {
     filled(selection.q) !== undefined ||
     filled(selection.fundingType) !== undefined ||
     filled(selection.status) !== undefined ||
-    filled(selection.ecosystem) !== undefined
+    filled(selection.ecosystem) !== undefined ||
+    filled(selection.organization ?? "") !== undefined
   );
 }
 
@@ -207,6 +217,9 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
     ecosystem: get("ecosystem"),
     ordering: ORDERING_VALUES.has(ordering) ? (ordering as Ordering) : DEFAULT_SELECTION.ordering,
     page: safePage,
+    // Free text, like ecosystem: it is a slug the API matches exactly, not a value drawn from a
+    // fixed set here, so nothing to validate against before forwarding it.
+    organization: get("organization") || undefined,
   };
 }
 
@@ -220,6 +233,8 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
   if (q) params.set("q", q);
   const ecosystem = filled(selection.ecosystem);
   if (ecosystem) params.set("ecosystem", ecosystem);
+  const organization = filled(selection.organization ?? "");
+  if (organization) params.set("organization", organization);
   if (selection.fundingType) params.set("type", selection.fundingType);
   if (selection.status !== DEFAULT_SELECTION.status) {
     params.set("status", selection.status === "" ? ANY_STATUS : selection.status);

@@ -6,6 +6,7 @@
  * pin that public structure while leaving the explanatory copy free to improve.
  */
 import HowItWorksPage from "@/app/how-it-works/page";
+import { GOVERNANCE, PUBLISHERS_DOC, REVIEW_CRITERIA, RFC_PROCESS } from "@/lib/links";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -78,5 +79,32 @@ describe("the how-it-works reference page", () => {
       expect(detail.open).toBe(false);
     }
     expect(container.querySelector(".button-primary")).toBeNull();
+  });
+
+  it("links how decisions are made to the four governance documents", () => {
+    const { container } = render(<HowItWorksPage />);
+    const section = container.querySelector("#decisions")?.closest("section") ?? container;
+
+    expect(container.ownerDocument.getElementById("decisions")).toBeTruthy();
+    expect(
+      within(section as HTMLElement)
+        .getByRole("link", { name: "Governance" })
+        .getAttribute("href"),
+    ).toBe(GOVERNANCE);
+    expect(
+      within(section as HTMLElement)
+        .getByRole("link", { name: "Publishers" })
+        .getAttribute("href"),
+    ).toBe(PUBLISHERS_DOC);
+    expect(
+      within(section as HTMLElement)
+        .getByRole("link", { name: "Review criteria" })
+        .getAttribute("href"),
+    ).toBe(REVIEW_CRITERIA);
+    expect(
+      within(section as HTMLElement)
+        .getByRole("link", { name: "RFC process" })
+        .getAttribute("href"),
+    ).toBe(RFC_PROCESS);
   });
 });

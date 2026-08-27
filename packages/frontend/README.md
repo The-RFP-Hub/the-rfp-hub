@@ -98,6 +98,7 @@ change the environment every other suite executes in.
 |---|---|
 | `/` | The directory. Every published opportunity, from `GET /v1/opportunities`: title, organisation, next deadline and award, with search, funding-type / status / ecosystem filters, ordering and pagination. Every filter is a parameter that endpoint declares — it validates its querystring with `additionalProperties: false`, so an invented one is a 400 rather than a control that quietly does nothing. Below the listing, the demoted sign-in card for publishers. |
 | `/opportunities/[id]` | One published opportunity in full, from `GET /v1/opportunities/{id}` — **the read the API counts as a detail view**. Dates, money, organisations, milestones, eligibility, links, the type-specific `fundingDetails` block verbatim, the provenance and source-check state the payload exposes, and the public, redacted change history from the audit route. The "open the application page" action goes through `/v1/r/{id}/apply`. |
+| `/publishers` | Every verified organisation, from `GET /v1/publishers` — one unauthenticated call, no pagination, ordered deterministically by slug. Each card links to `/?organization=<slug>`, which matches any operating or sponsoring organisation on that listing. `logoUrl` is never rendered as an `<img>` (see the CSP section below); it is a link, or nothing. |
 
 ### Signed in — the workbench
 

@@ -49,6 +49,7 @@ describe("route metadata", () => {
       "/organizations",
       "/organizations/[slug]",
       "/privacy",
+      "/publishers",
       "/review",
       "/terms",
     ]);
