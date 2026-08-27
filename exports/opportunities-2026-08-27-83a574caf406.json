@@ -1,7 +1,7 @@
 {
   "specVersion": "1.0.0",
   "license": "CC0-1.0",
-  "generatedAt": "2026-08-26T04:07:06.522Z",
+  "generatedAt": "2026-08-27T15:54:16.055Z",
   "count": 160,
   "opportunities": [
     {
@@ -21,7 +21,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:34.190Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -151,7 +152,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:16.459Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -261,7 +263,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:11.313Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -365,7 +368,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:06.896Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -435,7 +439,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:30.813Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -542,7 +547,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:13.621Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -625,7 +631,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:34.723Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -737,7 +744,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:08.283Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -821,7 +829,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:23.449Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -910,7 +919,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.079Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -1013,7 +1023,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:11.681Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -1118,7 +1129,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:04.539Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -1206,7 +1218,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:04.883Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -1294,7 +1307,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:23.665Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -1375,7 +1389,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:33.524Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -1472,7 +1487,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:15.321Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -1566,7 +1582,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:09.039Z"
       },
       "fundingDetails": {
         "fundingType": "vc_fund",
@@ -1672,7 +1689,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:31.619Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -1763,7 +1781,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:14.755Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -1900,7 +1919,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:12.851Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2050,7 +2070,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:15.563Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2158,7 +2179,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:19.307Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2260,7 +2282,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:12.289Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2390,7 +2413,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:33.923Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2495,7 +2519,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:17.847Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2624,7 +2649,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:16.301Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2771,7 +2797,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:14.445Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -2880,7 +2907,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:06.443Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -2955,7 +2983,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:10.780Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -3094,7 +3123,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:10.514Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -3221,7 +3251,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:10.217Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -3411,7 +3442,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:18.976Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -3596,7 +3628,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:17.508Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -3697,7 +3730,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:19.159Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -3822,7 +3856,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:19.994Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -3925,7 +3960,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:17.688Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4034,7 +4070,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:18.330Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4177,7 +4214,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:16.814Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4288,7 +4326,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:11.047Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4441,7 +4480,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:07.080Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -4537,7 +4577,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:18.521Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4652,7 +4693,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:23.341Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -4718,7 +4760,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:19.659Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4801,7 +4844,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:07.704Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -4863,7 +4907,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:28.693Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -4958,7 +5003,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:27.873Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5118,7 +5164,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:31.257Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5226,7 +5273,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:13.089Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5393,7 +5441,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:32.951Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5502,7 +5551,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:07.630Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -5574,7 +5624,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:19.818Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5654,7 +5705,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:31.959Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5760,7 +5812,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:11.474Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -5914,7 +5967,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:20.164Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -6012,7 +6066,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:13.315Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -6106,7 +6161,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:11.839Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -6237,7 +6293,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:09.783Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -6313,7 +6370,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:19.488Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -6439,7 +6497,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:06.216Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -6534,7 +6593,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:05.524Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -6649,7 +6709,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:06.024Z"
       },
       "fundingDetails": {
         "fundingType": "rfp",
@@ -6752,7 +6813,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:15.904Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -6860,7 +6922,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:21.888Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -6931,7 +6994,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:23.214Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -6991,7 +7055,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:33.722Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7093,7 +7158,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:07.906Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -7157,7 +7223,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:27.200Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7279,7 +7346,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:12.063Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7418,7 +7486,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:15.717Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7540,7 +7609,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:07.307Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -7622,7 +7692,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:17.994Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7735,7 +7806,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:16.092Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7841,7 +7913,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:16.967Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -7929,7 +8002,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:29.568Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -8039,7 +8113,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.517Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -8121,7 +8196,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.373Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -8186,7 +8262,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.616Z"
       },
       "fundingDetails": {
         "fundingType": "accelerator",
@@ -8270,7 +8347,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:34.372Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -8377,7 +8455,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:16.620Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -8487,7 +8566,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:13.478Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -8670,7 +8750,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:15.175Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -8810,7 +8891,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.959Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -8906,7 +8988,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:14.905Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -9005,7 +9088,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:20.213Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -9064,7 +9148,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:30.284Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -9182,7 +9267,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:07.752Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -9261,7 +9347,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:12.659Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -9492,7 +9579,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:26.274Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -9574,7 +9662,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:32.112Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -9664,7 +9753,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.801Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -9725,7 +9815,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:08.708Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -9787,7 +9878,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:17.107Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -9935,7 +10027,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:17.354Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -10036,7 +10129,8 @@
       ],
       "source": {
         "ingestedVia": "import",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:18.708Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -10154,7 +10248,8 @@
         "publisher": "filecoin",
         "ingestedVia": "import",
         "originalId": "1013",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:25.236Z"
       },
       "fundingDetails": {
         "fundingType": "grant"
@@ -10217,7 +10312,8 @@
         "publisher": "refi-colombia-community",
         "ingestedVia": "import",
         "originalId": "1021",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:03.472Z"
       },
       "fundingDetails": {
         "fundingType": "grant"
@@ -10283,7 +10379,8 @@
         "publisher": "filecoin",
         "ingestedVia": "import",
         "originalId": "1039",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:24.056Z"
       },
       "fundingDetails": {
         "fundingType": "grant"
@@ -10353,7 +10450,8 @@
         "publisher": "optimism",
         "ingestedVia": "import",
         "originalId": "1042",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:02.554Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -10600,7 +10698,8 @@
         "publisher": "celo",
         "ingestedVia": "import",
         "originalId": "1059",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:02.786Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -10732,7 +10831,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1094",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:23.944Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -11224,7 +11324,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1225",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:03.719Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -11392,7 +11493,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1229",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:46.707Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -11606,7 +11708,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1230",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:37.981Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -11757,7 +11860,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1246",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:56.816Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -11881,7 +11985,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1266",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:54.780Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -11961,7 +12066,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1275",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:48.827Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12034,7 +12140,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1277",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:43.016Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12212,7 +12319,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1283",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:52.119Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12287,7 +12395,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1291",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:56.844Z"
       },
       "fundingDetails": {
         "fundingType": "accelerator",
@@ -12365,7 +12474,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1298",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:53.219Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12467,7 +12577,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1299",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:49.817Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12543,7 +12654,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1329",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:01.253Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12648,7 +12760,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1343",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:58.937Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12731,7 +12844,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1355",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:00.136Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12822,7 +12936,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1360",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:02.607Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -12908,7 +13023,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1361",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:57.947Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13008,7 +13124,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1362",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:56.096Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13101,7 +13218,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1366",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:43:04.241Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -13191,7 +13309,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1375",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:45.353Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13297,7 +13416,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1382",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:40.350Z"
       },
       "fundingDetails": {
         "fundingType": "bounty",
@@ -13392,7 +13512,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1390",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:51.061Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13484,7 +13605,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1395",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:47.712Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13585,7 +13707,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1398",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:47.442Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13679,7 +13802,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1412",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:26.093Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -13778,7 +13902,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1414",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:43.197Z"
       },
       "fundingDetails": {
         "fundingType": "accelerator",
@@ -13865,7 +13990,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1417",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:49.982Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -13950,7 +14076,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1423",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:21.750Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -14059,7 +14186,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1429",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:44.238Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -14156,7 +14284,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1431",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:36.858Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -14298,7 +14427,8 @@
         "publisher": "celo",
         "ingestedVia": "import",
         "originalId": "1458",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:39.646Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -14434,7 +14564,8 @@
         "publisher": "celo",
         "ingestedVia": "import",
         "originalId": "1459",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:39.726Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -14576,7 +14707,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1462",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:41.730Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -14675,7 +14807,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1463",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:41.423Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -14742,7 +14875,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1467",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:38.937Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -14850,7 +14984,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1468",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:27.163Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15013,7 +15148,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1478",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:34.099Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15113,7 +15249,8 @@
         "publisher": "filecoin",
         "ingestedVia": "import",
         "originalId": "1479",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:24.783Z"
       },
       "fundingDetails": {
         "fundingType": "grant"
@@ -15174,7 +15311,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1480",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:35.130Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15254,7 +15392,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1482",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:24.949Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15331,7 +15470,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1483",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:31.310Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15432,7 +15572,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1487",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:32.320Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15515,7 +15656,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1488",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:30.284Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15617,7 +15759,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1489",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:29.256Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15689,7 +15832,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1490",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:28.238Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15780,7 +15924,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1491",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:21.011Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15856,7 +16001,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1493",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:18.917Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -15928,7 +16074,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1494",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:20.014Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -16007,7 +16154,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "1496",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:17.832Z"
       },
       "fundingDetails": {
         "fundingType": "hackathon",
@@ -16102,7 +16250,8 @@
       "source": {
         "ingestedVia": "import",
         "originalId": "600",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:39.902Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -16220,7 +16369,8 @@
         "publisher": "optimism",
         "ingestedVia": "import",
         "originalId": "958",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:03.696Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -16320,7 +16470,8 @@
         "publisher": "optimism",
         "ingestedVia": "import",
         "originalId": "959",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:14.184Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -16510,7 +16661,8 @@
         "publisher": "scroll",
         "ingestedVia": "import",
         "originalId": "969",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": true,
+        "verifiedAt": "2026-08-26T20:42:16.457Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -16619,7 +16771,8 @@
         "publisher": "polygon",
         "ingestedVia": "import",
         "originalId": "981",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:03.181Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -16729,7 +16882,8 @@
         "publisher": "ethereum-foundation",
         "ingestedVia": "import",
         "originalId": "990",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:16.769Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
@@ -16899,7 +17053,8 @@
         "publisher": "filecoin",
         "ingestedVia": "import",
         "originalId": "992",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:43:25.016Z"
       },
       "fundingDetails": {
         "fundingType": "grant"
@@ -16990,7 +17145,8 @@
         "publisher": "polygon",
         "ingestedVia": "import",
         "originalId": "996",
-        "verifiedAgainstSource": null
+        "verifiedAgainstSource": false,
+        "verifiedAt": "2026-08-26T20:42:03.153Z"
       },
       "fundingDetails": {
         "fundingType": "grant",
