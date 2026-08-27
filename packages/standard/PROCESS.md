@@ -305,6 +305,36 @@ quietly redesigning the standard.
 
 ---
 
+## RFC process
+
+There is no separate RFC document and no RFC number series. What other projects call an RFC, this
+project already has, split across this file and [`GOVERNANCE.md`](../../GOVERNANCE.md) — so this
+section is a routing table, not a new process. Start from what you want to change:
+
+| You want to… | Go to | Opens as |
+|---|---|---|
+| **Propose a new field**, or move one between stages | [Feature stages](#feature-stages) above | An issue or PR with a use case and at least one real document that needs it — that is the `proposed` stage |
+| **Register a vocabulary value** in `deadline-labels` or `program-models` | [Registering a value in a registry](#registering-a-value-in-a-registry) above | An issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
+| **Report a defect** in something already published | [Errata](#errata) above | An issue, triaged into exactly one of `erratum-editorial`, `erratum-technical`, `held-for-next-cut`, `redesign` |
+| **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) | An issue. The answer goes on the issue, in public |
+| **Make a structural decision** — the data model, the versioning policy, the process itself | [`adr/`](../../adr), starting from [`template.md`](../../adr/template.md) | A PR adding the ADR, including the options considered and rejected |
+
+Whichever door you came through, the same review windows apply, and
+[`GOVERNANCE.md` § Review windows](../../GOVERNANCE.md#review-windows) is the source of truth for
+them — if this table and that one ever disagree, that one wins:
+
+| Change | Minimum open time |
+|---|---|
+| **Substantive** — the schema, the context, the conformance suite, this file, `NORMATIVE.md`, `GOVERNANCE.md` | **72 hours** |
+| **Registry entry** | **24 hours** |
+| **Editorial** | none |
+
+The window is a minimum, not a target, and it may be waived only for a security fix or a broken
+build. Who approves, and what happens when editors do not converge, is
+[`GOVERNANCE.md` § The decision rule](../../GOVERNANCE.md#the-decision-rule).
+
+---
+
 ## Release checklist
 
 Before a spec release — a new version directory, or a patch line on the current one:
