@@ -1,40 +1,54 @@
 /**
  * M4-4 — the MCP server is installable and behaves.
  *
- * Resolving the server under test, in order:
+ * WHAT "installable" MEANS HERE, AND WHY THE DEFAULT CHANGED. An earlier revision of this file
+ * silently preferred a LOCAL build (`packages/mcp/dist/cli.js`) whenever one happened to exist,
+ * with the registry only ever a last resort. That let a full "MCP server installable and callable"
+ * PASS be reported without npm — or anyone — ever having resolved the package from the real
+ * registry, which is exactly the over-claim the criterion's own name makes: "installable" has to
+ * mean installable from where a real user installs it. The default now DOES test that:
  *
- *   1. `--mcp-spec <spec>`   → `npx -y @the-rfp-hub/mcp@<spec>` (an explicit npm version or "next")
- *   2. `packages/mcp/dist/cli.js`, if it exists in this checkout → `node <that file>` — so this
- *      check works BEFORE the package is ever published, which matters because `packages/mcp` is
- *      being built concurrently with this checker.
- *   3. Otherwise `npx -y @the-rfp-hub/mcp@next` as a last resort, which is expected to fail loudly
- *      until the package is actually published — that failure is reported by name, not swallowed.
+ *   - No `--mcp-spec`, or `--mcp-spec <version>` / `--mcp-spec next` → `npx -y
+ *     @the-rfp-hub/mcp@<spec>` (default spec `next`). Before the package is published this FAILS,
+ *     honestly, naming the npm 404 — it is not downgraded to a note.
+ *   - `--mcp-spec local` → the EXPLICIT opt-out, for developing this checker (or `packages/mcp`
+ *     itself) before publish: `node <repo-root>/packages/mcp/dist/cli.js`. The criterion is
+ *     renamed and its own description says plainly that this mode is not evidence of publication.
  *
  * The transport is newline-delimited JSON-RPC (see `mcp-client.mjs` for why it is hand-rolled
- * rather than pulled from an SDK this repo does not depend on). Three separate server processes are
+ * rather than pulled from an SDK this repo does not depend on). Separate server processes are
  * spawned across the sub-checks below, each with the minimum environment the case calls for —
  * sharing one process across cases would let state from an earlier call (a rate-limit counter, a
  * cached tool list) leak into a later assertion.
  */
+import { execFile } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { request } from "../../m2-compliance/http.mjs";
 import { McpStdioClient, findCredentialLeak } from "../mcp-client.mjs";
 import { RecordingServer } from "../mock-server.mjs";
 
+const execFileAsync = promisify(execFile);
+
 /**
  * Exported for `accept/flow.mjs`: the write-acceptance tool drives the exact same server binary
  * this read-only check does, and resolving it twice — possibly differently — would be its own bug.
+ *
+ * Throws when `--mcp-spec local` is given and there is nothing to run — a caller-facing mistake
+ * (forgot to build, or pointed `--repo-root` at the wrong checkout), reported as a clean failure by
+ * the caller rather than an uncaught exception.
  */
 export function resolveCommand(ctx, extraArgs = []) {
-  if (ctx.mcpSpec) {
-    const args = ["-y", `@the-rfp-hub/mcp@${ctx.mcpSpec}`, ...extraArgs];
-    return { command: "npx", args, describe: `npx ${args.join(" ")}` };
-  }
-  const local = join(ctx.repoRoot, "packages/mcp/dist/cli.js");
-  if (existsSync(local)) {
+  if (ctx.mcpSpec === "local") {
+    const local = join(ctx.repoRoot, "packages/mcp/dist/cli.js");
+    if (!existsSync(local)) {
+      throw new Error(
+        `--mcp-spec local: packages/mcp/dist/cli.js not found under --repo-root (${ctx.repoRoot}). Build it first: pnpm --filter @the-rfp-hub/mcp build.`,
+      );
+    }
     // REAL, not merely absolute. `cli.ts`'s own entrypoint guard compares
     // `fileURLToPath(import.meta.url)` (which Node resolves through any symlink in the path) to
     // `path.resolve(process.argv[1])` (which does NOT resolve symlinks). Passing `local` as given
@@ -42,20 +56,45 @@ export function resolveCommand(ctx, extraArgs = []) {
     // under `os.tmpdir()` looks like — makes the two disagree, `isEntrypoint` comes back false,
     // `main()` never runs, and the process exits 0 having done nothing: no banner, no error, no
     // response, silence indistinguishable from "hung" until this checker's own timeout fires. Found
-    // by actually spawning a real built `packages/mcp` (this checker's own tests, and every
-    // `--mcp-spec`-less run before the package is published, only ever exercised the npx-404
-    // fallback) — not a hypothetical, and not specific to this one package: any well-behaved CLI
-    // using this common `isEntrypoint` idiom would hit the same thing under a symlinked repo root.
-    const resolved = realpathSync(local);
-    const args = [resolved, ...extraArgs];
-    return { command: "node", args, describe: `node ${args.join(" ")}` };
+    // by actually spawning a real built `packages/mcp` — not a hypothetical, and not specific to
+    // this one package: any well-behaved CLI using this common `isEntrypoint` idiom would hit the
+    // same thing under a symlinked repo root.
+    const resolvedPath = realpathSync(local);
+    const args = [resolvedPath, ...extraArgs];
+    return {
+      command: "node",
+      args,
+      describe: `node ${args.join(" ")} (--mcp-spec local — a local build, NOT evidence of npm/registry publication)`,
+      local: true,
+      spec: "local",
+    };
   }
-  const args = ["-y", "@the-rfp-hub/mcp@next", ...extraArgs];
-  return {
-    command: "npx",
-    args,
-    describe: `npx ${args.join(" ")} (fallback — package not found locally and no --mcp-spec given)`,
-  };
+  const spec = ctx.mcpSpec ?? "next";
+  const args = ["-y", `@the-rfp-hub/mcp@${spec}`, ...extraArgs];
+  return { command: "npx", args, describe: `npx ${args.join(" ")}`, local: false, spec };
+}
+
+/**
+ * The installability check itself: does `npx -y @the-rfp-hub/mcp@<spec>` actually resolve from the
+ * npm registry and run at all? `--version` is cheap (`cli.ts`'s own `--version`/`-v` mode prints
+ * `SERVER_VERSION` and exits 0 immediately, no stdio server involved) and, critically, forces npx
+ * to complete a REAL install before it can even get that far — an unpublished package fails here
+ * with npm's own 404, in a single, clearly-named check, rather than as a confusing raw error
+ * surfacing later inside "tools/list succeeds" (a message shaped for a protocol bug, not a missing
+ * package).
+ */
+async function probeRegistryInstall(spec, ctx) {
+  const args = ["-y", `@the-rfp-hub/mcp@${spec}`, "--version"];
+  try {
+    const { stdout } = await execFileAsync("npx", args, {
+      cwd: ctx.repoRoot,
+      timeout: Math.max(ctx.timeoutMs, 30000),
+    });
+    return { ok: true, detail: stdout.trim().slice(0, 200) || "resolved" };
+  } catch (err) {
+    const stderr = (err.stderr ?? "").toString().trim();
+    return { ok: false, detail: (stderr || err.message).slice(0, 800) };
+  }
 }
 
 /** Pull a JSON-shaped result out of a `tools/call` response, trying structuredContent first. */
@@ -107,10 +146,13 @@ async function spawnClient(resolved, env, ctx, unset = []) {
 }
 
 export async function checkMcp(report, ctx) {
+  const local = ctx.mcpSpec === "local";
   const c = report.criterion(
     "M4-4",
-    "MCP server installable and callable",
-    "tools/list has search_opportunities and fetch_opportunity and NOT submit_opportunity without the env; search matches the API in ids; no rfph_ substring leaks anywhere; with the submit env, phase 1 returns pending and performs no network write.",
+    local ? "MCP server callable from a local build" : "MCP server installable and callable",
+    local
+      ? "--mcp-spec local: exercises packages/mcp/dist/cli.js directly. NOT evidence the package is published or installable via npm — see M4-4's other mode for that. tools/list has search_opportunities and fetch_opportunity and NOT submit_opportunity without the env; search matches the API in ids; no rfph_ substring leaks anywhere; with the submit env, phase 1 returns pending and performs no network write."
+      : "npx resolves @the-rfp-hub/mcp from the real npm registry and its CLI actually runs; tools/list has search_opportunities and fetch_opportunity and NOT submit_opportunity without the env; search matches the API in ids; no rfph_ substring leaks anywhere; with the submit env, phase 1 returns pending and performs no network write.",
   );
 
   if (ctx.skip.has("mcp")) {
@@ -118,8 +160,31 @@ export async function checkMcp(report, ctx) {
     return c.finish();
   }
 
-  const resolved = resolveCommand(ctx);
+  let resolved;
+  try {
+    resolved = resolveCommand(ctx);
+  } catch (err) {
+    c.fail("resolve the MCP server under test", err.message);
+    return c.finish();
+  }
   c.info("MCP server under test", resolved.describe);
+
+  if (!resolved.local) {
+    const probe = await probeRegistryInstall(resolved.spec, ctx);
+    c.expect(
+      probe.ok,
+      `npx resolves @the-rfp-hub/mcp@${resolved.spec} from the npm registry and runs`,
+      probe.detail,
+      probe.detail,
+    );
+    if (!probe.ok) {
+      c.skip(
+        "tools/list, search matching, and the submit interlock",
+        "skipped — the package did not resolve from the registry (see the check above)",
+      );
+      return c.finish();
+    }
+  }
 
   // A real server writes an audit-log line under `RFPHUB_MCP_HOME` (default `~/.rfphub`) for
   // EVERY tool call, read or write — `server.ts`'s `guard()` wrapper runs `appendAudit` in a

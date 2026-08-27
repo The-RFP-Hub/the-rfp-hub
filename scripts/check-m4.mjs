@@ -28,6 +28,8 @@
  * exercised · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { normalizeBase } from "./m2-compliance/http.mjs";
 import { checkDocs } from "./m4-compliance/checks/docs.mjs";
 import { checkFrontend } from "./m4-compliance/checks/frontend.mjs";
@@ -60,16 +62,21 @@ Options
   --offline               Skip every network request the docs check would otherwise make
                           (absolute link 2xx/3xx checks, safe-read block execution). Used by the
                           docs-links CI job, which has no deployment to talk to.
-  --mcp-spec <spec>       npm version (or "next") to install via \`npx -y @the-rfp-hub/mcp@<spec>\`
-                          for the MCP check. Default: use packages/mcp/dist/cli.js if it exists in
-                          this checkout, else \`npx -y @the-rfp-hub/mcp@next\`.
+  --mcp-spec <spec>       npm version for the MCP check's \`npx -y @the-rfp-hub/mcp@<spec>\`.
+                          Default: "next" — the REAL npm registry, which is what "installable"
+                          means; before the package is published this fails, honestly. Pass
+                          "local" to exercise packages/mcp/dist/cli.js directly instead (an
+                          explicit opt-out for developing the package before publish — the
+                          criterion is renamed and says plainly it is not evidence of publication).
   --skip <check>          Skip one check by id (repeatable). One of: ${CHECK_IDS.join(", ")}.
                           Still REGISTERS a skip criterion, so the run reports "incomplete".
   --only <check>          Run only this check (repeatable). The others are not registered at all,
                           so a passing scoped run is a clean PASS/exit 0, not "incomplete". Used
                           by the docs-links CI job (\`--only docs\`). Refused together with --skip.
   --json <path>           Where to write the machine-readable report.
-                          Default: m4-compliance-report.json. Use "-" for stdout.
+                          Default: <os.tmpdir()>/m4-compliance-report.json (printed after the run)
+                          — this tool is read-only, and a repo-root default would write into the
+                          caller's own checkout on every run. Use "-" for stdout.
   --concurrency <n>       Requests in flight. Default: 6.
   --timeout <ms>          Per-request/process timeout. Default: 15000.
   --no-color              Plain output.
@@ -126,7 +133,11 @@ async function main() {
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 
-  const jsonPath = opts.json ?? "m4-compliance-report.json";
+  // Default to the OS temp dir, not the repo root: this tool is advertised as read-only, and a
+  // repo-root default would write a report file into the caller's own checkout on every run —
+  // exactly the kind of side effect a "safe to run anywhere, including production" tool must not
+  // have. Printed after the run either way, so it is never a silent location.
+  const jsonPath = opts.json ?? join(tmpdir(), "m4-compliance-report.json");
   const serialized = `${JSON.stringify(report.toJSON(), null, 2)}\n`;
   if (jsonPath === "-") {
     process.stdout.write(serialized);

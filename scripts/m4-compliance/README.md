@@ -8,7 +8,10 @@ node scripts/check-m4.mjs --site https://ethrfps.app --api https://api.ethrfps.a
 ```
 
 Pass/fail per criterion on stdout, a JSON report alongside, non-zero exit on any failure **or on
-any criterion that was never exercised**.
+any criterion that was never exercised**. The report defaults to `os.tmpdir()`, not the repo
+root — a read-only tool that writes into the caller's own checkout on every run would not really be
+read-only — and its path is always printed. Pass `--json <path>` to choose one, or `--json -` for
+stdout.
 
 ---
 
@@ -28,9 +31,9 @@ reasoning as `check-m2.mjs`.
 |---|---|---|
 | `governance` | Governance framework published and linked | The four governance docs (`GOVERNANCE.md`, `REVIEW-CRITERIA.md`, `packages/standard/PROCESS.md`, `PUBLISHERS.md`) exist, their GitHub URLs answer 200, and the site links to `GOVERNANCE.md` from the home page and `/how-it-works` |
 | `publishers` | Public `/publishers` page | The route answers 200; rendered, its slugs equal `GET /v1/publishers`'s, requested with no `Authorization` header |
-| `frontend` | Reference frontend live and behaving | TLS, liveness, `robots.txt` (reported, not failed); rendered: `q` search, a `fundingType` filter and `page=2` each change the result set; the detail page shows the title; both deep-link hrefs (`apply`/`source`) are correct; three viewports have no horizontal overflow |
-| `mcp` | MCP server installable and callable | `tools/list` has the two read tools and not `submit_opportunity` without the env; `search_opportunities` matches the API in ids; no `rfph_` substring anywhere; with the submit env on, phase 1 answers `pending` and makes no network write |
-| `skill` | Agent skill published correctly | `SKILL.md` frontmatter is spec-valid, the file is under 500 lines, and `scripts/search.mjs` — run for real against `--api` — never emits a `description` field |
+| `frontend` | Reference frontend live and behaving | TLS, liveness, `robots.txt` (reported, not failed); rendered: `q` search, a `type` filter and `page=2` each change the result set, and an EMPTY result is never accepted as proof of that; the detail page shows the title; both deep-link hrefs (`apply`/`source`) are correct; three viewports have no horizontal overflow |
+| `mcp` | MCP server installable and callable | By default, `npx` actually resolves `@the-rfp-hub/mcp` from the npm registry and runs (fails, by name, before publish — see `--mcp-spec`); `tools/list` has the two read tools and not `submit_opportunity` without the env; `search_opportunities` matches the API in ids; no `rfph_` substring anywhere; with the submit env on, phase 1 answers `pending` and makes no network write |
+| `skill` | Agent skill published correctly | `.claude-plugin/marketplace.json` and the skill's `SKILL.md` are published on GitHub (`main`, fetched via raw — see `--mcp-spec`'s sibling reasoning); the local `SKILL.md` frontmatter is spec-valid, the file is under 500 lines, and `scripts/search.mjs` — run for real against `--api` — never emits a `description` field |
 | `docs` | Handoff documentation | The four `docs/*.md` guides exist, every link resolves, and only `safe-read` `sh` blocks are ever executed |
 
 Skip any of them with `--skip <id>` (repeatable).
@@ -61,18 +64,26 @@ the network.
 
 ## `--mcp-spec`
 
-Controls what `mcp.mjs` spawns:
+Controls what `mcp.mjs` spawns, and it defaults to testing the REAL thing:
 
-1. `--mcp-spec <spec>` → `npx -y @the-rfp-hub/mcp@<spec>` (an exact npm version, or `next`).
-2. Otherwise, if `packages/mcp/dist/cli.js` exists in this checkout → `node <that file>`. This is
-   what makes the check runnable **before the package is ever published** — `packages/mcp` is built
-   by a different stream, concurrently with this checker.
-3. Otherwise, `npx -y @the-rfp-hub/mcp@next` as a last resort. Before the package is published this
-   fails loudly (`npm error 404 ...`) and the check reports that verbatim — it does not swallow it.
+1. No `--mcp-spec`, or `--mcp-spec <version>` / `--mcp-spec next` → `npx -y
+   @the-rfp-hub/mcp@<spec>` (default spec `next`) — the npm registry, which is what
+   "installable" has to mean for the criterion's own name to be true. A dedicated check
+   (`npx resolves @the-rfp-hub/mcp@<spec> from the npm registry and runs`, via `npx ... --version`)
+   runs first and FAILS, by name, before the package is published — it is never downgraded to a
+   note, and the rest of the criterion's checks are cleanly skipped rather than each failing with
+   a redundant copy of the same npm error.
+2. `--mcp-spec local` → the EXPLICIT opt-out: `node <repo-root>/packages/mcp/dist/cli.js`. For
+   developing `packages/mcp` (or this checker) before publish. The criterion is renamed to "MCP
+   server callable from a local build" and its own description says plainly that this mode is not
+   evidence of publication.
 
-The local-build path (2) resolves the `dist/cli.js` path through `fs.realpathSync` before spawning
-it, not merely `path.join`. Found by actually spawning a real built `packages/mcp` for the first
-time (unit tests and every pre-publish run before that only ever exercised the npx-404 fallback):
+An earlier revision of this file did the opposite: it silently preferred a local build whenever one
+existed, with the registry only a last resort — so "MCP server installable and callable" could PASS
+without npm ever being involved. That was the over-claim; this is the fix.
+
+The local-build path resolves the `dist/cli.js` path through `fs.realpathSync` before spawning it,
+not merely `path.join`. Found by actually spawning a real built `packages/mcp` for the first time:
 `cli.ts`'s own entrypoint guard compares `fileURLToPath(import.meta.url)` (which Node resolves
 through any symlink) against `path.resolve(process.argv[1])` (which does not), and a `--repo-root`
 under `os.tmpdir()` — `/tmp` → `/private/tmp` on macOS — made the two disagree. `isEntrypoint` came

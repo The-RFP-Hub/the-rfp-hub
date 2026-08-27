@@ -13,19 +13,21 @@ import { withPage } from "../browser.mjs";
 /**
  * Extract the set of slugs the rendered `/publishers` page actually shows, and how.
  *
- * Two selectors, in order of preference:
+ * Two selectors, tried in order of preference:
  *
- *   1. `[data-publisher-slug]` — the robust, purpose-built attribute this checker WOULD prefer.
- *      It does not exist in the markup as landed on `brunodmsi/m4-frontend-publishers`
- *      (`packages/frontend/src/app/publishers/page.tsx`), so this branch exists for the day the
- *      frontend stream adds it — see the WARN this check raises when extraction finds nothing at
- *      all, which names the attribute explicitly for whoever picks that up.
- *   2. `article.publisher-card code` — what the markup actually renders today: each card carries
- *      `<code>{slug}:…</code>` as "the namespace every one of this organization's ids is prefixed
- *      with" (the component's own comment). The slug is the text before the first `:` — the
- *      trailing `:…` is decoration, not part of the identifier, and a Standard slug cannot itself
- *      contain a colon (ids are `<namespace>:<local>`, so a colon inside the namespace half would
- *      make an id unparseable).
+ *   1. `[data-publisher-slug]` — the robust, purpose-built attribute. It DOES exist in the markup
+ *      (`packages/frontend/src/app/publishers/page.tsx`'s `PublisherCard`, on the `<article
+ *      className="card publisher-card" data-publisher-slug={publisher.slug}>` element itself) —
+ *      added by the frontend stream specifically because an earlier revision of this check's WARN
+ *      named the attribute explicitly when extraction found nothing. This is now the path that
+ *      actually runs; a prior revision of this comment still described it as aspirational, which
+ *      it no longer is.
+ *   2. `article.publisher-card code` — the fallback, kept for robustness against a markup change
+ *      that ever drops the attribute again: each card also carries `<code>{slug}:…</code>` as "the
+ *      namespace every one of this organization's ids is prefixed with" (the component's own
+ *      comment). The slug is the text before the first `:` — the trailing `:…` is decoration, not
+ *      part of the identifier, and a Standard slug cannot itself contain a colon (ids are
+ *      `<namespace>:<local>`, so a colon inside the namespace half would make an id unparseable).
  *
  * Returns `{ renderedSlugs, extractionUsed }`, where `extractionUsed` is `"data-publisher-slug"`,
  * `"article.publisher-card code"`, or `"none"` when neither selector matched anything — the caller
@@ -137,7 +139,7 @@ export async function checkPublishers(report, ctx) {
       // "missing" — that would be a wrong diagnosis, not a right one.
       c.warn(
         "every API slug appears in the rendered page, and only those slugs",
-        `could not extract any rendered slug (looked for "[data-publisher-slug]", then "article.publisher-card code") — if the markup changed, the most robust fix is a dedicated data-publisher-slug attribute on the card`,
+        `could not extract any rendered slug (looked for "[data-publisher-slug]", then "article.publisher-card code") — both exist in packages/frontend/src/app/publishers/page.tsx today, so this means the markup has since been renamed or removed; check PublisherCard directly`,
       );
     } else {
       const rendered = new Set(renderedSlugs);
