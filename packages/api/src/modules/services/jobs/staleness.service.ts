@@ -31,6 +31,15 @@
  * with rolling deadlines that somebody touched last week — is *correctly* left alone, and is why
  * `processed` rather than `remaining` is what tells a runner whether to go round again.
  *
+ * A ROW THAT THROWS IS SKIPPED; A PASS IN WHICH EVERY ATTEMPTED WRITE THREW IS A FAILED RUN. The
+ * walk catches per row so one poison entry does not abandon every candidate after it — the walk is
+ * ordered by id, so that would be the same tail every night. But a pass in which every write it
+ * attempted was refused is not a poison row, it is a broken deployment, and
+ * `StalenessSettleFailure` makes it exit 1 instead of reporting a counter nobody reads. The
+ * denominator is attempted WRITES: most candidates need no change and open no transaction at all,
+ * and one that opens a transaction and correctly changes nothing is still evidence the database is
+ * accepting work.
+ *
  * `updated_at` IS DELIBERATELY NOT TOUCHED, by either pass. Two things read it:
  *   - this job's own inactivity clock is `coalesce(last_seen_at, updated_at)`, so bumping it would
  *     reset the very timer that selected the row;
@@ -62,16 +71,65 @@ export interface StalenessOptions {
   now?: Date;
 }
 
+export interface StalenessLogger {
+  error(payload: Record<string, unknown>, message: string): void;
+}
+
+/**
+ * EVERY WRITE THE PASS ATTEMPTED FAILED. Thrown, so the run is RED.
+ *
+ * Per-row isolation is right for a poison row and wrong for a broken deployment, and the two are
+ * indistinguishable one row at a time. A pass in which every write it attempted was refused has
+ * produced no evidence that writing works at all — a check constraint added to `audit_log`, a
+ * revoked grant, a full disk. Reporting that as `{processed: 0, failed: 380, remaining: 0}` and
+ * exiting 0 is a green nightly run in which the staleness pass has silently stopped happening, and
+ * the open-data export publishes programmes that are over until somebody reads the counters by
+ * hand.
+ *
+ * THE DENOMINATOR IS ATTEMPTED WRITES, NOT ROWS SETTLED, and the difference is a real night. Most
+ * candidates on any given night need no change at all: they are examined, found correct, and left
+ * alone without a transaction ever being opened. Meanwhile a write can be attempted and correctly
+ * do nothing — the locked re-read finds a publisher already resolved the entry, so the transaction
+ * commits having changed no row and `processed` does not move. Judging by "did anything settle"
+ * would call that pass systemic the moment one unrelated row went bad, which is exactly the
+ * over-reaction the per-row catch exists to prevent. Judging by "did every attempt fail" asks the
+ * question the counters can actually answer.
+ */
+export class StalenessSettleFailure extends Error {
+  constructor(
+    readonly failed: number,
+    readonly attemptedWrites: number,
+    readonly examined: number,
+    cause: unknown,
+  ) {
+    super(
+      `staleness wrote nothing: all ${failed} of the ${attemptedWrites} write(s) it attempted failed, over ${examined} candidate(s). First cause: ${
+        cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause)
+      }`,
+      { cause },
+    );
+    this.name = "StalenessSettleFailure";
+  }
+}
+
+const consoleLogger: StalenessLogger = {
+  error(payload, message) {
+    console.error(message, JSON.stringify(payload));
+  },
+};
+
 export class StalenessService {
   private readonly config: AppConfig;
   private readonly repos: Repositories;
+  private readonly logger: StalenessLogger;
 
   constructor(
     private readonly db: DB = defaultDb,
-    options: { config?: AppConfig } = {},
+    options: { config?: AppConfig; logger?: StalenessLogger } = {},
   ) {
     this.config = options.config ?? defaultConfig;
     this.repos = repositories(db);
+    this.logger = options.logger ?? consoleLogger;
   }
 
   /**
@@ -88,6 +146,12 @@ export class StalenessService {
 
     let examined = 0;
     let processed = 0;
+    let failed = 0;
+    // Rows for which a transaction was OPENED — the denominator the systemic test divides by. A
+    // candidate that needs no change never gets here, and a write that commits having changed
+    // nothing still counts, because it proves the database took the work.
+    let attemptedWrites = 0;
+    let firstCause: unknown;
     let cursor = 0;
     const closed: Record<StalenessReason, number> = { past_due: 0, inactive: 0 };
     let recomputed = 0;
@@ -98,12 +162,49 @@ export class StalenessService {
       for (const row of page) {
         cursor = row.id;
         examined++;
-        const outcome = await this.settle(row, now, inactiveBefore);
+        let outcome: Awaited<ReturnType<StalenessService["settle"]>>;
+        // Counted from inside `settle`, at the moment it commits to opening a transaction, because
+        // that is the only place that knows — and it has to be recorded BEFORE the write can throw,
+        // or the failing rows would never appear in their own denominator.
+        const noteWriteAttempt = () => {
+          attemptedWrites++;
+        };
+        try {
+          outcome = await this.settle(row, now, inactiveBefore, noteWriteAttempt);
+        } catch (error) {
+          // ONE POISON ROW MUST NOT END THE WALK — the same rule both backfills already keep, and
+          // it matters more here. `settle` opens a transaction per row, so a deadlock victim, a
+          // lock timeout or a constraint nobody anticipated is a per-row failure; letting it out
+          // abandons every candidate after it, and because the walk is ordered by id the SAME
+          // rows are abandoned every night. The row stays in the predicate for the next run, which
+          // is precisely the cursor contract.
+          failed++;
+          if (failed === 1) firstCause = error;
+          this.logger.error(
+            {
+              job: "staleness",
+              opportunityId: row.id,
+              error: error instanceof Error ? error.name : typeof error,
+              reason: error instanceof Error ? error.message : String(error),
+            },
+            "staleness could not settle an entry",
+          );
+          continue;
+        }
         if (outcome === "unchanged") continue;
         processed++;
         if (outcome === "recomputed") recomputed++;
         else closed[outcome]++;
       }
+    }
+
+    // SYSTEMIC FAILURE IS NOT A COUNTER, IT IS AN EXIT CODE — but only when the counters actually
+    // say so. Every failure happens inside a transaction, so the failed rows are a subset of the
+    // attempted ones, and `failed === attemptedWrites` is precisely "every write this pass tried
+    // was refused". One bad row among writes that succeeded leaves `failed < attemptedWrites` and
+    // stays a counter, which is the whole point of catching per row in the first place.
+    if (failed > 0 && failed === attemptedWrites) {
+      throw new StalenessSettleFailure(failed, attemptedWrites, examined, firstCause);
     }
 
     return {
@@ -116,15 +217,26 @@ export class StalenessService {
         closedPastDue: closed.past_due,
         closedInactive: closed.inactive,
         deadlinesRecomputed: recomputed,
+        // Rows that threw and were skipped. A run that swallowed them silently would report a
+        // clean `processed` while the same entries went unsettled indefinitely.
+        failed,
       },
     };
   }
 
-  /** Decide and apply one entry's fate. */
+  /**
+   * Decide and apply one entry's fate.
+   *
+   * `noteWriteAttempt` is called at each point this method commits to opening a transaction, and
+   * before anything inside it can throw — the caller uses it as the denominator for deciding
+   * whether a pass failed systemically or merely hit a bad row. A candidate that needs no change
+   * returns without calling it, which is the common case on any given night.
+   */
   private async settle(
     row: OpportunityRow,
     now: Date,
     inactiveBefore: Date,
+    noteWriteAttempt: () => void = () => undefined,
   ): Promise<"unchanged" | "recomputed" | StalenessReason> {
     const next = nextDeadlineAt(row.deadlines, now);
     const nextChanged = (next?.getTime() ?? null) !== (row.nextDeadlineAt?.getTime() ?? null);
@@ -132,6 +244,7 @@ export class StalenessService {
     const reason = this.closureReason(row, next, now, inactiveBefore);
     if (reason === null) {
       if (!nextChanged) return "unchanged";
+      noteWriteAttempt();
       // THE SAME LOCKED RE-READ THE CLOSURE BRANCH USES, for the same reason and against a key
       // that is read far more often. `next_deadline_at` is derived from `deadlines`, and a
       // publisher's `PUT` between the walk's SELECT and this UPDATE has already recomputed it from
@@ -156,6 +269,7 @@ export class StalenessService {
     // the row out of contention (closed it themselves, or resolved the condition), the transaction
     // correctly does nothing — and the caller has to be told that, or it reports an entry as
     // processed and closed for a mutation that never happened.
+    noteWriteAttempt();
     return withTransaction(this.db, async (repos): Promise<"unchanged" | StalenessReason> => {
       // Re-read under a row lock: a publisher editing this entry between the walk's SELECT and this
       // UPDATE must win, because their edit is the newer statement of fact.

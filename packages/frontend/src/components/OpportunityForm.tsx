@@ -46,7 +46,12 @@ import {
 } from "@/components/form-fields";
 import { ActionNote, actionErrorNote } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { describeDuplicateCheck, formatInstant, formatSimilarity } from "@/lib/format";
+import {
+  describeDuplicateCheck,
+  formatInstant,
+  formatMatchReasons,
+  formatSimilarity,
+} from "@/lib/format";
 import {
   BEFORE_DRAFTS_CLEARED_EVENT,
   canonicalForm,
@@ -2134,7 +2139,11 @@ function SubmissionOutcome({
           <ul>
             {result.duplicates.map((match) => (
               <li key={match.id}>
-                <strong>{formatSimilarity(match.similarity)}</strong> —{" "}
+                <strong>{formatSimilarity(match.similarity)}</strong>
+                {formatMatchReasons(match.matchedOn).length > 0 && (
+                  <> ({formatMatchReasons(match.matchedOn).join(", ")})</>
+                )}{" "}
+                —{" "}
                 <GuardedLink
                   href={`${match.isPublic ? "/opportunities" : "/listings"}/${encodeURIComponent(match.id)}`}
                 >

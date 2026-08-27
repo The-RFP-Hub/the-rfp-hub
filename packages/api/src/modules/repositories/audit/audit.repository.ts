@@ -49,6 +49,36 @@ export class AuditRepository {
     });
   }
 
+  /**
+   * Whether publisher ownership of this entry has ever been GRANTED away by a claim.
+   *
+   * THE DURABLE MARKER the write path needs, and the reason it is read from the trail rather than
+   * from `opportunity_claims`: an immediate grant to a verified operating organization settles any
+   * PENDING claim row and inserts none when there is nothing to settle, so the claims table is
+   * silent about the most common grant there is. Both grant paths — the immediate one and a
+   * reviewer's approval — record `grant_publisher` against the OPPORTUNITY, and `audit_log` is
+   * append-only (migration 0004 refuses `UPDATE`) and carries no foreign keys, so nothing removes
+   * the row afterwards. `subject_kind` is part of the predicate because the same action is also
+   * recorded against an ORGANIZATION when a reviewer grants somebody a publisher membership, which
+   * is a different event that happens to share a verb.
+   *
+   * Covered by `ix_audit_subject` — `(subject_kind, subject_id, …)` is its leading pair.
+   */
+  async hasPublisherGrant(opportunityId: number): Promise<boolean> {
+    const rows = await this.exec
+      .select({ id: auditLog.id })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.subjectKind, "opportunity"),
+          eq(auditLog.subjectId, opportunityId),
+          eq(auditLog.action, "grant_publisher"),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
   async list(
     subjectKind: AuditSubjectKind,
     subjectId: number,

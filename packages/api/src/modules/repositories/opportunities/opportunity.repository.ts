@@ -13,6 +13,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   lte,
   max,
   or,
@@ -221,13 +222,22 @@ export class OpportunityRepository {
     return rows[0];
   }
 
-  /** Idempotent seed ingest; preserve the Hub's original creation timestamp on conflict. */
-  async upsertByPublicId(values: OpportunityInsert): Promise<void> {
+  /**
+   * Idempotent seed ingest; preserve the Hub's original creation timestamp on conflict.
+   *
+   * RETURNS THE STORED ROW, on both arms of the conflict. The caller has to audit what it wrote,
+   * and it cannot: it does not know the surrogate id of a row it may have just inserted, and
+   * re-reading afterwards would be a second round trip answering a question this statement already
+   * has the answer to.
+   */
+  async upsertByPublicId(values: OpportunityInsert): Promise<OpportunityRow | undefined> {
     const { createdAt, ...onUpdate } = values;
-    await this.exec
+    const rows = await this.exec
       .insert(opportunities)
       .values(values)
-      .onConflictDoUpdate({ target: opportunities.publicId, set: onUpdate });
+      .onConflictDoUpdate({ target: opportunities.publicId, set: onUpdate })
+      .returning();
+    return rows[0];
   }
 
   async update(
@@ -257,21 +267,30 @@ export class OpportunityRepository {
     await this.exec.update(opportunities).set(values).where(eq(opportunities.id, id));
   }
 
-  async listPendingVerificationIds(limit: number): Promise<number[]> {
+  /**
+   * Entries owed a source check, NEVER-CHECKED FIRST.
+   *
+   * The order is the whole reason this is not `ORDER BY id`. `limit` is a nightly cap, so when the
+   * predicate matches more than the cap the order decides who is dropped — and an entry nobody has
+   * ever fetched is worth more than one whose check is a month old. `verified_at ASC NULLS FIRST`
+   * puts the never-checked at the head and then works through the stalest; `id` breaks ties so a
+   * capped run is deterministic rather than at the planner's discretion.
+   */
+  async listPendingVerificationIds(limit: number, recheckBefore: Date | null): Promise<number[]> {
     const rows = await this.exec
       .select({ id: opportunities.id })
       .from(opportunities)
-      .where(this.pendingVerificationFilter())
-      .orderBy(asc(opportunities.id))
+      .where(this.pendingVerificationFilter(recheckBefore))
+      .orderBy(sql`${opportunities.verifiedAt} asc nulls first`, asc(opportunities.id))
       .limit(limit);
     return rows.map((row) => row.id);
   }
 
-  async countPendingVerification(): Promise<number> {
+  async countPendingVerification(recheckBefore: Date | null): Promise<number> {
     const rows = await this.exec
       .select({ value: count() })
       .from(opportunities)
-      .where(this.pendingVerificationFilter());
+      .where(this.pendingVerificationFilter(recheckBefore));
     return rows[0]?.value ?? 0;
   }
 
@@ -531,14 +550,32 @@ export class OpportunityRepository {
     }
   }
 
-  private pendingVerificationFilter(): SQL | undefined {
+  /**
+   * Owed a check: has a URL to fetch, is not a merged-away duplicate, and one of three things is
+   * true — never checked, edited since its last check, or that check has simply gone stale.
+   *
+   * THE THIRD CLAUSE IS THE ONE THAT KEEPS THE CORPUS ALIVE. Without it the first two retire an
+   * entry permanently: `applyVerification` deliberately does not touch `updated_at` (a bump would
+   * reset the staleness clock and re-queue the row forever), so once `verified_at` is set,
+   * `verified_at < updated_at` is false and stays false. A seeded, never-edited entry was therefore
+   * checked exactly once, in the week it was imported, and never looked at again — while
+   * `staleness` closes rolling and no-deadline entries whose `coalesce(last_seen_at, updated_at)`
+   * is 90 days old, and only a MATCHED check refreshes `last_seen_at`. One check, then silence,
+   * then a mass auto-close ninety days later.
+   *
+   * `recheckBefore` is `now - VERIFY_RECHECK_DAYS`. NULL disables the TTL clause entirely, which is
+   * what a caller asking "what is owed a check on the old rules?" wants.
+   */
+  private pendingVerificationFilter(recheckBefore: Date | null): SQL | undefined {
+    const owed = [
+      isNull(opportunities.verifiedAt),
+      sql`${opportunities.verifiedAt} < ${opportunities.updatedAt}`,
+      ...(recheckBefore === null ? [] : [lt(opportunities.verifiedAt, recheckBefore)]),
+    ];
     return and(
       isNotNull(opportunities.applicationUrl),
       isNull(opportunities.mergedIntoId),
-      or(
-        isNull(opportunities.verifiedAt),
-        sql`${opportunities.verifiedAt} < ${opportunities.updatedAt}`,
-      ),
+      or(...owed),
     );
   }
 

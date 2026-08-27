@@ -18,13 +18,16 @@ import { describe, expect, it } from "vitest";
 import { buildIdfTable } from "../../scripts/build-idf-table.js";
 import {
   type CorpusDocument,
+  defaultRule,
   deriveMutationPositives,
   derivePairs,
   hardestNegatives,
+  hardestOverlapNegatives,
   loadCorpus,
   sweep,
 } from "../../scripts/dedupe-threshold-report.js";
-import { DEFAULT_SIMILARITY_THRESHOLD } from "../../src/config.js";
+import { DEFAULT_OVERLAP_THRESHOLD, DEFAULT_SIMILARITY_THRESHOLD } from "../../src/config.js";
+import { overlap as overlapOf } from "../../src/modules/services/dedupe/duplicate-signal.js";
 import {
   LexicalEmbeddingProvider,
   cosineSimilarity,
@@ -32,6 +35,7 @@ import {
 import { embeddingText } from "../../src/modules/shared/embedding-text.js";
 
 const THRESHOLD = DEFAULT_SIMILARITY_THRESHOLD.lexical;
+const OVERLAP_MIN = DEFAULT_OVERLAP_THRESHOLD.lexical;
 const corpus = loadCorpus();
 const result = sweep(corpus, THRESHOLD);
 
@@ -86,6 +90,132 @@ describe("dedupe threshold, against the committed corpus", () => {
     expect(again.negatives).toEqual(result.negatives);
     expect(again.hardestCorpusNegatives).toEqual(result.hardestCorpusNegatives);
     expect(again.mutations).toEqual(result.mutations);
+    // The overlap arm's inputs are part of the fixture now: an `overlap` or `minTokens` that moved
+    // between two runs would mean the norm or the token count is not a pure function of the text.
+    expect(again.hardestCorpusOverlaps).toEqual(result.hardestCorpusOverlaps);
+    expect(again.stubAttack).toEqual(result.stubAttack);
+    expect(again.conjunction).toEqual(result.conjunction);
+  });
+});
+
+/**
+ * THE OVERLAP ARM'S EVIDENCE.
+ *
+ * The same discipline as the lexical arm above and the same failure meaning: a red build here is
+ * the corpus having grown a pair the operating point no longer separates, not a stale test.
+ *
+ * One caveat governs every positive-side number in this block. The positives are MUTATED SELVES, so
+ * a subset of them has an overlap near 1 by construction; "full recall on M3" is not a discovery.
+ * All the evidential weight is on the negative side — 12 720 real pairs, hardest 0.682 — and the
+ * assertions are written so that side is what can fail.
+ */
+describe("the overlap arm, against the committed corpus", () => {
+  const rung = (id: string) => {
+    const found = result.mutations.find((m) => m.id === id);
+    if (!found) throw new Error(`no mutation report for ${id}`);
+    return found;
+  };
+
+  /**
+   * The pair of rungs that motivate the arm existing at all: both are missed by cosine at the
+   * configured threshold (asserted above, and kept), and both are recovered in full by the
+   * combined rule with a wide overlap margin.
+   */
+  it("recovers M3 and M5 in full under the combined rule", () => {
+    expect(rung("M3").recallCombined).toBe(rung("M3").count);
+    expect(rung("M5").recallCombined).toBe(rung("M5").count);
+    expect(rung("M3").worstOverlap).toBeGreaterThan(OVERLAP_MIN);
+    expect(rung("M5").worstOverlap).toBeGreaterThan(OVERLAP_MIN);
+  });
+
+  it("catches every rung M0–M7 under the combined rule", () => {
+    const missed = result.mutations.filter((m) => m.recallCombined < m.count);
+    expect(missed.map((m) => `${m.id} ${m.recallCombined}/${m.count}`)).toEqual([]);
+  });
+
+  /**
+   * M7 is M5's text mutation with `applicationUrl`, `website` and `operatingOrganizations` blanked
+   * on the right-hand side. It is the ONLY rung that carries evidence about structural fields —
+   * every other rung preserves them by construction — and what it says is that the decision does
+   * not depend on them.
+   */
+  it("still catches M7, where the re-lister copied no structural field", () => {
+    expect(rung("M7").recallCombined).toBe(rung("M7").count);
+  });
+
+  it("has zero false positives over every distinct corpus pair, COMBINED", () => {
+    expect(
+      result.corpusPairsAcceptedCombined,
+      `corpus pairs accepted by the combined rule: ${JSON.stringify(
+        result.hardestCorpusOverlaps.slice(0, 3),
+      )}`,
+    ).toBe(0);
+  });
+
+  it("keeps a usable overlap band between the two classes", () => {
+    expect(result.worstPositiveOverlap).toBeGreaterThan(result.hardestNegativeOverlap);
+    expect(result.overlapBand).toBeGreaterThan(0.15);
+  });
+
+  it("sits the overlap operating point inside its band rather than on an edge", () => {
+    expect(OVERLAP_MIN).toBeGreaterThan(result.hardestNegativeOverlap + 0.05);
+    expect(OVERLAP_MIN).toBeLessThan(result.worstPositiveOverlap - 0.05);
+  });
+
+  /**
+   * THE STUB-ATTACK REGRESSION, and the number to read is `marginalWins`.
+   *
+   * `armAWins` is 160/160 at a median winning stub of 5 tokens: the attack works against the
+   * detector that ALREADY SHIPPED, it is filed as its own issue, and this change neither creates
+   * nor worsens it. What this change is accountable for is the exposure it ADDS, and that is
+   * asserted at exactly zero — every target arm B reaches was already reachable through arm A.
+   * `armBWins` is pinned as an inequality because the absolute figure is a property of this corpus
+   * and will move as the corpus grows; the marginal figure is a property of the rule.
+   */
+  it("adds no new stub-attack exposure over the already-shipped lexical arm", () => {
+    expect(result.stubAttack.targets).toBeGreaterThanOrEqual(100);
+    expect(result.stubAttack.marginalWins).toBe(0);
+    expect(result.stubAttack.armBWins).toBeLessThanOrEqual(3);
+  });
+
+  /**
+   * The guard's justification, kept executable rather than left in a commit message: without the
+   * 20-token floor the same attack wins on most of the corpus. A future contributor who lowers
+   * `MIN_TOKENS` to recover recall on short entries will see exactly what it costs.
+   */
+  it("shows MIN_TOKENS is load-bearing, not decorative", () => {
+    expect(result.stubAttack.armBWinsWithoutTokenGuard).toBeGreaterThanOrEqual(100);
+    expect(result.stubAttack.armBWins).toBeLessThanOrEqual(3);
+  });
+
+  /**
+   * THE REJECTED ALTERNATIVE, pinned so it cannot be re-proposed without new data. A structural
+   * conjunction band `(url ∨ org) ∧ overlap ≥ C_low` needs `C_low` above the hardest corroborated
+   * negative — which is the SAME pair and the SAME value as the global hardest — while every rung's
+   * worst overlap is already far above that. The band catches nothing, and since a stub attacker
+   * copies `applicationUrl` for free it would make §0.3's attack easier, not harder.
+   */
+  it("shows the structural conjunction band would catch nothing", () => {
+    expect(result.conjunction.corroboratedPairs).toBeGreaterThan(0);
+    expect(result.conjunction.hardestCorroboratedOverlap).toBe(result.conjunction.hardestOverlap);
+    const worstRung = Math.min(...result.mutations.map((m) => m.worstOverlap));
+    expect(worstRung).toBeGreaterThan(result.conjunction.hardestCorroboratedOverlap);
+  });
+
+  /**
+   * The corpus's genuinely hard negatives, named: the Arbitrum DDA tracks, the Rocket Pool GMC
+   * rounds, the Road to Devcon regional programmes, the SSV grant/bounty pair. A new funder family
+   * that closes the band should surface here with a name attached.
+   */
+  it("keeps the named funder families below both arms", () => {
+    const caught = result.structuralNegativeScores.filter(
+      (pair) =>
+        pair.similarity >= THRESHOLD ||
+        (pair.minTokens >= result.rule.overlapMinTokens &&
+          pair.similarity >= result.rule.overlapMinSimilarity &&
+          pair.overlap >= OVERLAP_MIN),
+    );
+    expect(caught, `structural negatives caught: ${JSON.stringify(caught)}`).toEqual([]);
   });
 });
 
@@ -114,14 +244,17 @@ describe("the mutation ladder, at the configured threshold", () => {
   /**
    * THE ACKNOWLEDGED LIMITS, recorded rather than hidden — and scoped honestly: at the CONFIGURED
    * threshold, chosen mid-band for false-positive headroom, a body truncated to 40% (M3) or
-   * truncated AND compressed AND reordered (M5) is missed. The same featurizer recovers both at
-   * its zero-false-positive point (the report prints that column), so "missed" is a property of
-   * the conservative operating point, not an absolute bound of lexical methods — closing the gap
-   * without spending the headroom is the case for structural signals, which need their own
-   * labelled data first. A ladder that silently omitted the rungs we fail would be a test that
-   * lies.
+   * truncated AND compressed AND reordered (M5) is missed BY THE LEXICAL ARM ALONE. The same
+   * featurizer recovers both at its zero-false-positive point (the report prints that column), so
+   * "missed" is a property of the conservative operating point, not an absolute bound of lexical
+   * methods.
+   *
+   * KEPT, and retitled, now that the overlap arm catches both rungs in full: this is what makes
+   * arm B's contribution ATTRIBUTABLE. Delete it and nothing distinguishes "the second arm earns
+   * its keep" from "the corpus got easier". A ladder that silently omitted the rungs one arm fails
+   * would be a test that lies.
    */
-  it("records M3 and M5 as missed at the configured threshold", () => {
+  it("records M3 and M5 as missed by the lexical arm alone", () => {
     expect(recall("M3")).toBe(0);
     expect(recall("M5")).toBe(0);
   });
@@ -150,6 +283,39 @@ describe("the frozen idf table", () => {
 
     expect(positives.length).toBeGreaterThanOrEqual(8);
     expect(worstPositive - hardestNegative).toBeGreaterThanOrEqual(0.2);
+  });
+
+  /**
+   * The same falsification for the overlap arm: weights from one half, band measured on the other.
+   * The out-of-sample band is narrower than the in-sample one (0.195 against 0.274) — as it should
+   * be — and the floor is set below the measured value so honest degradation is not a red build
+   * while a collapse is.
+   */
+  it("generalises the OVERLAP band to held-out documents — at least 0.15 on the unseen half", () => {
+    const training = corpus.filter((_, index) => index % 2 === 1);
+    const heldOut = corpus.filter((_, index) => index % 2 === 0);
+    const provider = new LexicalEmbeddingProvider({ table: buildIdfTable(training) });
+    const rule = defaultRule();
+
+    const positives = ["M0", "M3", "M5", "M6", "M7"].flatMap((id) =>
+      deriveMutationPositives(heldOut, id as "M0").map((pair) => {
+        const left = provider.embedSyncDetailed(embeddingText(pair.left));
+        const right = provider.embedSyncDetailed(embeddingText(pair.right));
+        return (
+          overlapOf({
+            similarity: cosineSimilarity(left.vector, right.vector),
+            leftNorm: left.norm,
+            rightNorm: right.norm,
+          }) ?? 0
+        );
+      }),
+    );
+    const worstPositive = Math.min(...positives);
+    const hardestNegative = hardestOverlapNegatives(heldOut, provider, 1, rule)[0]?.overlap ?? 1;
+
+    expect(positives.length).toBeGreaterThanOrEqual(8);
+    expect(worstPositive).toBeGreaterThan(hardestNegative);
+    expect(worstPositive - hardestNegative).toBeGreaterThanOrEqual(0.15);
   });
 });
 

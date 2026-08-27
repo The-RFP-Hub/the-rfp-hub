@@ -538,7 +538,7 @@ describe("the public opportunity page", () => {
 
     await screen.findByText(HOSTILE_TITLE);
     expect(find).toHaveBeenCalledWith("acme:round-4");
-    expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`);
+    await waitFor(() => expect(document.title).toBe(`${HOSTILE_TITLE} | RFP Hub`));
   });
 
   it("renders the record's public fields", async () => {

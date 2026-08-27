@@ -443,6 +443,7 @@ describe("M3 closed components vs their view types", () => {
     title: "Other",
     isPublic: true,
     similarity: 0.91,
+    matchedOn: ["lexical", "operating_org"],
     status: "suspected",
     detectedAt: "2026-08-14T00:00:00.000Z",
   };
@@ -481,6 +482,8 @@ describe("M3 closed components vs their view types", () => {
     id: 1,
     status: "suspected",
     similarity: 0.91,
+    signal: { arm: "overlap", lexical: 0.612, overlap: 1.031, minTokens: 59 },
+    matchedOn: ["overlap", "application_url"],
     detectedAt: "2026-08-14T00:00:00.000Z",
     reviewedAt: null,
     left: duplicateSide,

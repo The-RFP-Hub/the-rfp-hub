@@ -135,12 +135,20 @@ from **either** list, so it keeps passing throughout. A partial move is caught r
 | `EMBEDDING_PROVIDER` | `lexical` \| `disabled` | Needs no key and no network — the in-process lexical featurizer is the default and the detector everywhere, CI included |
 | `DEDUPE_SIMILARITY_THRESHOLD` | per-provider default | Thresholds are **not** comparable between providers |
 | `DEDUPE_MAX_MATCHES` | `5` | |
+| `DEDUPE_OVERLAP_ENABLED` | `true` | The second arm — length-corrected term overlap, which catches a shortened re-listing that cosine cannot. `false` is a real rollback: pairs carry a `rules_key` derived from the effective configuration, so flipping this makes them stale and the nightly `embedding-backfill` retires them within a run or two — no constant to bump, no release to cut. The same is true of every row below |
+| `DEDUPE_OVERLAP_THRESHOLD` | per-provider default (`lexical` 0.85) | **Not bounded by 1** — cosine times a norm ratio, valid range (0, 4]. Not comparable between providers, for the same reason the similarity threshold is not |
+| `DEDUPE_OVERLAP_MIN_TOKENS` | `20` | Distinct tokens required on the shorter side. The only guard measured to blunt a stub built from a target's rarest terms. Lowering it buys recall on short entries with a real exposure; `pnpm --filter @the-rfp-hub/api dedupe:threshold` prints the current trade rather than this row quoting a number that goes stale |
+| `DEDUPE_OVERLAP_MIN_SIMILARITY` | `0.35` | The overlap arm's cosine floor. **Not** a security control — the arm only sees cosine-ordered ANN candidates and this makes that explicit |
 | `NOTIFICATION_QUEUE_MAX` | `100` | Waiting immediate email ids; full → reject the newest id to the nightly durable sweep |
 | `VERIFICATION_ENABLED` | `true` | |
 | `VERIFY_ON_SUBMIT` | `true` | Off in tests |
 | `VERIFY_TIMEOUT_MS` | `10000` | |
 | `VERIFY_MAX_BYTES` | `2097152` | Streamed cap |
 | `VERIFY_QUEUE_MAX` | `100` | Full → the submit-time trigger is skipped and the entry stays in the job's predicate |
+| `VERIFY_RECHECK_DAYS` | `30` | How old a check may be before the entry is fetched again. Without a TTL an entry is checked exactly once, and `staleness` then closes the rolling half of the corpus 90 days later |
+| `VERIFY_NIGHTLY_LIMIT` | `500` | Entries one `verification-backfill` **invocation** checks — not one pass: the job always reports `remaining: 0` so `--passes` cannot multiply it, and to drain a backlog you raise `--limit`. The TTL means the selection never drains, so this cap, not the predicate, is what bounds the nightly run |
+| `VERIFY_HOST_MIN_GAP_MS` | `1000` | Minimum gap between two backfill fetches to the **same host**. A corpus clusters by publisher, so without it a serial pass is dozens of requests to one domain in the seconds it takes that domain to answer them, and a block reads back as "every entry from this publisher stopped matching". It is also what makes one pass minutes long: `POST /v1/admin/jobs/{job}/run` therefore defaults to a 10-entry slice (§4c of `jobs.md`) rather than `VERIFY_NIGHTLY_LIMIT`. **Leave it at the default in every deployment** — `0` disables pacing and exists for the e2e stack, whose only source host is a fixture server the runner itself started |
+| `VERIFICATION_RUNS_KEEP` | `5` | Runs kept per entry. Pruned on every run insertion — manual and submit-time checks included — and again over the backfill's whole selection. Each run carries up to 200 KB of `snapshot_text`, so this is what bounds the table |
 | `VERIFY_ALLOW_PRIVATE_HOSTS` | **never set in ANY deployed task definition** — service or maintenance, staging or production | A deliberate SSRF escape hatch that exists so one integration test can drive the real fetcher against a loopback server. Setting it in a deployment would let a submitted `applicationUrl` reach the instance metadata endpoint and the private network. The process **refuses to boot** with it enabled under `NODE_ENV=production`, so this row is defence in depth rather than the only control |
 | `VERIFIER_EGRESS_PROXY` | optional | The network-layer backstop; application-level address validation should not be the only control |
 | `ANALYTICS_ENABLED` | `true` | |
@@ -356,7 +364,9 @@ starts the same one-off task by hand ([`jobs.md`](./jobs.md) §4a). Either way t
 same:
 
 ```sh
-node packages/api/dist/jobs.js <job> --json      # inside the image, as a container override
+node packages/api/dist/jobs.js all --json        # inside the image, as a container override:
+                                                 # the whole chain, ordered in-process
+node packages/api/dist/jobs.js <job> --json      # or one job by name
 ```
 
 A job is the deployed image with a different command, so it inherits everything already assembled

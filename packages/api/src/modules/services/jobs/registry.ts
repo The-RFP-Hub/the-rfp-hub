@@ -11,8 +11,8 @@
  *   `cursor` — the run retires its own selection, so a runner may go round again while it is still
  *              making progress;
  *   `sweep`  — the run reprocesses a fixed window by design, always reports `remaining: 0`, and is
- *              therefore never looped. The rollup re-selects the last three days on purpose; a
- *              loop-to-zero contract applied to it would not terminate.
+ *              therefore never looped. The rollup re-selects the two days before today on purpose;
+ *              a loop-to-zero contract applied to it would not terminate.
  *
  * The lock is taken per NAME (see `lock.ts`), so `staleness` excludes another `staleness` and
  * nothing else. Two different jobs run concurrently quite happily.
@@ -36,6 +36,33 @@ export interface JobDefinition {
   shape: JobShape;
   /** One line, used by `--help`, the OpenAPI description and `docs/jobs.md`. */
   describes: string;
+  /**
+   * The name that replaced this one. Present only on an alias kept alive for one release so an
+   * external scheduler still naming it gets its work done instead of an exit 2 — see `retention`.
+   * Aliases are not in `CHAIN`, so `jobs.js all` never runs one.
+   */
+  deprecatedFor?: string;
+  /**
+   * What one HTTP-triggered pass may select when the caller named no `limit`.
+   *
+   * Present only on a job whose per-row cost is a network round trip to somebody else's server,
+   * which is to say: only where a pass's wall clock is set by politeness rather than by the
+   * database. `verification-backfill` paces itself at `VERIFY_HOST_MIN_GAP_MS` per host
+   * (`verification/host-pacer.ts`), and a corpus clusters hard by publisher — so its default
+   * selection of `VERIFY_NIGHTLY_LIMIT` is minutes of wall clock. That is correct for the
+   * container task the schedule starts and impossible for `POST /v1/admin/jobs/{job}/run`, where a
+   * reviewer is holding a socket open and every proxy in front of the API has an opinion about how
+   * long that may last.
+   *
+   * A DEFAULT, NOT A CEILING. A caller that names a `limit` gets the one it named: the route is
+   * also how a staging operator asks for a bigger slice, and silently serving a smaller one would
+   * be a worse answer than a slow one. Draining a real backlog is still the container task's job
+   * (`docs/jobs.md` §4a), which has no socket to lose.
+   *
+   * Absent means "no interactive bound", which is the honest answer for every job whose pass is
+   * bounded by its own query.
+   */
+  interactiveLimit?: number;
   run(options: JobRunOptions): Promise<JobResult>;
 }
 
@@ -54,22 +81,45 @@ function dbOf(options: JobRunOptions): DB {
 }
 
 /**
- * Maintenance definitions are in chain order: rollup and prune settle yesterday's traffic, the
- * backfills and notification delivery catch up, and `staleness` runs last because the nightly
- * export is chained to its success. Provider refusals are durable row state rather than thrown job
- * errors, so the notification backstop does not fail the chain merely because mail is unavailable.
+ * THE ARRAY ORDER IS THE CHAIN ORDER, and `staleness` is last in it because it has to be.
+ *
+ * The header above used to say so while the array said otherwise — `staleness` sat fifth, ahead of
+ * `notification-dispatch` — which is exactly the kind of drift a comment cannot be trusted to
+ * police. It matters now beyond tidiness: `--help`, the admin route's enum and (from here on) the
+ * `all` chain runner all read this array in order, so a reader who takes the listing as the running
+ * order is right rather than nearly right.
+ *
+ * Why `staleness` is last is the one real ordering rule the chain carries (`docs/jobs.md` §4d): a
+ * successful source check writes `lastSeenAt`, which is the input to staleness's own inactivity
+ * clock, so staleness running before `verification-backfill` has exited closes entries that check
+ * was about to prove alive — and both runs report success. Everything before it writes nothing the
+ * others read. Provider refusals are durable row state rather than thrown job errors, so the
+ * notification backstop does not fail the chain merely because mail is unavailable.
  */
 export const JOBS: JobDefinition[] = [
   {
     name: "analytics-rollup",
     shape: "sweep",
-    describes: "Recompute the last three days of daily per-entry traffic totals from raw events.",
+    describes:
+      "Recompute the two days before today of per-entry traffic totals, then prune raw events past retention.",
     run: (options) => new AnalyticsRollupService(dbOf(options)).runBatch({ now: options.now }),
   },
   {
+    /**
+     * DEPRECATED, AND KEPT ONLY SO A SCHEDULER OUTSIDE THIS REPOSITORY DOES NOT BREAK.
+     *
+     * The prune runs inside `analytics-rollup` now (`rollup.service.ts` explains why). The name
+     * lives on for one release because the nightly chain is scheduled elsewhere and a caller still
+     * naming `retention` would otherwise exit 2 — a maintenance run that fails loudly for a reason
+     * nobody at the console can act on that night. It does the prune, alone, so a caller running
+     * the old six-job chain gets the same outcome as the new one; a caller running BOTH names
+     * simply prunes twice, which deletes nothing the first pass left.
+     */
     name: "retention",
     shape: "sweep",
-    describes: "Delete raw analytics events older than ANALYTICS_RETENTION_DAYS.",
+    deprecatedFor: "analytics-rollup",
+    describes:
+      "DEPRECATED alias for analytics-rollup, which now prunes. Runs the retention prune alone.",
     run: (options) =>
       new AnalyticsRollupService(dbOf(options)).pruneRetention({ now: options.now }),
   },
@@ -79,8 +129,9 @@ export const JOBS: JobDefinition[] = [
     describes: "Embed entries that have no vector for the configured provider, and pair them.",
     // The immediate-email accelerator is switched OFF here, and only here: a job container tears
     // its pool down as soon as the job resolves, which would strand the fire-and-forget sends this
-    // backfill's new notifications trigger. `notification-dispatch` in the same nightly matrix
-    // delivers them. See `noopNotificationDispatchQueue`. This catalogue is also what the admin
+    // backfill's new notifications trigger. `notification-dispatch` delivers them instead, and
+    // `CHAIN` runs it AFTER this job for that reason — see the note there.
+    // See `noopNotificationDispatchQueue`. This catalogue is also what the admin
     // job route runs, so an admin-triggered backfill takes the same durable path rather than the
     // accelerator — the alternative was a per-caller mode flag on a job definition, which is a
     // worse thing to own than a backfill's mail arriving on the nightly cycle.
@@ -92,16 +143,13 @@ export const JOBS: JobDefinition[] = [
   {
     name: "verification-backfill",
     shape: "cursor",
+    // Ten paced fetches — at the default one-second gap, ten seconds of wall clock in the worst
+    // case where every selected entry shares one host, which is exactly what a seeded corpus looks
+    // like. Small enough that the dashboard button always answers; large enough to be a real pass.
+    interactiveLimit: 10,
     describes:
-      "Fetch the applicationUrl of entries never checked or edited since their last check.",
+      "Fetch the applicationUrl of entries never checked, edited since, or checked longer ago than VERIFY_RECHECK_DAYS.",
     run: (options) => new VerificationService(dbOf(options)).runBatch({ limit: options.limit }),
-  },
-  {
-    name: "staleness",
-    shape: "cursor",
-    describes: "Close past-due and long-inactive entries, and recompute the derived deadline key.",
-    run: (options) =>
-      new StalenessService(dbOf(options)).runBatch({ limit: options.limit, now: options.now }),
   },
   {
     name: "notification-dispatch",
@@ -113,9 +161,42 @@ export const JOBS: JobDefinition[] = [
         now: options.now,
       }),
   },
+  {
+    name: "staleness",
+    shape: "cursor",
+    describes: "Close past-due and long-inactive entries, and recompute the derived deadline key.",
+    run: (options) =>
+      new StalenessService(dbOf(options)).runBatch({ limit: options.limit, now: options.now }),
+  },
 ];
 
 export const JOB_NAMES: string[] = JOBS.map((job) => job.name);
+
+/**
+ * The nightly chain, in the order one caller must run it. `jobs.js all` reads exactly this.
+ *
+ * Derived from `JOBS` rather than restated, because a second copy of an ordering is a copy that
+ * drifts — and the drift would be silent, since both lists look plausible on their own. What the
+ * derivation drops is the deprecated aliases: `retention` does work `analytics-rollup` already
+ * does, so running it here would prune twice for no one's benefit.
+ *
+ * THE ORDER CARRIES TWO THINGS, one hard and one worth having.
+ *
+ *   - `staleness` LAST, and this is the rule `docs/jobs.md` §4d states: it must come after
+ *     `verification-backfill` has exited, or it closes entries a successful check was about to
+ *     prove alive — with both runs reporting success.
+ *   - `notification-dispatch` AFTER `embedding-backfill`, which is softer but real. The backfill
+ *     runs with the immediate-email accelerator switched off (see its entry), so the notifications
+ *     it inserts wait for the dispatcher. Ordering it later means they go out the SAME night
+ *     instead of the next one. Nothing breaks if a caller reverses them — the rows are durable and
+ *     the next sweep takes them — so this is latency, not correctness.
+ *
+ * `test/unit/jobs.test.ts` pins the sequence literally, so adding a job to `JOBS` is a deliberate
+ * change to the chain rather than an accidental one.
+ */
+export const CHAIN: readonly string[] = JOBS.filter((job) => job.deprecatedFor === undefined).map(
+  (job) => job.name,
+);
 
 export function findJob(name: string): JobDefinition | undefined {
   return JOBS.find((job) => job.name === name);

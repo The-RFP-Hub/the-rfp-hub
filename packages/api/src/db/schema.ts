@@ -23,6 +23,7 @@ import {
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -669,6 +670,23 @@ export const opportunityEmbeddings = pgTable(
     embedding: vector({ dimensions: 1536 }).notNull(),
     /** `sha256(text + model + provider)` — what says whether this row is still current. */
     contentHash: text().notNull(),
+    /**
+     * The PRE-NORMALISATION L2 norm of `embedding`, and the distinct-token count behind it.
+     *
+     * NULLABLE IS THE DESIGN, not an omission. A row written before these columns existed has a
+     * perfectly valid vector and an unknown magnitude, and "unknown" must degrade to "the overlap
+     * arm is not evaluated for this pair" — never to "these entries are dissimilar", which would
+     * delete real pairs. `embedding-backfill` repairs them on its first pass after deploy; the
+     * predicate that selects them is gated on the provider actually being able to supply them
+     * (`EmbeddingProvider.suppliesNorm`), so a provider that cannot never selects rows it cannot
+     * fix.
+     *
+     * The norm is what a unit vector throws away, and it is what makes a length-corrected
+     * comparison possible: cosine alone cannot tell a 40 %-truncated re-listing from an unrelated
+     * entry, because normalisation has already erased the difference in length.
+     */
+    norm: doublePrecision(),
+    tokenCount: integer(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -691,6 +709,35 @@ export const opportunityDuplicates = pgTable(
       .notNull()
       .references(() => opportunities.id, { onDelete: "cascade" }),
     similarity: numeric(),
+    /**
+     * The NUMERIC decision inputs — `{ arm, lexical, overlap, minTokens }`.
+     *
+     * The values the decision was actually made on, so the row stays interpretable after the
+     * thresholds move. Nullable because every pair written before this column existed has none;
+     * the read mapper renders that as "no reasons recorded", never as an absent field or a crash.
+     *
+     * DELIBERATELY NO STRUCTURAL SUB-OBJECT. A stored "same application URL" would be a fact about
+     * two rows at one instant, and it goes stale the moment either is edited. Structural labels are
+     * computed at READ time from the live rows, and they were never part of the decision anyway.
+     */
+    signal: jsonb().$type<Record<string, unknown>>(),
+    /**
+     * Which rule produced this row — `rulesKey()` in `services/dedupe/duplicate-signal.ts`.
+     *
+     * Without it, turning an arm off — or moving a threshold — strands every pair the old rule
+     * wrote: pruning only ever runs for entries the backfill selects, so with nothing pending
+     * those rows linger indefinitely. `embedding-backfill`'s resweep arm selects on
+     * `rules_key IS DISTINCT FROM <current>` and re-judges or deletes, which is what turns the
+     * feature switch into an actual rollback. NULL is every pre-versioning pair.
+     *
+     * TEXT, AND DERIVED, not a version integer. A hand-maintained number cannot change when an
+     * operator moves `DEDUPE_OVERLAP_THRESHOLD` or flips `DEDUPE_OVERLAP_ENABLED` — which is
+     * precisely the moment the rows need retiring — so a rollback would depend on somebody
+     * remembering to bump a constant in a release they are not making. The key is a digest of the
+     * predicate's shape AND the effective configuration, so it moves on its own. Opaque: compared
+     * for equality, never parsed, never ordered on.
+     */
+    rulesKey: text(),
     status: dupStatus().notNull().default("suspected"),
     reviewedBy: bigint({ mode: "number" }).references(() => accounts.id, { onDelete: "set null" }),
     detectedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

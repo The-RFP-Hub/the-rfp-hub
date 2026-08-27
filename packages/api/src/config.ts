@@ -90,6 +90,18 @@ export interface DedupeConfig {
   /** Cosine similarity at or above which a pair is recorded as suspected. Per-provider. */
   similarityThreshold: number;
   maxMatches: number;
+  /**
+   * The second arm: length-corrected term overlap, which catches the re-listing that copies a
+   * programme and publishes a shorter version of it. Cosine cannot — normalisation erases the
+   * length difference that IS the signal. Off makes detection exactly what it was before.
+   */
+  overlapEnabled: boolean;
+  /** Overlap at or above which a pair is suspected even though its cosine is not. Per-provider. */
+  overlapThreshold: number;
+  /** Distinct embedded tokens required on the SHORTER side before the overlap arm may fire. */
+  overlapMinTokens: number;
+  /** Cosine floor under which the overlap arm is not evaluated at all. */
+  overlapMinSimilarity: number;
 }
 
 export interface VerificationConfig {
@@ -98,6 +110,28 @@ export interface VerificationConfig {
   timeoutMs: number;
   maxBytes: number;
   queueMax: number;
+  /**
+   * How many runs per entry survive the backfill's prune. A run carries up to 200 KB of
+   * `snapshot_text`, so an unpruned log is the largest thing this feature writes.
+   */
+  runsKeep: number;
+  /**
+   * How old a `verified_at` may be before the backfill checks the entry again. Without it an entry
+   * is checked exactly once and the corpus's "still real" signal decays to nothing.
+   */
+  recheckDays: number;
+  /** Entries one backfill invocation will check. Bounds the nightly run's wall clock. */
+  nightlyLimit: number;
+  /**
+   * The minimum gap between two backfill fetches to the SAME host (`host-pacer.ts`).
+   *
+   * A SETTING RATHER THAN A CONSTANT because it is the one number that decides how long a pass
+   * takes, and because zero is a legitimate value for a deployment whose only source host is its
+   * own: the e2e stack points every fixture at one disposable server it started itself, and paying
+   * a real second of politeness to a process this repository owns buys nothing and costs the suite
+   * a minute. Production leaves it at the default; nothing in a deployment should set it to 0.
+   */
+  hostGapMs: number;
   /** SSRF escape hatch for one loopback test. Refused outright under NODE_ENV=production. */
   allowPrivateHosts: boolean;
   egressProxy: string | undefined;
@@ -349,6 +383,24 @@ export function readPositiveInt(raw: string | undefined, fallback: number): numb
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * A whole number >= 0, or the default. Separate from `readPositiveInt` because ZERO IS A MEANING
+ * here rather than a typo: it is how a deployment says "do not do this at all" for a setting whose
+ * unit is a delay, and `readPositiveInt` would silently hand back the default instead.
+ *
+ * THE BLANK CHECK IS NOT REDUNDANT, and it is the whole reason this cannot be a one-line copy of
+ * `readPositiveInt`. `Number("")` is `0`, an integer, and >= 0 — so a variable that is unset, or
+ * set to an unsubstituted template that trimmed to nothing, would read as a deliberate "no delay"
+ * and silently turn the pacing off in production. The predicate that hides that trap for a
+ * positive-only reader is exactly the one this reader gives up.
+ */
+export function readNonNegativeInt(raw: string | undefined, fallback: number): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 /** A comma-separated list, trimmed, blanks dropped, duplicates removed, order preserved. */
 export function readList(raw: string | undefined): string[] {
   return [
@@ -435,6 +487,76 @@ export function readSimilarityThreshold(
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
     throw new Error(
       `DEDUPE_SIMILARITY_THRESHOLD must be a cosine similarity in [0, 1], got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * Per-provider defaults for the OVERLAP arm, mirroring `DEFAULT_SIMILARITY_THRESHOLD` for the
+ * same reason: a length-corrected overlap means something different in every weighting.
+ *
+ * `lexical` is settled at **0.85**, measured by `scripts/dedupe-threshold-report.ts` over every
+ * distinct pair of the committed corpus with the same substance guard the runtime applies:
+ *
+ * | | full corpus | held out (idf from one half, scored on the other) |
+ * |---|---|---|
+ * | hardest negative overlap | 0.682 | 0.750 |
+ * | worst positive overlap | 0.956 | 0.945 |
+ * | band | 0.274 | 0.195 |
+ *
+ * 0.85 is inside both bands and on the edge of neither: +0.168 above the hardest full-corpus
+ * negative, −0.106 below the worst positive; +0.100 / −0.095 out of sample.
+ *
+ * `disabled` is **4**, not 1 — see `readOverlapThreshold`, overlap is not bounded by 1, so 1 would
+ * be a reachable value rather than an unreachable one.
+ */
+export const DEFAULT_OVERLAP_THRESHOLD: Record<EmbeddingProvider, number> = {
+  lexical: 0.85,
+  disabled: 4,
+};
+
+/**
+ * An overlap threshold in **(0, 4]** — deliberately NOT `[0, 1]`.
+ *
+ * Overlap is cosine corrected by the norm ratio, and it is not bounded by 1: a shorter side made
+ * of the longer side's highest-weight terms measures above 1 (1.223 on an honest 40 % truncation
+ * of a real corpus entry, 1.543 on a cherry-picked stub). A `[0, 1]` range copied from
+ * `readSimilarityThreshold` would refuse legitimate operating points and, worse, would encode the
+ * false claim that this number is a proportion. Zero is refused because it accepts everything the
+ * cosine floor lets through, which is not a configuration anybody means.
+ *
+ * Out of range REFUSES rather than clamps: a clamped threshold is a detector running at a setting
+ * nobody chose.
+ */
+export function readOverlapThreshold(raw: string | undefined, provider: EmbeddingProvider): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return DEFAULT_OVERLAP_THRESHOLD[provider];
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 4) {
+    throw new Error(
+      `DEDUPE_OVERLAP_THRESHOLD must be a length-corrected overlap in (0, 4] — it is cosine times a norm ratio and is NOT bounded by 1 — got ${JSON.stringify(raw)}.`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * The overlap arm's cosine floor, in [0, 1].
+ *
+ * NOT A SECURITY CONTROL, and the doc comment says so because the name invites the opposite
+ * reading. Arm B is only ever evaluated on ANN candidates, which are already cosine-ordered; this
+ * makes that implicit dependency explicit and configurable. Raising it 0.35 → 0.55 was measured to
+ * change the stub attack not at all — the attacker simply uses a larger stub. The guard that works
+ * is `DEDUPE_OVERLAP_MIN_TOKENS`.
+ */
+export function readOverlapMinSimilarity(raw: string | undefined, fallback: number): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new Error(
+      `DEDUPE_OVERLAP_MIN_SIMILARITY must be a cosine similarity in [0, 1], got ${JSON.stringify(raw)}.`,
     );
   }
   return parsed;
@@ -758,6 +880,15 @@ export const config: AppConfig = {
       embeddingProvider,
     ),
     maxMatches: readPositiveInt(process.env.DEDUPE_MAX_MATCHES, 5),
+    overlapEnabled: readBoolean(process.env.DEDUPE_OVERLAP_ENABLED, true),
+    overlapThreshold: readOverlapThreshold(process.env.DEDUPE_OVERLAP_THRESHOLD, embeddingProvider),
+    // 20 distinct tokens on the shorter side. The only guard measured to work against the stub
+    // attack, and it costs nothing on real negatives — the hardest stays 0.682 at every setting —
+    // while every mutation rung clears it with at least 16 tokens spare. The attack numbers are
+    // printed by `scripts/dedupe-threshold-report.ts` and pinned by `test/unit/
+    // dedupe-threshold.test.ts`, so they are measured on every run rather than quoted here.
+    overlapMinTokens: readPositiveInt(process.env.DEDUPE_OVERLAP_MIN_TOKENS, 20),
+    overlapMinSimilarity: readOverlapMinSimilarity(process.env.DEDUPE_OVERLAP_MIN_SIMILARITY, 0.35),
   },
 
   verification: {
@@ -768,6 +899,13 @@ export const config: AppConfig = {
     timeoutMs: readPositiveInt(process.env.VERIFY_TIMEOUT_MS, 10_000),
     maxBytes: readPositiveInt(process.env.VERIFY_MAX_BYTES, 2 * 1024 * 1024),
     queueMax: readPositiveInt(process.env.VERIFY_QUEUE_MAX, 100),
+    runsKeep: readPositiveInt(process.env.VERIFICATION_RUNS_KEEP, 5),
+    recheckDays: readPositiveInt(process.env.VERIFY_RECHECK_DAYS, 30),
+    nightlyLimit: readPositiveInt(process.env.VERIFY_NIGHTLY_LIMIT, 500),
+    // The literal, rather than an import of `HOST_MIN_GAP_MS`: config is the bottom of the graph
+    // and does not reach up into a service module for a number. `config.test.ts` asserts the two
+    // agree, so the duplication cannot drift.
+    hostGapMs: readNonNegativeInt(process.env.VERIFY_HOST_MIN_GAP_MS, 1_000),
     allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
     egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
   },

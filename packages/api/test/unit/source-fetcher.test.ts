@@ -22,6 +22,7 @@ function transport(
   seen?: { url: string; headers: Record<string, string> }[],
 ): SourceTransport {
   return async (url, options) => {
+    await options.onHop?.(url);
     seen?.push({ url, headers: options.headers });
     const page = pages[url] ?? { status: 404, body: "" };
     return {
@@ -98,11 +99,70 @@ describe("source fetcher", () => {
     ).rejects.toMatchObject({ category: "too_many_redirects" });
   });
 
+  /**
+   * THE POLITENESS SEAM. A redirect is a request to a DIFFERENT server, so a caller pacing itself
+   * on the entry's own URL alone would space thirty vanity domains perfectly and burst thirty
+   * requests onto the one platform they all redirect to. `onHop` is how the verification service
+   * hands its per-host pacer every hop; it fires after the scheme check, so a URL this fetcher
+   * would never open is never waited on.
+   */
+  it("announces every hop before requesting it, and none it refuses outright", async () => {
+    const seen: string[] = [];
+    const onHop = async (url: string) => {
+      seen.push(url);
+    };
+
+    await fetchSource("https://example.org/one", {
+      transport: transport({
+        "https://example.org/one": { status: 302, headers: { location: "https://b.example/two" } },
+        "https://b.example/two": { status: 302, headers: { location: "https://c.example/three" } },
+        "https://c.example/three": { body: PAGE },
+      }),
+      onHop,
+    });
+    expect(seen).toEqual([
+      "https://example.org/one",
+      "https://b.example/two",
+      "https://c.example/three",
+    ]);
+
+    seen.length = 0;
+    await expect(fetchSource("file:///etc/passwd", { ...options, onHop })).rejects.toBeInstanceOf(
+      SourceFetchError,
+    );
+    expect(
+      seen,
+      "a scheme that is refused never reaches a server, so it is never waited on",
+    ).toEqual([]);
+  });
+
   it("refuses a redirect that names nowhere to go", async () => {
     const headless = transport({ "https://example.org/z": { status: 302 } });
     await expect(
       fetchSource("https://example.org/z", { transport: headless }),
     ).rejects.toMatchObject({ category: "redirect_without_location" });
+  });
+
+  /**
+   * A `Location` THAT IS NOT A URL IS THE SERVER'S FAULT, AND PERMANENTLY SO. `new URL` throws a
+   * native `TypeError` for `http://` and `//`, which an unclassified `catch` upstream records as
+   * `transport_failure` — and verification treats that as TRANSIENT, so the entry is never stamped
+   * and is re-fetched every night for as long as that server keeps answering the same way. It is a
+   * property of the redirect, not of the network, so it carries its own category.
+   */
+  it("names a redirect whose Location is not a URL, rather than looking like a network failure", async () => {
+    for (const location of ["http://", "//", "http://["]) {
+      const error = await fetchSource("https://example.org/go", {
+        transport: transport({
+          "https://example.org/go": { status: 302, headers: { location } },
+        }),
+      }).catch((e: unknown) => e);
+
+      expect(error, location).toBeInstanceOf(SourceFetchError);
+      expect((error as SourceFetchError).category, location).toBe("redirect_malformed");
+      expect((error as SourceFetchError).status, location).toBe(302);
+      expect((error as SourceFetchError).message, location).toContain(location);
+    }
   });
 
   it("refuses a body that is not a source page", async () => {

@@ -6,8 +6,22 @@
  * credential matrix — is in `test/integration/jobs.test.ts`.
  */
 import { describe, expect, it } from "vitest";
+import { config } from "../../src/config.js";
+import { runChain } from "../../src/modules/services/jobs/chain.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
-import { JOBS, JOB_NAMES, findJob } from "../../src/modules/services/jobs/registry.js";
+import {
+  CHAIN,
+  JOBS,
+  JOB_NAMES,
+  type JobDefinition,
+  findJob,
+} from "../../src/modules/services/jobs/registry.js";
+import {
+  type JobRunReport,
+  type RunJobOptions,
+  effectiveLimit,
+} from "../../src/modules/services/jobs/runner.js";
+import { HOST_MIN_GAP_MS } from "../../src/modules/services/verification/host-pacer.js";
 
 describe("the job catalogue", () => {
   it("names every job exactly once", () => {
@@ -43,10 +57,83 @@ describe("the job catalogue", () => {
     expect(sweeps.sort()).toEqual(["analytics-rollup", "retention"]);
   });
 
+  /**
+   * `retention` is no longer a job of its own — the prune runs inside `analytics-rollup`. The name
+   * is kept for one release because the nightly chain is scheduled OUTSIDE this repository, and a
+   * caller still naming it would otherwise exit 2 rather than get its work done.
+   */
+  it("keeps `retention` as a deprecated alias, and marks nothing else deprecated", () => {
+    expect(findJob("retention")?.deprecatedFor).toBe("analytics-rollup");
+    expect(JOBS.filter((job) => job.deprecatedFor !== undefined).map((job) => job.name)).toEqual([
+      "retention",
+    ]);
+  });
+
   it("resolves a known name and refuses an unknown one", () => {
     expect(findJob("staleness")?.shape).toBe("cursor");
     expect(findJob("Staleness")).toBeUndefined();
     expect(findJob("drop-everything")).toBeUndefined();
+  });
+});
+
+/**
+ * THE INTERACTIVE BOUND, which exists because "one pass" is not a wall-clock bound for a job whose
+ * per-row cost is a network round trip to somebody else's server.
+ *
+ * `verification-backfill` spaces its fetches at `HOST_MIN_GAP_MS` per host and a corpus clusters
+ * hard by publisher, so its scheduled selection of `VERIFY_NIGHTLY_LIMIT` is minutes in ONE pass —
+ * fine for the container task, fatal for `POST /v1/admin/jobs/{job}/run`, where a reviewer is
+ * holding a socket. The number is asserted against the pacing rather than pinned on its own,
+ * because the pacing is the only reason it has to be small.
+ */
+describe("the interactive bound", () => {
+  it("is declared by the paced job and by nothing else", () => {
+    expect(JOBS.filter((job) => job.interactiveLimit !== undefined).map((job) => job.name)).toEqual(
+      ["verification-backfill"],
+    );
+  });
+
+  it("keeps one interactive pass inside a request's worst case", () => {
+    const limit = findJob("verification-backfill")?.interactiveLimit ?? Number.POSITIVE_INFINITY;
+    // Every entry in a clustered corpus shares one host, so the pass is `limit` gaps end to end.
+    expect(limit * HOST_MIN_GAP_MS).toBeLessThanOrEqual(15_000);
+    expect(limit).toBeGreaterThan(0);
+  });
+
+  it("is smaller than the scheduled selection it stands in for", () => {
+    const limit = findJob("verification-backfill")?.interactiveLimit ?? Number.POSITIVE_INFINITY;
+    expect(limit).toBeLessThan(config.verification.nightlyLimit);
+  });
+});
+
+/**
+ * The rule that applies it. Pure, so it is read here rather than inferred from a route's timing.
+ */
+describe("effectiveLimit", () => {
+  const paced = findJob("verification-backfill") as JobDefinition;
+  const unpaced = findJob("staleness") as JobDefinition;
+
+  it("hands an interactive caller the job's interactive bound when it named none", () => {
+    expect(effectiveLimit(paced, { interactive: true })).toBe(paced.interactiveLimit);
+  });
+
+  it("leaves a scheduled caller on the job's own default", () => {
+    expect(effectiveLimit(paced, {})).toBeUndefined();
+  });
+
+  /**
+   * The bound is a DEFAULT, not a ceiling: the route is also how a staging operator asks for a
+   * bigger slice, and answering with ten while reporting success would be a quieter failure than a
+   * slow response.
+   */
+  it("honours a named limit exactly, including one larger than the bound", () => {
+    expect(effectiveLimit(paced, { interactive: true, limit: 500 })).toBe(500);
+    expect(effectiveLimit(paced, { interactive: true, limit: 1 })).toBe(1);
+  });
+
+  it("changes nothing for a job that declares no bound", () => {
+    expect(effectiveLimit(unpaced, { interactive: true })).toBeUndefined();
+    expect(effectiveLimit(unpaced, { interactive: true, limit: 200 })).toBe(200);
   });
 });
 
@@ -71,5 +158,108 @@ describe("the advisory lock key", () => {
       expect(key >= 0n, name).toBe(true);
       expect(key <= max, name).toBe(true);
     }
+  });
+});
+
+/**
+ * `CHAIN` is what `jobs.js all` runs, and the sequence is the only ordering the nightly work has.
+ * Pinned literally rather than derived a second time: a job added to `JOBS` should have to argue
+ * with this test about where it belongs in the night, not join the chain by being declared.
+ */
+describe("the chain", () => {
+  it("is the catalogue minus the deprecated aliases, with staleness last", () => {
+    expect([...CHAIN]).toEqual([
+      "analytics-rollup",
+      "embedding-backfill",
+      "verification-backfill",
+      "notification-dispatch",
+      "staleness",
+    ]);
+  });
+});
+
+/**
+ * The chain runner, with a fake catalogue and a fake runner: no database, no lock, no jobs.
+ *
+ * The case that matters is the one the ordering exists for. `staleness` reads what the jobs before
+ * it write, so it has to run after they have EXITED — which is not the same as after they have
+ * SUCCEEDED. A chain that stopped at the first throw would skip the pass the open-data export reads
+ * at 03:17 and publish a dataset advertising programmes that are over, because an unrelated
+ * backfill could not reach its provider.
+ */
+describe("running the chain", () => {
+  const fakeChain = ["first", "explodes", "staleness"];
+
+  const fakeRunner = (ran: string[]) => async (name: string, _options: RunJobOptions) => {
+    ran.push(name);
+    if (name === "explodes") throw new Error("provider refused");
+    return {
+      job: name,
+      shape: "cursor",
+      processed: 1,
+      remaining: 0,
+      passes: 1,
+      elapsedMs: 0,
+    } satisfies JobRunReport;
+  };
+
+  it("runs every job in order and does not stop at one that throws", async () => {
+    const ran: string[] = [];
+    const { reports, failed } = await runChain({ chain: fakeChain, run: fakeRunner(ran) });
+
+    expect(ran, "order preserved, and nothing skipped").toEqual(fakeChain);
+    expect(reports.map((report) => report.job)).toEqual(fakeChain);
+    expect(failed).toEqual(["explodes"]);
+    expect(reports[2], "staleness still ran after the failure").toMatchObject({
+      job: "staleness",
+      processed: 1,
+    });
+  });
+
+  it("reports the failure in the array rather than in the control flow", async () => {
+    const { reports } = await runChain({ chain: fakeChain, run: fakeRunner([]) });
+    const failure = reports[1];
+
+    // Shape-compatible with a successful entry: a parser written for a single job's `--json`
+    // object reads this without a special case, and only `error` tells the two apart.
+    expect(failure).toMatchObject({
+      job: "explodes",
+      shape: "cursor",
+      processed: 0,
+      remaining: 0,
+      passes: 0,
+      error: "provider refused",
+    });
+    expect(typeof failure?.elapsedMs).toBe("number");
+    expect(reports[0]?.error).toBeUndefined();
+  });
+
+  it("exits 1 only when something threw — a skip is not a failure", async () => {
+    const skipping = async (name: string) =>
+      ({
+        job: name,
+        shape: "cursor",
+        processed: 0,
+        remaining: 0,
+        skipped: "locked",
+        passes: 0,
+        elapsedMs: 0,
+      }) satisfies JobRunReport;
+
+    const clean = await runChain({ chain: fakeChain.slice(0, 1), run: skipping });
+    expect(clean.failed, "a declined run has not failed").toEqual([]);
+
+    const broken = await runChain({ chain: fakeChain, run: fakeRunner([]) });
+    expect(broken.failed.length).toBeGreaterThan(0);
+  });
+
+  it("streams each report as it finishes, in order", async () => {
+    const seen: string[] = [];
+    await runChain({
+      chain: fakeChain,
+      run: fakeRunner([]),
+      onReport: (report) => seen.push(report.job),
+    });
+    expect(seen).toEqual(fakeChain);
   });
 });

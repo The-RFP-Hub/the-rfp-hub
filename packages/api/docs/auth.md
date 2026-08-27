@@ -232,9 +232,14 @@ Concretely:
   it, an otherwise-auto-approving submission **lands `pending`**: it fails closed to the safe
   outcome rather than erroring, because a submitter who cannot publish still wants their submission
   recorded.
-* **A claim that would be granted immediately requires `publish`** on an API-key credential.
-  Its absence is a `403` naming the missing scope, **not** a silent queue — a claim that quietly
-  became a review request would be actively misleading.
+* **A claim has two bars, and neither of them is `read`.** Filing one at all requires `write` on
+  an API-key credential; a claim that would be **granted immediately** additionally requires
+  `publish`. Each absence is a `403` naming the missing scope. For the grant path that is
+  deliberately **not** a silent queue — a claim that quietly became a review request would be
+  actively misleading — and for the queue path there is no weaker outcome to fall back to: a
+  queued claim is still a write on somebody else's entry, with a reviewer decision in flight
+  behind it, and a `read`-only key is the scope an integration is given precisely so it cannot
+  start one.
 * **`requireSession()` — API keys refused with `403` — on every route in the next section.**
 
 ---
@@ -280,8 +285,8 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | Route | Credential | Notes |
 |---|---|---|
 | `POST /v1/opportunities` | T1 + `write` | auto-approves only via `canPublishImmediately` |
-| `PUT /v1/opportunities/:id` | owner or T2 of the namespace, + `write` | `body.id` must equal the path id |
-| `POST /v1/opportunities/:id/claim` | membership on the claiming org | an **immediate grant** needs `publish` on a key — its absence is a 403 naming the scope, never a silent queue |
+| `PUT /v1/opportunities/:id` | the submitter *while the entry is still theirs*, or T2 of the namespace, + `write` | `body.id` must equal the path id. Once publisher ownership has been **granted** away by a claim, the submitter keeps `PUT` only as a member of the organisation that publishes it now; otherwise it takes T2 of that namespace, or T3+ |
+| `POST /v1/opportunities/:id/claim` | membership on the claiming org, + `write` | filing needs `write` on a key; an **immediate grant** needs `publish`. Either absence is a 403 naming the scope, never a silent queue |
 | `GET /v1/me`, `/v1/me/opportunities`, `/v1/me/opportunities/:id`, `/v1/me/duplicates` | T1 | `/me/opportunities/:id` is the owner-visible full detail for a pending or rejected entry the public route 404s |
 | `GET /v1/insights/opportunities/:id` | owner or T3+ | 403 for anyone else — a publisher's numbers are not public |
 | `GET /v1/insights/me/summary` | T1 | every entry the caller may see the numbers for |
@@ -472,9 +477,24 @@ Two outcomes, and the status code is the whole answer:
 * **`202 {"outcome":"queued","claimId":…}`** — anything else. A reviewer decides.
 
 `409` when the entry is already owned by a **different** verified organisation;
-`200 {"outcome":"unchanged"}` when your organisation already owns it. On an API key, a claim that
-*would* be granted immediately needs
-the `publish` scope, and its absence is a 403 rather than a quiet downgrade to a queued claim.
+`200 {"outcome":"unchanged"}` when your organisation already owns it. On an API key, filing a claim
+at all needs the `write` scope, and a claim that *would* be granted immediately needs `publish` —
+each absence is a 403 naming the scope, never a quiet downgrade to a queued claim.
+
+**A granted claim moves `PUT` with it.** Ownership is the row's `source.publisher`, not who first
+typed the entry in, so once a claim is granted the original submitter's account no longer holds
+`PUT` on it — unless they are a member of the claiming organisation, which is the ordinary case of
+somebody submitting on their own organisation's behalf and then claiming. A refused replacement is
+the same `403 not_your_entry`, with a message saying ownership moved by claim rather than the
+misleading "submitted by another account".
+
+*Which entries this bites* is decided by the **trail**, not by the id: the check is whether a
+`grant_publisher` action was ever recorded against the entry (`audit_log` is append-only and both
+grant paths write it). Two shapes make the cheaper guesses wrong, and both are real — a legacy
+import whose publisher never matched its id prefix and never involved a claim, and an entry claimed
+away and later claimed back, whose id and publisher agree again while ownership has moved twice. An
+ordinary submission filed into a namespace you hold no membership on is untouched: you may still
+edit what you filed.
 
 ### Reviewing, as T3
 

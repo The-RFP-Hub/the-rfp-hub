@@ -11,10 +11,10 @@
  *     to check, and pretending otherwise would report a capability nobody enabled;
  *   - `duplicateCheck: "unavailable"` — the provider was configured but did not answer in time. The
  *     entry is queued for the backfill job, which is the designed behaviour;
- *   - the original is not `approved AND is_listed` — a submitter's candidate search is restricted
- *     to the public set on purpose, so that a "suspected match" response can never disclose
- *     somebody else's pending or unlisted title. If the fixture landed pending, there is nothing
- *     the submitter is entitled to be matched against.
+ *   - the original is not `approved AND is_listed` — a submitter's ANSWER is restricted to the
+ *     public set on purpose, so that a "suspected match" response can never disclose somebody
+ *     else's pending or unlisted title. Detection still ran and still recorded the pair for a
+ *     reviewer; there is simply nothing here the submitter is entitled to be shown.
  *
  * `duplicateCheck` is load-bearing precisely because of this: without it a client cannot tell
  * "none found" from "not checked".
@@ -67,7 +67,7 @@ export async function checkDuplicates(report, ctx, state) {
   if (!state.isPublic) {
     c.skip(
       "the original is surfaced as a suspected match",
-      "the criterion-1 fixture landed pending, and a submitter's candidate search is deliberately restricted to approved and listed entries so a match response cannot disclose somebody else's unpublished title. Run with a credential for a verified member of --namespace to exercise this.",
+      "the criterion-1 fixture landed pending, and a submitter's answer is deliberately restricted to approved and listed entries so a match response cannot disclose somebody else's unpublished title. The pair is still recorded for a reviewer. Run with a credential for a verified member of --namespace to exercise this.",
     );
     return c.finish();
   }

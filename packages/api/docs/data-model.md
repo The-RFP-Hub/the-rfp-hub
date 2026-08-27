@@ -109,7 +109,11 @@ Each ⏳ table/feature below is annotated inline where it appears.
    verification job's only fetch target. Verification history and source snapshots are
    append-only side tables.
 5. **Append-only history.** Audit trail, verification runs, analytics events, and dataset
-   snapshots are insert-only (no UPDATE/DELETE) — satisfies the M3 "append-only audit trail".
+   snapshots are insert-only (no UPDATE) — satisfies the M3 "append-only audit trail". The
+   AUDIT TRAIL additionally never deletes, and the database enforces it (`0004_audit_immutability`).
+   The three derived logs are bounded by retention instead: raw events by
+   `ANALYTICS_RETENTION_DAYS`, and `verification_runs` by `VERIFICATION_RUNS_KEEP` runs per entry —
+   see "Snapshots" below for why an unbounded run log is the largest thing verification writes.
 6. **Editorial state is server-side.** `review_status` (pending/approved/rejected) is a column,
    never exposed in the public object; public reads filter to approved + listed.
 7. **Idempotent ingestion.** M2 ingest (seed/upsert) keys on the unique `public_id`.
@@ -514,7 +518,7 @@ CREATE TABLE verification_runs (
   snapshot_url     TEXT,              -- ⏳ M4: optional external archive URL (IPFS/archive pinning)
   error            TEXT,              -- why a run produced no page (refused address, timeout, …)
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
-);  -- INSERT-only
+);  -- INSERT-only; never UPDATEd. Each insert prunes its entry to the newest VERIFICATION_RUNS_KEEP.
 CREATE INDEX ix_verification_opp ON verification_runs (opportunity_id, run_at DESC);
 
 -- ✅ M3 append-only audit trail of every mutation, whatever it is about
@@ -678,6 +682,40 @@ Three properties are load-bearing:
   operator ran it. The `REVOKE UPDATE, DELETE` in `scripts/sql/harden-audit.sql` is defence in
   depth on top, and is not a migration because it names a deployment-specific role.
 
+**The import path is audited too, and it is the reason the trail is complete.** The seed loader
+(`upsertOpportunityFromStandard`) writes most of the corpus and used to write no history at all, so
+"every write is audited" was true of every path except the one that produced the majority of rows.
+It now appends its row inside the same transaction as the upsert — on both callers: the seed's batch
+already held one, and `OpportunityService.upsertFromStandard` opens one, so the pre-image lock, the
+organization upserts, the row and its history commit together or not at all. The row is attributed
+to the SYSTEM (`actor_kind='job'`, no account), with `patch.job='import'` naming the path. Three
+rules:
+
+* **`create` on the first sighting, `update` on a content-changing re-import.** No new
+  `audit_action` value: the enum is closed (see above), and adding one is not just convention —
+  Drizzle runs every pending migration in ONE transaction, and PostgreSQL refuses to *use* an enum
+  value added by the transaction that is still adding it, so an `import` verb would have made the
+  backfill below fail on every already-migrated deployment. The job is named in the patch instead,
+  exactly as the staleness job names itself.
+* **A re-import that changed nothing writes nothing.** The seed re-runs whenever the corpus file
+  moves, so "changed" has to exclude what moves on every upsert regardless — `updated_at`,
+  `last_seen_at`, and the recomputed `next_deadline_at` above — or the whole corpus would be marked
+  as edited on every run, in a table nothing can delete from. It is the submission path's content
+  projection **plus `review_status`, `is_listed` and `source_system`**
+  (`modules/shared/opportunity-content.ts`). Those three are bookkeeping on the submission path,
+  where a review route, a visibility route and a claim each audit their own change — and they are
+  the *decision* on the import path, where no route will ever record it. Sharing the content half
+  keeps the two paths from disagreeing about whether a document was edited; adding the other three
+  is what stops a re-import that unpublishes the corpus from passing as a no-op.
+* **Entries imported before this existed were backfilled** by migration
+  `0010_audit_backfill_import`, which inserts one `create` row per opportunity that has no
+  `create` row of its own, stamped with the row's own `created_at` and carrying `patch.backfill=true`.
+  The marker is `create` rather than "no history at all" on purpose: an entry imported before the fix
+  and approved, edited or closed afterwards **has** history, and none of it says where the entry came
+  from — those are the entries whose trail somebody is most likely to open. `create` is the one action
+  only a first write emits, so its absence means the appearance was never recorded. Insert-only (the
+  0004 triggers never fire) and idempotent (a second run sees the rows the first one wrote).
+
 **Visibility.** `GET /v1/opportunities/:id/audit` reads `subject_kind='opportunity'`. Public callers
 get `{action, at, actorKind, actor, changedFields[]}` — field **names** only, since a pending entry's
 contents are not public and neither is a publisher's contact address. The entry's submitter, its
@@ -699,6 +737,27 @@ flow sets the opportunity's `snapshot_url`. M3 stores the snapshot **in the data
 
 Raw HTML is deliberately not stored: it is large, it is not what a reviewer reads, and it would be
 an XSS liability the moment any future surface rendered it.
+
+**A re-check of an unmoved page copies its snapshot forward.** `snapshot_sha256` is over the raw
+bytes *that were retained*, so an equal digest means the page has not changed **provided neither
+fetch was truncated by the byte cap** — over a prefix it would only mean the first 2 MiB match; the new run is flagged
+`extracted.snapshotUnchanged` and stores the previous run's `snapshot_text` verbatim rather than a
+second extraction of identical bytes. It is copied rather than left NULL *because* of the retention
+rule below — a run whose text lived only on a pruned ancestor would carry a digest of bytes nobody
+stores any more, and the snapshot of record has to be on the row that claims it.
+
+**And the log is bounded.** 200 KB per run is small once and expensive forever: an entry re-checked
+on a schedule appends one row per check for as long as it exists, which is megabytes a year each for
+a history nobody reads past the most recent few. **Every insertion** therefore prunes its own entry down to the
+newest `VERIFICATION_RUNS_KEEP` runs (5 by default) — whichever path wrote it, the backfill, a
+reviewer's manual check or the submit-time queue — and the backfill prunes its whole selection again
+afterwards. The bound lives at the point of insertion because the two paths that append most often
+to a single entry never go through the backfill at all, and an often-checked entry is precisely the
+one whose `verified_at` is always too fresh to be selected by it. The prune orders exactly as the
+read path does (`run_at DESC, id DESC`) so **the latest run — the one
+`GET /v1/opportunities/{id}/verification` serves — is always among the survivors**. This is a
+retention rule on *evidence*, not a hole in the audit trail: every check also appends a
+`verify_source` row to `audit_log`, which is immutable in the database and is never pruned.
 
 This amends the milestone's "submissions produce a snapshot" criterion to: *an immutable
 in-database record of the extracted content, plus a digest of the original bytes; external
@@ -808,10 +867,18 @@ held to containment on replace — a foreign-operated one is still rejected.
   the same transaction as their mutation. Ownership means direct submission or membership in the
   stored publisher namespace; reviewer access alone is never a subscription. Notification payloads
   identify the other side only when it is approved and listed at emission time, and represent the
-  acting person only as `reviewer`. A submitter's candidate
-  search runs over **`approved AND is_listed` rows only**, so a suspected-match response can never
-  disclose another user's pending or unlisted title; reviewers searching from `/v1/review/duplicates`
-  see all rows. A failed or absent provider yields `duplicateCheck: "unavailable" | "disabled"` and
+  acting person only as `reviewer`. **Scope restricts what is disclosed, not what is recorded.**
+  There is one detection pass and it searches every row; `scope` is applied to the matches on the
+  way out, so a submitter's response still names only counterparts that are **`approved AND
+  is_listed`** and can never disclose another user's pending or unlisted title, while the pairs
+  themselves are written whatever either side's status. The pair table is reviewer surface —
+  `/v1/review/duplicates` — so a pair with a non-public counterpart discloses nothing there. When
+  the scope narrowed the CANDIDATES instead it narrowed the pair table with them, and two pending
+  entries duplicating each other were paired by nothing at all: the backfill selects on "has no
+  current embedding" and the write it follows has just supplied one. `DEDUPE_MAX_MATCHES` caps each
+  audience's list off that one ranking — the reviewer's top N and the public top N — and what is
+  recorded is their union, so every pair either audience may be shown exists as a row. A failed or
+  absent provider yields `duplicateCheck: "unavailable" | "disabled"` and
   no embedding row, which the backfill job then picks up — the field is load-bearing, because
   without it a client cannot tell "none found" from "not checked".
 - **Analytics (M3):** capture is **server-side only** — there is no public beacon in this cut, since
@@ -887,18 +954,121 @@ held to containment on replace — a foreign-operated one is still rejected.
 
   The mutation ladder is recorded honestly, limits included: heavy synonym swaps and
   synonym-plus-compression are caught at full recall; a body truncated to 40 % (M3), or truncated
-  AND compressed AND reordered (M5), is asserted at zero AT THE CONFIGURED THRESHOLD — a property
-  of the mid-band operating point chosen for false-positive headroom, not an absolute bound (the
-  same featurizer recovers both rungs at its zero-false-positive point, which the report prints).
-  Closing that gap without spending the headroom is the case for structural signals, which need
-  their own labelled data first. A held-out check (weights from half the corpus, band measured on
-  the other half) guards the frozen idf table against overfitting its source.
+  AND compressed AND reordered (M5), is asserted at zero **on the lexical arm** at the configured
+  threshold — a property of the mid-band operating point chosen for false-positive headroom, not an
+  absolute bound (the same featurizer recovers both rungs at its zero-false-positive point, which
+  the report prints), and at **full recall under the combined rule** below. A held-out check
+  (weights from half the corpus, band measured on the other half) guards the frozen idf table
+  against overfitting its source.
 
   `test/unit/dedupe-threshold.test.ts` re-derives all of it on every commit and fails if the
   classes stop separating, if the margin drops under 0.30, if any corpus pair crosses the
   threshold, or if the threshold ends up within 0.05 of either class. A corpus change that closes
   the band is therefore a red build and a decision to make again, not a silent loss of
   detection.
+- **The overlap arm** — the second half of the predicate, and the reason M3/M5/M6 are now caught.
+
+  A pair is suspected when the cosine clears 0.75 (arm A, unchanged), **or** when a
+  length-corrected term overlap clears 0.85 with at least 20 distinct tokens on the shorter side
+  and a cosine of at least 0.35 (arm B).
+
+  ```
+  overlap(a,b) = dot(a,b) / min(‖a‖², ‖b‖²) = cos(â,b̂) · max(‖a‖,‖b‖) / min(‖a‖,‖b‖)
+  ```
+
+  **What this number is not.** It is cosine corrected by the norm ratio. It *estimates* how much of
+  the shorter entry's weighted vocabulary the longer entry accounts for. It is **not** a
+  containment proof and **not** bounded by 1: under `1 + log(tf)` weighting and signed feature
+  hashing, a shorter side made of the longer side's highest-weight terms scores above 1 — measured
+  to 1.543 on a cherry-picked stub and 1.223 on an honest 40 % truncation of a real corpus entry.
+  Values above 1 are normal and are not clamped; the threshold is a lower bound, which is why that
+  is harmless. Nothing in the code, the API or these docs calls it a probability, a percentage or a
+  containment. Cosine cannot do this job on its own for a structural reason: normalisation has
+  already erased the difference in length that IS the signal.
+
+  | | full corpus | held out (idf from one half, scored on the other) |
+  |---|---|---|
+  | hardest negative overlap | **0.682** (`fundingmap:1042 ↔ 961`) | 0.750 |
+  | worst positive overlap (M4) | 0.956 | 0.945 |
+  | separating band | **0.274** | 0.195 |
+  | corpus pairs accepted by the combined rule | **0** | **0** |
+  | operating point | **0.85**, inside both bands and on the edge of neither | |
+
+  | rung | lexical recall | **combined recall** | worst overlap | min tokens |
+  |---|---|---|---|---|
+  | M0 paraphrase | 12/12 | 12/12 | 0.987 | 127 |
+  | M1 heavy synonyms | 12/12 | 12/12 | 0.968 | 148 |
+  | M2 reorder | 12/12 | 12/12 | 1.000 | 148 |
+  | **M3 truncate 40 %** | **0/12** | **12/12** | 1.036 | 70 |
+  | M4 synonyms + drop ⅓ | 12/12 | 12/12 | 0.956 | 105 |
+  | **M5 syn + drop + trunc + reorder** | **0/12** | **12/12** | 1.027 | 59 |
+  | **M6 syn + drop + truncate 25 %** | **0/12** | **12/12** | 1.017 | 36 |
+  | **M7 M5 with structural fields blanked** | **0/12** | **12/12** | 1.032 | 59 |
+
+  **Structural signals are recorded as explanation and barred from the decision.** This was the
+  sketched design and the measurement says the opposite of what it assumed: the corpus's hardest
+  negatives ARE the structurally identical siblings. Normalized-URL equality and primary-org
+  equality each top out at a hardest negative of 0.568, deadline-day coincidence at 0.552, amount +
+  currency at 0.335, and exact normalized-title equality never fires at all. Corroboration moves
+  the safe floor from 0.593 to 0.569 — **0.024** — against M5's worst positive of 0.598. A
+  conjunction band `(url ∨ org) ∧ overlap ≥ C_low` was measured too: the hardest corroborated
+  overlap (guard applied) is **0.682 — the same pair and the same value as the global hardest**, so
+  `C_low` would have to sit above it while every rung is already at 0.956 or better. **It catches
+  nothing**, and since a stub attacker copies `applicationUrl` for free it would make the attack
+  below *easier*. `matchedOn` therefore carries structural labels — never values — computed from
+  the live rows at read time, never stored, because "these share an application URL" stops being
+  true the moment either entry is edited.
+
+  The corpus's four genuinely hard funder families are named in the harness so a new one arrives as
+  a regression with a name attached: the Arbitrum DDA tracks, the Rocket Pool GMC rounds, the Road
+  to Devcon regional programmes, and the SSV grant/bounty pair.
+
+  **The stub attack, and a pre-existing exposure it revealed.** An attacker who wants somebody's
+  entry flagged as *their* duplicate builds a listing from the target's rarest terms. Measured over
+  all 160 corpus documents, attacker free to choose the stub size:
+
+  | arm | wins |
+  |---|---|
+  | arm A (cosine ≥ 0.75) — **the detector that already shipped** | **160/160**, median winning stub **5 tokens** |
+  | arm B without the token guard | 147/160 |
+  | arm B at `MIN_TOKENS = 20` | **3/160** |
+  | reachable via arm B but **not** already via arm A | **0/160** |
+
+  Two things follow and both are stated rather than buried. `MIN_TOKENS = 20` is the only guard
+  that works — a norm-ratio ceiling changed nothing at any setting and was deleted, a cosine floor
+  changes nothing because the attacker uses a larger stub, and an `overlap` ceiling is evaded by
+  padding with filler and would clip honest truncations at 1.223. And **the arm-A exposure is a
+  property of the shipped TF-IDF detector, not of this change**: it is 160/160 today, arm B's
+  marginal contribution is zero, and it is filed as its own issue with its own threat model rather
+  than pretended into existence here. `test/unit/dedupe-threshold.test.ts` pins the marginal figure
+  at exactly 0, the arm-B figure at ≤ 3, and the no-guard figure at ≥ 100 so the guard's
+  justification stays executable.
+
+  **The honest price.** `MIN_TOKENS = 20` excludes roughly a quarter of corpus documents from arm B,
+  largely because `embeddingText` prefers a short `summary` over a long `description` (144 of 160
+  documents have a summary under a third of their description's token count). Fixing that
+  preference would *increase* arm B's applicable population and is the highest-value follow-up —
+  but it changes `embeddingText`, therefore every `content_hash`, therefore the model string and
+  every pinned number in this section, so it belongs in its own change with its own re-benchmark.
+
+  **New columns.** `opportunity_embeddings.norm` and `.token_count` are nullable by design: a row
+  written before them has a valid vector and an unknown magnitude, and unknown must degrade to "the
+  overlap arm is not evaluated", never to "dissimilar". `opportunity_duplicates.signal` records the
+  numeric decision inputs (`arm`, `lexical`, `overlap`, `minTokens`) and `.rules_key` records which
+  rule wrote the row — the stamp that lets `embedding-backfill`'s resweep arm retire pairs a
+  rollback or a threshold change orphaned. `similarity` remains the lexical cosine with unchanged
+  semantics and rounding; an arm-B pair simply carries one below 0.75.
+
+  **`rules_key` is text and DERIVED, and that is the whole point of it.** It is a short digest of
+  the predicate's shape together with the effective configuration it ran under — both thresholds,
+  the token floor, the cosine floor, the enable switch, and the provider/model identity. A
+  hand-maintained version integer was the obvious first answer and it does not work: it cannot
+  change when an operator moves `DEDUPE_OVERLAP_THRESHOLD` or sets `DEDUPE_OVERLAP_ENABLED=false`,
+  which is precisely the moment the rows the old rule wrote need retiring, so the rollback would
+  depend on somebody bumping a constant in a release they are not making. Because the key is
+  derived, changing a knob is sufficient on its own. The three fields move together when the
+  resweep re-judges a pair — a row carrying a new key beside an old `signal` would claim the
+  current rule accepted it on numbers the current rule never saw.
 - **Public analytics beacon** — dropped from M3 on purpose: an unauthenticated event endpoint lets
   anyone fabricate a publisher's numbers, and rate limiting is not integrity. A beacon with
   short-lived signed event tokens is the M4 shape.

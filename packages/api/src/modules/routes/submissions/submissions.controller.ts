@@ -28,9 +28,11 @@ const claims = new ClaimService();
 const writes = new OpportunityWriteService(undefined, {
   async afterCommit(event) {
     if (config.verification.onSubmit) verification.enqueue(event.opportunityId);
-    // Always the PUBLIC candidate scope, whoever submitted: a suspected-match response must never
-    // disclose another account's pending or unlisted title and id, and a reviewer submitting an
-    // entry is still submitting an entry.
+    // Always the PUBLIC scope, whoever submitted: a suspected-match response must never disclose
+    // another account's pending or unlisted title and id, and a reviewer submitting an entry is
+    // still submitting an entry. What that scope narrows is the ANSWER — the detection underneath
+    // is the same one a reviewer gets, and every pair it finds is recorded whether or not this
+    // response is allowed to mention it. See `DedupeService`'s header.
     return { duplicateCheck: await dedupe.check(event.opportunityId, "public") };
   },
 });

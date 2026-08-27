@@ -22,6 +22,7 @@ import type {
 } from "../../shared/api-views.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { notFound } from "../../shared/http-error.js";
+import { matchReasons } from "../dedupe/duplicate-reasons.js";
 import { isOpportunityOwnedBy } from "./opportunity-ownership.js";
 
 /** What a caller may see of one entry. */
@@ -87,6 +88,9 @@ export class OpportunityMetaService {
         title: match.title,
         isPublic: isPubliclyVisible(match),
         similarity: pair.similarity === null ? null : Number(pair.similarity),
+        // Computed from the two LIVE rows, and `[]` for a pair recorded before `signal` existed —
+        // "no reasons recorded", never an absent field and never a crash on a legacy row.
+        matchedOn: matchReasons(pair.signal, scope.row, match),
         status: pair.status,
         detectedAt: pair.detectedAt.toISOString(),
       }));
@@ -128,6 +132,7 @@ export class OpportunityMetaService {
         title: match.title,
         isPublic: isPubliclyVisible(match),
         similarity: pair.similarity === null ? null : Number(pair.similarity),
+        matchedOn: matchReasons(pair.signal, yours, match),
         status: pair.status,
         detectedAt: pair.detectedAt.toISOString(),
         yourListing: { id: yours.publicId, title: yours.title },
@@ -136,7 +141,7 @@ export class OpportunityMetaService {
 
   /** The most recent run, or undefined when the entry has never been checked. */
   async latestVerification(scope: ViewerScope): Promise<VerificationRunView | undefined> {
-    const run = await this.repos.duplicatePairs.latestVerification(scope.row.id);
+    const run = await this.repos.verificationRuns.latest(scope.row.id);
     if (!run) return undefined;
     return {
       runAt: run.runAt.toISOString(),

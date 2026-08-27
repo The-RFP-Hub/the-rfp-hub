@@ -151,6 +151,14 @@ export function apiEnv(input: ApiEnvInput): NodeJS.ProcessEnv {
   // rather than racing a submit-time one.
   env.VERIFY_ON_SUBMIT = "false";
   env.VERIFY_MAX_BYTES = String(input.verifyMaxBytes ?? 2 * 1024 * 1024);
+  // NO PER-HOST PACING. The backfill spaces its fetches a second apart per host so a real corpus,
+  // which clusters by publisher, does not read as a scraper to somebody else's server. Every URL in
+  // this suite points at ONE host — the fixture server this runner started three lines of output
+  // ago, in this process tree, and will kill in its `finally`. There is no stranger to be polite
+  // to, and at the default gap a single backfill pass over the entries a full run accumulates costs
+  // more wall clock than the whole rest of the suite. The pacer keeps its own unit tests
+  // (`packages/api/test/unit/host-pacer.test.ts`), which is where spacing belongs.
+  env.VERIFY_HOST_MIN_GAP_MS = "0";
   if (input.allowPrivateHosts) env.VERIFY_ALLOW_PRIVATE_HOSTS = "true";
 
   env.STALENESS_INACTIVE_DAYS = "90";

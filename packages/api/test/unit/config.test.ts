@@ -6,7 +6,9 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_OVERLAP_THRESHOLD,
   DEFAULT_SIMILARITY_THRESHOLD,
+  config,
   mailgunCredentialWarning,
   readAllowPrivateHosts,
   readAnalyticsHmacKey,
@@ -17,6 +19,9 @@ import {
   readEmbeddingProvider,
   readList,
   readMailgunApiBase,
+  readNonNegativeInt,
+  readOverlapMinSimilarity,
+  readOverlapThreshold,
   readPem,
   readPort,
   readPositiveInt,
@@ -24,6 +29,7 @@ import {
   readSimilarityThreshold,
   readTrustProxy,
 } from "../../src/config.js";
+import { HOST_MIN_GAP_MS } from "../../src/modules/services/verification/host-pacer.js";
 
 describe("readPort", () => {
   it("uses the default when PORT is unset", () => {
@@ -294,6 +300,48 @@ describe("readSimilarityThreshold", () => {
   });
 });
 
+describe("readOverlapThreshold", () => {
+  it("defaults per provider, like the similarity threshold", () => {
+    expect(readOverlapThreshold(undefined, "lexical")).toBe(DEFAULT_OVERLAP_THRESHOLD.lexical);
+    expect(readOverlapThreshold("", "disabled")).toBe(DEFAULT_OVERLAP_THRESHOLD.disabled);
+    expect(DEFAULT_OVERLAP_THRESHOLD.lexical).not.toBe(DEFAULT_OVERLAP_THRESHOLD.disabled);
+  });
+
+  /**
+   * THE EASY WRONG ANSWER, pinned. `readSimilarityThreshold`'s `[0, 1]` range is right for a
+   * cosine and wrong here: overlap is cosine corrected by a norm ratio and is NOT bounded by 1 —
+   * an honest 40 % truncation of a real corpus entry measures 1.223. A copied clamp would refuse a
+   * legitimate operating point and, worse, would encode the false claim that this is a proportion.
+   */
+  it("accepts values above 1, because overlap is not a proportion", () => {
+    expect(readOverlapThreshold("1.25", "lexical")).toBe(1.25);
+    expect(readOverlapThreshold("4", "lexical")).toBe(4);
+  });
+
+  it("refuses a value outside (0, 4] rather than clamping it", () => {
+    for (const raw of ["0", "-1", "4.1", "85%", "high"]) {
+      expect(() => readOverlapThreshold(raw, "lexical"), raw).toThrow(/DEDUPE_OVERLAP_THRESHOLD/);
+    }
+  });
+});
+
+describe("readOverlapMinSimilarity", () => {
+  it("falls back and takes a cosine in range", () => {
+    expect(readOverlapMinSimilarity(undefined, 0.35)).toBe(0.35);
+    expect(readOverlapMinSimilarity("", 0.35)).toBe(0.35);
+    expect(readOverlapMinSimilarity("0.55", 0.35)).toBe(0.55);
+    expect(readOverlapMinSimilarity("0", 0.35)).toBe(0);
+  });
+
+  it("refuses a value that is not a cosine similarity", () => {
+    for (const raw of ["-0.1", "1.5", "low"]) {
+      expect(() => readOverlapMinSimilarity(raw, 0.35), raw).toThrow(
+        /DEDUPE_OVERLAP_MIN_SIMILARITY/,
+      );
+    }
+  });
+});
+
 describe("readAllowPrivateHosts", () => {
   it("is off by default and may be enabled outside production", () => {
     expect(readAllowPrivateHosts(undefined, false)).toBe(false);
@@ -477,5 +525,47 @@ describe("readAnalyticsHmacKey", () => {
     expect(first.generated).toBe(true);
     expect(first.key).toMatch(/^[0-9a-f]{64}$/);
     expect(first.key).not.toBe(second.key);
+  });
+});
+
+/**
+ * The four knobs that decide how often the corpus is re-checked and what one night of it costs.
+ * They are asserted as SHIPPED VALUES rather than as readers because the defaults are the contract:
+ * a deployment that sets none of them still re-checks every entry monthly, 500 at a time, a second
+ * apart per host, keeping at most five runs each — and `docs/deploy.md` publishes exactly these
+ * numbers.
+ */
+describe("the verification schedule's shipped defaults", () => {
+  it("re-checks monthly, caps a night at 500 entries, and keeps five runs", () => {
+    expect(config.verification.recheckDays).toBe(30);
+    expect(config.verification.nightlyLimit).toBe(500);
+    expect(config.verification.runsKeep).toBe(5);
+  });
+
+  /**
+   * The default gap is spelled in two places — `HOST_MIN_GAP_MS`, which is the pacer's own default
+   * and what its unit tests read, and the literal in `config.ts`, which is deliberately not an
+   * import because configuration sits below the service layer. This is the guard that keeps the two
+   * from drifting apart, which is the only thing wrong with spelling a number twice.
+   */
+  it("paces same-host fetches at the pacer's own default", () => {
+    expect(config.verification.hostGapMs).toBe(HOST_MIN_GAP_MS);
+  });
+});
+
+/**
+ * ZERO IS A VALUE, not a missing one, and that is the whole reason this reader exists next to
+ * `readPositiveInt`: `VERIFY_HOST_MIN_GAP_MS=0` is how the e2e stack says "there is no stranger to
+ * be polite to here", and a reader that treated 0 as absent would silently pace it anyway.
+ */
+describe("readNonNegativeInt", () => {
+  it("accepts zero, rejects negatives and non-integers, and falls back on blanks", () => {
+    expect(readNonNegativeInt("0", 1_000)).toBe(0);
+    expect(readNonNegativeInt("250", 1_000)).toBe(250);
+    expect(readNonNegativeInt("-1", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt("1.5", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt("soon", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt("", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt(undefined, 1_000)).toBe(1_000);
   });
 });

@@ -34,6 +34,34 @@ function original(label: string) {
   };
 }
 
+/**
+ * A LONG original, and the leading fragment of it — the pair the OVERLAP arm exists for.
+ *
+ * `original`/`paraphrase` above are a same-length rewrite, which is the shape the cosine arm
+ * already catches. This pair is the shape it CANNOT: normalisation erases the difference in length
+ * that IS the signal, so a copy of the opening lands with a cosine below the threshold no matter
+ * how verbatim it is.
+ *
+ * The margins are deliberate and were measured against the shipped featurizer before this fixture
+ * was written — cosine 0.664 against a 0.75 threshold, overlap 1.037 against 0.85, and 34 distinct
+ * tokens on the shorter side against a floor of 20. There is room in all three directions, so the
+ * test fails when the RULE changes rather than when the corpus breathes. If it ever does fail, the
+ * fixture text is what changes.
+ */
+function longOriginal(label: string) {
+  return {
+    title: `Long-Form ${label} Archive Custody Fellowship`,
+    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive, document its provenance and handling history, and publish a machine-readable manifest of every stored section with its interval and collection season. Awards cover maintenance contracts, calibrated logging hardware and the technician time needed to re-inventory a collection that has outlived its original grant. Applicants must show that the archive is at genuine risk of loss through equipment failure or institutional reorganisation, and must commit to depositing the manifest under an open licence. Reviews run twice a year and are decided by working researchers rather than by programme staff.`,
+  };
+}
+
+function truncatedRelisting(label: string) {
+  return {
+    title: `${label} Custody Fellowship`,
+    description: `The ${label} Archive Custody Fellowship funds the physical transport, cold-chain storage and long-term curation of ${label} sample collections held by university departments. Fellows audit an existing archive and publish a manifest of every stored section.`,
+  };
+}
+
 function paraphrase(label: string) {
   return {
     title: `${label} Infrastructure Protocol Research Grant Programme`,
@@ -50,6 +78,59 @@ test.describe("@dedupe M3-3 detection", () => {
     // is only in the way, so the slots are freed the way the product frees them — by a reviewer
     // deciding the oldest ones — rather than by pretending the rule is not there.
     await pendingHeadroom("submitter", 2);
+  });
+
+  /**
+   * The second arm, end to end, with the reason chip asserted — because the chip is the ONLY thing
+   * that explains to a reviewer why a pair with a similarity under the threshold is in their queue
+   * at all. A pair like this one used to be impossible; the risk now is that it looks like a bug.
+   */
+  test("a truncated re-listing is caught by the overlap arm and says so", async ({
+    stack,
+    api,
+    db,
+    opportunityFixture,
+  }) => {
+    const publisher = await api("publisher");
+    const stamp = Date.now();
+    const originalDoc = opportunityFixture(
+      stack.namespaces.publisher,
+      `dup-overlap-original-${stamp}`,
+      longOriginal("attestation"),
+    );
+    const originalId = originalDoc.id as string;
+    expect((await publisher.post("/v1/opportunities", originalDoc)).status).toBe(201);
+
+    const submitter = await api("submitter");
+    const stubDoc = opportunityFixture(
+      stack.namespaces.publisher,
+      `dup-overlap-stub-${stamp}`,
+      truncatedRelisting("attestation"),
+    );
+    const stub = await submitter.post<{
+      duplicateCheck: string;
+      duplicates: Array<{ id: string; similarity: number; matchedOn: string[] }>;
+    }>("/v1/opportunities", stubDoc);
+
+    expect(stub.status).toBe(201);
+    expect(stub.body.duplicateCheck, "the detector ran").toBe("ok");
+    const match = stub.body.duplicates.find((duplicate) => duplicate.id === originalId);
+    expect(
+      match,
+      "the truncated re-listing was not matched to its source. With EMBEDDING_PROVIDER=lexical this is a fixture problem, not a flake: tune the fixture TEXT so the pair clears DEDUPE_OVERLAP_THRESHOLD with at least DEDUPE_OVERLAP_MIN_TOKENS distinct tokens on the shorter side — never lower a threshold to make a test pass.",
+    ).toBeDefined();
+    // The whole point: caught, and caught by the arm whose numbers are below the cosine threshold.
+    expect(match?.matchedOn).toContain("overlap");
+
+    const stored = await db.query<{ similarity: string; signal: { arm: string } }>(
+      `SELECT d.similarity, d.signal FROM opportunity_duplicates d
+         JOIN opportunities a ON a.id = d.opportunity_id
+         JOIN opportunities b ON b.id = d.duplicate_of_id
+        WHERE (a.public_id = $1 AND b.public_id = $2) OR (a.public_id = $2 AND b.public_id = $1)`,
+      [originalId, stubDoc.id as string],
+    );
+    expect(stored.rowCount).toBe(1);
+    expect(stored.rows[0]?.signal?.arm).toBe("overlap");
   });
 
   test("an equivalent submission is reported as a duplicate and the pair is persisted", async ({
@@ -358,7 +439,7 @@ async function pairIdFor(db: import("pg").Pool, a: string, b: string): Promise<n
   const id = found.rows[0]?.id;
   if (id === undefined) {
     throw new Error(
-      `no duplicate pair was detected for ${a} / ${b}. With EMBEDDING_PROVIDER=lexical this is a fixture problem, not a flake: tune the fixture TEXT so the pair crosses the similarity threshold — never lower the threshold to make a test pass.`,
+      `no duplicate pair was detected for ${a} / ${b}. With EMBEDDING_PROVIDER=lexical this is a fixture problem, not a flake: tune the fixture TEXT so the pair crosses DEDUPE_SIMILARITY_THRESHOLD (the cosine arm) or DEDUPE_OVERLAP_THRESHOLD with at least DEDUPE_OVERLAP_MIN_TOKENS distinct tokens on the shorter side (the overlap arm) — never lower a threshold to make a test pass. Those knobs are exactly what a frustrated contributor reaches for, and the corpus evidence for both operating points is in packages/api/docs/data-model.md.`,
     );
   }
   return Number(id);

@@ -288,7 +288,10 @@ describeWithDb("M3MAIL notification dispatch", () => {
       "notification-dispatch",
       jobOptions(accountId, email, START, () => completedAt),
     );
-    expect(failed).toMatchObject({ processed: 1, remaining: 1, details: { failed: 1 } });
+    // `remaining: 0` while a retry is pending, and that is the point: the row IS still owed, but
+    // not before its cool-down expires, and `remaining` is what the runner reads as "there is more
+    // to do NOW". Counting a row the selection would refuse buys a pass that selects nothing.
+    expect(failed).toMatchObject({ processed: 1, remaining: 0, details: { failed: 1 } });
     const afterFailure = await rowOf(notification.id);
     expect(afterFailure.emailDispatchedAt).toBeNull();
     expect(afterFailure.emailFailedAt?.toISOString()).toBe(completedAt.toISOString());

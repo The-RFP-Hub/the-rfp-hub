@@ -8,7 +8,7 @@
  * easiest to get wrong: a rolling-only entry nobody has touched for four months DOES close, and a
  * rolling-only entry touched yesterday does NOT. Both are asserted, in both directions.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import pg from "pg";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -18,7 +18,10 @@ import { db, pool } from "../../src/db/client.js";
 import { type OpportunityRow, auditLog, opportunities } from "../../src/db/schema.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
 import { runJob } from "../../src/modules/services/jobs/runner.js";
-import { StalenessService } from "../../src/modules/services/jobs/staleness.service.js";
+import {
+  StalenessService,
+  StalenessSettleFailure,
+} from "../../src/modules/services/jobs/staleness.service.js";
 import { bearer, mintApiKeyFor, seedIdentity, testAuth } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
@@ -374,6 +377,167 @@ run("M3JOB scheduled jobs", () => {
     });
     expect(key.statusCode).toBe(403);
     expect(key.json().error).toBe("session_required");
+  });
+
+  // ── a row that throws, and a pass in which everything does ───────────────────────
+  //
+  // These are the two halves of one decision. Catching per row is right for a poison entry — the
+  // walk is ordered by id, so letting one out abandons the same tail every night — and WRONG for a
+  // broken deployment, where it turns "the staleness pass silently stopped happening" into a
+  // counter in `details` and a green run. One row at a time the two are indistinguishable; over a
+  // whole pass they are not, and `processed === 0 && failed > 0` is the line between them.
+
+  /** A fresh past-due, open entry: a staleness candidate this suite's earlier tests have not spent. */
+  async function seedCandidate(local: string): Promise<number> {
+    const rows = await db
+      .insert(opportunities)
+      .values({
+        publicId: publicId(local),
+        fundingType: "grant" as const,
+        status: "open" as const,
+        title: `Job fixture ${local}`,
+        description: "A staleness failure fixture.",
+        operatingOrganizations: [{ name: NS, slug: NS }],
+        orgSlugs: [NS],
+        deadlines: [fixed(ago(10))],
+        nextDeadlineAt: ago(10),
+        lastSeenAt: ago(1),
+        reviewStatus: "approved" as const,
+        sourcePublisher: NS,
+      })
+      .returning({ id: opportunities.id });
+    const id = rows[0]?.id;
+    if (id === undefined) throw new Error(`could not seed ${local}`);
+    return id;
+  }
+
+  it("skips a row whose write fails and settles the rest of the walk", async () => {
+    const poisoned = await seedCandidate("poison-one");
+    const healthy = await seedCandidate("healthy-one");
+
+    // The failure is injected where a real one would land — the audit insert inside the closing
+    // transaction — and SCOPED TO ONE ROW, so this is genuinely the mixed case and not a global
+    // outage wearing its clothes. The close and the audit row share a transaction, so the entry
+    // stays open rather than closing without a trail.
+    // Two statements, two calls, and the id interpolated rather than bound: a function BODY is a
+    // string literal to the server, so a bind parameter inside it is not a parameter at all. It is
+    // a bigint this test just read back from its own insert, so there is nothing to escape.
+    await db.execute(
+      sql.raw(`
+        create or replace function m3job_refuse_audit() returns trigger as $$
+        begin
+          if new.subject_id = ${poisoned} then
+            raise exception 'm3job: audit refused for %', new.subject_id;
+          end if;
+          return new;
+        end;
+        $$ language plpgsql;
+      `),
+    );
+    await db.execute(
+      sql.raw(`
+        create trigger m3job_refuse_audit before insert on audit_log
+          for each row execute function m3job_refuse_audit();
+      `),
+    );
+
+    try {
+      const errors: string[] = [];
+      const result = await new StalenessService(db, {
+        logger: { error: (_payload, message) => errors.push(message) },
+      }).runBatch({ now: NOW });
+
+      expect(result.details?.failed, "the poisoned row is counted, not swallowed").toBe(1);
+      expect(result.processed, "and the rest of the walk still settled").toBeGreaterThan(0);
+      // Not thrown, because the pass attempted more writes than it lost: at least this row's
+      // close and the healthy one's, and only one of them was refused.
+      expect(errors).toContain("staleness could not settle an entry");
+      expect((await load("poison-one")).status, "rolled back with its audit row").toBe("open");
+      expect((await load("healthy-one")).status).toBe("closed");
+    } finally {
+      await db.execute(sql.raw("drop trigger if exists m3job_refuse_audit on audit_log"));
+      await db.execute(sql.raw("drop function if exists m3job_refuse_audit()"));
+    }
+  });
+
+  it("does not throw when a write was attempted, changed nothing, and did not fail", async () => {
+    // THE CASE THE DENOMINATOR EXISTS FOR, and the one "did anything settle?" gets wrong.
+    //
+    // A transaction can open, take its row lock, find that a publisher already resolved the entry,
+    // and commit having changed nothing. That is a SUCCESSFUL write attempt — the database took the
+    // work — but it moves no counter: `processed` stays where it was. Judge the pass by
+    // `processed === 0` and a single unrelated poison row alongside it looks systemic and reds the
+    // run. Judge it by `failed === attemptedWrites` and it is what it is: one bad row, carried in
+    // `details.failed`, with the pass continuing.
+    //
+    // Stubbed rather than seeded: producing "the locked re-read found it resolved" for real needs a
+    // write COMMITTED by another connection in the window between the walk's page SELECT and that
+    // row's transaction, and the only committed writes inside a walk are its own successful
+    // settles — which would put `processed` above zero and destroy the very case under test. The
+    // loop, its counters and the rule are the subject here, so the page and the per-row outcome are
+    // what get faked; `settle` itself is covered against a real database by the two cases around
+    // this one.
+    const [quiet, poisoned] = [await load("recompute"), await load("rolling-fresh")];
+    const errors: string[] = [];
+    const service = new StalenessService(db, {
+      logger: { error: (_payload, message) => errors.push(message) },
+    });
+    const internals = service as unknown as {
+      candidates(now: Date, afterId: number, limit: number): Promise<OpportunityRow[]>;
+      settle(
+        row: OpportunityRow,
+        now: Date,
+        inactiveBefore: Date,
+        noteWriteAttempt: () => void,
+      ): Promise<string>;
+    };
+    internals.candidates = async (_now, afterId) => (afterId === 0 ? [quiet, poisoned] : []);
+    internals.settle = async (row, _now, _inactiveBefore, noteWriteAttempt) => {
+      // BOTH open a transaction — that is what makes them attempted writes — and only one fails.
+      noteWriteAttempt();
+      if (row.id === poisoned.id) throw new Error("m3job: this row is poison");
+      return "unchanged";
+    };
+
+    const result = await service.runBatch({ now: NOW });
+
+    expect(result.processed, "nothing settled, and that is not the question").toBe(0);
+    expect(result.details?.failed, "the bad row stays a counter").toBe(1);
+    expect(result.details?.examined).toBe(2);
+    expect(errors).toContain("staleness could not settle an entry");
+  });
+
+  it("THROWS when every settle in the pass failed, so the run is red", async () => {
+    await seedCandidate("poison-every");
+
+    // Every transaction fails, however many candidates the walk finds — a check constraint added
+    // to `audit_log`, a revoked grant, a full disk. Reads keep working, which is exactly what makes
+    // this indistinguishable from a poison row until the pass is over: the proxy forwards
+    // everything the repositories do and refuses only `transaction`, which is what `settle` opens.
+    const refusesWrites = new Proxy(db, {
+      get(target, property, receiver) {
+        if (property === "transaction") {
+          return () => Promise.reject(new Error("m3job: writes are refused"));
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+
+    await expect(
+      new StalenessService(refusesWrites, { logger: { error: () => undefined } }).runBatch({
+        now: NOW,
+      }),
+    ).rejects.toThrow(StalenessSettleFailure);
+
+    // The message has to name the scale and the cause: a run that exits 1 at 01:05 is read from a
+    // task log, and "something failed" sends somebody to the database to find out what.
+    await expect(
+      new StalenessService(refusesWrites, { logger: { error: () => undefined } }).runBatch({
+        now: NOW,
+      }),
+    ).rejects.toThrow(
+      /staleness wrote nothing: all \d+ of the \d+ write\(s\) it attempted failed.*writes are refused/s,
+    );
   });
 
   it("400s a job name that is not in the catalogue", async () => {

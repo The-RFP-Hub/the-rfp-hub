@@ -35,7 +35,7 @@ import {
   actionErrorNote,
 } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { formatInstant, formatSimilarity } from "@/lib/format";
+import { formatInstant, formatMatchReasons, formatSimilarity } from "@/lib/format";
 import {
   CAPABILITY_DENIAL_COPY,
   ROUTE_GATE_COPY,
@@ -1069,7 +1069,12 @@ function PairCard({
   return (
     <div className="card">
       <div className="row-between">
-        <strong>{formatSimilarity(pair.similarity)}</strong>
+        <strong>
+          {formatSimilarity(pair.similarity)}
+          {formatMatchReasons(pair.matchedOn).length > 0 && (
+            <span className="muted"> · {formatMatchReasons(pair.matchedOn).join(" · ")}</span>
+          )}
+        </strong>
         <span className="muted">
           pair {pair.id} · {duplicateStatusLabel(pair.status)} · detected{" "}
           {formatInstant(pair.detectedAt)}

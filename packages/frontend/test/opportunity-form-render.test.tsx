@@ -806,7 +806,9 @@ describe("when problems appear", () => {
     submit();
 
     const summary = await screen.findByRole("alert");
-    expect(document.activeElement).toBe(summary);
+    // Focus moves in an effect after the alert renders; on a slow runner the render can be
+    // observed before the effect has run, so the focus is awaited rather than read once.
+    await waitFor(() => expect(document.activeElement).toBe(summary));
     expect(
       within(summary)
         .getByRole("link", { name: /Whole form/ })
@@ -1061,6 +1063,7 @@ describe("after a submission", () => {
               title: "Earlier Public Round",
               isPublic: true,
               similarity: 0.912,
+              matchedOn: ["lexical"],
               status: "suspected",
               detectedAt: "2026-08-25T00:00:00Z",
             },
@@ -1069,6 +1072,7 @@ describe("after a submission", () => {
               title: "Queued Private Round",
               isPublic: false,
               similarity: 0.86,
+              matchedOn: ["lexical"],
               status: "suspected",
               detectedAt: "2026-08-25T00:00:00Z",
             },
@@ -1105,6 +1109,7 @@ describe("after a submission", () => {
               title: "Earlier Round",
               isPublic: true,
               similarity: 0.9,
+              matchedOn: ["lexical"],
               status: "suspected",
               detectedAt: "2026-08-25T00:00:00Z",
             },

@@ -142,12 +142,19 @@ export class AnalyticsRepository {
       });
   }
 
+  /**
+   * Delete raw events older than `cutoff`, and report how many went.
+   *
+   * Deliberately NOT `.returning({id})`. The caller wants a count, and `returning` makes the
+   * server build and ship a row per deleted event to get one — on a prune whose whole point is that
+   * it removes a lot of them at once, that is a result set nobody reads, sized by the backlog. The
+   * driver already reports `rowCount` for a plain DELETE, which is the same number for free.
+   */
   async deleteEventsBefore(cutoff: Date): Promise<number> {
     const deleted = await this.exec
       .delete(opportunityEvents)
-      .where(lt(opportunityEvents.occurredAt, cutoff))
-      .returning({ id: opportunityEvents.id });
-    return deleted.length;
+      .where(lt(opportunityEvents.occurredAt, cutoff));
+    return deleted.rowCount ?? 0;
   }
 }
 

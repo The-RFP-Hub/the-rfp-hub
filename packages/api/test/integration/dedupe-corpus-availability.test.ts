@@ -22,7 +22,9 @@ const provider: EmbeddingProvider = {
   id: "m3dca-live-provider",
   model: "m3dca-live-model-v2",
   dimensions: 1536,
+  suppliesNorm: true,
   embed: vi.fn(async () => vector),
+  embedDetailed: vi.fn(async () => ({ vector, norm: 1, tokens: 40 })),
 };
 
 const insertOpportunity = async (suffix: string): Promise<number> => {

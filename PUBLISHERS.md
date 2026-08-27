@@ -162,6 +162,17 @@ Granted immediately when your organisation is verified **and** already appears a
 operating organisations; queued for a reviewer otherwise. The entry keeps its id, its history and
 anything already pointing at it, and publisher ownership moves to you.
 
+Two things about the scopes, if you claim with a key rather than a session:
+
+* **Filing a claim needs `write`.** A `read`-only key cannot start one, queued or not — a claim
+  puts a decision in flight over somebody else's entry, which is not a read.
+* **A claim that would be granted immediately needs `publish`,** on top of that. You get a `403`
+  naming the scope, never a claim that quietly downgrades itself into the review queue.
+
+And once a claim is granted, ownership really has moved: whoever submitted the entry originally
+stops being able to `PUT` over it unless they are also a member of the organisation it now belongs
+to. That is the point — the programme's operator publishes it now.
+
 ---
 
 ## Keeping it

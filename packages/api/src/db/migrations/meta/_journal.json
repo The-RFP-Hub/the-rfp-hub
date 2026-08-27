@@ -71,6 +71,20 @@
       "when": 1787754053624,
       "tag": "0009_premium_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787779087959,
+      "tag": "0010_audit_backfill_import",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787783983103,
+      "tag": "0011_hybrid_duplicate_overlap",
+      "breakpoints": true
     }
   ]
 }

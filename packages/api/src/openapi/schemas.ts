@@ -341,7 +341,7 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     description:
       "A suspected or decided duplicate pair, named by the OTHER entry. This published component retains that top-level meaning for compatibility with an external compliance checker; the account-specific OwnedDuplicateMatch adds `yourListing` instead of repurposing these fields.",
-    required: ["id", "title", "isPublic", "similarity", "status", "detectedAt"],
+    required: ["id", "title", "isPublic", "similarity", "matchedOn", "status", "detectedAt"],
     properties: {
       id: { type: "string", description: "The other entry's public id." },
       title: { type: "string" },
@@ -350,7 +350,20 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
         description:
           "True when the other entry is approved and listed, so a client may use its public detail route; false means an entitled workbench route is required.",
       },
-      similarity: { type: ["number", "null"] },
+      similarity: {
+        type: ["number", "null"],
+        description:
+          "The lexical cosine similarity, unchanged in meaning and rounding. A pair caught by the overlap arm carries a similarity BELOW the lexical threshold by construction — `matchedOn` is what says which arm decided.",
+      },
+      matchedOn: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: ["lexical", "overlap", "application_url", "operating_org"],
+        },
+        description:
+          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot), and anything after it is structural evidence corroborating the decision. Structural signals are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
+      },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       detectedAt: { type: "string", format: "date-time" },
     },
@@ -368,7 +381,16 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     description:
       "An account-owned duplicate pair. `yourListing` identifies the side owned by the current account; all top-level match fields continue to name the OTHER entry. DuplicateMatch and DuplicateList are published public-API components documented that way and checked by an external compliance consumer, which is why this owner-specific component adds a field instead of changing their meaning.",
-    required: ["id", "title", "isPublic", "similarity", "status", "detectedAt", "yourListing"],
+    required: [
+      "id",
+      "title",
+      "isPublic",
+      "similarity",
+      "matchedOn",
+      "status",
+      "detectedAt",
+      "yourListing",
+    ],
     properties: {
       id: { type: "string", description: "The other entry's public id." },
       title: { type: "string" },
@@ -378,6 +400,15 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
           "True when the other entry is approved and listed; false when it is visible only through an entitled workbench route.",
       },
       similarity: { type: ["number", "null"] },
+      matchedOn: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: ["lexical", "overlap", "application_url", "operating_org"],
+        },
+        description:
+          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot), and anything after it is structural evidence corroborating the decision. Structural signals are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
+      },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       detectedAt: { type: "string", format: "date-time" },
       yourListing: {
@@ -506,11 +537,36 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     additionalProperties: false,
     description:
       "A suspected or decided pair, both sides shown. `id` is the PAIR's own id — what /v1/review/duplicates/{id}/… names, never an opportunity id.",
-    required: ["id", "status", "similarity", "detectedAt", "reviewedAt", "left", "right"],
+    required: [
+      "id",
+      "status",
+      "similarity",
+      "signal",
+      "matchedOn",
+      "detectedAt",
+      "reviewedAt",
+      "left",
+      "right",
+    ],
     properties: {
       id: { type: "integer" },
       status: { type: "string", enum: ["suspected", "confirmed", "dismissed", "merged"] },
       similarity: { type: ["number", "null"] },
+      signal: {
+        type: ["object", "null"],
+        additionalProperties: true,
+        description:
+          "The numeric decision inputs the detector recorded — `arm`, `lexical` (the cosine), `overlap` (cosine corrected by the norm ratio; an ESTIMATE of how much of the shorter entry's weighted vocabulary the longer one accounts for, NOT a containment and not bounded by 1) and `minTokens`. Null on a pair written before the column existed.",
+      },
+      matchedOn: {
+        type: "array",
+        items: {
+          type: "string",
+          enum: ["lexical", "overlap", "application_url", "operating_org"],
+        },
+        description:
+          "Why this pair was flagged, as LABELS and never values: the first entry is the arm that decided (`lexical` = cosine similarity, `overlap` = length-corrected term overlap, which catches a shortened re-listing that cosine cannot), and anything after it is structural evidence corroborating the decision. Structural signals are recorded as explanation only and are deliberately barred from the decision itself. Computed from the live entries at read time, so it reflects them now. EMPTY on a pair recorded before these reasons existed.",
+      },
       detectedAt: { type: "string", format: "date-time" },
       reviewedAt: { type: ["string", "null"], format: "date-time" },
       left: { $ref: "DuplicateSide" },

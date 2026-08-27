@@ -2,15 +2,32 @@
  * The nightly analytics rollup, and the retention prune that is the reason the raw table is not
  * partitioned.
  *
+ * ONE JOB, NOT TWO. `runBatch` settles the window and then prunes, in the same invocation, because
+ * they were never independent: both walk `opportunity_events`, both are sweeps over a window keyed
+ * on `occurred_at`, and the prune's correctness DEPENDS on the rollup having already absorbed the
+ * days it is about to delete. Running them as two scheduled tasks made that dependency the
+ * scheduler's to remember, unwritten anywhere it could be checked — and a prune that ran first, on
+ * a night the rollup failed, would delete raw events whose totals were never recorded. In one
+ * invocation the order cannot be got wrong, and a rollup that throws never reaches the delete.
+ *
  * A SWEEP JOB, NOT A CURSOR JOB, and the distinction is not bookkeeping. A cursor job selects rows
  * by a predicate that the run itself retires, so `remaining` falls and a runner may loop it to zero.
- * This one deliberately REPROCESSES a fixed window every time — the last three days — so its
+ * This one deliberately REPROCESSES a fixed window every time — the two days before today — so its
  * selection never empties. Applying a loop-to-zero contract to it would never terminate. It runs
  * once per invocation and always reports `remaining: 0`, which is what `docs/jobs.md` records.
  *
- * WHY THREE DAYS AND NOT ONE. An event can be written after its day has rolled over: the buffer
- * flushes on a timer, a deployment restarts mid-flush, a clock is off. Recomputing yesterday and
- * the day before costs two extra grouped scans and means a late event is never permanently missing.
+ * WHY TWO PREVIOUS DAYS, AND WHY TODAY IS NOT ONE OF THEM. `insights.service.ts` reads rollup rows
+ * for days STRICTLY BEFORE today and live-aggregates today's raw events instead, precisely so a
+ * publisher who posts in the morning does not see zeros all day. So a row written for today is a
+ * row nothing ever reads — a grouped scan of the busiest, still-growing day of the table, whose
+ * result is overwritten by the next night's sweep before it can be used. Dropping it is the whole
+ * of the saving; nothing downstream can tell the difference.
+ *
+ * The two days that remain are the late-arrival margin, and they are what makes the window a sweep
+ * rather than a single day. An event can be written after its day has rolled over: the buffer
+ * flushes on a timer, a deployment restarts mid-flush, a clock is off. Recomputing yesterday AND
+ * the day before costs one extra grouped scan over a day that has stopped changing, and means a
+ * late event is never permanently missing.
  *
  * ASSIGNMENT, NEVER INCREMENT. The rollup writes `count(*)` for the day, not `existing + n`. An
  * increment is only correct if the job runs exactly once per day forever — the first retry, the
@@ -44,15 +61,20 @@ function isForeignKeyViolation(error: unknown): boolean {
   return false;
 }
 
-/** How many days back a sweep recomputes, including today. */
-export const ROLLUP_WINDOW_DAYS = 3;
+/**
+ * How many PREVIOUS days a sweep recomputes. Today is deliberately not one of them — see the
+ * header: nothing reads today's rollup row, because the series live-aggregates today.
+ */
+export const ROLLUP_WINDOW_DAYS = 2;
 
 export interface RollupResult {
-  /** Day-rows written. */
+  /** Day-rows written. The prune's own count is in `details.pruned`, not added in here. */
   processed: number;
   /** Always 0: a sweep reprocesses a fixed window and is never looped. */
   remaining: number;
   days: string[];
+  /** `pruned` — raw events deleted for age by the same invocation. */
+  details: { pruned: number };
 }
 
 export class AnalyticsRollupService {
@@ -65,9 +87,15 @@ export class AnalyticsRollupService {
   }
 
   /**
-   * Recompute the last `days` days of `opportunity_stats_daily` from the raw events.
+   * Recompute the `days` days BEFORE today in `opportunity_stats_daily`, then prune raw events
+   * past `ANALYTICS_RETENTION_DAYS`.
    *
-   * Idempotent by construction (see the header): running it twice writes the same numbers.
+   * Idempotent by construction (see the header): running it twice writes the same numbers and
+   * deletes nothing the first run left behind.
+   *
+   * THE PRUNE IS LAST, AND ONLY REACHED ON SUCCESS. A rollup that throws propagates from here
+   * without deleting anything — which is the point of putting the two in one invocation: the day
+   * the rollup fails is exactly the day its raw events must survive to be re-rolled tomorrow.
    */
   async runBatch(options: { days?: number; now?: Date } = {}): Promise<RollupResult> {
     const days = options.days ?? ROLLUP_WINDOW_DAYS;
@@ -75,12 +103,15 @@ export class AnalyticsRollupService {
     const written: string[] = [];
     let processed = 0;
 
-    for (let offset = days - 1; offset >= 0; offset--) {
+    // Oldest first, and stopping at offset 1: offset 0 is today, which no reader consults.
+    for (let offset = days; offset >= 1; offset--) {
       const day = shift(today, -offset);
       processed += await this.rollDay(day);
       written.push(day);
     }
-    return { processed, remaining: 0, days: written };
+
+    const { processed: pruned } = await this.pruneRetention({ now: options.now });
+    return { processed, remaining: 0, days: written, details: { pruned } };
   }
 
   /** One day, one grouped scan, one upsert per entry that had any traffic. */
@@ -154,6 +185,10 @@ export class AnalyticsRollupService {
 
   /**
    * Delete raw events older than `ANALYTICS_RETENTION_DAYS`.
+   *
+   * `runBatch` calls this as its last step; it stays a separate method because the deprecated
+   * `retention` job name still runs it alone (see `registry.ts`), and because a test that wants to
+   * exercise the prune should not have to roll two days first.
    *
    * This is what `PARTITION BY RANGE` would have bought, and the reason it was deferred: at this
    * volume a bounded `DELETE` by age over an index on `occurred_at` is enough, and it needs no DDL
