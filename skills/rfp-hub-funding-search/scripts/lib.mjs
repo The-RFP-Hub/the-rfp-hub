@@ -158,20 +158,86 @@ export function buildSearchQuery(flags) {
   return params;
 }
 
-/** Clamp `limit` to [1, MAX_LIMIT], warning on stderr when the caller asked for more. */
+/**
+ * Search defaults to `status=open` unless the caller passes `--status` explicitly. Most requests
+ * shaped like "find grants" / "search bounties" mean *currently open* ones; a raw, unfiltered
+ * `GET /v1/opportunities` also returns upcoming, closed and archived entries, which is rarely
+ * what "search funding opportunities" meant. Seeing every status (or a different subset) is one
+ * explicit `--status upcoming,open,closed,archived` (or any other combination) away.
+ */
+export function withDefaultStatus(flags) {
+  if (flags && typeof flags === "object" && !("status" in flags)) {
+    return { ...flags, status: "open" };
+  }
+  return flags;
+}
+
+/** `--format` accepts only `json` (default) or `table` — anything else is a usage error, not a
+ * silent fallback to `json`, so a typo (`--format tabel`) is caught before any network call. */
+export function validateFormat(value) {
+  if (value === undefined) return "json";
+  if (value === "json" || value === "table") return value;
+  throw new Error(`--format must be 'json' or 'table', got ${JSON.stringify(value)}`);
+}
+
+/** Reject any flag not in `allowed`, before any network call — the same "closed schema, loud
+ * failure" rule `buildSearchQuery` already applies to the API's own query parameters, extended to
+ * the skill-only flags (`--format`, `--id`, `--help`) that never reach the API at all. */
+export function assertKnownFlags(flags, allowed, scriptName) {
+  const unknown = Object.keys(flags).filter((k) => !allowed.has(k));
+  if (unknown.length) {
+    throw new Error(
+      `Unknown option(s): ${unknown.map((k) => `--${k}`).join(", ")}. Run 'node ${scriptName} --help' for usage.`,
+    );
+  }
+}
+
+/** Reject more positional arguments than a script accepts — a stray extra argument is far more
+ * likely a mistake (a misquoted value, a forgotten `--`) than an intentional no-op. */
+export function assertNoExtraPositionals(positional, max, usage) {
+  if (positional.length > max) {
+    throw new Error(`Unexpected extra argument(s): ${positional.slice(max).join(", ")}. ${usage}`);
+  }
+}
+
+/**
+ * Parse a strictly positive integer from a CLI string value. Rejects anything that isn't plainly
+ * one — "10.5", "1e2", "0x10", "-1", " 10 " (leading/trailing space aside), "abc" — with a usage
+ * error, rather than coercing/rounding it into something that looks like it worked. A caller who
+ * typed a fractional or malformed page/limit almost certainly made a mistake, and silently
+ * flooring it (the previous behaviour) turned that mistake into a different, unannounced request.
+ */
+function parsePositiveInteger(value, flagName) {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error(`--${flagName} must be a positive integer, got ${JSON.stringify(value)}`);
+  }
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`--${flagName} must be a positive integer, got ${JSON.stringify(value)}`);
+  }
+  return n;
+}
+
+/** Clamp `limit` to [1, MAX_LIMIT], warning on stderr when the caller asked for more. Non-integer
+ * or non-positive input is a usage error (see `parsePositiveInteger`), never silently rounded. */
 export function clampLimit(rawLimit, warn = (msg) => process.stderr.write(`${msg}\n`)) {
   if (rawLimit === undefined) return DEFAULT_LIMIT;
-  const n = Number(rawLimit);
-  if (!Number.isFinite(n) || n < 1) {
-    throw new Error(`--limit must be a positive integer, got ${JSON.stringify(rawLimit)}`);
-  }
+  const n = parsePositiveInteger(rawLimit, "limit");
   if (n > MAX_LIMIT) {
     warn(
       `Note: --limit ${n} exceeds this skill's cap of ${MAX_LIMIT} (a context-window budget, not the API's own limit of 100). Using ${MAX_LIMIT}.`,
     );
     return MAX_LIMIT;
   }
-  return Math.floor(n);
+  return n;
+}
+
+/** Parse `--page`: undefined (let the API default to page 1) or a strictly positive integer —
+ * never silently rounded, same rule as `clampLimit`. */
+export function parsePage(rawPage) {
+  if (rawPage === undefined) return undefined;
+  return parsePositiveInteger(rawPage, "page");
 }
 
 // ── minimal CLI arg parsing (no external deps) ──────────────────────────────────
@@ -313,10 +379,28 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
 // criteria, ...) never reach this projection's output, by construction: nothing here copies an
 // object through, every field is named individually.
 
+/**
+ * Collapse control characters — CR, LF, TAB and every other C0/C1 control plus the two Unicode
+ * line/paragraph separators — to a single space. Every third-party string that survives the
+ * allow-list still goes through this before it's ever interpolated into human-readable output
+ * (the table renderer's rows, and any inline message built from a field like a merged entry's
+ * title): a publisher-supplied `title` or `organization` containing an embedded newline can
+ * otherwise forge what LOOKS like an extra table row, or a fake "apply:" line pointing at an
+ * attacker's own URL, entirely within a single field. Collapsing to one space keeps the text
+ * readable on one line without deciding it needs to look "clean" beyond that — this is a
+ * structural fix (no control character survives to be interpolated), not a content filter.
+ */
+export function sanitizeText(value) {
+  if (typeof value !== "string") return value;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: that IS what this collapses.
+  return value.replace(/[\u0000-\u001F\u007F\u2028\u2029]+/g, " ");
+}
+
 /** Truncate `title` to `max` characters (default 140), the one free-text field this skill keeps
- * (short, and needed to identify the result — see SKILL.md for why it's still labelled DATA). */
+ * (short, and needed to identify the result — see SKILL.md for why it's still labelled DATA).
+ * Sanitized BEFORE truncation, so the 140-char budget is spent on visible characters. */
 export function truncateTitle(title, max = 140) {
-  const t = typeof title === "string" ? title : "";
+  const t = sanitizeText(typeof title === "string" ? title : "") ?? "";
   if (t.length <= max) return t;
   return `${t.slice(0, Math.max(0, max - 1))}…`;
 }
@@ -338,11 +422,14 @@ export function nextDeadlineAt(deadlines, now = new Date()) {
   return upcoming.length ? upcoming[0].toISOString() : null;
 }
 
-/** A one-line award summary rendered ONLY from numeric fundingInfo fields — never free text. */
+/** A one-line award summary rendered ONLY from numeric fundingInfo fields — never free text.
+ * `currency` (an ISO code or a publisher-chosen token symbol — itself untrusted, if a short,
+ * text field) is sanitized before interpolation, same as every other third-party string here. */
 export function awardSummary(fundingInfo) {
   if (!fundingInfo || typeof fundingInfo !== "object") return null;
   const { currency, budget, minAward, maxAward } = fundingInfo;
-  const unit = typeof currency === "string" && currency ? ` ${currency}` : "";
+  const cleanCurrency = typeof currency === "string" ? sanitizeText(currency) : currency;
+  const unit = typeof cleanCurrency === "string" && cleanCurrency ? ` ${cleanCurrency}` : "";
   const fmt = (n) => Number(n).toLocaleString("en-US");
   if (typeof minAward === "number" && typeof maxAward === "number") {
     return `${fmt(minAward)}–${fmt(maxAward)}${unit}`;
@@ -353,10 +440,11 @@ export function awardSummary(fundingInfo) {
   return null;
 }
 
-/** The primary organization's display name (`operatingOrganizations[0].name`), or null. */
+/** The primary organization's display name (`operatingOrganizations[0].name`), or null,
+ * sanitized like every other third-party string this file interpolates into output. */
 export function primaryOrganization(o) {
   const org = Array.isArray(o?.operatingOrganizations) ? o.operatingOrganizations[0] : null;
-  return typeof org?.name === "string" ? org.name : null;
+  return typeof org?.name === "string" ? sanitizeText(org.name) : null;
 }
 
 /** `/v1/r/{id}/apply` or `/v1/r/{id}/source` — the measured link-outs, never a raw stored URL. */
@@ -380,13 +468,14 @@ function isUsableUrl(v) {
 const MAX_ECOSYSTEM_VALUE_LEN = 40;
 const MAX_ECOSYSTEMS = 8;
 
-/** Truncate one ecosystem string to `MAX_ECOSYSTEM_VALUE_LEN`, with the same `…` convention as
- * `truncateTitle`. Reused here rather than calling `truncateTitle` because the two limits are
- * independent and documented separately — this list's cap must be able to change without moving
- * the title's. */
+/** Sanitize, then truncate, one ecosystem string to `MAX_ECOSYSTEM_VALUE_LEN`, with the same `…`
+ * convention as `truncateTitle`. Reused here rather than calling `truncateTitle` because the two
+ * limits are independent and documented separately — this list's cap must be able to change
+ * without moving the title's. */
 function truncateEcosystem(value) {
-  if (value.length <= MAX_ECOSYSTEM_VALUE_LEN) return value;
-  return `${value.slice(0, Math.max(0, MAX_ECOSYSTEM_VALUE_LEN - 1))}…`;
+  const clean = sanitizeText(value);
+  if (clean.length <= MAX_ECOSYSTEM_VALUE_LEN) return clean;
+  return `${clean.slice(0, Math.max(0, MAX_ECOSYSTEM_VALUE_LEN - 1))}…`;
 }
 
 /** Project `ecosystems[]`: drop non-strings, cap each value's length, cap the list length, and
@@ -467,13 +556,15 @@ export function formatRow(item) {
 
 export function formatTable(projected) {
   const items = Array.isArray(projected.items) ? projected.items : [projected];
-  if (items.length === 0) return "No results.";
-  const lines = items.map(formatRow);
+  // An empty page (e.g. --page past the last one) is still informative: the total/page footer
+  // tells the caller there WAS a real total and where they landed, rather than a bare "No
+  // results." that reads the same whether the whole search was empty or just this page is.
+  const body = items.length === 0 ? "No results." : items.map(formatRow).join("\n\n");
   const footer =
     "total" in projected
       ? `\n\n${projected.total} total, page ${projected.page} of ${projected.totalPages}.`
       : "";
-  return `${lines.join("\n\n")}${footer}`;
+  return `${body}${footer}`;
 }
 
 /** Table rendering for a SINGLE fetched record (get.mjs): the base row plus the source link-out,

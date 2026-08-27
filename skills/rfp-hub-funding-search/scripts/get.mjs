@@ -17,12 +17,16 @@ import {
   EXIT,
   RequestError,
   apiBase,
+  assertKnownFlags,
+  assertNoExtraPositionals,
   exitCodeFor,
   fetchJson,
   formatDetailTable,
   newInvocationId,
   parseArgs,
   projectDetail,
+  sanitizeText,
+  validateFormat,
 } from "./lib.mjs";
 
 const HELP = `rfp-hub-funding-search — get.mjs
@@ -39,11 +43,30 @@ Options:
 Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (default 10000).
 `;
 
+/** Every flag this script accepts. `--id` is the alternative to the positional argument. */
+const GET_ALLOWED_FLAGS = new Set(["id", "format", "help"]);
+
 async function main(argv) {
   const { flags, positional } = parseArgs(argv);
   if (flags.help !== undefined) {
     process.stdout.write(HELP);
     return EXIT.OK;
+  }
+
+  try {
+    assertKnownFlags(flags, GET_ALLOWED_FLAGS, "get.mjs");
+    assertNoExtraPositionals(positional, 1, "get.mjs takes exactly one <id> (or --id <id>).");
+  } catch (err) {
+    process.stderr.write(`${err.message}\n`);
+    return EXIT.USAGE;
+  }
+
+  let format;
+  try {
+    format = validateFormat(flags.format);
+  } catch (err) {
+    process.stderr.write(`${err.message}\n`);
+    return EXIT.USAGE;
   }
 
   const id = flags.id ?? positional[0];
@@ -52,7 +75,6 @@ async function main(argv) {
     return EXIT.USAGE;
   }
 
-  const format = flags.format === "table" ? "table" : "json";
   const base = apiBase();
   const url = `${base}/v1/opportunities/${encodeURIComponent(id)}`;
   const invocationId = newInvocationId();
@@ -64,10 +86,16 @@ async function main(argv) {
     if (err instanceof RequestError) {
       if (err.status === 404 && err.body?.error === "opportunity_merged") {
         // The API's contract for this field is `{ id, title }` (see
-        // OpportunityService#findMergedDestination), never a bare string — read `.id`.
+        // OpportunityService#findMergedDestination), never a bare string — read `.id`. `title` is
+        // ANOTHER entry's third-party title, so it goes through the same sanitizer as every other
+        // publisher-supplied string this file ever prints (see lib.mjs's `sanitizeText`) before
+        // being interpolated into this message.
         const merged = err.body.mergedInto;
         const mergedId = merged && typeof merged === "object" ? merged.id : merged;
-        const mergedTitle = merged && typeof merged === "object" ? merged.title : undefined;
+        const mergedTitle =
+          merged && typeof merged === "object" && typeof merged.title === "string"
+            ? sanitizeText(merged.title)
+            : undefined;
         const suffix = mergedTitle ? ` ("${mergedTitle}")` : "";
         process.stderr.write(
           `'${id}' was merged into '${mergedId}'${suffix}. Try fetching that id instead.\n`,

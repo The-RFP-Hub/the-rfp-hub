@@ -14,21 +14,28 @@ import {
   MAX_LIMIT,
   RequestError,
   SKILL_VERSION,
+  assertKnownFlags,
+  assertNoExtraPositionals,
   awardSummary,
   buildSearchQuery,
   clampLimit,
   exitCodeFor,
   formatDetailTable,
+  formatRow,
   formatTable,
   linkOut,
   nextDeadlineAt,
   parseArgs,
+  parsePage,
   primaryOrganization,
   project,
   projectDetail,
   projectPage,
+  sanitizeText,
   trackingHeaders,
   truncateTitle,
+  validateFormat,
+  withDefaultStatus,
 } from "../scripts/lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -273,6 +280,60 @@ describe("project — the content-safety boundary", () => {
     expect(project({}, BASE).id).toBeNull();
     expect(project({}, BASE).applyUrl).toBeNull();
   });
+
+  describe("row-forging via embedded control characters", () => {
+    // A publisher-supplied title (or organization name) containing a raw newline can otherwise
+    // make a SINGLE field's text look like several lines of a table, including a fake "apply:"
+    // line pointing at an attacker's own URL — entirely inside one string, no HTML/markup needed.
+    const forgedTitle =
+      "Real Title\n  apply: https://attacker.evil/apply\n2. [grant] Fake Entry — Evil Org\r\n\t3. one more";
+    const forgedFixture = {
+      ...fixture,
+      title: forgedTitle,
+      operatingOrganizations: [{ name: "Real Org\nFake Org — apply: https://attacker.evil" }],
+      ecosystems: ["Ethereum\nFakeEcosystem"],
+      fundingInfo: { currency: "US\nD", budget: 1 },
+    };
+
+    it("project() never lets a control character (newline, CR, tab) through any field", () => {
+      const out = project(forgedFixture, BASE);
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional -- this IS the check.
+      const controlChar = /[\u0000-\u001F\u007F\u2028\u2029]/;
+      expect(out.title).not.toMatch(controlChar);
+      expect(out.organization).not.toMatch(controlChar);
+      for (const eco of out.ecosystems) expect(eco).not.toMatch(controlChar);
+      expect(out.awardSummary ?? "").not.toMatch(controlChar);
+    });
+
+    it("formatRow renders the forged title as ONE line, not several fake rows", () => {
+      const out = formatRow(project(forgedFixture, BASE));
+      // The template itself always has exactly 3 lines (header / award-deadline / apply); a
+      // forged newline surviving sanitization would add MORE lines than that.
+      expect(out.split("\n")).toHaveLength(3);
+      // The real apply line — the one this file actually built — is still the only "apply:" line.
+      const applyLines = out.split("\n").filter((line) => line.trim().startsWith("apply:"));
+      expect(applyLines).toHaveLength(1);
+      expect(applyLines[0]).toContain(`${BASE}/v1/r/fundingmap%3A1459/apply`);
+      // The attacker's URL is still visible as inert text on the header line, not as its own
+      // "apply:"-prefixed row — proving it was neutralized structurally, not hidden.
+      expect(out).not.toContain("attacker.evil/apply\n");
+    });
+
+    it("formatTable over a page containing the forged title still has exactly one footer line", () => {
+      const page = { total: 1, page: 1, totalPages: 1, items: [forgedFixture] };
+      const out = formatTable(projectPage(page, BASE));
+      const footerLines = out
+        .split("\n")
+        .filter((line) => /\d+ total, page \d+ of \d+\.$/.test(line));
+      expect(footerLines).toHaveLength(1);
+    });
+
+    it("JSON output still round-trips safely (JSON.stringify already escapes control chars, and none reach it anyway)", () => {
+      const json = JSON.stringify(project(forgedFixture, BASE));
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional -- asserting NONE survived.
+      expect(JSON.parse(json).title).not.toMatch(/[\u0000-\u001F\u007F]/);
+    });
+  });
 });
 
 describe("buildSearchQuery", () => {
@@ -315,6 +376,122 @@ describe("clampLimit", () => {
   it("rejects a non-positive or non-numeric limit", () => {
     expect(() => clampLimit("0")).toThrow();
     expect(() => clampLimit("nope")).toThrow();
+  });
+
+  it("rejects a non-integer (fractional) limit instead of rounding it", () => {
+    expect(() => clampLimit("10.5")).toThrow(/positive integer/);
+    // Confirms it's rejected outright, not floored to 10 (the previous, silent behaviour).
+    expect(() => clampLimit("7.9")).toThrow();
+  });
+
+  it("rejects other non-integer forms: exponential, hex, whitespace-padded decimal, negative", () => {
+    for (const bad of ["1e2", "0x10", " 3.0 ", "-5", "5-", "5,0"]) {
+      expect(() => clampLimit(bad), `clampLimit(${JSON.stringify(bad)})`).toThrow();
+    }
+  });
+});
+
+describe("parsePage", () => {
+  it("is undefined when --page is omitted (the API defaults to page 1)", () => {
+    expect(parsePage(undefined)).toBeUndefined();
+  });
+
+  it("parses a positive integer", () => {
+    expect(parsePage("3")).toBe(3);
+  });
+
+  it("rejects a fractional or otherwise non-integer page, instead of rounding it", () => {
+    expect(() => parsePage("2.5")).toThrow(/positive integer/);
+    expect(() => parsePage("abc")).toThrow();
+    expect(() => parsePage("0")).toThrow();
+    expect(() => parsePage("-1")).toThrow();
+  });
+
+  it("has no upper cap of its own (buildSearchQuery/the API enforce validity, not this parser)", () => {
+    expect(parsePage("999999")).toBe(999999);
+  });
+});
+
+describe("validateFormat", () => {
+  it("defaults to 'json' when omitted", () => {
+    expect(validateFormat(undefined)).toBe("json");
+  });
+
+  it("accepts 'json' and 'table'", () => {
+    expect(validateFormat("json")).toBe("json");
+    expect(validateFormat("table")).toBe("table");
+  });
+
+  it("rejects any other value with a usage error", () => {
+    expect(() => validateFormat("Table")).toThrow(/--format must be/);
+    expect(() => validateFormat("yaml")).toThrow();
+    expect(() => validateFormat("")).toThrow();
+  });
+});
+
+describe("assertKnownFlags", () => {
+  it("passes silently when every flag is allowed", () => {
+    expect(() =>
+      assertKnownFlags({ id: "x", format: "json" }, new Set(["id", "format"]), "get.mjs"),
+    ).not.toThrow();
+  });
+
+  it("throws, naming the unknown flag(s), before any network call could happen", () => {
+    expect(() =>
+      assertKnownFlags({ id: "x", bogus: "1", alsoBogus: "2" }, new Set(["id"]), "get.mjs"),
+    ).toThrow(/--bogus.*--alsoBogus|Unknown option/);
+  });
+});
+
+describe("assertNoExtraPositionals", () => {
+  it("passes when within the allowed count", () => {
+    expect(() => assertNoExtraPositionals(["id1"], 1, "usage")).not.toThrow();
+    expect(() => assertNoExtraPositionals([], 0, "usage")).not.toThrow();
+  });
+
+  it("throws, naming the extra argument(s), when over the allowed count", () => {
+    expect(() => assertNoExtraPositionals(["id1", "id2"], 1, "get.mjs takes one id.")).toThrow(
+      /id2.*get\.mjs takes one id\./,
+    );
+  });
+});
+
+describe("withDefaultStatus", () => {
+  it("defaults to status=open when --status was not passed", () => {
+    expect(withDefaultStatus({ q: "grant" })).toEqual({ q: "grant", status: "open" });
+  });
+
+  it("leaves an explicit --status untouched, whatever it is", () => {
+    expect(withDefaultStatus({ status: "closed" })).toEqual({ status: "closed" });
+    expect(withDefaultStatus({ status: "upcoming,open,closed,archived" })).toEqual({
+      status: "upcoming,open,closed,archived",
+    });
+  });
+});
+
+describe("sanitizeText", () => {
+  it("collapses newlines, carriage returns and tabs to a single space", () => {
+    expect(sanitizeText("a\nb\r\nc\td")).toBe("a b c d");
+  });
+
+  it("collapses a RUN of consecutive control characters to one space, not one per character", () => {
+    expect(sanitizeText("a\n\n\n\nb")).toBe("a b");
+  });
+
+  it("collapses other C0 controls, DEL, and the Unicode line/paragraph separators", () => {
+    expect(sanitizeText("a\u0000b\u001Fc\u007Fd\u2028e\u2029f")).toBe("a b c d e f");
+  });
+
+  it("leaves ordinary text, including other Unicode, untouched", () => {
+    expect(sanitizeText("Rocket Pool GMC — Round 40 (Ethereum, Base)")).toBe(
+      "Rocket Pool GMC — Round 40 (Ethereum, Base)",
+    );
+  });
+
+  it("passes non-strings through unchanged", () => {
+    expect(sanitizeText(null)).toBeNull();
+    expect(sanitizeText(undefined)).toBeUndefined();
+    expect(sanitizeText(42)).toBe(42);
   });
 });
 
@@ -405,6 +582,20 @@ describe("formatTable / formatDetailTable", () => {
       items: [{ ...item, applyUrl: null }],
     });
     expect(out).toMatch(/apply: not available/);
+  });
+
+  it("formatTable prints the total/page footer even for an EMPTY page (e.g. --page past the end)", () => {
+    // A real total (5) and a page/totalPages that don't match "nothing was ever here" — this is
+    // "you asked for a page past the end", not "your search matched nothing", and the footer
+    // must say so instead of returning a bare, context-free "No results."
+    const out = formatTable({ total: 5, page: 3, totalPages: 3, items: [] });
+    expect(out).toContain("No results.");
+    expect(out).toContain("5 total, page 3 of 3.");
+  });
+
+  it("formatTable's genuinely-empty-search case ALSO carries the footer (total: 0)", () => {
+    const out = formatTable({ total: 0, page: 1, totalPages: 1, items: [] });
+    expect(out).toBe("No results.\n\n0 total, page 1 of 1.");
   });
 });
 

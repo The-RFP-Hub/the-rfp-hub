@@ -43,10 +43,12 @@ function fakeItem(i: number) {
 
 const items = Array.from({ length: ITEM_COUNT }, (_, i) => fakeItem(i));
 
-function startFakeApi(): Promise<{ server: Server; base: string }> {
+function startFakeApi(): Promise<{ server: Server; base: string; requestUrls: string[] }> {
+  const requestUrls: string[] = [];
   return new Promise((resolvePromise) => {
     const server = createServer((req, res) => {
       const url = req.url ?? "";
+      requestUrls.push(url);
       if (url.startsWith("/v1/opportunities/")) {
         const id = decodeURIComponent(url.split("/").pop() ?? "");
         const item = items.find((it) => it.id === id) ?? fakeItem(0);
@@ -62,7 +64,7 @@ function startFakeApi(): Promise<{ server: Server; base: string }> {
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       const port = typeof address === "object" && address ? address.port : 0;
-      resolvePromise({ server, base: `http://127.0.0.1:${port}` });
+      resolvePromise({ server, base: `http://127.0.0.1:${port}`, requestUrls });
     });
   });
 }
@@ -165,5 +167,126 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
       }
       expect(src).toMatch(/process\.exitCode\s*=/);
     }
+  });
+});
+
+describe("search.mjs defaults to status=open unless --status is passed explicitly", () => {
+  let server: Server;
+
+  afterEach(() => {
+    server?.close();
+  });
+
+  it("sends status=open when --status is omitted", async () => {
+    const fake = await startFakeApi();
+    server = fake.server;
+    const { code } = await run(searchScript, ["--q", "grant"], { RFPHUB_API_BASE: fake.base });
+    expect(code).toBe(0);
+    expect(fake.requestUrls).toHaveLength(1);
+    const params = new URLSearchParams(fake.requestUrls[0].split("?")[1] ?? "");
+    expect(params.get("status")).toBe("open");
+  });
+
+  it("honors an explicit --status instead of the default", async () => {
+    const fake = await startFakeApi();
+    server = fake.server;
+    const { code } = await run(searchScript, ["--status", "closed"], {
+      RFPHUB_API_BASE: fake.base,
+    });
+    expect(code).toBe(0);
+    const params = new URLSearchParams(fake.requestUrls[0].split("?")[1] ?? "");
+    expect(params.get("status")).toBe("closed");
+  });
+
+  it("honors an explicit multi-value --status (e.g. asking for every status)", async () => {
+    const fake = await startFakeApi();
+    server = fake.server;
+    const { code } = await run(searchScript, ["--status", "upcoming,open,closed,archived"], {
+      RFPHUB_API_BASE: fake.base,
+    });
+    expect(code).toBe(0);
+    const params = new URLSearchParams(fake.requestUrls[0].split("?")[1] ?? "");
+    expect(params.get("status")).toBe("upcoming,open,closed,archived");
+  });
+});
+
+describe("usage errors exit 1 BEFORE any network call", () => {
+  // Port 1 is a privileged port nothing in this test suite listens on: any attempted connection
+  // fails fast and distinctly (ECONNREFUSED -> this skill's own "network" exit code, 2) — which
+  // is different from the usage exit code (1) these tests expect. If a fix regressed and let one
+  // of these bad invocations reach fetchJson, the exit code would flip from 1 to 2, catching it
+  // without needing to prove a negative ("no request was sent") any other way.
+  const UNREACHABLE_BASE = "http://127.0.0.1:1";
+  const USAGE_EXIT_CODE = 1;
+  const NETWORK_EXIT_CODE = 2;
+
+  it("search.mjs rejects an unknown flag", async () => {
+    const { code, stderr } = await run(searchScript, ["--bogus", "x"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(code).not.toBe(NETWORK_EXIT_CODE);
+    expect(stderr).toMatch(/Unknown option|Unknown parameter/);
+  });
+
+  it("search.mjs rejects an invalid --format value", async () => {
+    const { code, stderr } = await run(searchScript, ["--format", "yaml"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(stderr).toMatch(/--format must be/);
+  });
+
+  it("search.mjs rejects extra positional arguments", async () => {
+    const { code, stderr } = await run(searchScript, ["stray-positional"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(stderr).toMatch(/no positional arguments/);
+  });
+
+  it("search.mjs rejects a non-integer --limit and --page", async () => {
+    const badLimit = await run(searchScript, ["--limit", "10.5"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(badLimit.code).toBe(USAGE_EXIT_CODE);
+    expect(badLimit.stderr).toMatch(/--limit must be a positive integer/);
+
+    const badPage = await run(searchScript, ["--page", "1.5"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(badPage.code).toBe(USAGE_EXIT_CODE);
+    expect(badPage.stderr).toMatch(/--page must be a positive integer/);
+  });
+
+  it("get.mjs rejects an unknown flag", async () => {
+    const { code, stderr } = await run(getScript, ["fixture:0", "--bogus", "x"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(code).not.toBe(NETWORK_EXIT_CODE);
+    expect(stderr).toMatch(/Unknown option/);
+  });
+
+  it("get.mjs rejects an invalid --format value", async () => {
+    const { code, stderr } = await run(getScript, ["fixture:0", "--format", "xml"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(stderr).toMatch(/--format must be/);
+  });
+
+  it("get.mjs rejects an extra positional argument beyond the single <id>", async () => {
+    const { code, stderr } = await run(getScript, ["fixture:0", "fixture:1"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(stderr).toMatch(/takes exactly one/);
+  });
+
+  it("get.mjs still requires an id when none is given", async () => {
+    const { code, stderr } = await run(getScript, [], { RFPHUB_API_BASE: UNREACHABLE_BASE });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(stderr).toMatch(/Usage: node get\.mjs/);
   });
 });

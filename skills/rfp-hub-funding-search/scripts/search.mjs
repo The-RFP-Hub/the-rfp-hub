@@ -23,7 +23,10 @@
 import {
   EXIT,
   RequestError,
+  SEARCH_PARAMS,
   apiBase,
+  assertKnownFlags,
+  assertNoExtraPositionals,
   buildSearchQuery,
   clampLimit,
   exitCodeFor,
@@ -31,7 +34,10 @@ import {
   formatTable,
   newInvocationId,
   parseArgs,
+  parsePage,
   projectPage,
+  validateFormat,
+  withDefaultStatus,
 } from "./lib.mjs";
 
 const HELP = `rfp-hub-funding-search — search.mjs
@@ -43,7 +49,7 @@ Search open Ethereum-ecosystem funding opportunities via the RFP Hub public API.
 Options map 1:1 to GET /v1/opportunities query params:
   --q <text>                Free-text search over title/summary/description
   --fundingType <list>      grant,hackathon,bounty,accelerator,vc_fund,rfp
-  --status <list>           upcoming,open,closed,archived
+  --status <list>           upcoming,open,closed,archived — DEFAULTS TO "open" when omitted
   --ecosystem <list>        e.g. Optimism,Base
   --category <list>         e.g. DeFi,"Public Goods"
   --organization <slug>     matches any operating OR sponsoring organization
@@ -51,29 +57,53 @@ Options map 1:1 to GET /v1/opportunities query params:
   --deadlineAfter <iso>     --deadlineBefore <iso>   RFC 3339 instants
   --sort <field>            nextDeadlineAt|opensAt|postedAt|updatedAt|createdAt
   --order <asc|desc>
-  --page <n>                --limit <n>              capped at 25 by this skill
+  --page <n>                --limit <n>              positive integers; limit capped at 25
   --format <json|table>     default json
   --help                    show this message
 
 A "<list>" value may be comma-separated: --ecosystem Optimism,Base
+This script takes no positional arguments — every filter is a --flag.
+
+Without --status, this skill searches OPEN opportunities only (most requests like "find grants"
+mean currently-open ones). Pass --status explicitly to see upcoming/closed/archived entries too,
+e.g. --status upcoming,open,closed,archived for everything.
 
 Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (default 10000).
 See references/api-reference.md for the full parameter table and enum values.
 `;
 
+/** Every flag this script itself accepts, beyond the API's own query params: `--format` never
+ * reaches the API, and `--help` short-circuits before anything else runs. */
+const SEARCH_ALLOWED_FLAGS = new Set([...SEARCH_PARAMS, "format", "help"]);
+
 async function main(argv) {
-  const { flags } = parseArgs(argv);
+  const { flags, positional } = parseArgs(argv);
   if (flags.help !== undefined) {
     process.stdout.write(HELP);
     return EXIT.OK;
   }
 
-  const { format: rawFormat, limit: rawLimit, ...searchFlags } = flags;
-  const format = rawFormat === "table" ? "table" : "json";
-
-  let limit;
   try {
+    assertKnownFlags(flags, SEARCH_ALLOWED_FLAGS, "search.mjs");
+    assertNoExtraPositionals(
+      positional,
+      0,
+      "search.mjs takes no positional arguments; every filter is a --flag (see --help).",
+    );
+  } catch (err) {
+    process.stderr.write(`${err.message}\n`);
+    return EXIT.USAGE;
+  }
+
+  const { format: rawFormat, limit: rawLimit, page: rawPage, ...searchFlags } = flags;
+
+  let format;
+  let limit;
+  let page;
+  try {
+    format = validateFormat(rawFormat);
     limit = clampLimit(rawLimit);
+    page = parsePage(rawPage);
   } catch (err) {
     process.stderr.write(`${err.message}\n`);
     return EXIT.USAGE;
@@ -81,7 +111,9 @@ async function main(argv) {
 
   let query;
   try {
-    query = buildSearchQuery({ ...searchFlags, limit });
+    query = buildSearchQuery(
+      withDefaultStatus({ ...searchFlags, limit, ...(page !== undefined ? { page } : {}) }),
+    );
   } catch (err) {
     process.stderr.write(`${err.message}\n`);
     return EXIT.USAGE;
@@ -91,9 +123,9 @@ async function main(argv) {
   const url = `${base}/v1/opportunities?${query.toString()}`;
   const invocationId = newInvocationId();
 
-  let page;
+  let pageResult;
   try {
-    page = await fetchJson(url, { invocationId });
+    pageResult = await fetchJson(url, { invocationId });
   } catch (err) {
     if (err instanceof RequestError) {
       process.stderr.write(`${err.message}\n`);
@@ -103,7 +135,7 @@ async function main(argv) {
     return EXIT.NETWORK;
   }
 
-  const projected = projectPage(page, base);
+  const projected = projectPage(pageResult, base);
   if (format === "table") {
     process.stdout.write(`${formatTable(projected)}\n`);
   } else {
