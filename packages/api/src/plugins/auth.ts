@@ -18,8 +18,26 @@
  * A PRESENTED-BUT-INVALID credential is always a 401, including on the optional gate. Ignoring one
  * and serving the anonymous view would mean a caller with an expired token silently sees less than
  * they asked for, and never learns why.
+ *
+ * RESOLVING IS SPLIT FROM REJECTING, and the split is what makes anonymous traffic meterable.
+ * Every gate above ANSWERS — `reply.send(401)` — and answering ends the hook chain it is running
+ * in, so anything registered after it never runs. A rate limiter registered after `requireAuth`
+ * therefore never saw a request with a bad credential: hammering a write route with a junk Bearer
+ * cost nothing. `resolvePrincipal` is the same resolution WITHOUT the answer — it populates
+ * `request.principal` when the credential is good, records why it was refused when it is not, and
+ * replies to nothing. Put it first, meter second, gate third, and the refusal still happens, one
+ * hook later, after the request has been counted. See `modules/routes/shared/rate-limit-key.ts`.
+ *
+ * The outcome is cached on the request (`request.principalResolution`), so a chain that resolves
+ * and then gates verifies the credential ONCE — one session lookup or one key hash, as before.
  */
-import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  onRequestAsyncHookHandler,
+  preHandlerHookHandler,
+} from "fastify";
 import { type Auth, type AuthConfig, defaultAuth } from "../auth/better-auth.js";
 import { type DB, db as defaultDb } from "../db/client.js";
 import { AccountService } from "../modules/services/auth/account.service.js";
@@ -56,6 +74,13 @@ export interface AuthDecorators {
    */
   auth: Auth;
   principals: PrincipalService;
+  /**
+   * Resolve the request's credential and ANSWER NOTHING — the half of a gate that is safe to run
+   * before a rate limiter. Sets `request.principal` when a valid Bearer is presented; leaves it
+   * `null` for an absent or invalid one, without a 401, a 403 or a throw. A gate placed after it
+   * still refuses; it just refuses one hook later, with the request already counted.
+   */
+  resolvePrincipal: onRequestAsyncHookHandler;
   requireAuth: preHandlerHookHandler;
   requireSession: preHandlerHookHandler;
   optionalAuth: preHandlerHookHandler;
@@ -86,6 +111,19 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
   void reply.code(status).send({ error, message });
 }
 
+/**
+ * What resolving this request's credential concluded — computed once, then reused.
+ *
+ * `rejected` carries the answer a gate WOULD have sent rather than the error itself, because the
+ * refusal has to survive the resolver returning quietly: the gate that runs later must be able to
+ * reproduce exactly the status, code and message the un-split `resolve()` produced, without
+ * verifying the credential a second time.
+ */
+export type PrincipalResolution =
+  | { kind: "anonymous" }
+  | { kind: "principal" }
+  | { kind: "rejected"; status: number; code: string; message: string };
+
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
   const db = options.db ?? defaultDb;
   const auth = options.auth ?? defaultAuth();
@@ -100,6 +138,39 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   // Declared so `request.principal` exists on every request object rather than being added as a
   // property later, which would deoptimise the shared shape Fastify allocates per request.
   app.decorateRequest("principal", null);
+  // The cache slot for the resolution above. Declared for the same reason, and so a chain of
+  // [resolvePrincipal, limiter, gate] costs ONE credential verification rather than two.
+  app.decorateRequest("principalResolution", null);
+
+  /** Verify the credential. Populates `request.principal`; answers nothing, throws nothing. */
+  async function computeResolution(request: FastifyRequest): Promise<PrincipalResolution> {
+    const token = bearerOf(request);
+    if (token === undefined) return { kind: "anonymous" };
+    try {
+      request.principal = await principals.fromBearer(token);
+      return { kind: "principal" };
+    } catch (error) {
+      if (isHttpError(error)) {
+        return { kind: "rejected", status: error.status, code: error.code, message: error.message };
+      }
+      request.log.error(error);
+      return {
+        kind: "rejected",
+        status: 500,
+        code: "internal_error",
+        message: "internal server error",
+      };
+    }
+  }
+
+  /** The cached form. Every gate and the quiet resolver go through this one. */
+  async function resolveOnce(request: FastifyRequest): Promise<PrincipalResolution> {
+    const cached = request.principalResolution;
+    if (cached) return cached;
+    const outcome = await computeResolution(request);
+    request.principalResolution = outcome;
+    return outcome;
+  }
 
   /** Resolve, or answer. Returns true when the request may continue. */
   async function resolve(
@@ -107,9 +178,12 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     reply: FastifyReply,
     required: boolean,
   ): Promise<boolean> {
-    const token = bearerOf(request);
-    if (token === undefined) {
-      if (!required) return true;
+    const outcome = await resolveOnce(request);
+    if (outcome.kind === "rejected") {
+      send(reply, outcome.status, outcome.code, outcome.message);
+      return false;
+    }
+    if (outcome.kind === "anonymous" && required) {
       send(
         reply,
         401,
@@ -118,19 +192,12 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
       );
       return false;
     }
-    try {
-      request.principal = await principals.fromBearer(token);
-      return true;
-    } catch (error) {
-      if (isHttpError(error)) {
-        send(reply, error.status, error.code, error.message);
-        return false;
-      }
-      request.log.error(error);
-      send(reply, 500, "internal_error", "internal server error");
-      return false;
-    }
+    return true;
   }
+
+  const resolvePrincipal: onRequestAsyncHookHandler = async (request) => {
+    await resolveOnce(request);
+  };
 
   const requireAuth: preHandlerHookHandler = async (request, reply) => {
     await resolve(request, reply, true);
@@ -190,6 +257,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   const decorators: AuthDecorators = {
     auth,
     principals,
+    resolvePrincipal,
     requireAuth,
     requireSession,
     optionalAuth,
