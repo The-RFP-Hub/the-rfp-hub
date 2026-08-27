@@ -41,6 +41,30 @@ import { redactString, registerSecret } from "./redact.js";
 import { PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION, createServer } from "./server.js";
 import { RedactingTransport } from "./transport.js";
 
+/**
+ * ONE message for "that preview is not available", whichever way it became unavailable.
+ *
+ * There are two code paths into it — the record is gone when `approve` first reads it, and the
+ * record is gone when `approve` claims it after the confirmation — and from the terminal they are
+ * the same situation: the thing you were asked about is not there any more, and nothing was
+ * approved. Which of the two fired depends on how a race happened to interleave, so reporting them
+ * differently would give the operator a detail they cannot act on and cannot reproduce, and it
+ * would make the visible outcome of a concurrent approve nondeterministic. The next step is
+ * identical either way, and it is what the message says.
+ */
+function previewUnavailable(id: string): string {
+  return `That preview is not available: ${id} was never pending, was revoked, or another \`approve\` for the same id completed first. NOTHING WAS APPROVED. Run \`rfphub-mcp pending\` to see what is actually waiting.`;
+}
+
+/**
+ * ONE message for "that preview's window has passed", from either of the two points that can
+ * notice — before the question, and after the answer. Same reasoning as above: the operator's next
+ * step does not depend on which check caught it.
+ */
+function previewExpired(expiresAt: string): string {
+  return `That preview expired at ${expiresAt}, so NOTHING WAS APPROVED. Approvals are deliberately short-lived. Ask for a fresh preview and approve that one.`;
+}
+
 const USAGE = `rfphub-mcp — the RFP Hub MCP server
 
   rfphub-mcp                 serve MCP over stdio (this is what an MCP client runs)
@@ -170,12 +194,12 @@ async function approve(
   }
   const record = readPending(config.home, id);
   if (record === null) {
-    say(`No preview with id ${id}. Run \`rfphub-mcp pending\` to see what is waiting.`);
+    say(previewUnavailable(id));
     return 1;
   }
   const now = new Date();
   if (isExpired(record, now)) {
-    say(`That preview expired at ${record.expiresAt}. Ask for a fresh preview and approve that.`);
+    say(previewExpired(record.expiresAt));
     return 1;
   }
 
@@ -220,11 +244,9 @@ async function approve(
   // two writes out of one decision. One atomic rename decides it; everyone else is refused.
   const claimed = claimPending(config.home, record.approvalId);
   if (claimed === null) {
-    say(
-      "That preview is no longer available — it was revoked, or another `approve` for the same id " +
-        "completed while this one was waiting. NOTHING WAS APPROVED. Run `rfphub-mcp pending` to " +
-        "see what is actually waiting.",
-    );
+    // Deliberately the SAME sentence the read-side miss prints. Losing this race and finding the
+    // preview already gone are one outcome as far as anybody at this terminal is concerned.
+    say(previewUnavailable(record.approvalId));
     return 1;
   }
 
@@ -232,9 +254,7 @@ async function approve(
   // the question is being asked, and because the claimed copy is the one nobody else can alter.
   const approvedAt = new Date();
   if (isExpired(claimed, approvedAt)) {
-    say(
-      `That preview expired at ${claimed.expiresAt} while it was on screen, so NOTHING WAS APPROVED. Ask for a fresh preview and approve that.`,
-    );
+    say(previewExpired(claimed.expiresAt));
     return 1;
   }
 
