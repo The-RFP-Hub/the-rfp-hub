@@ -373,5 +373,14 @@ jobs:
         with:
           node-version: 22
 
+      # `docs/` is built by a stream landing concurrently with this checker, so any PR that
+      # doesn't yet touch it must not turn this job red — that would be this job failing on work
+      # that isn't its own. Guarded with `hashFiles`, but at the STEP, not the job: a job-level
+      # `if:` is evaluated before a runner is even allocated for this job, so a job-level
+      # `hashFiles('docs/README.md')` would always see an empty workspace (nothing has been
+      # checked out yet) and always evaluate to `''` — silently disabling this job forever rather
+      # than gating it on whether `docs/` actually exists. Placed after `actions/checkout`, the
+      # same expression sees the real tree and does what it says.
       - name: Check the handoff docs (existence, links, sh-block markers) — offline
+        if: hashFiles('docs/README.md') != ''
         run: node scripts/check-m4.mjs --only docs --offline --json -

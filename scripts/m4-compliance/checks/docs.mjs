@@ -12,6 +12,8 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as nodePath from "node:path";
 import { promisify } from "node:util";
@@ -141,51 +143,62 @@ export async function checkDocs(report, ctx) {
   }
 
   // ── marked sh blocks ─────────────────────────────────────────────────────
-  for (const relPath of present) {
-    const full = join(ctx.repoRoot, relPath);
-    const text = readFileSync(full, "utf8");
-    const blocks = shellBlocks(text);
+  // `safe-read` blocks run with a FRESH, DISPOSABLE working directory, never `ctx.repoRoot` — a
+  // real block in `docs/api-integration.md` does `curl ... -o dataset.json` /
+  // `-o dataset.csv`, and running that with `cwd: ctx.repoRoot` left both files sitting in the
+  // caller's own checkout after every run of this checker. One directory for the whole check
+  // (not one per block): the blocks are independent — none of them reads a file an earlier block
+  // wrote — so sharing it costs nothing and avoids a `mkdtemp` per block for no benefit.
+  const scratchDir = await mkdtemp(join(tmpdir(), "m4-check-docs-safe-read-"));
+  try {
+    for (const relPath of present) {
+      const full = join(ctx.repoRoot, relPath);
+      const text = readFileSync(full, "utf8");
+      const blocks = shellBlocks(text);
 
-    for (const block of blocks) {
-      if (!block.marker) {
-        c.fail(
-          `${relPath}:${block.line}: sh block carries a marker`,
-          `no ${MARKERS.join("/")} marker found as the second word of the fence's info string (e.g. \`\`\`sh safe-read) — see scripts/m4-compliance/README.md for the convention`,
-        );
-        continue;
-      }
-
-      if (block.marker === "safe-read") {
-        if (ctx.offline) {
-          c.skip(`${relPath}:${block.line}: safe-read block executes successfully`, "--offline");
+      for (const block of blocks) {
+        if (!block.marker) {
+          c.fail(
+            `${relPath}:${block.line}: sh block carries a marker`,
+            `no ${MARKERS.join("/")} marker found as the second word of the fence's info string (e.g. \`\`\`sh safe-read) — see scripts/m4-compliance/README.md for the convention`,
+          );
           continue;
         }
-        try {
-          await execFileAsync("bash", ["-c", SAFE_READ_PREAMBLE + block.source], {
-            cwd: ctx.repoRoot,
-            timeout: ctx.timeoutMs,
-            // `docs/**` blocks reference the API as `$API`, never a literal URL.
-            env: { ...process.env, API: ctx.api },
-          });
-          c.pass(
-            `${relPath}:${block.line}: safe-read block executes successfully`,
-            block.source.trim().slice(0, 200),
-          );
-        } catch (err) {
-          c.fail(
-            `${relPath}:${block.line}: safe-read block executes successfully`,
-            `${err.message}${err.stderr ? `\nstderr: ${err.stderr}` : ""}`,
-          );
-        }
-        continue;
-      }
 
-      // no-run / staging-write: never executed by this checker, by design.
-      c.pass(
-        `${relPath}:${block.line}: ${block.marker} block is never executed by this checker`,
-        "not run (by design)",
-      );
+        if (block.marker === "safe-read") {
+          if (ctx.offline) {
+            c.skip(`${relPath}:${block.line}: safe-read block executes successfully`, "--offline");
+            continue;
+          }
+          try {
+            await execFileAsync("bash", ["-c", SAFE_READ_PREAMBLE + block.source], {
+              cwd: scratchDir,
+              timeout: ctx.timeoutMs,
+              // `docs/**` blocks reference the API as `$API`, never a literal URL.
+              env: { ...process.env, API: ctx.api },
+            });
+            c.pass(
+              `${relPath}:${block.line}: safe-read block executes successfully`,
+              block.source.trim().slice(0, 200),
+            );
+          } catch (err) {
+            c.fail(
+              `${relPath}:${block.line}: safe-read block executes successfully`,
+              `${err.message}${err.stderr ? `\nstderr: ${err.stderr}` : ""}`,
+            );
+          }
+          continue;
+        }
+
+        // no-run / staging-write: never executed by this checker, by design.
+        c.pass(
+          `${relPath}:${block.line}: ${block.marker} block is never executed by this checker`,
+          "not run (by design)",
+        );
+      }
     }
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true });
   }
 
   return c.finish();

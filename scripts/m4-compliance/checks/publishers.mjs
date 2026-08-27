@@ -119,7 +119,13 @@ export async function checkPublishers(report, ctx) {
           }
         });
         await page.goto(pageUrl, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
-        return await extractRenderedSlugs(page);
+        const extracted = await extractRenderedSlugs(page);
+        // `seen` (the captured /v1/publishers requests) has to come back too — an earlier
+        // revision of this callback returned only `extractRenderedSlugs`'s result, so `requests`
+        // at the call site was `undefined` and `requests.length` below threw on every SUCCESSFUL
+        // extraction. It went unnoticed only because /publishers didn't exist yet in production
+        // (the check returns early on the 404 before ever reaching this code).
+        return { ...extracted, requests: seen };
       },
     );
 
