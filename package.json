@@ -13,6 +13,7 @@
     "check": "pnpm -r --if-present check",
     "check:neutral": "node scripts/check-neutral.mjs",
     "check:deploy": "node scripts/check-deploy.mjs",
+    "check:skill": "node scripts/check-skill.mjs",
     "check:m2": "node scripts/check-m2.mjs",
     "check:m3": "node scripts/check-m3.mjs",
     "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",
@@ -37,6 +38,7 @@
     "ajv-formats": "^3.0.1",
     "json-schema-to-typescript": "^15.0.3",
     "rfphub-validate": "workspace:*",
+    "skills-ref": "0.1.5",
     "tsup": "^8.3.5",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
