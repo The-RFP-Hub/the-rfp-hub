@@ -198,8 +198,19 @@ Every failure carries one of seven codes.
 | `confirmation_invalid` | The approval does not apply: expired, already used, or bound to a different destination, credential, protocol or document. Nothing was sent. |
 | `exec_failed` | The API failed, was unreachable, answered with something that is not JSON, or answered with more than 1 MB. |
 
-A response over **1 MB fails rather than truncating**. Half a JSON document is not a smaller
+A response over **1 MB fails rather than truncating**, and the cap is applied while the body is
+being read, so an enormous response costs bounded memory. Half a JSON document is not a smaller
 answer, it is a wrong one; narrow the request instead.
+
+**A submission whose outcome cannot be known says so.** Any failure once the request has left —
+a dropped connection, a body that stops mid-stream, a body that is not JSON or is over the cap —
+is reported as *may have landed*, never as a plain failure, and points at
+`GET /v1/me/opportunities`. A *coded* refusal from the API is different: the API decided, the
+answer was no, and nothing was written. The approval is spent either way.
+
+**Arguments are validated against the published schema**, and a malformed call comes back with the
+same codes as everything else. An unknown parameter is an error rather than a filter that silently
+does nothing.
 
 ---
 
@@ -217,6 +228,15 @@ Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`
 
 **Rate limits fail closed.** If the counter store cannot be read or written, calls are refused — a
 budget that cannot be counted cannot be enforced. Keep `RFPHUB_MCP_HOME` writable.
+
+**The counters are correct across processes.** Check-and-increment runs under a lock directory
+(`policy-counters.lock`), because an MCP client and a terminal running this same package share one
+home directory by design, and an unlocked read-modify-write lets two processes through a cap of
+one. A lock left behind by a process that died is broken after five seconds.
+
+**The write budget is reserved before the approval is claimed.** A local refusal — an exhausted
+daily budget, a lost race for the approval — gives the budget back and leaves the approval intact,
+so nobody has to be asked to approve the same submission twice.
 
 **The audit log records argument key names and byte counts, never values.** A log that stored
 values would be a second copy of every document and every search term. Failing to write it never
@@ -236,10 +256,17 @@ Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per d
   error messages, the audit log — is scanned recursively for key-shaped strings.
 - **URLs are inert.** This server never follows a URL from any record, and the notice attached to
   every result says the client should not either.
-- **Residual risk, stated plainly:** `title` and organization names are third-party text and they
-  do reach the model. They are delimited and labelled. Labelling is a hint, not a control, and a
-  hostile title is not made harmless by it. The projection — the missing `description` — is the
-  control.
+- **Every third-party string is bounded.** Titles are cut at 140 characters, ecosystem labels at
+  40 characters and 8 values (the row says how many were dropped). `ecosystems` is an open list in
+  the standard — no registry, no enum — so leaving it unbounded would have made it the obvious
+  place to park a payload.
+- **Residual risk, stated plainly:** `title`, organization names and ecosystem labels are
+  third-party text and they do reach the model. They are delimited and labelled. Labelling is a
+  hint, not a control, and a hostile title is not made harmless by it. The projection — the missing
+  `description` — is the control.
+- **A preview refuses what the API would refuse.** The API's admission limits (title 256, summary
+  1 000, description 50 000, any array 100 entries, body 256 KiB) are checked locally, so nobody is
+  asked to approve a submission that could never have been accepted.
 - **`structuredContent` is not a safety boundary.** It is delivered to the model like any other
   output. It exists here for contract and validation.
 - **Pin exact versions**, as every example above does. That is the only real defense against a

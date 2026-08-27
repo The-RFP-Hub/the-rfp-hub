@@ -1,16 +1,23 @@
 /**
- * Tool registration, and the one wrapper every handler goes through.
+ * Tool registration, and the one boundary every failure goes through.
  *
- * NOTHING HERE KNOWS ABOUT A TRANSPORT. `createServer()` returns a configured `McpServer`;
+ * NOTHING HERE KNOWS ABOUT A TRANSPORT. `createServer()` returns a configured server;
  * `cli.ts` decides that it is served over stdio. Adding an HTTP entry later is a new file that
  * calls this one, not a refactor of it.
  *
- * The wrapper is where four cross-cutting rules live, so no tool can forget one:
+ * Four cross-cutting rules live in `guard`, so no tool can forget one:
  *   - the policy budget for the invocation's kind is spent before the work starts;
  *   - the result — text, structured content, and every error message — passes through redaction;
  *   - one audit line is written per call, recording key names and byte counts, never values;
  *   - a failure becomes an `isError` result carrying a code from the single error map, and an
  *     unexpected exception becomes `exec_failed` rather than a stack trace on the wire.
+ *
+ * ARGUMENT VALIDATION GOES THROUGH THE SAME BOUNDARY. The SDK validates a tool's arguments against
+ * its declared schema BEFORE the callback runs, and its own failure quotes the offending arguments
+ * back — outside `guard`, so uncoded, unaudited and unredacted. `installErrorBoundary` wraps that
+ * step so a malformed call is refused the way every other refusal is. Redaction additionally sits
+ * on the transport (`transport.ts`), because the SDK has error paths this package does not author
+ * at all, such as an unknown tool name echoed in a JSON-RPC error.
  *
  * FAIL-CLOSED REGISTRATION. The write tool is registered only when `RFPHUB_MCP_ENABLE_SUBMIT=1`.
  * Without it `tools/list` returns two tools, and a poisoned search result has no write tool to
@@ -57,6 +64,83 @@ export interface CreateServerOptions {
   apiClientOptions?: ApiClientOptions;
   policy?: Policy;
   now?: () => Date;
+}
+
+/**
+ * The two seams inside the SDK's `tools/call` dispatch that this package needs to reach.
+ *
+ * Both are ordinary prototype methods at run time, but the published types mark them `private`, so
+ * a subclass cannot override them and this interface has to describe them separately. That is a
+ * real coupling to an internal shape, and it is handled the only honest way: `installErrorBoundary`
+ * REFUSES TO START if either seam is missing, rather than continuing with a security boundary that
+ * silently is not there. An SDK upgrade that moves them fails immediately and loudly, in CI, on the
+ * first server this package constructs.
+ */
+interface ToolDispatchSeams {
+  validateToolInput(tool: unknown, args: unknown, toolName: string): Promise<unknown>;
+  createToolError(message: string): CallToolResult;
+}
+
+/**
+ * Route the SDK's argument validation and its error funnel through this package's boundary.
+ *
+ * WHY. The SDK validates a tool's arguments against its declared schema BEFORE the registered
+ * callback runs, and its own rejection quotes the offending arguments back. That happens outside
+ * `guard`: uncoded, unaudited, and unredacted — so an unknown property whose NAME is a credential
+ * would be echoed to the caller verbatim. Wrapping the seam keeps the schema published in
+ * `tools/list` exactly as authored (registering a permissive schema instead would hide the contract
+ * from every client) while making a malformed call fail like every other failure here.
+ *
+ * The instance properties SHADOW the prototype methods, which is what makes this work: the
+ * dispatcher calls them through `this`.
+ */
+function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
+  const seams = server as unknown as ToolDispatchSeams;
+  if (
+    typeof seams.validateToolInput !== "function" ||
+    typeof seams.createToolError !== "function"
+  ) {
+    throw new Error(
+      "The MCP SDK no longer exposes the tool-dispatch seams this server wraps to code, audit and " +
+        "redact argument-validation failures. Refusing to start rather than serve without that " +
+        "boundary. Re-point `installErrorBoundary` in src/server.ts at the current dispatch path.",
+    );
+  }
+  const validate = seams.validateToolInput.bind(seams);
+  const createError = seams.createToolError.bind(seams);
+
+  seams.validateToolInput = async (tool, args, toolName) => {
+    const started = Date.now();
+    try {
+      return await validate(tool, args, toolName);
+    } catch (err) {
+      const detail = redactString(err instanceof Error ? err.message : String(err));
+      appendAudit(ctx.config.home, {
+        at: new Date(started).toISOString(),
+        tool: toolName,
+        kind: "read",
+        status: "invalid_input",
+        inputSummary: summarizeInput(args),
+        durationMs: Date.now() - started,
+      });
+      // Thrown ALREADY FORMATTED. This path does not run through `guard` — it is upstream of the
+      // callback — and the SDK's funnel takes only `error.message`, so a bare `ToolError` would
+      // arrive on the wire with its code stripped off. `formatToolError` is the one place the wire
+      // shape is defined, so both paths produce the same thing.
+      throw new Error(
+        formatToolError(
+          new ToolError(
+            "invalid_input",
+            `Those arguments do not match ${toolName}'s input schema, so nothing ran. Every parameter is declared in the schema \`tools/list\` publishes, and an undeclared one is an error rather than a filter that silently does nothing. ${detail}`,
+          ),
+        ),
+      );
+    }
+  };
+
+  // The funnel every throw inside the dispatcher passes through on its way to an `isError` result.
+  // Redacting here covers the SDK's own wording as well as this package's.
+  seams.createToolError = (message: string) => createError(redactString(message));
 }
 
 export function createServer(options: CreateServerOptions): McpServer {
@@ -122,13 +206,33 @@ export function createServer(options: CreateServerOptions): McpServer {
           openWorldHint: true,
         },
       },
-      // The KIND is decided inside `run`, per phase: the preview spends the preview budget and the
-      // commit spends the commit budget, and only when it reaches the POST. Passing `preview` here
-      // would make five previews exhaust the daily write budget.
-      (args) =>
-        guard(submitTool.TOOL_NAME, "preview", args, ctx, () => submitTool.run(args, ctx), false),
+      (args) => {
+        // The KIND is decided by the PHASE, inside `run`: the preview spends the preview budget and
+        // the commit spends the commit budget, and only when it reaches the POST. `guard` therefore
+        // spends nothing here, and learns which phase happened from the callback below so the audit
+        // line names what actually occurred rather than what was expected.
+        let kind: ToolKind = "preview";
+        const phaseCtx: ToolContext = {
+          ...ctx,
+          spentCommitBudget: () => {
+            kind = "commit";
+          },
+        };
+        return guard(
+          submitTool.TOOL_NAME,
+          () => kind,
+          args,
+          phaseCtx,
+          () => submitTool.run(args, phaseCtx),
+          false,
+        );
+      },
     );
   }
+
+  // AFTER the registrations: the SDK installs its `tools/call` dispatcher lazily, on the first
+  // `registerTool`, and the seams do not exist to be wrapped until it has.
+  installErrorBoundary(server, ctx);
 
   return server;
 }
@@ -136,10 +240,13 @@ export function createServer(options: CreateServerOptions): McpServer {
 /**
  * Spend the budget (unless the tool does it itself), run, redact, audit, and turn any failure into
  * a coded error result.
+ *
+ * `kind` is either fixed or a thunk read AFTER the work finishes — the write tool does not know
+ * which phase it is in until it gets there.
  */
 async function guard(
   tool: string,
-  kind: ToolKind,
+  kind: ToolKind | (() => ToolKind),
   args: unknown,
   ctx: ToolContext,
   work: () => Promise<ToolSuccess> | ToolSuccess,
@@ -149,7 +256,7 @@ async function guard(
   const inputSummary = summarizeInput(args);
   let status = "ok";
   try {
-    if (consumeBudget) ctx.policy.consume(kind);
+    if (consumeBudget && typeof kind !== "function") ctx.policy.consume(kind);
     const result = await work();
     return {
       content: [{ type: "text", text: redactString(result.text) }],
@@ -159,19 +266,29 @@ async function guard(
     const error = toToolError(err);
     status = error.code;
     return {
-      content: [{ type: "text", text: redactString(`[${error.code}] ${error.message}`) }],
+      content: [{ type: "text", text: formatToolError(error) }],
       isError: true,
     };
   } finally {
     appendAudit(ctx.config.home, {
       at: new Date(started).toISOString(),
       tool,
-      kind,
+      kind: typeof kind === "function" ? kind() : kind,
       status,
       inputSummary,
       durationMs: Date.now() - started,
     });
   }
+}
+
+/**
+ * The ONE wire format for a coded failure: the code in brackets, then the sentence, redacted.
+ *
+ * Two paths produce these — `guard`, and the argument-validation wrapper that runs upstream of it —
+ * and a client that branches on the code needs both to look the same.
+ */
+export function formatToolError(error: ToolError): string {
+  return redactString(`[${error.code}] ${error.message}`);
 }
 
 /**

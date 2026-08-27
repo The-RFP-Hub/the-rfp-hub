@@ -41,6 +41,8 @@ export interface ApiErrorBody {
   message?: unknown;
   issues?: unknown;
   errors?: unknown;
+  /** Present only on an `opportunity_merged` 404: where the entry went. See `mergedInto`. */
+  mergedInto?: unknown;
 }
 
 /** The `<namespace>:<local>` rule, repeated wherever a 400 could be about it. */
@@ -68,6 +70,18 @@ function fieldReport(body: ApiErrorBody): string[] {
     out.push(typeof e === "string" ? e : JSON.stringify(e));
   }
   return out;
+}
+
+/**
+ * The `{ id, title }` an `opportunity_merged` 404 points at, or null when the body is any other
+ * kind of 404. Shape-checked rather than trusted: this is a network body.
+ */
+export function mergedInto(body: ApiErrorBody | undefined): { id: string; title: string } | null {
+  const raw = body?.mergedInto;
+  if (raw === null || typeof raw !== "object") return null;
+  const { id, title } = raw as { id?: unknown; title?: unknown };
+  if (typeof id !== "string" || typeof title !== "string") return null;
+  return { id, title };
 }
 
 /**
@@ -137,6 +151,26 @@ export function apiErrorToToolError(
     });
   }
 
+  if (status === 404) {
+    // Two different situations wear the same status, and collapsing them loses a followable
+    // pointer. `opportunity_merged` means the id RESOLVED — it named an entry a reviewer merged
+    // into another — and the body carries where it went. Reporting that as a bare "not found"
+    // sends a caller looking for a typo in an id that was perfectly correct.
+    const merged = mergedInto(body);
+    if (merged !== null) {
+      return new ToolError(
+        "invalid_input",
+        `That id names an entry that was merged into another during review, so it no longer has its own record. The entry it was merged into is \`${merged.id}\` (${JSON.stringify(merged.title)}). Fetch that id instead.`,
+        { status, apiError: code, mergedInto: merged },
+      );
+    }
+    return new ToolError(
+      "invalid_input",
+      `No published opportunity has that id${suffix} Ids are \`<namespace>:<local>\` and are case-sensitive. An entry still awaiting review is not on the public read surface at all — its submitter finds it through GET /v1/me/opportunities.`,
+      { status, apiError: code },
+    );
+  }
+
   if (status === 429) {
     return new ToolError(
       "rate_limited",
@@ -169,5 +203,22 @@ export function nonJsonResponseError(status: number, operation: string): ToolErr
     "exec_failed",
     `${operation} returned HTTP ${status} with a body that is not JSON. Something between this server and the API answered instead of the API itself (a proxy, a captive portal, a load balancer error page).`,
     { status, transport: true },
+  );
+}
+
+/**
+ * A write whose outcome is genuinely UNKNOWN.
+ *
+ * Every failure once the request has left this process lands here: a dropped connection, a body
+ * that stops mid-stream, a body that is not JSON, a body over the cap. None of them says anything
+ * about whether the row was written, and the one thing a caller must not do is assume. The
+ * approval stays consumed — see `approvals.ts` — precisely so this state cannot be resolved by
+ * blindly trying again.
+ */
+export function ambiguousWriteError(origin: string, what: string, cause: unknown): ToolError {
+  return new ToolError(
+    "exec_failed",
+    `The submission may have landed and its outcome is UNKNOWN: ${what} (${origin}). The entry may or may not have been written. Do NOT resubmit blindly — check GET /v1/me/opportunities first, because the public read hides entries awaiting review. The approval for this submission has been used up either way; if the entry is not there, take a fresh preview and have it approved again.`,
+    { ambiguous: true, cause: cause instanceof Error ? cause.message : String(cause) },
   );
 }

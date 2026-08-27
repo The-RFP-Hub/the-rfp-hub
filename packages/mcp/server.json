@@ -1,7 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.the-rfp-hub/rfp-hub",
-  "description": "Search Ethereum-ecosystem funding opportunities — grants, hackathons, bounties, accelerators, VC funds and RFPs — from the RFP Hub, and optionally submit one behind a human approval step.",
+  "title": "RFP Hub",
+  "description": "Search Ethereum-ecosystem funding opportunities; submit one behind a human approval step.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/The-RFP-Hub/the-rfp-hub/tree/main/packages/mcp",
   "repository": {

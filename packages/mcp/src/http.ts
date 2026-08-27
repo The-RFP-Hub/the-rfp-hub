@@ -1,24 +1,29 @@
 /**
  * A thin, dependency-free client for the public `/v1/` API — the same shape as the repository's
- * TypeScript example, with three rules this server needs and a general client does not.
+ * TypeScript example, with four rules this server needs and a general client does not.
  *
  * 1. READS ARE ANONYMOUS. No `Authorization` header is attached to a GET even when a key is
  *    configured. Search results are public data; sending a credential to fetch them would tie
  *    every model-driven read to an identity for no benefit, and would put the key on the wire far
  *    more often than submitting does.
- * 2. A `POST` IS NEVER RETRIED. The API is idempotent for a byte-identical repeat from the same
- *    submitter, but the CLIENT cannot tell a lost request from a lost response: on a timeout the
- *    body may already have been written. Retrying would also spend an approval that was already
- *    claimed. The ambiguity is reported instead, with where to go and check.
- * 3. RESPONSES ARE CAPPED AT 1 MB, AND EXCEEDING IT FAILS. Truncating JSON produces a document
- *    that parses as something else or not at all; a hard failure with "narrow the query" is
- *    information, a silent half-record is not.
+ * 2. A `POST` IS NEVER RETRIED, AND ANY FAILURE ONCE IT IS IN FLIGHT IS AMBIGUOUS. The API is
+ *    idempotent for a byte-identical repeat from the same submitter, but the CLIENT cannot tell a
+ *    lost request from a lost response. Crucially that is true *after* the response headers arrive
+ *    too: a body that is cut off, unparseable or over the cap says nothing about whether the row
+ *    was written. Every one of those is reported as "may have landed", never as a plain failure.
+ * 3. RESPONSES ARE CAPPED AT 1 MB WHILE STREAMING. The check is applied chunk by chunk and the
+ *    body is abandoned as soon as it goes over, so an enormous response costs bounded memory
+ *    rather than being buffered whole and then rejected. Nothing is ever truncated into a value: a
+ *    half-read JSON document parses as something else, or as nothing.
+ * 4. A `404` ON A DETAIL FETCH IS A REAL ANSWER, and one shape of it carries the id of the entry
+ *    the old one was merged into. Losing that turns a followable pointer into "not found".
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
 import type { McpConfig } from "./config.js";
 import {
   type ApiErrorBody,
   ToolError,
+  ambiguousWriteError,
   apiErrorToToolError,
   nonJsonResponseError,
 } from "./errors.js";
@@ -95,6 +100,51 @@ export function retryAfterMs(header: string | null, now: number): number {
   return 1_000;
 }
 
+/** Raised while draining a body that went past the cap. Carries the operation for the message. */
+export class ResponseTooLargeError extends Error {
+  readonly bytes: number;
+  constructor(bytes: number) {
+    super(`response exceeded ${MAX_RESPONSE_BYTES} bytes`);
+    this.name = "ResponseTooLargeError";
+    this.bytes = bytes;
+  }
+}
+
+/**
+ * Read a body chunk by chunk, stopping the moment it goes past the cap.
+ *
+ * Buffering the whole thing and measuring afterwards means a hostile or broken upstream can make
+ * this process hold an arbitrary amount of memory before being told no. The reader is cancelled on
+ * the way out so the connection is not left draining.
+ */
+export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promise<string> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > cap) throw new ResponseTooLargeError(declared);
+
+  const body = res.body;
+  if (body === null) return "";
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let seen = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      seen += value.byteLength;
+      if (seen > cap) throw new ResponseTooLargeError(seen);
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return text;
+  } finally {
+    // Releasing rather than cancelling on the success path would leave a half-read stream open on
+    // the over-cap path, which is the one that matters.
+    await reader.cancel().catch(() => {});
+  }
+}
+
 export class ApiClient {
   private readonly config: McpConfig;
   private readonly fetchImpl: FetchLike;
@@ -124,16 +174,16 @@ export class ApiClient {
   /**
    * `POST /v1/opportunities` with the configured credential. NO retry, at any status.
    *
-   * A transport failure here is reported as ambiguous on purpose: the caller is told the write may
-   * have landed and that `/v1/me/opportunities` is where to find out, because that owner-scoped
-   * route lists pending entries the public read hides.
+   * Once the request has left, every failure is reported as ambiguous — including one that happens
+   * after the response headers arrived. The caller is told the write may have landed and that
+   * `/v1/me/opportunities` is where to find out, because that owner-scoped route lists pending
+   * entries the public read hides.
    */
   async submitOpportunity(document: unknown): Promise<SubmissionResult> {
     if (this.config.apiKey === null) {
       throw new ToolError(
         "policy_denied",
-        "No credential is configured. Set RFPHUB_API_KEY in the MCP client's env block; it is " +
-          "never accepted as a tool argument.",
+        "No credential is configured. Set RFPHUB_API_KEY in the MCP client's env block; it is never accepted as a tool argument.",
       );
     }
     const url = `${this.config.apiBase}/v1/opportunities`;
@@ -148,13 +198,49 @@ export class ApiClient {
         body: JSON.stringify(document),
       });
     } catch (cause) {
-      throw new ToolError(
-        "exec_failed",
-        `The submission could not be completed and its outcome is UNKNOWN: the connection to ${this.config.apiOrigin} failed before a response arrived. The entry may or may not have been written. Do NOT resubmit blindly — check GET /v1/me/opportunities first (the public read hides pending entries).`,
-        { ambiguous: true, cause: cause instanceof Error ? cause.message : String(cause) },
+      throw ambiguousWriteError(
+        this.config.apiOrigin,
+        "the connection failed before a response arrived",
+        cause,
       );
     }
-    return this.readJson<SubmissionResult>(res, "submit_opportunity");
+
+    // From here the request HAS been delivered. A body that will not read, will not parse, or is
+    // over the cap tells us nothing about whether the row was written, so none of those may be
+    // reported as an ordinary failure.
+    let raw: string;
+    try {
+      raw = await readCapped(res);
+    } catch (cause) {
+      throw ambiguousWriteError(
+        this.config.apiOrigin,
+        cause instanceof ResponseTooLargeError
+          ? `the API answered ${res.status} with a body over this server's ${MAX_RESPONSE_BYTES}-byte cap, which could not be read`
+          : "the response body could not be read to the end",
+        cause,
+      );
+    }
+
+    let body: unknown;
+    try {
+      body = raw.length ? JSON.parse(raw) : undefined;
+    } catch (cause) {
+      throw ambiguousWriteError(
+        this.config.apiOrigin,
+        `the API answered ${res.status} with a body that is not JSON`,
+        cause,
+      );
+    }
+
+    if (!res.ok) {
+      // A coded error body IS an answer: the API decided, and the decision was "no". That is not
+      // ambiguous, and reporting it as such would send people hunting for a row nobody wrote.
+      throw apiErrorToToolError(res.status, (body ?? {}) as ApiErrorBody, {
+        operation: "submit_opportunity",
+        keyConfigured: true,
+      });
+    }
+    return body as SubmissionResult;
   }
 
   private async getJson<T>(path: string, operation: string): Promise<T> {
@@ -181,20 +267,24 @@ export class ApiClient {
   }
 
   /**
-   * Read a body ONCE, enforce the size cap, then decide what it was.
+   * Read a READ's body once, under the cap, then decide what it was.
    *
    * `res.json()` consumes the stream even when it rejects, so a `res.text()` fallback after it
    * would throw "Body is unusable" and bury the actual HTTP error — which is exactly the case that
    * matters (a proxy answering with HTML).
    */
   private async readJson<T>(res: Response, operation: string): Promise<T> {
-    const declared = Number(res.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-      throw this.tooLarge(declared, operation);
+    let raw: string;
+    try {
+      raw = await readCapped(res);
+    } catch (err) {
+      if (err instanceof ResponseTooLargeError) throw this.tooLarge(err.bytes, operation);
+      throw new ToolError(
+        "exec_failed",
+        `The API's response to ${operation} ended before it could be read. Nothing was returned.`,
+        { cause: err instanceof Error ? err.message : String(err) },
+      );
     }
-    const raw = await res.text();
-    const bytes = Buffer.byteLength(raw, "utf8");
-    if (bytes > MAX_RESPONSE_BYTES) throw this.tooLarge(bytes, operation);
 
     let body: unknown;
     try {
@@ -220,7 +310,7 @@ export class ApiClient {
   private tooLarge(bytes: number, operation: string): ToolError {
     return new ToolError(
       "exec_failed",
-      `The API's response to ${operation} is ${bytes} bytes, over this server's ${MAX_RESPONSE_BYTES}-byte cap. Nothing was truncated — a half-truncated JSON document is worse than none. Narrow the request (a smaller \`limit\`, or more filters) and try again.`,
+      `The API's response to ${operation} passed this server's ${MAX_RESPONSE_BYTES}-byte cap at ${bytes} bytes and was abandoned. Nothing was truncated — a half-read JSON document is worse than none. Narrow the request (a smaller \`limit\`, or more filters) and try again.`,
       { bytes, cap: MAX_RESPONSE_BYTES },
     );
   }

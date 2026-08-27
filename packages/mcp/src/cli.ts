@@ -19,10 +19,11 @@
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { StdioServerTransport, serveStdio } from "@modelcontextprotocol/server/stdio";
 import {
   APPROVAL_TTL_MS,
   approvalsDir,
+  assertApprovalId,
   claimedDir,
   deleteApproval,
   deletePending,
@@ -37,6 +38,7 @@ import {
 import { ConfigError, loadConfig } from "./config.js";
 import { redactString, registerSecret } from "./redact.js";
 import { PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION, createServer } from "./server.js";
+import { RedactingTransport } from "./transport.js";
 
 const USAGE = `rfphub-mcp — the RFP Hub MCP server
 
@@ -104,6 +106,9 @@ function serve(config: ReturnType<typeof loadConfig>): Promise<number> {
   );
   // The factory is called per connection; one server instance serves the connection's lifetime.
   serveStdio(() => createServer({ config }), {
+    // Wrapped so that EVERY outbound message is redacted, including the ones the SDK produces on
+    // its own error paths. See transport.ts.
+    transport: new RedactingTransport(new StdioServerTransport()),
     onerror: (error) => say(`transport error: ${error.message}`),
   });
   // Resolve never: the process lives until stdin closes and the runtime drains.
@@ -150,6 +155,16 @@ async function approve(
 ): Promise<number> {
   if (id === undefined) {
     say("usage: rfphub-mcp approve <approvalId>");
+    return 2;
+  }
+  // VALIDATED BEFORE IT TOUCHES A PATH. An approval id is joined onto a directory, so an argument
+  // like `../../.ssh/config` would otherwise be a traversal — a file read and printed to the
+  // terminal, or worse a file removed by `revoke`. The id is a digest and the shape is exact, so
+  // there is nothing to sanitize: anything that is not 64 lowercase hex characters is not an id.
+  try {
+    assertApprovalId(id);
+  } catch (err) {
+    say(err instanceof Error ? err.message : String(err));
     return 2;
   }
   const record = readPending(config.home, id);
@@ -216,6 +231,13 @@ async function approve(
 function revoke(home: string, id: string | undefined): number {
   if (id === undefined) {
     say("usage: rfphub-mcp revoke <approvalId>");
+    return 2;
+  }
+  // Same reasoning as `approve`, and the stakes are higher: this one DELETES.
+  try {
+    assertApprovalId(id);
+  } catch (err) {
+    say(err instanceof Error ? err.message : String(err));
     return 2;
   }
   const removedPending = deletePending(home, id);

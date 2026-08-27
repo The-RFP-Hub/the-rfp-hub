@@ -21,14 +21,33 @@ export {
 export {
   ApiClient,
   MAX_RESPONSE_BYTES,
+  ResponseTooLargeError,
+  readCapped,
   retryAfterMs,
   type Paginated,
   type OpportunitySummary,
   type SubmissionResult,
   type DuplicateMatch,
 } from "./http.js";
-export { ERROR_CODES, ToolError, apiErrorToToolError, type ErrorCode } from "./errors.js";
-export { Policy, DEFAULT_CAPS, counterPath, type ToolKind, type Caps } from "./policy.js";
+export {
+  ERROR_CODES,
+  ToolError,
+  apiErrorToToolError,
+  ambiguousWriteError,
+  mergedInto,
+  type ErrorCode,
+} from "./errors.js";
+export {
+  Policy,
+  DEFAULT_CAPS,
+  counterPath,
+  counterLockPath,
+  type ToolKind,
+  type Caps,
+  type Reservation,
+} from "./policy.js";
+export { withLock, LockTimeoutError, STALE_LOCK_MS, LOCK_TIMEOUT_MS } from "./lock.js";
+export { RedactingTransport } from "./transport.js";
 export { redact, redactString, findSecretPaths, registerSecret, REDACTED } from "./redact.js";
 export { appendAudit, auditPath, summarizeInput, type AuditEntry } from "./audit.js";
 export { canonicalStringify, digestOf, sha256Hex } from "./canonical.js";

@@ -28,6 +28,19 @@ export const TOOL_NAME = "search_opportunities";
 export const TITLE_MAX = 140;
 
 /**
+ * Caps on the ecosystem list.
+ *
+ * `ecosystems` is a deliberately OPEN list in the standard — no registry, no enum — so a publisher
+ * may put anything in it, at any length, as many times as they like. Every other third-party
+ * string in this projection is bounded; leaving this one unbounded would make it the obvious place
+ * to park a payload, and twenty long values across twenty rows is also just a wasted context
+ * window. Values past the cap are dropped and the row says how many were dropped, rather than
+ * silently showing a short list as if it were the whole one.
+ */
+export const ECOSYSTEM_VALUE_MAX = 40;
+export const ECOSYSTEM_COUNT_MAX = 8;
+
+/**
  * The description a client shows. Deliberately free of implementation vocabulary — a caller
  * choosing a tool needs to know what it answers, not how it is stored — and free of any imperative
  * addressed to the agent.
@@ -119,7 +132,14 @@ const itemSchema = z.object({
   organizations: z
     .array(organizationSchema)
     .describe("The organizations that operate the program."),
-  ecosystems: z.array(z.string()),
+  ecosystems: z
+    .array(z.string())
+    .describe(
+      `Third-party text, at most ${ECOSYSTEM_COUNT_MAX} values of ${ECOSYSTEM_VALUE_MAX} characters.`,
+    ),
+  ecosystemsOmitted: z
+    .number()
+    .describe("How many ecosystem values were dropped by the cap. 0 when the list is complete."),
   awardSummary: z
     .string()
     .nullable()
@@ -196,21 +216,34 @@ export function awardSummary(funding: FundingInfo): string | null {
  */
 export function nextDeadline(deadlines: OpportunitySummary["deadlines"], now: Date): string | null {
   if (!Array.isArray(deadlines)) return null;
-  const upcoming = deadlines
-    .filter((d) => d.deadlineType === "fixed" && typeof d.date === "string")
-    .map((d) => d.date as string)
-    .filter((iso) => {
-      const at = Date.parse(iso);
-      return Number.isFinite(at) && at > now.getTime();
-    })
-    .sort();
-  return upcoming[0] ?? null;
+  let best: { at: number; iso: string } | null = null;
+  for (const deadline of deadlines) {
+    if (deadline.deadlineType !== "fixed" || typeof deadline.date !== "string") continue;
+    const at = Date.parse(deadline.date);
+    if (!Number.isFinite(at) || at <= now.getTime()) continue;
+    // Compared as INSTANTS, not as strings. The standard asks for UTC, but a publisher may send
+    // an offset form, and lexicographic order puts "2026-03-01T00:00:00+05:00" before
+    // "2026-02-28T23:00:00Z" while the second is the earlier moment. The original string is what
+    // goes to the caller — reformatting somebody's timestamp is not this server's business.
+    if (best === null || at < best.at) best = { at, iso: deadline.date };
+  }
+  return best?.iso ?? null;
 }
 
 /** The id's namespace half. Ids are `<namespace>:<local>`; anything else yields an empty string. */
 export function namespaceOf(id: string): string {
   const at = id.indexOf(":");
   return at > 0 ? id.slice(0, at) : "";
+}
+
+/**
+ * Trim the ecosystem list to the caps, reporting how much was dropped rather than hiding it.
+ */
+export function boundEcosystems(values: unknown): { ecosystems: string[]; omitted: number } {
+  if (!Array.isArray(values)) return { ecosystems: [], omitted: 0 };
+  const strings = values.filter((v): v is string => typeof v === "string");
+  const kept = strings.slice(0, ECOSYSTEM_COUNT_MAX).map((v) => truncate(v, ECOSYSTEM_VALUE_MAX));
+  return { ecosystems: kept, omitted: strings.length - kept.length };
 }
 
 export function project(
@@ -231,7 +264,10 @@ export function project(
       fundingType: item.fundingType,
       status: item.status,
       organizations: item.operatingOrganizations.map((org) => ({ name: org.name, slug: org.slug })),
-      ecosystems: Array.isArray(item.ecosystems) ? [...item.ecosystems] : [],
+      ...(() => {
+        const bounded = boundEcosystems(item.ecosystems);
+        return { ecosystems: bounded.ecosystems, ecosystemsOmitted: bounded.omitted };
+      })(),
       awardSummary: awardSummary(item.fundingInfo),
       nextDeadline: nextDeadline(item.deadlines, now),
       applyUrl: `${apiBase}/v1/r/${encodeURIComponent(item.id)}/apply`,

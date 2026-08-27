@@ -27,3 +27,15 @@ user, and file permissions do not change that.
 
 The credential is read from the environment only — no tool accepts one — reads never send it, and
 a key-shaped string anywhere in a submitted document is refused before any request is made.
+
+Everything a caller can reach is bounded and coded. Argument validation runs through the same error
+map, audit line and redactor as every other failure, so a malformed call cannot echo an unknown
+property name back unredacted; redaction also sits on the transport, covering the error paths the
+SDK words itself. Rate counters are updated under a cross-process lock, because a client and a
+terminal share one home directory by design and an unlocked read-modify-write lets two processes
+through a cap of one. The write budget is reserved before the human's approval is claimed, so a
+local refusal never burns an approval. Third-party ecosystem labels are capped like every other
+untrusted string, the response cap is enforced while streaming, deadlines are compared as instants
+rather than as strings, a merged entry's 404 carries the id it was merged into, the preview mirrors
+the API's admission limits so nobody approves an impossible request, and any submission failure
+after the request left is reported as "may have landed" rather than as a plain error.

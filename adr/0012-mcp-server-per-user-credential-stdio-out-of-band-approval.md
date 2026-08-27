@@ -180,5 +180,7 @@ converge on it. Those are post-milestone work, recorded here so the gap is a kno
   optional feature fails open where the feature is missing.
 - A shared rate-limit store, if the local per-machine counters ever prove insufficient.
 - Confirm the registry namespace casing (`io.github.the-rfp-hub`, lowercase, against a GitHub
-  organization spelled `The-RFP-Hub`) before the first publish, and validate `server.json` against
-  the published schema with the registry's own tooling.
+  organization spelled `The-RFP-Hub`) with `mcp-publisher` before the first publish. The manifest
+  itself is no longer an open question: the registry's published schema (2025-12-11) is vendored
+  under `packages/mcp/test/fixtures/` and `server.json` is validated against it in CI, which is
+  also what settled that the publisher-defined `_meta` key is permitted.

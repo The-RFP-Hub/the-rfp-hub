@@ -137,6 +137,87 @@ export function explainDuplicateCheck(
   }
 }
 
+/**
+ * The API's admission limits, mirrored here so a preview refuses what the submission would.
+ *
+ * These are NOT schema rules — a document can be perfectly conformant and still be over them, so
+ * local validation passes and the write fails. Checking them only at commit time would mean a
+ * person reads a document, approves it, and only then finds out it was never admissible: their
+ * approval is spent, the round trip is wasted, and the failure arrives at the point where it is
+ * most expensive.
+ *
+ * They are a COPY of values that live in the API, which is a real cost: if the API loosens a cap,
+ * this refuses something that would now be accepted. That is the safe direction, and it is why the
+ * numbers are stated here with their source rather than buried as literals. Source: the write
+ * service's field caps and the submission route's body limit.
+ */
+export const ADMISSION_CAPS = {
+  title: 256,
+  summary: 1_000,
+  description: 50_000,
+  /** Any array anywhere in the document, top level or nested. */
+  arrayEntries: 100,
+  /** The route's body limit, applied to the serialized document. */
+  bodyBytes: 256 * 1024,
+} as const;
+
+/** Every array in the document, with the path that reaches it. */
+function arrayPaths(value: unknown, at: string, out: { path: string; length: number }[]): void {
+  if (value === null || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    out.push({ path: at || "(root)", length: value.length });
+    value.forEach((item, i) => arrayPaths(item, `${at}[${i}]`, out));
+    return;
+  }
+  for (const [key, item] of Object.entries(value)) arrayPaths(item, `${at}/${key}`, out);
+}
+
+/**
+ * Refuse, at PREVIEW time, anything the API would refuse on admission. Nothing is sent either way;
+ * the point is that nobody is asked to approve a request that cannot succeed.
+ */
+export function assertWithinAdmissionCaps(document: Record<string, unknown>): void {
+  const problems: string[] = [];
+
+  for (const field of ["title", "summary", "description"] as const) {
+    const value = document[field];
+    const cap = ADMISSION_CAPS[field];
+    if (typeof value === "string" && value.length > cap) {
+      problems.push(`/${field} is ${value.length} characters; the API accepts at most ${cap}.`);
+    }
+  }
+
+  const arrays: { path: string; length: number }[] = [];
+  arrayPaths(document, "", arrays);
+  for (const { path, length } of arrays) {
+    if (length > ADMISSION_CAPS.arrayEntries) {
+      problems.push(
+        `${path} has ${length} entries; the API accepts at most ${ADMISSION_CAPS.arrayEntries}.`,
+      );
+    }
+  }
+
+  let bytes: number;
+  try {
+    bytes = Buffer.byteLength(JSON.stringify(document), "utf8");
+  } catch {
+    bytes = Number.POSITIVE_INFINITY;
+  }
+  if (bytes > ADMISSION_CAPS.bodyBytes) {
+    problems.push(
+      `the serialized document is ${bytes} bytes; the API's submission route accepts at most ${ADMISSION_CAPS.bodyBytes}.`,
+    );
+  }
+
+  if (problems.length > 0) {
+    throw new ToolError(
+      "invalid_input",
+      `The document is schema-conformant but over the limits the API admits, so nothing was sent and no approval was created:\n${problems.map((entry) => `  - ${entry}`).join("\n")}`,
+      { problems },
+    );
+  }
+}
+
 interface DocumentFacts {
   namespace: string;
   id: string;
@@ -228,6 +309,7 @@ export async function run(input: SubmitInput, ctx: ToolContext): Promise<ToolSuc
     );
   }
   const validatorWarnings = result.warnings.map((w) => `${w.code}: ${w.message}`);
+  assertWithinAdmissionCaps(input.document);
 
   const binding = bindingFor(input.document, ctx);
   const approvalId = computeApprovalId(binding);
@@ -342,23 +424,40 @@ async function commit(
     );
   }
 
-  // THE CLAIM HAPPENS BEFORE THE NETWORK. An atomic rename means two processes racing this
-  // approval produce exactly one winner; doing it after a successful response would leave the
-  // approval spendable again whenever the response never arrives.
-  const claim = claimApproval(ctx.config.home, approvalId);
+  // ORDER MATTERS HERE, AND THIS IS THE ORDER.
+  //
+  // The write budget is reserved FIRST, because it is the cheap resource and the approval is the
+  // expensive one: a person spent attention on the approval, and running out of daily writes after
+  // the approval has been claimed would burn it for nothing — the caller would have to go back and
+  // ask them again for a submission that never left. Reserving first means a purely local refusal
+  // costs nothing.
+  const budget = ctx.policy.reserve("commit");
+
+  let claim: ReturnType<typeof claimApproval>;
+  try {
+    // THE CLAIM HAPPENS BEFORE THE NETWORK. An atomic rename means two processes racing this
+    // approval produce exactly one winner; claiming after a successful response would leave the
+    // approval spendable again whenever the response never arrives.
+    claim = claimApproval(ctx.config.home, approvalId);
+  } catch (err) {
+    budget.release();
+    throw err;
+  }
   if (claim === null) {
+    // Another process won the race. Nothing was sent, so the reservation goes back.
+    budget.release();
     throw new ToolError(
       "confirmation_invalid",
-      "That approval was already used and nothing was sent. An approval is single-use: either " +
-        "this submission already ran, or another process claimed it first. Check " +
-        "`GET /v1/me/opportunities` before submitting again — the public read hides entries " +
-        "awaiting review.",
+      "That approval was already used and nothing was sent. An approval is single-use: either this submission already ran, or another process claimed it first. Check `GET /v1/me/opportunities` before submitting again — the public read hides entries awaiting review.",
       { approvalId },
     );
   }
 
-  // Only now, with an approval claimed and the request about to go out, is the write budget spent.
-  ctx.policy.consume("commit");
+  // From this line on the request is going out, so the unit stays spent whatever comes back —
+  // including nothing at all. A timeout that refunded the budget would invite exactly the blind
+  // retry the ambiguous-outcome message tells the caller not to make.
+  budget.commit();
+  ctx.spentCommitBudget?.();
 
   const submission = await ctx.api.submitOpportunity(document);
   return renderSubmission(submission);
