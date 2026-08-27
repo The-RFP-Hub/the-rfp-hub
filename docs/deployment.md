@@ -78,7 +78,7 @@ hold the topology.
 | Resource | Notes |
 |---|---|
 | **A Vercel project** for `packages/frontend` | Its org and project ids become repository secrets |
-| **Environment variables in Vercel**, per environment | `NEXT_PUBLIC_API_URL` is the only one the app requires. It is **inlined at build time**, so which environment's variables `vercel pull` fetches decides which API the shipped bundle talks to |
+| **Environment variables in Vercel**, per environment | `NEXT_PUBLIC_API_URL` is the only one the app requires; `NEXT_PUBLIC_SITE_ORIGIN` is set on **production only**. Both are **inlined at build time**, so which environment's variables `vercel pull` fetches decides which API the shipped bundle talks to and whether it lets itself be indexed |
 | **Domains**: the apex (production) and the staging alias | The workflows alias the deployment after building |
 
 ### Repository variables and secrets the workflows read
@@ -165,27 +165,39 @@ any tenant on the platform. An unanchored pattern is refused at boot.
 
 ### Rate limits are per process — N tasks multiply every ceiling
 
-Rate limiting is registered with `global: false`: no route is limited unless it opts in, because a
-blanket limit would cap the public read surface this project exists to serve. The routes that do
-opt in, and their ceilings:
+The per-route ceilings, which routes are metered, and how a key is chosen are in
+[`packages/api/docs/auth.md` § Rate limits](../packages/api/docs/auth.md#rate-limits). The two
+facts that belong to the **operator** rather than the integrator, and that a limit is meaningless
+without:
 
-| Route | Ceiling |
+* **The ceilings are per PROCESS.** The store is this process's own memory, so with **N** tasks
+  behind the balancer every published number is multiplied by N — "60/min per account" across three
+  tasks is 180/min in practice, because a caller's requests land wherever the balancer sends them.
+  A shared store (Redis) would fix it and is not built. Size the numbers, and any statement made to
+  an integrator, against the task count actually running.
+* **`TRUST_PROXY` decides whether the address half works at all**, per the checklist item above.
+  The key is `acct:<accountId>` when the request proved an account and the caller's address
+  otherwise (grouped by /64 for IPv6), so without it every anonymous caller shares one bucket.
+
+Two behaviors worth knowing before reading a graph of `429`s: an invalid credential is metered by
+address and is refused for being **over the limit before** it is refused for being invalid, and a
+`503 auth_unavailable` — a failure to *check* a credential — is never metered, so an outage does
+not spend anybody's budget.
+
+### The frontend's two variables
+
+Both are `NEXT_PUBLIC_`, both are **inlined at build time**, and neither is a secret. Setting
+either on a running host changes nothing until the next build.
+
+| Variable | Where it is set |
 |---|---|
-| `POST /v1/opportunities`, `PUT /v1/opportunities/:id`, `POST /v1/opportunities/:id/claim` | 60 / minute |
-| `POST /v1/keys` | 10 / minute |
-| `DELETE /v1/keys/:id` | 30 / minute |
-| `POST /v1/organizations/...` (create), the two member routes | 20–30 / minute |
-| `GET /v1/r/:id/apply`, `.../source` | 120 / minute |
-| `GET /v1/me` and the review verify route | 20–30 / minute |
+| `NEXT_PUBLIC_API_URL` | Every environment. The API's origin — where `/v1` lives, where sign-in lives, and what is written into the page's CSP `connect-src` |
+| `NEXT_PUBLIC_SITE_ORIGIN` | **Production only.** The one origin this deployment considers itself the canonical, indexable copy of. The layout, `sitemap.ts` and `robots.ts` compare it against the incoming request's origin and index, sitemap and allow crawling **only when they match** |
 
-**The store is in the process's own memory.** With **N** ECS tasks behind the balancer, every
-number above is multiplied by N in practice: "60 a minute" across three tasks is up to 180 a
-minute, because a caller's requests land wherever the balancer sends them. A shared store is not
-deployed. Write the effective number down — a ceiling the operator believes is one number and is
-actually another is worse than none.
-
-A `429` carries `Retry-After`. Metering is per credential where one was proven, and per IP
-otherwise — which is the other reason `TRUST_PROXY` is on this list.
+Leave `NEXT_PUBLIC_SITE_ORIGIN` unset on staging, on previews, and on every self-hosted copy —
+unset means `noindex` and `Disallow: /`, which is the fail-closed direction: forgetting it costs
+production its search presence rather than costing a preview its privacy. Setting it on a second
+copy makes that copy index itself and compete with the real site in search results.
 
 ---
 
@@ -290,14 +302,32 @@ credentials and a namespace, and refuses a target that does not look like stagin
 rejected and unlisted at the end.
 
 ```sh no-run
-pnpm check:m4 --base-url https://api.example.org --site-url https://example.org
+pnpm check:m4 --site https://example.org --api https://api.example.org --browser
 ```
 
-`check:m4` is read-only and covers the M4 surface: the governance documents and their links from
-the site, the public `/publishers` page, the reference frontend's search, filters, paging, detail
-and both deep-links, mobile responsiveness, the MCP server being installable and callable, the
-published agent skill, and these guides' links and `safe-read` blocks. Its own README sits at `scripts/m4-compliance/README.md`,
-beside the M2 and M3 ones.
+`check:m4` is read-only and needs no `--allow-production`: its defaults already point at
+production, and the one case that looks like a write — the MCP server's fail-closed submit — runs
+against a local recording server the checker starts itself. It covers the governance documents and
+their links from the site, the public `/publishers` page, the reference frontend's search, filters,
+paging, detail and both deep-links, three responsive viewports, the MCP server being installable
+and callable, the agent skill, and these guides' links and `safe-read` blocks.
+
+**`--browser` is not optional in practice.** The directory and `/publishers` are client-rendered,
+so without it every check that needs a rendered page reports a named `WARN` — never a silent pass,
+and never a fail for something the tool did not look at. `--skip <id>` and `--only <id>` select
+checks; `--offline` skips every network request (what the CI `docs-links` job uses); `--json`
+writes the machine-readable report. See
+[`scripts/m4-compliance/README.md`](../scripts/m4-compliance/README.md).
+
+```sh staging-write
+RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
+  pnpm accept:m4 --api https://api-staging.example.org
+```
+
+`accept:m4` is the write-acceptance counterpart, staging only: it drives the real MCP
+`submit_opportunity` interlock end to end — preview, an out-of-band `rfphub-mcp approve`, commit —
+and tears its fixture down afterwards. Same refusal shape as `check:m3`: no run without both
+credentials, and no production target without `--allow-production`.
 
 ---
 
@@ -377,49 +407,75 @@ git diff                   # review every version bump and every rewritten depen
 git commit -am "chore: version packages for release"
 ```
 
-### 7.4 Inspect the tarball before every publish
+### 7.4 Inspect the tarball before every publish — with `pnpm pack`, never `npm pack`
+
+**This is the step where the wrong tool silently produces a broken package.** `pnpm pack` rewrites
+the tarball's own `workspace:*` dependencies to the exact versions in the workspace at pack time,
+which is what makes the tarball installable outside the monorepo at all. `npm pack` does not touch
+`workspace:*` — a tarball built with it still declares `"@the-rfp-hub/standard": "workspace:*"` in
+its own `package.json`, which `npm install` cannot resolve. Check inside the tarball, not in the
+source tree.
 
 ```sh no-run
-npm pack packages/standard
-tar -xzOf the-rfp-hub-standard-3.1.0.tgz package/package.json | less
+pnpm --filter @the-rfp-hub/standard pack --pack-destination /tmp/rfphub-pack
+tar -xzOf /tmp/rfphub-pack/the-rfp-hub-standard-3.1.0.tgz package/package.json | less
 #   version is 3.1.0; `files` carries schemas/, registries/, meta/, ns/, conformance/
 
-npm pack packages/validate
-tar -xzOf rfphub-validate-0.3.1.tgz package/package.json | less
+pnpm --filter rfphub-validate pack --pack-destination /tmp/rfphub-pack
+tar -xzOf /tmp/rfphub-pack/rfphub-validate-0.3.1.tgz package/package.json | less
 #   THE CHECK: "@the-rfp-hub/standard" must read "3.1.0" — never "workspace:*"
-tar -tzf rfphub-validate-0.3.1.tgz | grep humanize
-#   the export the frontend imports must actually be in the build output
+tar -tzf /tmp/rfphub-pack/rfphub-validate-0.3.1.tgz | grep dist
+grep -rl humanizeIssues /tmp/rfphub-pack/   # the export the frontend imports must be IN the build
 ```
 
-The second check is the one that matters. `rfphub-validate` 0.3.0 shipped without `humanizeIssues`
+The last check is the one that matters. `rfphub-validate` 0.3.0 shipped without `humanizeIssues`
 while the source exported it, and an external copy of the frontend failed to typecheck against the
-published package as a result. Look inside the tarball, not at the source tree.
+published package as a result — the failure that makes deploy path B need a local tarball until
+0.3.1 is out.
 
 ### 7.5 Publish
 
 ```sh no-run
-npm publish packages/standard --access public          # 3.1.0 — FIRST
-npm publish packages/validate --access public          # 0.3.1 — after the Standard resolves
-npm publish packages/mcp --access public --tag next    # 0.1.0 — never straight to latest
+pnpm --filter @the-rfp-hub/standard publish --access public          # 3.1.0 — FIRST
+pnpm --filter rfphub-validate publish --access public                # 0.3.1 — after the Standard resolves
+pnpm --filter @the-rfp-hub/mcp publish --access public --tag next    # 0.1.0 — never straight to latest
 ```
+
+`pnpm publish`, for the same reason as `pnpm pack`: it is what rewrites `workspace:*` on the way
+out. It also runs its own git checks — a release cut from a tagged, clean checkout passes them, and
+reaching for `--no-git-checks` to get past one is a reason to stop and look at why the tree is
+dirty.
 
 Add `--provenance` to each command **if** the publish runs from a CI job with an OIDC identity
 registered with the registry. Publishing by hand from a laptop cannot produce provenance — do not
-pass the flag there, and do not claim provenance in the README on a release that was cut that way.
+pass the flag there, and do not claim provenance in a README on a release cut that way.
 
 ### 7.6 Prove the `next` tag, then promote
 
 ```sh no-run
-npx -y @the-rfp-hub/mcp@next --help
-```
-
-```sh no-run
-pnpm check:m4 --base-url https://api.example.org --mcp-tag next
+pnpm check:m4 --site https://example.org --api https://api.example.org --browser \
+  --only mcp --mcp-spec next
 npm dist-tag add @the-rfp-hub/mcp@0.1.0 latest        # only after check:m4 is green
 ```
 
+`--mcp-spec next` is what makes the `mcp` check spawn `npx -y @the-rfp-hub/mcp@next` — the
+published artifact — rather than the `packages/mcp/dist/cli.js` in the checkout, which is what it
+falls back to so the check can run before anything is published at all. Proving the tag means
+proving the **tarball on the registry**, so pass it explicitly here.
+
 Nothing is promoted to `latest` on the strength of the publish succeeding. `latest` is what an
 unpinned install resolves to, and it is the one decision that cannot be quietly taken back.
+
+**Then re-run the frontend clean-room against the published ranges**, because 0.3.1 is what
+unblocks it:
+
+```sh no-run
+RFPHUB_STANDARD_SPEC='^3.1.0' RFPHUB_VALIDATE_SPEC='^0.3.1' \
+  pnpm frontend:clean-room --browser
+```
+
+Green here retires the local-tarball workaround in `packages/frontend/README.md` and in
+[§9](#9-the-frontend-three-ways-to-deploy-a-copy) below; delete both notes in the same change.
 
 ### 7.7 The MCP Registry
 
@@ -489,57 +545,99 @@ order of how little you need to know:
 ### Path A — the Deploy Button (clone the repository)
 
 ```
-https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL
+https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL&envDescription=Origin%20of%20the%20RFP%20Hub%20API%20this%20deployment%20reads%20from&envLink=https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/frontend/README.md
 ```
 
 `root-directory=packages/frontend` is a documented Deploy Button parameter, and `repository-url`
 deliberately points at the **repository**, not the subdirectory, so the workspace and the lockfile
 stay visible to the build. Vercel enables "Include source files outside of the Root Directory" by
-default, which is what makes the workspace dependencies resolve. Set `NEXT_PUBLIC_API_URL` when
-prompted.
+default, which is what makes the two workspace dependencies resolve. Set `NEXT_PUBLIC_API_URL` when
+prompted, and leave `NEXT_PUBLIC_SITE_ORIGIN` unset.
 
-By hand, the same path is: root directory `packages/frontend`, install command
-`pnpm install --frozen-lockfile`, build command `pnpm --filter @the-rfp-hub/frontend... build`
-(the `...` builds workspace dependencies first).
+The button and the by-hand equivalent (root directory, install command, build command) are kept in
+one place — [`packages/frontend/README.md` § Deploying your own copy](../packages/frontend/README.md#deploying-your-own-copy).
+Keep this URL byte-identical to the one there; two copies that drift are two different products.
 
 ### Path B — copy only the package, install from npm
 
-The most basic possible path, and the one CI proves on every run
-(`.github/workflows/external-deploy-smoke.yml`, a clean container with no monorepo):
+The most basic possible path, and the one CI proves on every push touching the package
+(`.github/workflows/external-deploy-smoke.yml`, a clean container with no monorepo). Do not do the
+copy and the rewrite by hand — `scripts/frontend-clean-room.mjs` **is** the procedure, and it is
+the same code the workflow runs:
 
 ```sh no-run
-cp -r packages/frontend/ my-directory/ && cd my-directory
-# replace the two workspace deps in package.json with published ranges:
-#   "@the-rfp-hub/standard": "^3.1.0"
-#   "rfphub-validate": "^0.3.1"
-npm install
-npm run build
-NEXT_PUBLIC_API_URL=https://api.example.org node .next/standalone/server.js
+pnpm frontend:clean-room --browser
 ```
 
-`scripts/frontend-clean-room.sh` performs the copy and the dependency rewrite, and is what the CI
-job runs — read it rather than doing the rewrite by hand.
+It copies `packages/frontend` alone into a temp directory, rewrites its two `workspace:*`
+dependencies to published ranges, `npm install`s and runs the package's own `npm run build` (never
+`pnpm`, and never `next build` directly — after a plain `npm install` the local binary only
+resolves through the npm-run path), starts the standalone server the build produced, and requests
+`/`, `/publishers` and a filtered `/`.
 
-Three things had to change in the package for this to work at all, and all three are in place: the
+**`--browser` is the real proof.** The plain HTTP check only sees server-rendered HTML, and the
+directory fetches its data from an effect after hydration — so a build whose client-side fetch
+cannot reach the API still returns a `200` shell and passes. `--browser` drives a real headless
+Chromium and waits for a row to render from a live request. `--require-publishers` turns a `404` on
+`/publishers` from a warning into a failure.
+
+Two environment variables select the dependency specs, one per package:
+`RFPHUB_STANDARD_SPEC` (`^3.1.0`) and `RFPHUB_VALIDATE_SPEC` (`^0.3.1`). An absolute path ending in
+`.tgz` is used as a local tarball instead of a registry range.
+
+**Until `rfphub-validate` 0.3.1 is published**, the registry range fails the build with a `TS2305`
+— the published 0.3.0 tarball predates the `humanizeIssues` export the frontend imports. Point the
+script at a locally built tarball in the meantime:
+
+```sh no-run
+pnpm --filter rfphub-validate build
+pnpm --filter rfphub-validate pack --pack-destination /tmp/rfphub-pack
+RFPHUB_VALIDATE_SPEC=/tmp/rfphub-pack/rfphub-validate-0.3.0.tgz pnpm frontend:clean-room --browser
+```
+
+`pnpm pack`, not `npm pack` — see
+[§7.4](#74-inspect-the-tarball-before-every-publish--with-pnpm-pack-never-npm-pack). This whole
+note goes away with the release in [§7](#7-npm-release-runbook-manual).
+
+Three things had to change in the package for any of this to work, and all three are in place: the
 `tsconfig.json` no longer `extends` a file outside the package, `@types/node` is a declared
-devDependency of the package rather than a hoist from the workspace root, and `rfphub-validate`
-0.3.1 actually ships the export the frontend imports.
+devDependency of the package rather than a hoist from the workspace root, and 0.3.1 carries the
+missing export.
 
 The canonical-namespace proxies are **apex-only** and need nothing here: with no apex to inherit,
 a missing or ordinary `NEXT_PUBLIC_API_URL` produces no rewrites and nothing throws.
 
+### Running the standalone output, whichever path built it
+
+Two things about `output: "standalone"` are easy to miss and cost an afternoon each:
+
+* **`.next/static` is not inside the standalone output.** Next's own documentation says so. Copy it
+  to sit beside `server.js`, as `<that directory>/.next/static`.
+* **`server.js` is not at `.next/standalone/server.js` in a stand-alone copy.** The package sets
+  `outputFileTracingRoot` two directories above itself — correct in the monorepo, where that is the
+  workspace root — and the option is unconditional, so a build from a copy nests the output under
+  whatever path Next computed from that root. **Find it rather than assuming**, which is exactly
+  what the clean-room script does:
+
+```sh no-run
+find .next/standalone -name server.js
+NEXT_PUBLIC_API_URL=https://api.example.org node <the path that printed>
+```
+
 ### Path C — Docker, over the standalone output
 
-Optional. `output: "standalone"` is set, so a minimal image over `node .next/standalone/server.js`
-works. Two things to know: the package has **no `public/` directory**, so a `COPY public/` step
-fails; and pnpm's symlinked `node_modules` needs the copy to follow targets (or a `pnpm deploy` /
-prune step) or the runtime will be missing modules.
+Optional, and worth doing last. A minimal image over the standalone output: `npm install` with the
+same dependency rewrite as path B, `npm run build`, then run the server the way the paragraph above
+describes. Two things to know: the package has **no `public/` directory**, so a `COPY public/ …`
+step fails on a missing source — do not add that line; and pnpm's symlinked `node_modules` needs
+the copy to follow targets (or a prune step) if a build stage ever touches a pnpm-installed tree.
 
 ### The honest limitation: an external copy is read-only
 
 **Sign-in will not work in a copy, and that is expected.** The API's `TRUSTED_ORIGINS` is an exact
 allowlist, so the browser's preflight for the sign-in routes is refused from any origin the
-deployment has not registered. The **public directory works completely**: `/v1` is `origin: "*"`
+deployment has not registered, and there is **no self-service way to add one** — ask the API's
+operator. The **public directory works completely**, with no ask required: `/v1` is `origin: "*"`
 with `credentials: false`, so browsing, searching, filtering, paging, detail pages and both
 link-outs all work.
 
@@ -559,4 +657,6 @@ deployment configuration change on the API side, not a code change on yours.
 | Who may write, and with which credential? | [`packages/api/docs/auth.md`](../packages/api/docs/auth.md) |
 | How do I integrate against the API? | [`api-integration.md`](./api-integration.md) |
 | How do I onboard a publisher? | [`publisher-onboarding.md`](./publisher-onboarding.md) |
+| What does a reviewer check on one listing? | [`REVIEW-CRITERIA.md`](../REVIEW-CRITERIA.md) |
+| How do the MCP server and the agent skill get installed? | [`packages/mcp/README.md`](../packages/mcp/README.md) and [`skills/README.md`](../skills/README.md) |
 | What was exposed by the old baked-`.env` path, and what is owed? | [`packages/api/docs/deploy.md`](../packages/api/docs/deploy.md) §7 — treat it as an incident, and rotate before anything else |

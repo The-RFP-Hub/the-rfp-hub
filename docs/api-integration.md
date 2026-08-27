@@ -194,7 +194,8 @@ Nine of them. Each one has cost somebody an afternoon.
 ### 4.1 Query validation is strict — an unknown parameter is a `400`
 
 ```sh safe-read
-curl -si "$API/v1/opportunities?funding_type=grant" | head -1   # 400, not "filter ignored"
+# The 400 is the point, so swallow it: a strict runner shims `curl -f`, where a 4xx is a failure.
+curl -si "$API/v1/opportunities?funding_type=grant" | head -1 || true   # 400, not "filter ignored"
 ```
 
 Every list and feed endpoint declares `additionalProperties: false`. A typo, a renamed parameter or
@@ -285,15 +286,32 @@ request carries no ambient authority. The auth routes under `/api/auth/*` are di
 (`TRUSTED_ORIGINS`). If sign-in fails from your origin while reads work perfectly, that is the
 allowlist, and it is a configuration change on the API side.
 
-### 4.8 Rate limits are per credential, and a `429` carries `Retry-After`
+### 4.8 Rate limits are per credential, and a `429` tells you when to come back
 
-The public read surface is not rate-limited — that is what the project exists to serve. The write
-routes opt in: 60 a minute for submissions, replaces and claims; 10 a minute for minting a key; 20
-to 30 a minute for the account and organization routes; 120 a minute for the redirects.
+The public read surface — the list, the detail, the feeds, the export — is deliberately
+**uncapped**. It is the traffic this project exists to serve. The write, credential and link-out
+routes are metered, and the per-route ceilings are in
+[`packages/api/docs/auth.md` § Rate limits](../packages/api/docs/auth.md#rate-limits) rather than
+repeated here, because that is where they are maintained.
 
-Metering is **per credential** when one is proven, and per IP otherwise. Two different accounts
-behind one shared egress do not share a bucket; one account calling from two machines does. Respect
-`Retry-After` rather than backing off blindly.
+What an integrator has to build around:
+
+* **The key is your account, not your address.** A metered route counts against your account
+  whenever the request proved one, and falls back to the caller's address only when it proved
+  nothing. Two people behind one office egress are two budgets; one account calling from a laptop
+  and from CI is **one**. Nothing is stored — the counter expires with its window and never reaches
+  a row or a log line.
+* **A `429` carries `retry-after` in seconds**, plus `x-ratelimit-limit`, `-remaining` and
+  `-reset`. Read them rather than backing off blindly.
+* **An invalid credential is refused for being over the limit before it is refused for being
+  invalid.** Hammering a write route with a junk Bearer gets `401` for the whole budget and `429`
+  once it is spent — so a sudden `429` on a request you believe is unauthenticated is the limiter,
+  not a bug.
+* **A `503 auth_unavailable` is never metered.** A failure to *check* your credential does not
+  spend your budget, so an outage never turns into a `429`.
+* **The ceilings are per process.** With several tasks behind a load balancer the effective number
+  is a multiple of the published one. Do not build a client that paces itself exactly at the
+  documented ceiling and assume the margin is real in either direction.
 
 ### 4.9 Errors have one shape, and unverified accounts have a queue cap
 
@@ -323,24 +341,44 @@ deployment setting raises it.
 
 ### The MCP server
 
-`@the-rfp-hub/mcp` puts the API in front of an agent over stdio: `search_opportunities` and
-`fetch_opportunity` are read-only and anonymous, and `submit_opportunity` writes only when
-explicitly enabled. It reads `RFPHUB_API_KEY` and `RFPHUB_API_BASE` **from the environment only**,
-never as tool parameters, and reads never carry the key.
+[`@the-rfp-hub/mcp`](../packages/mcp/README.md) puts the API in front of an agent over stdio.
+Install it into a client with `npx -y @the-rfp-hub/mcp@<exact version>` — the README carries the
+configuration snippet for each client.
 
-Submission is a two-phase interlock with an out-of-band human step: the tool returns a preview and
-an id, and the commit only happens after `rfphub-mcp approve <id>` is run in a terminal by a person.
-An agent cannot approve its own write, because approving is not something the protocol can reach.
+| Tool | Kind | Notes |
+|---|---|---|
+| `search_opportunities` | read | The full filter set, `limit` capped at 25. **It returns no `description` and no `summary`** — the two longest fields a publisher controls, which is where an instruction addressed to your agent would live |
+| `fetch_opportunity` | read | One record in full, structurally unmodified, wrapped in `{ notice, opportunity, links }`. Ask for it when you actually need the prose |
+| `submit_opportunity` | write | Not registered at all unless `RFPHUB_MCP_ENABLE_SUBMIT=1`. `tools/list` shows two tools without it |
 
-Pin the exact version in any configuration snippet. See `packages/mcp/README.md`.
+Configuration is read **from the environment only**, never as a tool parameter: `RFPHUB_API_BASE`
+(default the production API), `RFPHUB_API_KEY` (needed only to submit, never sent on a read),
+`RFPHUB_MCP_ENABLE_SUBMIT`, and `RFPHUB_MCP_HOME` (default `~/.rfphub`, where approvals, rate-limit
+counters and the local audit log live — it must be writable).
+
+**Submitting is two calls with a person in between.** The first returns
+`{ status: "pending", approvalId, preview }` and writes nothing. A human then runs
+`rfphub-mcp approve <approvalId>` in their own terminal, which prints the destination, the
+credential fingerprint, the operation and the whole document before asking for confirmation; the
+second call claims that single-use approval and posts. `rfphub-mcp pending` lists what is waiting
+and `rfphub-mcp revoke <id>` deletes one. An agent cannot approve its own write, because approving
+is not something the protocol can reach. The reasoning is in
+[`adr/0012`](../adr/0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md).
+
+Pin the exact version in any configuration snippet — never `@latest`. An example that floats hands
+whoever controls the package the ability to change what a user already installed.
 
 ### The agent skill
 
-`rfp-hub-funding-search` teaches an agent to search the Hub without an MCP client. It ships a
-zero-dependency Node helper that builds the query, refuses parameters the API does not declare, and
-**projects** the response down to a small, bounded set of fields before the agent ever sees it.
-That projection is code rather than an instruction in prose, on purpose: by the time a rule in a
-prompt could apply, third-party description text has already reached the model.
+[`rfp-hub-funding-search`](../skills/rfp-hub-funding-search/SKILL.md) teaches an agent to search the
+Hub without an MCP client. It ships zero-dependency Node helpers — `scripts/search.mjs` (defaulting
+to `status=open`) and `scripts/get.mjs` — which build the query, refuse parameters the API does not
+declare, and **project** the response down to a small, bounded set of fields before the agent ever
+sees it. That projection is code rather than an instruction in prose, on purpose: by the time a
+rule in a prompt could apply, third-party description text has already reached the model.
+
+Install channels — a multi-agent installer, the Claude Code plugin marketplace, or a plain directory
+copy — are in [`skills/README.md`](../skills/README.md).
 
 ### Building your own frontend
 
@@ -373,3 +411,4 @@ allowlist.
 | What does each field mean? | [`packages/standard`](../packages/standard) — the JSON Schema is the source of truth, with `FIELDS.md` beside it |
 | Validate a document before sending it | `npx rfphub-validate opportunity.json` |
 | How do I become a verified publisher? | [`PUBLISHERS.md`](../PUBLISHERS.md) |
+| What will a reviewer check on my submission? | [`REVIEW-CRITERIA.md`](../REVIEW-CRITERIA.md) |

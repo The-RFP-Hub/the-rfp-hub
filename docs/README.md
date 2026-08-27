@@ -41,8 +41,23 @@ The rule for anything automated that reads these files: **execute only `safe-rea
 block is documentation of an irreversible act and a `staging-write` block needs a credential and a
 target that a document cannot choose on the reader's behalf.
 
-The marker sits on the info string (` ```sh safe-read `) rather than in a comment, so it survives
-copy-paste into a renderer and is greppable:
+The marker sits on the info string (` ```sh safe-read `) rather than in a comment — that is the
+only form, there is no preceding-comment alternative — so it survives copy-paste into a renderer
+and is greppable. An `sh`/`bash` block with **no marker, or an unrecognized one, is a hard
+failure** in `pnpm check:m4`: a block it cannot tell is safe to run must not silently go
+unexercised.
+
+Two rules a `safe-read` block has to hold to, because the checker runs it for real:
+
+* **Reference the API as `$API`, never a literal URL.** The checker injects `API=<--api>` into the
+  block's environment, so a literal origin would send the run somewhere other than the deployment
+  under test.
+* **It must succeed.** The block runs under `set -eu` with `curl` shadowed as `curl -f`, so a `4xx`
+  is a failure — a block that deliberately shows an error response has to swallow it (`|| true`)
+  or be marked `no-run` instead.
+
+`scripts/m4-compliance/README.md` documents the runner's exact shape, including the two things it
+deliberately does not do (`pipefail`, and shimming `jq -e`) and the one gap that leaves open.
 
 ```sh no-run
 # every marked block in this directory, one per line

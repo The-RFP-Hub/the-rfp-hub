@@ -215,9 +215,14 @@ Then close the issue with what was checked and how — the issue is the record.
 ## 3. Refusing an application
 
 Refusals are as much a public record as approvals. Say which criterion was not met and what would
-change the answer. Never refuse on a criterion that is not written down in `PUBLISHERS.md` or
-`REVIEW-CRITERIA.md`; if you find yourself wanting to, that is a signal to amend the criteria under
+change the answer. Never refuse on a criterion that is not written down in
+[`PUBLISHERS.md`](../PUBLISHERS.md) or [`REVIEW-CRITERIA.md`](../REVIEW-CRITERIA.md); if you find
+yourself wanting to, that is a signal to amend the criteria under
 [`GOVERNANCE.md`](../GOVERNANCE.md), not to decide ad hoc.
+
+The two documents divide the question: `PUBLISHERS.md` is about the **organization** — may it
+publish under its own namespace — and `REVIEW-CRITERIA.md` is about **one listing**, which is the
+decision you make in step 8 and every day after.
 
 | Criterion not met | What to say |
 |---|---|
@@ -331,7 +336,8 @@ Everything above is written to the audit log in the same transaction as the chan
 | Document | What it covers |
 |---|---|
 | [`PUBLISHERS.md`](../PUBLISHERS.md) | The publisher's own guide — eligibility, applying, what approval grants, keeping it |
-| `REVIEW-CRITERIA.md` (repository root) | What is checked on an **individual listing**, what is not a criterion, what "pending" means, and who decides |
-| [`GOVERNANCE.md`](../GOVERNANCE.md) | Editors, the decision rule, review windows, appeals, and what this project deliberately does not have |
+| [`REVIEW-CRITERIA.md`](../REVIEW-CRITERIA.md) | What is checked on an **individual listing**, what is not a criterion, what "pending" means, who decides, and where a written reason is required |
+| [`GOVERNANCE.md`](../GOVERNANCE.md) | Editors, the decision rule, review windows, appeals, non-discrimination and ranking, and what this project deliberately does not have |
+| [`PROCESS.md` § RFC process](../packages/standard/PROCESS.md#rfc-process) | Where a proposed change to the data model or a vocabulary value goes — the routing table, when an applicant asks for a field that does not exist |
 | [`packages/api/docs/auth.md`](../packages/api/docs/auth.md) | Tiers, scopes, the full route matrix, and what the server owns on a write |
 | [`api-integration.md`](./api-integration.md) | What the publisher on the other end of the issue is reading |

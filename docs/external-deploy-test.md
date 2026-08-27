@@ -52,9 +52,13 @@ note about where it stopped is a result; a block that ran over and ate the next 
 
 ### Block 0 — five minutes
 
+```sh no-run
+API=https://api.ethrfps.app        # the target for this whole protocol
+```
+
 ```sh safe-read
-curl -s "https://api.ethrfps.app/v1/health" | jq
-curl -s "https://api.ethrfps.app/v1/opportunities?status=open&limit=3" | jq '.total'
+curl -s "$API/v1/health" | jq
+curl -s "$API/v1/opportunities?status=open&limit=3" | jq '.total'
 ```
 
 Record: did the quickstart get you to a real response without reading anything else?
@@ -83,11 +87,17 @@ cp -r the-rfp-hub/packages/frontend ./rfphub-frontend && cd ./rfphub-frontend
 
 npm install
 npm run build
-NEXT_PUBLIC_API_URL=https://api.ethrfps.app node .next/standalone/server.js
+
+# server.js is NOT at .next/standalone/server.js in a stand-alone copy — find it.
+find .next/standalone -name server.js
+# .next/static is not inside the standalone output either; copy it beside server.js first.
+NEXT_PUBLIC_API_URL=https://api.ethrfps.app node <the path that printed>
 ```
 
 Then open the port it prints. **A build that produces `.next/standalone` is not the result** — the
-result is a page that answers with content. Record whether the server actually served.
+result is a page that answers **with opportunities rendered in it**, which happens after hydration,
+from a live request to the API. A `200` carrying an empty shell is a pass you should record as a
+failure.
 
 Record every step you had to work out yourself: an unstated Node version, a directory the docs did
 not mention, a command that had to be run from somewhere other than where you were.
@@ -216,13 +226,16 @@ The report is published in the repository. Before it is committed:
 Say so, and say it in those words. Two things stand in, and **neither is a substitute** — they are
 narrower, and the report has to declare which evidence it is:
 
-**1. The clean-room CI job** (`.github/workflows/external-deploy-smoke.yml`). A container with no
-monorepo: it copies `packages/frontend` alone, rewrites the two workspace dependencies to their
-published versions, `npm install`, `npm run build`, starts `.next/standalone/server.js` and makes
-real requests against the public API — the list renders, `/publishers` lists verified
-organizations, and a search changes the result set. It asserts that the build completes and the
-server **answers**, deliberately not a fixed route count: a number would fail exactly when a new
-page was added.
+**1. The clean-room CI job** (`.github/workflows/external-deploy-smoke.yml`, whose whole body is
+an invocation of `scripts/frontend-clean-room.mjs` — `pnpm frontend:clean-room`). A container with
+no monorepo: it copies `packages/frontend` alone, rewrites the two workspace dependencies to
+published ranges or a local tarball, `npm install`, the package's own `npm run build`, finds and
+starts the standalone server, and makes real requests against the public API. It runs with
+`--browser`, which is the part that matters: a headless Chromium drives `/` and `/?q=<term>` and
+waits for a row to actually render from a live fetch, because the plain HTTP check would pass on a
+`200` shell whose client-side request never reached the API. It asserts that the build completes
+and the server **answers with data**, deliberately not a fixed route count: a number would fail
+exactly when a new page was added.
 
 This is strong evidence for **Path B**, and it is the only regression guard on portability — it is
 the exact scenario that failed twice before the three packaging fixes landed. It proves nothing
