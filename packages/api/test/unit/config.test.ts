@@ -18,6 +18,7 @@ import {
   readEmbeddingProvider,
   readList,
   readMailgunApiBase,
+  readNonNegativeInt,
   readPem,
   readPort,
   readPositiveInt,
@@ -25,6 +26,7 @@ import {
   readSimilarityThreshold,
   readTrustProxy,
 } from "../../src/config.js";
+import { HOST_MIN_GAP_MS } from "../../src/modules/services/verification/host-pacer.js";
 
 describe("readPort", () => {
   it("uses the default when PORT is unset", () => {
@@ -482,15 +484,43 @@ describe("readAnalyticsHmacKey", () => {
 });
 
 /**
- * The three knobs that decide how often the corpus is re-checked and what one night of it costs.
+ * The four knobs that decide how often the corpus is re-checked and what one night of it costs.
  * They are asserted as SHIPPED VALUES rather than as readers because the defaults are the contract:
- * a deployment that sets none of them still re-checks every entry monthly, 500 at a time, keeping
- * at most five runs each — and `docs/deploy.md` publishes exactly these numbers.
+ * a deployment that sets none of them still re-checks every entry monthly, 500 at a time, a second
+ * apart per host, keeping at most five runs each — and `docs/deploy.md` publishes exactly these
+ * numbers.
  */
 describe("the verification schedule's shipped defaults", () => {
   it("re-checks monthly, caps a night at 500 entries, and keeps five runs", () => {
     expect(config.verification.recheckDays).toBe(30);
     expect(config.verification.nightlyLimit).toBe(500);
     expect(config.verification.runsKeep).toBe(5);
+  });
+
+  /**
+   * The default gap is spelled in two places — `HOST_MIN_GAP_MS`, which is the pacer's own default
+   * and what its unit tests read, and the literal in `config.ts`, which is deliberately not an
+   * import because configuration sits below the service layer. This is the guard that keeps the two
+   * from drifting apart, which is the only thing wrong with spelling a number twice.
+   */
+  it("paces same-host fetches at the pacer's own default", () => {
+    expect(config.verification.hostGapMs).toBe(HOST_MIN_GAP_MS);
+  });
+});
+
+/**
+ * ZERO IS A VALUE, not a missing one, and that is the whole reason this reader exists next to
+ * `readPositiveInt`: `VERIFY_HOST_MIN_GAP_MS=0` is how the e2e stack says "there is no stranger to
+ * be polite to here", and a reader that treated 0 as absent would silently pace it anyway.
+ */
+describe("readNonNegativeInt", () => {
+  it("accepts zero, rejects negatives and non-integers, and falls back on blanks", () => {
+    expect(readNonNegativeInt("0", 1_000)).toBe(0);
+    expect(readNonNegativeInt("250", 1_000)).toBe(250);
+    expect(readNonNegativeInt("-1", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt("1.5", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt("soon", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt("", 1_000)).toBe(1_000);
+    expect(readNonNegativeInt(undefined, 1_000)).toBe(1_000);
   });
 });

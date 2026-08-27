@@ -42,6 +42,27 @@ export interface JobDefinition {
    * Aliases are not in `CHAIN`, so `jobs.js all` never runs one.
    */
   deprecatedFor?: string;
+  /**
+   * What one HTTP-triggered pass may select when the caller named no `limit`.
+   *
+   * Present only on a job whose per-row cost is a network round trip to somebody else's server,
+   * which is to say: only where a pass's wall clock is set by politeness rather than by the
+   * database. `verification-backfill` paces itself at `VERIFY_HOST_MIN_GAP_MS` per host
+   * (`verification/host-pacer.ts`), and a corpus clusters hard by publisher — so its default
+   * selection of `VERIFY_NIGHTLY_LIMIT` is minutes of wall clock. That is correct for the
+   * container task the schedule starts and impossible for `POST /v1/admin/jobs/{job}/run`, where a
+   * reviewer is holding a socket open and every proxy in front of the API has an opinion about how
+   * long that may last.
+   *
+   * A DEFAULT, NOT A CEILING. A caller that names a `limit` gets the one it named: the route is
+   * also how a staging operator asks for a bigger slice, and silently serving a smaller one would
+   * be a worse answer than a slow one. Draining a real backlog is still the container task's job
+   * (`docs/jobs.md` §4a), which has no socket to lose.
+   *
+   * Absent means "no interactive bound", which is the honest answer for every job whose pass is
+   * bounded by its own query.
+   */
+  interactiveLimit?: number;
   run(options: JobRunOptions): Promise<JobResult>;
 }
 
@@ -122,6 +143,10 @@ export const JOBS: JobDefinition[] = [
   {
     name: "verification-backfill",
     shape: "cursor",
+    // Ten paced fetches — at the default one-second gap, ten seconds of wall clock in the worst
+    // case where every selected entry shares one host, which is exactly what a seeded corpus looks
+    // like. Small enough that the dashboard button always answers; large enough to be a real pass.
+    interactiveLimit: 10,
     describes:
       "Fetch the applicationUrl of entries never checked, edited since, or checked longer ago than VERIFY_RECHECK_DAYS.",
     run: (options) => new VerificationService(dbOf(options)).runBatch({ limit: options.limit }),

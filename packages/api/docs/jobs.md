@@ -21,7 +21,7 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 | **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
 | `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
-| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` per invocation — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. |
+| `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` per invocation, paced `VERIFY_HOST_MIN_GAP_MS` apart per host — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. A pass triggered over HTTP takes a smaller default slice (§4c). |
 | `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
 
@@ -397,6 +397,14 @@ that connection, so nothing re-resolves while the pacer holds.
 A reviewer's own `POST .../verify` is **not** paced: one request is not a crawl, and making it queue
 behind a batch would charge politeness to the wrong person.
 
+The gap is `VERIFY_HOST_MIN_GAP_MS`, a **setting rather than a constant**, for two reasons. It is
+the one number that decides how long a pass takes, so an operator watching a nightly run stretch
+needs to be able to move it without a deploy of new code. And `0` is a legitimate value for a stack
+whose only source host is its own: the e2e runner points every fixture at a server it started in its
+own process tree and kills in its `finally`, and paying it a real second per entry buys nothing and
+costs the suite more wall clock than the rest of the run. **No deployment sets it to `0`** — the
+pacer's own behaviour is covered by `test/unit/host-pacer.test.ts`, which is where spacing belongs.
+
 **A re-check that finds the page unmoved says so.** The stored digest is over the raw bytes, so an
 equal digest is proof nothing changed since the last check — which is what a monthly re-check finds
 almost every time. **Unless either fetch stopped at `VERIFY_MAX_BYTES`**: the digest then covers
@@ -498,6 +506,24 @@ because a global role never elevates an API key. It runs **exactly one pass**: a
 looped a cursor job to exhaustion would hold a connection and a socket for as long as the backlog
 took, and the thing allowed to take that long is the container task. It takes the same advisory
 lock, so pressing it while the scheduled run is in flight answers `skipped: "locked"`.
+
+**One pass is not by itself a wall-clock bound**, and for one job it is nowhere near one.
+`verification-backfill` spaces its fetches at `VERIFY_HOST_MIN_GAP_MS` (default one second) per
+host, and a corpus clusters hard by publisher — so its scheduled selection of `VERIFY_NIGHTLY_LIMIT`
+(500) is **eight minutes of one pass** in the case the pacer exists for. No reviewer's browser and
+no proxy in front of the API will wait for that; the request is aborted, the job keeps running to
+completion behind it, and the retry that follows meets its own advisory lock.
+
+So a job whose per-row cost is a round trip to somebody else's server declares an **interactive
+limit** — `interactiveLimit` in `src/modules/services/jobs/registry.ts`, `10` for
+`verification-backfill` — and this route uses it **when the caller names no `limit`**. It is a
+default, not a ceiling: a `limit` in the body is honoured exactly as given, because this route is
+also how a staging operator asks for a bigger slice, and answering with ten while reporting success
+would be a quieter failure than a slow response. **Draining a real backlog is still (a) or (b)**,
+which have no socket to lose.
+
+Every other job's pass is bounded by its own query rather than by politeness, declares no
+interactive limit, and is unchanged by this.
 
 ### d. The external scheduler — the contract it depends on
 
@@ -697,7 +723,7 @@ Before the first M3 job run on any deployment, in order:
 | `analytics-rollup` | `ANALYTICS_RETENTION_DAYS` (default 180), for the prune it ends with. The rollup half reads whatever `opportunity_events` holds, so `ANALYTICS_ENABLED=false` makes it a no-op by starvation rather than by a flag |
 | `retention` *(deprecated)* | `ANALYTICS_RETENTION_DAYS` — the same prune, alone |
 | `embedding-backfill` | `EMBEDDING_PROVIDER`, `DEDUPE_SIMILARITY_THRESHOLD`, `DEDUPE_MAX_MATCHES` |
-| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFICATION_RUNS_KEEP` (default 5) |
+| `verification-backfill` | `VERIFICATION_ENABLED`, `VERIFY_TIMEOUT_MS`, `VERIFY_MAX_BYTES`, `VERIFIER_EGRESS_PROXY`, `VERIFY_RECHECK_DAYS` (default 30), `VERIFY_NIGHTLY_LIMIT` (default 500), `VERIFY_HOST_MIN_GAP_MS` (default 1000), `VERIFICATION_RUNS_KEEP` (default 5) |
 | `staleness` | `STALENESS_INACTIVE_DAYS` (default 90) |
 | `notification-dispatch` | `APP_BASE_URL`, `EMAIL_TRANSPORT`, provider-specific email settings, and `EMAIL_FROM`; the immediate API queue additionally reads `NOTIFICATION_QUEUE_MAX` (default 100 waiting ids) |
 

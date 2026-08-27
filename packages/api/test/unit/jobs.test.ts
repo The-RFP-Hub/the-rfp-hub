@@ -6,10 +6,22 @@
  * credential matrix — is in `test/integration/jobs.test.ts`.
  */
 import { describe, expect, it } from "vitest";
+import { config } from "../../src/config.js";
 import { runChain } from "../../src/modules/services/jobs/chain.js";
 import { advisoryLockKey } from "../../src/modules/services/jobs/lock.js";
-import { CHAIN, JOBS, JOB_NAMES, findJob } from "../../src/modules/services/jobs/registry.js";
-import type { JobRunReport, RunJobOptions } from "../../src/modules/services/jobs/runner.js";
+import {
+  CHAIN,
+  JOBS,
+  JOB_NAMES,
+  type JobDefinition,
+  findJob,
+} from "../../src/modules/services/jobs/registry.js";
+import {
+  type JobRunReport,
+  type RunJobOptions,
+  effectiveLimit,
+} from "../../src/modules/services/jobs/runner.js";
+import { HOST_MIN_GAP_MS } from "../../src/modules/services/verification/host-pacer.js";
 
 describe("the job catalogue", () => {
   it("names every job exactly once", () => {
@@ -61,6 +73,67 @@ describe("the job catalogue", () => {
     expect(findJob("staleness")?.shape).toBe("cursor");
     expect(findJob("Staleness")).toBeUndefined();
     expect(findJob("drop-everything")).toBeUndefined();
+  });
+});
+
+/**
+ * THE INTERACTIVE BOUND, which exists because "one pass" is not a wall-clock bound for a job whose
+ * per-row cost is a network round trip to somebody else's server.
+ *
+ * `verification-backfill` spaces its fetches at `HOST_MIN_GAP_MS` per host and a corpus clusters
+ * hard by publisher, so its scheduled selection of `VERIFY_NIGHTLY_LIMIT` is minutes in ONE pass —
+ * fine for the container task, fatal for `POST /v1/admin/jobs/{job}/run`, where a reviewer is
+ * holding a socket. The number is asserted against the pacing rather than pinned on its own,
+ * because the pacing is the only reason it has to be small.
+ */
+describe("the interactive bound", () => {
+  it("is declared by the paced job and by nothing else", () => {
+    expect(JOBS.filter((job) => job.interactiveLimit !== undefined).map((job) => job.name)).toEqual(
+      ["verification-backfill"],
+    );
+  });
+
+  it("keeps one interactive pass inside a request's worst case", () => {
+    const limit = findJob("verification-backfill")?.interactiveLimit ?? Number.POSITIVE_INFINITY;
+    // Every entry in a clustered corpus shares one host, so the pass is `limit` gaps end to end.
+    expect(limit * HOST_MIN_GAP_MS).toBeLessThanOrEqual(15_000);
+    expect(limit).toBeGreaterThan(0);
+  });
+
+  it("is smaller than the scheduled selection it stands in for", () => {
+    const limit = findJob("verification-backfill")?.interactiveLimit ?? Number.POSITIVE_INFINITY;
+    expect(limit).toBeLessThan(config.verification.nightlyLimit);
+  });
+});
+
+/**
+ * The rule that applies it. Pure, so it is read here rather than inferred from a route's timing.
+ */
+describe("effectiveLimit", () => {
+  const paced = findJob("verification-backfill") as JobDefinition;
+  const unpaced = findJob("staleness") as JobDefinition;
+
+  it("hands an interactive caller the job's interactive bound when it named none", () => {
+    expect(effectiveLimit(paced, { interactive: true })).toBe(paced.interactiveLimit);
+  });
+
+  it("leaves a scheduled caller on the job's own default", () => {
+    expect(effectiveLimit(paced, {})).toBeUndefined();
+  });
+
+  /**
+   * The bound is a DEFAULT, not a ceiling: the route is also how a staging operator asks for a
+   * bigger slice, and answering with ten while reporting success would be a quieter failure than a
+   * slow response.
+   */
+  it("honours a named limit exactly, including one larger than the bound", () => {
+    expect(effectiveLimit(paced, { interactive: true, limit: 500 })).toBe(500);
+    expect(effectiveLimit(paced, { interactive: true, limit: 1 })).toBe(1);
+  });
+
+  it("changes nothing for a job that declares no bound", () => {
+    expect(effectiveLimit(unpaced, { interactive: true })).toBeUndefined();
+    expect(effectiveLimit(unpaced, { interactive: true, limit: 200 })).toBe(200);
   });
 });
 

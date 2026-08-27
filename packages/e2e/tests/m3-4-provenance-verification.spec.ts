@@ -515,7 +515,16 @@ test.describe("M3-4 source verification", () => {
     // correct behaviour, not a defect. So it is run until this entry is covered, and every run is
     // still required to do real work: a broken job that processed nothing would fail on the first
     // iteration rather than spinning.
+    //
+    // THE LIMIT IS NAMED, and named LARGE, because the route's own default is deliberately small:
+    // an HTTP-triggered pass falls back to the job's `interactiveLimit` so a paced backfill cannot
+    // hold a reviewer's socket for minutes (`jobs/registry.ts`). Asking for a full pass here is the
+    // operator's move — the same one `--limit` is for on the container task — and it keeps this
+    // spec measuring the JOB rather than whatever the interactive default happens to be this week.
+    // The selection is never-checked-first by id, and this entry is the newest, so a pass smaller
+    // than the run's accumulated backlog would spend every iteration on older rows.
     const admin = await api("admin");
+    const FULL_PASS = 500;
     const verified = async (): Promise<number> => {
       const rows = await db.query(
         `SELECT 1 FROM verification_runs v JOIN opportunities o ON o.id = v.opportunity_id
@@ -529,7 +538,7 @@ test.describe("M3-4 source verification", () => {
     for (let attempt = 0; attempt < 10 && (await verified()) === 0; attempt++) {
       const run = await admin.post<{ job: string; processed: number }>(
         "/v1/admin/jobs/verification-backfill/run",
-        {},
+        { limit: FULL_PASS },
       );
       expect(run.status).toBe(200);
       expect(run.body.job).toBe("verification-backfill");

@@ -19,12 +19,20 @@
  * `maxPasses` is the belt to that braces: whatever else is true, the runner stops.
  */
 import { LOCKED, withJobLock } from "./lock.js";
-import { type JobRunOptions, findJob } from "./registry.js";
+import { type JobDefinition, type JobRunOptions, findJob } from "./registry.js";
 import type { JobResult } from "./types.js";
 
 export interface RunJobOptions extends JobRunOptions {
   /** How many times a cursor job may go round while it is still making progress. Default 1. */
   maxPasses?: number;
+  /**
+   * The caller is an HTTP request, so an unnamed `limit` falls back to the job's `interactiveLimit`
+   * rather than to the job's own (schedule-sized) default. See `JobDefinition.interactiveLimit`:
+   * `verification-backfill` paces itself per host, and its nightly selection is minutes of wall
+   * clock that a socket does not have. Set by `POST /v1/admin/jobs/{job}/run` and by nothing else —
+   * the CLI and the container task are deliberately not interactive.
+   */
+  interactive?: boolean;
   /** Overrides the connection the advisory lock is taken on. Tests point this at their instance. */
   lockConnectionString?: string;
 }
@@ -44,11 +52,32 @@ export class UnknownJobError extends Error {
   }
 }
 
+/**
+ * What one pass may select, once the caller's own opinion and the job's interactive bound have both
+ * been heard.
+ *
+ * A NAMED LIMIT ALWAYS WINS, including one larger than the interactive bound. The bound exists so
+ * that a DEFAULT cannot hang a request; a caller that asked for a thousand asked for it, and
+ * answering with ten while reporting success would be a quieter failure than a slow response.
+ *
+ * `undefined` means "the job's own default", which for every cursor job is a number its own service
+ * holds — this function does not know or need to know what it is.
+ *
+ * Pure, and exported, so the rule can be read and tested without an advisory lock or a database.
+ */
+export function effectiveLimit(job: JobDefinition, options: RunJobOptions): number | undefined {
+  if (options.limit !== undefined) return options.limit;
+  if (!options.interactive) return undefined;
+  return job.interactiveLimit;
+}
+
 export async function runJob(name: string, options: RunJobOptions = {}): Promise<JobRunReport> {
   const job = findJob(name);
   if (!job) throw new UnknownJobError(name);
   const maxPasses = Math.max(1, options.maxPasses ?? 1);
   const startedAt = Date.now();
+  const limit = effectiveLimit(job, options);
+  const runOptions: RunJobOptions = limit === options.limit ? options : { ...options, limit };
 
   const locked = await withJobLock(
     job.name,
@@ -59,7 +88,7 @@ export async function runJob(name: string, options: RunJobOptions = {}): Promise
       const details: Record<string, number> = {};
 
       while (passes < maxPasses) {
-        last = await job.run(options);
+        last = await job.run(runOptions);
         passes++;
         processed += last.processed;
         for (const [key, value] of Object.entries(last.details ?? {})) {

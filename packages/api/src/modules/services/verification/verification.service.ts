@@ -44,6 +44,15 @@
  * one request is not a crawl, and making it queue behind a batch charges politeness to the wrong
  * person.
  *
+ * THE PACE IS ALSO WHAT MAKES THIS JOB UNSERVABLE IN A REQUEST, and that is stated here rather
+ * than left for someone to discover from a timeout. One second per same-host fetch times a
+ * selection of `VERIFY_NIGHTLY_LIMIT` is minutes of wall clock — fine for the container task the
+ * schedule starts, impossible for `POST /v1/admin/jobs/verification-backfill/run`, which is a
+ * reviewer holding a socket open. So the job declares an `interactiveLimit` (`jobs/registry.ts`)
+ * that bounds what an HTTP trigger asks for by default; draining a backlog is the container task's
+ * job, with `--limit`. The gap itself is `VERIFY_HOST_MIN_GAP_MS`, a setting because a stack whose
+ * only source host is a fixture server it started itself owes that server nothing.
+ *
  * A RE-CHECK THAT FINDS THE PAGE UNMOVED SAYS SO. The digest is over the raw bytes, so an equal
  * digest is proof the page has not changed since the last check; the run still records a full
  * assessment (the RECORD may have moved even though the page did not) but is flagged
@@ -75,7 +84,7 @@ import {
   type SourceTransport,
   fetchSource,
 } from "./fetcher.service.js";
-import { HOST_MIN_GAP_MS, HostPacer, type PacerClock } from "./host-pacer.js";
+import { HostPacer, type PacerClock } from "./host-pacer.js";
 
 /** How many source fetches may be in flight at once. Politeness, and a bound on sockets. */
 const CONCURRENCY = 2;
@@ -407,7 +416,7 @@ export class VerificationService {
     // ONE PACER FOR THE WHOLE PASS, so the spacing is between this run's fetches rather than
     // between each entry and itself. A seeded corpus clusters by host, and that clustering is the
     // only reason this exists.
-    const pacer = new HostPacer(HOST_MIN_GAP_MS, this.clock);
+    const pacer = new HostPacer(this.config.verification.hostGapMs, this.clock);
     let processed = 0;
     let unsettled = 0;
     let pacedMs = 0;

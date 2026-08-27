@@ -4,10 +4,8 @@ import type { DbLike } from "../../../db/client.js";
 import {
   type OpportunityDuplicateRow,
   type OpportunityRow,
-  type VerificationRunRow,
   opportunities,
   opportunityDuplicates,
-  verificationRuns,
 } from "../../../db/schema.js";
 import type { Principal } from "../../shared/capabilities.js";
 import { ownedOpportunityPredicate } from "./opportunity.repository.js";

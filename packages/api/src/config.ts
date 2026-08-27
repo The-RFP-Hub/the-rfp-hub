@@ -110,6 +110,16 @@ export interface VerificationConfig {
   recheckDays: number;
   /** Entries one backfill invocation will check. Bounds the nightly run's wall clock. */
   nightlyLimit: number;
+  /**
+   * The minimum gap between two backfill fetches to the SAME host (`host-pacer.ts`).
+   *
+   * A SETTING RATHER THAN A CONSTANT because it is the one number that decides how long a pass
+   * takes, and because zero is a legitimate value for a deployment whose only source host is its
+   * own: the e2e stack points every fixture at one disposable server it started itself, and paying
+   * a real second of politeness to a process this repository owns buys nothing and costs the suite
+   * a minute. Production leaves it at the default; nothing in a deployment should set it to 0.
+   */
+  hostGapMs: number;
   /** SSRF escape hatch for one loopback test. Refused outright under NODE_ENV=production. */
   allowPrivateHosts: boolean;
   egressProxy: string | undefined;
@@ -359,6 +369,24 @@ export function readBoolean(raw: string | undefined, fallback: boolean): boolean
 export function readPositiveInt(raw: string | undefined, fallback: number): number {
   const parsed = Number((raw ?? "").trim());
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * A whole number >= 0, or the default. Separate from `readPositiveInt` because ZERO IS A MEANING
+ * here rather than a typo: it is how a deployment says "do not do this at all" for a setting whose
+ * unit is a delay, and `readPositiveInt` would silently hand back the default instead.
+ *
+ * THE BLANK CHECK IS NOT REDUNDANT, and it is the whole reason this cannot be a one-line copy of
+ * `readPositiveInt`. `Number("")` is `0`, an integer, and >= 0 — so a variable that is unset, or
+ * set to an unsubstituted template that trimmed to nothing, would read as a deliberate "no delay"
+ * and silently turn the pacing off in production. The predicate that hides that trap for a
+ * positive-only reader is exactly the one this reader gives up.
+ */
+export function readNonNegativeInt(raw: string | undefined, fallback: number): number {
+  const value = (raw ?? "").trim();
+  if (value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 /** A comma-separated list, trimmed, blanks dropped, duplicates removed, order preserved. */
@@ -783,6 +811,10 @@ export const config: AppConfig = {
     runsKeep: readPositiveInt(process.env.VERIFICATION_RUNS_KEEP, 5),
     recheckDays: readPositiveInt(process.env.VERIFY_RECHECK_DAYS, 30),
     nightlyLimit: readPositiveInt(process.env.VERIFY_NIGHTLY_LIMIT, 500),
+    // The literal, rather than an import of `HOST_MIN_GAP_MS`: config is the bottom of the graph
+    // and does not reach up into a service module for a number. `config.test.ts` asserts the two
+    // agree, so the duplication cannot drift.
+    hostGapMs: readNonNegativeInt(process.env.VERIFY_HOST_MIN_GAP_MS, 1_000),
     allowPrivateHosts: readAllowPrivateHosts(process.env.VERIFY_ALLOW_PRIVATE_HOSTS, isProduction),
     egressProxy: readOptional(process.env.VERIFIER_EGRESS_PROXY),
   },
