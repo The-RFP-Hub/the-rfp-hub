@@ -10,7 +10,14 @@
  *    idempotent for a byte-identical repeat from the same submitter, but the CLIENT cannot tell a
  *    lost request from a lost response. Crucially that is true *after* the response headers arrive
  *    too: a body that is cut off, unparseable or over the cap says nothing about whether the row
- *    was written. Every one of those is reported as "may have landed", never as a plain failure.
+ *    was written, and neither does a `5xx` — a server that failed while answering may well have
+ *    committed first. Every one of those is reported as "may have landed", never as a plain
+ *    failure. A CODED `4xx` is different: the API read the request, decided, and said no.
+ * 2b. A `POST` NEVER FOLLOWS A REDIRECT. `redirect: "manual"` means a `3xx` comes back as a `3xx`
+ *    instead of the runtime silently re-sending the body — and the credential — somewhere this
+ *    server never resolved and no human ever approved. The write approval binds the destination
+ *    origin precisely so the destination cannot move; a followed redirect would move it after the
+ *    binding was checked.
  * 3. RESPONSES ARE CAPPED AT 1 MB WHILE STREAMING. The check is applied chunk by chunk and the
  *    body is abandoned as soon as it goes over, so an enormous response costs bounded memory
  *    rather than being buffered whole and then rejected. Nothing is ever truncated into a value: a
@@ -196,12 +203,28 @@ export class ApiClient {
           authorization: `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify(document),
+        // NOT followed. See rule 2b in the file header.
+        redirect: "manual",
       });
     } catch (cause) {
       throw ambiguousWriteError(
         this.config.apiOrigin,
         "the connection failed before a response arrived",
         cause,
+      );
+    }
+
+    if (res.status >= 300 && res.status < 400) {
+      // Nothing was written HERE, and nothing was sent anywhere else: the body was not re-posted.
+      // Naming the header is deliberate — the operator has to be able to see where they were being
+      // sent, and to decide whether that destination is one they want to approve for.
+      const location = res.headers.get("location");
+      throw new ToolError(
+        "policy_denied",
+        `${this.config.apiOrigin} answered the submission with an HTTP ${res.status} redirect${
+          location === null ? "" : ` to ${location}`
+        }, and this server does not follow redirects on a write. Nothing was submitted, and the document and credential were not re-sent anywhere. An approval binds the destination origin, so silently continuing to another host would spend a decision that was made about a different destination. If that destination is the right one, point RFPHUB_API_BASE at it and take a fresh preview.`,
+        { status: res.status, redirect: true },
       );
     }
 
@@ -232,9 +255,22 @@ export class ApiClient {
       );
     }
 
+    if (res.status >= 500) {
+      // A 5xx is NOT an answer about the write, however well-formed its body is. The API commits
+      // the row and then does more work — duplicate detection, notification queueing — so a
+      // failure while answering is entirely consistent with a row that exists. Treating it as a
+      // clean refusal is what produces the duplicate: the caller retries something that landed.
+      throw ambiguousWriteError(
+        this.config.apiOrigin,
+        `the API answered ${res.status}, which says its request failed but not whether the entry was written`,
+        new Error(`HTTP ${res.status}`),
+      );
+    }
+
     if (!res.ok) {
-      // A coded error body IS an answer: the API decided, and the decision was "no". That is not
-      // ambiguous, and reporting it as such would send people hunting for a row nobody wrote.
+      // A coded 4xx IS an answer: the API read the request, decided, and the decision was "no".
+      // That is not ambiguous, and reporting it as such would send people hunting for a row nobody
+      // wrote.
       throw apiErrorToToolError(res.status, (body ?? {}) as ApiErrorBody, {
         operation: "submit_opportunity",
         keyConfigured: true,

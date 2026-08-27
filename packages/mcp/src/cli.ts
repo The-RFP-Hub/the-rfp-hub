@@ -24,6 +24,7 @@ import {
   APPROVAL_TTL_MS,
   approvalsDir,
   assertApprovalId,
+  claimPending,
   claimedDir,
   deleteApproval,
   deletePending,
@@ -210,20 +211,45 @@ async function approve(
     return 1;
   }
 
+  // THE PREVIEW IS CLAIMED AFTER THE ANSWER, NOT BEFORE THE QUESTION.
+  //
+  // Everything above this line happened across an unbounded wait for a human, and the world can
+  // move inside it: the preview can be revoked from another terminal, its window can pass, or a
+  // second `approve` for the same id can be sitting at its own prompt. Writing the approval on the
+  // strength of what was read before the question would let two confirmations mint two approvals —
+  // two writes out of one decision. One atomic rename decides it; everyone else is refused.
+  const claimed = claimPending(config.home, record.approvalId);
+  if (claimed === null) {
+    say(
+      "That preview is no longer available — it was revoked, or another `approve` for the same id " +
+        "completed while this one was waiting. NOTHING WAS APPROVED. Run `rfphub-mcp pending` to " +
+        "see what is actually waiting.",
+    );
+    return 1;
+  }
+
+  // Re-checked against the claimed record, because the answer to "has it expired" can change while
+  // the question is being asked, and because the claimed copy is the one nobody else can alter.
   const approvedAt = new Date();
+  if (isExpired(claimed, approvedAt)) {
+    say(
+      `That preview expired at ${claimed.expiresAt} while it was on screen, so NOTHING WAS APPROVED. Ask for a fresh preview and approve that.`,
+    );
+    return 1;
+  }
+
   writeApproval(config.home, {
-    apiOrigin: record.apiOrigin,
-    keyFingerprint: record.keyFingerprint,
-    operation: record.operation,
-    protocolVersion: record.protocolVersion,
-    documentHash: record.documentHash,
-    approvalId: record.approvalId,
+    apiOrigin: claimed.apiOrigin,
+    keyFingerprint: claimed.keyFingerprint,
+    operation: claimed.operation,
+    protocolVersion: claimed.protocolVersion,
+    documentHash: claimed.documentHash,
+    approvalId: claimed.approvalId,
     approvedAt: approvedAt.toISOString(),
     expiresAt: new Date(approvedAt.getTime() + APPROVAL_TTL_MS).toISOString(),
   });
-  deletePending(config.home, record.approvalId);
   process.stdout.write(
-    `Approved ${record.approvalId}. The submit tool may now perform this one write, once.\n`,
+    `Approved ${claimed.approvalId}. The submit tool may now perform this one write, once.\n`,
   );
   return 0;
 }

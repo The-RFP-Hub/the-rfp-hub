@@ -203,10 +203,17 @@ being read, so an enormous response costs bounded memory. Half a JSON document i
 answer, it is a wrong one; narrow the request instead.
 
 **A submission whose outcome cannot be known says so.** Any failure once the request has left —
-a dropped connection, a body that stops mid-stream, a body that is not JSON or is over the cap —
-is reported as *may have landed*, never as a plain failure, and points at
-`GET /v1/me/opportunities`. A *coded* refusal from the API is different: the API decided, the
-answer was no, and nothing was written. The approval is spent either way.
+a dropped connection, a body that stops mid-stream, a body that is not JSON or is over the cap, or
+a `5xx` however well-formed its body — is reported as *may have landed*, never as a plain failure,
+and points at `GET /v1/me/opportunities`. The API commits the row and then does more work, so a
+server error while answering is entirely consistent with a row that exists. A *coded `4xx`* is
+different: the API read the request, decided, and the answer was no. The approval is spent either
+way.
+
+**A submission never follows a redirect.** A `3xx` is refused, naming the destination it was being
+sent to; the document and the credential are not re-sent anywhere. An approval binds the
+destination origin, so continuing to another host would spend a decision made about somewhere
+else.
 
 **Arguments are validated against the published schema**, and a malformed call comes back with the
 same codes as everything else. An unknown parameter is an error rather than a filter that silently
@@ -223,7 +230,9 @@ Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`
 | `pending/<id>.json` | A preview awaiting approval, with the document so the terminal can print it |
 | `approvals/<id>.json` | A granted approval |
 | `approvals/claimed/<id>.json` | A spent approval. Never reusable. |
+| `pending/claimed/<id>.json` | A preview a person has already turned into an approval |
 | `policy-counters.json` | Per-kind rate counters |
+| `policy-counters.lock` | Held only while a counter is being updated |
 | `audit.log` | One JSON line per call |
 
 **Rate limits fail closed.** If the counter store cannot be read or written, calls are refused — a
@@ -238,11 +247,20 @@ one. A lock left behind by a process that died is broken after five seconds.
 daily budget, a lost race for the approval — gives the budget back and leaves the approval intact,
 so nobody has to be asked to approve the same submission twice.
 
+**Approving is decided at the moment you answer, not when the preview was printed.** The preview is
+claimed by an atomic rename after your confirmation, so two terminals approving the same id produce
+one approval, and a preview that was revoked or expired while it sat on screen is refused.
+
+**Refused submissions are metered too.** Every invocation of the write tool spends an `attempt`
+(20/minute, 400/day) before any work, so a loop of bogus approval ids or oversized documents cannot
+run unmetered.
+
 **The audit log records argument key names and byte counts, never values.** A log that stored
 values would be a second copy of every document and every search term. Failing to write it never
 fails a call.
 
-Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per day**.
+Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per day**, `attempt`
+20/minute and 400/day.
 
 ---
 
@@ -265,8 +283,13 @@ Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per d
   hint, not a control, and a hostile title is not made harmless by it. The projection — the missing
   `description` — is the control.
 - **A preview refuses what the API would refuse.** The API's admission limits (title 256, summary
-  1 000, description 50 000, any array 100 entries, body 256 KiB) are checked locally, so nobody is
-  asked to approve a submission that could never have been accepted.
+  1 000, description 50 000, top-level arrays 100 entries, body 256 KiB) are checked locally, so
+  nobody is asked to approve a submission that could never have been accepted. The array cap is
+  top-level only, exactly as the API applies it — checking more here would refuse documents the API
+  would have taken.
+- **Suspected-duplicate titles are third-party text too.** They come back truncated to 140
+  characters, delimited, and labelled — the write path is where a caller is most primed to act, so
+  it gets the same treatment the search results get.
 - **`structuredContent` is not a safety boundary.** It is delivered to the model like any other
   output. It exists here for contract and validation.
 - **Pin exact versions**, as every example above does. That is the only real defense against a

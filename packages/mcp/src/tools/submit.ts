@@ -42,10 +42,22 @@ import {
 import { ToolError } from "../errors.js";
 import type { SubmissionResult } from "../http.js";
 import { findSecretPaths } from "../redact.js";
-import { SUBMIT_NOTICE, delimit, truncate } from "../untrusted.js";
+import { DUPLICATES_NOTICE, SUBMIT_NOTICE, delimit, truncate } from "../untrusted.js";
 import type { ToolContext, ToolSuccess } from "./context.js";
 
 export const TOOL_NAME = "submit_opportunity";
+
+/**
+ * How much of a suspected duplicate's title comes back.
+ *
+ * These titles are SOMEBODY ELSE'S text, arriving on the write path — the one place where the
+ * caller is already primed to act — and they are the only third-party strings in this tool's
+ * output. Bounding and labelling them the way the search results are bounded and labelled is the
+ * whole point; leaving them raw would have made the write tool the soft spot in a projection the
+ * read tools take seriously. They are kept rather than dropped because a bare id and a score
+ * cannot be judged: deciding "is this the same program" needs the name.
+ */
+export const DUPLICATE_TITLE_MAX = 140;
 
 export const TOOL_DESCRIPTION =
   "Submit one funding opportunity, as an RFP Hub Standard document, for review and publication. " +
@@ -100,10 +112,15 @@ const submittedSchema = z.object({
   duplicates: z.array(
     z.object({
       id: z.string(),
-      title: z.string(),
+      title: z
+        .string()
+        .describe(`Third-party text, truncated to ${DUPLICATE_TITLE_MAX} characters.`),
       similarity: z.number().nullable(),
     }),
   ),
+  duplicatesNotice: z
+    .string()
+    .describe("Says that the duplicate titles are third-party text, not instructions."),
   note: z.string(),
 });
 
@@ -155,21 +172,28 @@ export const ADMISSION_CAPS = {
   title: 256,
   summary: 1_000,
   description: 50_000,
-  /** Any array anywhere in the document, top level or nested. */
+  /**
+   * TOP-LEVEL arrays only, which is exactly the rule the API applies: it walks the document's own
+   * entries and checks each one that is an array. A nested array — `operatingOrganizations[0]
+   * .ecosystems`, a milestone list inside `fundingDetails` — is NOT checked against this, and is
+   * bounded only by the body limit below.
+   *
+   * Checking more here than the API checks would be its own bug, and a quiet one: a document the
+   * API would have accepted comes back refused, with a reason that names a limit nobody enforces.
+   * A local mirror of somebody else's rule is only useful while it is the same rule.
+   */
   arrayEntries: 100,
   /** The route's body limit, applied to the serialized document. */
   bodyBytes: 256 * 1024,
 } as const;
 
-/** Every array in the document, with the path that reaches it. */
-function arrayPaths(value: unknown, at: string, out: { path: string; length: number }[]): void {
-  if (value === null || typeof value !== "object") return;
-  if (Array.isArray(value)) {
-    out.push({ path: at || "(root)", length: value.length });
-    value.forEach((item, i) => arrayPaths(item, `${at}[${i}]`, out));
-    return;
+/** The document's own array-valued fields. Deliberately not recursive — see `arrayEntries`. */
+function topLevelArrays(document: Record<string, unknown>): { path: string; length: number }[] {
+  const out: { path: string; length: number }[] = [];
+  for (const [key, value] of Object.entries(document)) {
+    if (Array.isArray(value)) out.push({ path: `/${key}`, length: value.length });
   }
-  for (const [key, item] of Object.entries(value)) arrayPaths(item, `${at}/${key}`, out);
+  return out;
 }
 
 /**
@@ -187,9 +211,7 @@ export function assertWithinAdmissionCaps(document: Record<string, unknown>): vo
     }
   }
 
-  const arrays: { path: string; length: number }[] = [];
-  arrayPaths(document, "", arrays);
-  for (const { path, length } of arrays) {
+  for (const { path, length } of topLevelArrays(document)) {
     if (length > ADMISSION_CAPS.arrayEntries) {
       problems.push(
         `${path} has ${length} entries; the API accepts at most ${ADMISSION_CAPS.arrayEntries}.`,
@@ -467,7 +489,7 @@ export function renderSubmission(submission: SubmissionResult): ToolSuccess {
   const id = submission.opportunity?.id ?? "(the API returned no id)";
   const duplicates = (submission.duplicates ?? []).map((d) => ({
     id: d.id,
-    title: d.title,
+    title: truncate(typeof d.title === "string" ? d.title : "", DUPLICATE_TITLE_MAX),
     similarity: d.similarity ?? null,
   }));
   const duplicateCheckExplanation = explainDuplicateCheck(
@@ -484,6 +506,7 @@ export function renderSubmission(submission: SubmissionResult): ToolSuccess {
     duplicateCheck: submission.duplicateCheck,
     duplicateCheckExplanation,
     duplicates,
+    duplicatesNotice: DUPLICATES_NOTICE,
     note:
       "`id` is promoted here from `opportunity.id` in the API's reply; the API's own result " +
       "object has no top-level id field.",
@@ -500,7 +523,11 @@ export function renderSubmission(submission: SubmissionResult): ToolSuccess {
     `  Review status: ${submission.reviewStatus}. ${listing}`,
     "",
     duplicateCheckExplanation,
-    ...duplicates.map((d) => `  - ${d.id} (similarity ${d.similarity ?? "unscored"})`),
+    ...(duplicates.length > 0 ? [DUPLICATES_NOTICE] : []),
+    ...duplicates.flatMap((d) => [
+      `  - ${d.id} (similarity ${d.similarity ?? "unscored"})`,
+      delimit(`title of ${d.id}`, d.title).replace(/^/gm, "    "),
+    ]),
     "",
     (submission.warnings ?? []).length
       ? `Advisory warnings:\n${(submission.warnings ?? []).map((w) => `  - ${w}`).join("\n")}`

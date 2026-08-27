@@ -76,9 +76,15 @@ export interface CreateServerOptions {
  * silently is not there. An SDK upgrade that moves them fails immediately and loudly, in CI, on the
  * first server this package constructs.
  */
+interface RegisteredToolLike {
+  enabled?: boolean;
+  executor?: (args: unknown, ctx: unknown) => unknown;
+}
+
 interface ToolDispatchSeams {
   validateToolInput(tool: unknown, args: unknown, toolName: string): Promise<unknown>;
   createToolError(message: string): CallToolResult;
+  _registeredTools: Record<string, RegisteredToolLike>;
 }
 
 /**
@@ -98,7 +104,9 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
   const seams = server as unknown as ToolDispatchSeams;
   if (
     typeof seams.validateToolInput !== "function" ||
-    typeof seams.createToolError !== "function"
+    typeof seams.createToolError !== "function" ||
+    typeof seams._registeredTools !== "object" ||
+    seams._registeredTools === null
   ) {
     throw new Error(
       "The MCP SDK no longer exposes the tool-dispatch seams this server wraps to code, audit and " +
@@ -141,6 +149,48 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
   // The funnel every throw inside the dispatcher passes through on its way to an `isError` result.
   // Redacting here covers the SDK's own wording as well as this package's.
   seams.createToolError = (message: string) => createError(redactString(message));
+
+  // UNKNOWN TOOLS. The dispatcher looks a tool up in this record and throws a bare protocol error
+  // when it misses — outside its own try block, so that failure never becomes a coded result and
+  // never reaches an audit line. Interposing on the LOOKUP puts it back inside the normal path: an
+  // unknown name resolves to a tool whose only behaviour is to raise `tool_not_found`, which then
+  // travels through the same funnel as everything else.
+  //
+  // This is why the proxy is installed AFTER registration: `registerTool` refuses a name that is
+  // already present, and a proxy answering every name would make every registration a duplicate.
+  //
+  // A tool that exists but is switched off — `submit_opportunity` without the env flag is not
+  // registered at all, but the SDK supports disabling — is left to the SDK, because the record
+  // holds a real entry for it and this trap never fires.
+  const registry = seams._registeredTools;
+  seams._registeredTools = new Proxy(registry, {
+    get(target, name, receiver) {
+      if (typeof name !== "string" || Reflect.has(target, name)) {
+        return Reflect.get(target, name, receiver);
+      }
+      return {
+        enabled: true,
+        executor: () => {
+          appendAudit(ctx.config.home, {
+            at: new Date().toISOString(),
+            tool: name,
+            kind: "read",
+            status: "tool_not_found",
+            inputSummary: { keys: [], bytes: 0 },
+            durationMs: 0,
+          });
+          throw new Error(
+            formatToolError(
+              new ToolError(
+                "tool_not_found",
+                "This server does not offer a tool by that name. Call `tools/list` for the ones it does. The write tool is registered only when the operator sets RFPHUB_MCP_ENABLE_SUBMIT=1, so its absence is a configuration choice, not an error.",
+              ),
+            ),
+          );
+        },
+      } satisfies RegisteredToolLike;
+    },
+  }) as Record<string, RegisteredToolLike>;
 }
 
 export function createServer(options: CreateServerOptions): McpServer {
@@ -172,7 +222,10 @@ export function createServer(options: CreateServerOptions): McpServer {
       // use them should not have to guess that a search is a read.
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    (args) => guard(searchTool.TOOL_NAME, "read", args, ctx, () => searchTool.run(args, ctx)),
+    (args) =>
+      guard(searchTool.TOOL_NAME, "read", args, ctx, () => searchTool.run(args, ctx), {
+        outputSchema: searchTool.outputSchema,
+      }),
   );
 
   server.registerTool(
@@ -184,7 +237,10 @@ export function createServer(options: CreateServerOptions): McpServer {
       outputSchema: fetchTool.outputSchema,
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    (args) => guard(fetchTool.TOOL_NAME, "read", args, ctx, () => fetchTool.run(args, ctx)),
+    (args) =>
+      guard(fetchTool.TOOL_NAME, "read", args, ctx, () => fetchTool.run(args, ctx), {
+        outputSchema: fetchTool.outputSchema,
+      }),
   );
 
   if (config.submitEnabled) {
@@ -223,8 +279,15 @@ export function createServer(options: CreateServerOptions): McpServer {
           () => kind,
           args,
           phaseCtx,
-          () => submitTool.run(args, phaseCtx),
-          false,
+          () => {
+            // CHARGED BEFORE ANY WORK, on every invocation, successful or not. The phase budgets
+            // only meter calls that got somewhere; without this, refusals — a bogus approval id, a
+            // document over the caps, a key hidden in a field — are free, and the refusal path is
+            // an unmetered loop through validation and the filesystem.
+            phaseCtx.policy.consume("attempt");
+            return submitTool.run(args, phaseCtx);
+          },
+          { consumeBudget: false, outputSchema: submitTool.outputSchema },
         );
       },
     );
@@ -250,17 +313,34 @@ async function guard(
   args: unknown,
   ctx: ToolContext,
   work: () => Promise<ToolSuccess> | ToolSuccess,
-  consumeBudget = true,
+  options: { consumeBudget?: boolean; outputSchema?: OutputValidator } = {},
 ): Promise<CallToolResult> {
+  const consumeBudget = options.consumeBudget ?? true;
   const started = Date.now();
   const inputSummary = summarizeInput(args);
   let status = "ok";
   try {
     if (consumeBudget && typeof kind !== "function") ctx.policy.consume(kind);
     const result = await work();
+    const structured = redact(result.structured);
+
+    // OUTPUT VALIDATION HAPPENS HERE, not after this function returns. The SDK checks
+    // `structuredContent` against the declared schema too — but it does so downstream, so a
+    // malformed body would already have been recorded as `ok` in the audit log and would come back
+    // in the SDK's own words rather than as one of this package's codes. Validating inside means a
+    // 2xx whose shape is wrong fails like anything else fails.
+    const parsed = options.outputSchema?.safeParse(structured);
+    if (parsed !== undefined && !parsed.success) {
+      throw new ToolError(
+        "exec_failed",
+        `${tool} produced a result that does not match the shape it publishes in \`tools/list\`, so it was not returned. This is a defect in this server or a response from the API that no longer matches its documented contract; the underlying call may well have succeeded.`,
+        { issues: parsed.error.issues.map((i) => `${i.path.join("/") || "(root)"}: ${i.message}`) },
+      );
+    }
+
     return {
       content: [{ type: "text", text: redactString(result.text) }],
-      structuredContent: redact(result.structured),
+      structuredContent: structured,
     };
   } catch (err) {
     const error = toToolError(err);
@@ -279,6 +359,18 @@ async function guard(
       durationMs: Date.now() - started,
     });
   }
+}
+
+/**
+ * Just enough of a schema for `guard` to check a result against, so this file does not take a
+ * dependency on a particular validation library's type surface.
+ */
+interface OutputValidator {
+  safeParse(
+    value: unknown,
+  ):
+    | { success: true }
+    | { success: false; error: { issues: { path: PropertyKey[]; message: string }[] } };
 }
 
 /**
