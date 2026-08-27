@@ -260,35 +260,41 @@ function checkMarketplace() {
 
 /**
  * `skills-ref validate` is a reference implementation of the spec this script hand-rolls checks
- * for — real, not simulated: `npx -y skills-ref validate <dir>` genuinely runs it when the
- * package is reachable (from cache or the registry). It is best-effort ON PURPOSE: a CI runner
- * with no registry access (or a registry outage) must not fail the build over a tool that is
- * supplementary to this script's own checks, not a replacement for them — so a failure to even
- * INVOKE the tool (network error, unresolvable package) is a warning, while the tool RUNNING and
- * reporting a real violation is a hard failure.
+ * for. It is a PINNED root devDependency (exact version — see package.json/pnpm-lock.yaml), run
+ * via `pnpm exec` so this always invokes the locked copy, never a version `npx -y` might fetch
+ * fresh from the registry on a given CI run (mutable, unpinned, and a supply-chain surface for a
+ * tool that never even needs write access to publish). Whether it's actually installed is checked
+ * by looking for its bin shim rather than by invoking anything — see `skillsRefInstalled` below.
+ * It stays best-effort in one direction only: a runner where `pnpm install` didn't pull it (e.g.
+ * a partial/offline install) gets a WARNING, not a failure, because this tool is supplementary to
+ * this script's own checks, not a replacement for them; but once it IS installed and running, a
+ * real violation it reports is a hard failure, same as any other check here.
  */
+function skillsRefInstalled() {
+  const bin = process.platform === "win32" ? "skills-ref.cmd" : "skills-ref";
+  return existsSync(join(repoRoot, "node_modules", ".bin", bin));
+}
+
 function runSkillsRefValidate() {
+  if (!skillsRefInstalled()) {
+    warn(
+      "skills-ref is not installed (expected node_modules/.bin/skills-ref from the pinned root devDependency after `pnpm install`) — skipping it, relying on this script's own checks only",
+    );
+    return;
+  }
   for (const dir of skillDirs()) {
     const target = join(skillsDir, dir);
     try {
-      execFileSync("npx", ["-y", "skills-ref", "validate", target], {
+      // `pnpm exec` resolves to the LOCKED version this repo pinned — never a version `npx`
+      // might fetch fresh from the registry.
+      execFileSync("pnpm", ["exec", "skills-ref", "validate", target], {
         cwd: repoRoot,
         encoding: "utf8",
         timeout: 60_000,
       });
     } catch (err) {
       const output = `${err.stdout ?? ""}${err.stderr ?? ""}`;
-      const unreachable =
-        /ENOTFOUND|ENETUNREACH|E404|no matching version|ETIMEDOUT|canceled due to missing packages/i.test(
-          `${output}${err.message}`,
-        );
-      if (unreachable) {
-        warn(
-          `skills-ref could not be fetched (offline or registry unreachable) — skipping it for skills/${dir}, relying on this script's own checks only`,
-        );
-      } else {
-        fail(`skills-ref validate skills/${dir}: ${output.trim() || err.message}`);
-      }
+      fail(`skills-ref validate skills/${dir}: ${output.trim() || err.message}`);
     }
   }
 }
