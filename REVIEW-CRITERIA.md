@@ -153,8 +153,9 @@ issue, and putting the reasoning on the record in public is what appeals are for
 
 ## Appeals
 
-**Open an issue.** [`GOVERNANCE.md`](./GOVERNANCE.md#appeals) is the whole appeal path, and it
-applies here unchanged: the answer goes on the issue, in public, with the reasoning. If the entry
+**Open an issue**, using the
+[appeal form](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=appeal.yml).
+[`GOVERNANCE.md`](./GOVERNANCE.md#appeals) is the whole appeal path, and it applies here unchanged: the answer goes on the issue, in public, with the reasoning. If the entry
 was rejected inside an organization's namespace and you believe the organization is wrong about
 your listing, say so there too — the decision has a handle against it precisely so it can be
 argued with.
