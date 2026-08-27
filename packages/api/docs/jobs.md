@@ -20,7 +20,7 @@ The five jobs, **in the order `registry.ts` lists them, which is the order the c
 |---|---|---|
 | **`all`** | chain | Runs the five below, in this order, in one process. **This is what a scheduler should call** — §4d. |
 | `analytics-rollup` | sweep | Recomputes the **two days before today** in `opportunity_stats_daily` from the raw events, then **prunes** raw events older than `ANALYTICS_RETENTION_DAYS`. |
-| `embedding-backfill` | cursor | Embeds entries with no vector for the configured provider, and records the pairs that come out. |
+| `embedding-backfill` | cursor | Embeds entries with no *current* vector for the configured provider — missing, from another model or provider, stale against the entry's text, or lacking the overlap scalars — records the pairs that come out, then re-judges suspected pairs the current rule did not write. It is a repair pass, not the primary detector: a normal write runs the same detection, over the same candidates, before it answers. |
 | `verification-backfill` | cursor | Fetches the `applicationUrl` of entries never checked, edited since their last check, or **not checked for `VERIFY_RECHECK_DAYS`** — never-checked first, at most `VERIFY_NIGHTLY_LIMIT` per invocation, paced `VERIFY_HOST_MIN_GAP_MS` apart per host — then prunes their run log to the newest `VERIFICATION_RUNS_KEEP`. A pass triggered over HTTP takes a smaller default slice (§4c). |
 | `notification-dispatch` | cursor | Joins pending notification accounts to `auth_user`, composes duplicate-domain copy, and sends it through the central email service. |
 | `staleness` | cursor | Closes past-due and long-inactive entries, and recomputes `next_deadline_at`. **Last, always** — §4d. |
@@ -382,6 +382,10 @@ touching the same rows, which is why `notification-dispatch` does not rely on th
   `DEDUPE_SIMILARITY_THRESHOLD`, where a threshold change used to strand every pair the old value
   wrote, because pruning only runs for entries the backfill selects
   and a drained backfill selects nothing.
+
+  Neither arm records anything a write would not. Detection has ONE candidate set — the caller's
+  scope trims only what a response is told about, never what is searched or written — so this job
+  finds a write's pairs already there and refreshes them rather than writing second copies of them.
 
   **`rules_key` is DERIVED, not a version somebody bumps.** It is a digest of the predicate's shape
   and the effective configuration — both thresholds, the token floor, the cosine floor, the switch,

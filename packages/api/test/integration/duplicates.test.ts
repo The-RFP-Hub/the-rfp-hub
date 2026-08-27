@@ -359,8 +359,10 @@ run("M3DUP duplicate detection", () => {
     expect(twin.statusCode, twin.body).toBe(201);
     expect(twin.json().reviewStatus).toBe("pending");
 
-    // The submit-time check searches PUBLIC rows only, so the pair between the two pending entries
-    // is not one it can find. The all-scope pass — what the backfill job runs — is.
+    // The submit-time RESPONSE names neither pending entry, because the filter on the way out
+    // drops both — but the search underneath saw them, so the write already recorded this pair.
+    // Running detection again here is the backfill's own path over the same row; the assertions
+    // below hold whichever pass put the pairs there (see `dedupe-write-scope.test.ts`).
     await new DedupeService().embedAndDetect(await rowIdOf(`${OTHER_NS}:hidden-twin`), "all");
     expect(await pairBetween(`${OTHER_NS}:hidden`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();
     expect(await pairBetween(`${NS}:alpha`, `${OTHER_NS}:hidden-twin`)).toBeTruthy();

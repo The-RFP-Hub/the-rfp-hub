@@ -151,12 +151,15 @@ export class EmbeddingRepository {
   /**
    * The ANN lookup stays in its original pgvector form so the vector remains one bound/cast
    * parameter and the planner can reach the HNSW cosine-distance index.
+   *
+   * IT TAKES NO SCOPE. It used to, and a candidate set that narrowed with the caller's credential
+   * narrowed the pair table with it — see `DedupeService`'s header. Review status now leaves here
+   * as `isPublic` on every match, for the service to disclose or withhold.
    */
   async searchNearest(
     vector: number[],
     options: {
       exclude: number;
-      scope: EmbeddingCandidateScope;
       identity: EmbeddingIdentity;
     },
   ): Promise<EmbeddingSearchMatch[]> {
@@ -167,9 +170,6 @@ export class EmbeddingRepository {
       eq(opportunityEmbeddings.providerId, options.identity.providerId),
       isNull(opportunities.mergedIntoId),
     ];
-    if (options.scope === "public") {
-      where.push(eq(opportunities.reviewStatus, "approved"), eq(opportunities.isListed, true));
-    }
 
     const rows = await this.exec
       .select({

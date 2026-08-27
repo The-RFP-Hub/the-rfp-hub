@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { and, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { ALPHA_BODY, reword } from "../helpers/dedupe-text.js";
+import { LEDGER_BODY, reword } from "../helpers/dedupe-text.js";
 import { submission } from "../helpers/opportunity-fixture.js";
 import { describeWithDb } from "./db-gate.js";
 
@@ -212,7 +212,7 @@ run("M3NOTE duplicate notifications", () => {
       method: "POST",
       url: "/v1/opportunities",
       headers: bearer(publicOwnerToken),
-      payload: entry(PUBLIC_ID, PUBLIC_NS, "Superchain Builders Fund", ALPHA_BODY),
+      payload: entry(PUBLIC_ID, PUBLIC_NS, "Regional Seed Bank Fund", LEDGER_BODY),
     });
     expect(published.statusCode, published.body).toBe(201);
     expect(published.json().reviewStatus).toBe("approved");
@@ -224,8 +224,8 @@ run("M3NOTE duplicate notifications", () => {
       payload: entry(
         PRIVATE_ID,
         PRIVATE_NS,
-        "Superchain Builders Fund — community submission",
-        reword(ALPHA_BODY),
+        "Regional Seed Bank Fund — community submission",
+        reword(LEDGER_BODY),
       ),
     });
     expect(pending.statusCode, pending.body).toBe(201);
@@ -245,13 +245,13 @@ run("M3NOTE duplicate notifications", () => {
     );
     const mail = await readFile(privateOutbox, "utf8");
     expect(mail).toContain('"subject":"A possible duplicate was found"');
-    expect(mail).toContain("Superchain Builders Fund — community submission");
+    expect(mail).toContain("Regional Seed Bank Fund — community submission");
     expect(mail).toContain("https://app.example.org/duplicates");
 
     const publicSide = suspected.find((row) => row.accountId === publicOwnerId);
     expect(publicSide?.payload).toMatchObject({
       pairId,
-      yourListing: { id: PUBLIC_ID, title: "Superchain Builders Fund" },
+      yourListing: { id: PUBLIC_ID, title: "Regional Seed Bank Fund" },
       action: "review_match",
       link: "/duplicates",
       decidedBy: null,
@@ -264,7 +264,7 @@ run("M3NOTE duplicate notifications", () => {
     expect(privateSide?.payload).toMatchObject({
       pairId,
       yourListing: { id: PRIVATE_ID },
-      otherListing: { id: PUBLIC_ID, title: "Superchain Builders Fund" },
+      otherListing: { id: PUBLIC_ID, title: "Regional Seed Bank Fund" },
       similarity: expect.any(Number),
     });
 
@@ -341,7 +341,7 @@ run("M3NOTE duplicate notifications", () => {
     expect(away[0]).toMatchObject({ accountId: privateOwnerId });
     expect(away[0]?.payload).toMatchObject({
       yourListing: { id: PRIVATE_ID },
-      otherListing: { id: PUBLIC_ID, title: "Superchain Builders Fund" },
+      otherListing: { id: PUBLIC_ID, title: "Regional Seed Bank Fund" },
       action: "view_survivor",
       link: `/opportunities/${encodeURIComponent(PUBLIC_ID)}`,
       decidedBy: "reviewer",

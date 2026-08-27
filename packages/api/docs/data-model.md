@@ -867,10 +867,18 @@ held to containment on replace — a foreign-operated one is still rejected.
   the same transaction as their mutation. Ownership means direct submission or membership in the
   stored publisher namespace; reviewer access alone is never a subscription. Notification payloads
   identify the other side only when it is approved and listed at emission time, and represent the
-  acting person only as `reviewer`. A submitter's candidate
-  search runs over **`approved AND is_listed` rows only**, so a suspected-match response can never
-  disclose another user's pending or unlisted title; reviewers searching from `/v1/review/duplicates`
-  see all rows. A failed or absent provider yields `duplicateCheck: "unavailable" | "disabled"` and
+  acting person only as `reviewer`. **Scope restricts what is disclosed, not what is recorded.**
+  There is one detection pass and it searches every row; `scope` is applied to the matches on the
+  way out, so a submitter's response still names only counterparts that are **`approved AND
+  is_listed`** and can never disclose another user's pending or unlisted title, while the pairs
+  themselves are written whatever either side's status. The pair table is reviewer surface —
+  `/v1/review/duplicates` — so a pair with a non-public counterpart discloses nothing there. When
+  the scope narrowed the CANDIDATES instead it narrowed the pair table with them, and two pending
+  entries duplicating each other were paired by nothing at all: the backfill selects on "has no
+  current embedding" and the write it follows has just supplied one. `DEDUPE_MAX_MATCHES` caps each
+  audience's list off that one ranking — the reviewer's top N and the public top N — and what is
+  recorded is their union, so every pair either audience may be shown exists as a row. A failed or
+  absent provider yields `duplicateCheck: "unavailable" | "disabled"` and
   no embedding row, which the backfill job then picks up — the field is load-bearing, because
   without it a client cannot tell "none found" from "not checked".
 - **Analytics (M3):** capture is **server-side only** — there is no public beacon in this cut, since

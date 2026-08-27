@@ -4,10 +4,25 @@
  *
  * SEVEN THINGS HERE ARE LOAD-BEARING AND NONE OF THEM IS THE VECTOR SEARCH.
  *
- * 1. **The candidate scope is credential-dependent.** A submitter's check runs over `approved AND
- *    is_listed` rows only. Searching everything would turn a submission into a way to enumerate the
- *    review queue: post something, read back the titles and ids of whatever it resembles. Reviewers
- *    searching from `/v1/review/duplicates` see all rows, which is what a reviewer is for.
+ * 1. **Scope restricts what is DISCLOSED, never what is RECORDED.** There is ONE detection pass and
+ *    it always searches every row: `scope` is applied to the MATCHES on the way out, not to the
+ *    candidates on the way in. It used to be applied to the candidates, and that silently
+ *    restricted the pair table too — two pending submissions that duplicate each other were paired
+ *    by nothing at all, because the write path only ever searched public rows and the backfill
+ *    selects on "has no current embedding", which the write path has just satisfied. Nobody
+ *    revisited the row, so `/v1/review/duplicates` never saw the one case it exists for. A pair row
+ *    is reviewer-only surface, so recording one whose counterpart is pending or unlisted discloses
+ *    nothing; RETURNING one would, which is why `scope: "public"` still drops every match that is
+ *    not approved and listed before the response is built. A submission must never become a way to
+ *    enumerate the review queue by reading back the titles and ids of what it resembles.
+ *
+ *    THE CAP IS PER AUDIENCE, off one ranking. `DEDUPE_MAX_MATCHES` bounds how long a LIST is, and
+ *    one search now feeds two: the reviewer's top N, and the top N of those that are public. What
+ *    is recorded is their union, because every pair either audience may be shown has to exist as a
+ *    row. Taking the cap once, on the all-scope list alone, would have quietly dropped a public
+ *    counterpart that enough pending entries outranked — out of the submitter's answer and out of
+ *    the pair table — which is a second version of the very bug above. One search, one ordering,
+ *    two capped views of it.
  * 2. **A pair is unordered, so it is written ordered.** `ux_dup_pair` is unique on
  *    `(least, greatest)`, so (A,B) and (B,A) are the same key and a dismissal cannot be undone by
  *    the mirrored row staying suspected.
@@ -28,6 +43,8 @@
  * 6. **A newly inserted pair emits in the same transaction.** `returning()` distinguishes a real
  *    creation from a re-detection, and the notification unique key is the final backstop. Decisions,
  *    merges and reopens likewise record owner notifications beside their mutations and audit rows.
+ *    Owner-facing payloads name a counterpart only while it is approved and listed, which is what
+ *    lets (1) record a non-public pair without leaking it back through the inbox.
  * 7. **Detection and pruning apply the SAME combined rule, and a pair records the rule version that
  *    produced it.** One predicate lives in `duplicate-signal.ts` and both paths call it, because an
  *    arm added to detection but not to pruning deletes its own output on the next nightly run. The
@@ -38,7 +55,10 @@
  *    knob — and a rollback that waits for somebody to remember a constant is not one. Without the
  *    stamp, turning an arm off strands every row it wrote, because pruning only ever runs for
  *    entries the backfill selects and a drained backfill selects nothing. That was already true of
- *    `DEDUPE_SIMILARITY_THRESHOLD` before this arm existed.
+ *    `DEDUPE_SIMILARITY_THRESHOLD` before this arm existed. Both arms are subject to (1): the
+ *    combined rule decides WHETHER a pair exists, and `scope` decides only whether this caller is
+ *    told about it, so an arm-B pair against a pending counterpart is recorded and withheld exactly
+ *    like an arm-A one.
  */
 
 import { validateOpportunity } from "rfphub-validate";
@@ -141,7 +161,11 @@ export interface DedupeOptions {
   notificationQueue?: NotificationDispatchEnqueuer;
 }
 
-/** What a search may see. `all` is the reviewer scope; `public` is everyone else's. */
+/**
+ * What a caller may be TOLD. `all` is the reviewer scope; `public` is everyone else's.
+ *
+ * Not what the search reaches — the search has one reach. See (1) in the file header.
+ */
 export type CandidateScope = "public" | "all";
 
 export class DedupeService {
@@ -205,7 +229,11 @@ export class DedupeService {
 
   // ── the write path's after-commit call ─────────────────────────────────────────
   /**
-   * Embed one entry, record its suspected pairs, and report what the submitter may see.
+   * Embed one entry, record EVERY suspected pair it has, and report the subset `scope` may see.
+   *
+   * `scope` is the caller's CREDENTIAL, not the search's reach. The pass underneath is the same one
+   * a reviewer gets; `public` only means the answer is trimmed to counterparts that are approved
+   * and listed. The pairs are recorded either way — see (1) in the file header.
    *
    * NEVER THROWS for a provider failure. The row is already committed; a duplicate check that could
    * turn a stored submission into a 500 would be strictly worse than no duplicate check.
@@ -239,6 +267,11 @@ export class DedupeService {
    *
    * This guard belongs in `check()`, not `embedAndDetect()`: the latter is what the
    * `embedding-backfill` job calls to repair this exact state and must never block its own remedy.
+   *
+   * It is the one place `scope` still narrows a QUESTION rather than an answer, and it is the right
+   * one: what it asks is whether the corpus this caller's answer is drawn from can be searched at
+   * all. Saying no costs nothing that is not recovered — nothing is embedded, so the entry stays in
+   * the backfill's predicate, and the job records its pairs at the reviewer scope shortly after.
    */
   private async hasSearchableCorpus(
     opportunityId: number,
@@ -274,6 +307,10 @@ export class DedupeService {
   /**
    * The whole detection pass for one entry: embed (or skip), search, record, clean up.
    *
+   * The search and the recording are identical whatever `scope` is; only the returned list narrows.
+   * That is the point of (1) in the file header, and it is why the backfill and the write path can
+   * share one pass instead of the queue depending on which of them ran last.
+   *
    * Throws on failure — `check()` is the tolerant wrapper, and the backfill job wants the error.
    */
   async embedAndDetect(
@@ -287,8 +324,11 @@ export class DedupeService {
     const subject = await this.ensureEmbedding(row, provider);
     const rule = this.ruleConfig(provider);
 
-    const neighbours = await this.search(subject.vector, { exclude: row.id, scope });
-    // Neighbours arrive in descending cosine order and STAY in it. `maxMatches` truncates, so the
+    // ONE SEARCH, over everything, and it feeds BOTH arms. `scope` is not consulted here and must
+    // not be: a candidate set that shrank with the caller's credential is what left two pending
+    // entries paired by nothing at all.
+    const neighbours = await this.search(subject.vector, { exclude: row.id });
+    // Neighbours arrive in descending cosine order and STAY in it. The caps below truncate, so the
     // order decides which five a submitter sees: sorting by anything else — or letting arm-B pairs
     // interleave by overlap — would let a length-corrected match crowd out a stronger lexical one.
     const accepted: { match: (typeof neighbours)[number]; signal: DuplicateSignalRecord }[] = [];
@@ -303,18 +343,48 @@ export class DedupeService {
       );
       if (decision.accepted && decision.signal) accepted.push({ match, signal: decision.signal });
     }
-    const kept = accepted.slice(0, this.config.dedupe.maxMatches);
 
-    await this.recordPairs(row.id, kept, this.rulesKeyFor(provider));
+    // TWO LISTS, ONE RANKING, and the combined rule has already spoken for both of them.
+    // `maxMatches` bounds how long a LIST is, and there are two audiences with two lists, so the
+    // cap is taken twice off the same ordering rather than once. Capping only the reviewer's list
+    // would silently drop a public counterpart that enough pending entries outranked — out of the
+    // submitter's answer AND out of the pair table; capping only the public one is the bug this
+    // whole change is about. Which arm accepted a match never enters into it.
+    const limit = this.config.dedupe.maxMatches;
+    const reviewerTop = accepted.slice(0, limit);
+    const publicTop = accepted.filter(({ match }) => match.isPublic).slice(0, limit);
+
+    // Recorded: the union, because every pair either audience can be shown has to exist as a row —
+    // each stamped with the rule identity that produced it, whichever arm that was. Ordered by the
+    // reviewer's list first so the union is stable; `ux_dup_pair` settles the rest.
+    const reviewerIds = new Set(reviewerTop.map(({ match }) => match.id));
+    await this.recordPairs(
+      row.id,
+      [...reviewerTop, ...publicTop.filter(({ match }) => !reviewerIds.has(match.id))],
+      this.rulesKeyFor(provider),
+    );
     await this.pruneStalePairs(row.id, subject, rule);
+
+    // Disclosed: the credential's own list. A non-public counterpart is a fact this caller is not
+    // entitled to, even though the pair it belongs to has just been written.
+    const disclosed = scope === "all" ? reviewerTop : publicTop;
 
     // Structural labels come from the counterpart's LIVE row, which is why they are loaded here
     // rather than projected through the ANN query: a stored label goes stale on the next edit, and
     // widening the vector search's projection to carry columns it does not order on is how an ANN
-    // query slowly stops being one. At most `maxMatches` rows.
-    const counterparts = await Promise.all(kept.map(({ match }) => this.loadRow(match.id)));
+    // query slowly stops being one. At most `maxMatches` rows — the disclosed ones, since these
+    // labels exist only to be shown.
+    //
+    // A COUNTERPART THAT VANISHED IS A MISSING LABEL, NOT A FAILED CHECK. The load is a second
+    // round trip after the search, so the row can be gone by the time it runs; letting that throw
+    // would turn a pass that found its matches and wrote its pairs into `unavailable`, discarding
+    // the whole answer because one piece of decoration could not be built. The reader below
+    // already treats an absent row as "no structural labels", which is exactly the right answer.
+    const counterparts = await Promise.all(
+      disclosed.map(({ match }) => this.loadRow(match.id).catch(() => undefined)),
+    );
     const detectedAt = new Date().toISOString();
-    return kept.map(({ match, signal }, index) => ({
+    return disclosed.map(({ match, signal }, index) => ({
       id: match.publicId,
       title: match.title,
       isPublic: match.isPublic,
@@ -401,10 +471,13 @@ export class DedupeService {
    *
    * Restricted to the SAME model and provider — a vector from another space is not a neighbour, it
    * is a coordinate coincidence — and never to a merge loser, whose survivor is the real entry.
+   *
+   * NOT restricted by review status, and it takes no scope to be restricted by. `isPublic` comes
+   * back on every match so the caller can decide what to say; the search itself has one answer.
    */
   private async search(
     vector: number[],
-    options: { exclude: number; scope: CandidateScope },
+    options: { exclude: number },
   ): Promise<
     {
       id: number;
