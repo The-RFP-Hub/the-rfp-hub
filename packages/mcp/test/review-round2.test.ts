@@ -224,23 +224,34 @@ describe("a submission never follows a redirect", () => {
     await new Promise<void>((r) => elsewhere.close(() => r()));
   });
 
-  it("refuses a 307 to another origin, and sends the document nowhere", async () => {
+  it("does not follow a 307 to another origin — the document goes nowhere", async () => {
     const client = new ApiClient(testConfig({ apiBase: originUrl }));
     const error = await rejection(client.submitOpportunity(validDocument()));
 
-    expect(error.code).toBe("policy_denied");
     expect(error.message).toContain("307");
-    expect(error.message).toContain("does not follow redirects on a write");
-    expect(error.message).toContain("approval binds the destination origin");
+    expect(error.message).toContain("does not follow");
+    expect(error.message).toContain("NOT re-sent anywhere");
     // THE POINT: the body and the credential were never re-sent.
     expect(elsewhereHits).toBe(0);
-    expect(error.details?.redirect).toBe(true);
   });
 
-  it("is not reported as ambiguous — nothing was written anywhere", async () => {
+  it("reports it as AMBIGUOUS, because a redirect is how a create is acknowledged", async () => {
+    // POST/Redirect/GET is the ordinary way a server says "made it, go and look" — so "we did not
+    // follow it" is not the same claim as "nothing was written". Calling this a clean refusal is
+    // what would send somebody to submit the same document a second time.
     const client = new ApiClient(testConfig({ apiBase: originUrl }));
     const error = await rejection(client.submitOpportunity(validDocument()));
-    expect(error.message).not.toContain("may have landed");
+    expect(error.code).toBe("exec_failed");
+    expect(error.details?.ambiguous).toBe(true);
+    expect(error.message).toContain("may have landed");
+    expect(error.message).toContain("/v1/me/opportunities");
+  });
+
+  it("still names the destination, so an operator can see where they were sent", async () => {
+    const client = new ApiClient(testConfig({ apiBase: originUrl }));
+    const error = await rejection(client.submitOpportunity(validDocument()));
+    expect(error.message).toContain(elsewhereUrl);
+    expect(error.message).toContain("approval binds the destination origin");
   });
 });
 

@@ -202,18 +202,26 @@ A response over **1 MB fails rather than truncating**, and the cap is applied wh
 being read, so an enormous response costs bounded memory. Half a JSON document is not a smaller
 answer, it is a wrong one; narrow the request instead.
 
-**A submission whose outcome cannot be known says so.** Any failure once the request has left —
-a dropped connection, a body that stops mid-stream, a body that is not JSON or is over the cap, or
-a `5xx` however well-formed its body — is reported as *may have landed*, never as a plain failure,
-and points at `GET /v1/me/opportunities`. The API commits the row and then does more work, so a
-server error while answering is entirely consistent with a row that exists. A *coded `4xx`* is
-different: the API read the request, decided, and the answer was no. The approval is spent either
-way.
+**A submission whose outcome cannot be known says so.** Once the request has left, the only clean
+answer is a coded `4xx` — the API read it, decided, and the answer was no. Everything else is
+reported as *may have landed*, never as a plain failure, and points at `GET /v1/me/opportunities`:
 
-**A submission never follows a redirect.** A `3xx` is refused, naming the destination it was being
-sent to; the document and the credential are not re-sent anywhere. An approval binds the
-destination origin, so continuing to another host would spend a decision made about somewhere
-else.
+- a dropped connection, or a body that stops mid-stream;
+- a body that is not JSON, or is over the cap;
+- a `5xx`, however well-formed its body — the API commits the row and *then* does more work, so a
+  server error while answering is entirely consistent with a row that exists;
+- a `2xx` whose body is not a submission result — an empty `200`, a `{}`, an answer from something
+  that is not this API;
+- a `3xx` (see below).
+
+The approval is spent in every one of those cases.
+
+**A submission never follows a redirect — and an unfollowed redirect is still ambiguous.** The
+document and the credential are never re-sent to a host this server did not resolve and nobody
+approved; an approval binds the destination origin, so continuing elsewhere would spend a decision
+made about somewhere else. But *not followed* is not *not written*: POST/Redirect/GET is the
+ordinary way a server acknowledges something it has just created, so a `3xx` is reported as *may
+have landed*, with the destination named so you can see where you were being sent.
 
 **Arguments are validated against the published schema**, and a malformed call comes back with the
 same codes as everything else. An unknown parameter is an error rather than a filter that silently
@@ -233,6 +241,7 @@ Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`
 | `pending/claimed/<id>.json` | A preview a person has already turned into an approval |
 | `policy-counters.json` | Per-kind rate counters |
 | `policy-counters.lock` | Held only while a counter is being updated |
+| `policy-counters.lock.stale.*` | A lock abandoned by a crashed process, on its way out |
 | `audit.log` | One JSON line per call |
 
 **Rate limits fail closed.** If the counter store cannot be read or written, calls are refused — a
@@ -241,7 +250,8 @@ budget that cannot be counted cannot be enforced. Keep `RFPHUB_MCP_HOME` writabl
 **The counters are correct across processes.** Check-and-increment runs under a lock directory
 (`policy-counters.lock`), because an MCP client and a terminal running this same package share one
 home directory by design, and an unlocked read-modify-write lets two processes through a cap of
-one. A lock left behind by a process that died is broken after five seconds.
+one. A lock left behind by a process that died is broken after five seconds — by renaming it aside,
+so that two processes breaking the same abandoned lock cannot end up deleting a live one.
 
 **The write budget is reserved before the approval is claimed.** A local refusal — an exhausted
 daily budget, a lost race for the approval — gives the budget back and leaves the approval intact,
@@ -252,8 +262,10 @@ claimed by an atomic rename after your confirmation, so two terminals approving 
 one approval, and a preview that was revoked or expired while it sat on screen is refused.
 
 **Refused submissions are metered too.** Every invocation of the write tool spends an `attempt`
-(20/minute, 400/day) before any work, so a loop of bogus approval ids or oversized documents cannot
-run unmetered.
+(20/minute, 400/day) before any work — including a call whose arguments are rejected before the
+handler runs, which is the cheapest thing to repeat. A loop of bogus approval ids, malformed
+arguments or oversized documents cannot run unmetered. Running out of `attempt` never masks the
+real error: bad arguments still come back as bad arguments.
 
 **The audit log records argument key names and byte counts, never values.** A log that stored
 values would be a second copy of every document and every search term. Failing to write it never

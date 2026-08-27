@@ -126,7 +126,13 @@ export class ResponseTooLargeError extends Error {
  */
 export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promise<string> {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > cap) throw new ResponseTooLargeError(declared);
+  if (Number.isFinite(declared) && declared > cap) {
+    // Cancelled, not merely abandoned. An un-cancelled body holds its socket out of the connection
+    // pool until the runtime gets around to collecting it, so refusing enormous responses would
+    // slowly starve the pool — the failure mode being avoided here would cause a different one.
+    await res.body?.cancel().catch(() => {});
+    throw new ResponseTooLargeError(declared);
+  }
 
   const body = res.body;
   if (body === null) return "";
@@ -150,6 +156,25 @@ export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promi
     // the over-cap path, which is the one that matters.
     await reader.cancel().catch(() => {});
   }
+}
+
+/**
+ * Whether a 2xx body really is the API's submission result.
+ *
+ * Only the members this package promises its own callers are checked — the id it promotes, and the
+ * three flags it reports. Validating the whole document would reject a response that is fine and
+ * merely newer, which is the opposite of what a client should do with a contract it does not own.
+ */
+export function isSubmissionResult(body: unknown): body is SubmissionResult {
+  if (body === null || typeof body !== "object") return false;
+  const record = body as Record<string, unknown>;
+  const opportunity = record.opportunity;
+  if (opportunity === null || typeof opportunity !== "object") return false;
+  if (typeof (opportunity as Record<string, unknown>).id !== "string") return false;
+  if (typeof record.created !== "boolean") return false;
+  if (typeof record.reviewStatus !== "string") return false;
+  if (typeof record.isListed !== "boolean") return false;
+  return true;
 }
 
 export class ApiClient {
@@ -215,16 +240,24 @@ export class ApiClient {
     }
 
     if (res.status >= 300 && res.status < 400) {
-      // Nothing was written HERE, and nothing was sent anywhere else: the body was not re-posted.
-      // Naming the header is deliberate — the operator has to be able to see where they were being
-      // sent, and to decide whether that destination is one they want to approve for.
+      // NOT FOLLOWED, and NOT a clean refusal either.
+      //
+      // The redirect is not followed: the document and the credential are never re-sent to a host
+      // this server did not resolve and no human approved. But "not followed" is not the same as
+      // "not written". POST/Redirect/GET is the ordinary way a server acknowledges a resource it
+      // just created and sends the client to look at it, so a 303 — or a 307 from a proxy that
+      // wrote through — is entirely consistent with a row that exists. Reporting this as a refusal
+      // would tell somebody to submit again, which is how the duplicate gets made.
+      //
+      // Naming the destination is deliberate: the operator has to be able to see where they were
+      // being sent and decide whether it is somewhere they want to approve for.
       const location = res.headers.get("location");
-      throw new ToolError(
-        "policy_denied",
-        `${this.config.apiOrigin} answered the submission with an HTTP ${res.status} redirect${
-          location === null ? "" : ` to ${location}`
-        }, and this server does not follow redirects on a write. Nothing was submitted, and the document and credential were not re-sent anywhere. An approval binds the destination origin, so silently continuing to another host would spend a decision that was made about a different destination. If that destination is the right one, point RFPHUB_API_BASE at it and take a fresh preview.`,
-        { status: res.status, redirect: true },
+      await res.body?.cancel().catch(() => {});
+      throw ambiguousWriteError(
+        this.config.apiOrigin,
+        `the API answered ${res.status}, a redirect${location === null ? "" : ` to ${location}`}, which this server does not follow on a write — the document and credential were NOT re-sent anywhere, but a redirect is also how a server acknowledges something it has just created`,
+        new Error(`HTTP ${res.status}`),
+        "An approval binds the destination origin, so continuing to another host would spend a decision made about a different destination. If that destination is the right one, point RFPHUB_API_BASE at it and take a fresh preview.",
       );
     }
 
@@ -276,7 +309,20 @@ export class ApiClient {
         keyConfigured: true,
       });
     }
-    return body as SubmissionResult;
+
+    // A 2xx WHOSE BODY IS NOT A SUBMISSION RESULT IS AMBIGUOUS TOO. An empty 200, a `{}`, or a
+    // body from something that is not this API says the request reached a server and tells us
+    // nothing about what that server did with it — and the approval has already been claimed. The
+    // alternative is worse than an error: passing the shape through would surface as
+    // `id: "(the API returned no id)"` in a result that otherwise reads like a success.
+    if (!isSubmissionResult(body)) {
+      throw ambiguousWriteError(
+        this.config.apiOrigin,
+        `the API answered ${res.status} with a body that is not a submission result, so what it did with the request cannot be read off it`,
+        new Error("unrecognised submission response"),
+      );
+    }
+    return body;
   }
 
   private async getJson<T>(path: string, operation: string): Promise<T> {
@@ -284,7 +330,12 @@ export class ApiClient {
     // Deliberately no `authorization` header: see the file header, rule 1.
     let res = await this.transport(url, operation);
     if (res.status === 429) {
-      await this.sleep(retryAfterMs(res.headers.get("retry-after"), Date.now()));
+      const wait = retryAfterMs(res.headers.get("retry-after"), Date.now());
+      // The refused response still has a body, and an unread one keeps its socket out of the
+      // connection pool. Cancelling it before sleeping means the retry reuses the connection
+      // instead of racing the runtime's cleanup for a new one.
+      await res.body?.cancel().catch(() => {});
+      await this.sleep(wait);
       res = await this.transport(url, operation);
     }
     return this.readJson<T>(res, operation);
@@ -337,7 +388,12 @@ export class ApiClient {
     if (!res.ok) {
       throw apiErrorToToolError(res.status, (body ?? {}) as ApiErrorBody, {
         operation,
-        keyConfigured: this.config.apiKey !== null,
+        // FALSE, always, and not `apiKey !== null`. This method serves READS, and reads attach no
+        // credential. The flag says whether one was sent on THIS request, because it decides which
+        // sentence a 401 gets — and "the API rejected the configured credential" is a bad thing to
+        // tell somebody about a request that carried none. A 401 on an anonymous read is the
+        // public surface asking for a credential, not a credential being refused.
+        keyConfigured: false,
       });
     }
     return body as T;
