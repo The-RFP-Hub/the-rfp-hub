@@ -7,6 +7,8 @@ because it tells contributors to expect a process nobody will actually run.
 - **What counts as a change to the standard, and what has to be true before it ships:**
   [`packages/standard/PROCESS.md`](./packages/standard/PROCESS.md)
 - **Which artifacts carry authority:** [`packages/standard/NORMATIVE.md`](./packages/standard/NORMATIVE.md)
+- **What a reviewer checks on one submitted listing:** [`REVIEW-CRITERIA.md`](./REVIEW-CRITERIA.md)
+- **How an organization becomes a verified publisher:** [`PUBLISHERS.md`](./PUBLISHERS.md)
 - **How to contribute anything:** [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 
 ## Editors
@@ -80,6 +82,70 @@ already in an ADR, the answer points at it. Decisions that cannot be explained i
 decisions that should not have been made.
 
 There is no escalation body above this, because there is no organisation above this.
+
+## Non-discrimination and ranking
+
+The sections above govern **the standard**. This one governs **the index** — which entries get
+listed, and in what order.
+
+**What decides indexing.** Three principles, and nothing else: the entry describes a **genuine
+funding opportunity**; the document **conforms to the Standard**; the id's namespace belongs to an
+**organization that operates the program**. Those are the principles, not the checklist — the
+operational list a reviewer actually works through, including the ones that only apply
+conditionally, is [`REVIEW-CRITERIA.md`](./REVIEW-CRITERIA.md), and that file is authoritative for
+how each principle is applied.
+
+**What does not influence indexing or ordering.**
+
+- **Payment.** There is no way to pay to be listed, to be listed sooner, or to be listed higher.
+  There is no field for it in the schema, no column for it in the database, and no parameter for it
+  anywhere in the API — which is the only form of this promise worth making.
+- **The size, age or funding of the organization.** Likewise unrepresented anywhere. A two-person
+  program and a foundation are the same kind of row.
+- **Any commercial relationship with the Hub or whoever operates it.** Likewise unrepresented.
+- **The ecosystem or chain — with a precise caveat.** `ecosystems` *is* a real field: it is in the
+  schema, it is a column, and `?ecosystem=` is a documented public filter, because "show me
+  Ethereum programs" is a question readers legitimately ask. The invariant is narrower and it is
+  the one that matters: ecosystem is **never used for admission and never used for ranking**. It
+  does not decide whether an entry is indexed, and it does not appear in the default order or in
+  any of the sort keys below. The Hub's focus is Ethereum; that is a focus, not an exclusion rule,
+  and other ecosystems are indexed rather than turned away ([`PUBLISHERS.md`](./PUBLISHERS.md),
+  *Who qualifies*). What a caller filters on is the caller's business.
+
+**Ordering.** The public list endpoint's default is `nextDeadlineAt` **ascending** — soonest
+deadline first, records with no upcoming fixed deadline last — with the row id as a tiebreak, so
+the same query returns the same page twice. Every other order is a **parameter the caller chooses**,
+never a judgment the server makes, and the sort keys are a **closed set** published in the OpenAPI
+document: `nextDeadlineAt`, `opensAt`, `postedAt`, `updatedAt`, `createdAt`, each `asc` or `desc`.
+A key outside that set is a `400`, not a silent fallback to something else. `GET /v1/publishers`
+orders by slug. There is no relevance score, no per-entry weight, and no operator thumb.
+
+**No paid placement.** No featured tier, no boost, no promoted entry, no recommendation surface.
+**If that ever changes, the policy changes before the code**: it would be a substantive edit to this
+file, in public, under the 72-hour window, with an ADR recording what problem it solves and what was
+rejected. A commit that introduces a ranking weight, a placement field or a paid tier before that
+has happened is a defect to revert, not a fact to document afterwards.
+
+**Symmetry, stated accurately.** Third-party listings and the operator's own listings are judged by
+the same **content** criteria: the same schema, the same checks, the same revocation when they are
+not met. The **queue** is not the same, and claiming it were would be false.
+
+Publication decisions are made by people, never by a classifier or a language model. What varies is
+*when* the person decided — before the fact, by granting an authority, or after it, by reading a
+submission. Skipping the queue takes **two** things at once, an account authority and a credential
+that carries publishing power, and either one missing means the entry lands pending:
+
+| | Grants it |
+|---|---|
+| **Account authority** over the namespace | A **verified membership** on that organization — the ordinary path, audited as `verified_publisher_namespace` — **or** an admin-granted `directCreate`, which publishes into any namespace and is deliberately independent of the reviewer and admin roles |
+| **Credential** used for the write | A signed-in **session**, or an **API key carrying the `publish` scope**. A `write`-only key never auto-publishes, even for a verified member of the namespace — its submissions queue like anyone else's |
+
+That second row is a feature, not an oversight: an integration that only files submissions should
+not be able to publish them, and a leaked key should be the smaller problem. Everything without
+both halves waits in a queue a person decides. Duplicate detection flags a pair and never rejects
+one. How verification is granted, and how it is taken away, is
+[`PUBLISHERS.md`](./PUBLISHERS.md); the full credential model is
+[`packages/api/docs/auth.md`](./packages/api/docs/auth.md).
 
 ## What this project deliberately does not have
 

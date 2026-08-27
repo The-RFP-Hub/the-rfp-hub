@@ -247,10 +247,13 @@ tree.
 The registries are how the standard keeps open fields comparable without closing them. Adding to
 one is the cheapest possible contribution and it is designed to be.
 
-There are **two**: `deadline-labels` and `program-models`. Those are the vocabularies where two
-publishers writing different strings for the same concept produce uncomparable data. (A third,
-`eligibility-keys`, was retired on 2026-08-05 when `eligibility` became free text — see the
-registry-retirement rule above.) `ecosystems` is an open list too and deliberately has **no**
+There are **four**, and `registries/index.json` is the authoritative list of them:
+`deadline-labels`, `program-models`, and — added 2026-08-10 with the security-bounty payout surface
+([`adr/0008`](../../adr/0008-security-bounty-payout-tiers.md)) — `bounty-severities` and
+`bounty-asset-types`. Those are the vocabularies where two publishers writing different strings for
+the same concept produce uncomparable data. (A fifth, `eligibility-keys`, was retired on 2026-08-05
+when `eligibility` became free text — see the registry-retirement rule above.) `ecosystems` is an
+open list too and deliberately has **no**
 registry — a registry over chain names is read as an allowed-values list however carefully
 [`NORMATIVE.md`](./NORMATIVE.md) words the distinction, and it would put this review process in
 front of a newly launched chain for no interoperability gain.
@@ -302,6 +305,36 @@ quietly redesigning the standard.
 | `erratum-technical` | The normative artifacts are internally inconsistent, or a description says something the schema does not do. A correct implementation could be misled. | Fix in the current version if the fix does not change what validates; otherwise it is a change, not an erratum. Record in `CHANGELOG.md`. |
 | `held-for-next-cut` | Real defect, but fixing it would change what validates. Cannot ship inside the current version. | Stays open, labelled, and is picked up when the next spec version opens. Say so on the issue — a defect parked without a label reads as ignored. |
 | `redesign` | The report is not a defect at all: it asks the standard to mean something different. | Not an erratum. Becomes a `proposed` feature, and if accepted an ADR. |
+
+---
+
+## RFC process
+
+There is no separate RFC document and no RFC number series. What other projects call an RFC, this
+project already has, split across this file and [`GOVERNANCE.md`](../../GOVERNANCE.md) — so this
+section is a routing table, not a new process. Start from what you want to change:
+
+| You want to… | Go to | Opens as |
+|---|---|---|
+| **Propose a new field**, or move one between stages | [Feature stages](#feature-stages) above | An issue or PR with a use case and at least one real document that needs it — that is the `proposed` stage |
+| **Register a vocabulary value** in any of the four registries — `deadline-labels`, `program-models`, `bounty-severities`, `bounty-asset-types` | [Registering a value in a registry](#registering-a-value-in-a-registry) above | An issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
+| **Report a defect** in something already published | [Errata](#errata) above | An issue, triaged into exactly one of `erratum-editorial`, `erratum-technical`, `held-for-next-cut`, `redesign` |
+| **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) | An issue. The answer goes on the issue, in public |
+| **Make a structural decision** — the data model, the versioning policy, the process itself | [`adr/`](../../adr), starting from [`template.md`](../../adr/template.md) | A PR adding the ADR, including the options considered and rejected |
+
+Whichever door you came through, the same review windows apply, and
+[`GOVERNANCE.md` § Review windows](../../GOVERNANCE.md#review-windows) is the source of truth for
+them — if this table and that one ever disagree, that one wins:
+
+| Change | Minimum open time |
+|---|---|
+| **Substantive** — the schema, the context, the conformance suite, this file, `NORMATIVE.md`, `GOVERNANCE.md` | **72 hours** |
+| **Registry entry** | **24 hours** |
+| **Editorial** | none |
+
+The window is a minimum, not a target, and it may be waived only for a security fix or a broken
+build. Who approves, and what happens when editors do not converge, is
+[`GOVERNANCE.md` § The decision rule](../../GOVERNANCE.md#the-decision-rule).
 
 ---
 
