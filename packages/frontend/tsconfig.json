@@ -1,7 +1,32 @@
 {
-  "extends": "../../tsconfig.base.json",
+  // This package inlines the options that every other package's tsconfig.json gets from
+  // "extends": "../../tsconfig.base.json". A cloned or copied `packages/frontend` — the
+  // clean-room deploy path documented in this package's README — has no `../../` to extend:
+  // TypeScript resolves `extends` relative to this file's own location, so outside the monorepo
+  // it points at nothing and `tsc` fails with TS5083 before it reads a single source file. This
+  // is the ONLY tsconfig.json in the repo that must survive being copied on its own, so it is the
+  // only one that inlines rather than extends. `tsc`'s own config reader accepts comments in
+  // tsconfig.json (it is JSONC, not strict JSON), so this explanation can live where the values
+  // it explains live.
+  //
+  // Keep these options equal to tsconfig.base.json — a diff here is a diff worth noticing, since
+  // `pnpm typecheck` in the monorepo must behave identically to `tsc` in a standalone copy.
+  "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
     "jsx": "preserve",
     "allowJs": true,
     "noEmit": true,

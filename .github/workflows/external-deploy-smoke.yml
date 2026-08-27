@@ -1,0 +1,147 @@
+# F3 of the M4 external-deploy criterion: a clean-room proof that "clone ONLY packages/frontend,
+# set NEXT_PUBLIC_API_URL, deploy" actually works — run in CI, against a real API, on every push
+# that could break it. `scripts/frontend-clean-room.mjs` does the work; this file only invokes it.
+# It is evidence, and evidence necessarily incomplete — a job here is not an external developer —
+# but it is the only guard against regressing the two portability fixes that made a real clean-room
+# attempt fail before this milestone (see the script's own header and `.changeset/validate-humanize-issues-export.md`).
+#
+# TWO MODES, because `rfphub-validate`'s published tarball does not yet carry the fix the frontend
+# needs (`humanizeIssues` — see the changeset above):
+#
+#   packed      Builds `rfphub-validate` from THIS checkout and packs it into the tarball the
+#               script consumes via RFPHUB_VALIDATE_SPEC. Proves the copy-and-rewrite-deps
+#               mechanics and the standalone server work; does NOT prove the published package is
+#               installable, because it never touches the registry for that package.
+#   published   Uses `rfphub-validate` straight from the npm registry, at whatever range the
+#               `validate-spec` input names (default: the script's own default, `^0.3.0`, which
+#               FAILS today — that is not a bug in this job, it is the fact `humanizeIssues` being
+#               unpublished. Point `validate-spec` at `^0.3.1` (or `standard-spec` at a newer
+#               `@the-rfp-hub/standard`) once the owner has published it.
+#
+# DEFAULT IS `packed`, on purpose, for both triggers below: it is the mode that is true today, and
+# a job that is red by default because of a dependency this workflow doesn't control is a job
+# nobody trusts. Switch the default to `published` in the same PR that bumps it in
+# `.changeset/validate-humanize-issues-export.md` past pre-release, once 0.3.1 (and, if needed, a
+# `@the-rfp-hub/standard` ahead of the one already on the registry) are actually on npm — see that
+# changeset for why `@the-rfp-hub/standard` must publish first: `rfphub-validate` depends on it via
+# `workspace:*`, which pnpm rewrites to the exact workspace version at publish time.
+name: External deploy smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/frontend/**"
+      - "packages/validate/**"
+      - "packages/standard/**"
+      - "scripts/frontend-clean-room.mjs"
+      - ".github/workflows/external-deploy-smoke.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "packed (build validate from this checkout) or published (use the npm registry)"
+        type: choice
+        options: [packed, published]
+        default: packed
+      api-url:
+        description: "API origin the built frontend is checked against"
+        type: string
+        default: "https://api.ethrfps.app"
+      standard-spec:
+        description: "Only used in 'published' mode. Range for @the-rfp-hub/standard."
+        type: string
+        default: ""
+      validate-spec:
+        description: "Only used in 'published' mode. Range for rfphub-validate — set to ^0.3.1 once published."
+        type: string
+        default: ""
+      require-publishers:
+        description: "Fail (rather than warn) if /publishers 404s. Flip once that route ships."
+        type: boolean
+        default: false
+
+# The workflow token, narrowed to reading the checkout. Without a `permissions:` block a job gets
+# whatever the repository's default Workflow permissions setting says — see ci.yml for the same
+# reasoning stated once.
+permissions:
+  contents: read
+
+jobs:
+  clean-room:
+    name: Clean-room build + standalone smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # This job never pushes; no credential should outlive the checkout for `npm install`'s
+        # (arbitrary third-party) lifecycle scripts to inherit.
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace (for the packed-mode build step, and to run the script itself)
+        run: pnpm install --frozen-lockfile
+
+      # Needed in both modes: rfphub-validate's own build depends on it, and so does the packed
+      # tarball's typecheck.
+      - name: Build @the-rfp-hub/standard
+        run: pnpm --filter @the-rfp-hub/standard build
+
+      # `github.event.inputs.*` rather than the `inputs` context: this job also runs on `push`,
+      # where `workflow_dispatch`'s inputs were never supplied. The event-inputs path reads as an
+      # empty string in that case, which the shell's `:-` default below handles; the `inputs`
+      # context is for workflow_dispatch/workflow_call specifically and is the wrong tool for a
+      # workflow with more than one trigger.
+      - name: Determine mode
+        id: mode
+        env:
+          MODE_INPUT: ${{ github.event.inputs.mode }}
+        run: |
+          echo "mode=${MODE_INPUT:-packed}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and pack rfphub-validate from this checkout (packed mode)
+        if: steps.mode.outputs.mode == 'packed'
+        run: |
+          pnpm --filter rfphub-validate build
+          mkdir -p "$RUNNER_TEMP/rfphub-pack"
+          pnpm --filter rfphub-validate pack --pack-destination "$RUNNER_TEMP/rfphub-pack"
+
+      # `--browser` is required here, even though it is opt-in for a local run: the plain HTTP
+      # checks alone would pass on a build whose client-side fetch never reaches the API at all
+      # (DirectoryList fetches from a post-hydration `useEffect` — see the script's own "WHY A
+      # BROWSER TOO"), which is exactly the class of regression this job exists to catch. Chromium
+      # is not preinstalled on the runner, so it is fetched once here — pinned to whatever
+      # `@playwright/test` resolves to in the lockfile, the same way every other dependency here is
+      # pinned, rather than to a floating "latest".
+      - name: Install Chromium for the browser-driven check
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the clean-room script
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          API_URL_INPUT: ${{ github.event.inputs.api-url }}
+          STANDARD_SPEC_INPUT: ${{ github.event.inputs.standard-spec }}
+          VALIDATE_SPEC_INPUT: ${{ github.event.inputs.validate-spec }}
+          REQUIRE_PUBLISHERS: ${{ github.event.inputs.require-publishers }}
+        run: |
+          set -euo pipefail
+          export NEXT_PUBLIC_API_URL="${API_URL_INPUT:-https://api.ethrfps.app}"
+          if [ -n "$STANDARD_SPEC_INPUT" ]; then
+            export RFPHUB_STANDARD_SPEC="$STANDARD_SPEC_INPUT"
+          fi
+          if [ "$MODE" = "packed" ]; then
+            tarball="$(ls "$RUNNER_TEMP"/rfphub-pack/rfphub-validate-*.tgz)"
+            export RFPHUB_VALIDATE_SPEC="$tarball"
+            echo "packed mode: RFPHUB_VALIDATE_SPEC=$RFPHUB_VALIDATE_SPEC"
+          elif [ -n "$VALIDATE_SPEC_INPUT" ]; then
+            export RFPHUB_VALIDATE_SPEC="$VALIDATE_SPEC_INPUT"
+            echo "published mode: RFPHUB_VALIDATE_SPEC=$RFPHUB_VALIDATE_SPEC"
+          else
+            echo "published mode: using the script's own default range (currently fails — see this file's header)"
+          fi
+          node scripts/frontend-clean-room.mjs --browser
