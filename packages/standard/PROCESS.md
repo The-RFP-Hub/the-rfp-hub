@@ -247,10 +247,13 @@ tree.
 The registries are how the standard keeps open fields comparable without closing them. Adding to
 one is the cheapest possible contribution and it is designed to be.
 
-There are **two**: `deadline-labels` and `program-models`. Those are the vocabularies where two
-publishers writing different strings for the same concept produce uncomparable data. (A third,
-`eligibility-keys`, was retired on 2026-08-05 when `eligibility` became free text — see the
-registry-retirement rule above.) `ecosystems` is an open list too and deliberately has **no**
+There are **four**, and `registries/index.json` is the authoritative list of them:
+`deadline-labels`, `program-models`, and — added 2026-08-10 with the security-bounty payout surface
+([`adr/0008`](../../adr/0008-security-bounty-payout-tiers.md)) — `bounty-severities` and
+`bounty-asset-types`. Those are the vocabularies where two publishers writing different strings for
+the same concept produce uncomparable data. (A fifth, `eligibility-keys`, was retired on 2026-08-05
+when `eligibility` became free text — see the registry-retirement rule above.) `ecosystems` is an
+open list too and deliberately has **no**
 registry — a registry over chain names is read as an allowed-values list however carefully
 [`NORMATIVE.md`](./NORMATIVE.md) words the distinction, and it would put this review process in
 front of a newly launched chain for no interoperability gain.
@@ -314,7 +317,7 @@ section is a routing table, not a new process. Start from what you want to chang
 | You want to… | Go to | Opens as |
 |---|---|---|
 | **Propose a new field**, or move one between stages | [Feature stages](#feature-stages) above | An issue or PR with a use case and at least one real document that needs it — that is the `proposed` stage |
-| **Register a vocabulary value** in `deadline-labels` or `program-models` | [Registering a value in a registry](#registering-a-value-in-a-registry) above | An issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
+| **Register a vocabulary value** in any of the four registries — `deadline-labels`, `program-models`, `bounty-severities`, `bounty-asset-types` | [Registering a value in a registry](#registering-a-value-in-a-registry) above | An issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
 | **Report a defect** in something already published | [Errata](#errata) above | An issue, triaged into exactly one of `erratum-editorial`, `erratum-technical`, `held-for-next-cut`, `redesign` |
 | **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) | An issue. The answer goes on the issue, in public |
 | **Make a structural decision** — the data model, the versioning policy, the process itself | [`adr/`](../../adr), starting from [`template.md`](../../adr/template.md) | A PR adding the ADR, including the options considered and rejected |

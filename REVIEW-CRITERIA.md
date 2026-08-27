@@ -88,13 +88,28 @@ Two consequences worth knowing before they surprise you:
 
 ## Who decides
 
-Publication decisions are made by people, never by a classifier or a language model. There are two
-paths, and the difference is prior human verification, not automation: an organization a reviewer
-has verified publishes inside its own namespace without a second review, recorded as
-`verified_publisher_namespace`
-(`packages/api/src/modules/services/opportunities/opportunity-write.service.ts`); everything else
-waits in a queue a person decides. Duplicate detection flags a pair and never rejects one. The same
-content criteria apply on both paths, and the same revocation applies when they are not met.
+Publication decisions are made by people, never by a classifier or a language model. What differs
+between the two paths is *when* the person decided — before the fact, by granting an authority, or
+after it, by reading the submission. The same content criteria apply on both, and the same
+revocation applies when they are not met. Duplicate detection flags a pair and never rejects one.
+
+Skipping the queue takes **two** things at once
+(`canPublishImmediately`, `packages/api/src/modules/shared/capabilities.ts`), and either one
+missing means the entry lands pending:
+
+1. **An account authority over the namespace** — a **verified membership** on the organization,
+   which is the ordinary path and is audited with the reason `verified_publisher_namespace`
+   (`packages/api/src/modules/services/opportunities/opportunity-write.service.ts`); **or** an
+   admin-granted `directCreate`, which publishes into any namespace without a membership, is
+   independent of the reviewer and admin roles, and is itself audited as `grant_direct_create`.
+2. **A credential that carries publishing power** — a signed-in **session**, or an **API key with
+   the `publish` scope**.
+
+The second condition catches people by surprise, so it is worth saying flatly: **a verified member
+of an organization, writing with a `write`-only API key, still lands in the queue.** That is
+deliberate. An integration that only files submissions should not be able to publish them, and a
+leaked key should be the smaller problem. The full credential model is
+[`packages/api/docs/auth.md`](./packages/api/docs/auth.md).
 
 Two people can decide one entry:
 
@@ -119,8 +134,20 @@ On the **Hub reviewer** route the API accepts `reason` and does not require it. 
 state of the code, not an endorsement: a decision worth making is worth explaining, and a null
 reason is exactly what an appeal will ask about.
 
-Every decision is audited either way, and the trail for any entry is public at
-`GET /v1/opportunities/{id}/audit`.
+Every decision is audited either way, but "audited" and "public" are not the same word, and the
+difference matters most in exactly the case you care about:
+
+- **Once an entry is approved and listed**, its trail is readable by anyone at
+  `GET /v1/opportunities/{id}/audit` — no credential needed. Public callers see the changed field
+  *names* and a coarse actor; the entry's submitter, its publisher and reviewers additionally see
+  the full `patch`, which is where a written reason lives.
+- **While an entry is pending or rejected**, that route answers `404` to anonymous and unrelated
+  callers, matching what the detail route says about the same entry. Only its submitter, its
+  publisher and reviewers can read it at all.
+
+So a rejection's reasoning is not automatically world-readable — it is readable by the person it
+was addressed to, which is the point. If it needs to be public, the route for that is an appeal
+issue, and putting the reasoning on the record in public is what appeals are for.
 
 ---
 
