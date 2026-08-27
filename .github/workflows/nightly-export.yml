@@ -32,6 +32,15 @@ name: Nightly open-data export
 # compliance checker, also with `contents: read`, because that checker needs ajv and the built
 # workspace validator and therefore must not sit in the publishing job either.
 #
+# HOW THE PUBLISH JOB GETS PAST THE MAIN RULESET. `main` requires a pull request and the `build`
+# status check, and the job's own GITHUB_TOKEN is not — and cannot be made — a bypass actor for
+# either. The job therefore pushes over SSH with a write DEPLOY KEY that the ruleset lists as a
+# bypass actor. The private half lives in the `nightly-export-publisher` environment, whose branch
+# policy admits only `main`, so a workflow on any other branch cannot even request it; the job
+# still holds it only as an ssh key in `core.sshCommand`, never in `.git/config` or the environment,
+# and only in the job that runs no third-party code. Rotating it is: new key pair, replace the
+# deploy key (Settings → Deploy keys → "nightly-export publisher") and the environment secret.
+#
 # Every action is pinned to a full commit SHA, with the release it belongs to in the trailing
 # comment. This is the one workflow in the repository that can WRITE to the default branch, so
 # "which code ran" has to be a fact rather than whatever a mutable tag pointed at last night: a
@@ -131,18 +140,25 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The environment is where the deploy key lives, and its branch policy (main only) is what keeps
+    # a workflow run from any other ref from ever being handed it.
+    environment: nightly-export-publisher
     permissions:
-      contents: write
+      contents: read
 
     steps:
       # Full history: the push below rebases onto whatever main has become, which a shallow clone
       # cannot do. The checkout keeps its credential here — that is what this job is FOR, and the
       # reason the old single-job version had to refuse one (a credential in `.git/config` that
-      # `pnpm install` could reach) does not exist in a job that never installs anything.
+      # `pnpm install` could reach) does not exist in a job that never installs anything. With
+      # `ssh-key` the credential is the deploy key: checkout points `origin` at the SSH URL and
+      # wires the key through `core.sshCommand`, so the push below is made by the deploy key — the
+      # ruleset's bypass actor — and not by the job token.
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          ssh-key: ${{ secrets.NIGHTLY_EXPORT_DEPLOY_KEY }}
 
       - name: Download the snapshot
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -209,11 +225,9 @@ jobs:
           cp "$SNAPSHOT"/* exports/
           ls -l exports
 
-      # The token is supplied here, to this step. The runner masks it in logs, so a git error
-      # quoting the remote URL cannot print it.
+      # The push goes through `origin`, which the checkout above pointed at the SSH remote with the
+      # deploy key. Nothing here names a token.
       - name: Commit and push to main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -227,22 +241,25 @@ jobs:
 
           git commit -m "data(exports): nightly snapshot $(date -u +%F)"
 
-          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
           # A human merge landing between this job's checkout and its push must not fail the job.
           # The commit is data only, so it rebases cleanly onto anything that is not itself an
           # `exports/` change — and nothing else writes that directory. A conflict therefore means
           # something genuinely unexpected touched the same files, which is worth stopping for
           # rather than resolving blind.
           #
-          # The fetch names a URL rather than the `origin` remote, so it updates FETCH_HEAD instead
-          # of a remote-tracking ref — which is what the rebase targets.
+          # Only a NON-FAST-FORWARD rejection is worth a retry. A ruleset rejection (GH013) means
+          # the deploy key is no longer a bypass actor for main, and rebasing five times against
+          # that only delays the same failure — so it stops on the first one and says why.
           for attempt in 1 2 3 4 5; do
-            if git push "$remote" HEAD:main; then
+            if git push origin HEAD:main 2>&1 | tee "$RUNNER_TEMP/push.log"; then
               exit 0
             fi
+            if grep -q "GH013" "$RUNNER_TEMP/push.log"; then
+              echo "::error::main rejected the push by repository rule — the deploy key must be listed as a bypass actor of the main ruleset"
+              exit 1
+            fi
             echo "push rejected (attempt ${attempt}/5) — rebasing onto the current main"
-            git fetch "$remote" main
+            git fetch origin main
             git rebase FETCH_HEAD || {
               git rebase --abort || true
               echo "rebase conflicted: something else changed exports/ — not resolving it here"
