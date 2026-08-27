@@ -16,6 +16,8 @@
     "check:skill": "node scripts/check-skill.mjs",
     "check:m2": "node scripts/check-m2.mjs",
     "check:m3": "node scripts/check-m3.mjs",
+    "check:m4": "node scripts/check-m4.mjs",
+    "accept:m4": "node scripts/accept-m4.mjs",
     "frontend:clean-room": "node scripts/frontend-clean-room.mjs",
     "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",
     "build": "pnpm -r --if-present build",

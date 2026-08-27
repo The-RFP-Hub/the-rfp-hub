@@ -152,6 +152,31 @@ write to, and a sign-off tool needing a standing publisher credential in reposit
 a worse thing to have than a tool somebody runs. See
 [`scripts/m3-compliance/README.md`](./scripts/m3-compliance/README.md).
 
+`scripts/check-m4.mjs` covers governance, the reference frontend, the MCP server, the agent skill,
+and the handoff docs:
+
+```bash
+pnpm check:m4 --site https://ethrfps.app --api https://api.ethrfps.app --browser
+```
+
+It is **read-only**, same as `check-m2` — the one case that could look like a write
+(`submit_opportunity`'s fail-closed behaviour) runs against a local recording server this checker
+starts itself, never against `--api` — so it needs no `--allow-production` and its defaults already
+point at production. Pass `--browser` for the checks that need a rendered page (search/filter/
+pagination, `/publishers`, the three responsive viewports); without it they report a named WARN
+rather than a silent pass. See [`scripts/m4-compliance/README.md`](./scripts/m4-compliance/README.md).
+
+`scripts/accept-m4.mjs` is the write-acceptance counterpart, staging only: it drives the real MCP
+`submit_opportunity` interlock end to end — preview, an out-of-band `rfphub-mcp approve`, commit —
+and tears the fixture down afterwards:
+
+```bash
+RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... pnpm accept:m4 --api https://api.staging.example.org
+```
+
+Same refusal shape as `check-m3`: no run without both credentials, and no production target without
+`--allow-production`, which prints a red warning when used.
+
 ## Open data
 
 The dataset is published to [`exports/`](./exports) on the default branch by a scheduled workflow

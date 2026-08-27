@@ -339,3 +339,39 @@ jobs:
         run: |
           npm ci
           npm run typecheck
+
+      # `packages/mcp` (the M4 MCP server) needs NO separate build/typecheck/test step here: it is
+      # a normal workspace member, so `pnpm build` / `pnpm typecheck` above (both `pnpm -r
+      # --if-present`) and `pnpm test` (root `vitest run`, which walks every workspace package not
+      # explicitly excluded — see vitest.config.ts) already reach it once it exists. Adding a
+      # `pnpm --filter @the-rfp-hub/mcp ...` step here before that package lands would fail this
+      # job outright (`pnpm --filter` errors when nothing matches), which is exactly backwards for
+      # a checker meant to keep passing while another stream builds the package concurrently.
+
+  # Read-only, and deliberately independent of the job above: the doc link check needs no Postgres,
+  # no seed, no build — `scripts/check-m4.mjs`'s docs check (`m4-compliance/checks/docs.mjs`) has
+  # zero runtime dependencies beyond Node itself (see scripts/m2-compliance/http.mjs, its only
+  # import) plus `bash`/`jq`, both preinstalled on this runner image, for the `safe-read` blocks'
+  # own `curl | jq` pipelines. `--offline` skips every network request the check would otherwise
+  # make (absolute-link 2xx/3xx, executing `safe-read` blocks), which is the only way to run it in
+  # CI at all: a GitHub Actions runner has no staging deployment to talk to.
+  #
+  # `--only docs`, NOT `--skip` five times: `--skip` still REGISTERS the other five criteria as
+  # skipped, which makes the report `incomplete` and the exit code 1 even when the one criterion
+  # this job is actually responsible for passes cleanly. `--only` excludes them from the run
+  # entirely, so this job is green exactly when the docs criterion is green.
+  docs-links:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Check the handoff docs (existence, links, sh-block markers) — offline
+        run: node scripts/check-m4.mjs --only docs --offline --json -
