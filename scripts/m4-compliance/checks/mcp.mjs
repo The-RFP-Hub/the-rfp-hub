@@ -60,8 +60,12 @@ function extractPayload(response) {
   return result.content;
 }
 
-async function spawnClient(resolved, env, ctx) {
-  const client = new McpStdioClient(resolved.command, resolved.args, { cwd: ctx.repoRoot, env });
+async function spawnClient(resolved, env, ctx, unset = []) {
+  const client = new McpStdioClient(resolved.command, resolved.args, {
+    cwd: ctx.repoRoot,
+    env,
+    unset,
+  });
   client.start();
   return client;
 }
@@ -82,9 +86,15 @@ export async function checkMcp(report, ctx) {
   c.info("MCP server under test", resolved.describe);
 
   // ── case A: default env — read-only tools only ──────────────────────────
+  // `unset` guarantees this case is actually tested with no credential and no submit flag
+  // present — not merely "not set by this call", which could still see them if the checker's own
+  // process happens to have inherited them from a developer's shell.
   let readClient;
   try {
-    readClient = await spawnClient(resolved, { RFPHUB_API_BASE: ctx.api }, ctx);
+    readClient = await spawnClient(resolved, { RFPHUB_API_BASE: ctx.api }, ctx, [
+      "RFPHUB_API_KEY",
+      "RFPHUB_MCP_ENABLE_SUBMIT",
+    ]);
     const listResponse = await readClient.request("tools/list", {}, { timeoutMs: ctx.timeoutMs });
     if (listResponse.error) {
       c.fail("tools/list succeeds", `JSON-RPC error: ${JSON.stringify(listResponse.error)}`);
@@ -203,6 +213,17 @@ export async function checkMcp(report, ctx) {
         "tools/list includes submit_opportunity with RFPHUB_MCP_ENABLE_SUBMIT=1",
         names.join(", "),
         `submit_opportunity missing even with the env set: [${names.join(", ")}]`,
+      );
+
+      // The synthetic key (`rfph_test_notreal`) is also a "credential-shaped" string, so this
+      // process's tools/list is exactly the surface most likely to leak one — e.g. into a tool's
+      // description if a future change ever interpolated config into it.
+      const listLeak = findCredentialLeak(listResponse);
+      c.expect(
+        !listLeak,
+        "no rfph_ substring in tools/list output (submit-enabled process)",
+        "clean",
+        listLeak ? `found "${listLeak.match}" at ${listLeak.path}` : "",
       );
     }
 

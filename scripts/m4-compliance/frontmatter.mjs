@@ -150,10 +150,24 @@ export function validateFrontmatter(fields, { dirName } = {}) {
     );
   }
 
-  if (fields.metadata && typeof fields.metadata === "object") {
-    for (const [key, value] of Object.entries(fields.metadata)) {
-      if (typeof value !== "string") {
-        errors.push(`metadata.${key} must be a string, got ${typeof value}`);
+  if ("metadata" in fields) {
+    // `parseFrontmatter` can hand back a plain scalar (a string) when `metadata:` was written as a
+    // top-level scalar rather than a nested mapping — `typeof value === "object"` alone would miss
+    // that (a string fails it, correctly, but silently skipping the whole block is wrong: it is
+    // still an invalid `metadata`, and staying silent about it is worse than no check at all). An
+    // array passes `typeof === "object"` in JS, so it needs its own explicit rejection too — the
+    // spec's `metadata` is a mapping of string keys to string values, not a list.
+    if (fields.metadata === null || typeof fields.metadata !== "object") {
+      errors.push(
+        `metadata must be a mapping of string keys to string values, got ${typeof fields.metadata}`,
+      );
+    } else if (Array.isArray(fields.metadata)) {
+      errors.push("metadata must be a mapping of string keys to string values, got an array");
+    } else {
+      for (const [key, value] of Object.entries(fields.metadata)) {
+        if (typeof value !== "string") {
+          errors.push(`metadata.${key} must be a string, got ${typeof value}`);
+        }
       }
     }
   }

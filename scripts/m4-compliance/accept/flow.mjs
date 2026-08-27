@@ -8,21 +8,70 @@
  * never does this — it only proves phase 1 writes nothing, against a local mock. This is the tool
  * that proves the whole cycle actually lands an entry.
  *
- * WHY THE APPROVAL SUBPROCESS GETS "y\n" ON STDIN. `rfphub-mcp approve <id>` is specified to prompt
- * interactively in the operator's terminal. An acceptance run has no operator; it stands in for one
- * by piping a confirming answer to the subprocess's stdin, which is the same trust boundary the
- * plan itself names as NOT isolated from an agent that already has shell access under the same
- * user (§3.4 "what this interlock does NOT guarantee"). That is exactly why this driver lives in
- * `accept-m4.mjs`, a tool a human runs deliberately against staging, and not in the read-only
- * `check-m4.mjs` that defaults to production.
+ * WHY THE APPROVAL SUBPROCESS GETS "approve\n" ON STDIN. `rfphub-mcp approve <id>` (`packages/mcp/
+ * src/cli.ts`) prompts `Type \`approve\` to authorize, anything else to cancel: ` and compares the
+ * TRIMMED answer against the literal string `"approve"` — nothing else counts, including "y". An
+ * acceptance run has no operator; it stands in for one by writing that exact literal to the
+ * subprocess's stdin, which is the same trust boundary the plan itself names as NOT isolated from
+ * an agent that already has shell access under the same user (README "What this does — and what it
+ * does not"). That is exactly why this driver lives in `accept-m4.mjs`, a tool a human runs
+ * deliberately against staging, and not in the read-only `check-m4.mjs` that defaults to
+ * production. `execFile`'s callback/promise form has no `input` option (that exists only on the
+ * `*Sync` variants), so this spawns the subprocess directly and writes to `child.stdin` itself.
  */
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import { callJson } from "../../m3-compliance/client.mjs";
 import { resolveCommand } from "../checks/mcp.mjs";
 import { McpStdioClient } from "../mcp-client.mjs";
 
-const execFileAsync = promisify(execFile);
+/**
+ * Run `rfphub-mcp approve <id>`, answering its confirmation prompt with the literal it requires.
+ * Rejects with an Error carrying `.stdout`/`.stderr` on a non-zero exit, a spawn error, or a
+ * timeout — the caller decides what a failure here means for the overall cycle.
+ */
+function runApprove(command, args, { cwd, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill();
+      reject(Object.assign(new Error(`timed out after ${timeoutMs}ms`), { stdout, stderr }));
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(Object.assign(err, { stdout, stderr }));
+    });
+    child.on("exit", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(Object.assign(new Error(`exited with code ${code}`), { stdout, stderr }));
+      }
+    });
+
+    // The exact, trimmed literal `approve()` in cli.ts requires — anything else, "y" included, is
+    // read as a cancellation.
+    child.stdin.write("approve\n");
+    child.stdin.end();
+  });
+}
 
 function extractPayload(response) {
   const result = response?.result;
@@ -62,10 +111,29 @@ function fixtureDocument(run) {
  * Runs the full cycle. Returns `{ approvalId, opportunityId, submitResult }` on success; throws
  * with a message naming exactly which phase failed otherwise. The caller (accept-m4.mjs) is
  * responsible for reporting into a Report criterion and for calling `teardown` afterwards.
+ *
+ * MUTATES `state` as it goes, and does so BEFORE each network call rather than after, on purpose:
+ *
+ *   - `state.candidateOpportunityId` is set from the document's own declared `id` before phase 1
+ *     ever runs — the document CHOOSES its id, so this is known with certainty from the start, not
+ *     derived from a response that might never arrive.
+ *   - `state.commitAttempted` is set immediately before the phase-3 `tools/call`, which is the one
+ *     request whose failure is AMBIGUOUS: a `POST` that this process never got a reply for may
+ *     still have reached the API (see submit.ts's own "never restore a claimed approval" rule for
+ *     why). Phase 1 and phase 2 have no such ambiguity — phase 1 is specified not to write, and
+ *     phase 2 is a local file operation — so a throw before `commitAttempted` is set means nothing
+ *     was created.
+ *
+ * The caller (`accept-m4.mjs`) reads `state.candidateOpportunityId` and `state.commitAttempted`
+ * from a catch block to decide whether an ambiguous outcome needs verifying and tearing down even
+ * though this function threw.
  */
 export async function runSubmissionCycle(ctx, state) {
   const resolved = resolveCommand(ctx);
   state.serverDescribe = resolved.describe;
+
+  const document = fixtureDocument(state.run);
+  state.candidateOpportunityId = document.id;
 
   const client = new McpStdioClient(resolved.command, resolved.args, {
     cwd: ctx.repoRoot,
@@ -78,9 +146,7 @@ export async function runSubmissionCycle(ctx, state) {
   client.start();
 
   try {
-    const document = fixtureDocument(state.run);
-
-    // ── phase 1: preview ──────────────────────────────────────────────────
+    // ── phase 1: preview (specified not to write) ───────────────────────────
     const previewResponse = await client.request(
       "tools/call",
       { name: "submit_opportunity", arguments: { document } },
@@ -105,14 +171,13 @@ export async function runSubmissionCycle(ctx, state) {
     state.approvalId = approvalId;
     state.previewPayload = preview;
 
-    // ── phase 2: approval, in a SEPARATE process, "y\n" standing in for the operator ──────────
+    // ── phase 2: approval, in a SEPARATE process (a local file operation — not ambiguous) ──────
     const approveArgs = resolveCommand(ctx, ["approve", approvalId]);
     let approveResult;
     try {
-      approveResult = await execFileAsync(approveArgs.command, approveArgs.args, {
+      approveResult = await runApprove(approveArgs.command, approveArgs.args, {
         cwd: ctx.repoRoot,
-        timeout: ctx.approveTimeoutMs,
-        input: "y\n",
+        timeoutMs: ctx.approveTimeoutMs,
       });
     } catch (err) {
       throw new Error(
@@ -121,7 +186,8 @@ export async function runSubmissionCycle(ctx, state) {
     }
     state.approveOutput = `${approveResult.stdout}${approveResult.stderr ?? ""}`;
 
-    // ── phase 3: commit ───────────────────────────────────────────────────
+    // ── phase 3: commit — from here, a throw means AMBIGUOUS, not "nothing happened" ───────────
+    state.commitAttempted = true;
     const commitResponse = await client.request(
       "tools/call",
       { name: "submit_opportunity", arguments: { document, approvalId } },
@@ -133,12 +199,10 @@ export async function runSubmissionCycle(ctx, state) {
       );
     }
     const commit = extractPayload(commitResponse);
-    const opportunityId = commit?.id ?? commit?.opportunity?.id;
-    if (!opportunityId) {
-      throw new Error(
-        `phase 3 (commit) did not return an opportunity id: ${JSON.stringify(commit).slice(0, 500)}`,
-      );
-    }
+    // `commit.id` is always present per the real submittedSchema (packages/mcp/src/tools/
+    // submit.ts), but the candidate is a sound fallback either way — it is the id the document
+    // itself declared, and the API does not get to choose a different one for a client-supplied id.
+    const opportunityId = commit?.id ?? state.candidateOpportunityId;
     state.opportunityId = opportunityId;
     state.commitPayload = commit;
 

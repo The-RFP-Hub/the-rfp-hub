@@ -21,6 +21,44 @@ import { MARKERS, shellBlocks } from "../markers.mjs";
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * The preamble every `safe-read` block runs after — and the two stronger designs that were tried
+ * first, against the REAL docs (`brunodmsi/m4-handoff-docs`), and reverted because each one broke
+ * a legitimate block that is actually in `docs/api-integration.md` today. This is not a
+ * hypothetical concern; every case below was executed against production, not assumed.
+ *
+ *   1. `bash -o pipefail` + `set -euo pipefail`. Broke
+ *      `curl -s "$API/v1/feeds/opportunities.atom" | head -40`: `head` closing its end of the pipe
+ *      once it has its 40 lines makes curl's own write fail (curl ignores SIGPIPE and converts it
+ *      to its own error code rather than dying by signal), and `pipefail` cannot tell that apart
+ *      from a real network failure — it inspects every stage's exit code, not just the one that
+ *      mattered here.
+ *   2. Dropping `pipefail`, but shimming BOTH `curl() { command curl -f "$@"; }` (so an HTTP error
+ *      makes curl itself fail and discard the body) AND `jq() { command jq -e "$@"; }` (so jq
+ *      exits non-zero when there was nothing left to parse — verified: exit `4` on empty stdin).
+ *      This closes the real gap (`jq '.'` on empty stdin exits **0**, so `curl | jq` on a 404
+ *      silently "succeeds" by pretty-printing the API's error body) — but it ALSO broke
+ *      `docs/publisher-onboarding.md`'s `curl ... | jq '.items[] | select(.slug=="example-
+ *      foundation")'`: that example slug does not exist in production, `select` legitimately
+ *      matches nothing, jq produces zero output for a perfectly healthy response, and `-e` cannot
+ *      tell "upstream failed" apart from "my own filter matched nothing" — both are just "no
+ *      output" to it. The doc's own author did not write `-e` there; forcing it on from outside
+ *      second-guesses an intentional, correct use of `select`.
+ *
+ * What ships: `curl` alone is shadowed with `-f`, under plain `set -eu`, no `pipefail`, no `jq`
+ * shim. This is a real, narrower improvement over doing nothing — a BARE (non-piped) failing
+ * `curl -f ... -o file` is the last command on its line, so `set -e` catches it directly, which
+ * matters for exactly the block that motivated this (`.../export/opportunities.json -o
+ * dataset.json`) — while every piped block is unaffected, because without `pipefail` only the
+ * pipe's LAST command's exit status is examined, and `-f` does not change what `head` or `jq`
+ * themselves return. The one gap this leaves open, stated plainly: a `curl -f ... | jq` (no `-e`)
+ * whose request fails still "succeeds", because plain `jq` on the empty body `-f` leaves behind
+ * also exits 0. Closing that gap without reintroducing case 2's regression would need per-line
+ * `PIPESTATUS` instrumentation of the doc's own text, which this checker does not do — it runs
+ * documentation as written, it does not rewrite it.
+ */
+export const SAFE_READ_PREAMBLE = 'curl() { command curl -f "$@"; }\nset -eu\n';
+
 export const HANDOFF_DOCS = [
   "docs/deployment.md",
   "docs/api-integration.md",
@@ -112,7 +150,7 @@ export async function checkDocs(report, ctx) {
       if (!block.marker) {
         c.fail(
           `${relPath}:${block.line}: sh block carries a marker`,
-          `no ${MARKERS.join("/")} marker found on the fence's info string or the preceding line — see scripts/m4-compliance/README.md for the convention`,
+          `no ${MARKERS.join("/")} marker found as the second word of the fence's info string (e.g. \`\`\`sh safe-read) — see scripts/m4-compliance/README.md for the convention`,
         );
         continue;
       }
@@ -123,10 +161,11 @@ export async function checkDocs(report, ctx) {
           continue;
         }
         try {
-          await execFileAsync("/bin/sh", ["-c", block.source], {
+          await execFileAsync("bash", ["-c", SAFE_READ_PREAMBLE + block.source], {
             cwd: ctx.repoRoot,
             timeout: ctx.timeoutMs,
-            env: process.env,
+            // `docs/**` blocks reference the API as `$API`, never a literal URL.
+            env: { ...process.env, API: ctx.api },
           });
           c.pass(
             `${relPath}:${block.line}: safe-read block executes successfully`,

@@ -127,6 +127,35 @@ describe("validateFrontmatter", () => {
     expect(errors.some((e) => e.includes("metadata.count must be a string"))).toBe(true);
   });
 
+  // rev.: an earlier version of this validator only checked object-typed values, which let a
+  // scalar `metadata` (a string, from `metadata: foo` written without a nested mapping) skip
+  // validation entirely, and let an array `metadata` pass because `typeof [] === "object"`.
+  it("rejects a string metadata (a scalar, not a mapping)", () => {
+    const { ok, errors } = validateFrontmatter(
+      { name: "x", description: "d", metadata: "0.1.0" },
+      {},
+    );
+    expect(ok).toBe(false);
+    expect(errors.some((e) => e.includes("metadata must be a mapping"))).toBe(true);
+  });
+
+  it("rejects an array metadata", () => {
+    const { ok, errors } = validateFrontmatter(
+      { name: "x", description: "d", metadata: ["0.1.0", "discovery"] },
+      {},
+    );
+    expect(ok).toBe(false);
+    expect(
+      errors.some((e) => e.includes("metadata must be a mapping") && e.includes("array")),
+    ).toBe(true);
+  });
+
+  it("rejects a null metadata", () => {
+    const { ok, errors } = validateFrontmatter({ name: "x", description: "d", metadata: null }, {});
+    expect(ok).toBe(false);
+    expect(errors.some((e) => e.includes("metadata must be a mapping"))).toBe(true);
+  });
+
   it("rejects an unrecognized top-level field", () => {
     const { ok, errors } = validateFrontmatter(
       { name: "x", description: "d", author: "someone" },

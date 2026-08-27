@@ -6,6 +6,15 @@
  * credential handling here — every default points at the live production deployment on purpose,
  * because reading it costs the deployment nothing and that is the whole value of a read-only
  * checker (same reasoning as `check-m2.mjs`).
+ *
+ * `--only` vs `--skip`: THEY MEAN DIFFERENT THINGS AND ARE NOT INTERCHANGEABLE. `--skip` still
+ * REGISTERS the criterion — as a `skip` outcome — which is what makes `Report.result` correctly
+ * report `incomplete` (and exit 1) for a run that only looked at part of the contract. `--only`
+ * does not register the excluded criteria AT ALL, so a run scoped to one check that passes is a
+ * clean PASS, exit 0. That distinction is exactly what the `docs-links` CI job needs: it runs only
+ * the `docs` check, has no deployment to hold the other five against, and must not fail on
+ * "incomplete" for work outside its own job's scope. The two flags are refused together, since
+ * combining "only run X" with "explicitly skip Y" has no single sensible meaning.
  */
 
 const CHECK_IDS = ["governance", "publishers", "frontend", "mcp", "skill", "docs"];
@@ -19,6 +28,7 @@ export function parseArgs(argv) {
     repoRoot: process.cwd(),
     json: undefined,
     skip: new Set(),
+    only: new Set(),
     browser: false,
     offline: false,
     mcpSpec: undefined,
@@ -68,6 +78,14 @@ export function parseArgs(argv) {
         opts.skip.add(value);
         break;
       }
+      case "--only": {
+        const value = next();
+        if (!CHECK_IDS.includes(value)) {
+          throw new Error(`--only must be one of ${CHECK_IDS.join(", ")}, got "${value}"`);
+        }
+        opts.only.add(value);
+        break;
+      }
       case "--browser":
         opts.browser = true;
         break;
@@ -91,6 +109,10 @@ export function parseArgs(argv) {
           NUMERIC.has(arg) ? `${arg} needs a value` : `unknown argument "${arg}" (try --help)`,
         );
     }
+  }
+
+  if (opts.only.size > 0 && opts.skip.size > 0) {
+    throw new Error("--only and --skip cannot be combined — see the module docstring for why");
   }
 
   return opts;

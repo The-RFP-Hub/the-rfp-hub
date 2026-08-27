@@ -134,7 +134,36 @@ async function main() {
       `reviewStatus=${entry.reviewStatus}, expected "pending"`,
     );
   } catch (err) {
-    c.fail("preview → approve → commit completes", err.message);
+    // `state.commitAttempted` is set by runSubmissionCycle immediately before the phase-3 `POST` —
+    // once that is true, a throw here does NOT mean "nothing was created". The request may have
+    // reached the API despite this process never seeing the reply (timeout, connection reset), and
+    // `state.candidateOpportunityId` (the document's own declared id, known since before phase 1)
+    // is exactly what lets this recover: check for it, and if it landed, still tear it down rather
+    // than leaving an unaccounted-for entry in the deployment. Either way this run is NOT a pass —
+    // an ambiguous outcome is not a demonstrated one.
+    if (state.commitAttempted && state.candidateOpportunityId) {
+      c.fail(
+        "preview → approve → commit completes",
+        `${err.message} — the outcome is AMBIGUOUS (the POST may have reached the API even though this call did not return); checking /v1/me/opportunities for the candidate id ${state.candidateOpportunityId}`,
+      );
+      try {
+        const entry = await verifyLandedPending(ctx, state.candidateOpportunityId);
+        // It landed despite the error above: record the id so the teardown block below tears it
+        // down, and say plainly that it was found this way.
+        state.opportunityId = state.candidateOpportunityId;
+        c.warn(
+          "ambiguous commit actually landed",
+          `${state.candidateOpportunityId} is present with reviewStatus=${entry.reviewStatus} despite the error above — tearing it down`,
+        );
+      } catch (verifyErr) {
+        c.info(
+          "ambiguous commit verification",
+          `${state.candidateOpportunityId} not found via /v1/me/opportunities either (${verifyErr.message}) — most likely the write genuinely did not land, but this is not certain`,
+        );
+      }
+    } else {
+      c.fail("preview → approve → commit completes", err.message);
+    }
   } finally {
     if (opts.keepFixture) {
       c.skip(
@@ -148,7 +177,10 @@ async function main() {
         await teardown(ctx, state.opportunityId);
         c.pass("teardown", `${state.opportunityId} rejected and unlisted`);
       } catch (err) {
-        c.warn("teardown", err.message);
+        // A teardown failure leaves a real (if prefixed) entry behind in the deployment this tool
+        // just wrote to — that is a FAILED run, not a warning on an otherwise-green one. Silently
+        // downgrading it would let `accept-m4` exit 0 while a fixture sits in staging unreviewed.
+        c.fail("teardown", err.message);
       }
     }
   }

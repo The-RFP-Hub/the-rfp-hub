@@ -72,36 +72,40 @@ Controls what `mcp.mjs` spawns:
 
 ## The `sh`-block marker convention (`docs/**`)
 
-This checker is the first consumer of the marker rule in the M4 plan (§3.6), so it also defines the
-syntax. Every fenced ` ```sh ` (or `shell`/`bash`/`console`) block in `docs/**` must carry one of:
+Defined by the docs stream itself (`docs/README.md` on `brunodmsi/m4-handoff-docs`), not by this
+checker — an earlier revision of this file spoke for a convention it hadn't seen yet and got the
+syntax wrong; this is the corrected version, read against the real doc. Every fenced ` ```sh ` (or
+`bash`) block in `docs/**` carries the marker as **the second word of the info string**, and that is
+the only form there is — no preceding-comment alternative:
+
+~~~
+```sh safe-read
+curl -s "$API/v1/health"
+```
+~~~
 
 - **`safe-read`** — a `GET` against a public endpoint, no credential. The **only** kind this
   checker ever executes, and it must succeed.
 - **`staging-write`** — mints a key, requests an OTP, submits/reviews/revokes. Never executed.
 - **`no-run`** — a deployment or infrastructure mutation. Never executed, ever.
 
-Two ways to mark a block:
+`docs/**` blocks reference the API as `$API` (never a literal URL), so a `safe-read` block runs with
+`API=<--api>` injected into the child's environment, under plain `set -eu` with `curl` shadowed as
+`curl() { command curl -f "$@"; }`. **Not** `pipefail`, and **not** a `jq` shim either — both were
+tried against the real docs and each broke a legitimate block that is actually there:
+`pipefail` failed a `curl ... | head -40` (head closing the pipe early makes curl's own write
+"fail"), and shimming `jq` with `-e` on top of `curl -f` failed a `curl ... | jq 'select(...)'`
+whose example organization legitimately doesn't exist in production — `-e` cannot tell "upstream
+failed" apart from "my own filter matched nothing". What ships catches a BARE failing
+`curl -f ... -o file` (the doc's export block) via plain `set -e`, and leaves one gap open
+honestly: a `curl -f ... | jq` (no `-e`) whose request fails still exits 0, because unmodified `jq`
+on an empty body is silent success. See the `SAFE_READ_PREAMBLE` docstring in `checks/docs.mjs` for
+all three designs and the real doc content each was verified against.
 
-~~~
-```sh safe-read
-curl -s https://api.example.org/v1/health
-```
-~~~
-
-or, when the fence itself can't carry a second token, an HTML comment on its own line immediately
-before it (one blank line is tolerated):
-
-~~~
-<!-- marker: staging-write -->
-```sh
-curl -X POST https://api.example.org/v1/keys ...
-```
-~~~
-
-A `sh` block with **neither** is a hard failure: an unmarked block is one this checker cannot tell
-is safe to run, and treating "unmarked" as "don't run" silently would let a real `safe-read` command
-go unexercised without anyone noticing. See `markers.mjs` (unit tested in `test/markers.test.mjs`)
-for the parser.
+A `sh`/`bash` block with **no marker, or an unrecognized one,** is a hard failure: an unmarked block
+is one this checker cannot tell is safe to run, and treating "unmarked" as "don't run" silently
+would let a real `safe-read` command go unexercised without anyone noticing. See `markers.mjs`
+(unit tested in `test/markers.test.mjs`) for the parser.
 
 ## What SKIP means here, and why it is never a pass
 

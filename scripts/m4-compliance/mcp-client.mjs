@@ -26,6 +26,20 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
+/**
+ * The child's environment: `base` (normally `process.env`) merged with `env`, then every name in
+ * `unset` deleted — in that order, so `unset` always wins even over an explicit `env` entry.
+ * Pulled out of `McpStdioClient.start()` as a pure function so the guarantee behind item 7 (the
+ * read-only MCP case must not merely "not set" `RFPHUB_API_KEY`/`RFPHUB_MCP_ENABLE_SUBMIT`, but
+ * actively strip them from whatever the checker's own process inherited) is unit-testable without
+ * spawning a process.
+ */
+export function buildChildEnv(base, env = {}, unset = []) {
+  const merged = { ...base, ...env };
+  for (const key of unset) delete merged[key];
+  return merged;
+}
+
 export class McpStdioClient {
   #child;
   #rl;
@@ -35,18 +49,28 @@ export class McpStdioClient {
   #closed = false;
   #exitInfo = null;
 
-  constructor(command, args = [], { env = {}, cwd } = {}) {
+  /**
+   * `unset`: environment variable NAMES to remove from the child's environment even if this
+   * checker's own process happens to have them set (a developer's shell exporting
+   * `RFPHUB_API_KEY` for unrelated reasons, say). Applied AFTER merging `process.env` with `env`,
+   * so it always wins — the read-only case in `checks/mcp.mjs` uses this to guarantee the
+   * "default env, read-only tools only" case is actually tested with no credential and no submit
+   * flag present, rather than merely not-explicitly-setting them and hoping the ambient
+   * environment agrees.
+   */
+  constructor(command, args = [], { env = {}, cwd, unset = [] } = {}) {
     this.command = command;
     this.args = args;
     this.env = env;
     this.cwd = cwd;
+    this.unset = unset;
   }
 
   /** Spawn the child process and start reading its stdout. Does NOT send any request. */
   start() {
     this.#child = spawn(this.command, this.args, {
       cwd: this.cwd,
-      env: { ...process.env, ...this.env },
+      env: buildChildEnv(process.env, this.env, this.unset),
       stdio: ["pipe", "pipe", "pipe"],
     });
 

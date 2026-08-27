@@ -1,7 +1,7 @@
 /**
- * The `sh` block marker convention: this checker is the first consumer of it, so getting the
- * parser right against both forms (info-string and preceding-comment) matters as much as the
- * convention itself — see the module docstring in markers.mjs for the two forms.
+ * The `sh` block marker convention: the marker is the SECOND WORD OF THE INFO STRING and nothing
+ * else — confirmed against `docs/README.md` on the `m4-handoff-docs` branch, the stream that owns
+ * `docs/**`. This checker is the consumer of that convention, not the author of it.
  */
 import { describe, expect, it } from "vitest";
 import { MARKERS, parseMarkedBlocks, shellBlocks } from "../markers.mjs";
@@ -14,25 +14,26 @@ describe("parseMarkedBlocks", () => {
     expect(blocks[0].source).toBe("curl https://example.org");
   });
 
-  it("reads a marker from an HTML comment immediately preceding the fence", () => {
-    const md = "<!-- marker: staging-write -->\n```sh\ncurl -X POST https://example.org\n```\n";
-    const blocks = parseMarkedBlocks(md);
-    expect(blocks[0]).toMatchObject({ marker: "staging-write", line: 2 });
+  it("reads each of the three markers", () => {
+    for (const marker of MARKERS) {
+      const blocks = parseMarkedBlocks(`\`\`\`sh ${marker}\necho hi\n\`\`\`\n`);
+      expect(blocks[0].marker).toBe(marker);
+    }
   });
 
-  it("reads a preceding-comment marker across one blank line", () => {
-    const md = "<!-- marker: no-run -->\n\n```sh\naws ecs update-service\n```\n";
-    const blocks = parseMarkedBlocks(md);
-    expect(blocks[0].marker).toBe("no-run");
-  });
-
-  it("leaves marker null when neither form is present", () => {
+  it("leaves marker null when the info string has no second word", () => {
     const blocks = parseMarkedBlocks("```sh\necho hi\n```\n");
     expect(blocks[0].marker).toBeNull();
   });
 
-  it("ignores an info-string token that is not one of the three markers", () => {
+  it("leaves marker null for an info-string second word that is not one of the three markers", () => {
     const blocks = parseMarkedBlocks("```sh some-other-word\necho hi\n```\n");
+    expect(blocks[0].marker).toBeNull();
+  });
+
+  it("does NOT read a marker from a preceding HTML comment — there is no such form", () => {
+    const md = "<!-- marker: staging-write -->\n```sh\ncurl -X POST https://example.org\n```\n";
+    const blocks = parseMarkedBlocks(md);
     expect(blocks[0].marker).toBeNull();
   });
 
@@ -42,8 +43,7 @@ describe("parseMarkedBlocks", () => {
       "curl https://example.org/health",
       "```",
       "",
-      "<!-- marker: staging-write -->",
-      "```sh",
+      "```sh staging-write",
       "curl -X POST https://example.org/v1/keys",
       "```",
     ].join("\n");

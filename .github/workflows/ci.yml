@@ -346,9 +346,15 @@ jobs:
   # Read-only, and deliberately independent of the job above: the doc link check needs no Postgres,
   # no seed, no build — `scripts/check-m4.mjs`'s docs check (`m4-compliance/checks/docs.mjs`) has
   # zero runtime dependencies beyond Node itself (see scripts/m2-compliance/http.mjs, its only
-  # import). `--offline` skips every network request the check would otherwise make (absolute-link
-  # 2xx/3xx, executing `safe-read` blocks), which is the only way to run it in CI at all: a GitHub
-  # Actions runner has no staging deployment to talk to, and this job must not depend on one.
+  # import) plus `bash`/`jq`, both preinstalled on this runner image, for the `safe-read` blocks'
+  # own `curl | jq` pipelines. `--offline` skips every network request the check would otherwise
+  # make (absolute-link 2xx/3xx, executing `safe-read` blocks), which is the only way to run it in
+  # CI at all: a GitHub Actions runner has no staging deployment to talk to.
+  #
+  # `--only docs`, NOT `--skip` five times: `--skip` still REGISTERS the other five criteria as
+  # skipped, which makes the report `incomplete` and the exit code 1 even when the one criterion
+  # this job is actually responsible for passes cleanly. `--only` excludes them from the run
+  # entirely, so this job is green exactly when the docs criterion is green.
   docs-links:
     runs-on: ubuntu-latest
     permissions:
@@ -363,7 +369,4 @@ jobs:
           node-version: 22
 
       - name: Check the handoff docs (existence, links, sh-block markers) — offline
-        run: >-
-          node scripts/check-m4.mjs
-          --skip governance --skip publishers --skip frontend --skip mcp --skip skill
-          --offline --json -
+        run: node scripts/check-m4.mjs --only docs --offline --json -

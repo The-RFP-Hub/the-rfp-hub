@@ -1,38 +1,27 @@
 /**
  * Marker parsing for ` ```sh ` code blocks in the handoff docs — pure, no I/O.
  *
- * The M4 plan (§3.6) requires every `sh` block in `docs/**` to carry one of three markers, because
- * a checker that runs a doc's shell blocks verbatim must never run a mutation or an infra command:
+ * The contract (confirmed against `docs/README.md` on the `m4-handoff-docs` branch, which is the
+ * stream that actually owns `docs/**`): every fenced `sh`/`bash` block carries the marker as the
+ * SECOND WORD OF THE INFO STRING — ` ```sh safe-read ` — and nothing else. There is no
+ * preceding-comment form; an earlier revision of this file supported one speculatively, before the
+ * docs stream's own convention could be read, and it is gone now that the real one is known.
  *
  *   safe-read      a GET against a public endpoint, no credential — the ONLY kind this checker runs
  *   staging-write  mints a key, requests an OTP, submits/reviews/revokes — never run automatically
  *   no-run         deployment or infrastructure mutation — never run automatically, ever
  *
- * THE CONVENTION (this checker is the first consumer, so it also defines the syntax the docs
- * stream writes to — see scripts/m4-compliance/README.md):
- *
- *   1. On the fence's own info string, as a second token after the language:
- *      ```sh safe-read
- *      curl https://api.example.org/v1/health
- *      ```
- *
- *   2. Or, when the fence itself can't carry it (e.g. a language-less fence), an HTML comment on
- *      its own line immediately before the fence, allowing one blank line in between:
- *      <!-- marker: staging-write -->
- *      ```sh
- *      curl -X POST https://api.example.org/v1/keys ...
- *      ```
- *
- * A `sh` block with neither is a hard failure — see `parseMarkedBlocks`' `unmarked` output — because
- * an unmarked block is one the checker cannot tell is safe to run, and treating "unmarked" as
- * "don't run" silently would let a real safe-read command go unexercised without anyone noticing.
+ * A `sh`/`bash` block with no marker (or an unrecognized second word) is a hard failure — an
+ * unmarked block is one this checker cannot tell is safe to run, and treating "unmarked" as "don't
+ * run" silently would let a real safe-read command go unexercised without anyone noticing.
  */
 
 export const MARKERS = ["safe-read", "no-run", "staging-write"];
 
 /**
- * Extract every fenced code block from markdown, with its language, its marker (if any, resolved
- * per the convention above), and its source line number (1-based, of the opening fence).
+ * Extract every fenced code block from markdown, with its language, its marker (the second word of
+ * the info string, when it is one of `MARKERS`; otherwise `null`), and its source line number
+ * (1-based, of the opening fence).
  */
 export function parseMarkedBlocks(markdown) {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
@@ -53,24 +42,9 @@ export function parseMarkedBlocks(markdown) {
       j++;
     }
 
-    let marker = MARKERS.includes(infoMarker) ? infoMarker : null;
-    if (!marker) {
-      // Look at up to two lines before the fence for `<!-- marker: X -->`, skipping one blank line.
-      for (const candidateIdx of [i - 1, i - 2]) {
-        if (candidateIdx < 0) continue;
-        const candidate = lines[candidateIdx];
-        if (candidate.trim() === "" && candidateIdx === i - 1) continue;
-        const commentMatch = /^<!--\s*marker:\s*(\S+)\s*-->\s*$/.exec(candidate.trim());
-        if (commentMatch && MARKERS.includes(commentMatch[1])) {
-          marker = commentMatch[1];
-        }
-        break;
-      }
-    }
-
     blocks.push({
       lang,
-      marker,
+      marker: MARKERS.includes(infoMarker) ? infoMarker : null,
       line: openLine,
       source: bodyLines.join("\n"),
     });

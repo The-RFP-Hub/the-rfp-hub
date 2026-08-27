@@ -10,6 +10,48 @@ import { request } from "../../m2-compliance/http.mjs";
  */
 import { withPage } from "../browser.mjs";
 
+/**
+ * Extract the set of slugs the rendered `/publishers` page actually shows, and how.
+ *
+ * Two selectors, in order of preference:
+ *
+ *   1. `[data-publisher-slug]` — the robust, purpose-built attribute this checker WOULD prefer.
+ *      It does not exist in the markup as landed on `brunodmsi/m4-frontend-publishers`
+ *      (`packages/frontend/src/app/publishers/page.tsx`), so this branch exists for the day the
+ *      frontend stream adds it — see the WARN this check raises when extraction finds nothing at
+ *      all, which names the attribute explicitly for whoever picks that up.
+ *   2. `article.publisher-card code` — what the markup actually renders today: each card carries
+ *      `<code>{slug}:…</code>` as "the namespace every one of this organization's ids is prefixed
+ *      with" (the component's own comment). The slug is the text before the first `:` — the
+ *      trailing `:…` is decoration, not part of the identifier, and a Standard slug cannot itself
+ *      contain a colon (ids are `<namespace>:<local>`, so a colon inside the namespace half would
+ *      make an id unparseable).
+ *
+ * Returns `{ renderedSlugs, extractionUsed }`, where `extractionUsed` is `"data-publisher-slug"`,
+ * `"article.publisher-card code"`, or `"none"` when neither selector matched anything — the caller
+ * treats that last case as "cannot verify", never as "the rendered set is empty".
+ */
+export async function extractRenderedSlugs(page) {
+  const viaAttribute = await page.$$eval("[data-publisher-slug]", (elements) =>
+    elements.map((el) => el.getAttribute("data-publisher-slug")),
+  );
+  if (viaAttribute.length > 0) {
+    return { renderedSlugs: viaAttribute, extractionUsed: "data-publisher-slug" };
+  }
+
+  const viaCode = await page.$$eval("article.publisher-card code", (elements) =>
+    elements.map((el) => (el.textContent ?? "").split(":")[0].trim()),
+  );
+  if (viaCode.length > 0) {
+    return {
+      renderedSlugs: viaCode.filter((slug) => slug.length > 0),
+      extractionUsed: "article.publisher-card code",
+    };
+  }
+
+  return { renderedSlugs: [], extractionUsed: "none" };
+}
+
 export async function checkPublishers(report, ctx) {
   const c = report.criterion(
     "M4-2",
@@ -67,29 +109,46 @@ export async function checkPublishers(report, ctx) {
   }
 
   try {
-    const { renderedSlugs, requests } = await withPage(ctx.repoRoot, async (page) => {
-      const seen = [];
-      page.on("request", (req) => {
-        if (req.url().includes("/v1/publishers")) {
-          seen.push({ url: req.url(), headers: req.headers() });
-        }
-      });
-      await page.goto(pageUrl, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
-      // Slugs are presented as the organization's namespace per §3.2 — matched generously as any
-      // element whose text content is exactly one of the API's slugs, so this does not depend on a
-      // specific class name or test id that the frontend stream may not have added yet.
-      const text = await page.content();
-      const found = [...apiSlugs].filter((slug) => text.includes(slug));
-      return { renderedSlugs: found, requests: seen };
-    });
-
-    const missing = [...apiSlugs].filter((slug) => !renderedSlugs.includes(slug));
-    c.expect(
-      missing.length === 0,
-      "every API slug appears somewhere in the rendered page",
-      `all ${apiSlugs.size} slug(s) found`,
-      `missing from the rendered page: ${missing.join(", ")}`,
+    const { renderedSlugs, extractionUsed, requests } = await withPage(
+      ctx.repoRoot,
+      async (page) => {
+        const seen = [];
+        page.on("request", (req) => {
+          if (req.url().includes("/v1/publishers")) {
+            seen.push({ url: req.url(), headers: req.headers() });
+          }
+        });
+        await page.goto(pageUrl, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
+        return await extractRenderedSlugs(page);
+      },
     );
+
+    if (extractionUsed === "none") {
+      // Neither selector below matched anything: this is not "the set happens to be empty" (an
+      // empty verified-publisher set still renders an EmptyState, a different element entirely),
+      // it is "this checker cannot find the publisher cards at all". Report it by name rather than
+      // silently comparing an empty extracted set against the API's and calling every slug
+      // "missing" — that would be a wrong diagnosis, not a right one.
+      c.warn(
+        "every API slug appears in the rendered page, and only those slugs",
+        `could not extract any rendered slug (looked for "[data-publisher-slug]", then "article.publisher-card code") — if the markup changed, the most robust fix is a dedicated data-publisher-slug attribute on the card`,
+      );
+    } else {
+      const rendered = new Set(renderedSlugs);
+      const missing = [...apiSlugs].filter((slug) => !rendered.has(slug));
+      const extra = [...rendered].filter((slug) => !apiSlugs.has(slug));
+      c.expect(
+        missing.length === 0 && extra.length === 0,
+        `every API slug appears in the rendered page, and only those slugs (via ${extractionUsed})`,
+        `${apiSlugs.size} slug(s) match exactly`,
+        [
+          missing.length > 0 ? `missing from the rendered page: ${missing.join(", ")}` : null,
+          extra.length > 0 ? `rendered but not in GET /v1/publishers: ${extra.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join("; "),
+      );
+    }
 
     if (requests.length === 0) {
       c.warn(

@@ -86,7 +86,7 @@ export async function checkFrontend(report, ctx) {
   if (!ctx.browser) {
     for (const name of [
       "search q changes the result set",
-      "a fundingType filter changes the result set",
+      "a type (funding type) filter changes the result set",
       "page=2 changes the result set",
       "detail page shows the title",
       "apply href equals {api}/v1/r/{id}/apply",
@@ -115,17 +115,21 @@ export async function checkFrontend(report, ctx) {
         `?q=grant rendered the same set as / (${searched.length} item(s)) — the query param may not be wired to the list`,
       );
 
-      // fundingType filter
-      await page.goto(`${ctx.site}/?fundingType=grant`, {
+      // Funding-type filter. The URL param is `type`, NOT `fundingType` — confirmed against
+      // `selectionFromParams` in packages/frontend/src/lib/directory.ts, which reads `type` and
+      // maps it onto the internal `DirectorySelection.fundingType` field. `?fundingType=grant`
+      // would be an unrecognized param the directory silently ignores, which would make this
+      // check fail for the wrong reason (param name) rather than the right one (filter wiring).
+      await page.goto(`${ctx.site}/?type=grant`, {
         waitUntil: "networkidle",
         timeout: ctx.timeoutMs,
       });
       const filtered = await renderedOpportunityIds(page);
       c.expect(
         JSON.stringify(filtered) !== JSON.stringify(baseline),
-        "fundingType=grant filter changes the result set",
+        "type=grant filter changes the result set",
         `${filtered.length} item(s), different from baseline's ${baseline.length}`,
-        "?fundingType=grant rendered the same set as / — the filter may not be wired to the list",
+        "?type=grant rendered the same set as / — the filter may not be wired to the list",
       );
 
       // pagination

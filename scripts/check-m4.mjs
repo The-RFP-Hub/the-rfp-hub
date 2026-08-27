@@ -64,6 +64,10 @@ Options
                           for the MCP check. Default: use packages/mcp/dist/cli.js if it exists in
                           this checkout, else \`npx -y @the-rfp-hub/mcp@next\`.
   --skip <check>          Skip one check by id (repeatable). One of: ${CHECK_IDS.join(", ")}.
+                          Still REGISTERS a skip criterion, so the run reports "incomplete".
+  --only <check>          Run only this check (repeatable). The others are not registered at all,
+                          so a passing scoped run is a clean PASS/exit 0, not "incomplete". Used
+                          by the docs-links CI job (\`--only docs\`). Refused together with --skip.
   --json <path>           Where to write the machine-readable report.
                           Default: m4-compliance-report.json. Use "-" for stdout.
   --concurrency <n>       Requests in flight. Default: 6.
@@ -103,12 +107,22 @@ async function main() {
     node: process.version,
   });
 
-  await checkGovernance(report, ctx);
-  await checkPublishers(report, ctx);
-  await checkFrontend(report, ctx);
-  await checkMcp(report, ctx);
-  await checkSkill(report, ctx);
-  await checkDocs(report, ctx);
+  // `--only` EXCLUDES a check from running at all — no criterion is registered for it, so it
+  // cannot turn the run `incomplete`. `--skip` (handled inside each check module) still registers
+  // a `skip` criterion, which does. See options.mjs's docstring for why these are not the same
+  // flag and are refused together.
+  const runs = [
+    ["governance", checkGovernance],
+    ["publishers", checkPublishers],
+    ["frontend", checkFrontend],
+    ["mcp", checkMcp],
+    ["skill", checkSkill],
+    ["docs", checkDocs],
+  ];
+  for (const [id, check] of runs) {
+    if (ctx.only.size > 0 && !ctx.only.has(id)) continue;
+    await check(report, ctx);
+  }
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 
