@@ -626,19 +626,20 @@ order of how little you need to know:
 
 ### Path A — the Deploy Button (clone the repository)
 
-```
-https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL&envDescription=Origin%20of%20the%20RFP%20Hub%20API%20this%20deployment%20reads%20from&envLink=https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/frontend/README.md
-```
+**The button lives in one place, and this is not it:**
+[`packages/frontend/README.md` § Deploying your own copy](../packages/frontend/README.md#deploying-your-own-copy).
+Click it there. A Deploy Button is a URL carrying the whole build configuration in its query string
+— root directory, install command, build command, the environment variable and its help text — so
+a second copy of it in a second document is a second build configuration that will drift from the
+real one without anybody noticing. It already had.
 
-`root-directory=packages/frontend` is a documented Deploy Button parameter, and `repository-url`
-deliberately points at the **repository**, not the subdirectory, so the workspace and the lockfile
-stay visible to the build. Vercel enables "Include source files outside of the Root Directory" by
-default, which is what makes the two workspace dependencies resolve. Set `NEXT_PUBLIC_API_URL` when
-prompted, and leave `NEXT_PUBLIC_SITE_ORIGIN` unset.
-
-The button and the by-hand equivalent (root directory, install command, build command) are kept in
-one place — [`packages/frontend/README.md` § Deploying your own copy](../packages/frontend/README.md#deploying-your-own-copy).
-Keep this URL byte-identical to the one there; two copies that drift are two different products.
+What the button does, so you know what you are agreeing to: it clones the **repository** (not the
+subdirectory) into your own Vercel account with the root directory set to `packages/frontend`,
+which is what keeps `pnpm-lock.yaml` and the two workspace dependencies visible to the build —
+Vercel enables "Include source files outside of the Root Directory" by default. It carries the pnpm
+install and filtered build commands, so nothing has to be typed into the project settings. Set
+`NEXT_PUBLIC_API_URL` when prompted, and leave `NEXT_PUBLIC_SITE_ORIGIN` unset — see
+[§4](#the-frontends-two-variables).
 
 ### Path B — copy only the package, install from npm
 
@@ -674,10 +675,17 @@ Two environment variables select the dependency specs, one per package:
 script at a locally built tarball in the meantime:
 
 ```sh no-run
+# The Standard FIRST — `rfphub-validate` imports it, and resolves it through its dist. Without
+# this line the build fails with TS2307 (cannot find module '@the-rfp-hub/standard').
+pnpm --filter @the-rfp-hub/standard build
 pnpm --filter rfphub-validate build
 pnpm --filter rfphub-validate pack --pack-destination /tmp/rfphub-pack
 RFPHUB_VALIDATE_SPEC=/tmp/rfphub-pack/rfphub-validate-0.3.0.tgz pnpm frontend:clean-room --browser
 ```
+
+`pnpm -r build` does the same thing with one line, if you would rather not think about the order.
+The dependency direction is why `packages/validate` declares `prepublishOnly: pnpm -w build` — the
+same trap, closed for the publish path only.
 
 `pnpm pack`, not `npm pack` — see
 [§7.4](#74-inspect-the-tarball-before-every-publish--with-pnpm-pack-never-npm-pack). This whole
@@ -706,13 +714,16 @@ Three things are easy to miss and cost an afternoon each:
   `outputFileTracingRoot` two directories above itself — correct in the monorepo, where that is the
   workspace root — and the option is unconditional, so a build from a copy nests the output under
   whatever path Next computed from that root. **Find it rather than assuming**, which is exactly
-  what the clean-room script does:
+  what the clean-room script does — **excluding `node_modules`**, because the traced dependencies
+  ship `server.js` files of their own and a bare `find` returns several. The app's entry point is
+  the only match outside `node_modules`, and it is the one sitting beside a `.next/` directory:
 
 ```sh no-run
 # The variable goes HERE — on the build.
 NEXT_PUBLIC_API_URL=https://api.example.org npm run build
 
-SERVER=$(find .next/standalone -name server.js)
+SERVER=$(find .next/standalone -name server.js -not -path '*/node_modules/*')
+echo "$SERVER"          # exactly one path. More than one means the -not -path was dropped.
 mkdir -p "$(dirname "$SERVER")/.next" && cp -r .next/static "$(dirname "$SERVER")/.next/static"
 node "$SERVER"          # no variable needed here: it is already baked into the bundle
 ```

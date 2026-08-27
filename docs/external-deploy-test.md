@@ -37,6 +37,14 @@ tester or the documentation. Running the protocol before the release burns forty
 somebody's time on a known defect and produces a finding you already have. Either wait for the
 release, or hand the tester the protocol with block 2 struck out and say why.
 
+**Do not substitute the local-tarball workaround.** It exists
+([`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy)) and it works,
+but it requires **pnpm and a clone of the monorepo** — which is precisely what block 2 is supposed
+to prove you do not need. A tester who builds the dependency from source is no longer an external
+developer installing from the registry, and their run answers a different question than the one
+this protocol asks. Once 0.3.1 is published, `npm install` is the whole story and pnpm is not
+needed anywhere in this document.
+
 ### What the tester needs to have
 
 Node 20 or newer, git, a free Vercel account, and a terminal. No AWS, no database, no credential of
@@ -119,8 +127,11 @@ npm install
 # front of `node server.js` later does nothing, and the page renders "no API configured".
 NEXT_PUBLIC_API_URL=https://api.ethrfps.app npm run build
 
-# server.js is NOT at .next/standalone/server.js in a stand-alone copy — find it.
-SERVER=$(find .next/standalone -name server.js)
+# server.js is NOT at .next/standalone/server.js in a stand-alone copy — find it. Exclude
+# node_modules: the traced dependencies ship server.js files of their own, and a bare find
+# returns several. The app's entry point is the only match outside node_modules.
+SERVER=$(find .next/standalone -name server.js -not -path '*/node_modules/*')
+echo "$SERVER"          # expect exactly one path
 
 # .next/static is not inside the standalone output either; copy it beside server.js.
 mkdir -p "$(dirname "$SERVER")/.next" && cp -r .next/static "$(dirname "$SERVER")/.next/static"
