@@ -157,7 +157,19 @@ function resolveSpec(spec) {
   return spec;
 }
 
-/** An OS-assigned free TCP port, so two runs never collide on a busy CI runner or a developer's laptop. */
+/**
+ * An OS-assigned free TCP port, so two runs never collide on a busy CI runner or a developer's
+ * laptop: bind a throwaway server to port 0, read back what the OS actually gave it, close it, and
+ * hand that number to the real server.
+ *
+ * THIS DOES NOT FULLY CLOSE THE RACE, and there is no way to with this server: passing `PORT=0`
+ * straight to the Next.js standalone server does NOT ask the OS for an ephemeral port the way this
+ * probe does — verified empirically, it falls back to the hard-coded default (3000) instead, which
+ * would make collisions MORE likely, not less. So a probe-then-reuse is the best available option,
+ * and the gap between this probe closing its socket and the real server binding the same number is
+ * the reason `waitUntilUp`'s caller also watches the child process for an early exit: that is the
+ * backstop for the residual window this function cannot close on its own.
+ */
 function freePort() {
   return new Promise((resolvePort, reject) => {
     const srv = createServer();
@@ -193,9 +205,21 @@ function run(cmd, args, opts) {
   }
 }
 
-async function waitUntilUp(url, timeoutMs) {
+/**
+ * Polls `url` until it answers or `timeoutMs` elapses — but checks `checkAborted()` on every tick
+ * FIRST, so a child process that has already exited (a likely `EADDRINUSE`, or a crash on startup)
+ * fails this immediately with a clear cause instead of continuing to poll. Polling alone cannot
+ * tell "our server is slow to start" apart from "our server is dead and something ELSE now answers
+ * on this port" — on a shared CI runner, or a laptop with something else already bound to the
+ * OS-assigned "free" port between when it was picked and when we tried to bind it, a foreign
+ * listener answering in our server's place would otherwise let this resolve as "up" and send every
+ * later check against a service that has nothing to do with this build.
+ */
+async function waitUntilUp(url, timeoutMs, checkAborted) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    const abortError = checkAborted?.();
+    if (abortError) throw abortError;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (res.ok || res.status === 404) return;
@@ -204,6 +228,8 @@ async function waitUntilUp(url, timeoutMs) {
     }
     await new Promise((r) => setTimeout(r, 300));
   }
+  const abortError = checkAborted?.();
+  if (abortError) throw abortError;
   throw new Error(`server never answered ${url} within ${timeoutMs}ms`);
 }
 
@@ -470,15 +496,27 @@ async function main() {
     serverProcess.stderr.on("data", (d) => {
       serverOutput += d;
     });
+    // Armed only until `confirmedUp` is set, right after `waitUntilUp` returns: an exit AFTER that
+    // point is just this script's own `finally` block killing a server whose checks are done, not a
+    // startup failure, so it is logged (still useful for debugging a check that then fails) but not
+    // treated as the reason the run failed.
+    let confirmedUp = false;
+    let startupFailure = null;
     serverProcess.on("exit", (code, signal) => {
       if (code !== null && code !== 0) {
         console.error(`server.js exited early with code ${code} (signal ${signal ?? "none"})`);
         console.error(serverOutput);
       }
+      if (!confirmedUp) {
+        startupFailure = new Error(
+          `server.js exited (code ${code ?? "null"}, signal ${signal ?? "none"}) before it ever answered a request — a likely port collision (EADDRINUSE) or a crash on startup; see the output above`,
+        );
+      }
     });
 
     const base = `http://127.0.0.1:${port}`;
-    await waitUntilUp(`${base}/`, 20_000);
+    await waitUntilUp(`${base}/`, 20_000, () => startupFailure);
+    confirmedUp = true;
 
     // 5. The fast HTTP pre-check. `/` and the filtered `/` are required; `/publishers` may 404
     // unless REQUIRE_PUBLISHERS says otherwise.

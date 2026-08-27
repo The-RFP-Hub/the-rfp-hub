@@ -294,10 +294,30 @@ There are three ways to do it, in increasing order of how much of the repository
 fork: root directory `packages/frontend`, pnpm workspaces enabled, `NEXT_PUBLIC_API_URL` set for
 your environment. The **Vercel Deploy Button** does exactly this in one click — Vercel's
 `root-directory` clone parameter is documented for this purpose, and clones the whole repository
-with "Include source files outside of the Root Directory" on by default, which is what lets the
-build see `pnpm-lock.yaml` and the two workspace dependencies:
+with "Include source files outside of the Root Directory" **on by default**, which is required
+here and is what lets the build see `pnpm-lock.yaml` and the two workspace dependencies:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL&envDescription=Origin%20of%20the%20RFP%20Hub%20API%20this%20deployment%20reads%20from&envLink=https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/frontend/README.md)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL&envDescription=Origin%20of%20the%20RFP%20Hub%20API%20this%20deployment%20reads%20from&envLink=https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/frontend/README.md&install-command=pnpm%20install%20--frozen-lockfile&build-command=pnpm%20--filter%20%40the-rfp-hub%2Ffrontend...%20build)
+
+> **Why this button carries `install-command`/`build-command`, rather than relying on Vercel's
+> defaults.** A brand-new project created through this button has no build configuration of its
+> own — Vercel's zero-config default for a `root-directory` project is to run the package's own
+> `build` script (`next build --webpack`) directly, without building `@the-rfp-hub/standard` or
+> `rfphub-validate` first. Both are consumed as workspace packages resolved from their built
+> `dist/`, which does not exist until something builds them, so that default fails with
+> `Module not found: Can't resolve '@the-rfp-hub/standard'` (reproduced locally: removing both
+> packages' `dist/` and running `next build --webpack` inside `packages/frontend` alone fails
+> exactly this way; `pnpm --filter @the-rfp-hub/frontend... build` from the repository root — the
+> `...` builds workspace dependencies first — succeeds). The query parameters set the new project's
+> Install and Build Command explicitly, so a fresh clone gets it right without any manual step.
+>
+> These parameters intentionally do **not** live in `packages/frontend/vercel.json`: that file is
+> also read by the already-deployed project behind `frontend-staging.yml`/`frontend-production.yml`
+> (both run `vercel build` against it), and this repository has no way to confirm from outside
+> Vercel's dashboard whether that project's Install/Build Command is already set to something
+> equivalent — writing to `vercel.json` would apply to both projects at once, silently, and a wrong
+> guess there would risk the deployment that is actually live. The Deploy Button's query parameters
+> only ever configure the **new** project a click creates; they cannot alter the existing one.
 
 **B — Copy only this package**, against the npm-published versions of its two workspace
 dependencies (`@the-rfp-hub/standard@^3.0.0`, `rfphub-validate@^0.3.0`+ — see the note below). This
