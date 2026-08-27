@@ -44,6 +44,7 @@ import {
   isFiltered,
   selectionFromParams,
   selectionToHref,
+  truncateForDisplay,
 } from "@/lib/directory";
 import { describeDeadline, formatCount } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
@@ -225,7 +226,7 @@ export function DirectoryList() {
           </div>
 
           <div className={`field${draft.minAward.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-min-award">Min award</label>
+            <label htmlFor="directory-min-award">Min award/budget</label>
             <input
               id="directory-min-award"
               type="number"
@@ -235,10 +236,14 @@ export function DirectoryList() {
               onChange={(event) => setDraft({ ...draft, minAward: event.target.value })}
               placeholder="No minimum"
             />
+            <p className="hint">
+              Compares a listing&rsquo;s award amount; one that states only a total programme budget
+              (no award range) is compared using that budget instead.
+            </p>
           </div>
 
           <div className={`field${draft.maxAward.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-max-award">Max award</label>
+            <label htmlFor="directory-max-award">Max award/budget</label>
             <input
               id="directory-max-award"
               type="number"
@@ -248,22 +253,31 @@ export function DirectoryList() {
               onChange={(event) => setDraft({ ...draft, maxAward: event.target.value })}
               placeholder="No maximum"
             />
+            <p className="hint">
+              Compares a listing&rsquo;s award amount; one that states only a total programme budget
+              (no award range) is compared using that budget instead.
+            </p>
           </div>
 
           {/*
-           * `nextDeadlineAt` — the derived, earliest-upcoming-fixed-deadline field these two compare
+           * `nextDeadlineAt` — the derived, earliest-upcoming-FIXED-deadline field these two compare
            * against, exactly as `sort`'s default already does. An entry with no upcoming fixed
            * deadline (rolling-only, all past, or none at all) has a NULL there and is excluded by
-           * either bound — the same rule the API's own parameter docs state.
+           * either bound — the same rule the API's own parameter docs state, and why the labels and
+           * hints below say "fixed" and "rolling" rather than leaving that implicit.
            */}
           <div className={`field${draft.deadlineAfter.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-deadline-after">Deadline after</label>
+            <label htmlFor="directory-deadline-after">Next fixed deadline after</label>
             <input
               id="directory-deadline-after"
               type="date"
               value={dateInputValue(draft.deadlineAfter)}
               onChange={(event) => setDraft({ ...draft, deadlineAfter: event.target.value })}
             />
+            <p className="hint">
+              Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones with no
+              upcoming fixed deadline, are excluded by this filter.
+            </p>
             {/*
              * A value carried in from a shared or hand-edited URL can be a full instant
              * (`2026-09-01T12:00:00Z`), not the bare day this picker can display — and the picker
@@ -276,24 +290,38 @@ export function DirectoryList() {
             dateInputValue(draft.deadlineAfter) !== draft.deadlineAfter.trim() ? (
               <p className="hint">
                 Filtering on the exact value from the link:{" "}
-                <code>{draft.deadlineAfter.trim()}</code>
+                <code className="wrap-anywhere">
+                  <UntrustedText value={truncateForDisplay(draft.deadlineAfter.trim())} />
+                </code>
               </p>
             ) : null}
           </div>
 
           <div className={`field${draft.deadlineBefore.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-deadline-before">Deadline before</label>
+            <label htmlFor="directory-deadline-before">Next fixed deadline before</label>
             <input
               id="directory-deadline-before"
               type="date"
               value={dateInputValue(draft.deadlineBefore)}
               onChange={(event) => setDraft({ ...draft, deadlineBefore: event.target.value })}
             />
+            <p className="hint">
+              Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones with no
+              upcoming fixed deadline, are excluded by this filter.
+            </p>
+            {/*
+             * LENGTH-BOUNDED and rendered through `UntrustedText`, same as the field above: a query
+             * parameter carries no length limit of its own, and this text still has to fit the
+             * layout on the narrowest viewport this package supports. `.wrap-anywhere` is the other
+             * half of that, for whatever survives the bound.
+             */}
             {draft.deadlineBefore.trim() &&
             dateInputValue(draft.deadlineBefore) !== draft.deadlineBefore.trim() ? (
               <p className="hint">
                 Filtering on the exact value from the link:{" "}
-                <code>{draft.deadlineBefore.trim()}</code>
+                <code className="wrap-anywhere">
+                  <UntrustedText value={truncateForDisplay(draft.deadlineBefore.trim())} />
+                </code>
               </p>
             ) : null}
           </div>

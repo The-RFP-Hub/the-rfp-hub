@@ -503,10 +503,14 @@ describe("the directory's filters", () => {
     });
     expect((screen.getByLabelText("Category") as HTMLInputElement).value).toBe("infrastructure");
     expect((screen.getByLabelText("Organization") as HTMLInputElement).value).toBe("acme");
-    expect((screen.getByLabelText("Min award") as HTMLInputElement).value).toBe("5000");
-    expect((screen.getByLabelText("Max award") as HTMLInputElement).value).toBe("50000");
-    expect((screen.getByLabelText("Deadline after") as HTMLInputElement).value).toBe("2026-09-01");
-    expect((screen.getByLabelText("Deadline before") as HTMLInputElement).value).toBe("2026-12-31");
+    expect((screen.getByLabelText("Min award/budget") as HTMLInputElement).value).toBe("5000");
+    expect((screen.getByLabelText("Max award/budget") as HTMLInputElement).value).toBe("50000");
+    expect((screen.getByLabelText("Next fixed deadline after") as HTMLInputElement).value).toBe(
+      "2026-09-01",
+    );
+    expect((screen.getByLabelText("Next fixed deadline before") as HTMLInputElement).value).toBe(
+      "2026-12-31",
+    );
   });
 
   it("accepts a fractional award threshold on a touch keyboard's decimal mode", async () => {
@@ -514,8 +518,8 @@ describe("the directory's filters", () => {
     mount(client, <DirectoryList />);
     await screen.findByText("Acme Foundation");
 
-    const min = screen.getByLabelText("Min award") as HTMLInputElement;
-    const max = screen.getByLabelText("Max award") as HTMLInputElement;
+    const min = screen.getByLabelText("Min award/budget") as HTMLInputElement;
+    const max = screen.getByLabelText("Max award/budget") as HTMLInputElement;
     // `step="any"` is what lets the browser accept a non-integer value at all; `inputMode="decimal"`
     // is what puts a decimal key on a phone's on-screen keyboard in the first place.
     expect(min.step).toBe("any");
@@ -533,12 +537,43 @@ describe("the directory's filters", () => {
     mount(client, <DirectoryList />);
     await screen.findByText("Acme Foundation");
 
-    expect((screen.getByLabelText("Deadline after") as HTMLInputElement).value).toBe("2026-09-01");
+    expect((screen.getByLabelText("Next fixed deadline after") as HTMLInputElement).value).toBe(
+      "2026-09-01",
+    );
     // The exact retained value stays visible as text, so nothing about the extra precision is lost
-    // from view even though the picker itself can only show the day.
-    expect(screen.getByText("2026-09-01T15:30:00.000Z", { selector: "code" })).toBeTruthy();
+    // from view even though the picker itself can only show the day. It is nested inside the
+    // untrusted-text span `UntrustedText` renders, so the text itself is found without a `code`
+    // selector restriction; the surrounding `<code class="wrap-anywhere">` is asserted separately.
+    const retained = screen.getByText("2026-09-01T15:30:00.000Z");
+    expect(retained).toBeTruthy();
+    const code = retained.closest("code");
+    expect(code, "the retained value must sit inside a <code> element").toBeTruthy();
+    expect(code?.className).toContain("wrap-anywhere");
     // And the ORIGINAL instant — not the truncated day — is what was actually sent.
     expect(list.mock.calls[0]?.[0]).toMatchObject({ deadlineAfter: "2026-09-01T15:30:00.000Z" });
+  });
+
+  it("bounds and wraps an absurdly long retained URL value instead of letting it blow out the layout", async () => {
+    // A query parameter has no length limit of its own. `truncateForDisplay` is the pure half of
+    // this fix (see directory.test.ts for its exact boundary); this is the component half — the
+    // value that actually reaches the DOM, and the class that lets whatever survives truncation
+    // still wrap on a narrow viewport instead of forcing the page wider.
+    const huge = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
+    navigation.params = new URLSearchParams({ deadlineAfter: huge });
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const hint = screen.getByText(/Filtering on the exact value from the link/).closest("p");
+    const code = hint?.querySelector("code");
+    expect(code).toBeTruthy();
+    // Bounded well under the full 524-character value...
+    expect(code?.textContent?.length ?? 0).toBeLessThan(huge.length);
+    expect(code?.textContent).toContain("…");
+    // ...but the beginning — the part a reader actually recognizes — is preserved verbatim.
+    expect(code?.textContent?.startsWith("2026-09-01T15:30:00.000Z")).toBe(true);
+    // And the class that lets a long unbroken run still wrap rather than widening the page.
+    expect(code?.className).toContain("wrap-anywhere");
   });
 
   it("resubmits the exact retained instant, not the day the picker displays", async () => {
@@ -571,7 +606,7 @@ describe("the directory's filters", () => {
     await screen.findByText("Acme Foundation");
 
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "acme" } });
-    fireEvent.change(screen.getByLabelText("Min award"), { target: { value: "1000" } });
+    fireEvent.change(screen.getByLabelText("Min award/budget"), { target: { value: "1000" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     const href = String(navigation.push.mock.calls[0]?.[0]);

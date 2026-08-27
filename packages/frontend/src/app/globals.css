@@ -171,6 +171,18 @@ code {
   border-radius: 3px;
 }
 
+/*
+ * A LONG, UNBROKEN STRING FORCES ITS CONTAINER WIDE, and `code`'s monospace run is exactly the
+ * shape that does it: no natural word boundary for the browser to wrap on. Used on values this
+ * package retains and displays verbatim rather than authors — a directory filter's raw URL value,
+ * say — which carry no length guarantee from whoever typed the address bar. `overflow-wrap: anywhere`
+ * (not `break-all`) still prefers a real word boundary when one exists and only forces a mid-token
+ * break when the alternative is overflow, which keeps ordinary short values looking untouched.
+ */
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+}
+
 button {
   font: inherit;
   color: inherit;
