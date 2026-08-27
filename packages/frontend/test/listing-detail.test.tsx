@@ -3,7 +3,7 @@ import ListingPage from "@/app/listings/[id]/page";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
 import type { ManagedOpportunity, Me, Opportunity } from "@/lib/types";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { session, listingQuery } = vi.hoisted(() => ({
@@ -164,7 +164,9 @@ describe("merged listing detail and edit routes", () => {
     ).toBeTruthy();
     expect(screen.getByText("Review decision")).toBeTruthy();
     expect(screen.getByText("Public visibility")).toBeTruthy();
-    expect(document.title).toBe("Old Round | RFP Hub");
+    // The title is set in an effect after the data lands: under a loaded runner it can trail the
+    // badge by a tick, so wait for it rather than assert the instant.
+    await waitFor(() => expect(document.title).toBe("Old Round | RFP Hub"));
     const edit = screen.getByRole("link", { name: "Edit" });
     expect(edit.className).toContain("button");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
