@@ -50,7 +50,7 @@ npx rfphub-validate opportunity.json
 | `packages/api` | — | MIT | Public `/v1/` REST API (Fastify + Postgres), plus the authenticated write, review and administration surfaces. |
 | `packages/frontend` | — | MIT | RFP Hub frontend (Next.js) — the public directory and the publisher dashboard: submit, claim, review, keys, and per-entry analytics, one app and one deploy pipeline for both. See [`packages/frontend/README.md`](./packages/frontend/README.md). |
 | `packages/client` | `@the-rfp-hub/client` | MIT | Typed HTTP client *(planned)*. |
-| `packages/mcp` | `@the-rfp-hub/mcp` | MIT | MCP server + agent skill *(planned)*. |
+| `packages/mcp` | `@the-rfp-hub/mcp` | MIT | Model Context Protocol server (stdio): search and fetch opportunities from any MCP client, plus an optional write behind an approval a person grants at their own terminal. See [`packages/mcp/README.md`](./packages/mcp/README.md) and [`adr/0012`](./adr/0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md). |
 
 Every package takes its *contract* from `@the-rfp-hub/standard` alone, and never reaches into
 another package's internals (dependency inversion at the package level). The only non-Standard
