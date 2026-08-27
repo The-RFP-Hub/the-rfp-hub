@@ -53,7 +53,9 @@ Required
 
 Options
   --repo-root <path>       Repo checkout, for resolving packages/mcp/dist/cli.js. Default: cwd.
-  --mcp-spec <spec>        npm version (or "next") to install via npx instead of the local build.
+  --mcp-spec <spec>        npm version for npx (default "next" — the real registry package).
+                           Pass "local" for packages/mcp/dist/cli.js instead, to drive this against
+                           a pre-publish build.
   --allow-production       Permit a target that does not look like staging or localhost. Prints a
                            red warning. There is no flag beyond this one — passing it IS the force.
   --keep-fixture           Do not reject/unlist the entry this run created. For debugging.

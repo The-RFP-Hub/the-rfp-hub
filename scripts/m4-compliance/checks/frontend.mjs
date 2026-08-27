@@ -21,18 +21,55 @@ const VIEWPORTS = [
   { width: 1440, height: 900, label: "1440×900 (desktop)" },
 ];
 
-/** Pull every opportunity id + title the rendered list is currently showing, generously — any
- * element carrying a `data-opportunity-id`, falling back to counting `/opportunities/` links. */
+/**
+ * Pull the opportunity ids the rendered directory table is currently showing — one per row, in
+ * page order.
+ *
+ * `tbody a.row-title` is what `DirectoryRow` in `packages/frontend/src/components/DirectoryList.tsx`
+ * actually renders: `<Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">`.
+ * There is no `data-opportunity-id` (or any other purpose-built test attribute) anywhere in
+ * `packages/frontend/src` — an earlier revision of this file assumed one existed and silently fell
+ * back to a looser `a[href*="/opportunities/"]` selector that this checker never actually exercised
+ * against a real page, because `/publishers` (unrelated) also links to `/opportunities/…`-shaped
+ * search results and would have double-counted them. `.row-title` is reused elsewhere in the
+ * frontend (organizations, review, account pages), but never on the public directory route this
+ * function is only ever called against, so `tbody a.row-title` is unambiguous here.
+ *
+ * The id is decoded back out of the href rather than read off a data attribute, which is a
+ * STRONGER assertion than a bare count: two pages rendering the same NUMBER of rows with
+ * DIFFERENT ids still correctly counts as "the result set changed".
+ */
 async function renderedOpportunityIds(page) {
-  return await page.evaluate(() => {
-    const fromDataAttr = [...document.querySelectorAll("[data-opportunity-id]")].map((el) =>
-      el.getAttribute("data-opportunity-id"),
+  return await page.evaluate(() =>
+    [...document.querySelectorAll("tbody a.row-title")]
+      .map((a) => a.getAttribute("href") ?? "")
+      .map((href) => href.replace(/^\/opportunities\//, ""))
+      .filter((encoded) => encoded.length > 0)
+      .map((encoded) => decodeURIComponent(encoded)),
+  );
+}
+
+/**
+ * Assert that a filter/search/pagination change actually changed what is on screen — and that an
+ * EMPTY result is never accepted as proof of that. `JSON.stringify(a) !== JSON.stringify(b)` alone
+ * is satisfied just as well by "0 items" vs "20 items" as by "20 different items", and the former
+ * proves nothing except that the param maybe reached the query string; it is exactly as consistent
+ * with a broken filter that matches nothing as with a correctly narrowed one.
+ */
+export function expectResultSetChanged(c, name, newIds, baselineIds, emptyHint) {
+  if (newIds.length === 0) {
+    c.fail(
+      name,
+      `rendered ZERO items — an empty result set is not evidence the filter works (it is equally consistent with a broken filter matching nothing). ${emptyHint}`,
     );
-    if (fromDataAttr.length > 0) return fromDataAttr;
-    return [...document.querySelectorAll('a[href*="/opportunities/"]')].map((a) =>
-      a.getAttribute("href"),
-    );
-  });
+    return;
+  }
+  c.expect(
+    JSON.stringify(newIds) !== JSON.stringify(baselineIds),
+    name,
+    `${newIds.length} item(s), different from baseline's ${baselineIds.length}`,
+    `rendered the same ${newIds.length} item(s), in the same order, as the baseline — the filter may not be wired to the list`,
+  );
 }
 
 export async function checkFrontend(report, ctx) {
@@ -103,16 +140,22 @@ export async function checkFrontend(report, ctx) {
     await withPage(ctx.repoRoot, async (page) => {
       await page.goto(ctx.site, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
       const baseline = await renderedOpportunityIds(page);
-      c.info("baseline result set at /", `${baseline.length} item(s) rendered`);
+      c.expect(
+        baseline.length > 0,
+        "baseline result set at / is non-empty",
+        `${baseline.length} item(s) rendered`,
+        "/ rendered ZERO items — every comparison below needs a real baseline to compare against, and an empty one would make 'different from baseline' true for the wrong reason",
+      );
 
       // search `q`
       await page.goto(`${ctx.site}/?q=grant`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
       const searched = await renderedOpportunityIds(page);
-      c.expect(
-        JSON.stringify(searched) !== JSON.stringify(baseline),
+      expectResultSetChanged(
+        c,
         "search q=grant changes the result set",
-        `${searched.length} item(s), different from baseline's ${baseline.length}`,
-        `?q=grant rendered the same set as / (${searched.length} item(s)) — the query param may not be wired to the list`,
+        searched,
+        baseline,
+        "the query param may not be wired to the list.",
       );
 
       // Funding-type filter. The URL param is `type`, NOT `fundingType` — confirmed against
@@ -125,21 +168,23 @@ export async function checkFrontend(report, ctx) {
         timeout: ctx.timeoutMs,
       });
       const filtered = await renderedOpportunityIds(page);
-      c.expect(
-        JSON.stringify(filtered) !== JSON.stringify(baseline),
+      expectResultSetChanged(
+        c,
         "type=grant filter changes the result set",
-        `${filtered.length} item(s), different from baseline's ${baseline.length}`,
-        "?type=grant rendered the same set as / — the filter may not be wired to the list",
+        filtered,
+        baseline,
+        "the filter may not be wired to the list, OR there are genuinely zero grant-type listings right now — check the dataset before assuming a bug.",
       );
 
       // pagination
       await page.goto(`${ctx.site}/?page=2`, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
       const paged = await renderedOpportunityIds(page);
-      c.expect(
-        JSON.stringify(paged) !== JSON.stringify(baseline),
+      expectResultSetChanged(
+        c,
         "page=2 changes the result set",
-        `${paged.length} item(s), different from page 1's ${baseline.length}`,
-        "?page=2 rendered the same set as page 1 — either there is only one page of data (report separately) or pagination is not wired",
+        paged,
+        baseline,
+        "either there is only one page of data (check /v1/stats before assuming a bug) or pagination is not wired.",
       );
     });
   } catch (err) {

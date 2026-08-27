@@ -1,7 +1,7 @@
 /**
  * M4-5 — the agent skill is published correctly.
  *
- * Three independent facts, none of which substitutes for the others:
+ * Four independent facts, none of which substitutes for the others:
  *
  *   1. `SKILL.md`'s frontmatter is valid against the Agent Skills spec (name == directory, kebab,
  *      length limits, no stray top-level `version`/`tags`) — see `frontmatter.mjs`, unit tested.
@@ -9,16 +9,24 @@
  *   3. `scripts/search.mjs` actually runs against a live API and its output carries no
  *      `description` field anywhere — the mitigation the plan requires is that the field never
  *      arrives, and only running the real script proves that; a lint of the source cannot.
+ *   4. The skill is actually PUBLISHED: `.claude-plugin/marketplace.json` and the skill's own
+ *      `SKILL.md`, fetched from GitHub raw on `main` — never the local checkout, which is exactly
+ *      what an earlier revision of this criterion tested instead, letting "Agent skill published
+ *      correctly" PASS without a single byte having ever left this checker's own filesystem.
+ *      These FAIL (not skip, not info) until the skill is actually merged to `main`.
  */
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
+import { request } from "../../m2-compliance/http.mjs";
 import { parseFrontmatter, splitFrontmatter, validateFrontmatter } from "../frontmatter.mjs";
 
 const execFileAsync = promisify(execFile);
 
 export const SKILL_DIR = "skills/rfp-hub-funding-search";
+const SKILL_NAME = "rfp-hub-funding-search";
+const RAW_BASE = "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main";
 
 /** Recursively check whether any object in a JSON value carries a `description` key. */
 function findDescriptionField(value, path = "$") {
@@ -43,13 +51,36 @@ export async function checkSkill(report, ctx) {
   const c = report.criterion(
     "M4-5",
     "Agent skill published correctly",
-    "SKILL.md frontmatter is valid and the file is under 500 lines; scripts/search.mjs runs against the live API and never emits a description field.",
+    "The marketplace manifest and SKILL.md are published on GitHub (main); the local SKILL.md's frontmatter is valid and the file is under 500 lines; scripts/search.mjs runs against the live API and never emits a description field.",
   );
 
   if (ctx.skip.has("skill")) {
     c.skip("skill", "--skip skill");
     return c.finish();
   }
+
+  // ── publication, checked against GitHub raw on `main` — never the local checkout ──────────
+  const marketplaceUrl = `${RAW_BASE}/.claude-plugin/marketplace.json`;
+  const marketplaceRes = await request(marketplaceUrl, { timeoutMs: ctx.timeoutMs, follow: true });
+  c.expect(
+    marketplaceRes.ok && marketplaceRes.status === 200,
+    `${marketplaceUrl} responds 200`,
+    `HTTP ${marketplaceRes.status}`,
+    marketplaceRes.ok
+      ? `HTTP ${marketplaceRes.status} — .claude-plugin/marketplace.json is not on \`main\` yet`
+      : `transport: ${marketplaceRes.error}`,
+  );
+
+  const skillRawUrl = `${RAW_BASE}/skills/${SKILL_NAME}/SKILL.md`;
+  const skillRawRes = await request(skillRawUrl, { timeoutMs: ctx.timeoutMs, follow: true });
+  c.expect(
+    skillRawRes.ok && skillRawRes.status === 200,
+    `${skillRawUrl} responds 200`,
+    `HTTP ${skillRawRes.status}`,
+    skillRawRes.ok
+      ? `HTTP ${skillRawRes.status} — skills/${SKILL_NAME}/SKILL.md is not on \`main\` yet`
+      : `transport: ${skillRawRes.error}`,
+  );
 
   const skillPath = join(ctx.repoRoot, SKILL_DIR, "SKILL.md");
   if (!existsSync(skillPath)) {
