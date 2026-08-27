@@ -293,7 +293,7 @@ under [the converter's README](./tools/converter/README.md).
 | `EXPORT_MIN_COUNT` | `100` | Floor below which an export writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 | `EXPORT_API_URL` | — | **Required by `pnpm export:api`**, ignored by everything else: the bare origin of the API to publish, e.g. `https://api.example.org`. Must be `https://` for any host that is not loopback — this value decides what gets published, so plaintext would let the network path choose the dataset. A path, query or fragment is an error rather than being trimmed off. |
 | `EXPORT_OUT_DIR` | `exports` | Where `pnpm export:api` writes its six files. Relative paths resolve against the working directory. |
-| `TRUST_PROXY` | unset | What may be believed about `X-Forwarded-For`, and therefore what `request.ip` is. **Not a boolean** — `true` is rejected at boot, because it means "believe whatever the client claims its address is", and that address is an analytics input. A hop count (`1`) or a comma-separated list of proxy addresses/CIDRs. Unset trusts nothing. |
+| `TRUST_PROXY` | unset | What may be believed about `X-Forwarded-For`, and therefore what `request.ip` is. **Not a boolean** — `true` is rejected at boot, because it means "believe whatever the client claims its address is", and that address is an analytics input. A hop count (`1`) or a comma-separated list of proxy addresses/CIDRs. Unset trusts nothing. **It is also what makes the address half of the rate limits work** — unset behind a load balancer, every anonymous caller shares one bucket; see [Rate limits](docs/auth.md#rate-limits). |
 
 ### M3 variables
 
