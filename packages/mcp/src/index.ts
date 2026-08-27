@@ -22,6 +22,7 @@ export {
   ApiClient,
   MAX_RESPONSE_BYTES,
   ResponseTooLargeError,
+  isSubmissionResult,
   readCapped,
   retryAfterMs,
   type Paginated,

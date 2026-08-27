@@ -52,6 +52,11 @@ export const ID_RULE =
   "`operatingOrganizations[].slug` — you may only publish under an organization that operates " +
   "the program.";
 
+/** Operations where the caller supplies a public id, and so where the id rule is about them. */
+function mentionsIdRule(operation: string): boolean {
+  return operation === "submit_opportunity" || operation === "fetch_opportunity";
+}
+
 function fieldReport(body: ApiErrorBody): string[] {
   const out: string[] = [];
   const issues = Array.isArray(body.issues) ? body.issues : [];
@@ -110,7 +115,12 @@ export function apiErrorToToolError(
         { status, apiError: code, fields },
       );
     }
-    return new ToolError("invalid_input", `${code ?? "bad_request"}${suffix}\n${ID_RULE}`, {
+    // The id rule is appended ONLY where an id is the caller's to get right — a submission, or a
+    // fetch by id. On a search, `<namespace>:<local>` is a rule about something the caller never
+    // supplied: it explains a field they did not send, in a message about a query they did, and
+    // sends them looking in the wrong place.
+    const idRule = mentionsIdRule(context.operation) ? `\n${ID_RULE}` : "";
+    return new ToolError("invalid_input", `${code ?? "bad_request"}${suffix}${idRule}`, {
       status,
       apiError: code,
     });
@@ -215,10 +225,15 @@ export function nonJsonResponseError(status: number, operation: string): ToolErr
  * approval stays consumed — see `approvals.ts` — precisely so this state cannot be resolved by
  * blindly trying again.
  */
-export function ambiguousWriteError(origin: string, what: string, cause: unknown): ToolError {
+export function ambiguousWriteError(
+  origin: string,
+  what: string,
+  cause: unknown,
+  advice?: string,
+): ToolError {
   return new ToolError(
     "exec_failed",
-    `The submission may have landed and its outcome is UNKNOWN: ${what} (${origin}). The entry may or may not have been written. Do NOT resubmit blindly — check GET /v1/me/opportunities first, because the public read hides entries awaiting review. The approval for this submission has been used up either way; if the entry is not there, take a fresh preview and have it approved again.`,
+    `The submission may have landed and its outcome is UNKNOWN: ${what} (${origin}). The entry may or may not have been written. Do NOT resubmit blindly — check GET /v1/me/opportunities first, because the public read hides entries awaiting review. The approval for this submission has been used up either way; if the entry is not there, take a fresh preview and have it approved again.${advice === undefined ? "" : ` ${advice}`}`,
     { ambiguous: true, cause: cause instanceof Error ? cause.message : String(cause) },
   );
 }

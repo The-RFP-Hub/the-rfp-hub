@@ -18,7 +18,17 @@
  * install, so a lock older than `staleMs` is removed and re-contended for. The window is short
  * because the critical section is a file read and a rename — microseconds — so a lock that is
  * seconds old is not slow, it is abandoned.
+ *
+ * BREAKING A STALE LOCK IS ITSELF ATOMIC, and it has to be. `rm` then `mkdir` looks fine until two
+ * processes both decide the same lock is stale: the first removes it and acquires a FRESH lock,
+ * the second's `rm` then deletes that fresh lock out from under a live critical section, and both
+ * proceed. The removal would have opened exactly the hole the lock exists to close, and it would
+ * only ever happen after a crash — the least observable moment. So the stale directory is first
+ * RENAMED to a unique tombstone; `rename` is atomic and only one process can succeed, and only
+ * that process cleans up and re-contends. Everyone else just loops and finds the lock gone or
+ * newly held, which are both states they already know how to handle.
  */
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -45,6 +55,32 @@ function sleepSync(ms: number): void {
   // `Atomics.wait` on a throwaway buffer is the only way to sleep synchronously without a busy
   // loop that pins a core. A spin here would make contention worse, not better.
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Take a stale lock out of the way, atomically, so at most one process ever removes a given one.
+ *
+ * The `rename` is the decision: on every filesystem this runs on it either moves the directory or
+ * fails, with nothing in between, so exactly one contender can claim the abandoned lock. Losers
+ * fail and return, which is correct — by then the lock is either gone or freshly held by the
+ * winner, and the caller's next `mkdir` handles both.
+ *
+ * The tombstone name carries the pid and a random suffix so two breaks in the same millisecond
+ * cannot collide, and removing it is best-effort: a tombstone nobody deleted is inert litter, and
+ * failing the caller over it would trade a harmless leftover file for a broken call.
+ */
+function breakStaleLock(dir: string): void {
+  const tombstone = `${dir}.stale.${process.pid}.${randomBytes(6).toString("hex")}`;
+  try {
+    fs.renameSync(dir, tombstone);
+  } catch {
+    return; // Another process claimed it first, or the holder released it. Both are fine.
+  }
+  try {
+    fs.rmSync(tombstone, { recursive: true, force: true });
+  } catch {
+    // Inert litter. See above.
+  }
 }
 
 function ageMs(dir: string): number | null {
@@ -82,13 +118,7 @@ export function withLock<T>(
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       const age = ageMs(dir);
       if (age !== null && age > staleMs) {
-        // The holder died. Remove and contend again; a second process doing the same thing at the
-        // same moment is fine — exactly one of them will win the next `mkdir`.
-        try {
-          fs.rmSync(dir, { recursive: true, force: true });
-        } catch {
-          // Somebody else removed it first, which is the outcome we wanted anyway.
-        }
+        breakStaleLock(dir);
         continue;
       }
       if (Date.now() >= deadline) throw new LockTimeoutError(dir);

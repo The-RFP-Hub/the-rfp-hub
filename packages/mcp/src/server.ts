@@ -99,6 +99,10 @@ interface ToolDispatchSeams {
  *
  * The instance properties SHADOW the prototype methods, which is what makes this work: the
  * dispatcher calls them through `this`.
+ *
+ * This is also where the write tool's attempt budget is charged for a call that never reaches the
+ * handler, and where an unknown tool name is turned into a coded answer instead of a bare protocol
+ * error. Both are failures the dispatcher owns, and neither is visible from inside a callback.
  */
 function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
   const seams = server as unknown as ToolDispatchSeams;
@@ -122,11 +126,33 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
     try {
       return await validate(tool, args, toolName);
     } catch (err) {
+      // THE WRITE TOOL'S ATTEMPT BUDGET IS SPENT HERE, on this path only.
+      //
+      // A call that gets past validation spends its attempt inside the handler, so charging here
+      // as well would bill every legitimate submission twice. But a call rejected BEFORE the
+      // handler never reaches that line — and rejection is the cheap, repeatable case, which is
+      // exactly what an attempt budget exists to meter. Left uncharged, malformed arguments were
+      // the one way to drive the write tool in an unmetered loop.
+      //
+      // A refusal here must never be masked by a refusal about the budget: the caller's arguments
+      // are still wrong, and `rate_limited` would send them to fix the wrong thing. So the charge
+      // is best-effort, and the schema error is what comes back either way.
+      const kind: ToolKind = toolName === submitTool.TOOL_NAME ? "attempt" : "read";
+      if (kind === "attempt") {
+        try {
+          ctx.policy.consume("attempt");
+        } catch {
+          // Already over budget, or the store is unusable. Either way the argument error below is
+          // the more useful thing to return.
+        }
+      }
       const detail = redactString(err instanceof Error ? err.message : String(err));
       appendAudit(ctx.config.home, {
         at: new Date(started).toISOString(),
         tool: toolName,
-        kind: "read",
+        // The audit line names the tool that was called and the budget it drew on, not a generic
+        // `read` that would make every rejected submission look like a search in the log.
+        kind,
         status: "invalid_input",
         inputSummary: summarizeInput(args),
         durationMs: Date.now() - started,
@@ -165,7 +191,12 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
   const registry = seams._registeredTools;
   seams._registeredTools = new Proxy(registry, {
     get(target, name, receiver) {
-      if (typeof name !== "string" || Reflect.has(target, name)) {
+      // `Object.hasOwn`, NOT `Reflect.has`: the latter walks the prototype chain, so `toString`,
+      // `constructor`, `valueOf` and every other `Object.prototype` member would be reported as
+      // present and handed back as-is. A caller asking for a tool named `constructor` would then
+      // get the SDK trying to dispatch to a function that is not a tool at all, instead of the
+      // plain answer that no such tool exists.
+      if (typeof name !== "string" || Object.hasOwn(target, name)) {
         return Reflect.get(target, name, receiver);
       }
       return {
@@ -174,6 +205,9 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
           appendAudit(ctx.config.home, {
             at: new Date().toISOString(),
             tool: name,
+            // `read` because nothing was read, written or previewed — the name resolved to
+            // nothing. There is no budget to charge for a tool that does not exist, and inventing
+            // a kind for it would put a phase in the log that never happened.
             kind: "read",
             status: "tool_not_found",
             inputSummary: { keys: [], bytes: 0 },
