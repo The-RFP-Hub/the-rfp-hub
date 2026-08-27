@@ -12,6 +12,7 @@ import {
   DEFAULT_SELECTION,
   FUNDING_TYPES,
   ORDERINGS,
+  RETAINED_VALUE_DISPLAY_LIMIT,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
   dateInputValue,
@@ -20,6 +21,7 @@ import {
   selectionFromParams,
   selectionToHref,
   selectionToParams,
+  truncateForDisplay,
 } from "@/lib/directory";
 import { describeAward, describeDeadline, formatAmount, nextFixedDeadline } from "@/lib/format";
 import type { Deadline } from "@/lib/types";
@@ -149,6 +151,33 @@ describe('what the <input type="date"> control displays', () => {
     expect(dateInputValue("")).toBe("");
     expect(dateInputValue("   ")).toBe("");
     expect(dateInputValue("not a date")).toBe("");
+  });
+});
+
+describe("what the retained-value hint shows for a value the picker can't display in full", () => {
+  it("leaves a short value untouched", () => {
+    expect(truncateForDisplay("2026-09-01T15:30:00.000Z")).toBe("2026-09-01T15:30:00.000Z");
+  });
+
+  it("bounds a value at the URL's own length limit, keeping the recognizable prefix", () => {
+    // A query parameter has no length limit of its own — this is what stops an absurd one from
+    // reaching the DOM whole and, on a narrow viewport, forcing the page wider than the screen.
+    const value = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
+    const shown = truncateForDisplay(value);
+    expect(shown.length).toBeLessThan(value.length);
+    expect(shown.length).toBeLessThanOrEqual(RETAINED_VALUE_DISPLAY_LIMIT + 1); // +1 for the ellipsis
+    expect(shown.startsWith("2026-09-01T15:30:00.000Z")).toBe(true);
+    expect(shown.endsWith("…")).toBe(true);
+  });
+
+  it("never sends the truncated form — directoryQuery reads the field's own raw value", () => {
+    const value = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
+    // The display helper and the query builder are independent: truncating for the DOM must never
+    // leak into what actually reaches the endpoint.
+    expect(directoryQuery({ ...DEFAULT_SELECTION, deadlineAfter: value }).deadlineAfter).toBe(
+      value,
+    );
+    expect(truncateForDisplay(value)).not.toBe(value);
   });
 });
 

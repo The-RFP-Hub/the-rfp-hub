@@ -197,6 +197,25 @@ export function dateInputValue(value: string): string {
   return match?.[1] ?? "";
 }
 
+/** How much of a raw, retained URL value the "exact value from the link" hint will ever show. */
+export const RETAINED_VALUE_DISPLAY_LIMIT = 200;
+
+/**
+ * Bounds how much of an arbitrary, reader-supplied URL value ever reaches the DOM as text.
+ *
+ * The value this feeds (`deadlineAfter`/`deadlineBefore`'s raw, untouched selection field) comes
+ * straight from the address bar with no length limit of its own — a query param can be kilobytes
+ * long. Showing it verbatim would let a single absurd link balloon the page's layout and the DOM
+ * itself; truncating it is a display concern only; `directoryQuery` above never calls this, so the
+ * FULL value is still exactly what reaches the endpoint.
+ */
+export function truncateForDisplay(
+  value: string,
+  limit: number = RETAINED_VALUE_DISPLAY_LIMIT,
+): string {
+  return value.length > limit ? `${value.slice(0, limit)}…` : value;
+}
+
 /**
  * The querystring for one selection.
  *
