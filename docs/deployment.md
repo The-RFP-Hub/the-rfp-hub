@@ -483,16 +483,28 @@ proving the **tarball on the registry**, so pass it explicitly here.
 Nothing is promoted to `latest` on the strength of the publish succeeding. `latest` is what an
 unpinned install resolves to, and it is the one decision that cannot be quietly taken back.
 
-**Then re-run the frontend clean-room against the published ranges**, because 0.3.1 is what
-unblocks it:
+**Then re-run the frontend clean-room against the newly published ranges**, because 0.3.1 is what
+unblocks it. Pass them explicitly — the script still defaults to the previous pair at this point:
 
 ```sh no-run
 RFPHUB_STANDARD_SPEC='^3.1.0' RFPHUB_VALIDATE_SPEC='^0.3.1' \
   pnpm frontend:clean-room --browser
 ```
 
-Green here retires the local-tarball workaround in `packages/frontend/README.md` and in
-[§9](#9-the-frontend-three-ways-to-deploy-a-copy) below; delete both notes in the same change.
+**Green here is what licenses the last step of the release: flip the script's defaults.**
+`scripts/frontend-clean-room.mjs` hard-codes the fallback ranges (`^3.0.0` / `^0.3.0`), and they
+are only correct while those are the newest published versions. In one change:
+
+* `scripts/frontend-clean-room.mjs` — the two `??` fallbacks, to `^3.1.0` and `^0.3.1`;
+* `.github/workflows/external-deploy-smoke.yml` — its `mode` input defaults to `packed` (build the
+  validator from the checkout) precisely because `published` could not work; flip that default to
+  `published`. Its `standard-spec` / `validate-spec` inputs are empty strings that fall through to
+  the script's own defaults, so the previous bullet is what fixes them;
+* `packages/frontend/README.md` and [§9](#9-the-frontend-three-ways-to-deploy-a-copy) of this guide
+  — delete the local-tarball workaround from both, and the ranges quoted alongside it.
+
+Leaving the defaults behind is not cosmetic: it is what keeps the next person's bare
+`pnpm frontend:clean-room` proving the current release rather than the previous one.
 
 ### 7.7 The MCP Registry
 
@@ -666,13 +678,20 @@ cannot reach the API still returns a `200` shell and passes. `--browser` drives 
 Chromium and waits for a row to render from a live request. `--require-publishers` turns a `404` on
 `/publishers` from a warning into a failure.
 
-Two environment variables select the dependency specs, one per package:
-`RFPHUB_STANDARD_SPEC` (`^3.1.0`) and `RFPHUB_VALIDATE_SPEC` (`^0.3.1`). An absolute path ending in
+Two environment variables select the dependency specs, one per package. **The script's own
+defaults are `RFPHUB_STANDARD_SPEC=^3.0.0` and `RFPHUB_VALIDATE_SPEC=^0.3.0`** — the versions that
+resolve on the registry today, so a bare `pnpm frontend:clean-room` needs no arguments to reach the
+install step. Override either to test a range that is not published yet; an absolute path ending in
 `.tgz` is used as a local tarball instead of a registry range.
 
-**Until `rfphub-validate` 0.3.1 is published**, the registry range fails the build with a `TS2305`
-— the published 0.3.0 tarball predates the `humanizeIssues` export the frontend imports. Point the
-script at a locally built tarball in the meantime:
+The defaults are a fact about the registry, not a preference, so they move when the registry does:
+publishing 3.1.0 and 0.3.1 is what makes `^3.1.0` / `^0.3.1` the right defaults, and flipping them
+is a step of the release ([§7.6](#76-prove-the-next-tag-then-promote)). Until then, passing the
+newer ranges by hand is how you test them.
+
+**And until `rfphub-validate` 0.3.1 is published, the default `^0.3.0` fails the build** with a
+`TS2305`: the published 0.3.0 tarball predates the `humanizeIssues` export the frontend imports.
+That is the one case where the default cannot work, and the way through is a locally built tarball:
 
 ```sh no-run
 # The Standard FIRST — `rfphub-validate` imports it, and resolves it through its dist. Without
