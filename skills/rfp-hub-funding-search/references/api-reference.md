@@ -28,8 +28,8 @@ never silently ignored.
 | `deadlineBefore` | RFC 3339 instant | Same derivation |
 | `sort` | enum | `nextDeadlineAt` (default) \| `opensAt` \| `postedAt` \| `updatedAt` \| `createdAt` |
 | `order` | enum | `asc` (default) \| `desc` |
-| `page` | integer ≥ 1 | Default `1` |
-| `limit` | integer, 1–100 | Default `20` on the API. **This skill's scripts cap it at 25** regardless of what's requested |
+| `page` | integer ≥ 1 | Default `1` on the API. **This skill's scripts reject a non-integer value** (e.g. `2.5`) as a usage error rather than rounding it |
+| `limit` | integer, 1–100 | Default `20` on the API. **This skill's scripts cap it at 25** regardless of what's requested, and reject a non-integer value the same way as `page` |
 
 ### `fundingType` values
 `grant`, `hackathon`, `bounty`, `accelerator`, `vc_fund`, `rfp` — a closed enum on the Standard
@@ -39,6 +39,10 @@ schema (`packages/standard/schemas/v1.0.0/opportunity.schema.json`).
 `upcoming` (announced, not yet accepting applications — there is no separate "draft" state),
 `open`, `closed`, `archived`. Editorial review state (pending/rejected) is server-side metadata and
 is never one of these values — every status here describes something publicly listed.
+
+**The raw API applies no default** — omitting `status` returns every status. **This skill's
+`search.mjs` does apply one**: it sends `status=open` unless the caller passes `--status`
+explicitly. Pass `--status upcoming,open,closed,archived` (or any subset) to see anything else.
 
 ### About `nextDeadlineAt`
 `nextDeadlineAt` is **not a field in the response body** — it's a derived sort/filter key, computed
@@ -109,8 +113,8 @@ Both `scripts/search.mjs` and `scripts/get.mjs` use the same exit codes:
 
 | Code | Meaning |
 |---|---|
-| `0` | Success — including an empty result set |
-| `1` | Usage error: bad or unknown flag, invalid `--limit`, missing `<id>` for `get.mjs` |
+| `0` | Success — including an empty result set, or a page past the last one |
+| `1` | Usage error, caught BEFORE any network call: an unknown flag, an invalid `--format` (only `json`/`table` are accepted), an unexpected extra positional argument, a non-integer `--limit`/`--page`, or a missing `<id>` for `get.mjs` |
 | `2` | Network error or timeout reaching the API |
 | `3` | HTTP 4xx from the API (not 429) — e.g. a validation error, or 404 |
 | `4` | HTTP 429 — rate limited; the message reports `Retry-After` when the API sends it |

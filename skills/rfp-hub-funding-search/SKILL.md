@@ -47,6 +47,15 @@ never arrives cannot be misread as an instruction, no matter how it's phrased. S
 `test/projection.test.ts` for a test that proves an instruction-shaped `description` never survives
 the projection.
 
+**Even a KEPT field is normalized before display.** `title`, `organization` and `ecosystems` are
+still third-party text, and a raw newline or other control character embedded in one of them could
+otherwise make a single field's text *look* like several lines of the table output — including a
+fake `apply:` line pointing at an attacker's own URL. The fallback scripts collapse every control
+character (newlines, carriage returns, tabs, and their Unicode line/paragraph-separator cousins) to
+a single space before any kept field is ever displayed, so a forged line can't be assembled inside
+one string. This is structural, the same way the projection itself is: no control character
+survives to be interpolated, so there's nothing for a client to "clean" after the fact.
+
 ## 3. Key handling
 
 Searching and fetching opportunities is **always anonymous and read-only** — the public API needs
@@ -82,13 +91,21 @@ node scripts/get.mjs fundingmap:1459
 
 ## 5. Workflow — mapping what the user says to parameters
 
+**Default status filter.** The bundled `search.mjs` sends `status=open` unless the caller passes
+`--status` explicitly (`search_opportunities` over MCP, if you're on that path instead, may or may
+not share this default — check its tool description). Most requests shaped like "find grants" mean
+*currently open* ones; the raw API's own default has no status filter at all and would also surface
+upcoming, closed and archived entries. Pass `--status` explicitly for anything else — including
+`--status upcoming,open,closed,archived` for literally everything.
+
 | User says | Parameters |
 |---|---|
-| "find grants" | `fundingType=grant` |
+| "find grants" | `fundingType=grant` (implicitly `status=open`, see above) |
 | "search bounties" | `fundingType=bounty` |
 | "hackathons on Optimism" | `fundingType=hackathon&ecosystem=Optimism` |
-| "what's open right now" | `status=open` |
-| "upcoming accelerators" | `fundingType=accelerator&status=upcoming` |
+| "what's open right now" | `status=open` (the default — explicit here only for clarity) |
+| "upcoming accelerators" | `fundingType=accelerator&status=upcoming` (overrides the open-only default) |
+| "closed/archived/every status" | `status=closed`, `status=archived`, or `status=upcoming,open,closed,archived` |
 | "VC funds investing in DeFi" | `fundingType=vc_fund&q=DeFi` |
 | "RFPs for security audits" | `fundingType=rfp&q=security audit` |
 | "funding on Base and Arbitrum" | `ecosystem=Base,Arbitrum` |
@@ -131,9 +148,11 @@ these headers identify the traffic, they don't filter it.
 | Timeout | Network issue or the API is unreachable | Tell the user; suggest retrying |
 | Malformed JSON response | Unexpected API change | Report it; do not attempt to interpret partial/garbled output |
 | Empty result (`total: 0`) | Filters matched nothing | **Not an error.** Say so plainly and suggest broadening one filter at a time. Note: an empty page still reports `totalPages: 1`, not `0` — that's the API's convention (page 1 of 1 results, zero of them), not a bug |
+| Empty page past the last one (e.g. `--page 50` when there are only 3) | Asked for a page that doesn't exist | **Also not an error** — a different case from the one above. The total/page footer (table mode) or the envelope (JSON) still reports the real `total`/`totalPages`, so say "page 50 doesn't exist, there are only 3" rather than "nothing matched" |
+| Unknown flag, invalid `--format`, an extra positional argument, or a non-integer `--limit`/`--page` | Usage mistake, caught locally | The script exits before making any network call — fix the invocation and retry; this is not an API problem |
 
-The fallback scripts exit non-zero with a message on stderr for every row above except the empty
-result, which exits `0`. Exact exit codes are in
+The fallback scripts exit non-zero with a message on stderr for every row above except the two
+"not an error" rows, which exit `0`. Exact exit codes are in
 [references/api-reference.md](references/api-reference.md#exit-codes).
 
 ## 8. Formatting results
