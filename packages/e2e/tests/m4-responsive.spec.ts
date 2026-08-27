@@ -98,6 +98,44 @@ async function expectTouchTarget(locator: Locator, label: string): Promise<void>
   ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 }
 
+/**
+ * Waits for a `ResourceView`-driven read to SETTLE before anything measures layout against it.
+ *
+ * `states.tsx`'s `Loading` placeholder (`output.state.loading`) is a deliberately minimal,
+ * fixed-height box — measuring overflow against it proves nothing about the page a reader actually
+ * sees. `content` is whatever locator proves THIS page's real data rendered (a fixture's own row or
+ * card); the shared empty (`.state.empty`) and error (`.callout.state.error`) containers race
+ * against it too, because either of those is just as much a "loaded" outcome as content is. Once one
+ * of the three wins, the loading placeholder itself must actually be gone — `useResource` never
+ * renders it alongside a result, but this is what proves that rather than assuming it.
+ */
+async function waitForLoaded(page: Page, content: Locator, timeout = 20_000): Promise<void> {
+  await Promise.any([
+    content.first().waitFor({ state: "visible", timeout }),
+    page.locator(".state.empty").first().waitFor({ state: "visible", timeout }),
+    page.locator(".callout.state.error").first().waitFor({ state: "visible", timeout }),
+  ]);
+  await expect(page.locator("output.state.loading")).toHaveCount(0);
+}
+
+/**
+ * The `/publishers` equivalent of `waitForLoaded`, for a page this repository cannot inspect (it
+ * may not exist here at all — see the module comment). Without a page-specific "real content"
+ * locator to race against empty/error, this settles for the two page-shape-agnostic signals
+ * available: the shared loading placeholder actually clearing if it ever appeared, and the
+ * browser's own network-idle signal as a second, independent proxy for the page's initial fetch
+ * having settled.
+ */
+async function waitForResourceSettled(page: Page): Promise<void> {
+  const loading = page.locator("output.state.loading").first();
+  const appeared = await loading
+    .waitFor({ state: "visible", timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (appeared) await loading.waitFor({ state: "hidden", timeout: 20_000 });
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+}
+
 /** The directory's main filter controls — the ones a thumb actually has to hit on a phone. */
 async function expectDirectoryControlsAreTouchable(page: Page): Promise<void> {
   await expectTouchTarget(page.getByLabel("Search", { exact: true }), "the Search box");
@@ -138,8 +176,19 @@ test.describe("M4 responsive layout", () => {
 
       try {
         // ── `/` — the directory ──────────────────────────────────────────────────────────────
+        // The heading is STATIC markup rendered beside `<DirectoryList/>`, not inside the
+        // `ResourceView` it drives (`app/page.tsx`) — it is visible well before the list's own
+        // fetch resolves, so it proves nothing about whether real content has rendered yet.
+        // `waitForLoaded` below, racing this fixture's own row against the shared empty/error
+        // containers, is what actually proves the page a reader would see rather than a loading
+        // skeleton.
         await page.goto(stack.urls.frontend);
         await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
+        const listedEntry = page.getByRole("link", {
+          name: new RegExp(`Responsive layout probe ${stamp}`),
+        });
+        await waitForLoaded(page, listedEntry);
+        await expect(listedEntry).toBeVisible();
         await expectNoHorizontalOverflow(page, "/");
 
         if (isMobile) {
@@ -151,6 +200,9 @@ test.describe("M4 responsive layout", () => {
         // ── `/opportunities/{id}` — one entry ────────────────────────────────────────────────
         await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
         const apply = page.getByRole("link", { name: /Apply on the programme’s own site/ });
+        // The apply action only renders once the entry's own data has loaded, so this doubles as
+        // the content signal `waitForLoaded` races against empty/error.
+        await waitForLoaded(page, apply);
         await expect(apply).toBeVisible();
         await expectNoHorizontalOverflow(page, `/opportunities/${id}`);
 
@@ -190,6 +242,11 @@ test.describe("M4 responsive layout", () => {
             "/publishers: responded, but no heading naming publishers was found -- a blank or " +
               "broken page must fail this test, not be treated as the route being absent",
           ).toBeVisible();
+          // The heading can be static markup beside the page's own `ResourceView`, exactly like the
+          // directory's — so it says the route rendered SOMETHING, not that its data has loaded.
+          // `waitForResourceSettled` is the page-shape-agnostic wait for that (see its own comment
+          // for why this page gets a different helper from `/` and the entry page above).
+          await waitForResourceSettled(page);
           await expectNoHorizontalOverflow(page, "/publishers");
         }
       } finally {
