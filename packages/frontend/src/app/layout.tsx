@@ -2,28 +2,24 @@ import { Chrome } from "@/components/Chrome";
 import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
 import { fontVariables } from "@/lib/fonts";
 import { AppProviders } from "@/lib/session";
-import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: {
-    default: "Directory | RFP Hub",
-    template: "%s | RFP Hub",
-  },
-  description:
-    "An open index of funding opportunities under one standard: read it without an account, and — for publishers — submit and maintain listings, read their traffic, and run the review queues.",
-  /*
-   * INDEXING STAYS OFF, even though half of this app is now public.
-   *
-   * It is not a statement about the directory's audience; it is a statement about this deployment.
-   * Nothing here is served from a canonical public host yet — there is no pipeline and no registered
-   * domain for it (see the deployment section of the README) — and a preview URL that indexes is a
-   * preview URL competing with the real one for every listing it carries. Turning this on is an
-   * operator decision to take once the directory has an address worth indexing, not a default to
-   * inherit from a build.
-   */
-  robots: { index: false, follow: false },
-};
+/**
+ * `generateMetadata`, NOT a static `metadata` object — because `robots` is the one field here that
+ * cannot be a build-time constant any more, and its logic lives in `lib/root-metadata.ts` (see that
+ * file's own comment for why it is not defined inline: it needs to be importable without also
+ * importing `next/font/google` by way of `lib/fonts.ts` below, which has no transform under this
+ * package's test runner).
+ *
+ * INDEXING IS CONDITIONAL ON THE CANONICAL ORIGIN, not unconditionally on. It was off while nothing
+ * here was served from a canonical public host at all — a preview URL that indexed would compete
+ * with the real one for every listing it carries — and that reasoning has not gone away, it has
+ * just moved from "no deployment qualifies" to "exactly one does". See `lib/site-origin.ts` for the
+ * mechanism: staging and every Vercel preview leave `NEXT_PUBLIC_SITE_ORIGIN` unset, so they stay
+ * `noindex` — the fail-closed direction: forgetting to set the variable costs production its
+ * indexing rather than costing staging its privacy.
+ */
+export { generateMetadata } from "@/lib/root-metadata";
 
 /**
  * EVERY PAGE IS RENDERED PER REQUEST, and it is the Content-Security-Policy that requires it.

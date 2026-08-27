@@ -31,15 +31,17 @@ and nothing else, whoever asks.
 
 ## Environment
 
-**One** variable, `NEXT_PUBLIC_`, **inlined at build time**. Setting it on a running host changes
-nothing until the next build — the frontend says so on screen when it is missing, because it is the
-most common way to lose an afternoon here. Copy `.env-example` to `.env.local` to start.
+Two variables, both `NEXT_PUBLIC_`, both **inlined at build time**. Setting either on a running host
+changes nothing until the next build — the frontend says so on screen when `NEXT_PUBLIC_API_URL` is
+missing, because it is the most common way to lose an afternoon here. Copy `.env-example` to
+`.env.local` to start.
 
 | Variable | What it is |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
+| `NEXT_PUBLIC_API_URL` | **Required, every environment.** Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
+| `NEXT_PUBLIC_SITE_ORIGIN` | **Optional, and set ONLY on production.** The one origin this deployment considers itself the canonical, indexable copy of the site — e.g. `https://ethrfps.app`. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` compare it against the incoming request's own origin (`src/lib/site-origin.ts`) and index, sitemap and allow-crawl **only when they match**. Left unset, as it is on staging and on every Vercel preview, the deployment always answers `noindex` and `Disallow: /` — the fail-closed direction, so forgetting to set it costs production its search presence rather than costing a preview its privacy. |
 
-It is not a secret — an API origin is an identifier, readable by anyone who loads the page.
+Neither is a secret — an origin is an identifier, readable by anyone who loads the page.
 **Nothing secret may ever be added with this prefix.** This package holds no server-side credential
 at all.
 
@@ -98,6 +100,7 @@ change the environment every other suite executes in.
 |---|---|
 | `/` | The directory. Every published opportunity, from `GET /v1/opportunities`: title, organisation, next deadline and award, with search, funding-type / status / ecosystem filters, ordering and pagination. Every filter is a parameter that endpoint declares — it validates its querystring with `additionalProperties: false`, so an invented one is a 400 rather than a control that quietly does nothing. Below the listing, the demoted sign-in card for publishers. |
 | `/opportunities/[id]` | One published opportunity in full, from `GET /v1/opportunities/{id}` — **the read the API counts as a detail view**. Dates, money, organisations, milestones, eligibility, links, the type-specific `fundingDetails` block verbatim, the provenance and source-check state the payload exposes, and the public, redacted change history from the audit route. The "open the application page" action goes through `/v1/r/{id}/apply`. |
+| `/publishers` | Every verified organisation, from `GET /v1/publishers` — one unauthenticated call, no pagination, ordered deterministically by slug. Each card links to `/?organization=<slug>`, which matches any operating or sponsoring organisation on that listing. `logoUrl` is never rendered as an `<img>` (see the CSP section below); it is a link, or nothing. |
 
 ### Signed in — the workbench
 
@@ -223,11 +226,19 @@ the root layout). A prerendered page cannot carry a nonce a later request's head
 is no server-side content to cache anyway — the public directory is fetched in the browser like
 every other screen here.
 
-**Indexing stays off** (`robots: { index: false }` in the root layout), even though half the app is
-now public. That is a statement about this deployment, not about the directory's audience: nothing
-here is served from a canonical public host yet, and a preview URL that indexes competes with the
-real one for every listing it carries. Turning it on is an operator decision to take once the
-directory has an address worth indexing.
+**Indexing is on — on ONE origin, and never by accident anywhere else.** `src/app/layout.tsx`'s
+`generateMetadata`, `sitemap.ts` and `robots.ts` all call `isCanonicalRequest()`
+(`src/lib/site-origin.ts`), which is true only when the incoming request's own origin matches
+`NEXT_PUBLIC_SITE_ORIGIN` — a variable set ONLY on the production deployment (see "Environment"
+above and `.github/workflows/frontend-production.yml`). Every other host this app answers on — this
+dev server, staging, a Vercel preview, a self-hosted copy that has not set the variable — resolves
+`false` and gets `noindex`, an empty sitemap and a blanket `Disallow: /`. It used to be off
+everywhere for a simpler reason — nothing was served from a canonical address at all, and a preview
+URL that indexed would have competed with the real one for every listing it carried — and that
+reasoning has not gone away, it has just narrowed from "no deployment qualifies" to "exactly one
+does, and it names itself." The request origin itself is still derived from the incoming `Host`
+header rather than hard-coded, so a self-hosted copy of this reference frontend that sets its own
+`NEXT_PUBLIC_SITE_ORIGIN` gets a correct, self-describing sitemap for its own hostname.
 
 ---
 
@@ -266,10 +277,14 @@ public API:
    deployment's own origin to the API's `TRUSTED_ORIGINS` — without it the browser's preflight for
    the sign-in calls is refused and nobody can log in, while the public directory keeps working
    (`/v1` is `origin: "*"`). That asymmetry is the symptom to recognise.
-4. `output: "standalone"` is set, so a self-hosted deployment runs `node .next/standalone/server.js`
+4. Leave `NEXT_PUBLIC_SITE_ORIGIN` **unset**, unless this deployment IS the one canonical, indexable
+   copy of the site — setting it anywhere else (a staging alias, a second self-hosted copy) makes
+   that deployment index itself and compete with the real one in search results. See "Environment"
+   above.
+5. `output: "standalone"` is set, so a self-hosted deployment runs `node .next/standalone/server.js`
    with `.next/static` and `public/` copied alongside it.
 
-Redeploy on every configuration change: the variable is baked into the bundle.
+Redeploy on every configuration change: both variables are baked into the bundle.
 
 If a pipeline is added later, it needs exactly two things this repository does not yet have — a
 build step with a per-environment API origin, and a way to register each preview URL with the API's
