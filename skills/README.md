@@ -47,14 +47,29 @@ cp -R skills/rfp-hub-funding-search ~/.claude/skills/
 cp -R skills/rfp-hub-funding-search .agents/skills/
 cp -R skills/rfp-hub-funding-search ~/.agents/skills/
 
+# Cursor — project-local or global (cursor.com/docs/skills confirms both; also honors .claude/skills
+# and .codex/skills for compatibility, so the Claude Code and Codex copies above work too)
+cp -R skills/rfp-hub-funding-search .cursor/skills/
+cp -R skills/rfp-hub-funding-search ~/.cursor/skills/
+
+# GitHub Copilot (CLI, coding agent, and IDE integrations) — repository-level or, for the CLI,
+# global (docs.github.com confirms these; .agents/skills above is ALSO a valid Copilot location)
+cp -R skills/rfp-hub-funding-search .github/skills/
+cp -R skills/rfp-hub-funding-search ~/.copilot/skills/
+
 # Gemini CLI
 cp -R skills/rfp-hub-funding-search ~/.gemini/skills/
 ```
 
-**Cursor / GitHub Copilot**: both have announced or shipped Agent Skills support compatible with
-this same `SKILL.md` format; consult their current docs for the install path *(verify)* — this
-repository does not pin a location for them because neither has published one this project has
-independently confirmed.
+Cursor and GitHub Copilot paths confirmed against their official docs:
+[cursor.com/docs/skills](https://cursor.com/docs/skills) and
+[docs.github.com/en/copilot/concepts/agents/about-agent-skills](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills)
+(repository-level path) /
+[docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills)
+(adds the global `~/.copilot/skills` path, CLI-specific).
+
+**Other Agent-Skills-compatible tools**: copy the directory to the location their own docs
+specify — the bundle itself (`SKILL.md` + `scripts/` + `references/`) needs no per-agent changes.
 
 ## Why there's no npm channel
 
