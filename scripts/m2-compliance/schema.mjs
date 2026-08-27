@@ -39,6 +39,69 @@ function componentsForAjv(schemas) {
   return out;
 }
 
+/**
+ * The keywords whose VALUE is a map from a name to a schema, rather than a schema itself.
+ *
+ * They exist here for one reason: a document is free to declare a property literally called
+ * `$id`, and under `properties` that string is a NAME. Walking it as a schema keyword would delete
+ * the property from the copy and the checker would then accept a body missing it.
+ */
+const SCHEMA_MAPS = new Set([
+  "properties",
+  "patternProperties",
+  "$defs",
+  "definitions",
+  "dependentSchemas",
+]);
+
+/**
+ * Deep-copy a schema taken from the served document, rebasing every internal `$ref` onto the
+ * registered bundle and dropping the `$id`s that would otherwise re-anchor them.
+ *
+ * A `$ref` in the served document is written against the DOCUMENT — `#/components/schemas/…` — and
+ * ajv resolves `#` against whatever schema it is compiling. Compile that fragment on its own and
+ * `#` is the fragment, so the pointer resolves to nothing. The components are registered under
+ * `OAS_ID`, so prefixing the pointer with it points the reference back at the document it was
+ * written against.
+ *
+ * Doing it at every depth rather than only at the root is what the 404 of
+ * `GET /v1/opportunities/{id}` needs: it is declared as an INLINE
+ * `oneOf: [ErrorResponse, MergedOpportunityErrorResponse]` — a merged id answers a 404 that names
+ * the survivor, an ordinary miss answers the plain error — and a root-only rebase compiled that
+ * object as-is, so the whole check failed with "can't resolve reference
+ * #/components/schemas/ErrorResponse from id #" and took the nightly gate red with it.
+ *
+ * `$id` is dropped for the reason `componentsForAjv` gives at the root, applied at depth: ajv reads
+ * one as a schema identity and rebases every pointer inside it onto that identity, which undoes the
+ * rebase this function just performed.
+ */
+function schemaForAjv(node) {
+  if (Array.isArray(node)) return node.map(schemaForAjv);
+  if (node === null || typeof node !== "object") return node;
+
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "$id") continue;
+    if (key === "$ref" && typeof value === "string" && value.startsWith("#")) {
+      out[key] = OAS_ID + value;
+      continue;
+    }
+    if (
+      SCHEMA_MAPS.has(key) &&
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      out[key] = Object.fromEntries(
+        Object.entries(value).map(([name, sub]) => [name, schemaForAjv(sub)]),
+      );
+      continue;
+    }
+    out[key] = schemaForAjv(value);
+  }
+  return out;
+}
+
 export class OpenApiBundle {
   constructor(doc) {
     this.doc = doc;
@@ -58,10 +121,9 @@ export class OpenApiBundle {
     const key = JSON.stringify(schema);
     let validate = this.cache.get(key);
     if (!validate) {
-      // A `$ref` is rebased onto the registered bundle so its own internal cross-refs resolve; an
-      // inline schema is compiled as-is (nothing in the published surface uses one today).
-      const target = typeof schema?.$ref === "string" ? { $ref: OAS_ID + schema.$ref } : schema;
-      validate = this.ajv.compile(target);
+      // Every `$ref` is rebased onto the registered bundle, at every depth — a bare `$ref` and an
+      // inline composition of component refs are the same case, and the published surface has both.
+      validate = this.ajv.compile(schemaForAjv(schema));
       this.cache.set(key, validate);
     }
     return validate;
