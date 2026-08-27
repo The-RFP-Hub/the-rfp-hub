@@ -350,8 +350,56 @@ describe("the public directory list", () => {
     mount(client, <DirectoryList />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.getByText(/must NOT have additional properties/)).toBeTruthy();
+    // A 400 from the list route names its OWN querystring, so it gets a dedicated panel rather than
+    // the generic "we couldn't load" one — and the message appears twice on purpose: once up front,
+    // and once again inside the closed technical details alongside the machine-readable code.
+    expect(screen.getAllByText(/must NOT have additional properties/).length).toBeGreaterThan(0);
     expect(screen.getByText(/validation_failed/)).toBeTruthy();
+  });
+
+  it("names the bad parameter on a 400 from a filter, rather than a generic failure", async () => {
+    // Exactly what `querystring/minAward must be number` looks like coming off ajv's `instancePath`
+    // — the case a bad `type`/`format` on one of the new filters actually produces.
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(400, "bad_request", "querystring/minAward must be number");
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByText("These filters aren’t valid.")).toBeTruthy();
+    expect(screen.getAllByText("querystring/minAward must be number").length).toBeGreaterThan(0);
+    // A clear way out, not just a "try again" that would fail identically.
+    expect(screen.getByRole("link", { name: "Clear the filters" })).toBeTruthy();
+  });
+
+  it("lists structured issues on a 400 that carries them", async () => {
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(400, "validation_failed", "the querystring failed validation", {
+          issues: [{ path: "/deadlineAfter", message: 'must match format "date-time"' }],
+        });
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByText("/deadlineAfter", { selector: "code" })).toBeTruthy();
+    expect(screen.getByText(/must match format/)).toBeTruthy();
+  });
+
+  it("does NOT use the filter-specific 400 panel for a non-400 failure", async () => {
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(500, "internal_error", "internal server error");
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.queryByText("These filters aren’t valid.")).toBeNull();
+    expect(screen.getByText(/We couldn.t load the directory/)).toBeTruthy();
   });
 });
 
@@ -435,6 +483,53 @@ describe("the directory's filters", () => {
     const href = String(navigation.push.mock.calls[0]?.[0]);
     expect(href).toContain("q=retrieval");
     expect(href).toContain("type=bounty");
+  });
+
+  it("exposes the newer filters — category, organization, award range and deadline range", async () => {
+    navigation.params = new URLSearchParams(
+      "category=infrastructure&organization=acme&minAward=5000&maxAward=50000&deadlineAfter=2026-09-01&deadlineBefore=2026-12-31",
+    );
+    const { client, list } = stub();
+    mount(client, <DirectoryList />);
+
+    await screen.findByText("Acme Foundation");
+    expect(list.mock.calls[0]?.[0]).toMatchObject({
+      category: "infrastructure",
+      organization: "acme",
+      minAward: 5000,
+      maxAward: 50000,
+      deadlineAfter: "2026-09-01T00:00:00.000Z",
+      deadlineBefore: "2026-12-31T23:59:59.999Z",
+    });
+    expect((screen.getByLabelText("Category") as HTMLInputElement).value).toBe("infrastructure");
+    expect((screen.getByLabelText("Organization") as HTMLInputElement).value).toBe("acme");
+    expect((screen.getByLabelText("Min award") as HTMLInputElement).value).toBe("5000");
+    expect((screen.getByLabelText("Max award") as HTMLInputElement).value).toBe("50000");
+    expect((screen.getByLabelText("Deadline after") as HTMLInputElement).value).toBe("2026-09-01");
+    expect((screen.getByLabelText("Deadline before") as HTMLInputElement).value).toBe("2026-12-31");
+  });
+
+  it("tells the reader the organization filter matches either side of the listing", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect(screen.getByText(/Matches the operating OR the sponsoring organization/)).toBeTruthy();
+  });
+
+  it("carries the newer filters on submit, same as every other control", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "acme" } });
+    fireEvent.change(screen.getByLabelText("Min award"), { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    const href = String(navigation.push.mock.calls[0]?.[0]);
+    const applied = new URLSearchParams(href.slice(href.indexOf("?")));
+    expect(applied.get("organization")).toBe("acme");
+    expect(applied.get("minAward")).toBe("1000");
   });
 
   it("makes 'include closed and upcoming' a real address rather than a hidden toggle", async () => {
