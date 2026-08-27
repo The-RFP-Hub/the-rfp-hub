@@ -39,6 +39,7 @@ import {
   type Ordering,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
+  dateInputValue,
   directoryQuery,
   isFiltered,
   selectionFromParams,
@@ -228,7 +229,8 @@ export function DirectoryList() {
             <input
               id="directory-min-award"
               type="number"
-              inputMode="numeric"
+              step="any"
+              inputMode="decimal"
               value={draft.minAward}
               onChange={(event) => setDraft({ ...draft, minAward: event.target.value })}
               placeholder="No minimum"
@@ -240,7 +242,8 @@ export function DirectoryList() {
             <input
               id="directory-max-award"
               type="number"
-              inputMode="numeric"
+              step="any"
+              inputMode="decimal"
               value={draft.maxAward}
               onChange={(event) => setDraft({ ...draft, maxAward: event.target.value })}
               placeholder="No maximum"
@@ -258,9 +261,24 @@ export function DirectoryList() {
             <input
               id="directory-deadline-after"
               type="date"
-              value={draft.deadlineAfter}
+              value={dateInputValue(draft.deadlineAfter)}
               onChange={(event) => setDraft({ ...draft, deadlineAfter: event.target.value })}
             />
+            {/*
+             * A value carried in from a shared or hand-edited URL can be a full instant
+             * (`2026-09-01T12:00:00Z`), not the bare day this picker can display — and the picker
+             * silently shows blank for anything it cannot parse. That would make an ACTIVE filter
+             * look like no filter at all, so the exact, untouched value stays visible as text
+             * whenever it carries more than the day the control shows. Submitting the form again
+             * without touching this field still sends this exact value, not the truncated day.
+             */}
+            {draft.deadlineAfter.trim() &&
+            dateInputValue(draft.deadlineAfter) !== draft.deadlineAfter.trim() ? (
+              <p className="hint">
+                Filtering on the exact value from the link:{" "}
+                <code>{draft.deadlineAfter.trim()}</code>
+              </p>
+            ) : null}
           </div>
 
           <div className={`field${draft.deadlineBefore.trim() ? " is-set" : ""}`}>
@@ -268,9 +286,16 @@ export function DirectoryList() {
             <input
               id="directory-deadline-before"
               type="date"
-              value={draft.deadlineBefore}
+              value={dateInputValue(draft.deadlineBefore)}
               onChange={(event) => setDraft({ ...draft, deadlineBefore: event.target.value })}
             />
+            {draft.deadlineBefore.trim() &&
+            dateInputValue(draft.deadlineBefore) !== draft.deadlineBefore.trim() ? (
+              <p className="hint">
+                Filtering on the exact value from the link:{" "}
+                <code>{draft.deadlineBefore.trim()}</code>
+              </p>
+            ) : null}
           </div>
 
           <div className="field field-action">

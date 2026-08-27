@@ -14,6 +14,7 @@ import {
   ORDERINGS,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
+  dateInputValue,
   directoryQuery,
   isFiltered,
   selectionFromParams,
@@ -96,6 +97,19 @@ describe("the directory querystring", () => {
     expect(query.maxAward).toBeUndefined();
   });
 
+  it("accepts a fractional award threshold — the control is not integer-only", () => {
+    // `step="any"` + `inputMode="decimal"` on the control (see DirectoryList) is what lets a reader
+    // TYPE "0.5" on a touch keyboard in the first place; this is the pure half of that fix, proving
+    // the value it produces actually survives the number parse rather than being dropped as NaN.
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      minAward: "0.5",
+      maxAward: "1500.25",
+    });
+    expect(query.minAward).toBe(0.5);
+    expect(query.maxAward).toBe(1500.25);
+  });
+
   it("passes a deadline value that is already a full instant straight through, unwidened", () => {
     // A hand-edited URL, or a value this module did not itself produce. Widening it a second time
     // would silently change what the reader asked for; the endpoint validates the result either way.
@@ -106,6 +120,39 @@ describe("the directory querystring", () => {
     expect(query.deadlineAfter).toBe("2026-09-01T12:00:00Z");
   });
 
+  it("never re-derives the query from the date picker's truncated display value", () => {
+    // If this ever read `dateInputValue(...)` instead of the raw field, a reader who loaded a link
+    // carrying a specific time of day and then re-submitted the form untouched would silently have
+    // that time replaced by midnight/end-of-day — a real precision loss `directoryQuery` must not
+    // introduce on its own.
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      deadlineAfter: "2026-09-01T15:30:00.000Z",
+      deadlineBefore: "2026-09-02T15:30:00.000Z",
+    });
+    expect(query.deadlineAfter).toBe("2026-09-01T15:30:00.000Z");
+    expect(query.deadlineBefore).toBe("2026-09-02T15:30:00.000Z");
+  });
+});
+
+describe('what the <input type="date"> control displays', () => {
+  it("shows a bare date exactly as given", () => {
+    expect(dateInputValue("2026-09-01")).toBe("2026-09-01");
+  });
+
+  it("extracts the day from a full instant, so an active filter is never shown as blank", () => {
+    expect(dateInputValue("2026-09-01T12:00:00Z")).toBe("2026-09-01");
+    expect(dateInputValue("2026-09-01T00:00:00.000Z")).toBe("2026-09-01");
+  });
+
+  it("falls back to blank for anything that isn't a date or doesn't start with one", () => {
+    expect(dateInputValue("")).toBe("");
+    expect(dateInputValue("   ")).toBe("");
+    expect(dateInputValue("not a date")).toBe("");
+  });
+});
+
+describe("the directory querystring", () => {
   it("drops an empty control instead of sending it blank", () => {
     const query = directoryQuery(DEFAULT_SELECTION);
 

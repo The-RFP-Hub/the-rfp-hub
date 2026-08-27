@@ -174,6 +174,30 @@ function instant(value: string, edge: "start" | "end"): string | undefined {
 }
 
 /**
+ * What `<input type="date">` should show for a deadline control's raw value.
+ *
+ * The control can only DISPLAY a bare `YYYY-MM-DD` — handed a full RFC 3339 instant (from a shared
+ * link, a hand-edited URL, or anywhere else this module didn't itself produce), a native date input
+ * silently renders BLANK. That is the bug this exists to prevent: a filter that is still active (it
+ * is still in the selection, and `directoryQuery` still sends it, untouched, for the endpoint to
+ * validate) would look exactly like no filter at all. This extracts the day so the picker shows the
+ * right one; it is a DISPLAY value only; `directoryQuery` above always reads the field's own raw,
+ * unaltered value, so a time-of-day carried by the instant is never lost by round-tripping through
+ * the day-only control the reader never touched.
+ *
+ * Returns `""` when the value is not a bare date and does not start with one — the control falls
+ * back to blank, same as it always did with anything it could not parse; the DirectoryList surfaces
+ * the literal, untouched value as text right next to it, so an active filter is still visible even
+ * then.
+ */
+export function dateInputValue(value: string): string {
+  const trimmed = value.trim();
+  if (DATE_ONLY.test(trimmed)) return trimmed;
+  const match = /^(\d{4}-\d{2}-\d{2})T/.exec(trimmed);
+  return match?.[1] ?? "";
+}
+
+/**
  * The querystring for one selection.
  *
  * Empty controls become `undefined` and are dropped by the client rather than sent blank: the list

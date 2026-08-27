@@ -509,6 +509,54 @@ describe("the directory's filters", () => {
     expect((screen.getByLabelText("Deadline before") as HTMLInputElement).value).toBe("2026-12-31");
   });
 
+  it("accepts a fractional award threshold on a touch keyboard's decimal mode", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const min = screen.getByLabelText("Min award") as HTMLInputElement;
+    const max = screen.getByLabelText("Max award") as HTMLInputElement;
+    // `step="any"` is what lets the browser accept a non-integer value at all; `inputMode="decimal"`
+    // is what puts a decimal key on a phone's on-screen keyboard in the first place.
+    expect(min.step).toBe("any");
+    expect(min.inputMode).toBe("decimal");
+    expect(max.step).toBe("any");
+    expect(max.inputMode).toBe("decimal");
+  });
+
+  it("shows a full-instant deadline as its day, not as a blank control", async () => {
+    // A link built from a full RFC 3339 instant rather than a bare day — exactly what `/publishers`
+    // or a hand-edited URL can carry. A native `<input type="date">` cannot parse that and silently
+    // renders blank, which would make an ACTIVE filter look like no filter at all.
+    navigation.params = new URLSearchParams("deadlineAfter=2026-09-01T15:30:00.000Z");
+    const { client, list } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect((screen.getByLabelText("Deadline after") as HTMLInputElement).value).toBe("2026-09-01");
+    // The exact retained value stays visible as text, so nothing about the extra precision is lost
+    // from view even though the picker itself can only show the day.
+    expect(screen.getByText("2026-09-01T15:30:00.000Z", { selector: "code" })).toBeTruthy();
+    // And the ORIGINAL instant — not the truncated day — is what was actually sent.
+    expect(list.mock.calls[0]?.[0]).toMatchObject({ deadlineAfter: "2026-09-01T15:30:00.000Z" });
+  });
+
+  it("resubmits the exact retained instant, not the day the picker displays", async () => {
+    navigation.params = new URLSearchParams("deadlineBefore=2026-09-02T09:15:00.000Z");
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    // Touch nothing about the deadline field; submit via a different control, the way a reader
+    // narrowing a second filter while an instant-precision deadline is already active would.
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "grants" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    const href = String(navigation.push.mock.calls[0]?.[0]);
+    const applied = new URLSearchParams(href.slice(href.indexOf("?")));
+    expect(applied.get("deadlineBefore")).toBe("2026-09-02T09:15:00.000Z");
+  });
+
   it("tells the reader the organization filter matches either side of the listing", async () => {
     const { client } = stub();
     mount(client, <DirectoryList />);
