@@ -34,6 +34,8 @@ on:
       - "packages/frontend/**"
       - "packages/validate/**"
       - "packages/standard/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "scripts/frontend-clean-room.mjs"
       - ".github/workflows/external-deploy-smoke.yml"
   workflow_dispatch:
