@@ -13,16 +13,14 @@ export const metadata: Metadata = {
   description:
     "An open index of funding opportunities under one standard: read it without an account, and — for publishers — submit and maintain listings, read their traffic, and run the review queues.",
   /*
-   * INDEXING STAYS OFF, even though half of this app is now public.
-   *
-   * It is not a statement about the directory's audience; it is a statement about this deployment.
-   * Nothing here is served from a canonical public host yet — there is no pipeline and no registered
-   * domain for it (see the deployment section of the README) — and a preview URL that indexes is a
-   * preview URL competing with the real one for every listing it carries. Turning this on is an
-   * operator decision to take once the directory has an address worth indexing, not a default to
-   * inherit from a build.
+   * INDEXING IS ON. It was off while nothing here was served from a canonical public host — a
+   * preview URL that indexes competes with the real one for every listing it carries — and that
+   * condition no longer holds: this deployment IS the canonical public host, and a public register
+   * of funding opportunities with no search presence is failing the people it exists for. See the
+   * README for the operator reasoning; a self-hosted copy on a domain that is not yet worth
+   * indexing should override this back to `false` for its own build.
    */
-  robots: { index: false, follow: false },
+  robots: { index: true, follow: true },
 };
 
 /**

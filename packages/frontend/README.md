@@ -224,11 +224,17 @@ the root layout). A prerendered page cannot carry a nonce a later request's head
 is no server-side content to cache anyway — the public directory is fetched in the browser like
 every other screen here.
 
-**Indexing stays off** (`robots: { index: false }` in the root layout), even though half the app is
-now public. That is a statement about this deployment, not about the directory's audience: nothing
-here is served from a canonical public host yet, and a preview URL that indexes competes with the
-real one for every listing it carries. Turning it on is an operator decision to take once the
-directory has an address worth indexing.
+**Indexing is on** (`robots: { index: true, follow: true }` in the root layout), because this
+deployment is now the canonical public host: `main` and `packages/frontend/README.md` agree on that,
+and a public register of funding opportunities with no search presence is failing the applicants it
+exists for. It used to be off for the opposite reason — nothing here was served from a canonical
+address yet, and a preview URL that indexed would have competed with the real one for every listing
+it carried — and that condition, not the app's public/private split, is what the flag actually
+tracks. `src/app/sitemap.ts` and `src/app/robots.ts` derive their absolute URLs from the incoming
+request's own `Host` header rather than a hard-coded address, precisely so a self-hosted copy of this
+reference frontend (see "Deployment" below) gets a correct sitemap for **its** hostname automatically
+— an operator running one on a domain that is not yet worth indexing overrides `robots` back to
+`{ index: false }` in their own build.
 
 ---
 
