@@ -259,6 +259,23 @@ Locally, against a database you own:
 DATABASE_URL=… pnpm --filter @the-rfp-hub/api migrate
 ```
 
+### Never regenerate a migration that has already run somewhere
+
+Drizzle decides what to apply by comparing each journal entry's `when` with the newest `created_at`
+in `drizzle.__drizzle_migrations` — not by hash, and not by tag. So editing an applied migration in
+place and letting `drizzle-kit` move its `when` **re-offers that migration to any database that
+already ran the earlier form of it**, where its `ADD COLUMN`s abort on columns that are already
+there. Migrations run in a transaction, so the whole file rolls back: the new columns never appear,
+every later `migrate` fails on the same statement, and the deployment runs against a schema its
+code no longer matches. That is exactly what left `opportunity_duplicates.rules_key` missing after
+0011 was regenerated, and it 500'd every duplicate read until 0011 was made re-runnable.
+
+If a change to an unreleased migration is genuinely wanted, it must be written so that applying it
+to **either** state converges — `ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF EXISTS` for whatever
+the superseded form added. Otherwise add a new migration and leave the old one alone. Since
+migrations here are a manual operator step rather than a deploy gate, "nothing is deployed yet" is
+never something the repository can tell you.
+
 ### Runtime privileges on the identity tables
 
 **Immediately after the migrations, in the same ceremony**, as an ADMIN/owner connection:

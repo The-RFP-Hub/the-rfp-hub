@@ -10,14 +10,42 @@ import {
 import type { Principal } from "../../shared/capabilities.js";
 import { ownedOpportunityPredicate } from "./opportunity.repository.js";
 
+/**
+ * The pair columns a READ surface renders — and deliberately not the whole row.
+ *
+ * `rules_key` is the detector's own bookkeeping: the resweep arm compares it for equality and
+ * nothing ever shows it to anybody. Selecting it anyway is what made a schema the read path does
+ * not depend on able to take the read path down — the deployment ran ahead of its own migration,
+ * the column was absent, and `GET /v1/opportunities/{id}/duplicates` answered 500 for every entry
+ * in the corpus, including the ones with no pairs at all, because the SELECT failed before a row
+ * was ever mapped.
+ *
+ * So the reads name what they render. It is least privilege applied to a query, and it means a
+ * column added for a job can never again be a public read's problem.
+ */
+const pairReadColumns = {
+  id: opportunityDuplicates.id,
+  similarity: opportunityDuplicates.similarity,
+  signal: opportunityDuplicates.signal,
+  status: opportunityDuplicates.status,
+  detectedAt: opportunityDuplicates.detectedAt,
+  reviewedAt: opportunityDuplicates.reviewedAt,
+} as const;
+
+/** One pair as the read surfaces see it: the rendered columns, nothing else. */
+export type DuplicatePairReadRow = Pick<
+  OpportunityDuplicateRow,
+  "id" | "similarity" | "signal" | "status" | "detectedAt" | "reviewedAt"
+>;
+
 export interface DuplicatePairSidesRow {
-  pair: OpportunityDuplicateRow;
+  pair: DuplicatePairReadRow;
   left: OpportunityRow;
   right: OpportunityRow;
 }
 
 export interface DuplicatePairOtherRow {
-  pair: OpportunityDuplicateRow;
+  pair: DuplicatePairReadRow;
   other: OpportunityRow;
 }
 
@@ -156,7 +184,7 @@ export class DuplicatePairRepository {
     const left = alias(opportunities, "dup_left");
     const right = alias(opportunities, "dup_right");
     return this.exec
-      .select({ pair: opportunityDuplicates, left, right })
+      .select({ pair: pairReadColumns, left, right })
       .from(opportunityDuplicates)
       .innerJoin(left, eq(left.id, opportunityDuplicates.opportunityId))
       .innerJoin(right, eq(right.id, opportunityDuplicates.duplicateOfId))
@@ -169,7 +197,7 @@ export class DuplicatePairRepository {
   async listForOpportunity(opportunityId: number): Promise<DuplicatePairOtherRow[]> {
     const other = alias(opportunities, "duplicate_counterpart");
     return this.exec
-      .select({ pair: opportunityDuplicates, other })
+      .select({ pair: pairReadColumns, other })
       .from(opportunityDuplicates)
       .innerJoin(
         other,
@@ -195,7 +223,7 @@ export class DuplicatePairRepository {
     const mineOnRight = ownedOpportunityPredicate(right, principal);
 
     return this.exec
-      .select({ pair: opportunityDuplicates, left, right })
+      .select({ pair: pairReadColumns, left, right })
       .from(opportunityDuplicates)
       .innerJoin(left, eq(left.id, opportunityDuplicates.opportunityId))
       .innerJoin(right, eq(right.id, opportunityDuplicates.duplicateOfId))
