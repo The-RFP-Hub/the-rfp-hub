@@ -15,6 +15,7 @@
     "check:deploy": "node scripts/check-deploy.mjs",
     "check:m2": "node scripts/check-m2.mjs",
     "check:m3": "node scripts/check-m3.mjs",
+    "frontend:clean-room": "node scripts/frontend-clean-room.mjs",
     "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
