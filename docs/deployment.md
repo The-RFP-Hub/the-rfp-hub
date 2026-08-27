@@ -268,13 +268,30 @@ itself — every route that grants `admin` requires an admin. **The person must 
 so that an identity exists to promote:
 
 ```sh no-run
-DATABASE_URL=… pnpm --filter @the-rfp-hub/api grant-admin -- --email you@example.org --create --yes
+# Against a deployed database this needs --allow-remote as well — see below.
+DATABASE_URL=… pnpm --filter @the-rfp-hub/api grant-admin -- \
+  --email you@example.org --create --allow-remote --yes
 ```
 
-`--create` matters even immediately after sign-in: signing in makes the identity, but the account
-row is provisioned lazily on the first authenticated `/v1` request. No environment variable grants
-a role, deliberately — a role re-derived from configuration on every request is granted to whoever
-holds the configuration and cannot be revoked in the product.
+**Three flags, and leaving any of them out is a refusal rather than a surprise.** The script exits
+non-zero and says which one it wanted:
+
+| Flag | Why it is not the default |
+|---|---|
+| `--create` | Signing in makes the identity, but the `accounts` row is provisioned lazily on the first authenticated `/v1` request. Run right after sign-in — before the dashboard has ever loaded — the script finds an identity with no account, and this is what provisions one. It cannot conjure an identity that has never signed in |
+| `--allow-remote` | The script refuses any `DATABASE_URL` whose host is not loopback, because the ordinary case is a developer's own machine and a remote host is a production database somebody meant to point elsewhere. A deployed run **always** needs it: `refusing: <host> is not loopback. Re-run with --allow-remote if that is the database you mean.` |
+| `--yes` | It refuses to write at all without it |
+
+`--allow-remote` is the flag to think about rather than paste. The alternative is to make the
+target genuinely loopback — run the command from inside a one-off task on the deployed image, or
+through an SSH/SSM port-forward to the database, so `DATABASE_URL` points at `127.0.0.1`. Either is
+fine; what matters is that reaching a production database is a deliberate act. The script echoes
+back the `host:port/database` it resolved — never the URL, which carries a password — so read that
+line before answering for it.
+
+No environment variable grants a role, deliberately — a role re-derived from configuration on every
+request is granted to whoever holds the configuration and cannot be revoked in the product. The run
+is idempotent: an account that is already an admin is a reported no-op.
 
 ### 5.6 Deploy the frontend
 
@@ -508,24 +525,88 @@ only on a tag, so a release is always an explicit act with a name in the history
 
 ## 8. Rollback
 
-**The API.** Point the service back at the previous task-definition revision.
+### You cannot roll the API back by naming the old revision
+
+**Both deploy workflows deregister the revision they replaced**, as the last step after a
+successful deploy (`aws ecs deregister-task-definition`, `staging.yml` / `production.yml`). So the
+obvious move —
 
 ```sh no-run
+# DOES NOT WORK: that revision is INACTIVE, and ECS refuses to deploy from one.
 aws ecs update-service --cluster "$CLUSTER" --service rfp-hub-production-service \
   --task-definition rfp-hub-production:<previous-revision>
 ```
 
-**A revision freezes its configuration along with its image.** Rolling back restores that
-revision's environment — including any credential that has been **rotated since**. If a rotation
-has happened between the two revisions, the rollback target will authenticate with the old value
-and fail; re-deploy forward with the current configuration instead. The deploy workflow deregisters
-the revision it replaces for exactly this reason: the copy an immediate rollback would have used is
-the copy most likely to hold a superseded secret.
+— fails, and it fails at the worst possible moment. The deregistration is deliberate: a revision
+freezes the configuration it was registered with, so the copy an immediate rollback would reach for
+is also the copy most likely to hold a **superseded secret**. Rolling back means putting the
+previous **image** back, with the **current** configuration.
 
-There is one migration in the history with no down-migration: the identity swap is destructive, and
-its rollback is *redeploy the previous images and rebuild the database*. That is acceptable only
-while no deployment holds identities anybody wants back. It is written here so nobody discovers it
-during an incident.
+### Preferred: re-run the pipeline at the last good commit
+
+```sh no-run
+git tag prod-2026-09-09-rollback <last-good-commit>
+git push origin prod-2026-09-09-rollback
+# staging: re-run the workflow with workflow_dispatch on that ref
+```
+
+This rebuilds the image and re-reads Secrets Manager, so the configuration is current by
+construction and the path taken is the one that is tested every day. It costs a build.
+
+### Fast path: register a new revision carrying the previous image
+
+When a build is too slow, take the revision the service is running **now** as the base — it holds
+the current configuration — and change only the image:
+
+```sh no-run
+FAMILY=rfp-hub-production
+CLUSTER="$PRODUCTION_ECS_CLUSTER"
+SERVICE=rfp-hub-production-service
+CONTAINER=rfp-hub-production
+PREVIOUS_IMAGE=<account>.dkr.ecr.us-east-1.amazonaws.com/production-rfp-hub:<previous commit sha>
+
+# The image tag is the commit SHA the workflow pushed. Confirm the one you want exists:
+aws ecr describe-images --repository-name production-rfp-hub \
+  --query 'sort_by(imageDetails,&imagePushedAt)[-10:].[imageTags[0],imagePushedAt]' --output table
+
+# The active revision carries plaintext configuration, so treat the file the way the deploy job
+# does: 0600, out of the working tree, deleted at the end.
+umask 077
+aws ecs describe-task-definition --task-definition "$FAMILY" --query taskDefinition \
+  > "$TMPDIR/td.json"
+
+jq --arg image "$PREVIOUS_IMAGE" --arg container "$CONTAINER" '
+      .containerDefinitions |= map(if .name == $container then .image = $image else . end)
+    | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+          .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+  ' "$TMPDIR/td.json" > "$TMPDIR/td-rollback.json"
+
+NEW_TD=$(aws ecs register-task-definition --cli-input-json "file://$TMPDIR/td-rollback.json" \
+  --query 'taskDefinition.taskDefinitionArn' --output text)
+
+aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$NEW_TD"
+aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+
+rm -f "$TMPDIR/td.json" "$TMPDIR/td-rollback.json"
+```
+
+The `del(...)` is not optional: `register-task-definition` rejects the read-only fields
+`describe-task-definition` returns. Rolling **forward** again is the ordinary deploy — no cleanup
+of this revision is needed beyond the workflow's own deregistration of it next time.
+
+### The caveats that survive both paths
+
+* **A revision that is still ACTIVE still freezes its configuration.** The deregistration only runs
+  on a *successful* deploy, so a failed one can leave an older revision usable. Deploying from it
+  restores the credentials it was registered with, and a value rotated since will simply fail to
+  authenticate. Prefer the two procedures above, which both carry current configuration.
+* **Rolling the image back does not roll the schema back.** If the deploy being undone applied
+  migrations, the previous image runs against the newer schema. Check what was applied before
+  assuming an image swap is the whole rollback.
+* **One migration in the history has no down-migration**: the identity swap is destructive, and its
+  rollback is *redeploy the previous images and rebuild the database*. That is acceptable only
+  while no deployment holds identities anybody wants back. Written here so nobody discovers it
+  during an incident.
 
 **The frontend.** Push a new `frontend-prod-*` tag pointing at the previous good commit. Rollback
 is a git operation, not a console one, so the deployed state stays a fact in the history.
@@ -539,7 +620,8 @@ of `exports/`.
 ## 9. The frontend: three ways to deploy a copy
 
 The reference frontend is a Next.js app whose **only** required variable is `NEXT_PUBLIC_API_URL`,
-inlined at build time. Anyone may deploy their own copy against the public API. Three paths, in
+**inlined at build time** — so it has to be present when the build runs, and setting it on a
+running server does nothing. Anyone may deploy their own copy against the public API. Three paths, in
 order of how little you need to know:
 
 ### Path A — the Deploy Button (clone the repository)
@@ -572,8 +654,10 @@ pnpm frontend:clean-room --browser
 It copies `packages/frontend` alone into a temp directory, rewrites its two `workspace:*`
 dependencies to published ranges, `npm install`s and runs the package's own `npm run build` (never
 `pnpm`, and never `next build` directly — after a plain `npm install` the local binary only
-resolves through the npm-run path), starts the standalone server the build produced, and requests
-`/`, `/publishers` and a filtered `/`.
+resolves through the npm-run path) **with `NEXT_PUBLIC_API_URL` in the build's environment**, finds
+and starts the standalone server the build produced, and requests `/`, `/publishers` and a filtered
+`/`. Point it elsewhere with `--api-url <url>` (or the same variable); the default is the
+production API.
 
 **`--browser` is the real proof.** The plain HTTP check only sees server-rendered HTML, and the
 directory fetches its data from an effect after hydration — so a build whose client-side fetch
@@ -609,8 +693,13 @@ a missing or ordinary `NEXT_PUBLIC_API_URL` produces no rewrites and nothing thr
 
 ### Running the standalone output, whichever path built it
 
-Two things about `output: "standalone"` are easy to miss and cost an afternoon each:
+Three things are easy to miss and cost an afternoon each:
 
+* **`NEXT_PUBLIC_API_URL` belongs on the BUILD, not on the run.** It is inlined into the bundle by
+  `npm run build`; setting it in front of `node server.js` changes nothing at all, and the page
+  renders its "no API configured" state while the variable sits in the process environment looking
+  correct. This is the single most common way to lose an afternoon on this package. The clean-room
+  script passes it to the build step for exactly this reason.
 * **`.next/static` is not inside the standalone output.** Next's own documentation says so. Copy it
   to sit beside `server.js`, as `<that directory>/.next/static`.
 * **`server.js` is not at `.next/standalone/server.js` in a stand-alone copy.** The package sets
@@ -620,15 +709,20 @@ Two things about `output: "standalone"` are easy to miss and cost an afternoon e
   what the clean-room script does:
 
 ```sh no-run
-find .next/standalone -name server.js
-NEXT_PUBLIC_API_URL=https://api.example.org node <the path that printed>
+# The variable goes HERE — on the build.
+NEXT_PUBLIC_API_URL=https://api.example.org npm run build
+
+SERVER=$(find .next/standalone -name server.js)
+mkdir -p "$(dirname "$SERVER")/.next" && cp -r .next/static "$(dirname "$SERVER")/.next/static"
+node "$SERVER"          # no variable needed here: it is already baked into the bundle
 ```
 
 ### Path C — Docker, over the standalone output
 
 Optional, and worth doing last. A minimal image over the standalone output: `npm install` with the
-same dependency rewrite as path B, `npm run build`, then run the server the way the paragraph above
-describes. Two things to know: the package has **no `public/` directory**, so a `COPY public/ …`
+same dependency rewrite as path B, then `npm run build` **with `NEXT_PUBLIC_API_URL` set as a build
+argument** — a runtime `ENV` in the final stage is too late — then run the server the way the
+paragraph above describes. Two things to know: the package has **no `public/` directory**, so a `COPY public/ …`
 step fails on a missing source — do not add that line; and pnpm's symlinked `node_modules` needs
 the copy to follow targets (or a prune step) if a build stage ever touches a pnpm-installed tree.
 
