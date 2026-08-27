@@ -806,7 +806,9 @@ describe("when problems appear", () => {
     submit();
 
     const summary = await screen.findByRole("alert");
-    expect(document.activeElement).toBe(summary);
+    // Focus moves in an effect after the alert renders; on a slow runner the render can be
+    // observed before the effect has run, so the focus is awaited rather than read once.
+    await waitFor(() => expect(document.activeElement).toBe(summary));
     expect(
       within(summary)
         .getByRole("link", { name: /Whole form/ })
