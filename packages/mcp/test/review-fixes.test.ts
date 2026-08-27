@@ -530,6 +530,6 @@ describe("the CLI treats an approval id as a digest, not as a path fragment", ()
     const home = testConfig().home;
     const { status, stderr } = cli(["approve", "a".repeat(64)], home);
     expect(status).toBe(1); // not-found, not a usage error
-    expect(stderr).toContain("No preview with id");
+    expect(stderr).toContain("That preview is not available");
   });
 });

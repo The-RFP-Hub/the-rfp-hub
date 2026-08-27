@@ -66,6 +66,50 @@ function seedPending(
   });
 }
 
+/** The prompt `approve` writes once it has read and displayed the preview. */
+const PROMPT = "Type `approve` to authorize";
+
+interface RunningApprove {
+  /** Resolves once the process has printed its prompt, or exited without one. */
+  ready: Promise<void>;
+  /** Send the confirmation. */
+  answer: (text: string) => void;
+  done: Promise<{ code: number; out: string }>;
+}
+
+/**
+ * Start `rfphub-mcp approve <id>` and hand back a handle that says when it is waiting for input.
+ *
+ * The readiness promise also settles if the process exits first — a child that failed before
+ * reaching its prompt must not leave the test hanging on a signal that will never come.
+ */
+function spawnApprove(home: string, id: string): RunningApprove {
+  const child: ChildProcess = spawn(process.execPath, [CLI, "approve", id], {
+    env: { ...process.env, RFPHUB_MCP_HOME: home },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let out = "";
+  let signalReady = (): void => {};
+  const ready = new Promise<void>((resolve) => {
+    signalReady = resolve;
+  });
+  const collect = (chunk: Buffer) => {
+    out += chunk.toString();
+    if (out.includes(PROMPT)) signalReady();
+  };
+  child.stdout?.on("data", collect);
+  child.stderr?.on("data", collect);
+
+  const done = new Promise<{ code: number; out: string }>((resolve) => {
+    child.on("close", (code) => {
+      signalReady();
+      resolve({ code: code ?? 0, out });
+    });
+  });
+
+  return { ready, answer: (text) => child.stdin?.end(`${text}\n`), done };
+}
+
 /** Run `rfphub-mcp approve <id>` to completion, feeding it a confirmation. */
 function approve(home: string, id: string, answer = "approve"): { code: number; out: string } {
   requireBuilt();
@@ -105,7 +149,7 @@ describe("approving is decided once, against the state at the moment of the answ
     expect(approve(home, id).code).toBe(0);
     const second = approve(home, id);
     expect(second.code).toBe(1);
-    expect(second.out).toContain("No preview with id");
+    expect(second.out).toContain("That preview is not available");
     expect(listApprovals(home)).toHaveLength(1);
   });
 
@@ -115,33 +159,30 @@ describe("approving is decided once, against the state at the moment of the answ
     const id = "c".repeat(64);
     seedPending(home, id);
 
-    // Both are started before either can answer, so both read the same live preview and both sit
-    // at their own prompt. That is the window the claim closes.
-    const spawnApprove = (): Promise<{ code: number; out: string }> =>
-      new Promise((resolve) => {
-        const child: ChildProcess = spawn(process.execPath, [CLI, "approve", id], {
-          env: { ...process.env, RFPHUB_MCP_HOME: home },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-        let out = "";
-        child.stdout?.on("data", (c: Buffer) => {
-          out += c.toString();
-        });
-        child.stderr?.on("data", (c: Buffer) => {
-          out += c.toString();
-        });
-        // Answer only once both have printed their preview.
-        setTimeout(() => child.stdin?.end("approve\n"), 250);
-        child.on("close", (code) => resolve({ code: code ?? 0, out }));
-      });
+    // BOTH MUST BE AT THEIR PROMPT BEFORE EITHER ANSWERS, and the test waits for evidence of that
+    // rather than guessing how long it takes. A fixed sleep here passed on an idle machine and
+    // failed under a loaded full-suite run: the second process had not yet read the preview when
+    // the first claimed it, so it never reached the post-confirmation path this test is about.
+    // The prompt on stdout is the readiness signal — it is printed only after the preview has been
+    // read and displayed, which is exactly the state the race needs both processes to be in.
+    const started = spawnApprove(home, id);
+    const other = spawnApprove(home, id);
+    await Promise.all([started.ready, other.ready]);
+    started.answer("approve");
+    other.answer("approve");
+    const [first, second] = await Promise.all([started.done, other.done]);
 
-    const [first, second] = await Promise.all([spawnApprove(), spawnApprove()]);
     const codes = [first.code, second.code].sort();
     expect(codes).toEqual([0, 1]);
     // ONE approval, from two confirmations. Without the claim this is two, and two writes.
     expect(listApprovals(home)).toHaveLength(1);
     const loser = first.code === 0 ? second : first;
+    // ONE message, whichever way the loser lost. `approve` prints the same sentence for "the
+    // preview was already gone when I read it" and "somebody claimed it while I was waiting",
+    // because from this terminal they are the same outcome — which is also what makes this
+    // assertion deterministic instead of interleaving-dependent.
     expect(loser.out).toContain("NOTHING WAS APPROVED");
+    expect(loser.out).toContain("That preview is not available");
   });
 
   it("refuses to approve a preview that was revoked while it was on screen", () => {
@@ -153,7 +194,7 @@ describe("approving is decided once, against the state at the moment of the answ
 
     const { code, out } = approve(home, id);
     expect(code).toBe(1);
-    expect(out).toContain("No preview with id");
+    expect(out).toContain("That preview is not available");
     expect(listApprovals(home)).toHaveLength(0);
   });
 
@@ -179,6 +220,34 @@ describe("approving is decided once, against the state at the moment of the answ
     expect(listApprovals(home)).toHaveLength(0);
     // The preview survives a cancellation — cancelling is not revoking.
     expect(listPending(home).map((r) => r.approvalId)).toEqual([id]);
+  });
+
+  it("prints the same sentence however the preview became unavailable", () => {
+    // The two code paths — gone before the read, gone at the claim — are one outcome here, and
+    // this is what lets the concurrency test above assert a single string.
+    const gone = tempHome();
+    const beforeRead = approve(gone, "9".repeat(64));
+
+    const raced = tempHome();
+    const id = "8".repeat(64);
+    seedPending(raced, id);
+    approve(raced, id); // wins, and takes the preview with it
+    seedPending(raced, id); // re-seeded, then claimed out from under the next reader
+    const atClaim = approve(raced, id);
+
+    expect(beforeRead.out).toContain("That preview is not available");
+    expect(beforeRead.code).toBe(1);
+    expect(atClaim.code).toBe(0); // the re-seeded one is approvable; the sentence is what matters
+    expect(approve(raced, id).out).toContain("That preview is not available");
+  });
+
+  it("prints one expiry sentence, from either check", () => {
+    const home = tempHome();
+    const id = "7".repeat(64);
+    seedPending(home, id, new Date(Date.now() - 1_000));
+    const { out } = approve(home, id);
+    expect(out).toContain("NOTHING WAS APPROVED");
+    expect(out).toContain("expired at");
   });
 
   it("claimPending is atomic: the second caller gets null, not a copy", () => {
