@@ -19,7 +19,7 @@ import { auditPath } from "../src/audit.js";
 import { apiErrorToToolError, mergedInto } from "../src/errors.js";
 import { MAX_RESPONSE_BYTES, ResponseTooLargeError, readCapped } from "../src/http.js";
 import { ApiClient } from "../src/http.js";
-import { Policy } from "../src/policy.js";
+import { DEFAULT_CAPS, Policy } from "../src/policy.js";
 import { clearRegisteredSecrets } from "../src/redact.js";
 import type { ToolContext } from "../src/tools/context.js";
 import {
@@ -276,8 +276,16 @@ describe("the preview refuses what the API would refuse on admission", () => {
     }
   });
 
-  it("refuses an over-long array, at any depth", () => {
-    const deep = validDocument({
+  it("refuses an over-long TOP-LEVEL array", () => {
+    const wide = validDocument({ ecosystems: Array.from({ length: 101 }, () => "e") });
+    expect(() => assertWithinAdmissionCaps(wide)).toThrowError(/\/ecosystems has 101 entries/);
+  });
+
+  it("does NOT cap a nested array, because the API does not either", () => {
+    // The API walks the document's own entries and checks the array-valued ones; a nested array is
+    // bounded only by the body limit. Checking more here than the API checks would refuse
+    // documents it would have accepted, and would name a limit nobody enforces as the reason.
+    const nested = validDocument({
       operatingOrganizations: [
         {
           name: "Example Org",
@@ -286,7 +294,12 @@ describe("the preview refuses what the API would refuse on admission", () => {
         },
       ],
     });
-    expect(() => assertWithinAdmissionCaps(deep)).toThrowError(/101 entries/);
+    expect(() => assertWithinAdmissionCaps(nested)).not.toThrow();
+  });
+
+  it("accepts a top-level array at exactly the API's number", () => {
+    const atCap = validDocument({ ecosystems: Array.from({ length: 100 }, () => "e") });
+    expect(() => assertWithinAdmissionCaps(atCap)).not.toThrow();
   });
 
   it("refuses a document over the route's body limit", () => {
@@ -380,11 +393,7 @@ describe("a purely local failure never spends the human's approval", () => {
   it("refuses on an exhausted write budget WITHOUT claiming the approval", async () => {
     const { config, id } = await previewed();
     const spent = new Policy(config.home, {
-      caps: {
-        read: { perMinute: 60, perDay: 5000 },
-        preview: { perMinute: 10, perDay: 200 },
-        commit: { perMinute: 0, perDay: 0 },
-      },
+      caps: { ...DEFAULT_CAPS, commit: { perMinute: 0, perDay: 0 } },
       now: () => NOW,
     });
     const stub = stubFetch([{ body: {} }]);

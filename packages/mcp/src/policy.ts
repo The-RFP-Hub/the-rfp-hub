@@ -26,7 +26,16 @@ import { ensureDir } from "./approvals.js";
 import { ToolError } from "./errors.js";
 import { LockTimeoutError, withLock } from "./lock.js";
 
-export type ToolKind = "read" | "preview" | "commit";
+/**
+ * `attempt` is not a phase — it is every invocation of the write tool, charged before any work.
+ *
+ * The other three meter work that SUCCEEDED far enough to matter. That leaves the failures free:
+ * a caller can send a thousand bogus approval ids, or a thousand oversized documents, and each one
+ * is refused without spending anything, so the refusal path is an unmetered loop through local
+ * validation and the filesystem. `attempt` closes it — the budget is spent whether or not the call
+ * goes on to do anything.
+ */
+export type ToolKind = "read" | "preview" | "commit" | "attempt";
 
 export interface Caps {
   perMinute: number;
@@ -37,6 +46,9 @@ export const DEFAULT_CAPS: Readonly<Record<ToolKind, Caps>> = Object.freeze({
   read: { perMinute: 60, perDay: 5_000 },
   preview: { perMinute: 10, perDay: 200 },
   commit: { perMinute: 2, perDay: 5 },
+  // Deliberately looser than `preview` and far tighter than `read`: a legitimate session takes a
+  // few previews and a few refusals to get a document right, and nothing legitimate takes hundreds.
+  attempt: { perMinute: 20, perDay: 400 },
 });
 
 interface Bucket {

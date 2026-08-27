@@ -162,6 +162,37 @@ export function deletePending(home: string, approvalId: string): boolean {
   return unlinkIfExists(path.join(pendingDir(home), `${approvalId}.json`));
 }
 
+/** Where a preview goes once a person has turned it into an approval. */
+export function claimedPendingDir(home: string): string {
+  return path.join(pendingDir(home), "claimed");
+}
+
+/**
+ * Claim a PREVIEW, atomically, at the moment a person confirms it.
+ *
+ * Reading the preview, printing it, and waiting for a human is a long window — seconds at least,
+ * and as long as somebody leaves the terminal open. Everything can change inside it: the preview
+ * can be revoked, it can expire, or a second `approve` for the same id can be sitting at its own
+ * prompt. Writing the approval on the strength of what was read BEFORE the question would let two
+ * confirmations produce two approvals, which is two writes out of one human decision.
+ *
+ * So the preview is claimed exactly the way an approval is: one `rename()`, atomic, ENOENT for the
+ * loser. Whoever wins may write the approval; everyone else is refused. Expiry is re-checked after
+ * the claim rather than before the question, because the answer can change while it is being asked.
+ */
+export function claimPending(home: string, approvalId: string): PendingRecord | null {
+  const from = path.join(pendingDir(home), `${approvalId}.json`);
+  const record = readRecord<PendingRecord>(from);
+  if (record === null) return null;
+  ensureDir(claimedPendingDir(home));
+  try {
+    fs.renameSync(from, path.join(claimedPendingDir(home), `${approvalId}.json`));
+  } catch {
+    return null; // Revoked, or another `approve` won the race between the read and the rename.
+  }
+  return record;
+}
+
 // ── approvals (written by a person at a terminal) ────────────────────────────────
 export function writeApproval(home: string, record: ApprovalRecord): void {
   writeFile0600(
