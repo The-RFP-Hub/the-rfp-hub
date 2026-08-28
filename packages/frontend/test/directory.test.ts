@@ -20,7 +20,13 @@ import {
   selectionToHref,
   selectionToParams,
 } from "@/lib/directory";
-import { describeAward, describeDeadline, formatAmount, nextFixedDeadline } from "@/lib/format";
+import {
+  describeAward,
+  describeDeadline,
+  describeDirectoryDeadline,
+  formatAmount,
+  nextFixedDeadline,
+} from "@/lib/format";
 import type { Deadline } from "@/lib/types";
 import { describe, expect, it } from "vitest";
 
@@ -117,12 +123,12 @@ describe("the directory querystring", () => {
 
   it("reads its filter values out of the Standard rather than re-typing them", () => {
     expect(FUNDING_TYPES).toEqual([
+      "rfp",
       "grant",
       "hackathon",
       "bounty",
       "accelerator",
       "vc_fund",
-      "rfp",
     ]);
     expect(STATUSES).toEqual(["upcoming", "open", "closed", "archived"]);
   });
@@ -241,6 +247,11 @@ describe("the deadline column", () => {
     const deadlines: Deadline[] = [{ deadlineType: "rolling" }, fixed("2026-09-30T23:59:00Z")];
     expect(describeDeadline(deadlines, now)).toBe("30 Sep 23:59 UTC");
   });
+
+  it("renders the directory deadline as a calendar date without a time", () => {
+    expect(describeDirectoryDeadline([fixed("2026-09-04T05:00:00Z")], now)).toBe("Sep 4, 2026");
+    expect(describeDirectoryDeadline([{ deadlineType: "rolling" }], now)).toBe("Rolling");
+  });
 });
 
 describe("amounts", () => {
@@ -256,14 +267,14 @@ describe("amounts", () => {
     expect(formatAmount(undefined)).toBeNull();
   });
 
-  it("prefers the per-award range over the programme budget", () => {
+  it("prefers the per-award range over the program budget", () => {
     expect(
       describeAward({ currency: "USD", minAward: 5000, maxAward: 50000, budget: 1000000 }),
     ).toBe("5,000–50,000 USD per award");
     expect(describeAward({ currency: "USD", maxAward: 50000 })).toBe("Up to 50,000 USD per award");
     expect(describeAward({ currency: "USD", minAward: 5000 })).toBe("From 5,000 USD per award");
     expect(describeAward({ currency: "USD", budget: 1000000 })).toBe(
-      "1,000,000 USD programme budget",
+      "1,000,000 USD program budget",
     );
   });
 

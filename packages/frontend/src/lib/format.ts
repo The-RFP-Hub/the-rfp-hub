@@ -30,6 +30,14 @@ export function formatInstant(value: string | null | undefined): string {
   return `${day} ${parsed.toISOString().slice(11, 16)} UTC`;
 }
 
+/** An RFC 3339 instant as a plain, human-readable UTC calendar date. */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${MONTHS[parsed.getUTCMonth()]} ${parsed.getUTCDate()}, ${parsed.getUTCFullYear()}`;
+}
+
 /** Thousands separators without a locale — the same string on every machine, including in tests. */
 export function formatCount(value: number): string {
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -84,7 +92,7 @@ export function formatAmount(
 /**
  * The funding envelope as one line, or null when the publisher stated nothing.
  *
- * The per-award range is preferred over the programme budget because it is the number an applicant
+ * The per-award range is preferred over the program budget because it is the number an applicant
  * is deciding on. Absent both, null — an empty envelope is shown as nothing rather than as a zero.
  */
 export function describeAward(funding: Funding | null | undefined): string | null {
@@ -97,7 +105,7 @@ export function describeAward(funding: Funding | null | undefined): string | nul
   if (max) return `Up to ${max}${suffix} per award`;
   if (min) return `From ${min}${suffix} per award`;
   const budget = formatAmount(funding.budget);
-  if (budget) return `${budget}${suffix} programme budget`;
+  if (budget) return `${budget}${suffix} program budget`;
   return null;
 }
 
@@ -146,6 +154,18 @@ export function describeDeadline(
 ): string {
   const next = nextFixedDeadline(deadlines, now);
   if (next) return formatInstant(next.date);
+  if (hasRollingDeadline(deadlines)) return "Rolling";
+  if (fixedDeadlines(deadlines).length > 0) return "No upcoming deadline";
+  return "—";
+}
+
+/** The compact directory deadline: the same four states, with a calendar date instead of a time. */
+export function describeDirectoryDeadline(
+  deadlines: readonly Deadline[] | null | undefined,
+  now: Date = new Date(),
+): string {
+  const next = nextFixedDeadline(deadlines, now);
+  if (next) return formatDate(next.date);
   if (hasRollingDeadline(deadlines)) return "Rolling";
   if (fixedDeadlines(deadlines).length > 0) return "No upcoming deadline";
   return "—";
