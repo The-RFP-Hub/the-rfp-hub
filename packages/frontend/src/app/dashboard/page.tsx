@@ -1,5 +1,6 @@
 "use client";
 
+import { IconLabel } from "@/components/IconLabel";
 /**
  * The publisher's own front door: sign in, then this account's traffic across everything it
  * publishes.
@@ -18,6 +19,7 @@ import { HOW_IT_WORKS } from "@/lib/links";
 import { DASHBOARD_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
+import { PlusIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useCallback } from "react";
 
@@ -70,7 +72,7 @@ function Overview() {
       <div className="row-between">
         <h1>Dashboard</h1>
         <Link className="button-primary" href="/listings/new">
-          Submit an opportunity
+          <IconLabel icon={PlusIcon}>Submit an opportunity</IconLabel>
         </Link>
       </div>
       <h2>Listings traffic</h2>

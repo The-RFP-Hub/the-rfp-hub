@@ -1,5 +1,6 @@
 "use client";
 
+import { DecorativeIcon, type HeroIcon, IconLabel } from "@/components/IconLabel";
 /**
  * The public directory: every PUBLISHED opportunity, as a visitor with no account reads it.
  *
@@ -44,15 +45,39 @@ import {
   selectionFromParams,
   selectionToHref,
 } from "@/lib/directory";
-import { describeDeadline, formatCount } from "@/lib/format";
+import { describeDirectoryDeadline, formatCount } from "@/lib/format";
 import { HOW_IT_WORKS } from "@/lib/links";
 import { fundingTypeLabel, opportunityStatusLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
-import type { OpportunitySummary } from "@/lib/types";
+import type { FundingType, OpportunitySummary } from "@/lib/types";
+import {
+  ArrowsUpDownIcon,
+  BanknotesIcon,
+  BuildingOffice2Icon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CodeBracketIcon,
+  DocumentTextIcon,
+  GlobeAltIcon,
+  MagnifyingGlassIcon,
+  RocketLaunchIcon,
+  SignalIcon,
+  TrophyIcon,
+} from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+
+/** One quickly recognizable silhouette per opportunity type, backed by the written Type column. */
+const FUNDING_TYPE_ICONS: Readonly<Record<FundingType, HeroIcon>> = {
+  rfp: DocumentTextIcon,
+  grant: BanknotesIcon,
+  hackathon: CodeBracketIcon,
+  bounty: TrophyIcon,
+  accelerator: RocketLaunchIcon,
+  vc_fund: BuildingOffice2Icon,
+};
 
 export function DirectoryList() {
   const api = useApi();
@@ -107,7 +132,9 @@ export function DirectoryList() {
       <search>
         <form className="filters" onSubmit={search}>
           <div className={`field${draft.q.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-q">Search</label>
+            <label htmlFor="directory-q">
+              <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
+            </label>
             <input
               id="directory-q"
               type="search"
@@ -127,7 +154,9 @@ export function DirectoryList() {
            * a reader who typed the wrong case with an empty page about a well-populated ecosystem.
            */}
           <div className={`field${draft.ecosystem.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-ecosystem">Ecosystem</label>
+            <label htmlFor="directory-ecosystem">
+              <IconLabel icon={GlobeAltIcon}>Ecosystem</IconLabel>
+            </label>
             <input
               id="directory-ecosystem"
               list="directory-ecosystems"
@@ -143,7 +172,9 @@ export function DirectoryList() {
           </div>
 
           <div className={`field${draft.fundingType ? " is-set" : ""}`}>
-            <label htmlFor="directory-type">Funding type</label>
+            <label htmlFor="directory-type">
+              <IconLabel icon={BanknotesIcon}>Funding type</IconLabel>
+            </label>
             <select
               id="directory-type"
               value={draft.fundingType}
@@ -164,7 +195,9 @@ export function DirectoryList() {
            * cannot see is a filter they cannot undo.
            */}
           <div className={`field${draft.status ? " is-set" : ""}`}>
-            <label htmlFor="directory-status">Status</label>
+            <label htmlFor="directory-status">
+              <IconLabel icon={SignalIcon}>Status</IconLabel>
+            </label>
             <select
               id="directory-status"
               value={draft.status}
@@ -180,7 +213,9 @@ export function DirectoryList() {
           </div>
 
           <div className="field">
-            <label htmlFor="directory-order">Order by</label>
+            <label htmlFor="directory-order">
+              <IconLabel icon={ArrowsUpDownIcon}>Order by</IconLabel>
+            </label>
             <select
               id="directory-order"
               value={draft.ordering}
@@ -195,7 +230,9 @@ export function DirectoryList() {
           </div>
 
           <div className="field field-action">
-            <button type="submit">Search</button>
+            <button type="submit">
+              <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
+            </button>
           </div>
         </form>
       </search>
@@ -225,10 +262,10 @@ export function DirectoryList() {
                   isFiltered(applied) ? (
                     <>
                       <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
-                      <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
+                      <Link href={HOW_IT_WORKS}>Do you run a program?</Link>
                     </>
                   ) : (
-                    <Link href={HOW_IT_WORKS}>Do you run a programme?</Link>
+                    <Link href={HOW_IT_WORKS}>Do you run a program?</Link>
                   )
                 }
               />
@@ -243,7 +280,7 @@ export function DirectoryList() {
                         <th scope="col">Type</th>
                         <th scope="col">Status</th>
                         <th scope="col" className="numeric">
-                          Next deadline
+                          Deadline
                         </th>
                       </tr>
                     </thead>
@@ -261,7 +298,7 @@ export function DirectoryList() {
                     disabled={list.page <= 1}
                     onClick={() => commit({ page: list.page - 1 })}
                   >
-                    Previous
+                    <IconLabel icon={ChevronLeftIcon}>Previous</IconLabel>
                   </button>
                   <span className="muted">
                     Page {list.page} of {list.totalPages}
@@ -271,7 +308,9 @@ export function DirectoryList() {
                     disabled={list.page >= list.totalPages}
                     onClick={() => commit({ page: list.page + 1 })}
                   >
-                    Next
+                    <IconLabel icon={ChevronRightIcon} position="end">
+                      Next
+                    </IconLabel>
                   </button>
                 </nav>
               </>
@@ -354,26 +393,34 @@ function ResultLine({
  */
 export function DirectoryRow({ item }: { item: OpportunitySummary }) {
   const operator = item.operatingOrganizations[0];
+  const typeLabel = fundingTypeLabel(item.fundingType);
   return (
     <tr>
       <th scope="row">
-        <Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">
-          <UntrustedText value={item.title} />
-        </Link>
-        {item.summary?.trim() ? (
-          <div className="row-summary">
-            <UntrustedText value={item.summary} />
+        <div className="opportunity-cell">
+          <span className="opportunity-type-icon" title={typeLabel} aria-hidden="true">
+            <DecorativeIcon icon={FUNDING_TYPE_ICONS[item.fundingType]} />
+          </span>
+          <div className="opportunity-cell-copy">
+            <Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">
+              <UntrustedText value={item.title} />
+            </Link>
+            {item.summary?.trim() ? (
+              <div className="row-summary">
+                <UntrustedText value={item.summary} />
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </th>
       <td className="muted">
         <UntrustedText value={operator?.name} />
       </td>
-      <td>{fundingTypeLabel(item.fundingType)}</td>
+      <td>{typeLabel}</td>
       <td>
         <StatusBadge status={item.status} />
       </td>
-      <td className="numeric">{describeDeadline(item.deadlines)}</td>
+      <td className="numeric">{describeDirectoryDeadline(item.deadlines)}</td>
     </tr>
   );
 }

@@ -32,7 +32,7 @@ function Duplicates() {
       <h1>Possible duplicates</h1>
       <p className="muted footnote">
         Each row names one of your listings and the listing it resembles. Similarity is a
-        model&rsquo;s opinion about wording, not a judgement about the programmes; two genuinely
+        model&rsquo;s opinion about wording, not a judgement about the programs; two genuinely
         different rounds of the same grant will look alike. A reviewer decides, and only a reviewer
         can merge.
       </p>

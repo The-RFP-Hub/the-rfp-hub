@@ -39,7 +39,7 @@ const REVIEW_STATUS_LABELS: Readonly<Record<ReviewStatus, string>> = {
 const DUPLICATE_STATUS_LABELS: Readonly<Record<DuplicateStatus, string>> = {
   suspected: "Needs review",
   confirmed: "Confirmed match",
-  dismissed: "Dismissed — different programmes",
+  dismissed: "Dismissed — different programs",
   merged: "Merged",
 };
 
@@ -76,7 +76,7 @@ const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
   close: "Closed",
   claim: "Claimed",
   confirm_duplicate: "Confirmed as a match",
-  dismiss_duplicate: "Marked as different programmes",
+  dismiss_duplicate: "Marked as different programs",
   verify_source: "Checked the source",
   verify_organization: "Verified the organization",
   unverify_organization: "Removed organization verification",
@@ -126,7 +126,7 @@ const AUDIT_FIELD_LABELS: Readonly<Record<string, string>> = {
   role: "Role",
   directCreate: "Direct-create access",
   verified: "Organization verification",
-  typeData: "Programme details",
+  typeData: "Program details",
   httpStatus: "HTTP status",
   publicId: "Public ID",
   orgSlugs: "Organization slugs",
