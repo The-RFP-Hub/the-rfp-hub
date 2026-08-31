@@ -23,7 +23,11 @@ import { contentSecurityPolicy } from "./lib/csp";
 
 export function proxy(request: NextRequest): NextResponse {
   const nonce = Buffer.from(crypto.randomUUID().replaceAll("-", ""), "hex").toString("base64");
-  const csp = contentSecurityPolicy(nonce, process.env.NEXT_PUBLIC_API_URL);
+  const csp = contentSecurityPolicy(
+    nonce,
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.NEXT_PUBLIC_GA_ID,
+  );
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
