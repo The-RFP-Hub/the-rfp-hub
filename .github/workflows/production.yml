@@ -2,9 +2,18 @@ on:
   # No paths-ignore for the nightly `exports/` commits, and none is needed: this workflow has no
   # branch trigger at all, so a push to main cannot start it — and GitHub does not evaluate path
   # filters for tag pushes, which would make one here dead config that merely looked protective.
+  #
+  # THREE TAG FAMILIES, because path filters cannot do this job for tags — the scoping has to
+  # live in which tag the operator pushes:
+  #   prod-*           releases BOTH halves (this workflow and frontend-production.yml match it);
+  #   frontend-prod-*  releases the frontend only (frontend-production.yml);
+  #   api-prod-*       releases the API only (this workflow).
+  # A frontend-only change tagged `prod-*` still rolls the API service — that is what
+  # `frontend-prod-*` exists to avoid; pick the tag for what actually changed.
   push:
     tags:
       - 'prod-*'
+      - 'api-prod-*'
   workflow_dispatch:
 
 name: Production API
