@@ -139,6 +139,19 @@ describe("the public publishers page", () => {
     expect(hrefs).toContain("/?organization=beta");
   });
 
+  it("says on the page what that filtered directory link will match", async () => {
+    const { client: c } = client();
+    mount(c);
+
+    await screen.findByText(HOSTILE);
+    // Not a comment in the source and not only on the directory it links to: `organization` matches
+    // the sponsoring organization as well as the operating one, and the reader decides whether to
+    // click here.
+    expect(
+      screen.getAllByText("Every listing this organization operates or sponsors."),
+    ).toHaveLength(2);
+  });
+
   it("stamps a stable, checkable slug on each card's root element", async () => {
     const { client: c } = client();
     mount(c);

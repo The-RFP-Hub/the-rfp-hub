@@ -135,15 +135,16 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
         {publisher.verifiedAt ? `Verified ${formatInstant(publisher.verifiedAt)}` : "Verified"}
       </p>
 
-      {/*
-       * `organization` matches ANY operating OR sponsoring organization on the endpoint
-       * (`listQuerySchema`'s own description) — a listing this publisher only sponsors shows up
-       * here too, which is correct: the filter is "involves this organization", not "submitted by
-       * it".
-       */}
       <p>
         <Link href={directoryHref}>View this publisher&rsquo;s listings</Link>
       </p>
+      {/*
+       * The filter is "involves this organization", not "submitted by it", and the reader has to be
+       * told before they click: `organization` matches the operating OR the sponsoring organization
+       * on the endpoint (`listQuerySchema`'s own description), so a listing this publisher only
+       * sponsors is in that result too.
+       */}
+      <p className="muted footnote">Every listing this organization operates or sponsors.</p>
     </article>
   );
 }
