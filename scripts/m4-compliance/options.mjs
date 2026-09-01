@@ -21,6 +21,29 @@ const CHECK_IDS = ["governance", "publishers", "frontend", "mcp", "skill", "docs
 
 const NUMERIC = new Set(["--timeout", "--concurrency"]);
 
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const DIST_TAG = /^[A-Za-z][A-Za-z0-9-]*$/;
+const MCP_SPEC_HELP =
+  'a dist-tag ("next"), an exact version ("0.1.0"), or "local"; a full "@the-rfp-hub/mcp@<x>" is accepted and normalized to "<x>"';
+
+/**
+ * Normalize `--mcp-spec` to what `npx -y @the-rfp-hub/mcp@<spec>` needs after it.
+ *
+ * The full-package form is accepted and stripped because the operator runbook spells it that way,
+ * and concatenating it produced `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next` — an npm ENOENT nobody
+ * could read back to the flag. A range (`^1.0.0`, `1.x`, `*`) is refused rather than passed
+ * through: this criterion is about ONE immutable published artifact, and a range does not name one.
+ */
+export function normalizeMcpSpec(raw) {
+  const value = String(raw ?? "").trim();
+  if (!value) throw new Error(`--mcp-spec needs a value — ${MCP_SPEC_HELP}`);
+  const full = /^@the-rfp-hub\/mcp@(.*)$/.exec(value);
+  const spec = (full ? full[1] : value).trim();
+  if (spec === "local") return "local";
+  if (EXACT_VERSION.test(spec) || DIST_TAG.test(spec)) return spec;
+  throw new Error(`--mcp-spec must be ${MCP_SPEC_HELP}, got "${value}"`);
+}
+
 export function parseArgs(argv) {
   const opts = {
     site: "https://ethrfps.app",
@@ -31,6 +54,7 @@ export function parseArgs(argv) {
     only: new Set(),
     browser: false,
     offline: false,
+    expectIndexable: false,
     mcpSpec: undefined,
     timeoutMs: 15000,
     concurrency: 6,
@@ -92,8 +116,11 @@ export function parseArgs(argv) {
       case "--offline":
         opts.offline = true;
         break;
+      case "--expect-indexable":
+        opts.expectIndexable = true;
+        break;
       case "--mcp-spec":
-        opts.mcpSpec = next();
+        opts.mcpSpec = normalizeMcpSpec(next());
         break;
       case "--timeout":
         opts.timeoutMs = number(next());
@@ -116,6 +143,22 @@ export function parseArgs(argv) {
   }
 
   return opts;
+}
+
+/**
+ * What a scoped run answers, when it is not the whole question. A run narrowed by --only/--skip,
+ * or one that did not make the docs criterion's requests at all, cannot be presented as an M4
+ * sign-off, so its headline never renders the bare PASS that answer wears.
+ */
+export function describeScope(opts) {
+  const parts = [];
+  if (opts.only.size > 0) parts.push(`--only ${[...opts.only].join(", ")}`);
+  if (opts.skip.size > 0) parts.push(`--skip ${[...opts.skip].join(", ")}`);
+  if (opts.offline) parts.push("--offline");
+  if (parts.length === 0) return undefined;
+  const docsLint = opts.offline && opts.only.size === 1 && opts.only.has("docs");
+  const what = docsLint ? "docs lint, offline" : parts.join(" ");
+  return `${what} — NOT an M4 sign-off (${parts.join(" ")})`;
 }
 
 export { CHECK_IDS };

@@ -99,11 +99,11 @@ export async function checkPublishers(report, ctx) {
   );
 
   if (!ctx.browser) {
-    c.warn(
+    c.unmet(
       "rendered slugs equal the API's",
       "needs --browser — the page is client-fetched, so a plain GET of the HTML cannot see the rendered list",
     );
-    c.warn(
+    c.unmet(
       "the browser's request to /v1/publishers carries no Authorization header",
       "needs --browser",
     );

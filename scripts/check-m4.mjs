@@ -37,7 +37,7 @@ import { checkGovernance } from "./m4-compliance/checks/governance.mjs";
 import { checkMcp } from "./m4-compliance/checks/mcp.mjs";
 import { checkPublishers } from "./m4-compliance/checks/publishers.mjs";
 import { checkSkill } from "./m4-compliance/checks/skill.mjs";
-import { CHECK_IDS, parseArgs } from "./m4-compliance/options.mjs";
+import { CHECK_IDS, describeScope, parseArgs } from "./m4-compliance/options.mjs";
 import { Report } from "./m4-compliance/report.mjs";
 
 const USAGE = `M4 sign-off compliance checker
@@ -45,9 +45,9 @@ const USAGE = `M4 sign-off compliance checker
   node scripts/check-m4.mjs [options]
 
 This tool is READ-ONLY. It never mints a key, submits an entry, or asks a reviewer to do anything —
-the one case that could look like a write (MCP submit_opportunity's fail-closed behaviour) runs
-against a local recording server this checker starts itself, never against --api. There is
-therefore no --allow-production: the defaults already point at production, on purpose.
+the one case that could look like a write (MCP submit_opportunity's fail-closed behavior) runs
+against a local recording server this checker starts itself, never against --api. The defaults
+already point at production, on purpose.
 
 Options
   --site <url>            The reference frontend. Default: https://ethrfps.app
@@ -56,12 +56,17 @@ Options
   --browser               Use Playwright (resolved via packages/e2e) for checks that need a
                           rendered DOM: governance link rendering, /publishers slugs, the
                           frontend's search/filter/pagination/detail/deep-links/responsive checks.
-                          Without it, those checks report WARN "needs --browser", except the
-                          three responsive viewports, which only run at all when --browser is
-                          given (nothing to skip when it is absent).
-  --offline               Skip every network request the docs check would otherwise make
-                          (absolute link 2xx/3xx checks, safe-read block execution). Used by the
-                          docs-links CI job, which has no deployment to talk to.
+                          Without it those requirements are reported UNMET, which makes their
+                          criterion INCOMPLETE and the run exit 1 — never a silent pass.
+  --offline               Skip the network requests the DOCS criterion would otherwise make
+                          (absolute link 2xx/3xx checks, safe-read block execution). Every other
+                          criterion still uses the network, so the intended combination is
+                          --only docs --offline, which the docs-links CI job runs. A run with
+                          --offline is labeled a scoped lint, never an M4 sign-off.
+  --expect-indexable      Make the robots/indexability row a REQUIREMENT: fail when robots.txt
+                          disallows the whole site or the home page carries a noindex meta tag.
+                          Without it the row stays report-only (the index decision is the
+                          operator's, per the plan).
   --mcp-spec <spec>       npm version for the MCP check's \`npx -y @the-rfp-hub/mcp@<spec>\`.
                           Default: "next" — the REAL npm registry, which is what "installable"
                           means; before the package is published this fails, honestly. Pass
@@ -74,14 +79,21 @@ Options
                           so a passing scoped run is a clean PASS/exit 0, not "incomplete". Used
                           by the docs-links CI job (\`--only docs\`). Refused together with --skip.
   --json <path>           Where to write the machine-readable report.
-                          Default: <os.tmpdir()>/m4-compliance-report.json (printed after the run)
-                          — this tool is read-only, and a repo-root default would write into the
-                          caller's own checkout on every run. Use "-" for stdout.
+                          Default: <os.tmpdir()>/m4-compliance-report-<pid>-<timestamp>.json,
+                          printed after the run — this tool is read-only, a repo-root default
+                          would write into the caller's own checkout, and a CONSTANT temp name
+                          makes two concurrent runs overwrite each other's evidence. Use "-" for
+                          stdout.
   --concurrency <n>       Requests in flight. Default: 6.
   --timeout <ms>          Per-request/process timeout. Default: 15000.
   --no-color              Plain output.
   -h, --help              This text.
 `;
+
+function defaultReportName() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `m4-compliance-report-${process.pid}-${stamp}.json`;
+}
 
 async function main() {
   let opts;
@@ -105,12 +117,15 @@ async function main() {
   }
 
   const ctx = { ...opts };
+  const scopeLabel = describeScope(opts);
   const report = new Report({
     siteUrl: ctx.site,
     baseUrl: ctx.api,
     repoRoot: ctx.repoRoot,
     browser: ctx.browser,
     offline: ctx.offline,
+    mcpSpec: ctx.mcpSpec ?? "next",
+    ...(scopeLabel ? { scopeLabel } : {}),
     node: process.version,
   });
 
@@ -133,11 +148,10 @@ async function main() {
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 
-  // Default to the OS temp dir, not the repo root: this tool is advertised as read-only, and a
-  // repo-root default would write a report file into the caller's own checkout on every run —
-  // exactly the kind of side effect a "safe to run anywhere, including production" tool must not
-  // have. Printed after the run either way, so it is never a silent location.
-  const jsonPath = opts.json ?? join(tmpdir(), "m4-compliance-report.json");
+  // The OS temp dir, not the repo root: a "safe to run anywhere, including production" tool must
+  // not write into the caller's own checkout. Unique per run, because a constant name lets two
+  // concurrent runs silently overwrite each other's evidence. Printed either way.
+  const jsonPath = opts.json ?? join(tmpdir(), defaultReportName());
   const serialized = `${JSON.stringify(report.toJSON(), null, 2)}\n`;
   if (jsonPath === "-") {
     process.stdout.write(serialized);

@@ -112,9 +112,9 @@ export async function checkGovernance(report, ctx) {
     }
 
     if (!ctx.browser) {
-      c.warn(
+      c.unmet(
         `${page.label} links to GOVERNANCE.md`,
-        `not found in server HTML at ${target} (expected — the page is client-rendered); pass --browser to render it and check the footer/section link. NOT failed on this basis alone.`,
+        `not found in server HTML at ${target} (expected — the page is client-rendered); pass --browser to render it`,
       );
       continue;
     }

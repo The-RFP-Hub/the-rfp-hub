@@ -120,7 +120,7 @@ export async function checkDocs(report, ctx) {
   }
 
   if (ctx.offline) {
-    c.skip(
+    c.skipOptional(
       "absolute links answer 2xx/3xx",
       `--offline: ${absoluteToCheck.length} absolute link(s) not requested`,
     );
@@ -167,7 +167,10 @@ export async function checkDocs(report, ctx) {
 
         if (block.marker === "safe-read") {
           if (ctx.offline) {
-            c.skip(`${relPath}:${block.line}: safe-read block executes successfully`, "--offline");
+            c.skipOptional(
+              `${relPath}:${block.line}: safe-read block executes successfully`,
+              "--offline",
+            );
             continue;
           }
           try {

@@ -130,7 +130,7 @@ export async function checkFrontend(report, ctx) {
       "source href equals {api}/v1/r/{id}/source",
       ...VIEWPORTS.map((v) => `no horizontal overflow at ${v.label}`),
     ]) {
-      c.warn(name, "needs --browser");
+      c.unmet(name, "needs --browser");
     }
     return c.finish();
   }

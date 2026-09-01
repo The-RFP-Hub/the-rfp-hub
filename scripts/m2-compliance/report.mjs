@@ -26,11 +26,11 @@ export const INFO = "info";
 /** Run-level only: no criterion failed, but at least one was never exercised. */
 export const INCOMPLETE = "incomplete";
 
-const MARK = { [PASS]: "✓", [FAIL]: "✗", [WARN]: "!", [SKIP]: "-", [INFO]: "i" };
-const COLOR = { [PASS]: 32, [FAIL]: 31, [WARN]: 33, [SKIP]: 90, [INFO]: 36 };
+const MARK = { [PASS]: "✓", [FAIL]: "✗", [WARN]: "!", [SKIP]: "-", [INFO]: "i", [INCOMPLETE]: "?" };
+const COLOR = { [PASS]: 32, [FAIL]: 31, [WARN]: 33, [SKIP]: 90, [INFO]: 36, [INCOMPLETE]: 33 };
 
 /** One completion criterion, and the individual checks performed for it. */
-class Criterion {
+export class Criterion {
   constructor(id, name, describes) {
     this.id = id;
     this.name = name;
