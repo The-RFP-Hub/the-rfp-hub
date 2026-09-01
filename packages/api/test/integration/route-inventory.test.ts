@@ -72,7 +72,6 @@ run("route inventory", () => {
   }, 60_000);
 
   it("reads the router back, and finds the surface it is supposed to find", () => {
-    // A parser matching nothing would make every assertion below vacuous.
     expect(routes.length).toBeGreaterThan(100);
     expect(routes.filter((r) => r.path.startsWith("/v1/") && isMutation(r)).length).toBeGreaterThan(
       30,
@@ -120,7 +119,6 @@ run("route inventory", () => {
   });
 
   it("publishes the 429 contract on every metered operation", async () => {
-    // Against the LIVE document, because that is what a client is generated from.
     const doc = (await app.inject({ method: "GET", url: "/v1/docs/json" })).json<OpenApiDocument>();
 
     const documented = Object.entries(doc.paths).flatMap(([path, operations]) =>

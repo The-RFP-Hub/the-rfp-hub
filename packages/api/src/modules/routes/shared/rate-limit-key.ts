@@ -1,6 +1,7 @@
 /** Who a request is metered as, and the chain that meters it. See `docs/auth.md` §Rate limits. */
 import { isIPv4, isIPv6 } from "node:net";
 import type { FastifyInstance, FastifyRequest, onRequestHookHandler } from "fastify";
+import { HttpError } from "../../shared/http-error.js";
 
 const IPV6_SUBNET_BITS = 64;
 const IPV6_GROUPS = IPV6_SUBNET_BITS / 16;
@@ -9,6 +10,19 @@ const IPV6_GROUPS = IPV6_SUBNET_BITS / 16;
 const ACCOUNT_PREFIX = "acct:";
 const ADDRESS_PREFIX = "ip:";
 const INVALID_ADDRESS = `${ADDRESS_PREFIX}invalid`;
+
+/** What a throttled caller branches on: the default body is the generic `client_error`, which an
+ * integrator cannot tell from a validation failure. */
+export const RATE_LIMITED_CODE = "rate_limited";
+
+/** The 429 body for EVERY limiter — set once on the registration, so the metered writes, the two
+ * redirects and the auth mount cannot drift apart. `ttl` is ms, and `Retry-After` is its ceiling. */
+export const rateLimitedError = (_request: FastifyRequest, context: { ttl: number }): HttpError =>
+  new HttpError(
+    429,
+    RATE_LIMITED_CODE,
+    `Rate limit exceeded, retry in ${Math.ceil(context.ttl / 1000)} seconds`,
+  );
 
 /** What the limiter emits, and what BOTH CORS policies must expose or a browser cannot read it. */
 export const RATE_LIMIT_HEADERS = [

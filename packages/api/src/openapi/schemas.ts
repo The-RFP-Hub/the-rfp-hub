@@ -1155,11 +1155,14 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
     type: "object",
     additionalProperties: false,
     description:
-      "The request was refused for exceeding this operation's ceiling. The STATUS is the discriminator — `error` is the generic client-error code, because the limiter's refusal is raised before any handler and carries no domain code of its own.",
+      "The request was refused for exceeding this operation's ceiling. `error` is always `rate_limited`, so a client can branch on the code rather than on the status: backing off is the one 4xx with a correct automatic response.",
     required: ["error", "message"],
     properties: {
-      error: { type: "string", enum: ["client_error"] },
-      message: { type: "string" },
+      error: { type: "string", enum: ["rate_limited"] },
+      message: {
+        type: "string",
+        description: "e.g. `Rate limit exceeded, retry in 60 seconds`. Obey `Retry-After` instead.",
+      },
     },
   },
 ];

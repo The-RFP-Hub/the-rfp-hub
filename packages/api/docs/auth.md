@@ -387,7 +387,18 @@ The public read surface — the list, the detail, the feeds, the export — is d
 (`global: false` in `app.ts`); it is the traffic this project exists to serve, and an address-keyed
 cap on it would be one number for a whole organization.
 
-A `429` carries `retry-after` as a whole number of seconds, plus
+A `429` answers with the same stable body everywhere — the metered writes, the two redirects and
+the auth mount all take it from one `errorResponseBuilder` on the plugin registration:
+
+```json
+{ "error": "rate_limited", "message": "Rate limit exceeded, retry in 60 seconds" }
+```
+
+`error` is what a client branches on. The default body would have arrived as the generic
+`client_error`, which an integrator cannot tell from a validation failure — and backing off is the
+one `4xx` with a correct automatic response. Obey `retry-after` rather than parsing the message.
+
+The response carries `retry-after` as a whole number of seconds, plus
 `x-ratelimit-limit`/`-remaining`/`-reset`; the last three appear on a metered response below the
 ceiling too. **All four are on `Access-Control-Expose-Headers` in both CORS policies**, or a
 cross-origin page could receive a `429` and read nothing off it. An `OPTIONS` preflight is not

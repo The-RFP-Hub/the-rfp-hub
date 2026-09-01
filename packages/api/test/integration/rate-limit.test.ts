@@ -11,7 +11,10 @@ import { buildApp } from "../../src/app.js";
 import type { Auth } from "../../src/auth/better-auth.js";
 import { type DB, db, pool } from "../../src/db/client.js";
 import { apiKeys } from "../../src/db/schema.js";
-import { RATE_LIMIT_HEADERS } from "../../src/modules/routes/shared/rate-limit-key.js";
+import {
+  RATE_LIMITED_CODE,
+  RATE_LIMIT_HEADERS,
+} from "../../src/modules/routes/shared/rate-limit-key.js";
 import { analyticsEvents } from "../../src/modules/services/insights/event-buffer.js";
 import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
 import { bearer, mintApiKeyFor, seedIdentity, testAuth, testAuthConfig } from "../helpers/auth.js";
@@ -40,6 +43,21 @@ const AUTH_ORIGIN = "http://127.0.0.1:3005";
 
 const exposedHeadersOf = (headers: Record<string, unknown>): string[] =>
   String(headers["access-control-expose-headers"] ?? "").split(", ");
+
+/** The published 429 contract. The code is the point: the default body reaches a client as the
+ * generic `client_error`, indistinguishable from a validation failure. */
+function expectRateLimited(res: {
+  statusCode: number;
+  headers: Record<string, unknown>;
+  body: string;
+}) {
+  expect(res.statusCode).toBe(429);
+  const retryAfter = Number(res.headers["retry-after"]);
+  expect(JSON.parse(res.body)).toEqual({
+    error: RATE_LIMITED_CODE,
+    message: `Rate limit exceeded, retry in ${retryAfter} seconds`,
+  });
+}
 /** The first two are one customer's /64, the third is somebody else's. */
 const IPV6_HOST = "2001:db8:5:5::1";
 const IPV6_SAME_64 = "2001:db8:5:5:ffff:ffff:ffff:ffff";
@@ -166,11 +184,10 @@ run("M4RATE rate-limit keys", () => {
       headers: junk,
       remoteAddress: IP_A,
     });
-    expect(exceeded.statusCode).toBe(429);
+    expectRateLimited(exceeded);
     expect(Number(exceeded.headers["retry-after"])).toBeGreaterThan(0);
 
-    // Keyed by ADDRESS, not globally — one shared bucket is a denial of service on every
-    // anonymous caller at once, and would also pass the assertion above.
+    // Keyed by ADDRESS, not globally: one shared bucket would also pass the assertion above.
     const elsewhere = await app.inject({
       method: "POST",
       url: "/v1/opportunities",
@@ -222,8 +239,7 @@ run("M4RATE rate-limit keys", () => {
   }, 60_000);
 
   it("moves a credential revoked mid-window onto the address bucket", async () => {
-    // A credential that can no longer be PROVEN is not the account, and must neither spend nor
-    // inherit its budget.
+    // A credential that can no longer be PROVEN must neither spend nor inherit the account's budget.
     await db
       .update(apiKeys)
       .set({ revokedAt: new Date() })
@@ -264,7 +280,7 @@ run("M4RATE rate-limit keys", () => {
       expect(Number(first.headers["x-ratelimit-remaining"])).toBe(KEYS_MAX - 1);
 
       for (let i = 1; i < KEYS_MAX; i++) expect((await call(JUNK_KEY)).statusCode).toBe(401);
-      expect((await call(JUNK_KEY)).statusCode).toBe(429);
+      expectRateLimited(await call(JUNK_KEY));
 
       const stillOutage = await call(JUNK_SESSION);
       expect(stillOutage.statusCode).toBe(503);
@@ -275,8 +291,8 @@ run("M4RATE rate-limit keys", () => {
   }, 120_000);
 
   it("never meters — or masks — a failure to CHECK an API KEY either", async () => {
-    // A key is verified by a query, so a broken database is the same distinction as a broken
-    // session lookup. One decision, two arms, and they must not drift apart.
+    // A key is verified by a query, so a broken database is the same distinction. One decision,
+    // two arms, and they must not drift apart.
     const broken = await buildApp({
       auth: { auth: await testAuth(), db: brokenKeyLookupDb() },
     });
@@ -296,13 +312,13 @@ run("M4RATE rate-limit keys", () => {
       expect(outage.headers["x-ratelimit-remaining"]).toBeUndefined();
 
       // No credential needs no lookup, so this is refused for real — and its being the FIRST
-      // charge is what proves the outage above cost nothing.
+      // charge proves the outage above cost nothing.
       const first = await call({});
       expect(first.statusCode).toBe(401);
       expect(Number(first.headers["x-ratelimit-remaining"])).toBe(KEYS_MAX - 1);
 
       for (let i = 1; i < KEYS_MAX; i++) expect((await call({})).statusCode).toBe(401);
-      expect((await call({})).statusCode).toBe(429);
+      expectRateLimited(await call({}));
 
       const stillOutage = await call(bearer(JUNK_KEY));
       expect(stillOutage.statusCode).toBe(500);
@@ -341,7 +357,7 @@ run("M4RATE rate-limit keys", () => {
       headers: cors,
       remoteAddress: IP_E,
     });
-    expect(exceeded.statusCode).toBe(429);
+    expectRateLimited(exceeded);
     expect(exposedHeadersOf(exceeded.headers)).toEqual(expect.arrayContaining(RATE_LIMIT_HEADERS));
   }, 120_000);
 
@@ -369,7 +385,8 @@ run("M4RATE rate-limit keys", () => {
 
       for (let i = 1; i < mailMax; i++) await send();
       const exceeded = await send();
-      expect(exceeded.statusCode).toBe(429);
+      // A different limiter path — declarative `config.rateLimit` — and the same body.
+      expectRateLimited(exceeded);
       expect(exposedHeadersOf(exceeded.headers)).toEqual(
         expect.arrayContaining(RATE_LIMIT_HEADERS),
       );
@@ -386,7 +403,7 @@ run("M4RATE rate-limit keys", () => {
       headers: junk,
       remoteAddress: IP_A,
     });
-    expect(exceeded.statusCode).toBe(429);
+    expectRateLimited(exceeded);
     const retryAfter = exceeded.headers["retry-after"];
     expect(String(retryAfter)).toMatch(/^[1-9][0-9]*$/);
     expect(Number(retryAfter)).toBeLessThanOrEqual(60);
@@ -412,7 +429,7 @@ run("M4RATE rate-limit keys", () => {
 
   it("meters a HEAD on a redirect, and records no click for it", async () => {
     // HEAD is served off the GET route, so the click-counting handler ran and only the body was
-    // dropped. The automatic HEAD is its OWN route, so it is bounded on a bucket of its own.
+    // dropped. The automatic HEAD is its own route, so it is bounded on its own bucket.
     const reader = { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) TestReader/1.0" };
     // Every `buildApp` close shuts this module singleton, and the outage cases above closed two.
     analyticsEvents.reopen();
