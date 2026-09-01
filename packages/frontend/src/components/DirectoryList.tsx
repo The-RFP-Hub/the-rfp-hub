@@ -251,12 +251,9 @@ export function DirectoryList() {
           </div>
 
           {/*
-           * A slug, not a name — the field the endpoint actually filters on — and the hint says
-           * exactly what it matches, because the API's `organization` param is wider than the label
-           * alone would suggest: it hits `operatingOrganizations` (who runs the intake) AND
-           * `sponsoringOrganizations` (who backs it), not only the one named in the "Organization"
-           * column. This is also the exact param name and value a `/publishers` card links here with
-           * (`/?organization=<slug>`), so a shared or bookmarked link round-trips through this box.
+           * A slug, and the hint says what it matches: the API's `organization` param is wider than
+           * the label suggests — operating AND sponsoring organizations, not only the one in the
+           * "Organization" column. It is also the param a `/publishers` card links here with.
            */}
           <div className={`field${draft.organization.trim() ? " is-set" : ""}`}>
             <label htmlFor="directory-organization">
@@ -288,11 +285,7 @@ export function DirectoryList() {
               Compares a listing&rsquo;s award amount; one that states only a total program budget
               (no award range) is compared using that budget instead.
             </p>
-            {/*
-             * A number control renders BLANK for anything it cannot parse, so a link carrying
-             * `?minAward=abc` would look like no filter at all. The value is still sent — the
-             * endpoint answers a 400 naming the parameter — so it stays visible as text.
-             */}
+            {/* The control renders blank for `?minAward=abc`, but the value IS still sent. */}
             {draft.minAward.trim() && awardInputValue(draft.minAward) !== draft.minAward.trim() ? (
               <p className="hint">
                 Filtering on the exact value from the link:{" "}
@@ -331,11 +324,9 @@ export function DirectoryList() {
           </div>
 
           {/*
-           * `nextDeadlineAt` — the derived, earliest-upcoming-FIXED-deadline field these two compare
-           * against, exactly as `sort`'s default already does. An entry with no upcoming fixed
-           * deadline (rolling-only, all past, or none at all) has a NULL there and is excluded by
-           * either bound — the same rule the API's own parameter docs state, and why the labels and
-           * hints below say "fixed" and "rolling" rather than leaving that implicit.
+           * Both bounds compare against the derived `nextDeadlineAt`. An entry with no upcoming
+           * fixed deadline has a NULL there and is excluded by either — which is why the labels and
+           * hints say "fixed" and "rolling" rather than leaving it implicit.
            */}
           <div className={`field${draft.deadlineAfter.trim() ? " is-set" : ""}`}>
             <label htmlFor="directory-deadline-after">
@@ -352,12 +343,9 @@ export function DirectoryList() {
               upcoming fixed deadline, are excluded by this filter.
             </p>
             {/*
-             * A value carried in from a shared or hand-edited URL can be a full instant
-             * (`2026-09-01T12:00:00Z`), not the bare day this picker can display — and the picker
-             * silently shows blank for anything it cannot parse. That would make an ACTIVE filter
-             * look like no filter at all, so the exact, untouched value stays visible as text
-             * whenever it carries more than the day the control shows. Submitting the form again
-             * without touching this field still sends this exact value, not the truncated day.
+             * A link can carry a full instant, which the picker shows as blank — an ACTIVE filter
+             * looking like no filter. The exact value stays visible as text, and resubmitting the
+             * form untouched still sends it rather than the truncated day.
              */}
             {draft.deadlineAfter.trim() &&
             dateInputValue(draft.deadlineAfter) !== draft.deadlineAfter.trim() ? (
@@ -384,12 +372,8 @@ export function DirectoryList() {
               Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones with no
               upcoming fixed deadline, are excluded by this filter.
             </p>
-            {/*
-             * LENGTH-BOUNDED and rendered through `UntrustedText`, same as the field above: a query
-             * parameter carries no length limit of its own, and this text still has to fit the
-             * layout on the narrowest viewport this package supports. `.wrap-anywhere` is the other
-             * half of that, for whatever survives the bound.
-             */}
+            {/* Length-bounded and `UntrustedText`, same as above: a query param has no limit of
+             * its own and this still has to fit the narrowest viewport. */}
             {draft.deadlineBefore.trim() &&
             dateInputValue(draft.deadlineBefore) !== draft.deadlineBefore.trim() ? (
               <p className="hint">
@@ -411,13 +395,8 @@ export function DirectoryList() {
 
       {/*
        * A 400 HERE IS ALWAYS THIS PAGE'S OWN QUERYSTRING, so it gets its own state rather than the
-       * generic "we couldn't load the directory" panel: retrying an invalid filter combination fails
-       * the same way every time, and a reader who typed `2026-13-40` into a date box needs to be told
-       * WHICH filter is wrong, not invited to try again. `additionalProperties: false` means the
-       * endpoint's own message already names the offending parameter for most cases (a bad type or
-       * format carries its field in `instancePath`); an unrecognized param name is the one case where
-       * it does not, and `issues` (empty here — this is a querystring rejection, not a document
-       * validation one) would carry it structurally if the API ever adds that.
+       * generic "we couldn't load" panel: retrying an invalid filter fails the same way every time,
+       * and the reader needs to be told WHICH filter is wrong. The endpoint's own message names it.
        */}
       {state.status === "error" && state.error.status === 400 ? (
         <div className="callout state error" role="alert">
@@ -506,12 +485,9 @@ export function DirectoryList() {
 }
 
 /**
- * An empty result, with the reason whenever the filters themselves supply one.
- *
- * "Nothing matches those filters" reads as a fact about the corpus, and for an inverted range or a
- * page past the end it is not one — the reader's own query is what cannot match. Each of those also
- * needs a way out that is not "Clear the filters": paging too far should not cost somebody the
- * search that got them there.
+ * "Nothing matches those filters" reads as a fact about the corpus; for an inverted range or a page
+ * past the end it is not one. Each also needs a way out that is not "Clear the filters", which
+ * would cost a reader who merely paged too far the search that got them there.
  */
 function EmptyResult({ applied, page }: { applied: DirectorySelection; page: number }) {
   const filtered = isFiltered(applied);

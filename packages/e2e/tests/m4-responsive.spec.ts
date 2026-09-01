@@ -1,20 +1,10 @@
 /**
- * M4 — mobile-responsive evidence for the public reference frontend.
+ * M4 — mobile-responsive evidence for the three public pages: `/`, `/opportunities/{id}` and
+ * `/publishers`.
  *
- * THIS IS THE FIRST RESPONSIVE TEST IN THE REPOSITORY. `globals.css` has carried breakpoints
- * (40rem/56rem/30rem) and a `(pointer: coarse)` touch-target rule for a while, but nothing ever
- * exercised them in a real browser at a real viewport — so a regression in either would have shipped
- * silent. This file is that evidence, for the three public pages the reference frontend's own README
- * calls the front door: the directory (`/`), one entry (`/opportunities/{id}`), and the publisher
- * directory (`/publishers`). All three are asserted unconditionally: a 404 from any of them is a
- * regression, and a spec that folds one into a skip is a green gate that proved nothing.
- *
- * EVERY CASE RUNS IN A CONTEXT BUILT FRESH, sized to the viewport under test and with no stored
- * session — these are public, unauthenticated pages, and the project's shared `storageState` would
- * only be a confound here. `hasTouch` is set for the two narrower viewports so the CSS's own
- * `(pointer: coarse)` rule — which is what actually widens a control to the 44px touch target this
- * file checks — takes effect exactly the way a real phone or tablet would trigger it; the desktop
- * viewport runs with a mouse pointer, which is the point of including it as a contrast case.
+ * `globals.css` has carried breakpoints and a `(pointer: coarse)` touch-target rule for a while,
+ * but nothing ever exercised them in a real browser at a real viewport. All three pages are
+ * asserted unconditionally: a spec that folds one into a skip is a green gate that proved nothing.
  */
 import type { Browser, Locator, Page } from "@playwright/test";
 import { expect, skipUnlessActor, test } from "../src/fixtures.js";
@@ -25,7 +15,6 @@ interface Viewport {
   name: string;
   width: number;
   height: number;
-  /** Only the two touch-sized viewports flip on `(pointer: coarse)` — see the module comment. */
   hasTouch: boolean;
 }
 
@@ -35,8 +24,7 @@ const VIEWPORTS: Viewport[] = [
   { name: "desktop (1440×900)", width: 1440, height: 900, hasTouch: false },
 ];
 
-/** The minimum a touch target must clear — `--control-touch` in `globals.css`, restated here because
- *  the point of this file is to prove the CSS value in a real browser rather than to trust it. */
+/** `--control-touch`, restated rather than read: the point is to prove the value in a browser. */
 const MIN_TOUCH_TARGET_PX = 44;
 
 async function newViewportPage(
@@ -46,24 +34,15 @@ async function newViewportPage(
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     hasTouch: viewport.hasTouch,
-    // `hasTouch` ALONE does not flip Chromium's `pointer`/`hover` media features — it only adds
-    // touch-event dispatch. `isMobile` is what actually makes `(pointer: coarse)` match, which is
-    // the rule `globals.css` uses to widen a control to its 44px touch target. Confirmed the hard
-    // way: without this, the mobile-viewport run below measured a 40px control and failed.
+    // `hasTouch` alone only adds touch-event dispatch; `isMobile` is what makes `(pointer: coarse)`
+    // match, and that is the rule being measured. Without it the mobile run measured a 40px control.
     isMobile: viewport.hasTouch,
     storageState: undefined,
   });
   return { context, page: await context.newPage() };
 }
 
-/**
- * `document.documentElement.scrollWidth <= innerWidth` — a page that must not scroll sideways.
- *
- * `globalThis`, not `window`/`document` by name: this package's `tsconfig.json` has no DOM lib (it
- * is a Node runner and its specs run in Node too — only the callback below actually executes in the
- * browser), so every other spec in this suite that reaches into page globals goes through the same
- * cast rather than widening the whole package's `lib` for one evaluate call.
- */
+/** `globalThis` rather than `window`/`document`: this package's tsconfig has no DOM lib. */
 async function expectNoHorizontalOverflow(page: Page, where: string): Promise<void> {
   const { scrollWidth, innerWidth } = await page.evaluate(() => {
     const browser = globalThis as unknown as {
@@ -81,7 +60,6 @@ async function expectNoHorizontalOverflow(page: Page, where: string): Promise<vo
   ).toBeLessThanOrEqual(innerWidth);
 }
 
-/** Visible, and at least `MIN_TOUCH_TARGET_PX` tall — the shape of every touch-target assertion below. */
 async function expectTouchTarget(locator: Locator, label: string): Promise<void> {
   await expect(locator, `${label} must be visible`).toBeVisible();
   const box = await locator.boundingBox();
@@ -92,17 +70,8 @@ async function expectTouchTarget(locator: Locator, label: string): Promise<void>
   ).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
 }
 
-/**
- * Waits for a `ResourceView`-driven read to SETTLE before anything measures layout against it.
- *
- * `states.tsx`'s `Loading` placeholder (`output.state.loading`) is a deliberately minimal,
- * fixed-height box — measuring overflow against it proves nothing about the page a reader actually
- * sees. `content` is whatever locator proves THIS page's real data rendered (a fixture's own row or
- * card); the shared empty (`.state.empty`) and error (`.callout.state.error`) containers race
- * against it too, because either of those is just as much a "loaded" outcome as content is. Once one
- * of the three wins, the loading placeholder itself must actually be gone — `useResource` never
- * renders it alongside a result, but this is what proves that rather than assuming it.
- */
+/** Measuring layout against the fixed-height `Loading` placeholder proves nothing about the page a
+ *  reader sees. `content` is this page's real data; empty and error race it, being just as settled. */
 async function waitForLoaded(page: Page, content: Locator, timeout = 20_000): Promise<void> {
   await Promise.any([
     content.first().waitFor({ state: "visible", timeout }),
@@ -112,14 +81,8 @@ async function waitForLoaded(page: Page, content: Locator, timeout = 20_000): Pr
   await expect(page.locator("output.state.loading")).toHaveCount(0);
 }
 
-/**
- * The `/publishers` equivalent of `waitForLoaded`, for a page this repository cannot inspect (it
- * may not exist here at all — see the module comment). Without a page-specific "real content"
- * locator to race against empty/error, this settles for the two page-shape-agnostic signals
- * available: the shared loading placeholder actually clearing if it ever appeared, and the
- * browser's own network-idle signal as a second, independent proxy for the page's initial fetch
- * having settled.
- */
+/** `waitForLoaded` without a page-specific content locator: the shared placeholder clearing, plus
+ *  network-idle as a second, independent proxy for the initial fetch having settled. */
 async function waitForResourceSettled(page: Page): Promise<void> {
   const loading = page.locator("output.state.loading").first();
   const appeared = await loading
@@ -130,13 +93,7 @@ async function waitForResourceSettled(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle").catch(() => undefined);
 }
 
-/**
- * The header is usable here: the landmark exists and its public links are reachable.
- *
- * A layout that survives a narrow viewport without horizontal scroll and then hides its own
- * navigation off-screen has not survived it — this is the assertion the responsive workflow already
- * claimed the file made.
- */
+/** A layout that survives a narrow viewport and then hides its own navigation has not survived it. */
 async function expectUsableNav(page: Page, viewport: Viewport): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Sections" });
   await expect(nav, "the header navigation landmark must be present").toBeVisible();
@@ -157,8 +114,6 @@ async function expectDirectoryControlsAreTouchable(page: Page): Promise<void> {
 
 test.describe("M4 responsive layout", () => {
   test.beforeEach(({ stack }) => {
-    // Only a publisher is needed: one published entry is enough to exercise the detail page. See
-    // `m3-7-public-browse.spec.ts` for the same shape of setup.
     skipUnlessActor(stack, "publisher");
   });
 
@@ -173,9 +128,7 @@ test.describe("M4 responsive layout", () => {
       const stamp = Date.now();
       const document = opportunityFixture(stack.namespaces.publisher, `responsive-${stamp}`, {
         title: `Responsive layout probe ${stamp}`,
-        // `seedDocument`'s default carries `applicationUrl` but not `website` — and the "Program
-        // site" (source) link only renders when `website` is set. Both are asserted below, so both
-        // need to be true of this fixture.
+        // The "Program site" link renders only when `website` is set, and it is asserted below.
         website: stack.urls.programme,
       });
       const id = document.id as string;
@@ -185,13 +138,8 @@ test.describe("M4 responsive layout", () => {
       const { context, page } = await newViewportPage(browser, viewport);
 
       try {
-        // ── `/` — the directory ──────────────────────────────────────────────────────────────
-        // The heading is STATIC markup rendered beside `<DirectoryList/>`, not inside the
-        // `ResourceView` it drives (`app/page.tsx`) — it is visible well before the list's own
-        // fetch resolves, so it proves nothing about whether real content has rendered yet.
-        // `waitForLoaded` below, racing this fixture's own row against the shared empty/error
-        // containers, is what actually proves the page a reader would see rather than a loading
-        // skeleton.
+        // The heading is static markup beside `<DirectoryList/>`, so it is visible long before the
+        // list's own fetch resolves; `waitForLoaded` is what proves real content rendered.
         await page.goto(stack.urls.frontend);
         await expect(page.getByRole("heading", { name: "Funding opportunities" })).toBeVisible();
         const listedEntry = page.getByRole("link", {
@@ -202,15 +150,13 @@ test.describe("M4 responsive layout", () => {
         await expectNoHorizontalOverflow(page, "/");
         await expectUsableNav(page, viewport);
 
-        // BOTH touch viewports, not only the phone. 768×1024 also runs with `isMobile: true`, so
-        // `(pointer: coarse)` matches there too and the same rule is what has to hold.
+        // Both touch viewports: 768×1024 also runs `isMobile`, so the same rule has to hold there.
         if (viewport.hasTouch) await expectDirectoryControlsAreTouchable(page);
 
-        // ── `/opportunities/{id}` — one entry ────────────────────────────────────────────────
         await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
+        // The apply action renders only once the entry's data has loaded, so it doubles as the
+        // content signal `waitForLoaded` races against empty/error.
         const apply = page.getByRole("link", { name: /Apply on the program’s own site/ });
-        // The apply action only renders once the entry's own data has loaded, so this doubles as
-        // the content signal `waitForLoaded` races against empty/error.
         await waitForLoaded(page, apply);
         await expect(apply).toBeVisible();
         await expectNoHorizontalOverflow(page, `/opportunities/${id}`);
@@ -222,7 +168,6 @@ test.describe("M4 responsive layout", () => {
           await expectTouchTarget(source, "the Program site (source) link");
         }
 
-        // ── `/publishers` ────────────────────────────────────────────────────────────────────
         const response = await page.goto(`${stack.urls.frontend}/publishers`);
         expect(
           response,
@@ -236,10 +181,6 @@ test.describe("M4 responsive layout", () => {
           page.getByRole("heading", { name: /publisher/i }).first(),
           "/publishers: responded, but no heading naming publishers was found",
         ).toBeVisible();
-        // The heading can be static markup beside the page's own `ResourceView`, exactly like the
-        // directory's — so it says the route rendered SOMETHING, not that its data has loaded.
-        // `waitForResourceSettled` is the page-shape-agnostic wait for that (see its own comment
-        // for why this page gets a different helper from `/` and the entry page above).
         await waitForResourceSettled(page);
         await expectNoHorizontalOverflow(page, "/publishers");
         await expectUsableNav(page, viewport);

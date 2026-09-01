@@ -36,11 +36,8 @@ export type Resource<T> =
   | { status: "error"; error: ApiError };
 
 /**
- * How long a read may stay in flight before this hook stops waiting on it.
- *
- * A loading state has no end of its own: an API that accepts the connection and then never answers
- * leaves a page spinning until the reader closes the tab. Turning that into the error state is what
- * gives them a "try again" and a technical detail to report.
+ * A loading state has no end of its own: an API that accepts the connection and never answers
+ * leaves the page spinning until the reader closes the tab.
  */
 export const RESOURCE_TIMEOUT_MS = 30_000;
 

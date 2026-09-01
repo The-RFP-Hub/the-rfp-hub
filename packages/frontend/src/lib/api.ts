@@ -118,10 +118,7 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * `Retry-After` as whole seconds. The header is either a count or an HTTP date, and a deployment
- * behind a proxy may send neither — an unreadable value is `undefined` rather than a guess.
- */
+/** A count or an HTTP date; an unreadable value is `undefined` rather than a guess. */
 function retryAfterSeconds(header: string | null): number | undefined {
   const raw = header?.trim();
   if (!raw) return undefined;
@@ -193,8 +190,7 @@ export type DirectoryQuery = {
   category?: string;
   /** Organization slug — matches any operating OR sponsoring organization. */
   organization?: string;
-  /** A number, or the reader's raw text when the address bar carried something else — the endpoint
-   *  then answers a 400 naming the parameter instead of the filter being dropped in silence. */
+  /** Raw text when the address bar carried something else, so the endpoint names it in a 400. */
   minAward?: number | string;
   maxAward?: number | string;
   /** RFC 3339 instants, compared against the derived `nextDeadlineAt`. */

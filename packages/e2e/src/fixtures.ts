@@ -297,12 +297,8 @@ export function requireActor(stack: RunState, actor: ActorName) {
 }
 
 /**
- * A skip locally, a FAILURE in CI.
- *
- * Playwright exits 0 on a skip, so a job whose whole purpose is evidence can be green having
- * asserted nothing — and a bring-up failure is exactly the case that skips every spec at once.
- * Locally the skip is still the useful answer: a developer running one part of the suite has not
- * broken anything by not having brought the rest of it up.
+ * A skip locally, a FAILURE in CI: Playwright exits 0 on a skip, so a bring-up failure — which
+ * skips every spec at once — would leave an evidence gate green having asserted nothing.
  */
 function blocked(reason: string): void {
   if (process.env.CI) throw new Error(`${reason} In CI this is a failure, not a skip.`);

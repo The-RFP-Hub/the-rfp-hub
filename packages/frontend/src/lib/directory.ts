@@ -102,14 +102,11 @@ export interface DirectorySelection {
   category: string;
   /** An organization SLUG. Matches any operating OR sponsoring organization — see the field's hint. */
   organization: string;
-  /** Held as the control's raw text so an in-progress edit ("1" before "1500") never round-trips
-   *  through a parse. Turned into a number only in `directoryQuery`, and dropped there if it isn't
-   *  one. */
+  /** The control's raw text, so an in-progress edit ("1" before "1500") never round-trips a parse. */
   minAward: string;
   maxAward: string;
-  /** The `<input type="date">` control's own value, `YYYY-MM-DD`. The endpoint wants a full RFC 3339
-   *  instant — `directoryQuery` is where that conversion happens, once, rather than in every place
-   *  that reads or writes this field. */
+  /** The `<input type="date">` value, `YYYY-MM-DD`. `directoryQuery` widens it to an RFC 3339
+   *  instant, once, rather than in every place that reads or writes this field. */
   deadlineAfter: string;
   deadlineBefore: string;
   ordering: Ordering;
@@ -159,26 +156,14 @@ function finiteNumber(value: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/**
- * What an award control sends.
- *
- * A value that is not a finite number is FORWARDED AS TYPED rather than dropped, exactly as the two
- * deadline fields forward a hand-edited instant: `minAward`/`maxAward` are declared `number`, so the
- * endpoint answers a 400 naming the offending parameter and this page renders it. Dropping it left
- * the address bar advertising a filter that was never applied, with nothing on screen saying so.
- */
+/** Not a finite number? FORWARDED AS TYPED, so the endpoint answers a 400 naming the parameter.
+ *  Dropping it left the address bar advertising a filter the request never carried. */
 function awardParam(value: string): number | string | undefined {
   return finiteNumber(value) ?? filled(value);
 }
 
-/**
- * What `<input type="number">` should show for an award control's raw value.
- *
- * Same problem the deadline controls have: a native number input renders BLANK for anything it
- * cannot parse, so a value carried in from a link (`?minAward=abc`, or `1e400`, which is `Infinity`)
- * would look like no filter at all. This returns `""` for those, and the DirectoryList surfaces the
- * literal value as text beside the control instead.
- */
+/** A number input renders BLANK for `?minAward=abc` (and `1e400`, which is `Infinity`), so an
+ *  active filter would look like none; the DirectoryList shows the literal value as text instead. */
 export function awardInputValue(value: string): string {
   const text = value.trim();
   return finiteNumber(text) === undefined ? "" : text;
@@ -187,15 +172,8 @@ export function awardInputValue(value: string): string {
 /** `YYYY-MM-DD` (what `<input type="date">` holds) → `date`; anything already an instant. */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * The endpoint wants a full RFC 3339 instant, and `<input type="date">` gives back only the day.
- * `deadlineAfter`/`deadlineBefore` are inclusive of the boundary day, so the day is widened to its
- * first or last instant rather than left at midnight for both — a reader who picks the same day for
- * both ends should still see whatever is due that day, not zero results.
- *
- * A value that is not a bare date (a hand-edited URL, say) is passed through untouched: the endpoint
- * validates it and, if it's malformed, answers a 400 this page already knows how to show.
- */
+/** BOTH ENDS ARE INCLUSIVE OF THEIR DAY, so the day widens to its first or last instant rather
+ *  than to midnight for both. A value that is not a bare date passes through for the endpoint. */
 function instant(value: string, edge: "start" | "end"): string | undefined {
   const text = filled(value);
   if (text === undefined) return undefined;
@@ -203,23 +181,8 @@ function instant(value: string, edge: "start" | "end"): string | undefined {
   return edge === "start" ? `${text}T00:00:00.000Z` : `${text}T23:59:59.999Z`;
 }
 
-/**
- * What `<input type="date">` should show for a deadline control's raw value.
- *
- * The control can only DISPLAY a bare `YYYY-MM-DD` — handed a full RFC 3339 instant (from a shared
- * link, a hand-edited URL, or anywhere else this module didn't itself produce), a native date input
- * silently renders BLANK. That is the bug this exists to prevent: a filter that is still active (it
- * is still in the selection, and `directoryQuery` still sends it, untouched, for the endpoint to
- * validate) would look exactly like no filter at all. This extracts the day so the picker shows the
- * right one; it is a DISPLAY value only; `directoryQuery` above always reads the field's own raw,
- * unaltered value, so a time-of-day carried by the instant is never lost by round-tripping through
- * the day-only control the reader never touched.
- *
- * Returns `""` when the value is not a bare date and does not start with one — the control falls
- * back to blank, same as it always did with anything it could not parse; the DirectoryList surfaces
- * the literal, untouched value as text right next to it, so an active filter is still visible even
- * then.
- */
+/** A DISPLAY VALUE ONLY: the picker renders blank for a full instant, so the day is extracted for
+ *  it while `directoryQuery` keeps reading the raw field — a link's time of day is never lost. */
 export function dateInputValue(value: string): string {
   const trimmed = value.trim();
   if (DATE_ONLY.test(trimmed)) return trimmed;
@@ -230,25 +193,12 @@ export function dateInputValue(value: string): string {
 /** How much of a raw, retained URL value the "exact value from the link" hint will ever show. */
 export const RETAINED_VALUE_DISPLAY_LIMIT = 200;
 
-/**
- * How much of a free-text filter read out of the address bar is kept.
- *
- * A query parameter carries no length limit of its own, so `?category=<200 KB>` would otherwise be
- * forwarded verbatim to the endpoint and rendered into the control. Bounding it HERE — where the
- * URL becomes the selection — keeps the control, the address bar and the request agreeing on one
- * value, which a bound applied only on the way out would not.
- */
+/** A query parameter has no length limit of its own. Bounding it where the URL BECOMES the
+ *  selection keeps control, address bar and request agreeing on one value. */
 export const FREE_TEXT_FILTER_LIMIT = 200;
 
-/**
- * Bounds how much of an arbitrary, reader-supplied URL value ever reaches the DOM as text.
- *
- * The value this feeds (`deadlineAfter`/`deadlineBefore`'s raw, untouched selection field) comes
- * straight from the address bar with no length limit of its own — a query param can be kilobytes
- * long. Showing it verbatim would let a single absurd link balloon the page's layout and the DOM
- * itself; truncating it is a display concern only; `directoryQuery` above never calls this, so the
- * FULL value is still exactly what reaches the endpoint.
- */
+/** Bounds a reader-supplied URL value on its way to the DOM. A display concern only: the full
+ *  value is still what reaches the endpoint. */
 export function truncateForDisplay(
   value: string,
   limit: number = RETAINED_VALUE_DISPLAY_LIMIT,
@@ -256,14 +206,8 @@ export function truncateForDisplay(
   return value.length > limit ? `${value.slice(0, limit)}…` : value;
 }
 
-/**
- * Why an empty result is empty, when the filters themselves say so.
- *
- * An inverted range can never match anything, and a reader who typed one is owed that sentence
- * rather than the generic "nothing matches those filters" — which reads as a fact about the corpus.
- * `organization` earns its own line for a different reason: it takes a slug, the control's
- * placeholder says so, and until now the empty state did not.
- */
+/** An inverted range can never match, so "nothing matches those filters" — a claim about the
+ *  corpus — is the wrong sentence. `organization` takes a slug, which only the placeholder said. */
 export function emptyResultHints(selection: DirectorySelection): string[] {
   const hints: string[] = [];
 
@@ -378,16 +322,10 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
           ? status
           : DEFAULT_SELECTION.status,
     ecosystem: get("ecosystem"),
-    // `category` and `organization` are free text on the API side too (no enum to validate against),
-    // so — like `ecosystem` — whatever is here is passed straight through; a value the endpoint
-    // rejects becomes the 400 this page already renders, not a silent drop.
+    // Free text on the API side too, so passed straight through: a rejected value becomes the 400
+    // this page renders. `organization` is also the param a `/publishers` card links here with.
     category: getBounded("category"),
-    // Matches the URL a verified-publisher card links with (`/?organization=<slug>`) exactly: the
-    // same param name on both sides of that link.
     organization: getBounded("organization"),
-    // `minAward`/`maxAward`/the two deadline params are likewise forwarded as typed. `directoryQuery`
-    // is where a non-numeric award or a malformed instant either gets dropped (award) or reaches the
-    // endpoint to be validated (deadline) — see its comments for why those two differ.
     minAward: get("minAward"),
     maxAward: get("maxAward"),
     deadlineAfter: get("deadlineAfter"),
@@ -409,9 +347,6 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
   if (ecosystem) params.set("ecosystem", ecosystem);
   const category = filled(selection.category);
   if (category) params.set("category", category);
-  // Deliberately the SAME param name the API filter uses (`organization`), because this is also the
-  // param a verified-publisher card on `/publishers` links here with — `/?organization=<slug>` has
-  // to resolve to this exact key without this module knowing that page exists.
   const organization = filled(selection.organization);
   if (organization) params.set("organization", organization);
   const minAward = filled(selection.minAward);

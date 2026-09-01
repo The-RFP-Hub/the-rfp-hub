@@ -404,8 +404,7 @@ describe("the public directory list", () => {
     mount(client, <DirectoryList />);
 
     expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
-    // "Clear the filters" would also throw away the search that produced the result — it must not
-    // be the only way out of a page number.
+    // "Clear the filters" would also throw away the search that produced the result.
     const back = screen.getByRole("link", { name: "Back to page 1" });
     expect(back.getAttribute("href")).toBe("/?q=zk");
   });
@@ -423,16 +422,13 @@ describe("the public directory list", () => {
     mount(client, <DirectoryList />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    // A 400 from the list route names its OWN querystring, so it gets a dedicated panel rather than
-    // the generic "we couldn't load" one — and the message appears twice on purpose: once up front,
-    // and once again inside the closed technical details alongside the machine-readable code.
+    // The message appears twice on purpose: up front, and inside the closed technical details.
     expect(screen.getAllByText(/must NOT have additional properties/).length).toBeGreaterThan(0);
     expect(screen.getByText(/validation_failed/)).toBeTruthy();
   });
 
   it("names the bad parameter on a 400 from a filter, rather than a generic failure", async () => {
-    // Exactly what `querystring/minAward must be number` looks like coming off ajv's `instancePath`
-    // — the case a bad `type`/`format` on one of the new filters actually produces.
+    // Exactly what ajv's `instancePath` produces for a bad type on one of the new filters.
     const { client } = stub({
       list: async () => {
         throw new ApiError(400, "bad_request", "querystring/minAward must be number");
@@ -606,8 +602,7 @@ describe("the directory's filters", () => {
 
     const min = screen.getByLabelText("Min award/budget") as HTMLInputElement;
     const max = screen.getByLabelText("Max award/budget") as HTMLInputElement;
-    // `step="any"` is what lets the browser accept a non-integer value at all; `inputMode="decimal"`
-    // is what puts a decimal key on a phone's on-screen keyboard in the first place.
+    // `step="any"` lets the browser accept a non-integer; `inputMode` puts a decimal key on a phone.
     expect(min.step).toBe("any");
     expect(min.inputMode).toBe("decimal");
     expect(max.step).toBe("any");
@@ -615,9 +610,7 @@ describe("the directory's filters", () => {
   });
 
   it("shows a full-instant deadline as its day, not as a blank control", async () => {
-    // A link built from a full RFC 3339 instant rather than a bare day — exactly what `/publishers`
-    // or a hand-edited URL can carry. A native `<input type="date">` cannot parse that and silently
-    // renders blank, which would make an ACTIVE filter look like no filter at all.
+    // A native date input renders blank for a full instant, making an ACTIVE filter look like none.
     navigation.params = new URLSearchParams("deadlineAfter=2026-09-01T15:30:00.000Z");
     const { client, list } = stub();
     mount(client, <DirectoryList />);
@@ -626,24 +619,18 @@ describe("the directory's filters", () => {
     expect((screen.getByLabelText("Next fixed deadline after") as HTMLInputElement).value).toBe(
       "2026-09-01",
     );
-    // The exact retained value stays visible as text, so nothing about the extra precision is lost
-    // from view even though the picker itself can only show the day. It is nested inside the
-    // untrusted-text span `UntrustedText` renders, so the text itself is found without a `code`
-    // selector restriction; the surrounding `<code class="wrap-anywhere">` is asserted separately.
+    // Nested inside the span `UntrustedText` renders, so the `<code>` wrapper is asserted apart.
     const retained = screen.getByText("2026-09-01T15:30:00.000Z");
     expect(retained).toBeTruthy();
     const code = retained.closest("code");
     expect(code, "the retained value must sit inside a <code> element").toBeTruthy();
     expect(code?.className).toContain("wrap-anywhere");
-    // And the ORIGINAL instant — not the truncated day — is what was actually sent.
     expect(list.mock.calls[0]?.[0]).toMatchObject({ deadlineAfter: "2026-09-01T15:30:00.000Z" });
   });
 
   it("bounds and wraps an absurdly long retained URL value instead of letting it blow out the layout", async () => {
-    // A query parameter has no length limit of its own. `truncateForDisplay` is the pure half of
-    // this fix (see directory.test.ts for its exact boundary); this is the component half — the
-    // value that actually reaches the DOM, and the class that lets whatever survives truncation
-    // still wrap on a narrow viewport instead of forcing the page wider.
+    // The component half of `truncateForDisplay`: what actually reaches the DOM, and the class
+    // that lets whatever survives truncation wrap instead of forcing the page wider.
     const huge = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
     navigation.params = new URLSearchParams({ deadlineAfter: huge });
     const { client } = stub();
@@ -653,12 +640,9 @@ describe("the directory's filters", () => {
     const hint = screen.getByText(/Filtering on the exact value from the link/).closest("p");
     const code = hint?.querySelector("code");
     expect(code).toBeTruthy();
-    // Bounded well under the full 524-character value...
     expect(code?.textContent?.length ?? 0).toBeLessThan(huge.length);
     expect(code?.textContent).toContain("…");
-    // ...but the beginning — the part a reader actually recognizes — is preserved verbatim.
     expect(code?.textContent?.startsWith("2026-09-01T15:30:00.000Z")).toBe(true);
-    // And the class that lets a long unbroken run still wrap rather than widening the page.
     expect(code?.className).toContain("wrap-anywhere");
   });
 
@@ -668,8 +652,7 @@ describe("the directory's filters", () => {
     mount(client, <DirectoryList />);
     await screen.findByText("Acme Foundation");
 
-    // Touch nothing about the deadline field; submit via a different control, the way a reader
-    // narrowing a second filter while an instant-precision deadline is already active would.
+    // Touch nothing about the deadline field; submit via a different control.
     fireEvent.change(screen.getByLabelText("Search"), { target: { value: "grants" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
@@ -679,9 +662,8 @@ describe("the directory's filters", () => {
   });
 
   it("keeps an unparseable award visible and on the wire instead of dropping it in silence", async () => {
-    // The control is `type="number"`, so it renders blank for this; the URL still advertises the
-    // filter. Dropping it there left a reader looking at unfiltered results with nothing on screen
-    // saying why — the exact failure the deadline fields already go out of their way to prevent.
+    // The control renders blank for this while the URL still advertises the filter; dropping it
+    // left a reader looking at unfiltered results with nothing on screen saying why.
     navigation.params = new URLSearchParams("minAward=abc");
     const { client, list } = stub();
     mount(client, <DirectoryList />);

@@ -65,9 +65,6 @@ function Harness({ load }: { load: (attempt: number) => Promise<string> }) {
 
 describe("useResource", () => {
   it("gives up on a read that never answers, instead of spinning forever", async () => {
-    // An API that accepts the connection and then goes quiet leaves a loading state with no end of
-    // its own — the reader's only exit is closing the tab. Turning that into the error state is
-    // what gives them a retry and something to report.
     render(<NeverSettles timeoutMs={20} />);
     expect(screen.getByText(/Loading the list/)).toBeTruthy();
 

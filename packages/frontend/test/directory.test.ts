@@ -87,21 +87,17 @@ describe("the directory querystring", () => {
     });
 
     expect(query.category).toBe("infrastructure");
-    // Matches ANY operating OR sponsoring organization on the API side — this module just forwards
-    // the slug; the wider match is the endpoint's own behavior, not something computed here.
+    // The wider operating-OR-sponsoring match is the endpoint's, not computed here.
     expect(query.organization).toBe("acme");
     expect(query.minAward).toBe(5000);
     expect(query.maxAward).toBe(50000);
-    // `<input type="date">` gives back a bare day; the endpoint wants a full RFC 3339 instant, and
-    // the two ends widen to the day's first and last instant so a single-day range is not empty.
+    // The two ends widen to the day's first and last instant, so a single-day range is not empty.
     expect(query.deadlineAfter).toBe("2026-09-01T00:00:00.000Z");
     expect(query.deadlineBefore).toBe("2026-12-31T23:59:59.999Z");
   });
 
   it("forwards an award the control cannot parse instead of dropping it in silence", () => {
-    // Dropping it left `?minAward=abc` in the address bar advertising a filter the request never
-    // carried. Forwarding it makes the endpoint answer a 400 naming `minAward`, which this page
-    // renders — the same bargain the two deadline fields already strike with a hand-edited instant.
+    // Dropping it left the address bar advertising a filter the request never carried.
     const query = directoryQuery({
       ...DEFAULT_SELECTION,
       minAward: "not a number",
@@ -123,9 +119,7 @@ describe("the directory querystring", () => {
   });
 
   it("accepts a fractional award threshold — the control is not integer-only", () => {
-    // `step="any"` + `inputMode="decimal"` on the control (see DirectoryList) is what lets a reader
-    // TYPE "0.5" on a touch keyboard in the first place; this is the pure half of that fix, proving
-    // the value it produces actually survives the number parse rather than being dropped as NaN.
+    // The pure half of the `step="any"` / `inputMode="decimal"` fix on the control itself.
     const query = directoryQuery({
       ...DEFAULT_SELECTION,
       minAward: "0.5",
@@ -136,8 +130,7 @@ describe("the directory querystring", () => {
   });
 
   it("passes a deadline value that is already a full instant straight through, unwidened", () => {
-    // A hand-edited URL, or a value this module did not itself produce. Widening it a second time
-    // would silently change what the reader asked for; the endpoint validates the result either way.
+    // Widening it a second time would silently change what the reader asked for.
     const query = directoryQuery({
       ...DEFAULT_SELECTION,
       deadlineAfter: "2026-09-01T12:00:00Z",
@@ -146,10 +139,8 @@ describe("the directory querystring", () => {
   });
 
   it("never re-derives the query from the date picker's truncated display value", () => {
-    // If this ever read `dateInputValue(...)` instead of the raw field, a reader who loaded a link
-    // carrying a specific time of day and then re-submitted the form untouched would silently have
-    // that time replaced by midnight/end-of-day — a real precision loss `directoryQuery` must not
-    // introduce on its own.
+    // Reading `dateInputValue(...)` here would replace a link's time of day with midnight on any
+    // untouched resubmit — a precision loss `directoryQuery` must not introduce on its own.
     const query = directoryQuery({
       ...DEFAULT_SELECTION,
       deadlineAfter: "2026-09-01T15:30:00.000Z",
@@ -183,8 +174,6 @@ describe("what the retained-value hint shows for a value the picker can't displa
   });
 
   it("bounds a value at the URL's own length limit, keeping the recognizable prefix", () => {
-    // A query parameter has no length limit of its own — this is what stops an absurd one from
-    // reaching the DOM whole and, on a narrow viewport, forcing the page wider than the screen.
     const value = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
     const shown = truncateForDisplay(value);
     expect(shown.length).toBeLessThan(value.length);
@@ -195,8 +184,7 @@ describe("what the retained-value hint shows for a value the picker can't displa
 
   it("never sends the truncated form — directoryQuery reads the field's own raw value", () => {
     const value = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
-    // The display helper and the query builder are independent: truncating for the DOM must never
-    // leak into what actually reaches the endpoint.
+    // Truncating for the DOM must never leak into what reaches the endpoint.
     expect(directoryQuery({ ...DEFAULT_SELECTION, deadlineAfter: value }).deadlineAfter).toBe(
       value,
     );
@@ -295,9 +283,7 @@ describe("the directory querystring", () => {
     expect(isFiltered({ ...unfiltered, maxAward: "1000" })).toBe(true);
     expect(isFiltered({ ...unfiltered, deadlineAfter: "2026-09-01" })).toBe(true);
     expect(isFiltered({ ...unfiltered, deadlineBefore: "2026-09-01" })).toBe(true);
-    // A blank award control is not a filter — nothing was chosen. A non-numeric one IS: it is on
-    // the wire, and the empty state it produces has to read as "nothing matches", not "nothing
-    // published".
+    // A blank control is not a filter. A non-numeric one IS: it is on the wire.
     expect(isFiltered({ ...unfiltered, minAward: "  " })).toBe(false);
     expect(isFiltered({ ...unfiltered, minAward: "not a number" })).toBe(true);
   });
@@ -320,7 +306,6 @@ describe("why an empty result is empty", () => {
   it("names an inverted award range rather than blaming the corpus", () => {
     const hints = emptyResultHints({ ...DEFAULT_SELECTION, minAward: "100", maxAward: "1" });
     expect(hints.join(" ")).toContain("Your minimum award is above your maximum");
-    // The same pair the right way round is a perfectly ordinary filter.
     expect(emptyResultHints({ ...DEFAULT_SELECTION, minAward: "1", maxAward: "100" })).toEqual([]);
   });
 
@@ -356,8 +341,7 @@ describe("free text read out of the address bar", () => {
     );
     expect(selection.category).toHaveLength(FREE_TEXT_FILTER_LIMIT);
     expect(selection.organization).toHaveLength(FREE_TEXT_FILTER_LIMIT);
-    // The control, the address bar and the request all see the same bounded value — a bound applied
-    // only on the way out would leave the box showing something the endpoint never received.
+    // Control, address bar and request all see the same bounded value.
     expect(directoryQuery(selection).category).toHaveLength(FREE_TEXT_FILTER_LIMIT);
   });
 

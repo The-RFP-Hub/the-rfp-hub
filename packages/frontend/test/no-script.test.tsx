@@ -1,13 +1,6 @@
 /**
- * The one thing a scriptless reader gets: where the same data lives as JSON.
- *
- * `/` renders its list after hydration, so with scripting off there is nothing on the page — and
- * that is also what a crawler which does not execute JavaScript sees, on the origin the robots
- * rules now allow one to index.
- *
  * ASSERTED AGAINST THE SERVER-RENDERED MARKUP, not a client render: React DOM leaves a `<noscript>`
- * empty in the browser (nothing there will ever be displayed), so the HTML the framework actually
- * sends is the only place this notice exists.
+ * empty in the browser, so the HTML the framework sends is the only place this notice exists.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -27,8 +20,7 @@ describe("the no-JavaScript notice", () => {
   });
 
   it("is rendered by the public directory page, the surface with nothing else to show", () => {
-    // Read from disk rather than rendered: the page pulls in the session provider and the whole
-    // directory, and what has to be true here is one line of wiring.
+    // Read from disk: rendering the page pulls in the session provider and the whole directory.
     const source = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
     expect(source).toContain("<NoScriptNotice />");
   });

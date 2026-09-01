@@ -133,11 +133,7 @@ export function ErrorState({
     );
   }
 
-  /**
-   * NO RETRY BUTTON, deliberately. A 429 means the deployment already refused this reader for
-   * asking too often; a button that fires the same request straight back is a second refusal and a
-   * third, and it teaches the reader that the control does not work.
-   */
+  // NO RETRY BUTTON: a button that fires the just-refused request back is a second refusal.
   if (error.isRateLimited) {
     return (
       <div className="callout state error" role="alert">

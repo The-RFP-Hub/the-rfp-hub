@@ -168,9 +168,7 @@ run("/v1/opportunities filters, sort & pagination", () => {
   });
 
   it("category filter matches regardless of case", async () => {
-    // `categories[]` is explicitly "Free text" in the Standard, not a closed vocabulary — so, like
-    // ecosystem, the corpus holds whatever casing a publisher typed (`DeFi`, `defi`, `DEFI`), and a
-    // case-sensitive `&&` silently answered one spelling with a fraction of the matching rows.
+    // Free text in the Standard: the corpus holds whatever casing a publisher typed.
     const canonical = await query("category=DeFi");
     expect(canonical.ids).toEqual(new Set(["ftest:a"]));
     expect((await query("category=defi")).ids).toEqual(canonical.ids);
