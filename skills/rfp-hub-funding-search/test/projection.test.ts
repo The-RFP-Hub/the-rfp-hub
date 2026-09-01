@@ -418,7 +418,7 @@ describe("clampLimit", () => {
 
   it("rejects a non-integer (fractional) limit instead of rounding it", () => {
     expect(() => clampLimit("10.5")).toThrow(/positive integer/);
-    // Confirms it's rejected outright, not floored to 10 (the previous, silent behaviour).
+    // Confirms it's rejected outright, not floored to 10 (the previous, silent behavior).
     expect(() => clampLimit("7.9")).toThrow();
   });
 

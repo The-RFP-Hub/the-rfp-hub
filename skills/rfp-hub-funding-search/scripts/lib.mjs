@@ -230,7 +230,7 @@ export function assertNoExtraPositionals(positional, max, usage) {
  * one — "10.5", "1e2", "0x10", "-1", " 10 " (leading/trailing space aside), "abc" — with a usage
  * error, rather than coercing/rounding it into something that looks like it worked. A caller who
  * typed a fractional or malformed page/limit almost certainly made a mistake, and silently
- * flooring it (the previous behaviour) turned that mistake into a different, unannounced request.
+ * flooring it (the previous behavior) turned that mistake into a different, unannounced request.
  */
 function parsePositiveInteger(value, flagName) {
   const trimmed = typeof value === "string" ? value.trim() : "";

@@ -148,7 +148,7 @@ these headers identify the traffic, they don't filter it.
 
 | Situation | What happened | What to do |
 |---|---|---|
-| HTTP 4xx (not 429) | Usually a malformed parameter — the API's schema is closed (`additionalProperties: false`), so a typo'd or invented filter is a clear 400 naming the bad field, never a silently-ignored filter | Read the error message, fix the parameter, retry |
+| HTTP 4xx (not 429) | Usually a malformed parameter — the API's schema is closed (`additionalProperties: false`), so a typo'd or invented filter is a clear 400, never a silently-ignored filter. The 400 names the parameter for a bad *value* (`querystring/sort must be equal to one of the allowed values`) but reports an unknown *name* as `querystring must NOT have additional properties`; the scripts' own client-side rejection names it | Read the error message, fix the parameter, retry |
 | HTTP 429 | Rate limited | Wait for the `Retry-After` value the script reports, then retry once |
 | HTTP 5xx | API server issue | Tell the user the API is temporarily unavailable; try again shortly |
 | Timeout | Network issue or the API is unreachable | Tell the user; suggest retrying |
