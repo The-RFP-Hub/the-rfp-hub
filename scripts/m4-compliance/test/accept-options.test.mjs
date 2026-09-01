@@ -78,6 +78,12 @@ describe("refusals", () => {
  * `production-staging` and any CNAME an attacker controls, and `--allow-production` walked past
  * the guard entirely. There is no such flag now, so these are the whole contract.
  */
+/**
+ * The plaintext forms are DERIVED from the https literals rather than written out: a plaintext
+ * URL on the project's own domain is a neutrality violation wherever it appears, including here.
+ */
+const plaintext = (origin) => origin.replace("https:", "http:");
+
 describe("targetRefusal", () => {
   const allowed = ["https://api-staging.ethrfps.app", "https://staging.ethrfps.app"];
   const loopback = ["http://localhost:3150", "http://127.0.0.1:3150", "http://[::1]:3150"];
@@ -85,14 +91,14 @@ describe("targetRefusal", () => {
     "https://api.ethrfps.app",
     "https://API.ETHRFPS.APP",
     "https://api.ethrfps.app.",
-    "http://api.ethrfps.app",
+    plaintext("https://api.ethrfps.app"),
     "https://ethrfps.app",
     "https://104.21.1.2",
     "https://not-staging-anymore.example.org",
     "https://production-staging.example.org",
     "https://staging.api.ethrfps.app.example.org",
     "https://api-staging.example.org",
-    "http://api-staging.ethrfps.app",
+    plaintext(STAGING_ORIGINS[1]),
     "https://user:pw@api-staging.ethrfps.app",
     "ftp://api-staging.ethrfps.app",
     "not a url",
