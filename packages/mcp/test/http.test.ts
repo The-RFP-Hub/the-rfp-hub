@@ -22,6 +22,18 @@ describe("retry-after parsing", () => {
   it("falls back to a second on anything it cannot parse", () => {
     expect(retryAfterMs(null, now)).toBe(1_000);
     expect(retryAfterMs("soon", now)).toBe(1_000);
+    expect(retryAfterMs("", now)).toBe(1_000);
+  });
+
+  it("clamps every hostile value into 0…5 seconds", () => {
+    for (const header of ["-30", "-1e12", "1e400", "999999999", "  7  ", "0x10"]) {
+      const wait = retryAfterMs(header, now);
+      expect(wait, header).toBeGreaterThanOrEqual(0);
+      expect(wait, header).toBeLessThanOrEqual(5_000);
+    }
+    expect(retryAfterMs("-30", now)).toBe(0);
+    expect(retryAfterMs("Mon, 01 Jun 2020 00:00:00 GMT", now)).toBe(0);
+    expect(retryAfterMs("Mon, 01 Jun 2099 00:00:00 GMT", now)).toBe(5_000);
   });
 });
 

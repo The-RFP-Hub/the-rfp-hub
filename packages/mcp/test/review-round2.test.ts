@@ -475,12 +475,11 @@ describe("the server boundary", () => {
     expect("no_such_tool" in tools).toBe(false);
   });
 
-  it("codes a malformed result instead of recording it as ok", async () => {
+  it("codes a malformed 2xx at the HTTP boundary instead of recording it as ok", async () => {
     const home = tempHome();
     const config = testConfig({ submitEnabled: false, home });
-    // A 2xx that projects cleanly but whose SHAPE is wrong: `total` is a string where the
-    // published output schema promises a number. This is the case that used to sail through as
-    // `ok` and then fail downstream, in the SDK's words, after the audit line was already written.
+    // `total` is a string where the contract promises a number. This used to sail through as `ok`
+    // and fail downstream, in the SDK's words, after the audit line was already written.
     const api = new ApiClient(config, {
       fetchImpl: stubFetch([
         { body: { items: [], page: 1, limit: 10, total: "many", totalPages: 1 } },
@@ -493,12 +492,35 @@ describe("the server boundary", () => {
     const result = await tools.search_opportunities?.executor({}, {});
     expect(result?.isError).toBe(true);
     expect(result?.content[0]?.text).toContain("[exec_failed]");
-    expect(result?.content[0]?.text).toContain("does not match the shape it publishes");
+    expect(result?.content[0]?.text).toContain("is not a page of opportunities");
 
     // And the audit line records the failure rather than a success.
     const audit = fs.readFileSync(auditPath(home), "utf8");
     expect(audit).toContain('"status":"exec_failed"');
     expect(audit).not.toContain('"status":"ok"');
+  });
+
+  it("still codes a result the published output schema rejects", async () => {
+    const home = tempHome();
+    const config = testConfig({ submitEnabled: false, home });
+    // Past the HTTP boundary and wrong anyway: the guard's own output check is the last net.
+    const api = {
+      listOpportunities: async () => ({
+        items: [],
+        page: 1,
+        limit: 10,
+        total: "many",
+        totalPages: 1,
+      }),
+    } as unknown as ApiClient;
+    const server = createServer({ config, api, policy: new Policy(home, { now: () => NOW }) });
+    const tools = (server as unknown as { _registeredTools: Record<string, Registered> })
+      ._registeredTools;
+
+    const result = await tools.search_opportunities?.executor({}, {});
+    expect(result?.isError).toBe(true);
+    expect(result?.content[0]?.text).toContain("does not match the shape it publishes");
+    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"status":"exec_failed"');
   });
 
   it("passes a well-formed result through untouched", async () => {

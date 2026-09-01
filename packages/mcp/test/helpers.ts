@@ -41,6 +41,7 @@ export function testConfig(overrides: Partial<McpConfig> = {}): McpConfig {
     apiKey: overrides.apiKey !== undefined ? overrides.apiKey : FAKE_KEY,
     submitEnabled: overrides.submitEnabled ?? false,
     home: overrides.home ?? tempHome(),
+    timeoutMs: overrides.timeoutMs ?? 20_000,
   };
 }
 
@@ -106,8 +107,11 @@ export function stubFetch(
       index += 1;
       if (spec === undefined) throw new Error("stubFetch: no response configured");
       const body = spec.raw ?? (spec.body === undefined ? "" : JSON.stringify(spec.body));
-      return new Response(body, {
-        status: spec.status ?? 200,
+      const status = spec.status ?? 200;
+      // 204/205/304 may carry no body at all — the `Response` constructor refuses even "".
+      const nullBody = status === 204 || status === 205 || status === 304;
+      return new Response(nullBody ? null : body, {
+        status,
         headers: { "content-type": "application/json", ...(spec.headers ?? {}) },
       });
     },

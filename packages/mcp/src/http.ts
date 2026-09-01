@@ -1,6 +1,6 @@
 /**
  * A thin, dependency-free client for the public `/v1/` API — the same shape as the repository's
- * TypeScript example, with four rules this server needs and a general client does not.
+ * TypeScript example, with five rules this server needs and a general client does not.
  *
  * 1. READS ARE ANONYMOUS. No `Authorization` header is attached to a GET even when a key is
  *    configured. Search results are public data; sending a credential to fetch them would tie
@@ -9,21 +9,22 @@
  * 2. A `POST` IS NEVER RETRIED, AND ANY FAILURE ONCE IT IS IN FLIGHT IS AMBIGUOUS. The API is
  *    idempotent for a byte-identical repeat from the same submitter, but the CLIENT cannot tell a
  *    lost request from a lost response. Crucially that is true *after* the response headers arrive
- *    too: a body that is cut off, unparseable or over the cap says nothing about whether the row
- *    was written, and neither does a `5xx` — a server that failed while answering may well have
- *    committed first. Every one of those is reported as "may have landed", never as a plain
- *    failure. A CODED `4xx` is different: the API read the request, decided, and said no.
+ *    too: a body that is cut off, unparseable, over the cap or simply not the documented shape says
+ *    nothing about whether the row was written, and neither does a `5xx` — a server that failed
+ *    while answering may well have committed first. Every one of those is reported as "may have
+ *    landed", never as a plain failure. A CODED `4xx` is different: the API read the request,
+ *    decided, and said no.
  * 2b. A `POST` NEVER FOLLOWS A REDIRECT. `redirect: "manual"` means a `3xx` comes back as a `3xx`
  *    instead of the runtime silently re-sending the body — and the credential — somewhere this
- *    server never resolved and no human ever approved. The write approval binds the destination
- *    origin precisely so the destination cannot move; a followed redirect would move it after the
- *    binding was checked.
- * 3. RESPONSES ARE CAPPED AT 1 MB WHILE STREAMING. The check is applied chunk by chunk and the
- *    body is abandoned as soon as it goes over, so an enormous response costs bounded memory
- *    rather than being buffered whole and then rejected. Nothing is ever truncated into a value: a
- *    half-read JSON document parses as something else, or as nothing.
+ *    server never resolved and no human ever approved.
+ * 3. RESPONSES ARE CAPPED AT 1 MB WHILE STREAMING, AND EVERY REQUEST HAS A DEADLINE. Both bound
+ *    what a hostile or broken upstream can cost: memory in one case, and in the other a connection
+ *    that accepts and then says nothing, which without a deadline hangs the tool call forever.
  * 4. A `404` ON A DETAIL FETCH IS A REAL ANSWER, and one shape of it carries the id of the entry
  *    the old one was merged into. Losing that turns a followable pointer into "not found".
+ * 5. A `2xx` BODY IS VALIDATED BEFORE IT IS BELIEVED. Casting an arbitrary JSON body to the
+ *    expected type turns a proxy's `{}` into a successful empty record, and an unknown
+ *    `duplicateCheck` value into a crash after the write.
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
 import type { McpConfig } from "./config.js";
@@ -34,12 +35,17 @@ import {
   apiErrorToToolError,
   nonJsonResponseError,
 } from "./errors.js";
+import { redactString } from "./redact.js";
+import { truncate } from "./untrusted.js";
 
 /** One megabyte, in bytes. */
 export const MAX_RESPONSE_BYTES = 1_048_576;
 
 /** Upper bound on how long a `Retry-After` may make a read wait. */
 export const MAX_RETRY_AFTER_MS = 5_000;
+
+/** How much of a redirect's `Location` is reported back. It is attacker-controlled text. */
+export const MAX_LOCATION_CHARS = 200;
 
 export interface Paginated<T> {
   items: T[];
@@ -95,14 +101,21 @@ export interface ApiClientOptions {
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** Parse `Retry-After` (delta-seconds or HTTP-date) into a bounded millisecond delay. */
+/**
+ * Parse `Retry-After` (delta-seconds or HTTP-date) into a delay clamped to 0…5 s.
+ *
+ * A header is a value from the network, so every branch here ends inside the clamp: a negative
+ * delta, an enormous one, a date in the past and an unparseable string all have to produce a wait
+ * this process can survive, and the single retry above is the only one there ever is.
+ */
 export function retryAfterMs(header: string | null, now: number): number {
   if (!header) return 1_000;
-  const seconds = Number(header.trim());
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.min(seconds * 1_000, MAX_RETRY_AFTER_MS);
+  const trimmed = header.trim();
+  const seconds = Number(trimmed);
+  if (trimmed !== "" && Number.isFinite(seconds)) {
+    return Math.min(Math.max(seconds * 1_000, 0), MAX_RETRY_AFTER_MS);
   }
-  const at = Date.parse(header);
+  const at = Date.parse(trimmed);
   if (Number.isFinite(at)) return Math.min(Math.max(at - now, 0), MAX_RETRY_AFTER_MS);
   return 1_000;
 }
@@ -114,6 +127,16 @@ export class ResponseTooLargeError extends Error {
     super(`response exceeded ${MAX_RESPONSE_BYTES} bytes`);
     this.name = "ResponseTooLargeError";
     this.bytes = bytes;
+  }
+}
+
+/** Raised when a request passed its deadline, whether waiting for headers or mid-body. */
+export class RequestTimeoutError extends Error {
+  readonly timeoutMs: number;
+  constructor(timeoutMs: number) {
+    super(`no complete response within ${timeoutMs}ms`);
+    this.name = "RequestTimeoutError";
+    this.timeoutMs = timeoutMs;
   }
 }
 
@@ -158,23 +181,75 @@ export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promi
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isCount(value: unknown, min: number): boolean {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= min;
+}
+
+/**
+ * Whether a 2xx body is a list page this server can project.
+ *
+ * FORWARD-COMPATIBLE BY CONSTRUCTION: unknown members are ignored, and only the fields the
+ * projection actually reads are required. What is not tolerated is a body that is missing them —
+ * `{}` from a proxy, a page whose `total` is a string, a negative page number — because every one
+ * of those renders as a perfectly ordinary empty result set.
+ */
+export function isListPage(body: unknown): body is Paginated<OpportunitySummary> {
+  if (!isRecord(body) || !Array.isArray(body.items)) return false;
+  if (!isCount(body.page, 1) || !isCount(body.limit, 1)) return false;
+  if (!isCount(body.total, 0) || !isCount(body.totalPages, 1)) return false;
+  return body.items.every(isOpportunityLike);
+}
+
+/**
+ * Whether a value carries the four members every consumer of a document here reads.
+ *
+ * Not a schema check: validating the whole standard at the transport boundary would reject a
+ * document that is merely newer than this package, which is the opposite of what a client should
+ * do with a contract it does not own.
+ */
+export function isOpportunityLike(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  for (const field of ["id", "title", "fundingType", "status"]) {
+    if (typeof value[field] !== "string") return false;
+  }
+  return Array.isArray(value.operatingOrganizations);
+}
+
+const REVIEW_STATUSES = new Set(["pending", "approved", "rejected"]);
+const DUPLICATE_CHECKS = new Set(["ok", "unavailable", "disabled"]);
+
 /**
  * Whether a 2xx body really is the API's submission result.
  *
- * Only the members this package promises its own callers are checked — the id it promotes, and the
- * three flags it reports. Validating the whole document would reject a response that is fine and
- * merely newer, which is the opposite of what a client should do with a contract it does not own.
+ * EVERY member the renderer consumes is checked, including the two closed enums. The renderer has
+ * an exhaustive switch on `duplicateCheck`; letting an unknown value through here would turn a
+ * completed write into a generic crash further down, at the one point where the caller most needs
+ * to be told the row may exist.
  */
 export function isSubmissionResult(body: unknown): body is SubmissionResult {
-  if (body === null || typeof body !== "object") return false;
-  const record = body as Record<string, unknown>;
-  const opportunity = record.opportunity;
-  if (opportunity === null || typeof opportunity !== "object") return false;
-  if (typeof (opportunity as Record<string, unknown>).id !== "string") return false;
-  if (typeof record.created !== "boolean") return false;
-  if (typeof record.reviewStatus !== "string") return false;
-  if (typeof record.isListed !== "boolean") return false;
-  return true;
+  if (!isRecord(body)) return false;
+  if (!isRecord(body.opportunity) || typeof body.opportunity.id !== "string") return false;
+  if (typeof body.created !== "boolean" || typeof body.isListed !== "boolean") return false;
+  if (typeof body.reviewStatus !== "string" || !REVIEW_STATUSES.has(body.reviewStatus))
+    return false;
+  if (typeof body.duplicateCheck !== "string" || !DUPLICATE_CHECKS.has(body.duplicateCheck)) {
+    return false;
+  }
+  if (!Array.isArray(body.warnings) || !body.warnings.every((w) => typeof w === "string")) {
+    return false;
+  }
+  if (!Array.isArray(body.duplicates)) return false;
+  return body.duplicates.every(
+    (d) =>
+      isRecord(d) &&
+      typeof d.id === "string" &&
+      typeof d.title === "string" &&
+      (d.similarity === null || typeof d.similarity === "number"),
+  );
 }
 
 export class ApiClient {
@@ -192,15 +267,21 @@ export class ApiClient {
   async listOpportunities(query: URLSearchParams): Promise<Paginated<OpportunitySummary>> {
     const qs = query.toString();
     const path = `/v1/opportunities${qs ? `?${qs}` : ""}`;
-    return this.getJson<Paginated<OpportunitySummary>>(path, "search_opportunities");
+    const body = await this.getJson(path, "search_opportunities");
+    if (!isListPage(body)) throw this.badShape("search_opportunities", "a page of opportunities");
+    return body;
   }
 
   /** `GET /v1/opportunities/{id}` — anonymous, one retry on 429. */
   async getOpportunity(id: string): Promise<Opportunity> {
-    return this.getJson<Opportunity>(
+    const body = await this.getJson(
       `/v1/opportunities/${encodeURIComponent(id)}`,
       "fetch_opportunity",
     );
+    if (!isOpportunityLike(body)) {
+      throw this.badShape("fetch_opportunity", "one opportunity document");
+    }
+    return body as Opportunity;
   }
 
   /**
@@ -219,25 +300,46 @@ export class ApiClient {
       );
     }
     const url = `${this.config.apiBase}/v1/opportunities`;
-    let res: Response;
+    const deadline = newDeadline(this.config.timeoutMs);
     try {
-      res = await this.fetchImpl(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify(document),
-        // NOT followed. See rule 2b in the file header.
-        redirect: "manual",
-      });
+      return await this.post(url, document, deadline);
     } catch (cause) {
-      throw ambiguousWriteError(
-        this.config.apiOrigin,
-        "the connection failed before a response arrived",
-        cause,
-      );
+      if (cause instanceof ToolError) throw cause;
+      throw ambiguousWriteError(this.config.apiOrigin, this.writeFailure(deadline), cause);
+    } finally {
+      deadline.done();
     }
+  }
+
+  /**
+   * Why a POST produced no usable answer — the deadline, or the connection.
+   *
+   * Both are ambiguous: the request had already left this process, so neither says whether the row
+   * was written. A timeout is called a timeout because "check your network" is the wrong advice
+   * for a destination that is merely slow.
+   */
+  private writeFailure(deadline: Deadline): string {
+    return deadline.expired()
+      ? `no complete response arrived within this server's ${this.config.timeoutMs}ms deadline, so the request was abandoned mid-flight`
+      : "the connection failed before a response arrived";
+  }
+
+  private async post(
+    url: string,
+    document: unknown,
+    deadline: Deadline,
+  ): Promise<SubmissionResult> {
+    const res = await this.fetchImpl(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify(document),
+      // NOT followed. See rule 2b in the file header.
+      redirect: "manual",
+      signal: deadline.signal,
+    });
 
     if (res.status >= 300 && res.status < 400) {
       // NOT FOLLOWED, and NOT a clean refusal either.
@@ -249,21 +351,24 @@ export class ApiClient {
       // wrote through — is entirely consistent with a row that exists. Reporting this as a refusal
       // would tell somebody to submit again, which is how the duplicate gets made.
       //
-      // Naming the destination is deliberate: the operator has to be able to see where they were
-      // being sent and decide whether it is somewhere they want to approve for.
+      // The destination is NAMED so the operator can see where they were being sent, and it is
+      // bounded and redacted first: it is a header from whatever answered, and an unbounded one
+      // would put an arbitrary attacker-chosen string into the model's context.
       const location = res.headers.get("location");
       await res.body?.cancel().catch(() => {});
+      const where =
+        location === null ? "" : ` to ${redactString(truncate(location, MAX_LOCATION_CHARS))}`;
       throw ambiguousWriteError(
         this.config.apiOrigin,
-        `the API answered ${res.status}, a redirect${location === null ? "" : ` to ${location}`}, which this server does not follow on a write — the document and credential were NOT re-sent anywhere, but a redirect is also how a server acknowledges something it has just created`,
+        `the API answered ${res.status}, a redirect${where}, which this server does not follow on a write — the document and credential were NOT re-sent anywhere, but a redirect is also how a server acknowledges something it has just created`,
         new Error(`HTTP ${res.status}`),
         "An approval binds the destination origin, so continuing to another host would spend a decision made about a different destination. If that destination is the right one, point RFPHUB_API_BASE at it and take a fresh preview.",
       );
     }
 
-    // From here the request HAS been delivered. A body that will not read, will not parse, or is
-    // over the cap tells us nothing about whether the row was written, so none of those may be
-    // reported as an ordinary failure.
+    // From here the request HAS been delivered. A body that will not read, will not parse, is over
+    // the cap or is not the documented shape tells us nothing about whether the row was written,
+    // so none of those may be reported as an ordinary failure.
     let raw: string;
     try {
       raw = await readCapped(res);
@@ -272,7 +377,9 @@ export class ApiClient {
         this.config.apiOrigin,
         cause instanceof ResponseTooLargeError
           ? `the API answered ${res.status} with a body over this server's ${MAX_RESPONSE_BYTES}-byte cap, which could not be read`
-          : "the response body could not be read to the end",
+          : deadline.expired()
+            ? `the API answered ${res.status} and then stopped sending, passing this server's ${this.config.timeoutMs}ms deadline mid-body`
+            : "the response body could not be read to the end",
         cause,
       );
     }
@@ -310,41 +417,55 @@ export class ApiClient {
       });
     }
 
-    // A 2xx WHOSE BODY IS NOT A SUBMISSION RESULT IS AMBIGUOUS TOO. An empty 200, a `{}`, or a
-    // body from something that is not this API says the request reached a server and tells us
-    // nothing about what that server did with it — and the approval has already been claimed. The
-    // alternative is worse than an error: passing the shape through would surface as
-    // `id: "(the API returned no id)"` in a result that otherwise reads like a success.
+    // A 2xx WHOSE BODY IS NOT A SUBMISSION RESULT IS AMBIGUOUS TOO. An empty 200, a 204, a `{}`, a
+    // `duplicateCheck` this build has never heard of, or a body from something that is not this API
+    // says the request reached a server and tells us nothing about what that server did with it —
+    // and the approval has already been claimed.
     if (!isSubmissionResult(body)) {
       throw ambiguousWriteError(
         this.config.apiOrigin,
         `the API answered ${res.status} with a body that is not a submission result, so what it did with the request cannot be read off it`,
-        new Error("unrecognised submission response"),
+        new Error("unrecognized submission response"),
       );
     }
     return body;
   }
 
-  private async getJson<T>(path: string, operation: string): Promise<T> {
+  private async getJson(path: string, operation: string): Promise<unknown> {
     const url = `${this.config.apiBase}${path}`;
-    // Deliberately no `authorization` header: see the file header, rule 1.
-    let res = await this.transport(url, operation);
-    if (res.status === 429) {
-      const wait = retryAfterMs(res.headers.get("retry-after"), Date.now());
-      // The refused response still has a body, and an unread one keeps its socket out of the
-      // connection pool. Cancelling it before sleeping means the retry reuses the connection
-      // instead of racing the runtime's cleanup for a new one.
-      await res.body?.cancel().catch(() => {});
-      await this.sleep(wait);
-      res = await this.transport(url, operation);
-    }
-    return this.readJson<T>(res, operation);
+    const first = await this.attempt(url, operation);
+    if (first.res.status !== 429) return this.readJson(first, operation);
+
+    const wait = retryAfterMs(first.res.headers.get("retry-after"), Date.now());
+    // The refused response still has a body, and an unread one keeps its socket out of the
+    // connection pool. Cancelling it before sleeping means the retry reuses the connection
+    // instead of racing the runtime's cleanup for a new one.
+    await first.res.body?.cancel().catch(() => {});
+    first.deadline.done();
+    await this.sleep(wait);
+    return this.readJson(await this.attempt(url, operation), operation);
   }
 
-  private async transport(url: string, operation: string): Promise<Response> {
+  /**
+   * One GET, with a deadline that stays armed until its body has been read.
+   *
+   * The deadline covers the body as well as the headers, because a peer that sends half a document
+   * and then stops is the same hang as one that never answers at all. There is no retry on this
+   * path beyond the single 429 above: a timeout is reported, never quietly attempted again.
+   */
+  private async attempt(url: string, operation: string): Promise<InFlight> {
+    const deadline = newDeadline(this.config.timeoutMs);
     try {
-      return await this.fetchImpl(url, { method: "GET", headers: { accept: "application/json" } });
+      // Deliberately no `authorization` header: see the file header, rule 1.
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        headers: { accept: "application/json" },
+        signal: deadline.signal,
+      });
+      return { res, deadline };
     } catch (cause) {
+      deadline.done();
+      if (deadline.expired()) throw this.timedOut(operation);
       throw new ToolError(
         "exec_failed",
         `Could not reach the RFP Hub API at ${this.config.apiOrigin} for ${operation}. Check RFPHUB_API_BASE and network access.`,
@@ -360,17 +481,20 @@ export class ApiClient {
    * would throw "Body is unusable" and bury the actual HTTP error — which is exactly the case that
    * matters (a proxy answering with HTML).
    */
-  private async readJson<T>(res: Response, operation: string): Promise<T> {
+  private async readJson({ res, deadline }: InFlight, operation: string): Promise<unknown> {
     let raw: string;
     try {
       raw = await readCapped(res);
     } catch (err) {
       if (err instanceof ResponseTooLargeError) throw this.tooLarge(err.bytes, operation);
+      if (deadline.expired()) throw this.timedOut(operation);
       throw new ToolError(
         "exec_failed",
         `The API's response to ${operation} ended before it could be read. Nothing was returned.`,
         { cause: err instanceof Error ? err.message : String(err) },
       );
+    } finally {
+      deadline.done();
     }
 
     let body: unknown;
@@ -396,7 +520,23 @@ export class ApiClient {
         keyConfigured: false,
       });
     }
-    return body as T;
+    return body;
+  }
+
+  private timedOut(operation: string): ToolError {
+    return new ToolError(
+      "exec_failed",
+      `The API did not answer ${operation} within this server's ${this.config.timeoutMs}ms deadline, so the request was abandoned. Nothing was retried. Raise RFPHUB_MCP_TIMEOUT_MS if this destination is legitimately slow.`,
+      { timeoutMs: this.config.timeoutMs, transport: true },
+    );
+  }
+
+  private badShape(operation: string, expected: string): ToolError {
+    return new ToolError(
+      "exec_failed",
+      `${operation} got a 2xx from ${this.config.apiOrigin} whose body is not ${expected}. Nothing is returned rather than an empty-looking record built from a shape this server does not recognize — a proxy, a captive portal or an API version this build predates can all answer 200 with something else.`,
+      { transport: true },
+    );
   }
 
   private tooLarge(bytes: number, operation: string): ToolError {
@@ -406,4 +546,39 @@ export class ApiClient {
       { bytes, cap: MAX_RESPONSE_BYTES },
     );
   }
+}
+
+interface Deadline {
+  signal: AbortSignal;
+  expired(): boolean;
+  done(): void;
+}
+
+/** A response whose deadline is still armed, because its body has not been read yet. */
+interface InFlight {
+  res: Response;
+  deadline: Deadline;
+}
+
+/**
+ * A request deadline: one `AbortController`, armed until `done()`.
+ *
+ * The timer is deliberately still running when `fetch` resolves — it resolves on the response
+ * HEADERS, and a peer that then stops sending the body is the hang this exists to bound. Aborting
+ * the signal errors the body stream too, so one timer covers both halves.
+ */
+function newDeadline(timeoutMs: number): Deadline {
+  const controller = new AbortController();
+  let fired = false;
+  const timer = setTimeout(() => {
+    fired = true;
+    controller.abort(new RequestTimeoutError(timeoutMs));
+  }, timeoutMs);
+  // An armed timer must not by itself keep the process alive after stdin closes.
+  timer.unref?.();
+  return {
+    signal: controller.signal,
+    expired: () => fired,
+    done: () => clearTimeout(timer),
+  };
 }

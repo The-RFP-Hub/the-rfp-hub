@@ -47,7 +47,7 @@ beforeAll(() => {
   child = spawn(process.execPath, [CLI], {
     env: {
       ...process.env,
-      RFPHUB_API_BASE: "http://127.0.0.1:1/never-reached",
+      RFPHUB_API_BASE: "http://127.0.0.1:1",
       RFPHUB_MCP_HOME: home,
     },
     stdio: ["pipe", "pipe", "pipe"],

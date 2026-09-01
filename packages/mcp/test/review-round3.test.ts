@@ -112,21 +112,30 @@ describe("a write's 2xx body is checked before it is believed", () => {
     });
   });
 
-  it("checks only what this package promises its own callers", () => {
+  it("checks every member it consumes, and tolerates ones it does not", () => {
+    const complete = {
+      opportunity: { id: "org:x" },
+      created: true,
+      reviewStatus: "pending",
+      isListed: false,
+      warnings: [],
+      duplicateCheck: "ok",
+      duplicates: [],
+    };
     // A response that is fine and merely NEWER must not be rejected: this client does not own the
     // contract, and refusing unknown members would break on the API's next additive change.
-    expect(
-      isSubmissionResult({
-        opportunity: { id: "org:x" },
-        created: true,
-        reviewStatus: "pending",
-        isListed: false,
-        somethingAddedLater: 42,
-      }),
-    ).toBe(true);
+    expect(isSubmissionResult({ ...complete, somethingAddedLater: 42 })).toBe(true);
     expect(isSubmissionResult(null)).toBe(false);
     expect(isSubmissionResult("a string")).toBe(false);
     expect(isSubmissionResult({ opportunity: { id: 1 } })).toBe(false);
+    // Everything the renderer reads is required, because a missing one renders as a plausible
+    // success and an unknown enum value crashes an exhaustive switch after the write has landed.
+    expect(isSubmissionResult({ ...complete, warnings: undefined })).toBe(false);
+    expect(isSubmissionResult({ ...complete, duplicates: undefined })).toBe(false);
+    expect(isSubmissionResult({ ...complete, duplicateCheck: "future-value" })).toBe(false);
+    expect(isSubmissionResult({ ...complete, reviewStatus: "quarantined" })).toBe(false);
+    expect(isSubmissionResult({ ...complete, warnings: [1] })).toBe(false);
+    expect(isSubmissionResult({ ...complete, duplicates: [{ id: "a" }] })).toBe(false);
   });
 });
 
