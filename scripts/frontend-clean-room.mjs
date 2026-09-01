@@ -67,14 +67,10 @@ function resolveSpec(spec) {
   return spec;
 }
 
-/**
- * An OS-assigned free TCP port: bind port 0, read back what the OS gave, close, hand it over.
- *
- * `PORT=0` on the Next standalone server does NOT ask for an ephemeral port — verified empirically,
- * it falls back to 3000, which makes collisions more likely, not less. The window between this
- * probe closing its socket and the server binding the same number stays open, which is why
- * `waitUntilUp`'s caller also watches the child for an early exit.
- */
+// `PORT=0` on the Next standalone server does NOT ask the OS for an ephemeral port — verified
+// empirically, it falls back to 3000 — so the port is probed here instead. The window between this
+// probe closing and the server binding stays open, which is why the caller also watches for an
+// early exit.
 function freePort() {
   return new Promise((resolvePort, reject) => {
     const srv = createServer();
@@ -109,10 +105,8 @@ function run(cmd, args, opts) {
   }
 }
 
-/**
- * Polls `url` until it answers, checking `checkAborted()` first on every tick: polling alone cannot
- * tell "our server is slow" apart from "our server is dead and something else answers on its port".
- */
+// `checkAborted()` runs first on every tick: polling alone cannot tell "our server is slow" apart
+// from "our server is dead and something else now answers on its port".
 async function waitUntilUp(url, timeoutMs, checkAborted) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -187,12 +181,8 @@ async function checkRoute(base, path, { label, allow404 }) {
   return { path, label, ok: true, level: "pass", detail: "200, app shell present" };
 }
 
-/**
- * Every file the copy ships in `public/`, requested from the running server.
- *
- * `src/app/manifest.ts` names three of these icons, so a standalone output missing them serves a
- * manifest whose every icon 404s — invisible to any check that only looks at HTML routes.
- */
+// `src/app/manifest.ts` names three of these icons, so a standalone output missing `public/` serves
+// a manifest whose icons all 404 — invisible to any check that only looks at HTML routes.
 async function checkPublicAssets(base, publicDir) {
   const label = "public/ assets served from the standalone output";
   const path = "/<public>";
@@ -239,16 +229,13 @@ async function checkPublicAssets(base, publicDir) {
 }
 
 /**
- * The browser-driven check, and the only one that proves the app talks to its API: `DirectoryList`
- * fetches after hydration, so the HTML the plain HTTP check reads is the loading shell. A wrong
- * `NEXT_PUBLIC_API_URL`, a CORS rejection or a CSP `connect-src` block all leave that shell 200.
+ * The only check that proves the app talks to its API: `DirectoryList` fetches after hydration, so a
+ * wrong `NEXT_PUBLIC_API_URL`, a CORS rejection or a blocked `connect-src` all still leave the HTML
+ * the HTTP check reads a 200 shell. Selectors are read off `DirectoryList.tsx` and `states.tsx`.
  *
- * Waits for either rendered rows or the shared error callout, and separately asserts a request
- * reached the configured API origin — which catches a fetch that quietly went to the app's own
- * origin instead. `/` also renders a sign-in card whose `AuthUnavailable` state uses the SAME error
- * markup and is EXPECTED on every clean-room run (`TRUSTED_ORIGINS` is an exact allowlist), so it
- * is excluded by its own copy rather than by poll order: the two fetches race independently.
- * Both selectors are read off `DirectoryList.tsx` and `components/states.tsx`.
+ * `/` also renders a sign-in card whose `AuthUnavailable` state uses the SAME error markup and is
+ * EXPECTED on every clean-room run (`TRUSTED_ORIGINS` is an exact allowlist), so it is excluded by
+ * its own copy rather than by poll order: the two fetches race independently.
  */
 async function checkRouteInBrowser(browser, base, apiUrl, path, { label }) {
   const apiOrigin = new URL(apiUrl).origin;
@@ -341,11 +328,8 @@ async function checkRouteInBrowser(browser, base, apiUrl, path, { label }) {
   }
 }
 
-/**
- * `?q=` must narrow: a search that returns the whole directory is a filter the copy is not applying.
- * Identical sets are only forgivable when the unfiltered corpus fits on one page, where a term
- * matching everything is a plausible corpus, not a broken build.
- */
+// A search that returns the whole directory is a filter the copy is not applying — unless the
+// corpus fits one page, where a term matching everything is plausible rather than broken.
 function checkSearchNarrows(all, filtered) {
   const path = "/?q= vs /";
   const label = "the search term changes the result set";
@@ -410,8 +394,7 @@ async function main() {
   let exitCode = 0;
 
   try {
-    // A gitignored `.env*.local` is a developer's own machine leaking into the clean room, and into
-    // whatever `--keep` leaves behind.
+    // A gitignored `.env*.local` is a developer's own machine leaking into the clean room.
     cpSync(frontendSrc, appDir, {
       recursive: true,
       filter: (src) =>
@@ -433,9 +416,8 @@ async function main() {
     pkg.dependencies["rfphub-validate"] = validateSpec;
     writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-    // npm, and the package's own `build` script — exactly what an external developer runs. Never
-    // `next build` directly: after a plain `npm install` that binary resolves only through the
-    // npm-run PATH.
+    // The package's own `build` script, never `next build` directly: after a plain `npm install`
+    // that binary resolves only through the npm-run PATH.
     console.log("\n$ npm install");
     run("npm", ["install", "--no-audit", "--no-fund"], { cwd: appDir });
 
@@ -445,9 +427,8 @@ async function main() {
       env: { ...process.env, NEXT_PUBLIC_API_URL: apiUrl },
     });
 
-    // `next.config.ts` sets `outputFileTracingRoot` two directories above the package. A copy has no
-    // monorepo there, but the option is unconditional, so the standalone output stays nested under
-    // the path from that computed root — the depth is found, never assumed.
+    // `outputFileTracingRoot` is two directories above the package, so a copy's standalone output
+    // stays nested under the path from that computed root — the depth is found, never assumed.
     const standaloneDir = join(appDir, ".next", "standalone");
     let serverJsCandidates;
     try {
@@ -487,8 +468,7 @@ async function main() {
     serverProcess.stderr.on("data", (d) => {
       serverOutput += d;
     });
-    // Armed only until `confirmedUp`: an exit after that is this script's own teardown, not a
-    // startup failure.
+    // Armed only until `confirmedUp`: a later exit is this script's own teardown.
     let confirmedUp = false;
     let startupFailure = null;
     serverProcess.on("exit", (code, signal) => {

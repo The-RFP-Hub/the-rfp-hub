@@ -1,9 +1,7 @@
-# F3 of the M4 external-deploy criterion: `scripts/frontend-clean-room.mjs`, run in CI against a
-# real API, proving that a copy of ONLY packages/frontend installs, builds and serves. Two modes —
-# `packed` builds rfphub-validate from this checkout, `published` takes it from the registry.
-# `packed` is the default until 0.3.1 ships `humanizeIssues`: a job red by default over a dependency
-# it does not control is a job nobody trusts. A fork's PR runs `npm install` of that PR's own
-# dependency list on the runner, under `contents: read` and with no checkout credentials.
+# `scripts/frontend-clean-room.mjs` in CI against a real API: a copy of ONLY packages/frontend has
+# to install, build and serve. `packed` builds rfphub-validate from this checkout and is the default
+# until 0.3.1 ships `humanizeIssues`; `published` takes it from the registry. A fork's PR runs
+# `npm install` of that PR's own dependency list on the runner, read-only and without credentials.
 name: External deploy smoke test
 
 on:
@@ -17,7 +15,6 @@ on:
       - "pnpm-lock.yaml"
       - "scripts/frontend-clean-room.mjs"
       - ".github/workflows/external-deploy-smoke.yml"
-  # PRs too: a regression in any path above should be caught before it merges, not after.
   pull_request:
     branches: [main]
     paths: *clean-room-paths
@@ -69,8 +66,7 @@ jobs:
       - name: Build @the-rfp-hub/standard
         run: pnpm --filter @the-rfp-hub/standard build
 
-      # `github.event.inputs.*`, not the `inputs` context: on `push` there are no dispatch inputs,
-      # and only the event path reads as the empty string the `:-` default below expects.
+      # `github.event.inputs.*`, not `inputs`: on `push` only that path reads as the empty string.
       - name: Determine mode
         id: mode
         env:
@@ -85,8 +81,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/rfphub-pack"
           pnpm --filter rfphub-validate pack --pack-destination "$RUNNER_TEMP/rfphub-pack"
 
-      # `--browser` is required here: the HTTP checks alone pass on a build whose client-side fetch
-      # never reaches the API. Chromium comes from the lockfile's @playwright/test, not "latest".
+      # `--browser` is required here: the HTTP checks alone pass on a build that never reaches the API.
       - name: Install Chromium for the browser-driven check
         run: pnpm exec playwright install --with-deps chromium
 

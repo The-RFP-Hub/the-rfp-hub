@@ -1,9 +1,7 @@
-# Runs packages/e2e/tests/m4-responsive.spec.ts — and only that spec — through the real E2E runner
-# (`packages/e2e/src/run.ts`), which owns the disposable Postgres, API and frontend it needs; a bare
-# `playwright test` has no stack and refuses to start. Nothing else runs this suite: the root vitest
-# config excludes `packages/e2e/**`. The two guard steps exist because both halves of the selection
-# fail open — a filter that matches nothing and a spec that skips itself are each a green run that
-# proved nothing. Runner and bring-up details: `packages/e2e/README.md`.
+# packages/e2e/tests/m4-responsive.spec.ts — and only that spec — through the real E2E runner
+# (`packages/e2e/src/run.ts`), which owns the Postgres, API and frontend it needs; a bare
+# `playwright test` has no stack. The two guard steps exist because both halves of the selection
+# fail open: a filter matching nothing, and a spec skipping itself, are each a green run of nothing.
 name: Frontend responsive E2E
 
 on:
@@ -22,9 +20,6 @@ on:
     paths: *responsive-e2e-paths
   workflow_dispatch:
 
-# The workflow token, narrowed to reading the checkout. Without a `permissions:` block a job gets
-# whatever the repository's default Workflow permissions setting says — see ci.yml for the same
-# reasoning stated once.
 permissions:
   contents: read
 
@@ -32,14 +27,9 @@ jobs:
   responsive:
     name: m4-responsive.spec.ts (real stack, one spec)
     runs-on: ubuntu-latest
-    # Cold Docker pull (pgvector/pgvector:pg15) + a cold `next dev` compile + the full identity
-    # bring-up, ALL of which this suite pays regardless of how many specs are selected, ahead of one
-    # spec's own runtime. 20 minutes is headroom over a warm local run, not the expected time.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        # This job never pushes; no credential should outlive the checkout for `npm`/`pnpm`
-        # lifecycle scripts, or the Playwright browser installer, to inherit.
         with:
           persist-credentials: false
 
@@ -53,21 +43,15 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # The frontend's `next.config.ts` sets `transpilePackages` for both, but that only tells Next
-      # to run its OWN loader over whatever file Node resolution finds — it does not change which
-      # file that is. Both packages' `package.json` still resolves through `dist/`, so `next dev`
-      # fails to resolve them exactly as `next build` does (see `scripts/frontend-clean-room.mjs`'s
-      # own header) unless their dist exists first. `rfphub-validate...` builds it and its one
-      # workspace dependency, `@the-rfp-hub/standard`, in the correct order.
+      # `transpilePackages` does not change which file Node resolves: both still resolve via `dist/`.
       - name: Build workspace dependencies (@the-rfp-hub/standard, rfphub-validate)
         run: pnpm --filter rfphub-validate... build
 
       - name: Install Chromium for Playwright
         run: pnpm --filter @the-rfp-hub/e2e exec playwright install --with-deps chromium
 
-      # `playwright test <filter>` exits 0 when the filter matches nothing, so renaming the spec
-      # would disarm this job silently. The config reads the runner's state file at import time,
-      # and listing needs no real stack behind it.
+      # `playwright test <filter>` exits 0 when the filter matches nothing, so a rename would
+      # disarm this job silently. The config reads a state file at import time; listing needs no stack.
       - name: The filter still selects the spec
         shell: bash
         working-directory: packages/e2e
@@ -81,9 +65,8 @@ jobs:
       - name: Run m4-responsive.spec.ts through the real E2E runner
         run: pnpm e2e -- m4-responsive.spec.ts
 
-      # A skipped case is a green gate that asserted nothing, which is the one outcome this job
-      # exists to rule out. Scoped to the spec: the setup project skips one case by design on a run
-      # with no earlier administrator recorded.
+      # A skipped case is a green gate that asserted nothing. Scoped to the spec: the setup project
+      # skips one case by design when no earlier run recorded an administrator.
       - name: Every responsive case ran
         shell: bash
         run: |

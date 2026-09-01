@@ -90,9 +90,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Next rewrites a tsconfig.json that has neither "extends" nor "references"; the frontend's
-      # has no "extends" on purpose, so it carries "references": [] to bail Next out. If that ever
-      # goes, fail here rather than three steps later in Lint on a reformatted file.
+      # Next rewrites a tsconfig.json carrying neither "extends" nor "references"; the frontend's
+      # has no "extends" on purpose, so it carries "references": []. Fail here, not later in Lint.
       - name: Frontend tsconfig survived the build
         run: git diff --exit-code -- packages/frontend/tsconfig.json
 
