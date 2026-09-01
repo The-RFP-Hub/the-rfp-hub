@@ -299,6 +299,48 @@ function runSkillsRefValidate() {
   }
 }
 
+/** `claude plugin validate --strict` is the plugin host's own manifest check, and `--strict` is the
+ * mode it recommends for CI. Best-effort in the same one direction as `skills-ref`: absent CLI →
+ * warning; present CLI reporting a real violation → failure. */
+function claudeCliInstalled() {
+  try {
+    execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], {
+      stdio: "ignore",
+      timeout: 10_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runClaudePluginValidate() {
+  const targets = skillDirs()
+    .filter((dir) => existsSync(join(skillsDir, dir, ".claude-plugin", "plugin.json")))
+    .map((dir) => join(skillsDir, dir));
+  const marketplacePath = join(repoRoot, ".claude-plugin", "marketplace.json");
+  if (existsSync(marketplacePath)) targets.push(marketplacePath);
+  if (targets.length === 0) return;
+  if (!claudeCliInstalled()) {
+    warn(
+      "the claude CLI is not on PATH — skipping `claude plugin validate --strict` on the plugin/marketplace manifests",
+    );
+    return;
+  }
+  for (const target of targets) {
+    try {
+      execFileSync("claude", ["plugin", "validate", target, "--strict"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        timeout: 60_000,
+      });
+    } catch (err) {
+      const output = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+      fail(`claude plugin validate --strict ${target}: ${output.trim() || err.message}`);
+    }
+  }
+}
+
 function skillDirs() {
   if (!existsSync(skillsDir)) return [];
   return readdirSync(skillsDir).filter((entry) => {
@@ -316,6 +358,7 @@ if (dirs.length === 0) {
 for (const dir of dirs) checkSkill(dir);
 checkMarketplace();
 runSkillsRefValidate();
+runClaudePluginValidate();
 
 for (const w of warnings) console.warn(`⚠ ${w}`);
 if (errors.length) {
