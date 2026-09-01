@@ -15,6 +15,7 @@ import {
   RETAINED_VALUE_DISPLAY_LIMIT,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
+  awardInputValue,
   dateInputValue,
   directoryQuery,
   isFiltered,
@@ -95,14 +96,28 @@ describe("the directory querystring", () => {
     expect(query.deadlineBefore).toBe("2026-12-31T23:59:59.999Z");
   });
 
-  it("drops an award control that isn't a number, rather than sending garbage", () => {
+  it("forwards an award the control cannot parse instead of dropping it in silence", () => {
+    // Dropping it left `?minAward=abc` in the address bar advertising a filter the request never
+    // carried. Forwarding it makes the endpoint answer a 400 naming `minAward`, which this page
+    // renders — the same bargain the two deadline fields already strike with a hand-edited instant.
     const query = directoryQuery({
       ...DEFAULT_SELECTION,
       minAward: "not a number",
-      maxAward: "  ",
+      maxAward: "1e400",
     });
+    expect(query.minAward).toBe("not a number");
+    // `Number("1e400")` is `Infinity`, which is not a value this filter can compare against.
+    expect(query.maxAward).toBe("1e400");
+  });
+
+  it("still drops a blank award control — nothing was chosen", () => {
+    const query = directoryQuery({ ...DEFAULT_SELECTION, minAward: "  ", maxAward: "" });
     expect(query.minAward).toBeUndefined();
     expect(query.maxAward).toBeUndefined();
+  });
+
+  it("sends zero as a number, not as the absence of a filter", () => {
+    expect(directoryQuery({ ...DEFAULT_SELECTION, minAward: "0" }).minAward).toBe(0);
   });
 
   it("accepts a fractional award threshold — the control is not integer-only", () => {
@@ -278,9 +293,20 @@ describe("the directory querystring", () => {
     expect(isFiltered({ ...unfiltered, maxAward: "1000" })).toBe(true);
     expect(isFiltered({ ...unfiltered, deadlineAfter: "2026-09-01" })).toBe(true);
     expect(isFiltered({ ...unfiltered, deadlineBefore: "2026-09-01" })).toBe(true);
-    // A blank or non-numeric award control is not a filter — nothing was actually chosen.
+    // A blank award control is not a filter — nothing was chosen. A non-numeric one IS: it is on
+    // the wire, and the empty state it produces has to read as "nothing matches", not "nothing
+    // published".
     expect(isFiltered({ ...unfiltered, minAward: "  " })).toBe(false);
-    expect(isFiltered({ ...unfiltered, minAward: "not a number" })).toBe(false);
+    expect(isFiltered({ ...unfiltered, minAward: "not a number" })).toBe(true);
+  });
+
+  it("shows a blank number control for an award the browser cannot render, and keeps the rest", () => {
+    expect(awardInputValue("5000")).toBe("5000");
+    expect(awardInputValue(" 0.5 ")).toBe("0.5");
+    expect(awardInputValue("0")).toBe("0");
+    expect(awardInputValue("abc")).toBe("");
+    expect(awardInputValue("1e400")).toBe("");
+    expect(awardInputValue("")).toBe("");
   });
 });
 

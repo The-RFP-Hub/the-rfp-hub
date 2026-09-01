@@ -151,12 +151,37 @@ function filled(value: string): string | undefined {
   return trimmed === "" ? undefined : trimmed;
 }
 
-/** A number control's raw text, or `undefined` when it is empty or not a number at all. */
-function filledNumber(value: string): number | undefined {
+/** A number control's raw text as a finite number, or `undefined` when it is neither. */
+function finiteNumber(value: string): number | undefined {
   const text = filled(value);
   if (text === undefined) return undefined;
   const n = Number(text);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * What an award control sends.
+ *
+ * A value that is not a finite number is FORWARDED AS TYPED rather than dropped, exactly as the two
+ * deadline fields forward a hand-edited instant: `minAward`/`maxAward` are declared `number`, so the
+ * endpoint answers a 400 naming the offending parameter and this page renders it. Dropping it left
+ * the address bar advertising a filter that was never applied, with nothing on screen saying so.
+ */
+function awardParam(value: string): number | string | undefined {
+  return finiteNumber(value) ?? filled(value);
+}
+
+/**
+ * What `<input type="number">` should show for an award control's raw value.
+ *
+ * Same problem the deadline controls have: a native number input renders BLANK for anything it
+ * cannot parse, so a value carried in from a link (`?minAward=abc`, or `1e400`, which is `Infinity`)
+ * would look like no filter at all. This returns `""` for those, and the DirectoryList surfaces the
+ * literal value as text beside the control instead.
+ */
+export function awardInputValue(value: string): string {
+  const text = value.trim();
+  return finiteNumber(text) === undefined ? "" : text;
 }
 
 /** `YYYY-MM-DD` (what `<input type="date">` holds) → `date`; anything already an instant. */
@@ -240,8 +265,8 @@ export function directoryQuery(
     ecosystem: filled(selection.ecosystem),
     category: filled(selection.category),
     organization: filled(selection.organization),
-    minAward: filledNumber(selection.minAward),
-    maxAward: filledNumber(selection.maxAward),
+    minAward: awardParam(selection.minAward),
+    maxAward: awardParam(selection.maxAward),
     deadlineAfter: instant(selection.deadlineAfter, "start"),
     deadlineBefore: instant(selection.deadlineBefore, "end"),
     sort,
@@ -260,8 +285,8 @@ export function isFiltered(selection: DirectorySelection): boolean {
     filled(selection.ecosystem) !== undefined ||
     filled(selection.category) !== undefined ||
     filled(selection.organization) !== undefined ||
-    filledNumber(selection.minAward) !== undefined ||
-    filledNumber(selection.maxAward) !== undefined ||
+    filled(selection.minAward) !== undefined ||
+    filled(selection.maxAward) !== undefined ||
     filled(selection.deadlineAfter) !== undefined ||
     filled(selection.deadlineBefore) !== undefined
   );

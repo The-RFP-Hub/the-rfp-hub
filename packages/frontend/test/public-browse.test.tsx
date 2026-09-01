@@ -627,6 +627,21 @@ describe("the directory's filters", () => {
     expect(applied.get("deadlineBefore")).toBe("2026-09-02T09:15:00.000Z");
   });
 
+  it("keeps an unparseable award visible and on the wire instead of dropping it in silence", async () => {
+    // The control is `type="number"`, so it renders blank for this; the URL still advertises the
+    // filter. Dropping it there left a reader looking at unfiltered results with nothing on screen
+    // saying why — the exact failure the deadline fields already go out of their way to prevent.
+    navigation.params = new URLSearchParams("minAward=abc");
+    const { client, list } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect((screen.getByLabelText("Min award/budget") as HTMLInputElement).value).toBe("");
+    const retained = screen.getByText("abc");
+    expect(retained.closest("code")?.className).toContain("wrap-anywhere");
+    expect(list.mock.calls[0]?.[0]).toMatchObject({ minAward: "abc" });
+  });
+
   it("tells the reader the organization filter matches either side of the listing", async () => {
     const { client } = stub();
     mount(client, <DirectoryList />);

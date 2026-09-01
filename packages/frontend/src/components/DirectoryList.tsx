@@ -40,6 +40,7 @@ import {
   type Ordering,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
+  awardInputValue,
   dateInputValue,
   directoryQuery,
   isFiltered,
@@ -278,7 +279,7 @@ export function DirectoryList() {
               type="number"
               step="any"
               inputMode="decimal"
-              value={draft.minAward}
+              value={awardInputValue(draft.minAward)}
               onChange={(event) => setDraft({ ...draft, minAward: event.target.value })}
               placeholder="No minimum"
             />
@@ -286,6 +287,19 @@ export function DirectoryList() {
               Compares a listing&rsquo;s award amount; one that states only a total program budget
               (no award range) is compared using that budget instead.
             </p>
+            {/*
+             * A number control renders BLANK for anything it cannot parse, so a link carrying
+             * `?minAward=abc` would look like no filter at all. The value is still sent — the
+             * endpoint answers a 400 naming the parameter — so it stays visible as text.
+             */}
+            {draft.minAward.trim() && awardInputValue(draft.minAward) !== draft.minAward.trim() ? (
+              <p className="hint">
+                Filtering on the exact value from the link:{" "}
+                <code className="wrap-anywhere">
+                  <UntrustedText value={truncateForDisplay(draft.minAward.trim())} />
+                </code>
+              </p>
+            ) : null}
           </div>
 
           <div className={`field${draft.maxAward.trim() ? " is-set" : ""}`}>
@@ -297,7 +311,7 @@ export function DirectoryList() {
               type="number"
               step="any"
               inputMode="decimal"
-              value={draft.maxAward}
+              value={awardInputValue(draft.maxAward)}
               onChange={(event) => setDraft({ ...draft, maxAward: event.target.value })}
               placeholder="No maximum"
             />
@@ -305,6 +319,14 @@ export function DirectoryList() {
               Compares a listing&rsquo;s award amount; one that states only a total program budget
               (no award range) is compared using that budget instead.
             </p>
+            {draft.maxAward.trim() && awardInputValue(draft.maxAward) !== draft.maxAward.trim() ? (
+              <p className="hint">
+                Filtering on the exact value from the link:{" "}
+                <code className="wrap-anywhere">
+                  <UntrustedText value={truncateForDisplay(draft.maxAward.trim())} />
+                </code>
+              </p>
+            ) : null}
           </div>
 
           {/*

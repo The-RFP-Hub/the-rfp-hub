@@ -166,8 +166,10 @@ export type DirectoryQuery = {
   category?: string;
   /** Organization slug — matches any operating OR sponsoring organization. */
   organization?: string;
-  minAward?: number;
-  maxAward?: number;
+  /** A number, or the reader's raw text when the address bar carried something else — the endpoint
+   *  then answers a 400 naming the parameter instead of the filter being dropped in silence. */
+  minAward?: number | string;
+  maxAward?: number | string;
   /** RFC 3339 instants, compared against the derived `nextDeadlineAt`. */
   deadlineAfter?: string;
   deadlineBefore?: string;
