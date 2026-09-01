@@ -28,6 +28,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { digestOf, sha256Hex } from "./canonical.js";
 import { ToolError } from "./errors.js";
+import { ensureDir, isRegularFile, secureFile } from "./state.js";
+
+export { ensureDir } from "./state.js";
 
 /** How long a preview waits for a human, and how long the approval it produces stays spendable. */
 export const PENDING_TTL_MS = 15 * 60 * 1000;
@@ -102,33 +105,26 @@ export function assertApprovalId(id: string): void {
   }
 }
 
-/** `mkdir -p` with 0700, then a best-effort chmod for a directory that already existed. */
-export function ensureDir(dir: string): void {
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  try {
-    fs.chmodSync(dir, 0o700);
-  } catch {
-    // A directory we cannot chmod (a mounted volume, a foreign owner) still works; the write
-    // below is what actually has to succeed.
-  }
-}
-
+/**
+ * Write through a temporary file and a rename, and refuse a path that is not securable.
+ *
+ * The rename replaces whatever was at the target — including a symlink, which is replaced rather
+ * than followed. Both names are checked: the temporary one because it is what receives the bytes,
+ * the final one because it is what the next process will read.
+ */
 function writeFile0600(file: string, contents: string): void {
   ensureDir(path.dirname(file));
-  // `wx` so a same-id write never silently overwrites; the id is a digest, so a collision means
-  // the identical preview was taken twice and the existing record is equivalent.
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, contents, { mode: 0o600 });
+  secureFile(tmp);
   fs.renameSync(tmp, file);
-  try {
-    fs.chmodSync(file, 0o600);
-  } catch {
-    // Same reasoning as ensureDir: the content is written; a failed chmod is not a reason to lose
-    // it. The mode was already requested at creation time.
-  }
+  secureFile(file);
 }
 
 function readRecord<T>(file: string): T | null {
+  // A record that is not a plain file is not a record. Following a symlink here would read
+  // whatever it points at and treat that as an approval.
+  if (!isRegularFile(file)) return null;
   let raw: string;
   try {
     raw = fs.readFileSync(file, "utf8");
@@ -238,9 +234,22 @@ export function claimApproval(home: string, approvalId: string): ApprovalRecord 
   return record;
 }
 
-export function isExpired(record: { expiresAt: string }, now: Date): boolean {
+/**
+ * Whether a stored decision is outside its window — including because the clock moved backwards.
+ *
+ * A record stamped in the FUTURE means the machine's clock went back after it was written, and the
+ * only safe reading is that its window has passed: the alternative is that winding a clock back
+ * revives an approval that had already expired.
+ */
+export function isExpired(
+  record: { expiresAt: string; createdAt?: string; approvedAt?: string },
+  now: Date,
+): boolean {
   const at = Date.parse(record.expiresAt);
-  return !Number.isFinite(at) || at <= now.getTime();
+  if (!Number.isFinite(at)) return true;
+  const issued = Date.parse(record.approvedAt ?? record.createdAt ?? "");
+  if (Number.isFinite(issued) && issued > now.getTime()) return true;
+  return at <= now.getTime();
 }
 
 /**

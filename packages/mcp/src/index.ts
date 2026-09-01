@@ -51,6 +51,8 @@ export {
   DEFAULT_CAPS,
   counterPath,
   counterLockPath,
+  parseCounterFile,
+  TOOL_KINDS,
   type ToolKind,
   type Caps,
   type Reservation,
@@ -58,7 +60,16 @@ export {
 export { withLock, LockTimeoutError, STALE_LOCK_MS, LOCK_TIMEOUT_MS } from "./lock.js";
 export { RedactingTransport } from "./transport.js";
 export { redact, redactString, findSecretPaths, registerSecret, REDACTED } from "./redact.js";
-export { appendAudit, auditPath, summarizeInput, type AuditEntry } from "./audit.js";
+export {
+  appendAudit,
+  auditPath,
+  rotatedAuditPath,
+  rotateAudit,
+  summarizeInput,
+  AUDIT_MAX_BYTES,
+  type AuditEntry,
+} from "./audit.js";
+export { ensureDir, secureFile, InsecureStateError } from "./state.js";
 export { canonicalStringify, digestOf, sha256Hex } from "./canonical.js";
 export {
   computeApprovalId,

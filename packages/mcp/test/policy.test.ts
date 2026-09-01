@@ -170,3 +170,77 @@ describe("submit spends the budget of the PHASE, not of the tool", () => {
     expect(policy.usage("preview").day).toBe(1);
   });
 });
+
+/**
+ * A syntactically valid file that is semantically nonsense used to be trusted: a negative count
+ * bought extra calls, and a string count concatenated instead of adding, so no cap was ever
+ * reached. The rule is that a budget this server cannot count is a budget it refuses.
+ */
+describe("a corrupt counter file fails closed", () => {
+  const minute = Math.floor(NOW.getTime() / 60_000);
+  const day = Math.floor(NOW.getTime() / 86_400_000);
+
+  function withFile(contents: string): { policy: Policy; home: string } {
+    const home = testConfig().home;
+    fs.mkdirSync(home, { recursive: true });
+    fs.writeFileSync(counterPath(home), contents);
+    return { policy: new Policy(home, { now: () => NOW }), home };
+  }
+
+  const corrupt: Record<string, string> = {
+    "a negative count": `{"minute":{"commit":{"window":${minute},"count":-100}},"day":{}}`,
+    "a fractional count": `{"minute":{"commit":{"window":${minute},"count":1.5}},"day":{}}`,
+    "a string count": `{"minute":{"commit":{"window":${minute},"count":"4"}},"day":{}}`,
+    "a boolean count": `{"minute":{"commit":{"window":${minute},"count":true}},"day":{}}`,
+    "a null count": `{"minute":{"commit":{"window":${minute},"count":null}},"day":{}}`,
+    "a count past exact arithmetic": `{"minute":{"commit":{"window":${minute},"count":1e30}},"day":{}}`,
+    "a non-finite count": `{"minute":{"commit":{"window":${minute},"count":1e999}},"day":{}}`,
+    "a negative window": `{"minute":{"commit":{"window":-1,"count":0}},"day":{}}`,
+    "a non-finite window": `{"minute":{"commit":{"window":1e999,"count":0}},"day":{}}`,
+    "an unknown kind": `{"minute":{"exfiltrate":{"window":${minute},"count":0}},"day":{}}`,
+    "an extra bucket member": `{"minute":{"commit":{"window":${minute},"count":0,"x":1}},"day":{}}`,
+    "an array where a record belongs": `{"minute":[],"day":{}}`,
+    "an array where a bucket belongs": `{"minute":{"commit":[]},"day":{}}`,
+    "an array root": "[]",
+    "a missing day record": `{"minute":{}}`,
+    "a missing minute record": `{"day":{}}`,
+    "an unexpected record": `{"minute":{},"day":{},"year":{}}`,
+    "a bare string": '"nope"',
+    "truncated JSON": '{"minute":{',
+  };
+
+  for (const [name, contents] of Object.entries(corrupt)) {
+    it(`refuses ${name}, and leaves the file exactly as it found it`, () => {
+      const { policy, home } = withFile(contents);
+      expect(() => policy.consume("commit")).toThrowError(/rate-limit store/);
+      expect(() => policy.usage("commit")).toThrowError(/rate-limit store/);
+      expect(fs.readFileSync(counterPath(home), "utf8")).toBe(contents);
+    });
+  }
+
+  it("still accepts a file that is merely full", () => {
+    const { policy } = withFile(
+      `{"minute":{"commit":{"window":${minute},"count":0}},"day":{"commit":{"window":${day},"count":0}}}`,
+    );
+    policy.consume("commit");
+    expect(policy.usage("commit").day).toBe(1);
+  });
+});
+
+describe("a clock that moves backwards buys nothing", () => {
+  it("keeps counting in the stored window rather than resetting to zero", () => {
+    const home = testConfig().home;
+    const caps = { ...DEFAULT_CAPS, commit: { perMinute: 2, perDay: 2 } };
+    const later = new Date(NOW.getTime() + 10 * 60_000);
+
+    const ahead = new Policy(home, { caps, now: () => later });
+    ahead.consume("commit");
+    ahead.consume("commit");
+    expect(() => ahead.consume("commit")).toThrowError(/per minute/);
+
+    // The same store, read by a process whose clock has been wound back ten minutes.
+    const behind = new Policy(home, { caps, now: () => NOW });
+    expect(behind.usage("commit").minute).toBe(2);
+    expect(() => behind.consume("commit")).toThrowError(/per minute/);
+  });
+});

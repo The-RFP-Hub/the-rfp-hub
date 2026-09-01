@@ -22,9 +22,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { ensureDir } from "./approvals.js";
 import { ToolError } from "./errors.js";
 import { LockTimeoutError, withLock } from "./lock.js";
+import { ensureDir, isRegularFile, secureFile } from "./state.js";
 
 /**
  * `attempt` is not a phase — it is every invocation of the write tool, charged before any work.
@@ -36,6 +36,9 @@ import { LockTimeoutError, withLock } from "./lock.js";
  * goes on to do anything.
  */
 export type ToolKind = "read" | "preview" | "commit" | "attempt";
+
+/** The only kinds a counter file may name. Anything else is corruption, not a newer build. */
+export const TOOL_KINDS: readonly ToolKind[] = ["read", "preview", "commit", "attempt"];
 
 export interface Caps {
   perMinute: number;
@@ -193,6 +196,9 @@ export class Policy {
 
   private locked<T>(critical: () => T): T {
     try {
+      // Before the lock, because the lock is itself a directory in this home: a home that is not
+      // this user's own 0700 directory must be refused rather than have state created inside it.
+      ensureDir(this.home);
       return withLock(counterLockPath(this.home), critical, {
         ...(this.lockTimeoutMs === undefined ? {} : { timeoutMs: this.lockTimeoutMs }),
       });
@@ -213,6 +219,11 @@ export class Policy {
     const file = counterPath(this.home);
     let raw: string;
     try {
+      // A counter store that is not a plain file is not a counter store; following a symlink here
+      // would count against whatever it points at.
+      if (fs.existsSync(file) && !isRegularFile(file)) {
+        throw new Error("the counter file is not a regular file");
+      }
       raw = fs.readFileSync(file, "utf8");
     } catch (err) {
       // A missing file is the normal first call, not a broken store.
@@ -220,12 +231,11 @@ export class Policy {
       throw this.storeError(file, err);
     }
     try {
-      const parsed = JSON.parse(raw) as Partial<CounterFile>;
-      return { minute: parsed.minute ?? {}, day: parsed.day ?? {} };
-    } catch {
+      return parseCounterFile(raw);
+    } catch (err) {
       // Corrupt bookkeeping is not the same as no bookkeeping: refuse rather than reset to zero,
-      // which is what an attacker who can truncate the file would want.
-      throw this.storeError(file, new Error("the counter file is not valid JSON"));
+      // which is what an attacker who can truncate the file would want. Nothing here writes.
+      throw this.storeError(file, err);
     }
   }
 
@@ -235,8 +245,13 @@ export class Policy {
       ensureDir(path.dirname(target));
       const tmp = `${target}.${process.pid}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify(file), { mode: 0o600 });
+      secureFile(tmp);
       fs.renameSync(tmp, target);
+      secureFile(target);
     } catch (err) {
+      // An insecure-state refusal already says exactly what is wrong with which path; restating it
+      // as "the store is unusable" would replace the diagnosis with a guess.
+      if (err instanceof ToolError) throw err;
       throw this.storeError(target, err);
     }
   }
@@ -250,7 +265,71 @@ export class Policy {
   }
 }
 
+/**
+ * The bucket to count in for `window`, given what is on disk.
+ *
+ * A stored window AHEAD of the current one means the clock went backwards — an NTP correction, a
+ * VM resumed from a snapshot, or somebody buying budget with `date`. The stored bucket is kept and
+ * counted in, so no call is granted by moving the clock; the cost is that budget stays spent until
+ * real time catches up, which is the safe direction for a limiter.
+ */
 function rollover(bucket: Bucket | undefined, window: number): Bucket {
-  if (bucket === undefined || bucket.window !== window) return { window, count: 0 };
+  if (bucket === undefined) return { window, count: 0 };
+  if (bucket.window > window) return bucket;
+  if (bucket.window < window) return { window, count: 0 };
   return bucket;
+}
+
+class CounterFileError extends Error {}
+
+function fail(what: string): never {
+  throw new CounterFileError(`the counter file is corrupt: ${what}`);
+}
+
+/**
+ * Parse the whole counter file, or refuse it.
+ *
+ * NOTHING HERE IS TOLERANT. A negative count hands out extra budget; a string count concatenates
+ * instead of adding, so the cap is never reached; a bucket under an unknown kind is a file this
+ * build cannot reason about. Every one of those has to reach `storeError` — which denies the call
+ * and leaves the file untouched — rather than being normalized into something countable.
+ */
+export function parseCounterFile(raw: string): CounterFile {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    fail("it is not valid JSON");
+  }
+  if (!isPlainObject(parsed)) fail("its root is not an object");
+  for (const key of Object.keys(parsed)) {
+    if (key !== "minute" && key !== "day") fail(`it has an unexpected \`${key}\` record`);
+  }
+  return { minute: parseRecord(parsed.minute, "minute"), day: parseRecord(parsed.day, "day") };
+}
+
+function parseRecord(value: unknown, name: string): Partial<Record<ToolKind, Bucket>> {
+  if (!isPlainObject(value)) fail(`its \`${name}\` record is missing or is not an object`);
+  const out: Partial<Record<ToolKind, Bucket>> = {};
+  for (const [kind, bucket] of Object.entries(value)) {
+    if (!TOOL_KINDS.includes(kind as ToolKind)) fail(`\`${name}\` names an unknown kind`);
+    if (!isPlainObject(bucket)) fail(`\`${name}\` holds something that is not a bucket`);
+    for (const key of Object.keys(bucket)) {
+      if (key !== "window" && key !== "count") fail(`a \`${name}\` bucket has an extra member`);
+    }
+    if (!isCount(bucket.window) || !isCount(bucket.count)) {
+      fail(`a \`${name}\` bucket's window or count is not a whole number of at least zero`);
+    }
+    out[kind as ToolKind] = { window: bucket.window, count: bucket.count };
+  }
+  return out;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Finite, integral, non-negative and inside the range arithmetic on it stays exact. */
+function isCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
