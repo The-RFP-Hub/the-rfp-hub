@@ -62,6 +62,7 @@ Options map 1:1 to GET /v1/opportunities query params:
   --help                    show this message
 
 A "<list>" value may be comma-separated: --ecosystem Optimism,Base
+Repeating a flag is a usage error — pass one comma-separated value instead.
 This script takes no positional arguments — every filter is a --flag.
 
 Without --status, this skill searches OPEN opportunities only (most requests like "find grants"
@@ -77,13 +78,14 @@ See references/api-reference.md for the full parameter table and enum values.
 const SEARCH_ALLOWED_FLAGS = new Set([...SEARCH_PARAMS, "format", "help"]);
 
 async function main(argv) {
-  const { flags, positional } = parseArgs(argv);
-  if (flags.help !== undefined) {
-    process.stdout.write(HELP);
-    return EXIT.OK;
-  }
-
+  let flags;
   try {
+    let positional;
+    ({ flags, positional } = parseArgs(argv));
+    if (flags.help !== undefined) {
+      process.stdout.write(HELP);
+      return EXIT.OK;
+    }
     assertKnownFlags(flags, SEARCH_ALLOWED_FLAGS, "search.mjs");
     assertNoExtraPositionals(
       positional,

@@ -16,9 +16,9 @@ never silently ignored.
 
 | Param | Type | Notes |
 |---|---|---|
-| `q` | string | Free-text search over title, summary, and description |
-| `fundingType` | list | See "fundingType values" below. Repeat the param and/or comma-separate; both OR together |
-| `status` | list | See "status values" below. Same repeat/comma-separate rule |
+| `q` | string | Free-text search over title, summary, and description. **This skill's scripts reject anything over 200 characters**, which is about where the API truncates it functionally |
+| `fundingType` | list | See "fundingType values" below. Comma-separate to OR values together. The API also accepts a repeated param, but **this skill's scripts reject a repeated flag** — pass `--fundingType grant,bounty` |
+| `status` | list | See "status values" below. Same comma-separate rule |
 | `ecosystem` | list | Open vocabulary, e.g. `Optimism`, `Base`, `Ethereum` — no fixed enum |
 | `category` | list | Open vocabulary, e.g. `DeFi`, `Public Goods` — no fixed enum |
 | `organization` | string | An organization **slug**. Matches ANY entry in `operatingOrganizations` OR `sponsoringOrganizations`, not only the primary one |
@@ -114,7 +114,7 @@ Both `scripts/search.mjs` and `scripts/get.mjs` use the same exit codes:
 | Code | Meaning |
 |---|---|
 | `0` | Success — including an empty result set, or a page past the last one |
-| `1` | Usage error, caught BEFORE any network call: an unknown flag, an invalid `--format` (only `json`/`table` are accepted), an unexpected extra positional argument, a non-integer `--limit`/`--page`, or a missing `<id>` for `get.mjs` |
+| `1` | Usage error, caught BEFORE any network call: an unknown flag, a flag given twice, an invalid `--format` (only `json`/`table` are accepted), an unexpected extra positional argument, an over-long `--q`, a non-integer `--limit`/`--page`, or a missing `<id>` for `get.mjs` |
 | `2` | Network error or timeout reaching the API |
 | `3` | HTTP 4xx from the API (not 429) — e.g. a validation error, or 404 |
 | `4` | HTTP 429 — rate limited; the message reports `Retry-After` when the API sends it |

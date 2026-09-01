@@ -145,6 +145,10 @@ export const SEARCH_PARAMS = new Set([
   "limit",
 ]);
 
+/** The API truncates search text functionally around here, so a longer `--q` is a mistake worth
+ * naming rather than a silently different search. */
+export const MAX_Q_LEN = 200;
+
 export const FUNDING_TYPES = ["grant", "hackathon", "bounty", "accelerator", "vc_fund", "rfp"];
 export const STATUSES = ["upcoming", "open", "closed", "archived"];
 export const SORT_FIELDS = ["nextDeadlineAt", "opensAt", "postedAt", "updatedAt", "createdAt"];
@@ -167,6 +171,11 @@ export function buildSearchQuery(flags) {
     }
     const asString = Array.isArray(value) ? value.join(",") : String(value);
     if (asString === "") continue;
+    if (key === "q" && asString.length > MAX_Q_LEN) {
+      throw new Error(
+        `--q is ${asString.length} characters; this skill limits it to ${MAX_Q_LEN}, which is about where the API truncates search text anyway. Shorten it.`,
+      );
+    }
     params.set(key, asString);
   }
   return params;
@@ -257,9 +266,10 @@ export function parsePage(rawPage) {
 // ── minimal CLI arg parsing (no external deps) ──────────────────────────────────
 
 /**
- * Parse `--key value`, `--key=value` and bare positional args. Repeating a list-style key
- * accumulates values (joined with `,` later by the caller via LIST_PARAMS handling); repeating a
- * scalar key keeps the last occurrence, matching how most CLIs behave.
+ * Parse `--key value`, `--key=value` and bare positional args. A repeated flag is a usage error,
+ * not a last-one-wins guess: `--status open --status closed` almost certainly meant one of the two
+ * comma-separated forms, and silently dropping half of it is the kind of quiet wrong answer this
+ * file refuses everywhere else. Throws a plain `Error`, like the other usage checks.
  */
 export function parseArgs(argv) {
   const flags = {};
@@ -287,11 +297,13 @@ export function parseArgs(argv) {
           i++;
         }
       }
-      if (key in flags && LIST_PARAMS.has(key)) {
-        flags[key] = `${flags[key]},${value}`;
-      } else {
-        flags[key] = value;
+      if (key in flags) {
+        const hint = LIST_PARAMS.has(key)
+          ? ` Pass one comma-separated value instead: --${key} ${flags[key]},${value}.`
+          : "";
+        throw new Error(`--${key} was given more than once.${hint}`);
       }
+      flags[key] = value;
     } else {
       positional.push(arg);
     }
@@ -496,7 +508,8 @@ export function nextDeadlineAt(deadlines, now = new Date()) {
 export function awardSummary(fundingInfo) {
   if (!fundingInfo || typeof fundingInfo !== "object") return null;
   const { currency, budget, minAward, maxAward } = fundingInfo;
-  const cleanCurrency = typeof currency === "string" ? truncateText(currency, MAX_CURRENCY_LEN) : "";
+  const cleanCurrency =
+    typeof currency === "string" ? truncateText(currency, MAX_CURRENCY_LEN) : "";
   const unit = cleanCurrency ? ` ${cleanCurrency}` : "";
   const fmt = (n) => Number(n).toLocaleString("en-US");
   if (typeof minAward === "number" && typeof maxAward === "number") {
@@ -532,7 +545,9 @@ function isUsableUrl(v) {
 export function projectEcosystems(ecosystems) {
   if (!Array.isArray(ecosystems)) return [];
   const strings = ecosystems.filter((e) => typeof e === "string" && e.length > 0);
-  const kept = strings.slice(0, MAX_ECOSYSTEMS).map((e) => truncateText(e, MAX_ECOSYSTEM_VALUE_LEN));
+  const kept = strings
+    .slice(0, MAX_ECOSYSTEMS)
+    .map((e) => truncateText(e, MAX_ECOSYSTEM_VALUE_LEN));
   if (strings.length > MAX_ECOSYSTEMS) {
     kept.push(`+${strings.length - MAX_ECOSYSTEMS} more`);
   }

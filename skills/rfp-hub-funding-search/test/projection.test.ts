@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_LIMIT,
   DEFAULT_TIMEOUT_MS,
@@ -15,6 +15,7 @@ import {
   MAX_CURRENCY_LEN,
   MAX_LIMIT,
   MAX_ORGANIZATION_LEN,
+  MAX_Q_LEN,
   MAX_TIMEOUT_MS,
   MAX_TITLE_LEN,
   RequestError,
@@ -366,6 +367,13 @@ describe("buildSearchQuery", () => {
     expect(() => buildSearchQuery({ notAParam: "x" })).toThrow(/Unknown parameter/);
   });
 
+  it("rejects a --q longer than the documented limit, naming the limit", () => {
+    expect(() => buildSearchQuery({ q: "x".repeat(MAX_Q_LEN + 1) })).toThrow(
+      new RegExp(`--q is ${MAX_Q_LEN + 1} characters.*${MAX_Q_LEN}`),
+    );
+    expect(() => buildSearchQuery({ q: "x".repeat(MAX_Q_LEN) })).not.toThrow();
+  });
+
   it("drops undefined/empty values instead of sending them", () => {
     const q = buildSearchQuery({ q: undefined, organization: "" });
     expect(q.has("q")).toBe(false);
@@ -410,24 +418,21 @@ describe("clampLimit", () => {
 });
 
 describe("timeoutMs", () => {
-  const original = process.env.RFPHUB_TIMEOUT_MS;
-
   afterEach(() => {
-    if (original === undefined) delete process.env.RFPHUB_TIMEOUT_MS;
-    else process.env.RFPHUB_TIMEOUT_MS = original;
+    vi.unstubAllEnvs();
   });
 
   it("falls back to the default when unset, non-numeric or non-positive", () => {
-    delete process.env.RFPHUB_TIMEOUT_MS;
+    vi.stubEnv("RFPHUB_TIMEOUT_MS", undefined);
     expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
-    process.env.RFPHUB_TIMEOUT_MS = "nope";
+    vi.stubEnv("RFPHUB_TIMEOUT_MS", "nope");
     expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
-    process.env.RFPHUB_TIMEOUT_MS = "-1";
+    vi.stubEnv("RFPHUB_TIMEOUT_MS", "-1");
     expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
   });
 
   it("passes a usable override through without a note", () => {
-    process.env.RFPHUB_TIMEOUT_MS = "2500";
+    vi.stubEnv("RFPHUB_TIMEOUT_MS", "2500");
     let warned = "";
     expect(
       timeoutMs((msg) => {
@@ -438,7 +443,7 @@ describe("timeoutMs", () => {
   });
 
   it("clamps an absurd override to the ceiling instead of waiting forever", () => {
-    process.env.RFPHUB_TIMEOUT_MS = "1e12";
+    vi.stubEnv("RFPHUB_TIMEOUT_MS", "1e12");
     let warned = "";
     expect(
       timeoutMs((msg) => {
@@ -566,9 +571,16 @@ describe("parseArgs", () => {
     expect(flags.help).toBe("true");
   });
 
-  it("accumulates a repeated list-style flag with a comma", () => {
-    const { flags } = parseArgs(["--ecosystem", "Optimism", "--ecosystem", "Base"]);
-    expect(flags.ecosystem).toBe("Optimism,Base");
+  it("rejects a repeated list-style flag, naming it and the comma-separated form to use", () => {
+    expect(() => parseArgs(["--ecosystem", "Optimism", "--ecosystem", "Base"])).toThrow(
+      /--ecosystem was given more than once.*--ecosystem Optimism,Base/,
+    );
+  });
+
+  it("rejects a repeated scalar flag instead of keeping the last one", () => {
+    expect(() => parseArgs(["--format", "json", "--format=table"])).toThrow(
+      /--format was given more than once/,
+    );
   });
 });
 

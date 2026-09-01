@@ -13,12 +13,7 @@
  * skill's output (or an agent runtime capturing it) actually uses.
  */
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import {
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-  createServer,
-} from "node:http";
+import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -284,6 +279,23 @@ describe("usage errors exit 1 BEFORE any network call", () => {
     });
     expect(badPage.code).toBe(USAGE_EXIT_CODE);
     expect(badPage.stderr).toMatch(/--page must be a positive integer/);
+  });
+
+  it("search.mjs rejects a repeated flag rather than silently dropping one value", async () => {
+    const { code, stderr } = await run(searchScript, ["--status", "open", "--status", "closed"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(code).not.toBe(NETWORK_EXIT_CODE);
+    expect(stderr).toMatch(/--status was given more than once/);
+  });
+
+  it("search.mjs rejects an over-long --q, naming the limit", async () => {
+    const { code, stderr } = await run(searchScript, ["--q", "x".repeat(5000)], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(stderr).toMatch(/--q is 5000 characters.*200/);
   });
 
   it("get.mjs rejects an unknown flag", async () => {

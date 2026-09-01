@@ -47,13 +47,14 @@ Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (defau
 const GET_ALLOWED_FLAGS = new Set(["id", "format", "help"]);
 
 async function main(argv) {
-  const { flags, positional } = parseArgs(argv);
-  if (flags.help !== undefined) {
-    process.stdout.write(HELP);
-    return EXIT.OK;
-  }
-
+  let flags;
+  let positional;
   try {
+    ({ flags, positional } = parseArgs(argv));
+    if (flags.help !== undefined) {
+      process.stdout.write(HELP);
+      return EXIT.OK;
+    }
     assertKnownFlags(flags, GET_ALLOWED_FLAGS, "get.mjs");
     assertNoExtraPositionals(positional, 1, "get.mjs takes exactly one <id> (or --id <id>).");
   } catch (err) {

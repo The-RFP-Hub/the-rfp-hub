@@ -154,7 +154,7 @@ these headers identify the traffic, they don't filter it.
 | Unusable response body | Not JSON, not a JSON object, or past the scripts' 1 MiB response cap — an unexpected API change, or an `RFPHUB_API_BASE` that is not the RFP Hub API | Report it; do not attempt to interpret partial/garbled output. For the size cap, narrow the query (smaller `--limit`, more filters) and retry once |
 | Empty result (`total: 0`) | Filters matched nothing | **Not an error.** Say so plainly and suggest broadening one filter at a time. Note: an empty page still reports `totalPages: 1`, not `0` — that's the API's convention (page 1 of 1 results, zero of them), not a bug |
 | Empty page past the last one (e.g. `--page 50` when there are only 3) | Asked for a page that doesn't exist | **Also not an error** — a different case from the one above. The total/page footer (table mode) or the envelope (JSON) still reports the real `total`/`totalPages`, so say "page 50 doesn't exist, there are only 3" rather than "nothing matched" |
-| Unknown flag, invalid `--format`, an extra positional argument, or a non-integer `--limit`/`--page` | Usage mistake, caught locally | The script exits before making any network call — fix the invocation and retry; this is not an API problem |
+| Unknown flag, a flag repeated twice, invalid `--format`, an extra positional argument, an over-long `--q`, or a non-integer `--limit`/`--page` | Usage mistake, caught locally | The script exits before making any network call — fix the invocation and retry; this is not an API problem |
 
 The fallback scripts exit non-zero with a message on stderr for every row above except the two
 "not an error" rows, which exit `0`. Exact exit codes are in
@@ -189,8 +189,8 @@ site) alongside `links.apply`.
 - `limit` is capped at **25** by this skill (the fallback scripts clamp and warn; ask the MCP
   server's own tool description for its cap if using that path instead) — a budget for the agent's
   context window, not the API's own ceiling of 100. Use `page` to see more.
-- `q` truncates functionally around 200 characters server-side; keep search text short and
-  specific.
+- `q` is rejected past 200 characters, which is about where the API truncates search text
+  functionally anyway; keep search text short and specific.
 - Titles in results are truncated to 140 characters and organization names to 80. If a user needs
   the full title or any other publisher-authored prose, that's exactly the free text this skill
   deliberately does not surface — point them at the opportunity's own page or `applyUrl` instead.
