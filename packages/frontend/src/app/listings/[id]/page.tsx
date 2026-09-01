@@ -198,7 +198,7 @@ function Header({
         ) : null}
         {entry.website ? (
           <a href={linkOutUrl(api.baseUrl, id, "source")} target="_blank" rel="noopener noreferrer">
-            Open the programme site
+            Open the program site
           </a>
         ) : null}
         <span className="muted">(these links record aggregate outbound clicks)</span>
@@ -290,7 +290,7 @@ function VerificationTab({ id, canTrigger }: { id: string; canTrigger: boolean }
       <p className="muted footnote">
         The check fetches this listing&rsquo;s <code>applicationUrl</code> and records what the page
         said. A match is a <strong>low-bar anti-spam signal</strong> — the page exists and its title
-        is about the same programme — and never a fact-check of the amounts or the deadlines.
+        is about the same program — and never a fact-check of the amounts or the deadlines.
       </p>
 
       {canTrigger ? (

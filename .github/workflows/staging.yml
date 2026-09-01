@@ -2,14 +2,27 @@ on:
   push:
     branches:
       - main
-    # The nightly export commits its dataset to `exports/` on main (see nightly-export.yml).
-    # Publishing data must not roll the service: a push whose every changed file is under
-    # `exports/` skips this workflow entirely, while a push that also touches anything else
-    # deploys exactly as before. Tag pushes are unaffected — GitHub does not evaluate path filters
-    # for them.
+    # The API image's build inputs only, mirroring frontend-staging.yml's approach: its own
+    # package, the workspace packages it consumes (the Standard and the validator), `scripts/`
+    # (copied into the builder stage, and the deploy job runs env-to-container-env.mjs from the
+    # checkout), the Dockerfile, the root workspace files that pin it all, and this workflow.
+    # This is what keeps a frontend-only merge — or the nightly `exports/` commit — from rolling
+    # the service for an image that would be functionally identical. This used to be a lone
+    # `paths-ignore: ['exports/**']`, which excluded the data commits but deployed on everything
+    # else, frontend included.
     # Path filters only apply to branch pushes; there is no tag trigger here — staging tracks
     # main, and the one-off escape hatch is workflow_dispatch, not a tag family.
-    paths-ignore: ['exports/**']
+    paths:
+      - "packages/api/**"
+      - "packages/standard/**"
+      - "packages/validate/**"
+      - "scripts/**"
+      - "Dockerfile"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".github/workflows/staging.yml"
   workflow_dispatch:
 
 name: Staging API

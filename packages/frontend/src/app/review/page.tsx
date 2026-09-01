@@ -273,7 +273,7 @@ function Submissions({
     <>
       <p className="muted footnote">
         Approving publishes a listing into the public directory. Rejecting also unlists it. Neither
-        is a statement about the programme&rsquo;s quality — it is a statement about whether the
+        is a statement about the program&rsquo;s quality — it is a statement about whether the
         record is real and conformant.
       </p>
       <ActionNote note={note} />
@@ -443,7 +443,7 @@ function SubmissionRow({
                 {isSelfReview ? <SelfReviewNotice kind="listing" /> : null}
                 <p>
                   It becomes visible to everyone in the public directory and in the open-data
-                  exports, immediately. Publishing is not an endorsement of the programme — it is a
+                  exports, immediately. Publishing is not an endorsement of the program — it is a
                   statement that the record is real and conformant.
                 </p>
               </ConfirmPanel>
@@ -484,7 +484,7 @@ function SubmissionRow({
                     id={`review-reason-${item.id}`}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
-                    placeholder="e.g. the application link 404s and no other source names this programme"
+                    placeholder="e.g. the application link 404s and no other source names this program"
                   />
                 </div>
               </ConfirmPanel>
@@ -579,7 +579,7 @@ function SubmissionDetails({ item, origin }: { item: ManagedOpportunity; origin:
                 result.matched === null
                   ? "no verdict"
                   : result.matched
-                    ? "the linked page looks like this programme"
+                    ? "the linked page looks like this program"
                     : "the linked page did not match"
               }. Source response: ${presentation.response}${presentation.uncertain ? ` ${BOT_PROTECTION_NOTE}` : ""}`;
               return {
@@ -1156,7 +1156,7 @@ function PairCard({
 
       {pair.status === "confirmed" ? (
         <p className="note">
-          <strong>Confirmed</strong> — Recorded as the same programme. Choose the survivor to merge
+          <strong>Confirmed</strong> — Recorded as the same program. Choose the survivor to merge
           the listings, or leave both records unchanged.
         </p>
       ) : null}
