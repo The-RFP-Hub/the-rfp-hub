@@ -306,10 +306,10 @@ quietly redesigning the standard.
 | `held-for-next-cut` | Real defect, but fixing it would change what validates. Cannot ship inside the current version. | Stays open, labelled, and is picked up when the next spec version opens. Say so on the issue — a defect parked without a label reads as ignored. |
 | `redesign` | The report is not a defect at all: it asks the standard to mean something different. | Not an erratum. Becomes a `proposed` feature, and if accepted an ADR. |
 
-These four are real GitHub labels, not just names in this table:
-[`.github/labels.yml`](../../.github/labels.yml) is the manifest, with the `gh label create` block
-that applies it. Naming a label in prose does not create it, and a triage step whose labels do not
-exist is a step nobody can perform.
+These four become real GitHub labels only after an operator applies
+[`.github/labels.yml`](../../.github/labels.yml) — the manifest — with the `gh label create` block
+it carries; until then they are just names in this table. Naming a label in prose does not create
+it, and a triage step whose labels do not exist is a step nobody can perform.
 
 ---
 
