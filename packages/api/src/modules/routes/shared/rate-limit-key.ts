@@ -24,6 +24,20 @@ const ADDRESS_PREFIX = "ip:";
 const INVALID_ADDRESS = `${ADDRESS_PREFIX}invalid`;
 
 /**
+ * What the limiter emits, and what BOTH CORS policies have to expose.
+ *
+ * A header a browser cannot read is a header the client does not have: without this list every one
+ * of these is invisible to the cross-origin fetch that received it, so a 429 reaches the page as a
+ * bare status with no backoff to obey and no budget to pace against.
+ */
+export const RATE_LIMIT_HEADERS = [
+  "retry-after",
+  "x-ratelimit-limit",
+  "x-ratelimit-remaining",
+  "x-ratelimit-reset",
+];
+
+/**
  * The eight 16-bit groups of an IPv6 address, or null if it does not parse.
  *
  * Written out rather than delegated: the library that would do it (`ip-address`) is

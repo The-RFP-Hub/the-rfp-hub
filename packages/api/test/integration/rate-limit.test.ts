@@ -29,13 +29,15 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import type { Auth } from "../../src/auth/better-auth.js";
 import { type DB, db, pool } from "../../src/db/client.js";
-import { bearer, seedIdentity, testAuth } from "../helpers/auth.js";
+import { RATE_LIMIT_HEADERS } from "../../src/modules/routes/shared/rate-limit-key.js";
+import { bearer, seedIdentity, testAuth, testAuthConfig } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
 
 const EMAILS = {
   first: "m4rate-first@rfphub.invalid",
   second: "m4rate-second@rfphub.invalid",
+  cors: "m4rate-cors@rfphub.invalid",
 };
 const FIRST_HANDLE = "m4rate-first";
 const SECOND_HANDLE = "m4rate-second";
@@ -46,6 +48,17 @@ const IP_B = "203.0.113.22";
 /** Two more, for the outage cases, so each starts on an untouched budget. */
 const IP_C = "198.51.100.33";
 const IP_D = "198.51.100.44";
+/** One for the CORS case, which has to exhaust a bucket of its own to reach a 429. */
+const IP_E = "198.51.100.55";
+
+/** A page on some other origin. What CORS is the enforcement point for. */
+const BROWSER_ORIGIN = "https://dashboard.example";
+/** The one origin the auth mount's exact allowlist admits — see `test/helpers/auth.ts`. */
+const AUTH_ORIGIN = "http://127.0.0.1:3005";
+
+/** What a browser on another origin is permitted to read off the response. */
+const exposedHeadersOf = (headers: Record<string, unknown>): string[] =>
+  String(headers["access-control-expose-headers"] ?? "").split(", ");
 /** Three IPv6 hosts: the first two are one customer's, the third is somebody else's. */
 const IPV6_HOST = "2001:db8:5:5::1";
 const IPV6_SAME_64 = "2001:db8:5:5:ffff:ffff:ffff:ffff";
@@ -295,6 +308,115 @@ run("M4RATE rate-limit keys", () => {
       await broken.close();
     }
   }, 120_000);
+
+  it("lets a BROWSER read the limit and the backoff, on both CORS policies", async () => {
+    // The limiter emitted all four headers already; a cross-origin page could read none of them,
+    // because `Access-Control-Expose-Headers` did not name them. A 429 a client cannot inspect is
+    // a wall with the clock on the other side of it.
+    const junk = bearer(JUNK_SESSION);
+    const cors = { ...junk, origin: BROWSER_ORIGIN };
+
+    const below = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: cors,
+      remoteAddress: IP_E,
+    });
+    expect(below.statusCode).toBe(401);
+    expect(below.headers["access-control-allow-origin"]).toBe("*");
+    expect(exposedHeadersOf(below.headers)).toEqual(expect.arrayContaining(RATE_LIMIT_HEADERS));
+    expect(Number(below.headers["x-ratelimit-remaining"])).toBe(SUBMIT_MAX - 1);
+
+    for (let i = 1; i < SUBMIT_MAX; i++) {
+      await app.inject({
+        method: "POST",
+        url: "/v1/opportunities",
+        headers: cors,
+        remoteAddress: IP_E,
+      });
+    }
+    const exceeded = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: cors,
+      remoteAddress: IP_E,
+    });
+    expect(exceeded.statusCode).toBe(429);
+    expect(exposedHeadersOf(exceeded.headers)).toEqual(expect.arrayContaining(RATE_LIMIT_HEADERS));
+  }, 120_000);
+
+  it("does the same on the auth mount, which is the OTHER CORS policy", async () => {
+    // Two policies, one registration: `/api/auth/*` gets an exact-origin allowlist because it
+    // mints credentials. Its ceilings are the tighter pair, so a client here needs the backoff
+    // headers at least as much — and a second policy is exactly the kind of place a header list
+    // gets added once and forgotten.
+    const mounted = await buildApp({
+      auth: { auth: await testAuth(), config: testAuthConfig() },
+    });
+    await mounted.ready();
+    try {
+      const send = () =>
+        mounted.inject({
+          method: "POST",
+          url: "/api/auth/email-otp/send-verification-otp",
+          headers: { origin: AUTH_ORIGIN, "content-type": "application/json" },
+          payload: JSON.stringify({ email: EMAILS.cors, type: "sign-in" }),
+          remoteAddress: IP_E,
+        });
+
+      const below = await send();
+      expect(below.headers["access-control-allow-origin"]).toBe(AUTH_ORIGIN);
+      expect(exposedHeadersOf(below.headers)).toEqual(expect.arrayContaining(RATE_LIMIT_HEADERS));
+      const mailMax = Number(below.headers["x-ratelimit-limit"]);
+      expect(mailMax).toBeGreaterThan(0);
+
+      for (let i = 1; i < mailMax; i++) await send();
+      const exceeded = await send();
+      expect(exceeded.statusCode).toBe(429);
+      expect(exposedHeadersOf(exceeded.headers)).toEqual(
+        expect.arrayContaining(RATE_LIMIT_HEADERS),
+      );
+    } finally {
+      await mounted.close();
+    }
+  }, 120_000);
+
+  it("emits `Retry-After` as a positive whole number of seconds", async () => {
+    // An agent's backoff parses this. A fractional or millisecond value would be obeyed as
+    // seconds and back off by three orders of magnitude too little.
+    const junk = bearer(JUNK_SESSION);
+    const exceeded = await app.inject({
+      method: "POST",
+      url: "/v1/opportunities",
+      headers: junk,
+      remoteAddress: IP_A,
+    });
+    expect(exceeded.statusCode).toBe(429);
+    const retryAfter = exceeded.headers["retry-after"];
+    expect(String(retryAfter)).toMatch(/^[1-9][0-9]*$/);
+    expect(Number(retryAfter)).toBeLessThanOrEqual(60);
+  }, 60_000);
+
+  it("does not meter an OPTIONS preflight", async () => {
+    // A preflight is the browser asking permission, not the caller acting. Metering it would let
+    // one cross-origin write cost two, and would answer the preflight itself with a 429 — which a
+    // browser reports as a CORS failure rather than as a rate limit.
+    for (let i = 0; i < 8; i++) {
+      const res = await app.inject({
+        method: "OPTIONS",
+        url: "/v1/opportunities",
+        headers: {
+          origin: BROWSER_ORIGIN,
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "authorization,content-type",
+        },
+        remoteAddress: IP_E,
+      });
+      expect(res.statusCode).toBe(204);
+      expect(res.headers["x-ratelimit-limit"]).toBeUndefined();
+      expect(res.headers["retry-after"]).toBeUndefined();
+    }
+  }, 60_000);
 
   it("leaves the public read uncapped, which is the point of `global: false`", async () => {
     // The list, the feeds and the export are the traffic this project exists to serve, and they are

@@ -387,7 +387,11 @@ The public read surface — the list, the detail, the feeds, the export — is d
 (`global: false` in `app.ts`); it is the traffic this project exists to serve, and an address-keyed
 cap on it would be one number for a whole organization.
 
-A `429` carries `retry-after` in seconds, plus `x-ratelimit-limit`/`-remaining`/`-reset`.
+A `429` carries `retry-after` as a whole number of seconds, plus
+`x-ratelimit-limit`/`-remaining`/`-reset`; the last three appear on a metered response below the
+ceiling too. **All four are on `Access-Control-Expose-Headers` in both CORS policies**, or a
+cross-origin page could receive a `429` and read nothing off it. An `OPTIONS` preflight is not
+metered: it is the browser asking permission, not the caller acting.
 
 **Two operational facts a limit is meaningless without:**
 

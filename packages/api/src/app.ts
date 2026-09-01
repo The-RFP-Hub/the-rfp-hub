@@ -6,6 +6,7 @@ import { authConfigFromEnvironment } from "./auth/better-auth.js";
 import { config } from "./config.js";
 import { pool } from "./db/client.js";
 import { registerRoutes } from "./modules/routes/index.js";
+import { RATE_LIMIT_HEADERS } from "./modules/routes/shared/rate-limit-key.js";
 import { analyticsEvents } from "./modules/services/insights/event-buffer.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { isHttpError } from "./modules/shared/http-error.js";
@@ -82,6 +83,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     origin: "*" as const,
     methods: ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: RATE_LIMIT_HEADERS,
     credentials: false,
     maxAge: 600,
   };
