@@ -46,8 +46,11 @@ export class McpStdioClient {
   #pending = new Map();
   #nextId = 1;
   #stderr = "";
+  #resolveExited;
   #closed = false;
   #exitInfo = null;
+  #spawnError = null;
+  #exited;
 
   /**
    * `unset`: environment variable NAMES to remove from the child's environment even if this
@@ -68,6 +71,9 @@ export class McpStdioClient {
 
   /** Spawn the child process and start reading its stdout. Does NOT send any request. */
   start() {
+    this.#exited = new Promise((resolve) => {
+      this.#resolveExited = resolve;
+    });
     this.#child = spawn(this.command, this.args, {
       cwd: this.cwd,
       env: buildChildEnv(process.env, this.env, this.unset),
@@ -79,6 +85,17 @@ export class McpStdioClient {
 
     this.#child.stderr.on("data", (chunk) => {
       this.#stderr += chunk.toString("utf8");
+    });
+
+    // ENOENT (no `npx`, no `node`, a mistyped binary) arrives here, never as an exit — without
+    // this listener it surfaced as an unhandled 'error' event that took the whole run down.
+    this.#child.on("error", (err) => {
+      this.#closed = true;
+      this.#spawnError = err;
+      for (const [, pending] of this.#pending) {
+        pending.reject(new Error(`MCP server could not be started: ${err.message}`));
+      }
+      this.#pending.clear();
     });
 
     this.#child.on("exit", (code, signal) => {
@@ -95,6 +112,10 @@ export class McpStdioClient {
       }
       this.#pending.clear();
     });
+
+    // `close` rather than `exit`: it fires once every stdio stream has ended too, so a caller
+    // scanning `stderr` after this resolves has the child's LAST line, not most of them.
+    this.#child.on("close", () => this.#resolveExited?.());
 
     this.startedAt = Date.now();
   }
@@ -121,6 +142,9 @@ export class McpStdioClient {
 
   /** One JSON-RPC request; resolves with the full response envelope (`result` or `error`). */
   async request(method, params, { timeoutMs = 15000 } = {}) {
+    if (this.#spawnError) {
+      throw new Error(`MCP server could not be started: ${this.#spawnError.message}`);
+    }
     if (this.#closed) {
       throw new Error(
         `MCP server already exited (code=${this.#exitInfo?.code}, signal=${this.#exitInfo?.signal})`,
@@ -164,13 +188,30 @@ export class McpStdioClient {
     return this.#exitInfo;
   }
 
-  async close() {
-    if (this.#closed) return;
+  /**
+   * Terminate and AWAIT the exit, so a caller that scans `stderr` afterwards sees everything the
+   * child wrote on its way out — a shutdown path that logs configuration is exactly the surface a
+   * scan taken while the process was still running would miss. SIGTERM first; SIGKILL if the child
+   * ignores it, so one unresponsive server cannot hang the whole run.
+   */
+  async close({ graceMs = 2000 } = {}) {
+    if (this.#spawnError) return;
+    if (this.#closed) {
+      this.#rl?.close();
+      return;
+    }
     this.#rl?.close();
-    this.#child?.kill();
-    // Give it a moment to exit cleanly before this process moves on; the `exit` handler already
-    // covers accounting either way.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    this.#child?.kill("SIGTERM");
+    const killed = await Promise.race([
+      this.#exited.then(() => true),
+      new Promise((resolve) => setTimeout(() => resolve(false), graceMs)),
+    ]);
+    if (killed) return;
+    this.#child?.kill("SIGKILL");
+    await Promise.race([
+      this.#exited,
+      new Promise((resolve) => setTimeout(resolve, Math.min(graceMs, 1000))),
+    ]);
   }
 }
 

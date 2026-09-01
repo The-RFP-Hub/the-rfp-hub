@@ -22,11 +22,12 @@
  * cached tool list) leak into a later assertion.
  */
 import { execFile } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import AjvModule from "ajv";
 import { request } from "../../m2-compliance/http.mjs";
 import { McpStdioClient, findCredentialLeak } from "../mcp-client.mjs";
 import { RecordingServer } from "../mock-server.mjs";
@@ -42,6 +43,11 @@ const execFileAsync = promisify(execFile);
  * the caller rather than an uncaught exception.
  */
 export function resolveCommand(ctx, extraArgs = []) {
+  // A seam, used by this checker's own tests to point the criterion at a stand-in server: the
+  // assertions M4-4 makes are a different question from how the binary under test is located.
+  if (ctx.resolveOverride) {
+    return { ...ctx.resolveOverride, args: [...ctx.resolveOverride.args, ...extraArgs] };
+  }
   if (ctx.mcpSpec === "local") {
     const local = join(ctx.repoRoot, "packages/mcp/dist/cli.js");
     if (!existsSync(local)) {
@@ -97,22 +103,6 @@ async function probeRegistryInstall(spec, ctx) {
   }
 }
 
-/** Pull a JSON-shaped result out of a `tools/call` response, trying structuredContent first. */
-function extractPayload(response) {
-  const result = response?.result;
-  if (!result) return undefined;
-  if (result.structuredContent !== undefined) return result.structuredContent;
-  const text = result.content?.find((block) => block.type === "text")?.text;
-  if (typeof text === "string") {
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
-    }
-  }
-  return result.content;
-}
-
 /**
  * `findCredentialLeak` over every value given, PLUS the client's own `stderr` and any stdout
  * lines that weren't valid JSON-RPC. A key-shaped string can leak into a diagnostic log line or a
@@ -138,11 +128,172 @@ function scanClientForLeak(client, ...values) {
 async function spawnClient(resolved, env, ctx, unset = []) {
   const client = new McpStdioClient(resolved.command, resolved.args, {
     cwd: ctx.repoRoot,
-    env,
+    env: { ...env, ...ctx.childEnv },
     unset,
   });
   client.start();
   return client;
+}
+
+/** ajv is a root devDependency; its CJS default export needs unwrapping under ESM. */
+const Ajv = AjvModule.default ?? AjvModule;
+const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
+
+function schemaErrors(schema, value) {
+  try {
+    const validate = ajv.compile(schema);
+    return validate(value) ? null : ajv.errorsText(validate.errors, { separator: "; " });
+  } catch (err) {
+    return `the advertised outputSchema is not usable: ${err.message}`;
+  }
+}
+
+const READ_TOOLS = ["fetch_opportunity", "search_opportunities"];
+const SUBMIT_TOOL = "submit_opportunity";
+
+/** Every tool's shape: an outputSchema, and annotations whose values are booleans. */
+function checkToolDefinitions(c, tools, { label, readOnly }) {
+  for (const tool of tools) {
+    const where = `${tool.name} (${label})`;
+    c.expect(
+      tool.outputSchema && typeof tool.outputSchema === "object",
+      `${where} advertises an outputSchema`,
+      "present",
+      "no outputSchema — a client cannot validate structuredContent against anything",
+    );
+    const annotations = tool.annotations;
+    if (!annotations || typeof annotations !== "object") {
+      c.fail(`${where} carries annotations`, "no annotations object");
+      continue;
+    }
+    const nonBoolean = Object.entries(annotations).filter(
+      ([key, value]) => key.endsWith("Hint") && typeof value !== "boolean",
+    );
+    c.expect(
+      nonBoolean.length === 0,
+      `${where}: every annotation hint is a boolean`,
+      JSON.stringify(annotations),
+      `non-boolean hint(s): ${nonBoolean.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")}`,
+    );
+    const expected = readOnly.includes(tool.name);
+    c.expect(
+      annotations.readOnlyHint === expected,
+      `${where}: readOnlyHint is ${expected}`,
+      `readOnlyHint=${annotations.readOnlyHint}`,
+      `readOnlyHint=${JSON.stringify(annotations.readOnlyHint)}, expected ${expected}`,
+    );
+    if (!expected) {
+      c.expect(
+        annotations.destructiveHint === false,
+        `${where}: destructiveHint is false`,
+        "destructiveHint=false",
+        `destructiveHint=${JSON.stringify(annotations.destructiveHint)} — a submission behind an approval never destroys anything`,
+      );
+    }
+  }
+}
+
+/**
+ * The structured contract, with no text fallback. `structuredContent` is what the tool's own
+ * outputSchema promises; accepting a JSON-shaped text block instead let a server that never
+ * produced structured output pass this criterion.
+ */
+function structuredPayload(c, response, tool, name) {
+  const structured = response?.result?.structuredContent;
+  if (structured === undefined) {
+    c.fail(name, "the reply carries no structuredContent — a text block is not the contract");
+    return undefined;
+  }
+  const errors = tool?.outputSchema ? schemaErrors(tool.outputSchema, structured) : null;
+  c.expect(
+    errors === null,
+    name,
+    "structuredContent validates against the advertised outputSchema",
+    `structuredContent does not match the tool's own outputSchema: ${errors}`,
+  );
+  return errors === null ? structured : undefined;
+}
+
+/**
+ * A query the live corpus can actually answer with MORE THAN ONE PAGE, so page 2 proves something.
+ * Hard-coding `q=grant` made the pagination assertion pass vacuously the day the corpus stopped
+ * matching it; two empty pages are equal, and equality was the whole test.
+ */
+export async function deriveSearchQuery(ctx, limit = 5) {
+  for (const q of ["grant", "funding", "ethereum", "open", "public goods"]) {
+    const res = await request(
+      `${ctx.api}/v1/opportunities?q=${encodeURIComponent(q)}&limit=${limit}&page=1`,
+      { timeoutMs: ctx.timeoutMs },
+    );
+    if (!res.ok || res.status !== 200) continue;
+    try {
+      const json = JSON.parse(res.body);
+      if (Number(json.total) > limit) return { q, limit };
+    } catch {
+      // a body this checker cannot parse is the API's problem, reported by the M4-2/M4-3 rows
+    }
+  }
+  return null;
+}
+
+async function apiPage(ctx, { q, limit, page }) {
+  const res = await request(
+    `${ctx.api}/v1/opportunities?q=${encodeURIComponent(q)}&limit=${limit}&page=${page}`,
+    { timeoutMs: ctx.timeoutMs },
+  );
+  if (!res.ok || res.status !== 200) return null;
+  try {
+    return JSON.parse(res.body);
+  } catch {
+    return null;
+  }
+}
+
+/** One report line per sub-criterion, so an omission cannot hide inside one M4-4 PASS. */
+async function checkSearchPage(c, client, ctx, tool, { q, limit, page }) {
+  const label = `search_opportunities q="${q}" page ${page}`;
+  const response = await client.request(
+    "tools/call",
+    { name: "search_opportunities", arguments: { q, limit, page } },
+    { timeoutMs: ctx.timeoutMs },
+  );
+  if (response.error) {
+    c.fail(`${label} succeeds`, `JSON-RPC error: ${JSON.stringify(response.error)}`);
+    return null;
+  }
+  const payload = structuredPayload(c, response, tool, `${label} returns valid structuredContent`);
+  if (!payload) return null;
+
+  const api = await apiPage(ctx, { q, limit, page });
+  if (!api) {
+    c.fail(`${label} matches GET /v1/opportunities`, "could not fetch the comparison page");
+    return null;
+  }
+  const mcpIds = (payload.items ?? []).map((i) => i.id);
+  const apiIds = (api.items ?? []).map((i) => i.id);
+  c.expect(
+    mcpIds.length > 0,
+    `${label} is non-empty`,
+    `${mcpIds.length} item(s)`,
+    "zero items — two empty pages compare equal, so an empty page proves nothing",
+  );
+  c.expect(
+    JSON.stringify(mcpIds) === JSON.stringify(apiIds),
+    `${label} ids equal the API's, in order`,
+    `[${mcpIds.join(", ")}]`,
+    `MCP returned [${mcpIds.join(", ")}], API returned [${apiIds.join(", ")}]`,
+  );
+  const envelope = ["total", "page", "limit", "totalPages"];
+  const mismatched = envelope.filter((key) => payload[key] !== api[key]);
+  c.expect(
+    mismatched.length === 0,
+    `${label} pagination envelope equals the API's`,
+    envelope.map((k) => `${k}=${payload[k]}`).join(", "),
+    mismatched
+      .map((k) => `${k}: MCP ${JSON.stringify(payload[k])} vs API ${JSON.stringify(api[k])}`)
+      .join("; "),
+  );
+  return mcpIds;
 }
 
 export async function checkMcp(report, ctx) {
@@ -151,13 +302,14 @@ export async function checkMcp(report, ctx) {
     "M4-4",
     local ? "MCP server callable from a local build" : "MCP server installable and callable",
     local
-      ? "--mcp-spec local: exercises packages/mcp/dist/cli.js directly. NOT evidence the package is published or installable via npm — see M4-4's other mode for that. tools/list has search_opportunities and fetch_opportunity and NOT submit_opportunity without the env; search matches the API in ids; no rfph_ substring leaks anywhere; with the submit env, phase 1 returns pending and performs no network write."
-      : "npx resolves @the-rfp-hub/mcp from the real npm registry and its CLI actually runs; tools/list has search_opportunities and fetch_opportunity and NOT submit_opportunity without the env; search matches the API in ids; no rfph_ substring leaks anywhere; with the submit env, phase 1 returns pending and performs no network write.",
+      ? "--mcp-spec local: exercises packages/mcp/dist/cli.js directly. NOT evidence the package is published — see M4-4b. Exactly two tools without the submit env and three with it, each with an outputSchema and boolean annotations; search returns structuredContent that validates against its own schema and matches the API page for page; no rfph_ substring leaks anywhere, including after the process exits; phase 1 returns pending and performs no network write."
+      : "npx resolves @the-rfp-hub/mcp from the real npm registry and its CLI runs; exactly two tools without the submit env and three with it, each with an outputSchema and boolean annotations; search returns structuredContent that validates against its own schema and matches the API page for page; no rfph_ substring leaks anywhere, including after the process exits; phase 1 returns pending and performs no network write.",
   );
 
   if (ctx.skip.has("mcp")) {
     c.skip("mcp", "--skip mcp");
-    return c.finish();
+    c.finish();
+    return checkMcpPublication(report, ctx);
   }
 
   let resolved;
@@ -165,7 +317,8 @@ export async function checkMcp(report, ctx) {
     resolved = resolveCommand(ctx);
   } catch (err) {
     c.fail("resolve the MCP server under test", err.message);
-    return c.finish();
+    c.finish();
+    return checkMcpPublication(report, ctx);
   }
   c.info("MCP server under test", resolved.describe);
 
@@ -180,26 +333,18 @@ export async function checkMcp(report, ctx) {
     if (!probe.ok) {
       c.skip(
         "tools/list, search matching, and the submit interlock",
-        "skipped — the package did not resolve from the registry (see the check above)",
+        "the package did not resolve from the registry (see the check above)",
       );
-      return c.finish();
+      c.finish();
+      return checkMcpPublication(report, ctx);
     }
   }
 
-  // A real server writes an audit-log line under `RFPHUB_MCP_HOME` (default `~/.rfphub`) for
-  // EVERY tool call, read or write — `server.ts`'s `guard()` wrapper runs `appendAudit` in a
-  // `finally`, unconditionally. Left unset, even the read-only cases below (tools/list, a plain
-  // search) would leave entries in the PERSON RUNNING THIS CHECKER's own `~/.rfphub/audit.log`,
-  // and case C's synthetic preview would land in `~/.rfphub/pending/`, indistinguishable from a
-  // real preview `rfphub-mcp pending` would list. One fresh, disposable directory for the whole
-  // check — cleaned up in the `finally` below regardless of how the checks inside fare — keeps
-  // every case's fixtures out of anyone's real state.
+  // A real server appends an audit line under `RFPHUB_MCP_HOME` (default `~/.rfphub`) for EVERY
+  // tool call, and case C's preview would land in `~/.rfphub/pending/` indistinguishable from a
+  // real one. One disposable directory for the whole check keeps every fixture out of real state.
   const mcpHome = await mkdtemp(join(tmpdir(), "m4-check-mcp-home-"));
   try {
-    // ── case A: default env — read-only tools only ──────────────────────────
-    // `unset` guarantees this case is actually tested with no credential and no submit flag
-    // present — not merely "not set by this call", which could still see them if the checker's
-    // own process happens to have inherited them from a developer's shell.
     let readClient;
     try {
       readClient = await spawnClient(
@@ -209,28 +354,20 @@ export async function checkMcp(report, ctx) {
         ["RFPHUB_API_KEY", "RFPHUB_MCP_ENABLE_SUBMIT"],
       );
       const listResponse = await readClient.request("tools/list", {}, { timeoutMs: ctx.timeoutMs });
+      let searchTool;
       if (listResponse.error) {
         c.fail("tools/list succeeds", `JSON-RPC error: ${JSON.stringify(listResponse.error)}`);
       } else {
-        const names = (listResponse.result?.tools ?? []).map((t) => t.name);
+        const tools = listResponse.result?.tools ?? [];
+        const names = tools.map((t) => t.name).sort();
         c.expect(
-          names.includes("search_opportunities"),
-          "tools/list includes search_opportunities",
+          names.length === 2 && READ_TOOLS.every((n) => names.includes(n)),
+          "tools/list is exactly the two read tools without RFPHUB_MCP_ENABLE_SUBMIT",
           names.join(", "),
-          `search_opportunities missing from tools/list: [${names.join(", ")}]`,
+          `expected exactly [${READ_TOOLS.join(", ")}], got [${names.join(", ")}]`,
         );
-        c.expect(
-          names.includes("fetch_opportunity"),
-          "tools/list includes fetch_opportunity",
-          names.join(", "),
-          `fetch_opportunity missing from tools/list: [${names.join(", ")}]`,
-        );
-        c.expect(
-          !names.includes("submit_opportunity"),
-          "tools/list does NOT include submit_opportunity without RFPHUB_MCP_ENABLE_SUBMIT",
-          names.join(", "),
-          `submit_opportunity is registered even though RFPHUB_MCP_ENABLE_SUBMIT was not set: [${names.join(", ")}]`,
-        );
+        checkToolDefinitions(c, tools, { label: "read-only process", readOnly: READ_TOOLS });
+        searchTool = tools.find((t) => t.name === "search_opportunities");
         const leak = scanClientForLeak(readClient, listResponse);
         c.expect(
           !leak,
@@ -240,51 +377,24 @@ export async function checkMcp(report, ctx) {
         );
       }
 
-      // ── case B: search matches the API ────────────────────────────────────
-      const callResponse = await readClient.request(
-        "tools/call",
-        { name: "search_opportunities", arguments: { q: "grant", limit: 5 } },
-        { timeoutMs: ctx.timeoutMs },
-      );
-      if (callResponse.error) {
-        c.fail(
-          "search_opportunities matches GET /v1/opportunities in ids",
-          `JSON-RPC error: ${JSON.stringify(callResponse.error)}`,
+      const query = await deriveSearchQuery(ctx);
+      if (!query) {
+        c.unmet(
+          "search_opportunities matches the API across two pages",
+          `no query in the live corpus at ${ctx.api} returns more than one page, so pagination cannot be exercised — seed the deployment before signing M4 off`,
         );
       } else {
-        const payload = extractPayload(callResponse);
-        const mcpIds = Array.isArray(payload?.items) ? payload.items.map((i) => i.id) : undefined;
-
-        const apiRes = await request(`${ctx.api}/v1/opportunities?q=grant&limit=5`, {
-          timeoutMs: ctx.timeoutMs,
-        });
-        let apiIds;
-        try {
-          apiIds = apiRes.ok ? JSON.parse(apiRes.body).items.map((i) => i.id) : undefined;
-        } catch {
-          apiIds = undefined;
-        }
-
-        if (!mcpIds) {
-          c.fail(
-            "search_opportunities matches GET /v1/opportunities in ids",
-            `could not find an items[].id array in the tool's payload: ${JSON.stringify(payload).slice(0, 500)}`,
-          );
-        } else if (!apiIds) {
-          c.fail(
-            "search_opportunities matches GET /v1/opportunities in ids",
-            `could not fetch a comparison result from ${ctx.api}/v1/opportunities?q=grant&limit=5`,
-          );
-        } else {
+        const first = await checkSearchPage(c, readClient, ctx, searchTool, { ...query, page: 1 });
+        const second = await checkSearchPage(c, readClient, ctx, searchTool, { ...query, page: 2 });
+        if (first && second) {
           c.expect(
-            JSON.stringify(mcpIds) === JSON.stringify(apiIds),
-            "search_opportunities ids equal GET /v1/opportunities ids, in order",
-            `[${mcpIds.join(", ")}]`,
-            `MCP returned [${mcpIds.join(", ")}], API returned [${apiIds.join(", ")}]`,
+            JSON.stringify(first) !== JSON.stringify(second),
+            "page 2 returns different ids from page 1",
+            `${first.length} then ${second.length} item(s), different`,
+            `both pages returned [${first.join(", ")}] — pagination is not reaching the API`,
           );
         }
-
-        const leak = scanClientForLeak(readClient, callResponse);
+        const leak = scanClientForLeak(readClient);
         c.expect(
           !leak,
           "no rfph_ substring in search_opportunities output",
@@ -295,10 +405,18 @@ export async function checkMcp(report, ctx) {
     } catch (err) {
       c.fail("MCP server starts and answers tools/list", err.message);
     } finally {
+      // Scanned AFTER the child has fully exited: a shutdown path that logs configuration is
+      // exactly the surface a scan taken while the process was still running would miss.
       await readClient?.close();
+      const exitLeak = readClient ? scanClientForLeak(readClient) : null;
+      c.expect(
+        !exitLeak,
+        "no rfph_ substring on any surface after the read-only process exits",
+        "clean",
+        exitLeak ? `found "${exitLeak.match}" at ${exitLeak.path}` : "",
+      );
     }
 
-    // ── case C: submit_opportunity, fail-closed, no network write ───────────
     const mock = new RecordingServer();
     let submitClient;
     try {
@@ -319,23 +437,25 @@ export async function checkMcp(report, ctx) {
         {},
         { timeoutMs: ctx.timeoutMs },
       );
+      let submitTool;
       if (listResponse.error) {
         c.fail(
-          "tools/list includes submit_opportunity with RFPHUB_MCP_ENABLE_SUBMIT=1",
+          "tools/list is exactly three tools with RFPHUB_MCP_ENABLE_SUBMIT=1",
           `JSON-RPC error: ${JSON.stringify(listResponse.error)}`,
         );
       } else {
-        const names = (listResponse.result?.tools ?? []).map((t) => t.name);
+        const tools = listResponse.result?.tools ?? [];
+        const names = tools.map((t) => t.name).sort();
         c.expect(
-          names.includes("submit_opportunity"),
-          "tools/list includes submit_opportunity with RFPHUB_MCP_ENABLE_SUBMIT=1",
+          names.length === 3 && [...READ_TOOLS, SUBMIT_TOOL].every((n) => names.includes(n)),
+          "tools/list is exactly three tools with RFPHUB_MCP_ENABLE_SUBMIT=1",
           names.join(", "),
-          `submit_opportunity missing even with the env set: [${names.join(", ")}]`,
+          `expected exactly [${[...READ_TOOLS, SUBMIT_TOOL].sort().join(", ")}], got [${names.join(", ")}]`,
         );
-
-        // The synthetic key (`rfph_test_notreal`) is also a "credential-shaped" string, so this
-        // process's tools/list is exactly the surface most likely to leak one — e.g. into a tool's
-        // description if a future change ever interpolated config into it.
+        checkToolDefinitions(c, tools, { label: "submit-enabled process", readOnly: READ_TOOLS });
+        submitTool = tools.find((t) => t.name === SUBMIT_TOOL);
+        // The synthetic key is itself credential-shaped, so this process's tools/list is the
+        // surface most likely to leak one — into a description that interpolated config, say.
         const listLeak = scanClientForLeak(submitClient, listResponse);
         c.expect(
           !listLeak,
@@ -345,45 +465,29 @@ export async function checkMcp(report, ctx) {
         );
       }
 
-      const document = {
-        specVersion: "1.0.0",
-        id: "m4check:mcp-submit-fixture",
-        fundingType: "grant",
-        title: "M4 compliance MCP submission fixture",
-        summary: "A fixture submitted by scripts/check-m4.mjs to verify the fail-closed interlock.",
-        description: "Not a real funding opportunity.",
-        status: "open",
-        operatingOrganizations: [{ name: "m4check", slug: "m4check" }],
-        ecosystems: ["Ethereum"],
-        categories: ["tooling"],
-        source: {},
-        fundingDetails: { fundingType: "grant" },
-      };
       const submitResponse = await submitClient.request(
         "tools/call",
-        { name: "submit_opportunity", arguments: { document } },
+        { name: SUBMIT_TOOL, arguments: { document: fixtureDocument() } },
         { timeoutMs: ctx.timeoutMs },
       );
-
       if (submitResponse.error) {
         c.fail(
           "submit_opportunity phase 1 returns pending",
           `JSON-RPC error: ${JSON.stringify(submitResponse.error)}`,
         );
       } else {
-        // The success condition is the STRUCTURED contract, not a regex over the human-readable
-        // text block: `structuredContent.status === "pending"` is what `submit.ts`'s own
-        // `outputSchema` actually promises, and a regex over `asText` would happily pass on the
-        // word "pending" appearing anywhere at all — inside an error message explaining that
-        // something is NOT pending, for instance.
-        const structured = submitResponse.result?.structuredContent;
-        c.expect(
-          structured?.status === "pending",
-          'submit_opportunity phase 1 returns status: "pending" (structuredContent)',
-          JSON.stringify(structured).slice(0, 300),
-          `structuredContent.status is not "pending": ${JSON.stringify(structured ?? submitResponse.result).slice(0, 500)}`,
+        const preview = structuredPayload(
+          c,
+          submitResponse,
+          submitTool,
+          "submit_opportunity phase 1 returns valid structuredContent",
         );
-
+        c.expect(
+          preview?.status === "pending",
+          'submit_opportunity phase 1 returns status: "pending"',
+          JSON.stringify(preview).slice(0, 300),
+          `status is not "pending": ${JSON.stringify(preview ?? submitResponse.result).slice(0, 500)}`,
+        );
         const leak = scanClientForLeak(submitClient, submitResponse);
         c.expect(
           !leak,
@@ -405,11 +509,205 @@ export async function checkMcp(report, ctx) {
       c.fail("MCP server starts with RFPHUB_MCP_ENABLE_SUBMIT=1", err.message);
     } finally {
       await submitClient?.close();
+      const exitLeak = submitClient ? scanClientForLeak(submitClient) : null;
+      c.expect(
+        !exitLeak,
+        "no rfph_ substring on any surface after the submit-enabled process exits",
+        "clean",
+        exitLeak ? `found "${exitLeak.match}" at ${exitLeak.path}` : "",
+      );
       await mock.stop();
     }
   } finally {
     await rm(mcpHome, { recursive: true, force: true });
   }
 
+  c.finish();
+  return checkMcpPublication(report, ctx);
+}
+
+/** The document phase 1 previews. Declared here so both the fixture id and the title stay `m4check`. */
+export function fixtureDocument() {
+  return {
+    specVersion: "1.0.0",
+    id: "m4check:mcp-submit-fixture",
+    fundingType: "grant",
+    title: "M4 compliance MCP submission fixture",
+    summary: "A fixture submitted by scripts/check-m4.mjs to verify the fail-closed interlock.",
+    description: "Not a real funding opportunity.",
+    status: "open",
+    operatingOrganizations: [{ name: "m4check", slug: "m4check" }],
+    ecosystems: ["Ethereum"],
+    categories: ["tooling"],
+    source: {},
+    fundingDetails: { fundingType: "grant" },
+  };
+}
+
+const REGISTRY_BASE = "https://registry.modelcontextprotocol.io/v0";
+const PACKAGE_NAME = "@the-rfp-hub/mcp";
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+async function npmView(fields, spec, ctx) {
+  try {
+    const { stdout } = await execFileAsync(
+      "npm",
+      ["view", `${PACKAGE_NAME}@${spec}`, ...fields, "--json"],
+      {
+        cwd: ctx.repoRoot,
+        timeout: Math.max(ctx.timeoutMs, 30000),
+      },
+    );
+    return { ok: true, value: stdout.trim() ? JSON.parse(stdout) : undefined };
+  } catch (err) {
+    const stderr = (err.stderr ?? "").toString().trim();
+    return { ok: false, detail: (stderr || err.message).slice(0, 500) };
+  }
+}
+
+/**
+ * Every configuration snippet a reader would copy must pin an exact, immutable version. A moving
+ * tag is the one thing that turns "the description digest in server.json binds this build" into a
+ * promise about a build nobody has seen. Only `npx`/`-y` lines are examined: `pnpm --filter
+ * @the-rfp-hub/mcp build` names a workspace package, not a version to install.
+ */
+export function unpinnedReadmeSpecs(readme) {
+  const offenders = [];
+  for (const block of readme.split(/^```/m).filter((_, i) => i % 2 === 1)) {
+    for (const line of block.split("\n")) {
+      if (line.includes("--filter") || !/npx|"-y"|'-y'/.test(line)) continue;
+      for (const match of line.matchAll(/@the-rfp-hub\/mcp(@[^"'\s\],]*)?/g)) {
+        const version = match[1]?.slice(1);
+        if (!version || !EXACT_VERSION.test(version)) {
+          offenders.push(`${match[0]} — ${line.trim().slice(0, 110)}`);
+        }
+      }
+    }
+  }
+  return offenders;
+}
+
+/**
+ * M4-4b — the RELEASE CHANNEL, which the behavior criterion above cannot establish: the server
+ * behaves the same whether it came from npm, the Registry or a local build, so "installable from a
+ * documented endpoint" needs its own evidence. It FAILS while unpublished; that is correct.
+ */
+export async function checkMcpPublication(report, ctx) {
+  const c = report.criterion(
+    "M4-4b",
+    "MCP server published to npm and the official Registry",
+    `npm resolves an exact ${PACKAGE_NAME} version whose published mcpName matches the manifest, the official MCP Registry carries that server at that version with the same npm package identifier, and every configuration snippet in packages/mcp/README.md pins an exact version.`,
+  );
+
+  if (ctx.skip.has("mcp")) {
+    c.skip("mcp", "--skip mcp");
+    return c.finish();
+  }
+
+  const readmePath = join(ctx.repoRoot, "packages/mcp/README.md");
+  if (!existsSync(readmePath)) {
+    c.fail(
+      "packages/mcp/README.md pins an exact version in every configuration snippet",
+      `not found at ${readmePath} — the documented install path cannot be checked`,
+    );
+  } else {
+    const offenders = unpinnedReadmeSpecs(readFileSync(readmePath, "utf8"));
+    c.expect(
+      offenders.length === 0,
+      "packages/mcp/README.md pins an exact version in every configuration snippet",
+      "every npx snippet names an exact version",
+      `unpinned or moving spec(s): ${offenders.join(" | ")}`,
+    );
+  }
+
+  const expectedName = declaredMcpName(ctx.repoRoot);
+  if (!expectedName) {
+    c.fail(
+      "packages/mcp declares an mcpName",
+      "neither packages/mcp/package.json's mcpName nor packages/mcp/server.json's name is readable in this checkout",
+    );
+  }
+
+  if (ctx.mcpSpec === "local") {
+    c.unmet(
+      "npm and the official MCP Registry carry this server",
+      "--mcp-spec local: a local build is not evidence of publication, so this criterion cannot be established from this run",
+    );
+    return c.finish();
+  }
+
+  const spec = ctx.mcpSpec ?? "next";
+  const resolvedVersion = await npmView(["version"], spec, ctx);
+  if (!resolvedVersion.ok || typeof resolvedVersion.value !== "string") {
+    c.fail(
+      `npm resolves ${PACKAGE_NAME}@${spec} to an exact version`,
+      resolvedVersion.detail ?? `npm view returned ${JSON.stringify(resolvedVersion.value)}`,
+    );
+    return c.finish();
+  }
+  const version = resolvedVersion.value;
+  c.pass(`npm resolves ${PACKAGE_NAME}@${spec} to an exact version`, version);
+
+  const published = await npmView(["mcpName"], version, ctx);
+  c.expect(
+    published.ok && published.value === expectedName,
+    `the published ${PACKAGE_NAME}@${version} carries mcpName "${expectedName}"`,
+    `mcpName=${published.value}`,
+    published.ok
+      ? `published mcpName is ${JSON.stringify(published.value)}, the manifest declares ${JSON.stringify(expectedName)}`
+      : (published.detail ?? "npm view failed"),
+  );
+
+  const url = `${REGISTRY_BASE}/servers/${encodeURIComponent(expectedName ?? "")}/versions/${encodeURIComponent(version)}`;
+  const res = await request(url, { timeoutMs: ctx.timeoutMs, follow: true });
+  if (!res.ok || res.status !== 200) {
+    c.fail(
+      `the official MCP Registry carries ${expectedName}@${version}`,
+      res.ok ? `${url} — HTTP ${res.status}` : `transport: ${res.error}`,
+    );
+    return c.finish();
+  }
+  let entry;
+  try {
+    entry = JSON.parse(res.body)?.server;
+  } catch (err) {
+    c.fail(
+      `the official MCP Registry carries ${expectedName}@${version}`,
+      `${url} — ${err.message}`,
+    );
+    return c.finish();
+  }
+  c.expect(
+    entry?.name === expectedName && entry?.version === version,
+    `the official MCP Registry carries ${expectedName}@${version}`,
+    `${entry?.name}@${entry?.version}`,
+    `${url} answered with ${JSON.stringify(entry?.name)}@${JSON.stringify(entry?.version)}`,
+  );
+  const npmPackage = (entry?.packages ?? []).find((p) => p.identifier === PACKAGE_NAME);
+  c.expect(
+    npmPackage?.version === version,
+    `the Registry entry names ${PACKAGE_NAME}@${version} as its npm package`,
+    `identifier=${npmPackage?.identifier}, version=${npmPackage?.version}`,
+    npmPackage
+      ? `the Registry entry names ${PACKAGE_NAME}@${npmPackage.version}, not @${version}`
+      : `no packages[] entry with identifier ${PACKAGE_NAME}`,
+  );
+
   return c.finish();
+}
+
+/** The mcpName the repository declares — `package.json`'s field, or `server.json`'s own name. */
+function declaredMcpName(repoRoot) {
+  for (const [relPath, field] of [
+    ["packages/mcp/package.json", "mcpName"],
+    ["packages/mcp/server.json", "name"],
+  ]) {
+    try {
+      const value = JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"))[field];
+      if (typeof value === "string" && value) return value;
+    } catch {
+      // the next candidate, or a named failure at the call site
+    }
+  }
+  return undefined;
 }

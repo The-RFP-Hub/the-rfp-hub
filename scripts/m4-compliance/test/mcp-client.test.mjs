@@ -6,7 +6,7 @@
  * case and silently make that case untested.
  */
 import { describe, expect, it } from "vitest";
-import { buildChildEnv, findCredentialLeak } from "../mcp-client.mjs";
+import { McpStdioClient, buildChildEnv, findCredentialLeak } from "../mcp-client.mjs";
 
 describe("buildChildEnv", () => {
   it("merges base and env, with env winning on overlap", () => {
@@ -52,5 +52,16 @@ describe("findCredentialLeak", () => {
 
   it("returns null when nothing matches", () => {
     expect(findCredentialLeak({ a: "fine", b: [1, 2, { c: "also fine" }] })).toBeNull();
+  });
+});
+
+describe("close()", () => {
+  it("reports a spawn failure by name instead of taking the run down", async () => {
+    const client = new McpStdioClient("this-binary-does-not-exist", []);
+    client.start();
+    await expect(client.request("tools/list", {}, { timeoutMs: 2000 })).rejects.toThrow(
+      /could not be started/,
+    );
+    await client.close();
   });
 });
