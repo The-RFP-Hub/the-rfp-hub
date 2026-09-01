@@ -313,10 +313,12 @@ What an integrator has to build around:
 * **The `429` is in the published contract.** `GET /v1/docs/json` carries the response and its
   headers on every metered operation, so a generated client models the throttle instead of
   discovering it.
-* **A `503 auth_unavailable` is never metered.** A failure to *check* your credential does not
-  spend your budget, so an outage never turns into a `429`. Every other `5xx` **does** spend it:
-  a request that reached the handler has already been counted, so a client retrying into a server
-  fault can exhaust its window and start seeing `429` instead of the real error.
+* **A failure to *check* your credential is never metered.** A `503 auth_unavailable` from the
+  session lookup, or a `500` from the key lookup, means the credential store is unreachable rather
+  than your budget being spent, so an outage never turns into a `429`. **Any other response does
+  spend it**, `5xx` included: a request that reached the handler has already been counted, so a
+  client retrying into a server fault can exhaust its window and start seeing `429` instead of the
+  real error.
 * **The ceilings are per API process.** With several tasks behind a load balancer the effective
   number is a multiple of the published one, because each process counts in its own memory. Do not
   build a client that paces itself exactly at the documented ceiling and assume the margin is real

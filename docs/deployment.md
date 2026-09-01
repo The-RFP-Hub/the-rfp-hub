@@ -181,10 +181,11 @@ without:
 
 Three behaviors worth knowing before reading a graph of `429`s: an anonymous or invalid credential
 is metered by address and is refused for being **over the limit before** it is refused for being
-invalid; a `503 auth_unavailable` — a failure to *check* a credential — is never metered, so an
-outage does not spend anybody's budget; and every other `5xx` **is** metered, so a client retrying
-into a fault of ours eventually sees `429` instead of the fault. The integrator's side of the same
-facts is [`api-integration.md` §4.8](./api-integration.md#48-rate-limits-are-per-credential-and-a-429-tells-you-when-to-come-back).
+invalid; a credential-store outage — a `503 auth_unavailable` from the session lookup or a `500`
+from the key lookup, both of them a failure to *check* a credential rather than to serve a request
+— is never metered, so an outage does not spend anybody's budget; and any other response **is**
+metered, `5xx` included, so a client retrying into a fault of ours eventually sees `429` instead of
+the fault. The integrator's side of the same facts is [`api-integration.md` §4.8](./api-integration.md#48-rate-limits-are-per-credential-and-a-429-tells-you-when-to-come-back).
 
 ### The frontend's variables
 
