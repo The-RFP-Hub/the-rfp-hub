@@ -85,13 +85,21 @@ node scripts/search.mjs --fundingTyp grant
 ```
 
 ```
-Unknown parameter 'fundingTyp'. The API does not declare it, so it would 400 rather than filter
-silently. Known parameters: q, fundingType, status, ecosystem, category, organization, minAward,
-maxAward, deadlineAfter, deadlineBefore, sort, order, page, limit
+Unknown option(s): --fundingTyp. Known options: --q, --fundingType, --status, --ecosystem, --category, --organization, --minAward, --maxAward, --deadlineAfter, --deadlineBefore, --sort, --order, --page, --limit, --format, --help. Run 'node search.mjs --help' for usage.
 ```
 
 Exit code `1` — this is caught before any network request is made, since it's a typo the skill can
 already recognize from the parameter table.
+
+The same rule covers a flag given twice:
+
+```sh
+node scripts/search.mjs --status open --status closed
+```
+
+```
+--status was given more than once. Pass one comma-separated value instead: --status open,closed.
+```
 
 ## An empty result is not an error
 

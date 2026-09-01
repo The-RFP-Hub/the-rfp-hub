@@ -210,7 +210,9 @@ export function assertKnownFlags(flags, allowed, scriptName) {
   const unknown = Object.keys(flags).filter((k) => !allowed.has(k));
   if (unknown.length) {
     throw new Error(
-      `Unknown option(s): ${unknown.map((k) => `--${k}`).join(", ")}. Run 'node ${scriptName} --help' for usage.`,
+      `Unknown option(s): ${unknown.map((k) => `--${k}`).join(", ")}. Known options: ${[...allowed]
+        .map((k) => `--${k}`)
+        .join(", ")}. Run 'node ${scriptName} --help' for usage.`,
     );
   }
 }

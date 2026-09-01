@@ -527,6 +527,12 @@ describe("assertKnownFlags", () => {
       assertKnownFlags({ id: "x", bogus: "1", alsoBogus: "2" }, new Set(["id"]), "get.mjs"),
     ).toThrow(/--bogus.*--alsoBogus|Unknown option/);
   });
+
+  it("names the options it DOES know, so a near-miss typo is fixable from the message alone", () => {
+    expect(() =>
+      assertKnownFlags({ fundingTyp: "grant" }, new Set(["fundingType", "format"]), "search.mjs"),
+    ).toThrow(/Known options: --fundingType, --format/);
+  });
 });
 
 describe("assertNoExtraPositionals", () => {
