@@ -81,30 +81,21 @@ describe("the how-it-works reference page", () => {
     expect(container.querySelector(".button-primary")).toBeNull();
   });
 
-  it("links how decisions are made to the four governance documents", () => {
+  it("links how decisions are made to the four governance documents, inside that section", () => {
     const { container } = render(<HowItWorksPage />);
-    const section = container.querySelector("#decisions")?.closest("section") ?? container;
 
-    expect(container.ownerDocument.getElementById("decisions")).toBeTruthy();
-    expect(
-      within(section as HTMLElement)
-        .getByRole("link", { name: "Governance" })
-        .getAttribute("href"),
-    ).toBe(GOVERNANCE);
-    expect(
-      within(section as HTMLElement)
-        .getByRole("link", { name: "Publishers" })
-        .getAttribute("href"),
-    ).toBe(PUBLISHERS_DOC);
-    expect(
-      within(section as HTMLElement)
-        .getByRole("link", { name: "Review criteria" })
-        .getAttribute("href"),
-    ).toBe(REVIEW_CRITERIA);
-    expect(
-      within(section as HTMLElement)
-        .getByRole("link", { name: "RFC process" })
-        .getAttribute("href"),
-    ).toBe(RFC_PROCESS);
+    // The region, not the page: scoping to the nearest `<section>` used to resolve to the page's
+    // single root element, so the four links could have sat anywhere and the test still passed.
+    const decisions = screen.getByRole("region", { name: "How decisions are made" });
+    expect(container.querySelector("#decisions")).toBe(decisions.querySelector("h2#decisions"));
+
+    for (const [name, href] of [
+      ["Governance", GOVERNANCE],
+      ["Publishers", PUBLISHERS_DOC],
+      ["Review criteria", REVIEW_CRITERIA],
+      ["RFC process", RFC_PROCESS],
+    ] as const) {
+      expect(within(decisions).getByRole("link", { name }).getAttribute("href")).toBe(href);
+    }
   });
 });

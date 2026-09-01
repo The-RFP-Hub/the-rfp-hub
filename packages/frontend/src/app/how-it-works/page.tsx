@@ -415,27 +415,31 @@ export default function HowItWorksPage() {
         <Link href="/">Back to the directory</Link>
       </p>
 
-      <h2 id="decisions">How decisions are made</h2>
-      <p className="prose">
-        Every rule on this page describes what the API actually enforces; the project&rsquo;s
-        governance framework covers who gets to change those rules, what one listing is checked
-        against before it publishes, how a proposed change to the Standard itself gets reviewed, and
-        what happens when somebody disagrees with a decision.
-      </p>
-      <p className="row">
-        <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
-          Governance
-        </a>
-        <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">
-          Publishers
-        </a>
-        <a href={REVIEW_CRITERIA} target="_blank" rel="noopener noreferrer">
-          Review criteria
-        </a>
-        <a href={RFC_PROCESS} target="_blank" rel="noopener noreferrer">
-          RFC process
-        </a>
-      </p>
+      {/* A named region, so "the four governance links are in this section" is a checkable claim
+          rather than "they are somewhere on this page". */}
+      <section aria-labelledby="decisions">
+        <h2 id="decisions">How decisions are made</h2>
+        <p className="prose">
+          Every rule on this page describes what the API actually enforces; the project&rsquo;s
+          governance framework covers who gets to change those rules, what one listing is checked
+          against before it publishes, how a proposed change to the Standard itself gets reviewed,
+          and what happens when somebody disagrees with a decision.
+        </p>
+        <p className="row">
+          <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
+            Governance
+          </a>
+          <a href={PUBLISHERS_DOC} target="_blank" rel="noopener noreferrer">
+            Publishers
+          </a>
+          <a href={REVIEW_CRITERIA} target="_blank" rel="noopener noreferrer">
+            Review criteria
+          </a>
+          <a href={RFC_PROCESS} target="_blank" rel="noopener noreferrer">
+            RFC process
+          </a>
+        </p>
+      </section>
     </section>
   );
 }
