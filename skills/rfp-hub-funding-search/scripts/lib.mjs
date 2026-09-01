@@ -273,10 +273,15 @@ function tooLarge(url) {
   );
 }
 
-/** Streams rather than trusting `Content-Length`, which a server can omit or understate. */
-async function readCappedText(res, url) {
+/** Streams rather than trusting `Content-Length`, which a server can omit or understate. Aborts
+ * before throwing: fetchJson's `finally` clears the timeout, so a server that declares a huge body
+ * and then stalls would otherwise hold the socket — and the process — open after exit 6 printed. */
+async function readCappedText(res, url, controller) {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) throw tooLarge(url);
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+    controller.abort();
+    throw tooLarge(url);
+  }
   if (!res.body) return await res.text();
   const reader = res.body.getReader();
   const chunks = [];
@@ -286,7 +291,7 @@ async function readCappedText(res, url) {
     if (done) break;
     total += value.byteLength;
     if (total > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
+      controller.abort();
       throw tooLarge(url);
     }
     chunks.push(value);
@@ -337,7 +342,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
 
     let text;
     try {
-      text = await readCappedText(res, url);
+      text = await readCappedText(res, url, controller);
     } catch (err) {
       if (err instanceof RequestError) throw err;
       if (err.name === "AbortError") {

@@ -335,6 +335,7 @@ describe("an unusable response body fails loudly instead of reading as an empty 
   let server: Server;
 
   afterEach(() => {
+    server?.closeAllConnections?.();
     server?.close();
   });
 
@@ -359,6 +360,28 @@ describe("an unusable response body fails loudly instead of reading as an empty 
     const { code, stderr } = await run(getScript, ["fixture:0"], { RFPHUB_API_BASE: fake.base });
     expect(code).toBe(MALFORMED_EXIT_CODE);
     expect(stderr).toMatch(/Narrow the query/);
+  });
+
+  it("exits promptly, not once the socket dies, when an oversize length is declared and the body then stalls", async () => {
+    const fake = await startServerWith((_req, res) => {
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-length": String(4 * 1024 * 1024),
+      });
+      // Headers must be flushed for the client to see the declared length at all; the body then
+      // never arrives. Without an abort before the throw, the request holds the socket — and the
+      // process — open long after exit 6 was already decided.
+      res.flushHeaders();
+    });
+    server = fake.server;
+    const startedAt = Date.now();
+    const { code, stderr } = await run(searchScript, [], {
+      RFPHUB_API_BASE: fake.base,
+      RFPHUB_TIMEOUT_MS: "30000",
+    });
+    expect(code).toBe(MALFORMED_EXIT_CODE);
+    expect(stderr).toMatch(/Narrow the query/);
+    expect(Date.now() - startedAt).toBeLessThan(4000);
   });
 
   it("exits 6 on a chunked body that grows past the cap with no Content-Length to warn first", async () => {
