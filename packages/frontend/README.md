@@ -285,25 +285,13 @@ here and is what lets the build see `pnpm-lock.yaml` and the two workspace depen
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL&envDescription=Origin%20of%20the%20RFP%20Hub%20API%20this%20deployment%20reads%20from&envLink=https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/frontend/README.md&install-command=pnpm%20install%20--frozen-lockfile&build-command=pnpm%20--filter%20%40the-rfp-hub%2Ffrontend...%20build)
 
-> **Why this button carries `install-command`/`build-command`, rather than relying on Vercel's
-> defaults.** A brand-new project created through this button has no build configuration of its
-> own — Vercel's zero-config default for a `root-directory` project is to run the package's own
-> `build` script (`next build --webpack`) directly, without building `@the-rfp-hub/standard` or
-> `rfphub-validate` first. Both are consumed as workspace packages resolved from their built
-> `dist/`, which does not exist until something builds them, so that default fails with
-> `Module not found: Can't resolve '@the-rfp-hub/standard'` (reproduced locally: removing both
-> packages' `dist/` and running `next build --webpack` inside `packages/frontend` alone fails
-> exactly this way; `pnpm --filter @the-rfp-hub/frontend... build` from the repository root — the
-> `...` builds workspace dependencies first — succeeds). The query parameters set the new project's
-> Install and Build Command explicitly, so a fresh clone gets it right without any manual step.
->
-> These parameters intentionally do **not** live in `packages/frontend/vercel.json`: that file is
-> also read by the already-deployed project behind `frontend-staging.yml`/`frontend-production.yml`
-> (both run `vercel build` against it), and this repository has no way to confirm from outside
-> Vercel's dashboard whether that project's Install/Build Command is already set to something
-> equivalent — writing to `vercel.json` would apply to both projects at once, silently, and a wrong
-> guess there would risk the deployment that is actually live. The Deploy Button's query parameters
-> only ever configure the **new** project a click creates; they cannot alter the existing one.
+> **Why the button sets `install-command`/`build-command`.** Vercel's zero-config default for a
+> `root-directory` project runs this package's own `build` script directly, without building
+> `@the-rfp-hub/standard` and `rfphub-validate` first — and both resolve from a `dist/` that does
+> not exist until something builds them, so the default fails with `Module not found: Can't resolve
+> '@the-rfp-hub/standard'` (reproduced locally). These cannot move to `vercel.json`: that file is
+> also read by the already-deployed project behind `frontend-staging.yml`, so a wrong guess there
+> would change the deployment that is live. The button's parameters only configure the new project.
 
 **B — Copy only this package**, against the npm-published versions of its two workspace
 dependencies (`@the-rfp-hub/standard@^3.0.0`, `rfphub-validate@^0.3.0`+ — see the note below). This
@@ -311,7 +299,7 @@ is the "spin it up separately, as plainly as possible" path, and it is proven me
 `scripts/frontend-clean-room.mjs` at the repository root does exactly this: copies
 `packages/frontend` on its own, rewrites the two `workspace:*` dependencies to published ranges,
 `npm install`s and `npm run build`s it with no monorepo present, then starts the standalone server
-it produces and requests `/`, `/publishers` and a filtered `/`. Read that script's own header
+it produces and requests `/`, `/publishers`, a filtered `/` and every file in `public/`. Read that script's own header
 before running it — it documents both a "published" mode and a "local tarball" mode, and today only
 the tarball mode succeeds (see the note below). That HTTP request is only a fast pre-check, though:
 `DirectoryList` fetches its data from a `useEffect` after hydration, so a build whose client-side
@@ -333,17 +321,19 @@ an opportunity row to actually render from a live request, and is what
 **C — Docker (optional, do this last).** A minimal Dockerfile over `output: "standalone"`: build
 with `npm run build` after an `npm install` with the same dependency rewrite as path B, then run
 the standalone output the same way the clean-room script does — see the next paragraph for the one
-part of that which is not obvious. There is no `public/` directory in this package, so a Dockerfile
-that tries to `COPY public/ ...` will fail on a missing source; do not add that line. Watch for
-pnpm's node_modules symlinks if the image build stage ever touches a pnpm-installed tree.
+part of that which is not obvious. `COPY public/ ...` **is** needed: this package ships `public/`
+with the icons `src/app/manifest.ts` names, and an image built without it serves a manifest whose
+icons all 404. Watch for pnpm's node_modules symlinks if the image build stage ever touches a
+pnpm-installed tree.
 
 **Running the standalone output, however you built it.** `output: "standalone"` (`next.config.ts`)
 is set, so any of the three paths produces a `.next/standalone` directory containing a `server.js`
-and its own pruned `node_modules`. Two things are easy to miss: `.next/static` is not included in
-that output — Next's own documentation says so — and must be copied to sit alongside `server.js`
-manually as `<same directory>/.next/static`; and because this package sets
-`outputFileTracingRoot` to two directories above itself (correct in the monorepo, where that is the
-workspace root), a build from a stand-alone copy nests `server.js` a few directories deeper than
+and its own pruned `node_modules`. Two things are easy to miss: neither `.next/static` nor
+`public/` is included in that output — Next's own documentation says so — and both must be copied
+to sit alongside `server.js`, as `<same directory>/.next/static` and `<same directory>/public`; and
+because this package sets `outputFileTracingRoot` to two directories above itself (correct in the
+monorepo, where that is the workspace root), a build from a stand-alone copy nests `server.js` a
+few directories deeper than
 `.next/standalone/server.js` — under whatever path Next computed from that root to the copy. Find
 it (`find .next/standalone -name server.js`) rather than assuming the flat path; the clean-room
 script does exactly that.
