@@ -244,7 +244,7 @@ export interface VerificationRun {
   finalUrl: string | null;
   httpStatus: number | null;
   existsAtSource: boolean | null;
-  /** A LOW-BAR anti-spam signal — the page exists and its title is about the same programme. */
+  /** A LOW-BAR anti-spam signal — the page exists and its title is about the same program. */
   matched: boolean | null;
   fieldDiff: Record<string, unknown> | null;
   extracted: Record<string, unknown> | null;

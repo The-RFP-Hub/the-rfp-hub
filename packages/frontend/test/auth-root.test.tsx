@@ -37,7 +37,7 @@ function ClaimLikeOpener() {
   const [signedIn, setSignedIn] = useState(false);
   return (
     <details open>
-      <summary>This is my programme — claim it</summary>
+      <summary>This is my program — claim it</summary>
       {signedIn ? (
         <select aria-label="Organization">
           <option>Acme</option>

@@ -158,7 +158,7 @@ describe("the id's namespace", () => {
     expect(problems.id).toContain("acme");
   });
 
-  it("names the fix when the namespace runs the programme but is not primary", () => {
+  it("names the fix when the namespace runs the program but is not primary", () => {
     const form = usable({
       id: "beta:round-one",
       operatingOrganizations: [
@@ -978,7 +978,7 @@ describe("every funding-details branch survives a round trip", () => {
   const base = {
     specVersion: "1.0.0",
     id: "acme:x",
-    title: "A programme",
+    title: "A program",
     description: "A description.",
     status: "open",
     operatingOrganizations: [{ name: "Acme Foundation", slug: "acme" }],

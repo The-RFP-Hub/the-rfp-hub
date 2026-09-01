@@ -464,7 +464,7 @@ export class OpportunityWriteService {
     if (!operatingSlugs(document).includes(namespace)) {
       throw badRequest(
         "publisher_not_operating",
-        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this programme. You may only publish under an organization named in \`operatingOrganizations\`.`,
+        `\`source.publisher\` is ${JSON.stringify(namespace)}, which does not operate this program. You may only publish under an organization named in \`operatingOrganizations\`.`,
       );
     }
     const idProblem = checkPublicId(document.id, namespace);

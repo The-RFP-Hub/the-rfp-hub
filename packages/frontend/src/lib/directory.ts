@@ -35,7 +35,12 @@ function schemaEnum(name: string): string[] {
   return values.map(String);
 }
 
-export const FUNDING_TYPES = schemaEnum("fundingType") as FundingType[];
+const schemaFundingTypes = schemaEnum("fundingType");
+
+export const FUNDING_TYPES = [
+  ...schemaFundingTypes.filter((value) => value === "rfp"),
+  ...schemaFundingTypes.filter((value) => value !== "rfp"),
+] as FundingType[];
 export const STATUSES = schemaEnum("status") as OpportunityStatus[];
 
 /**
@@ -116,7 +121,7 @@ export interface DirectorySelection {
  *
  * Roughly one listing in eight here is closed or archived, and a reader arriving at a public
  * register of funding is looking for something they can still apply to — a first page whose top row
- * is a programme that shut in June is a first page that has wasted their most attentive thirty
+ * is a program that shut in June is a first page that has wasted their most attentive thirty
  * seconds. So the default narrows, and two things make that honest rather than a hidden filter:
  * the Status control is rendered holding `open` (never blank), and the count line carries a
  * one-click way to see everything. A default that a reader cannot see and cannot undo would be the

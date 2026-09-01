@@ -33,7 +33,7 @@ export default function DirectoryPage() {
         An open, neutral index of funding in the Ethereum ecosystem — grants, hackathons, bounties,
         RFPs. <strong>Free to read, no account.</strong>
         <br />
-        We link you to each programme&rsquo;s own application page;{" "}
+        We link you to each program&rsquo;s own application page;{" "}
         <strong>we never take applications ourselves</strong>.
       </p>
 
@@ -66,7 +66,7 @@ function PublisherInvitation() {
 
   return (
     <section className="card" aria-labelledby="publish-heading">
-      <h2 id="publish-heading">Do you run one of these programmes?</h2>
+      <h2 id="publish-heading">Do you run one of these programs?</h2>
       <p className="footnote">
         Submit your opportunities, keep them current, and see what they get read and applied for.
         Signing in creates an account the first time; publishing without review additionally

@@ -19,6 +19,7 @@ import { AuditAction, AuditActor, AuditFields } from "@/components/AuditPresenta
  */
 import { PublicClaimControl } from "@/components/ClaimForm";
 import { DocumentTitle } from "@/components/DocumentTitle";
+import { IconLabel } from "@/components/IconLabel";
 import { UntrustedBlock, UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, StatusBadge } from "@/components/badges";
 import { EmptyState, ResourceView } from "@/components/states";
@@ -34,6 +35,7 @@ import { fundingTypeLabel, ingestionMethodLabel } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Opportunity } from "@/lib/types";
+import { ArrowTopRightOnSquareIcon, GlobeAltIcon, LinkIcon } from "@heroicons/react/20/solid";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
@@ -212,7 +214,7 @@ export function OpportunityView({
         <p className="muted footnote">
           The Hub republishes what a publisher or a submitter stated. The check below is a{" "}
           <strong>low-bar anti-spam signal</strong> — the linked page exists and its title is about
-          the same programme — and never a fact-check of the amounts or the dates.
+          the same program — and never a fact-check of the amounts or the dates.
         </p>
         <p>
           <MatchBadge matched={source.verifiedAgainstSource ?? null} />{" "}
@@ -272,8 +274,8 @@ export function OpportunityView({
  * THE ONE THING A READER CAME HERE TO DO, above the fold and shaped like it matters.
  *
  * The action this page exists for is leaving it — the Hub takes no applications and never will, so
- * the honest primary action is the programme's own intake, named as such. "Apply on the
- * programme's own site" says where the click goes before it is clicked; "Open the application
+ * the honest primary action is the program's own intake, named as such. "Apply on the
+ * program's own site" says where the click goes before it is clicked; "Open the application
  * page" said neither whose page nor that it leaves.
  *
  * THE HOP GOES THROUGH THE API, and that is not decoration: `GET /v1/r/{id}/apply` is where the
@@ -281,10 +283,10 @@ export function OpportunityView({
  * publisher's numbers at zero while people were applying through it.
  *
  * NO APPLICATION LINK IS A REAL STATE AND IT IS NOT A DEAD END. Roughly one listing in eight
- * carries no `applicationUrl` — an ongoing bounty programme, a record imported from a feed that
+ * carries no `applicationUrl` — an ongoing bounty program, a record imported from a feed that
  * never had one. The old page said "This entry states no application link." and stopped, which
  * left the reader holding a description and nowhere to go. It now says the same true thing and
- * then hands over the two things it does have: the programme's own site, and the organization
+ * then hands over the two things it does have: the program's own site, and the organization
  * running it.
  */
 function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }) {
@@ -300,7 +302,9 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
             target="_blank"
             rel="noopener noreferrer"
           >
-            Apply on the programme&rsquo;s own site ↗
+            <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+              Apply on the program&rsquo;s own site
+            </IconLabel>
           </a>
           {entry.website ? (
             <a
@@ -309,15 +313,15 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
               target="_blank"
               rel="noopener noreferrer"
             >
-              Programme site
+              <IconLabel icon={GlobeAltIcon}>Program site</IconLabel>
             </a>
           ) : null}
           <ShareLink />
         </p>
         <p className="muted footnote">
-          The Hub does not take applications and never sees yours — you land on the
-          programme&rsquo;s own page. The hop goes through the Hub so the publisher can see their
-          listing was acted on.
+          The Hub does not take applications and never sees yours — you land on the program&rsquo;s
+          own page. The hop goes through the Hub so the publisher can see their listing was acted
+          on.
         </p>
       </div>
     );
@@ -330,8 +334,8 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
       </p>
       <p className="muted footnote">
         That is what the publisher filed, not something missing from this page. Applications for
-        this programme are arranged wherever {operator ? "the organization below" : "its organiser"}{" "}
-        says — start from the programme&rsquo;s own site.
+        this program are arranged wherever {operator ? "the organization below" : "its organiser"}{" "}
+        says — start from the program&rsquo;s own site.
       </p>
       <p className="row">
         {entry.website ? (
@@ -341,10 +345,12 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open the programme site ↗
+            <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+              Open the program site
+            </IconLabel>
           </a>
         ) : operator?.website ? (
-          <UntrustedLink href={operator.website} label="Open the organization’s site ↗" />
+          <UntrustedLink href={operator.website} label="Open the organization’s site" />
         ) : (
           <span className="muted">
             No site was stated either. Everything the listing does carry is below.
@@ -379,7 +385,7 @@ function ShareLink() {
   return (
     <>
       <button type="button" onClick={() => void copy()}>
-        Copy link
+        <IconLabel icon={LinkIcon}>Copy link</IconLabel>
       </button>
       {note ? (
         <output className="muted" aria-live="polite">
@@ -574,7 +580,7 @@ function Links({ entry }: { entry: Opportunity }) {
       </p>
       <dl className="grid-2">
         <div>
-          <dt>Programme site</dt>
+          <dt>Program site</dt>
           <dd>
             <UntrustedLink href={entry.website} />
           </dd>

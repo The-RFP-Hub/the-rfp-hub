@@ -162,6 +162,38 @@ a:hover {
   text-decoration-thickness: 2px;
 }
 
+/*
+ * Icons are a reading aid, never a substitute for a label. Every use comes through `IconLabel`,
+ * which keeps the SVG out of the accessible name while this rule gives text and symbol one shared
+ * baseline. The compact solid Heroicons are sized like a letter rather than promoted to artwork.
+ */
+.icon-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.icon-label-icon {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  flex: 0 0 auto;
+}
+
+.icon-label-text {
+  min-width: 0;
+}
+
+.icon-label-spin {
+  animation: icon-spin 0.9s linear infinite;
+}
+
+@keyframes icon-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 code {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 500;
@@ -426,6 +458,9 @@ caption {
  * not become. Same reasoning for the navigation below.
  */
 .brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 800;
   font-size: var(--text-h2);
@@ -436,6 +471,24 @@ caption {
 
 .brand:hover {
   text-decoration: none;
+}
+
+/*
+ * The mark inherits the wordmark's ink through `currentColor`, so the identity is a single colour
+ * and the accent stays rationed to the one place it is allowed. It sits on the cap-height of the
+ * wordmark, not the tagline, which is why the lockup is centred on the text column rather than the
+ * whole two-line block.
+ */
+.brand-mark {
+  flex: none;
+  width: 1.7em;
+  height: 1.7em;
+  color: var(--ink);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
 }
 
 .brand-tagline {
@@ -495,6 +548,15 @@ caption {
   padding-bottom: 2px;
   border-bottom: 2px solid transparent;
   overflow-wrap: anywhere;
+}
+
+.shell-nav .icon-label {
+  gap: var(--space-1);
+}
+
+.shell-nav .icon-label-icon {
+  inline-size: 1rem;
+  block-size: 1rem;
 }
 
 .shell-nav-group li {
@@ -574,6 +636,29 @@ caption {
  */
 .shell-footer a {
   color: var(--accent-ink);
+}
+
+/*
+ * The footer identity is NOT an editorial link, so it opts out of the olive link colour above and
+ * stays ink like the header wordmark — same rationed-accent rule. The compound selector clears the
+ * `.shell-footer a` specificity rather than leaning on source order.
+ */
+.shell-footer .shell-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: var(--space-2);
+  font-family: var(--font-display), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.footer-mark {
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  color: var(--ink);
 }
 
 .shell-footer-note {
@@ -849,11 +934,18 @@ caption {
 .state.loading {
   min-height: 8rem;
   color: var(--ink-soft);
+  display: flex;
+  align-items: center;
 }
 
 .empty-title {
   font-weight: 700;
   margin: 0 0 var(--space-1);
+}
+
+.empty-title .icon-label-icon {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
 }
 
 .state p:last-child {
@@ -863,6 +955,11 @@ caption {
 .note {
   margin: var(--space-2) 0;
   display: block;
+}
+
+.note > .icon-label-icon {
+  margin-inline-end: var(--space-2);
+  vertical-align: -0.18em;
 }
 
 .note.ok {
@@ -1311,6 +1408,15 @@ ul.plain {
   color: var(--ink-soft);
 }
 
+.filters label .icon-label {
+  gap: var(--space-1);
+}
+
+.filters label .icon-label-icon {
+  inline-size: 0.9rem;
+  block-size: 0.9rem;
+}
+
 /* The submit button sizes to its text rather than stretching across a column of its own. */
 .filters .field-action {
   flex: 0 0 auto;
@@ -1360,6 +1466,32 @@ ul.plain {
  */
 .row-title {
   font-weight: 700;
+}
+
+/*
+ * The type silhouette forms a narrow visual index down the title column. It stays decorative — the
+ * explicit Type column remains the accessible, unambiguous source of the same information.
+ */
+.opportunity-cell {
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-2);
+}
+
+.opportunity-cell-copy {
+  min-width: 0;
+}
+
+.opportunity-type-icon {
+  display: inline-flex;
+  margin-top: 2px;
+  color: var(--ink-soft);
+}
+
+.opportunity-type-icon .icon-label-icon {
+  inline-size: 1rem;
+  block-size: 1rem;
 }
 
 .row-summary {
@@ -1521,6 +1653,12 @@ pre.untrusted-block {
     display: inline-flex;
     align-items: center;
     min-block-size: var(--control-touch);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-label-spin {
+    animation: none;
   }
 }
 

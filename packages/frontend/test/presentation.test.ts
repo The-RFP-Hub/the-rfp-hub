@@ -25,7 +25,7 @@ describe("presentation vocabulary", () => {
     expect(opportunityStatusLabel("open")).toBe("Open");
     expect(reviewStatusLabel("pending")).toBe("Waiting for review");
     expect(duplicateStatusLabel("suspected")).toBe("Needs review");
-    expect(duplicateStatusLabel("dismissed")).toBe("Dismissed — different programmes");
+    expect(duplicateStatusLabel("dismissed")).toBe("Dismissed — different programs");
     expect(ingestionMethodLabel("publisher_api")).toBe("Submitted with an API key");
   });
 
@@ -59,7 +59,7 @@ describe("presentation vocabulary", () => {
       "HTTP status",
       "Ingestion method",
       "Organization slugs",
-      "Programme details",
+      "Program details",
       "Public ID",
       "Specification version",
     ]);
