@@ -16,10 +16,10 @@
  * read surface, which hides pending entries by design), and tears it down — rejected and unlisted
  * by a reviewer — the same as `m3-compliance/cleanup.mjs`.
  *
- * WHY THIS REFUSES PRODUCTION THE SAME WAY check-m3 DOES. This tool writes a real entry through a
- * real interlock. `--allow-production` unlocks a target that doesn't look like staging, and PRINTS
- * A RED WARNING when it does — there is no further flag to force past that warning; passing
- * `--allow-production` already is the forcing.
+ * THERE IS NO FLAG TO FORCE PRODUCTION. The target guard is default-deny against an explicit
+ * allowlist of this project's staging origins plus loopback, https required off loopback, and the
+ * redirect chain `--api` answers with is followed before the first write — a staging-looking CNAME
+ * pointed at production passes every hostname rule there is.
  *
  * Usage:
  *   RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
@@ -33,7 +33,7 @@
 import { writeFileSync } from "node:fs";
 import { normalizeBase } from "./m2-compliance/http.mjs";
 import { runSubmissionCycle, teardown, verifyLandedPending } from "./m4-compliance/accept/flow.mjs";
-import { parseArgs, productionWarning, refusals } from "./m4-compliance/accept/options.mjs";
+import { parseArgs, redirectRefusal, refusals } from "./m4-compliance/accept/options.mjs";
 import { Report } from "./m4-compliance/report.mjs";
 
 const USAGE = `M4 write-acceptance — real 3-phase MCP submission, staging only
@@ -45,8 +45,9 @@ through the real MCP submit_opportunity interlock, including a simulated human a
 It tears the entry down (rejected + unlisted) at the end when the reviewer credential is available.
 
 Required
-  --api <url>              Origin of the deployed /v1/ API. Must look like staging or loopback
-                           unless --allow-production is passed.
+  --api <url>              Origin of the deployed /v1/ API. Loopback, or one of this project's
+                           staging origins. There is no flag to force production; add another
+                           staging origin with RFPHUB_ACCEPT_EXTRA_STAGING_ORIGIN.
   RFPHUB_REVIEWER_TOKEN     A reviewer session, used only for teardown (reject + unlist).
   RFPHUB_WRITE_KEY          A write-scoped rfph_ key (write only, never publish — so the fixture
                            lands pending by construction, which is the property this tool proves).
@@ -56,12 +57,17 @@ Options
   --mcp-spec <spec>        npm version for npx (default "next" — the real registry package).
                            Pass "local" for packages/mcp/dist/cli.js instead, to drive this against
                            a pre-publish build.
-  --allow-production       Permit a target that does not look like staging or localhost. Prints a
-                           red warning. There is no flag beyond this one — passing it IS the force.
+  --interactive-approval   Pause at phase 2 and print the exact \`rfphub-mcp approve <id>\` command
+                           for a HUMAN to run in another terminal, then wait for it. Without it
+                           the CLI is driven non-interactively and the report says plainly that
+                           the approval was SIMULATED.
   --keep-fixture           Do not reject/unlist the entry this run created. For debugging.
   --json <path>            Where to write the machine-readable report.
-                           Default: m4-accept-report.json. Use "-" for stdout.
+                           Default: m4-accept-report-<pid>-<timestamp>.json, printed after the
+                           run. Use "-" for stdout.
   --timeout <ms>           Per-request/process timeout. Default: 20000.
+  --approve-timeout <ms>   How long phase 2 may take. Default: 15000 (raised automatically with
+                           --interactive-approval, which waits on a person).
   --no-color               Plain output.
   -h, --help               This text.
 `;
@@ -92,8 +98,10 @@ async function main() {
     process.stderr.write(`${err.message}\n\n${USAGE}`);
     return 2;
   }
-  if (opts.allowProduction) {
-    process.stderr.write(`${productionWarning(opts.api)}\n`);
+  const redirect = await redirectRefusal(opts.api, { timeoutMs: opts.timeoutMs });
+  if (redirect) {
+    process.stderr.write(`accept-m4 refuses to run:\n  \u2022 ${redirect}\n`);
+    return 2;
   }
 
   const ctx = {
@@ -207,11 +215,14 @@ async function main() {
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 
   const serialized = `${JSON.stringify(report.toJSON(), null, 2)}\n`;
-  if (opts.json === "-") {
+  const jsonPath =
+    opts.json ??
+    `m4-accept-report-${process.pid}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+  if (jsonPath === "-") {
     process.stdout.write(serialized);
   } else {
-    writeFileSync(opts.json, serialized);
-    process.stdout.write(`\nJSON report written to ${opts.json}\n`);
+    writeFileSync(jsonPath, serialized);
+    process.stdout.write(`\nJSON report written to ${jsonPath}\n`);
   }
 
   return report.ok ? 0 : 1;

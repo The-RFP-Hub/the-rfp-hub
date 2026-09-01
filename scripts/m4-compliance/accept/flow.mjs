@@ -242,7 +242,7 @@ export async function verifyLandedPending(ctx, opportunityId) {
 /**
  * Reject and unlist the fixture with the reviewer credential — the write-acceptance equivalent of
  * `m3-compliance/cleanup.mjs`, reused rather than reimplemented where the shape matches: same
- * reject endpoint, same "leave it named rather than silently drop it" behaviour on failure.
+ * reject endpoint, same "leave it named rather than silently drop it" behavior on failure.
  */
 export async function teardown(ctx, opportunityId) {
   if (!opportunityId) return { skipped: "no fixture was created" };

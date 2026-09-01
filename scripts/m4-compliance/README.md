@@ -19,7 +19,7 @@ stdout.
 
 `check-m3` writes: it submits entries, mints a key, generates traffic. This checker does none of
 that. It never mints a real credential, never submits a real entry, and never asks a reviewer to do
-anything. The one thing that looks like a write — `submit_opportunity`'s fail-closed behaviour under
+anything. The one thing that looks like a write — `submit_opportunity`'s fail-closed behavior under
 M4-4 — is exercised against a **local recording HTTP server this checker starts itself**, never
 against `--api`. That is what lets it default to `https://ethrfps.app` / `https://api.ethrfps.app`
 with no `--allow-production` flag at all: reading a live deployment costs it nothing, same
@@ -163,7 +163,7 @@ scripts/m4-compliance/
 ## What it cannot establish
 
 - That the MCP package is actually **published** to npm and the MCP Registry (§4.4 row "4b" in the
-  plan) — this checker verifies the server's *behaviour*, wherever it runs from; publication status
+  plan) — this checker verifies the server's *behavior*, wherever it runs from; publication status
   is a manual step documented in `docs/deployment.md`.
 - That a human reviewer's actual approval flow (`rfphub-mcp approve <id>`) works end to end against
   a real, writable deployment — that is `scripts/accept-m4.mjs`, which runs against staging only.
