@@ -127,10 +127,18 @@ is single-use even when the response never arrives, and it is **never restored**
 a timeout the honest state is "may have been written", and restoring the approval would invite a
 second write.
 
-The transport stays **stdio**, and the internal structure keeps it replaceable: tool registration,
-policy and execution live in modules that know nothing about a transport, so an HTTP entry point is
-a new file rather than a refactor. Discovery documents and the precedence-ordered auth chain are
-deferred with it — both only mean anything over HTTP.
+The transport stays **stdio**, and the internal structure keeps it replaceable: `createServer()`
+registers the tools and the policy without naming a transport, and the single call to
+`serveStdio()` in the executable is the only place one is chosen. An HTTP entry point is therefore
+a new file that calls the same factory, not a refactor of it. Discovery documents and the
+precedence-ordered auth chain are deferred with it — both only mean anything over HTTP.
+
+**The SDK is `@modelcontextprotocol/server` v2 because of the protocol decision, not instead of
+it.** The 2026-07-28 revision is a separate era from the legacy one, and the v1 SDK does not speak
+it at all — its newest supported revision is 2025-11-25. Choosing the revision therefore chose the
+SDK. There was no migration to weigh against it: this server is new, so v2 costs nothing that v1
+would have saved, while starting on an SDK that cannot speak the revision the server advertises
+would have been day-zero debt with a rewrite already scheduled.
 
 ### A fourth, internal rate-limit kind: `attempt`
 
