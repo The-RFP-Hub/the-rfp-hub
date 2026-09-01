@@ -3,7 +3,8 @@
 # Two tag families trigger it: `prod-*` — the repository's whole-product release tag, which also
 # deploys the API (production.yml), so one tag moves both halves and the frontend's baked
 # NEXT_PUBLIC_API_URL always points at an API of the same release — and `frontend-prod-*`, for a
-# frontend-only release when the API is not changing. The rationale for CLI-driven deploys, and
+# frontend-only release when the API is not changing. The API's own single-half family is
+# `api-prod-*` (production.yml), which this workflow deliberately does not match. The rationale for CLI-driven deploys, and
 # for why the Git integration cannot express "production moves on a tag", is in
 # frontend-staging.yml; this workflow is its production twin: same steps, production environment,
 # `--prod` deploy. The production domain is assigned by Vercel to the promoted deployment, so no

@@ -325,7 +325,9 @@ granted and revoked in the product, and the same command is how a lockout is rec
 
 ### Gating deploys on migrations
 
-Staging deploys on every push to the default branch while migrations are manual, so code can reach
+Staging deploys on every push to the default branch that touches the API's build inputs (the
+workflow's `paths:` filter names them; frontend-only and `exports/` pushes deploy nothing) while
+migrations are manual, so code can reach
 staging before the tables it needs exist. The intended fix is a `migrate` job between `build_image`
 and `deploy-ecs-service` in both deploy workflows — `aws ecs run-task` on the newly built image with
 a container override of `["node","packages/api/dist/migrate.js"]`, the migration credential, and

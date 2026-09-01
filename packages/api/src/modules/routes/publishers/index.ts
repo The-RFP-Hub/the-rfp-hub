@@ -21,7 +21,7 @@ export const publishers = async (router: FastifyInstance): Promise<void> => {
         tags: ["publishers"],
         summary: "Verified publishing organizations",
         description:
-          "A row here means writes from that namespace are published without review, so a consumer can weigh an entry's provenance. It is not an endorsement of the programmes themselves.",
+          "A row here means writes from that namespace are published without review, so a consumer can weigh an entry's provenance. It is not an endorsement of the programs themselves.",
         response: { 200: { $ref: "PublisherList#" } },
       },
     },

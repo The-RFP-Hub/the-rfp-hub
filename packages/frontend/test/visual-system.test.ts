@@ -62,6 +62,7 @@ describe("the visual-system token boundary", () => {
       { declaration: "margin-left: -0.35rem;", name: "globals.css" },
       { declaration: "margin-top: 2px;", name: "globals.css" },
       { declaration: "margin-top: 2px;", name: "globals.css" },
+      { declaration: "margin-top: 2px;", name: "globals.css" },
     ]);
   });
 

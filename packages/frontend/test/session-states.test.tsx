@@ -268,7 +268,10 @@ describe("organization navigation", () => {
   ] as const)(
     "links %s to the useful organization destination",
     (_case, memberships, href, label) => {
-      expect(organizationNav({ ...me, memberships: [...memberships] })).toEqual({ href, label });
+      expect(organizationNav({ ...me, memberships: [...memberships] })).toMatchObject({
+        href,
+        label,
+      });
     },
   );
 

@@ -31,17 +31,18 @@ and nothing else, whoever asks.
 
 ## Environment
 
-Two variables, both `NEXT_PUBLIC_`, both **inlined at build time**. Setting either on a running host
-changes nothing until the next build — the frontend says so on screen when `NEXT_PUBLIC_API_URL` is
-missing, because it is the most common way to lose an afternoon here. Copy `.env-example` to
-`.env.local` to start.
+**One required** variable and two optional, all `NEXT_PUBLIC_`, all **inlined at build time**.
+Setting any of them on a running host changes nothing until the next build — the frontend says so on
+screen when `NEXT_PUBLIC_API_URL` is missing, because it is the most common way to lose an afternoon
+here. Copy `.env-example` to `.env.local` to start.
 
 | Variable | What it is |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | **Required, every environment.** Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
+| `NEXT_PUBLIC_GA_ID` | *Optional.* A Google Analytics 4 measurement id (`G-…`). When set, the layout loads gtag.js and the CSP opens exactly the Google origins GA4 needs; when unset — the default, and what every fork inherits — no analytics loads and the policy names no Google origin at all. Enabling it is a per-deployment decision with privacy-page consequences: see `src/app/privacy/page.tsx`. |
 | `NEXT_PUBLIC_SITE_ORIGIN` | **Optional, and set ONLY on production.** The one origin this deployment considers itself the canonical, indexable copy of the site — e.g. `https://ethrfps.app`. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` compare it against the incoming request's own origin (`src/lib/site-origin.ts`) and index, sitemap and allow-crawl **only when they match**. Left unset, as it is on staging and on every Vercel preview, the deployment always answers `noindex` and `Disallow: /` — the fail-closed direction, so forgetting to set it costs production its search presence rather than costing a preview its privacy. |
 
-Neither is a secret — an origin is an identifier, readable by anyone who loads the page.
+None of them is a secret — an origin is an identifier, readable by anyone who loads the page.
 **Nothing secret may ever be added with this prefix.** This package holds no server-side credential
 at all.
 

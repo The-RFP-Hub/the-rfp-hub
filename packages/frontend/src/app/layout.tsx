@@ -1,4 +1,5 @@
 import { Chrome } from "@/components/Chrome";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
 import { fontVariables } from "@/lib/fonts";
 import { AppProviders } from "@/lib/session";
@@ -49,6 +50,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={fontVariables}>
       <body>
+        {/*
+         * Analytics is a PER-DEPLOYMENT decision, not a repository default: it renders only where
+         * `NEXT_PUBLIC_GA_ID` is set, and `lib/csp.ts` opens the Google origins on the same
+         * condition. The variable must be the literal `process.env.` expression — it is inlined at
+         * build time (see `lib/config.ts`).
+         */}
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_ID} />
+        )}
         <AppProviders>
           <NavigationBlockerProvider>
             <Chrome>{children}</Chrome>

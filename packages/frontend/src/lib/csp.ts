@@ -32,6 +32,10 @@
  *   `frame-src 'self'` → `'none'` and `worker-src 'self' blob:` → `'self'`. Neither capability is
  *   used any more, and `blob:` in `worker-src` is a script-execution channel.
  *
+ * ONE third-party has since been re-admitted, deliberately and behind a switch: Google Analytics,
+ * only when a deployment sets `NEXT_PUBLIC_GA_ID` (see `gaOrigins` below and the layout). The
+ * default policy — every fork, every environment without the variable — still names no one.
+ *
  * The one remaining relaxation is named rather than buried: `style-src 'unsafe-inline'`, because the
  * framework emits inline style attributes. Inline styles are not script execution; the prohibition
  * that matters is on `script-src`, and that one is now absolute.
@@ -57,10 +61,32 @@ export function originOf(url: string | undefined): string | null {
   }
 }
 
+/**
+ * The origins GA4's gtag.js needs, per Google's own CSP guidance: the loader comes from
+ * `googletagmanager.com`, and hits go to `google-analytics.com` / `analytics.google.com`
+ * (wildcarded because Google routes EU traffic through regional subdomains like `region1.`).
+ * They appear in the policy ONLY when a deployment sets `NEXT_PUBLIC_GA_ID` — an unset variable
+ * keeps the header exactly as strict as it was, so a fork inherits no Google origins by default.
+ */
+const gaOrigins = {
+  script: ["https://*.googletagmanager.com"],
+  connect: [
+    "https://*.google-analytics.com",
+    "https://*.analytics.google.com",
+    "https://*.googletagmanager.com",
+  ],
+  img: ["https://*.google-analytics.com", "https://*.googletagmanager.com"],
+};
+
 /** The whole header value, for one request's nonce and one deployment's API origin. */
 export function contentSecurityPolicy(
   nonce: string,
   apiUrl: string | undefined,
+  /**
+   * The GA4 measurement id (`G-…`), or undefined for the stricter policy with no Google origins.
+   * Only its presence matters here — the id itself is consumed by the layout, not the header.
+   */
+  gaMeasurementId: string | undefined = undefined,
   /**
    * The DEV SERVER's one allowance, and the reason it is a parameter rather than a constant.
    *
@@ -79,16 +105,21 @@ export function contentSecurityPolicy(
   development = process.env.NODE_ENV !== "production",
 ): string {
   const api = originOf(apiUrl);
+  const ga = gaMeasurementId ? gaOrigins : { script: [], connect: [], img: [] };
   const directives: [string, string[]][] = [
     ["default-src", ["'self'"]],
-    ["script-src", ["'self'", `'nonce-${nonce}'`, ...(development ? ["'unsafe-eval'"] : [])]],
+    [
+      "script-src",
+      ["'self'", `'nonce-${nonce}'`, ...ga.script, ...(development ? ["'unsafe-eval'"] : [])],
+    ],
     ["style-src", ["'self'", "'unsafe-inline'"]],
-    // No remote images. A publisher-supplied `logoUrl` is rendered as a link, never as an <img>:
-    // loading it would leak every reader's IP to whatever host a submitter names.
-    ["img-src", ["'self'", "data:"]],
+    // No remote images beyond GA's collect pixel. A publisher-supplied `logoUrl` is rendered as a
+    // link, never as an <img>: loading it would leak every reader's IP to whatever host a
+    // submitter names.
+    ["img-src", ["'self'", "data:", ...ga.img]],
     ["font-src", ["'self'", "data:"]],
-    // The API, and nothing else. Both halves of this app talk to exactly one host.
-    ["connect-src", ["'self'", ...(api ? [api] : [])]],
+    // The API — plus Google's collection endpoints when analytics is on. Nothing else.
+    ["connect-src", ["'self'", ...(api ? [api] : []), ...ga.connect]],
     ["frame-src", ["'none'"]],
     ["worker-src", ["'self'"]],
     ["object-src", ["'none'"]],

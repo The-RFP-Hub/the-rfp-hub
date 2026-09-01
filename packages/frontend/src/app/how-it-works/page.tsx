@@ -69,8 +69,8 @@ const BANDS: { label: string; actions: Action[] }[] = [
         can: { visitor: true, submitter: true, member: true, reviewer: true, admin: true },
       },
       {
-        what: "Apply to a programme",
-        note: "Always on the programme's own site.",
+        what: "Apply to a program",
+        note: "Always on the program's own site.",
         can: { visitor: true, submitter: true, member: true, reviewer: true, admin: true },
       },
       {
@@ -161,9 +161,9 @@ export default function HowItWorksPage() {
       <h1>How the Hub works</h1>
       <p className="lede">
         The RFP Hub is an open index of funding opportunities. It <strong>republishes</strong> what
-        programmes state, under one open standard, and links every reader out to the
-        programme&rsquo;s own application page. It takes no applications, holds no money, and
-        decides nobody&rsquo;s funding.
+        programs state, under one open standard, and links every reader out to the program&rsquo;s
+        own application page. It takes no applications, holds no money, and decides nobody&rsquo;s
+        funding.
       </p>
 
       <section id="publish" className="card card-strong">
@@ -242,7 +242,7 @@ export default function HowItWorksPage() {
           <dt>Submitter</dt>
           <dd>
             Any signed-in account. Submits opportunities and edits its own. Everything it files
-            waits for a decision — including a listing about a programme you run — and{" "}
+            waits for a decision — including a listing about a program you run — and{" "}
             <strong>five</strong> can be waiting at a time.
           </dd>
         </div>
@@ -339,14 +339,14 @@ export default function HowItWorksPage() {
       <h2 id="verified">What &ldquo;verified&rdquo; means, and what it does not</h2>
       <p className="prose">
         Verification says a reviewer is satisfied that an organization&rsquo;s members speak for it.
-        It is <strong>not</strong> an endorsement of the programme, a check that its amounts are
-        real, or a statement that it is a good place to apply.
+        It is <strong>not</strong> an endorsement of the program, a check that its amounts are real,
+        or a statement that it is a good place to apply.
       </p>
       <p className="prose">
         Separately, the Hub runs a <strong>low-bar anti-spam check</strong>: the application page
-        exists and its title is about the same programme. <em>Link looks right</em> means only that.
-        No amount, deadline or eligibility rule here has been verified. Read the programme&rsquo;s
-        own page before you spend a week applying.
+        exists and its title is about the same program. <em>Link looks right</em> means only that.
+        No amount, deadline or eligibility rule here has been verified. Read the program&rsquo;s own
+        page before you spend a week applying.
       </p>
 
       <h2 id="why">Why it works this way</h2>
@@ -358,7 +358,7 @@ export default function HowItWorksPage() {
         <summary>Why an organization decides in its own namespace</summary>
         <p className="prose">
           A verified organization decides what publishes in its own namespace. Somebody outside the
-          organization files a listing about your programme; a member approves it — the organization
+          organization files a listing about your program; a member approves it — the organization
           saying <em>yes, this is ours and it is right</em> — or rejects it. Nobody is better placed
           to know.
         </p>
@@ -379,7 +379,7 @@ export default function HowItWorksPage() {
           which of two near-identical listings survives — those are the four powers that could be
           used to widen a namespace&rsquo;s own reach, so they sit with people who have no stake in
           any of them. Reviewers are Hub staff rather than delegates precisely so that a reviewer
-          decides on programmes they compete with by the same rule as on programmes they have never
+          decides on programs they compete with by the same rule as on programs they have never
           heard of.
         </p>
       </details>
@@ -394,8 +394,8 @@ export default function HowItWorksPage() {
           It keeps the queue honest. A queue anybody can fill without limit is a queue where the
           careful submission behind forty careless ones waits weeks for a person to reach it, and
           the first thing that goes is the review itself. Five is enough to file a whole grants
-          programme in one sitting, and few enough that everything in the queue is something
-          somebody meant.
+          program in one sitting, and few enough that everything in the queue is something somebody
+          meant.
         </p>
       </details>
 

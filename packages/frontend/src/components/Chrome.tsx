@@ -1,5 +1,7 @@
 "use client";
 
+import { BrandMark } from "@/components/BrandMark";
+import { type HeroIcon, IconLabel } from "@/components/IconLabel";
 import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocker";
 /**
  * The application shell: navigation, session state, and the one place a page's access is gated.
@@ -33,6 +35,22 @@ import type { GateCopy } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
+import {
+  ArrowLeftOnRectangleIcon,
+  ArrowRightOnRectangleIcon,
+  ArrowTopRightOnSquareIcon,
+  BellIcon,
+  BookOpenIcon,
+  BuildingOffice2Icon,
+  ChartBarSquareIcon,
+  CheckBadgeIcon,
+  ClipboardDocumentCheckIcon,
+  DocumentTextIcon,
+  KeyIcon,
+  ListBulletIcon,
+  UserCircleIcon,
+  UsersIcon,
+} from "@heroicons/react/20/solid";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect } from "react";
@@ -40,6 +58,7 @@ import { useCallback, useEffect } from "react";
 interface NavItem {
   href: string;
   label: string;
+  icon: HeroIcon;
   /** Whole-account unread count. Zero/undefined renders no count marker. */
   badge?: number;
   /** Which capability the API reported. `undefined` means "any signed-in account". */
@@ -48,9 +67,9 @@ interface NavItem {
 
 /** Readable to everybody, session or not. */
 const PUBLIC_NAV: NavItem[] = [
-  { href: "/", label: "Directory" },
-  { href: PUBLISHERS, label: "Publishers" },
-  { href: HOW_IT_WORKS, label: "How it works" },
+  { href: "/", label: "Directory", icon: ListBulletIcon },
+  { href: PUBLISHERS, label: "Publishers", icon: CheckBadgeIcon },
+  { href: HOW_IT_WORKS, label: "How it works", icon: BookOpenIcon },
 ];
 
 /**
@@ -64,12 +83,22 @@ const PUBLIC_NAV: NavItem[] = [
 function accountNav(me: Me, unreadCount: number | null): NavItem[] {
   const organization = organizationNav(me);
   return [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/listings", label: "Your listings" },
-    { href: "/notifications", label: "Notifications", badge: unreadCount ?? undefined },
+    { href: "/dashboard", label: "Dashboard", icon: ChartBarSquareIcon },
+    { href: "/listings", label: "Your listings", icon: DocumentTextIcon },
+    {
+      href: "/notifications",
+      label: "Notifications",
+      icon: BellIcon,
+      badge: unreadCount ?? undefined,
+    },
     organization,
-    { href: "/account", label: "Account" },
-    { href: "/keys", label: "API keys", requires: (item) => item.canManageKeys },
+    { href: "/account", label: "Account", icon: UserCircleIcon },
+    {
+      href: "/keys",
+      label: "API keys",
+      icon: KeyIcon,
+      requires: (item) => item.canManageKeys,
+    },
   ];
 }
 
@@ -87,11 +116,17 @@ function accountNav(me: Me, unreadCount: number | null): NavItem[] {
  */
 export function organizationNav(me: Me): NavItem {
   const [only] = me.memberships;
-  if (!only) return { href: "/organizations", label: "Organizations" };
-  if (me.memberships.length === 1) {
-    return { href: `/organizations/${encodeURIComponent(only.slug)}`, label: only.name };
+  if (!only) {
+    return { href: "/organizations", label: "Organizations", icon: BuildingOffice2Icon };
   }
-  return { href: "/organizations", label: "Organizations" };
+  if (me.memberships.length === 1) {
+    return {
+      href: `/organizations/${encodeURIComponent(only.slug)}`,
+      label: only.name,
+      icon: BuildingOffice2Icon,
+    };
+  }
+  return { href: "/organizations", label: "Organizations", icon: BuildingOffice2Icon };
 }
 
 /**
@@ -100,8 +135,18 @@ export function organizationNav(me: Me): NavItem {
  * things the page actually does.
  */
 const STAFF_NAV: NavItem[] = [
-  { href: "/review", label: "Review queues", requires: (me) => me.canReview },
-  { href: "/admin", label: "Accounts & roles", requires: (me) => me.canAdmin },
+  {
+    href: "/review",
+    label: "Review queues",
+    icon: ClipboardDocumentCheckIcon,
+    requires: (me) => me.canReview,
+  },
+  {
+    href: "/admin",
+    label: "Accounts & roles",
+    icon: UsersIcon,
+    requires: (me) => me.canAdmin,
+  },
 ];
 
 /**
@@ -128,15 +173,17 @@ function NavGroup({ items, pathname, me }: { items: NavItem[]; pathname: string;
             href={item.href}
             aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
           >
-            {item.label}
-            {item.badge ? (
-              <span
-                className="shell-nav-count"
-                aria-label={`${item.badge} unread notification${item.badge === 1 ? "" : "s"}`}
-              >
-                {item.badge}
-              </span>
-            ) : null}
+            <IconLabel icon={item.icon}>
+              {item.label}
+              {item.badge ? (
+                <span
+                  className="shell-nav-count"
+                  aria-label={`${item.badge} unread notification${item.badge === 1 ? "" : "s"}`}
+                >
+                  {item.badge}
+                </span>
+              ) : null}
+            </IconLabel>
           </GuardedLink>
         </li>
       ))}
@@ -173,8 +220,11 @@ export function Chrome({ children }: { children: ReactNode }) {
       </a>
       <header className="shell-header">
         <GuardedLink href="/" className="brand">
-          RFP Hub
-          <span className="brand-tagline">an open index of funding opportunities</span>
+          <BrandMark className="brand-mark" />
+          <span className="brand-text">
+            RFP Hub
+            <span className="brand-tagline">an open index of funding opportunities</span>
+          </span>
         </GuardedLink>
 
         <nav className="shell-nav" aria-label="Sections">
@@ -197,12 +247,12 @@ export function Chrome({ children }: { children: ReactNode }) {
                   if (confirmNavigation()) void session.logout();
                 }}
               >
-                Log out
+                <IconLabel icon={ArrowLeftOnRectangleIcon}>Log out</IconLabel>
               </button>
             </>
           ) : (
             <button type="button" onClick={session.login}>
-              Log in
+              <IconLabel icon={ArrowRightOnRectangleIcon}>Log in</IconLabel>
             </button>
           )}
         </div>
@@ -213,10 +263,16 @@ export function Chrome({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="shell-footer">
+        <GuardedLink href="/" className="shell-footer-brand" aria-label="RFP Hub home">
+          <BrandMark className="footer-mark" />
+          RFP Hub
+        </GuardedLink>
         <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
         <GuardedLink href={PUBLISHERS}>Publishers</GuardedLink>
         <a href={STANDARD} target="_blank" rel="noopener noreferrer">
-          The Standard
+          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+            The Standard
+          </IconLabel>
         </a>
         {/*
          * The API this build talks to, not a hard-coded one. A preview deployment linking at
@@ -224,10 +280,14 @@ export function Chrome({ children }: { children: ReactNode }) {
          * pages are reading.
          */}
         <a href={apiDocsUrl(api.baseUrl)} target="_blank" rel="noopener noreferrer">
-          API &amp; data
+          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+            API &amp; data
+          </IconLabel>
         </a>
         <a href={REPOSITORY} target="_blank" rel="noopener noreferrer">
-          GitHub
+          <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
+            GitHub
+          </IconLabel>
         </a>
         <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
           Governance
@@ -274,7 +334,7 @@ export function RequireSession({
         </p>
         <p className="row">
           <button type="button" className="button-primary" onClick={session.login}>
-            Log in
+            <IconLabel icon={ArrowRightOnRectangleIcon}>Log in</IconLabel>
           </button>
           <GuardedLink href={HOW_IT_WORKS}>What an account is for</GuardedLink>
         </p>

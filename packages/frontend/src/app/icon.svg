@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="RFP Hub">
+  <defs>
+    <clipPath id="sq"><rect x="0" y="0" width="1024" height="1024" rx="228"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7c8030"/>
+      <stop offset="0.55" stop-color="#6d7123"/>
+      <stop offset="1" stop-color="#565a1c"/>
+    </linearGradient>
+    <radialGradient id="vig" cx="0.5" cy="0.64" r="0.8">
+      <stop offset="0.5" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#2b2d0d" stop-opacity="0.34"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#sq)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#vig)"/>
+    <!-- Baked emboss: a soft dark offset of the rows, so depth survives any rasterizer. -->
+    <g fill="#2f3110" opacity="0.4" transform="translate(0,7)">
+      <rect x="232" y="322" width="44" height="44" rx="11"/><rect x="312" y="322" width="472" height="44" rx="22"/>
+      <rect x="232" y="434" width="44" height="44" rx="11"/><rect x="312" y="434" width="346" height="44" rx="22"/>
+      <rect x="232" y="546" width="44" height="44" rx="11"/><rect x="312" y="546" width="472" height="44" rx="22"/>
+      <rect x="232" y="658" width="44" height="44" rx="11"/><rect x="312" y="658" width="300" height="44" rx="22"/>
+    </g>
+    <!-- Listed entries. -->
+    <g fill="#fbfbf6" opacity="0.8">
+      <rect x="232" y="322" width="44" height="44" rx="11"/><rect x="312" y="322" width="472" height="44" rx="22"/>
+      <rect x="232" y="546" width="44" height="44" rx="11"/><rect x="312" y="546" width="472" height="44" rx="22"/>
+      <rect x="232" y="658" width="44" height="44" rx="11"/><rect x="312" y="658" width="300" height="44" rx="22"/>
+    </g>
+    <!-- The live entry. -->
+    <g fill="#ffffff">
+      <rect x="232" y="434" width="44" height="44" rx="11"/><rect x="312" y="434" width="346" height="44" rx="22"/>
+    </g>
+  </g>
+  <rect x="4" y="4" width="1016" height="1016" rx="226" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2.5"/>
+</svg>
