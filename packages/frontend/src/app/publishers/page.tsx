@@ -111,7 +111,7 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
           <UntrustedLink
             href={publisher.logoUrl}
             label="linked, not embedded"
-            ariaLabel={`${name} logo (external link)`}
+            ariaLabel={`${name} logo: linked, not embedded`}
           />
         </p>
       ) : null}

@@ -160,13 +160,16 @@ describe("the public publishers page", () => {
     expect(labels[0]?.parentElement?.querySelector("code")?.textContent).toBe("filecoin:…");
   });
 
-  it("names the publisher in the logo link, which every card otherwise labels identically", async () => {
+  it("names the publisher in the logo link, without losing the visible text from the name", async () => {
     const { client: c } = client();
     mount(c);
 
     await screen.findByText(HOSTILE);
-    const logo = screen.getByRole("link", { name: `${HOSTILE} logo (external link)` });
+    const logo = screen.getByRole("link", { name: `${HOSTILE} logo: linked, not embedded` });
     expect(logo.getAttribute("href")).toBe(filecoin.logoUrl);
+    // Label in name: a speech-control user says what they can see, so the visible text has to
+    // survive inside the accessible name rather than being replaced by it.
+    expect(logo.getAttribute("aria-label")).toContain(logo.textContent);
   });
 
   it("wraps an unbroken publisher name rather than widening the card", async () => {

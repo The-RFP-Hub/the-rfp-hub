@@ -58,7 +58,7 @@ export function UntrustedLink({
 }: {
   href: string | null | undefined;
   label?: string;
-  /** For a repeated label ("linked, not embedded") that needs saying WHOSE it is out of context. */
+  /** Says WHOSE a repeated label is. Must CONTAIN `label`, or speech control cannot address it. */
   ariaLabel?: string;
 }) {
   if (!href) return <span className="muted untrusted-link">—</span>;
