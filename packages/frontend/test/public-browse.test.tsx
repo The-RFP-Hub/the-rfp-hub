@@ -240,6 +240,12 @@ describe("the public directory list", () => {
       ["directory-type", "Funding type"],
       ["directory-status", "Status"],
       ["directory-order", "Order by"],
+      ["directory-category", "Category"],
+      ["directory-organization", "Organization"],
+      ["directory-min-award", "Min award/budget"],
+      ["directory-max-award", "Max award/budget"],
+      ["directory-deadline-after", "Next fixed deadline after"],
+      ["directory-deadline-before", "Next fixed deadline before"],
     ] as const) {
       expect(screen.getByLabelText(name).getAttribute("id")).toBe(id);
       expect(container.querySelector(`label[for="${id}"] svg[aria-hidden="true"]`)).toBeTruthy();

@@ -54,9 +54,13 @@ import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { FundingType, OpportunitySummary } from "@/lib/types";
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   ArrowsUpDownIcon,
   BanknotesIcon,
   BuildingOffice2Icon,
+  CalendarDaysIcon,
+  CalendarIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CodeBracketIcon,
@@ -65,6 +69,7 @@ import {
   MagnifyingGlassIcon,
   RocketLaunchIcon,
   SignalIcon,
+  TagIcon,
   TrophyIcon,
 } from "@heroicons/react/20/solid";
 import Link from "next/link";
@@ -232,7 +237,9 @@ export function DirectoryList() {
           </div>
 
           <div className={`field${draft.category.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-category">Category</label>
+            <label htmlFor="directory-category">
+              <IconLabel icon={TagIcon}>Category</IconLabel>
+            </label>
             <input
               id="directory-category"
               value={draft.category}
@@ -250,7 +257,9 @@ export function DirectoryList() {
            * (`/?organization=<slug>`), so a shared or bookmarked link round-trips through this box.
            */}
           <div className={`field${draft.organization.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-organization">Organization</label>
+            <label htmlFor="directory-organization">
+              <IconLabel icon={BuildingOffice2Icon}>Organization</IconLabel>
+            </label>
             <input
               id="directory-organization"
               value={draft.organization}
@@ -261,7 +270,9 @@ export function DirectoryList() {
           </div>
 
           <div className={`field${draft.minAward.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-min-award">Min award/budget</label>
+            <label htmlFor="directory-min-award">
+              <IconLabel icon={ArrowUpIcon}>Min award/budget</IconLabel>
+            </label>
             <input
               id="directory-min-award"
               type="number"
@@ -278,7 +289,9 @@ export function DirectoryList() {
           </div>
 
           <div className={`field${draft.maxAward.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-max-award">Max award/budget</label>
+            <label htmlFor="directory-max-award">
+              <IconLabel icon={ArrowDownIcon}>Max award/budget</IconLabel>
+            </label>
             <input
               id="directory-max-award"
               type="number"
@@ -302,7 +315,9 @@ export function DirectoryList() {
            * hints below say "fixed" and "rolling" rather than leaving that implicit.
            */}
           <div className={`field${draft.deadlineAfter.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-deadline-after">Next fixed deadline after</label>
+            <label htmlFor="directory-deadline-after">
+              <IconLabel icon={CalendarDaysIcon}>Next fixed deadline after</IconLabel>
+            </label>
             <input
               id="directory-deadline-after"
               type="date"
@@ -333,7 +348,9 @@ export function DirectoryList() {
           </div>
 
           <div className={`field${draft.deadlineBefore.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-deadline-before">Next fixed deadline before</label>
+            <label htmlFor="directory-deadline-before">
+              <IconLabel icon={CalendarIcon}>Next fixed deadline before</IconLabel>
+            </label>
             <input
               id="directory-deadline-before"
               type="date"
