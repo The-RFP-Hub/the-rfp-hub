@@ -184,15 +184,16 @@ address and is refused for being **over the limit before** it is refused for bei
 `503 auth_unavailable` — a failure to *check* a credential — is never metered, so an outage does
 not spend anybody's budget.
 
-### The frontend's two variables
+### The frontend's variables
 
-Both are `NEXT_PUBLIC_`, both are **inlined at build time**, and neither is a secret. Setting
-either on a running host changes nothing until the next build.
+All three are `NEXT_PUBLIC_`, all three are **inlined at build time**, and none of them is a
+secret. Setting any of them on a running host changes nothing until the next build.
 
 | Variable | Where it is set |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | Every environment. The API's origin — where `/v1` lives, where sign-in lives, and what is written into the page's CSP `connect-src` |
+| `NEXT_PUBLIC_API_URL` | Every environment, and the only **required** one. The API's origin — where `/v1` lives, where sign-in lives, and what is written into the page's CSP `connect-src` |
 | `NEXT_PUBLIC_SITE_ORIGIN` | **Production only.** The one origin this deployment considers itself the canonical, indexable copy of. The layout, `sitemap.ts` and `robots.ts` compare it against the incoming request's origin and index, sitemap and allow crawling **only when they match** |
+| `NEXT_PUBLIC_GA_ID` | **Optional**, and a production-only decision. A Google Analytics 4 measurement id (`G-…`). Unset — the default, and what every fork inherits — no analytics loads and the CSP names no Google origin at all. Set, the layout loads `gtag.js` and the policy opens exactly the Google origins GA4 needs, and nothing else. Turning it on has a privacy-page consequence: `src/app/privacy/page.tsx` has to keep describing what that deployment actually does. Details in [`packages/frontend/README.md`](../packages/frontend/README.md#environment) |
 
 Leave `NEXT_PUBLIC_SITE_ORIGIN` unset on staging, on previews, and on every self-hosted copy —
 unset means `noindex` and `Disallow: /`, which is the fail-closed direction: forgetting it costs
@@ -651,7 +652,7 @@ which is what keeps `pnpm-lock.yaml` and the two workspace dependencies visible 
 Vercel enables "Include source files outside of the Root Directory" by default. It carries the pnpm
 install and filtered build commands, so nothing has to be typed into the project settings. Set
 `NEXT_PUBLIC_API_URL` when prompted, and leave `NEXT_PUBLIC_SITE_ORIGIN` unset — see
-[§4](#the-frontends-two-variables).
+[§4](#the-frontends-variables).
 
 ### Path B — copy only the package, install from npm
 

@@ -391,10 +391,14 @@ does that yours should:
 * **Treat every string that came from a submitter as untrusted.** The reference frontend renders
   third-party text through components that never emit markup, and only links `http:`/`https:` URLs
   — anything else is rendered as text. A test sweeps the source for raw HTML.
-* **Never load remote images.** The content-security policy is `img-src 'self' data:`, because
-  fetching a logo from a host a submitter named leaks every reader's IP address to it.
-* **`NEXT_PUBLIC_API_URL` is the only variable**, it is not a secret, and it is inlined at build
-  time — so a configuration change needs a rebuild, not a restart.
+* **Never load remote images.** The content-security policy is `img-src 'self' data:` unless the
+  deployment opts into analytics, because fetching a logo from a host a submitter named leaks every
+  reader's IP address to it.
+* **`NEXT_PUBLIC_API_URL` is the only required variable**, it is not a secret, and it is inlined at
+  build time — so a configuration change needs a rebuild, not a restart. The two optional ones —
+  `NEXT_PUBLIC_SITE_ORIGIN`, which decides whether the copy is indexable, and `NEXT_PUBLIC_GA_ID`,
+  which is what opens those Google origins in the CSP — are in
+  [`deployment.md` §4](./deployment.md#the-frontends-variables).
 
 Deploying a copy: [`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy).
 The short version is that reads work everywhere and sign-in needs your origin on the API's
