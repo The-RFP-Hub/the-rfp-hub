@@ -13,7 +13,12 @@
  * skill's output (or an agent runtime capturing it) actually uses.
  */
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { type Server, createServer } from "node:http";
+import {
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+  createServer,
+} from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -68,6 +73,26 @@ function startFakeApi(): Promise<{ server: Server; base: string; requestUrls: st
       const address = server.address();
       const port = typeof address === "object" && address ? address.port : 0;
       resolvePromise({ server, base: `http://127.0.0.1:${port}`, requestUrls });
+    });
+  });
+}
+
+/** A fake API with a caller-supplied handler, for the failure modes the fixture page can't model.
+ * Response-level errors are swallowed: a client that stops reading mid-body (the point of the
+ * response-cap test) leaves the server writing into a closed socket. */
+function startServerWith(
+  handler: (req: IncomingMessage, res: ServerResponse) => void,
+): Promise<{ server: Server; base: string }> {
+  return new Promise((resolvePromise) => {
+    const server = createServer((req, res) => {
+      res.on("error", () => {});
+      handler(req, res);
+    });
+    server.on("clientError", () => {});
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      resolvePromise({ server, base: `http://127.0.0.1:${port}` });
     });
   });
 }
@@ -290,5 +315,49 @@ describe("usage errors exit 1 BEFORE any network call", () => {
     const { code, stderr } = await run(getScript, [], { RFPHUB_API_BASE: UNREACHABLE_BASE });
     expect(code).toBe(USAGE_EXIT_CODE);
     expect(stderr).toMatch(/Usage: node get\.mjs/);
+  });
+});
+
+describe("an unusable response body fails loudly instead of reading as an empty page", () => {
+  const MALFORMED_EXIT_CODE = 6;
+  let server: Server;
+
+  afterEach(() => {
+    server?.close();
+  });
+
+  it("exits 6 on valid JSON that is not an object", async () => {
+    const fake = await startServerWith((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("[]");
+    });
+    server = fake.server;
+    const { code, stdout, stderr } = await run(searchScript, [], { RFPHUB_API_BASE: fake.base });
+    expect(code).toBe(MALFORMED_EXIT_CODE);
+    expect(stdout).toBe("");
+    expect(stderr).toMatch(/not an object/);
+  });
+
+  it("exits 6 on a body whose declared Content-Length is over the cap", async () => {
+    const fake = await startServerWith((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(`{"pad":"${"x".repeat(2 * 1024 * 1024)}"}`);
+    });
+    server = fake.server;
+    const { code, stderr } = await run(getScript, ["fixture:0"], { RFPHUB_API_BASE: fake.base });
+    expect(code).toBe(MALFORMED_EXIT_CODE);
+    expect(stderr).toMatch(/Narrow the query/);
+  });
+
+  it("exits 6 on a chunked body that grows past the cap with no Content-Length to warn first", async () => {
+    const fake = await startServerWith((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json", "transfer-encoding": "chunked" });
+      for (let i = 0; i < 8; i++) res.write("x".repeat(256 * 1024));
+      res.end();
+    });
+    server = fake.server;
+    const { code, stderr } = await run(searchScript, [], { RFPHUB_API_BASE: fake.base });
+    expect(code).toBe(MALFORMED_EXIT_CODE);
+    expect(stderr).toMatch(/exceeded this skill's/);
   });
 });

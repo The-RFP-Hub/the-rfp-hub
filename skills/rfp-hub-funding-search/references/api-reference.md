@@ -119,7 +119,7 @@ Both `scripts/search.mjs` and `scripts/get.mjs` use the same exit codes:
 | `3` | HTTP 4xx from the API (not 429) — e.g. a validation error, or 404 |
 | `4` | HTTP 429 — rate limited; the message reports `Retry-After` when the API sends it |
 | `5` | HTTP 5xx from the API |
-| `6` | The API's response body was not valid JSON |
+| `6` | The API's response body was unusable: not valid JSON, valid JSON that is not an object (`null`, `[]`, `"x"`), or larger than the scripts' 1 MiB cap |
 
 ## Examples
 

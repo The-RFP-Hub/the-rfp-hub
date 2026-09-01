@@ -287,6 +287,40 @@ export function parseArgs(argv) {
 
 // ── fetch with timeout + typed errors ────────────────────────────────────────────
 
+/** Hard ceiling on a response body. A page of 25 projected summaries is a few tens of KB; anything
+ * past this is a rogue or misconfigured base URL, and buffering it would cost the caller memory
+ * before the projection ever gets a chance to drop it. */
+export const MAX_RESPONSE_BYTES = 1024 * 1024;
+
+function tooLarge(url) {
+  return new RequestError(
+    "malformed_response",
+    `The response from ${url} exceeded this skill's ${MAX_RESPONSE_BYTES}-byte cap. Narrow the query (a smaller --limit, or more filters) or check RFPHUB_API_BASE.`,
+  );
+}
+
+/** Read the body, refusing to buffer more than `MAX_RESPONSE_BYTES`. Streams rather than trusting
+ * `Content-Length`, which a hostile or chunked server can omit or understate. */
+async function readCappedText(res, url) {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) throw tooLarge(url);
+  if (!res.body) return await res.text();
+  const reader = res.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw tooLarge(url);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /**
  * GET `url` with the tracking headers, a hard timeout, and typed failure modes. Never throws a
  * raw fetch/JSON error — always a `RequestError` with a `.kind` the CLI can map to an exit code.
@@ -335,8 +369,9 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
 
     let text;
     try {
-      text = await res.text();
+      text = await readCappedText(res, url);
     } catch (err) {
+      if (err instanceof RequestError) throw err;
       if (err.name === "AbortError") {
         throw new RequestError(
           "timeout",
@@ -363,6 +398,16 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
           ? body.message
           : `Request failed with status ${res.status}.`;
       throw new RequestError("client_error", message, { status: res.status, body });
+    }
+
+    // Valid JSON that isn't an object (`null`, `[]`, `"x"`) would otherwise flow into projectPage
+    // and read as a clean empty page — indistinguishable, to the agent, from "nothing matched".
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      throw new RequestError(
+        "malformed_response",
+        `The RFP Hub API returned JSON that is not an object (status ${res.status}).`,
+        { status: res.status },
+      );
     }
 
     return body;
