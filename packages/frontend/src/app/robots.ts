@@ -6,7 +6,7 @@ import type { MetadataRoute } from "next";
  * Allow the public surface, disallow the workbench — but ONLY on the declared canonical origin.
  * Every other host this app answers on (staging, a Vercel preview, a self-hosted copy that has not
  * set `NEXT_PUBLIC_SITE_ORIGIN`) gets a blanket `Disallow: /`, because indexing a duplicate of the
- * real site is worse than a crawler finding nothing at all — search engines penalise exactly that
+ * real site is worse than a crawler finding nothing at all — search engines penalize exactly that
  * kind of duplicate content, and a preview URL that ranked would compete with the real one for
  * every listing it carries.
  *

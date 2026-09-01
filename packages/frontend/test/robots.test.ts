@@ -11,10 +11,17 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(),
 }));
 
-async function mockHost(host: string | null) {
+async function mockHost(host: string | null, forwardedHost: string | null = null) {
   const { headers } = await import("next/headers");
   vi.mocked(headers).mockResolvedValue({
-    get: (key: string) => (key === "host" ? host : key === "x-forwarded-proto" ? "https" : null),
+    get: (key: string) =>
+      key === "host"
+        ? host
+        : key === "x-forwarded-host"
+          ? forwardedHost
+          : key === "x-forwarded-proto"
+            ? "https"
+            : null,
   } as unknown as Awaited<ReturnType<typeof headers>>);
 }
 
@@ -61,7 +68,30 @@ describe("robots.txt", () => {
     expect(file.sitemap).toBeUndefined();
   });
 
-  it("disallows everything on an unrecognised Vercel preview host", async () => {
+  it("disallows everything when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
+    // The whole fail-closed chain, not just the helper that parses the value: a typo in the
+    // production variable costs the deployment its indexing, never a preview its privacy.
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    const file = await robots();
+    expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
+    expect(file.sitemap).toBeUndefined();
+  });
+
+  it("allows the public surface behind a proxy that rewrote Host", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("frontend.internal:8080", "ethrfps.app");
+
+    const file = await robots();
+    expect(file.rules).toEqual({
+      userAgent: "*",
+      allow: "/",
+      disallow: [...NOINDEX_ROUTE_PREFIXES],
+    });
+  });
+
+  it("disallows everything on an unrecognized Vercel preview host", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
     await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
 

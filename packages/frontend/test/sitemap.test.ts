@@ -10,10 +10,17 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(),
 }));
 
-async function mockHost(host: string | null) {
+async function mockHost(host: string | null, forwardedHost: string | null = null) {
   const { headers } = await import("next/headers");
   vi.mocked(headers).mockResolvedValue({
-    get: (key: string) => (key === "host" ? host : key === "x-forwarded-proto" ? "https" : null),
+    get: (key: string) =>
+      key === "host"
+        ? host
+        : key === "x-forwarded-host"
+          ? forwardedHost
+          : key === "x-forwarded-proto"
+            ? "https"
+            : null,
   } as unknown as Awaited<ReturnType<typeof headers>>);
 }
 
@@ -57,6 +64,21 @@ describe("the public sitemap", () => {
     await mockHost("staging.ethrfps.app");
 
     await expect(sitemap()).resolves.toEqual([]);
+  });
+
+  it("is empty when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    await expect(sitemap()).resolves.toEqual([]);
+  });
+
+  it("publishes for the forwarded host when a proxy rewrote Host", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("frontend.internal:8080", "ethrfps.app");
+
+    const entries = await sitemap();
+    expect(entries.map((entry) => entry.url)).toContain("https://ethrfps.app/publishers");
   });
 
   it("carries no opportunity, organization or listing route", async () => {

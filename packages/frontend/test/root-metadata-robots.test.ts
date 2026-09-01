@@ -11,10 +11,17 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(),
 }));
 
-async function mockHost(host: string | null) {
+async function mockHost(host: string | null, forwardedHost: string | null = null) {
   const { headers } = await import("next/headers");
   vi.mocked(headers).mockResolvedValue({
-    get: (key: string) => (key === "host" ? host : key === "x-forwarded-proto" ? "https" : null),
+    get: (key: string) =>
+      key === "host"
+        ? host
+        : key === "x-forwarded-host"
+          ? forwardedHost
+          : key === "x-forwarded-proto"
+            ? "https"
+            : null,
   } as unknown as Awaited<ReturnType<typeof headers>>);
 }
 
@@ -45,6 +52,22 @@ describe("the root layout's robots metadata", () => {
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("stays noindex when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    const metadata = await generateMetadata();
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("indexes behind a proxy that rewrote Host, on the forwarded host", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("frontend.internal:8080", "ethrfps.app");
+
+    const metadata = await generateMetadata();
+    expect(metadata.robots).toEqual({ index: true, follow: true });
   });
 
   it("keeps the title and description regardless of indexing", async () => {

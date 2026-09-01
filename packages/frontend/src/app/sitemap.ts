@@ -18,7 +18,7 @@ import type { MetadataRoute } from "next";
  * NO CANONICAL ORIGIN, NO SITEMAP. `isCanonicalRequest` (`lib/site-origin.ts`) is false on staging
  * and on every Vercel preview, because `NEXT_PUBLIC_SITE_ORIGIN` is set only for production — a
  * sitemap published from a duplicate host is exactly the kind of duplicate-content signal a search
- * engine penalises, and an empty list is the correct, honest answer for a deployment this file does
+ * engine penalizes, and an empty list is the correct, honest answer for a deployment this file does
  * not believe is the canonical one.
  *
  * `lastModified` IS DELIBERATELY OMITTED. This file has no idea when any of these pages last

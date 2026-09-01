@@ -39,6 +39,25 @@ describe("originFromHeaders", () => {
   it("resolves nothing without a host — never guesses one", () => {
     expect(originFromHeaders(null, "https")).toBeNull();
   });
+
+  it("prefers x-forwarded-host, which is the address the browser actually used", () => {
+    // The shape behind a CDN or load balancer that rewrites Host to an internal name: without this
+    // preference, such a deployment could never match its own canonical origin.
+    expect(originFromHeaders("frontend.internal", "https", "ethrfps.app")).toBe(
+      "https://ethrfps.app",
+    );
+  });
+
+  it("takes the first forwarded host when the header carries a chain of proxies", () => {
+    expect(originFromHeaders("frontend.internal", "https", "ethrfps.app, edge.internal")).toBe(
+      "https://ethrfps.app",
+    );
+  });
+
+  it("falls back to Host when nothing forwarded a host", () => {
+    expect(originFromHeaders("ethrfps.app", "https", null)).toBe("https://ethrfps.app");
+    expect(originFromHeaders("ethrfps.app", "https", "")).toBe("https://ethrfps.app");
+  });
 });
 
 describe("requestOrigin", () => {
@@ -59,7 +78,7 @@ describe("canonicalSiteOrigin", () => {
     expect(canonicalSiteOrigin()).toBeUndefined();
   });
 
-  it("normalises through URL().origin, dropping a trailing slash or stray path", () => {
+  it("normalizes through URL().origin, dropping a trailing slash or stray path", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app/");
     expect(canonicalSiteOrigin()).toBe("https://ethrfps.app");
   });
@@ -71,11 +90,17 @@ describe("canonicalSiteOrigin", () => {
 });
 
 describe("isCanonicalRequest", () => {
-  function mockHost(host: string | null) {
+  function mockHost(host: string | null, forwardedHost: string | null = null) {
     return import("next/headers").then(({ headers }) => {
       vi.mocked(headers).mockResolvedValue({
         get: (key: string) =>
-          key === "host" ? host : key === "x-forwarded-proto" ? "https" : null,
+          key === "host"
+            ? host
+            : key === "x-forwarded-host"
+              ? forwardedHost
+              : key === "x-forwarded-proto"
+                ? "https"
+                : null,
       } as unknown as Awaited<ReturnType<typeof headers>>);
     });
   }
@@ -97,6 +122,27 @@ describe("isCanonicalRequest", () => {
   it("is false for a staging alias or a preview, even with the variable set on production", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
     await mockHost("staging.ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(false);
+  });
+
+  it("is true behind a proxy that rewrote Host, because the forwarded host is the real one", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("frontend.internal:8080", "ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(true);
+  });
+
+  it("is false when the proxy forwards some other host, whatever Host says", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://ethrfps.app");
+    await mockHost("ethrfps.app", "staging.ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(false);
+  });
+
+  it("is false for a malformed NEXT_PUBLIC_SITE_ORIGIN — a typo costs indexing, never privacy", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
+    await mockHost("ethrfps.app");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);
   });

@@ -3,11 +3,10 @@
  * production host — the two facts `sitemap.ts` and `robots.ts` need in order to avoid indexing a
  * staging alias or a Vercel preview as if it were a second copy of the real site.
  *
- * THE REQUEST ORIGIN IS DERIVED, NEVER HARD-CODED. The `Host` header is what a reverse proxy or the
- * platform's own edge sets to the address a visitor actually typed; `X-Forwarded-Proto` is how that
- * layer tells the app the original request was `https` even though it forwards over plain HTTP
- * internally, which is the normal shape behind Vercel and most other hosts. A self-hosted copy of
- * this reference frontend — the README documents that path explicitly — can be reached at any
+ * THE REQUEST ORIGIN IS DERIVED, NEVER HARD-CODED. `X-Forwarded-Host` and `Host` are how a reverse
+ * proxy or the platform's own edge names the address a visitor actually typed, and
+ * `X-Forwarded-Proto` is how it says the original request was `https` even though it forwards over
+ * plain HTTP internally. A self-hosted copy of this reference frontend can be reached at any
  * hostname its operator chooses, so a literal here would make every fork's sitemap and robots.txt
  * describe production's address rather than their own.
  *
@@ -23,26 +22,43 @@
  */
 import { headers } from "next/headers";
 
+/** A forwarded header may carry a proxy chain; the client-facing hop is the first entry. */
+function firstValue(header: string | null | undefined): string | undefined {
+  return header?.split(",")[0]?.trim() || undefined;
+}
+
+/**
+ * `X-Forwarded-Host` WINS OVER `Host`, because a CDN or load balancer in front of this app is free
+ * to rewrite `Host` to an internal name — and a deployment where it does would otherwise never
+ * match its own canonical origin and would serve `noindex` forever, silently. Both headers are set
+ * by the same hop and are equally forgeable by a client that reaches the app directly, so
+ * preferring the forwarded one costs nothing that `Host` was not already exposed to.
+ */
 export function originFromHeaders(
   host: string | null,
   forwardedProto: string | null,
+  forwardedHost?: string | null,
 ): string | null {
-  if (!host) return null;
-  const proto = forwardedProto?.split(",")[0]?.trim() || "https";
-  return `${proto}://${host}`;
+  const authority = firstValue(forwardedHost) ?? firstValue(host);
+  if (!authority) return null;
+  return `${firstValue(forwardedProto) ?? "https"}://${authority}`;
 }
 
 /** The one call that actually reads the incoming request. Everything else here is pure. */
 export async function requestOrigin(): Promise<string | null> {
   const list = await headers();
-  return originFromHeaders(list.get("host"), list.get("x-forwarded-proto"));
+  return originFromHeaders(
+    list.get("host"),
+    list.get("x-forwarded-proto"),
+    list.get("x-forwarded-host"),
+  );
 }
 
 /**
  * The ONE origin this deployment considers itself canonical for, or `undefined` when the operator
  * has not declared one — which is the normal, correct state for staging and every preview.
  *
- * Normalised through `URL().origin` so a trailing slash or a stray path segment in the variable
+ * Normalized through `URL().origin` so a trailing slash or a stray path segment in the variable
  * cannot make an otherwise-correct value fail to match a request origin, which never carries either.
  */
 export function canonicalSiteOrigin(): string | undefined {

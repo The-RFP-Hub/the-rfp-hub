@@ -40,7 +40,7 @@ here. Copy `.env-example` to `.env.local` to start.
 |---|---|
 | `NEXT_PUBLIC_API_URL` | **Required, every environment.** Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
 | `NEXT_PUBLIC_GA_ID` | *Optional.* A Google Analytics 4 measurement id (`G-…`). When set, the layout loads gtag.js and the CSP opens exactly the Google origins GA4 needs; when unset — the default, and what every fork inherits — no analytics loads and the policy names no Google origin at all. Enabling it is a per-deployment decision with privacy-page consequences: see `src/app/privacy/page.tsx`. |
-| `NEXT_PUBLIC_SITE_ORIGIN` | **Optional, and set ONLY on production.** The one origin this deployment considers itself the canonical, indexable copy of the site — e.g. `https://ethrfps.app`. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` compare it against the incoming request's own origin (`src/lib/site-origin.ts`) and index, sitemap and allow-crawl **only when they match**. Left unset, as it is on staging and on every Vercel preview, the deployment always answers `noindex` and `Disallow: /` — the fail-closed direction, so forgetting to set it costs production its search presence rather than costing a preview its privacy. |
+| `NEXT_PUBLIC_SITE_ORIGIN` | **Optional, and set ONLY on production.** The one origin this deployment considers itself the canonical, indexable copy of the site — e.g. `https://ethrfps.app`. It must be **the scheme and host a browser actually uses**, exactly: `http://` where the visitor gets `https://`, or an internal hostname a proxy rewrites `Host` to, never matches. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` compare it against the incoming request's own origin (`src/lib/site-origin.ts`, which reads `X-Forwarded-Host` before `Host`) and index, sitemap and allow-crawl **only when they match**. Left unset, as it is on staging and on every Vercel preview, the deployment always answers `noindex` and `Disallow: /` — the fail-closed direction, so forgetting to set it costs production its search presence rather than costing a preview its privacy. |
 
 None of them is a secret — an origin is an identifier, readable by anyone who loads the page.
 **Nothing secret may ever be added with this prefix.** This package holds no server-side credential
@@ -101,7 +101,7 @@ change the environment every other suite executes in.
 |---|---|
 | `/` | The directory. Every published opportunity, from `GET /v1/opportunities`: title, organisation, next deadline and award, with search, funding-type / status / ecosystem filters, ordering and pagination. Every filter is a parameter that endpoint declares — it validates its querystring with `additionalProperties: false`, so an invented one is a 400 rather than a control that quietly does nothing. Below the listing, the demoted sign-in card for publishers. |
 | `/opportunities/[id]` | One published opportunity in full, from `GET /v1/opportunities/{id}` — **the read the API counts as a detail view**. Dates, money, organisations, milestones, eligibility, links, the type-specific `fundingDetails` block verbatim, the provenance and source-check state the payload exposes, and the public, redacted change history from the audit route. The "open the application page" action goes through `/v1/r/{id}/apply`. |
-| `/publishers` | Every verified organisation, from `GET /v1/publishers` — one unauthenticated call, no pagination, ordered deterministically by slug. Each card links to `/?organization=<slug>`, which matches any operating or sponsoring organisation on that listing. `logoUrl` is never rendered as an `<img>` (see the CSP section below); it is a link, or nothing. |
+| `/publishers` | Every verified organization, from `GET /v1/publishers` — one unauthenticated call, no pagination, ordered deterministically by slug. Each card links to `/?organization=<slug>`, and says so on the card: that filter matches any operating or sponsoring organization on a listing. `logoUrl` is never rendered as an `<img>` (see the CSP section below); it is a link, or nothing. |
 
 ### Signed in — the workbench
 
@@ -237,9 +237,17 @@ dev server, staging, a Vercel preview, a self-hosted copy that has not set the v
 everywhere for a simpler reason — nothing was served from a canonical address at all, and a preview
 URL that indexed would have competed with the real one for every listing it carried — and that
 reasoning has not gone away, it has just narrowed from "no deployment qualifies" to "exactly one
-does, and it names itself." The request origin itself is still derived from the incoming `Host`
-header rather than hard-coded, so a self-hosted copy of this reference frontend that sets its own
-`NEXT_PUBLIC_SITE_ORIGIN` gets a correct, self-describing sitemap for its own hostname.
+does, and it names itself." The request origin itself is still derived from the incoming request —
+`X-Forwarded-Host` first, then `Host`, so a CDN or load balancer that rewrites `Host` to an internal
+name does not silently cost the deployment its indexing — rather than hard-coded, so a self-hosted
+copy of this reference frontend that sets its own `NEXT_PUBLIC_SITE_ORIGIN` gets a correct,
+self-describing sitemap for its own hostname.
+
+**One deployment, one origin.** If the site answers at both an apex and a `www.` alias, the alias
+must **redirect** to the canonical origin at the edge, not run as a second deployment: two
+deployments both reachable means one of them is `noindex` and the other is not, which is correct but
+splits inbound links, and setting the variable on both would put two indexable copies of the same
+directory in the index.
 
 ---
 
