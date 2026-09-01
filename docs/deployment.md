@@ -592,10 +592,11 @@ only on a tag, so a release is always an explicit act with a name in the history
 ### 7.9 Click the Deploy Button once, end to end, and write down where it landed
 
 The last step before handing the release to anybody, and the one nothing automated can stand in
-for. Open [`packages/frontend/README.md` § Deploying your own
-copy](../packages/frontend/README.md#deploying-your-own-copy), click the button, take the flow all
-the way to a running deployment with `NEXT_PUBLIC_API_URL` set at the prompt, load the directory,
-and **record the resulting URL** in the release notes. Delete the deployment afterwards.
+for. Open the button's one canonical home —
+[`packages/frontend/README.md`](../packages/frontend/README.md#deploying-your-own-copy) — click it,
+take the flow all the way to a running deployment with `NEXT_PUBLIC_API_URL` set at the prompt,
+load the directory, and **record the resulting URL** in the release notes. Delete the deployment
+afterwards.
 
 A Deploy Button is a URL carrying a build configuration — root directory, install command, build
 command, the variable and its help text — and every one of those can be individually correct while
