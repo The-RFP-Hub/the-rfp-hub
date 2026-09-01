@@ -64,6 +64,8 @@ Notes on the windows:
 
 - The window is a **minimum, not a target**. A contentious change stays open until it is
   resolved, not until 72 hours elapse.
+- A **substantive amendment** to an open change restarts its window from the amendment; an
+  **editorial** one — wording, a typo, a broken link — does not.
 - The **registry fast path** exists because registering a value changes nothing about what
   validates — unregistered values were already valid data. It is a documentation change with a
   review criterion attached ([`PROCESS.md`](./packages/standard/PROCESS.md)), and pricing it like
