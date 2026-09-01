@@ -1,15 +1,8 @@
 /**
- * Everything the server reads from its ENVIRONMENT, resolved once, in one place.
- *
- * The credential is deliberately not a tool parameter and never will be: a model that can put a
- * key in an argument can also put it in a transcript, a log line, or a document it submits. It
- * comes from the process environment the person configuring the client wrote, and nothing in the
- * MCP channel can change it.
- *
- * `apiOrigin` is the CANONICAL origin of `apiBase`, and it is a separate field because the write
- * approval binds to it: `https://api.ethrfps.app`, `https://api.ethrfps.app/` and
- * `https://api.ethrfps.app:443` are the same destination and must produce the same approval, while
- * a staging host must not.
+ * Everything the server reads from its ENVIRONMENT, resolved once. The credential is deliberately
+ * not a tool parameter: a model that can put a key in an argument can put it in a transcript.
+ * `apiOrigin` is separate because the approval binds to it — a trailing slash, an explicit `:443`
+ * and an upper-case host are one destination and must produce one approval.
  */
 import os from "node:os";
 import path from "node:path";
@@ -30,10 +23,7 @@ export interface McpConfig {
   apiOrigin: string;
   /** The `rfph_` credential, or null when none is configured. Reads never send it. */
   apiKey: string | null;
-  /**
-   * Whether the write tool is REGISTERED at all. Fail-closed: without the flag the tool does not
-   * appear in `tools/list`, so a poisoned search result has no write tool to reach for.
-   */
+  /** Whether the write tool is REGISTERED at all — not merely whether it refuses. */
   submitEnabled: boolean;
   /** Directory for the approval, policy-counter and audit files. 0700. */
   home: string;
@@ -43,24 +33,13 @@ export interface McpConfig {
 
 export class ConfigError extends Error {}
 
-/**
- * A non-secret, stable handle for a credential: the first 8 hex characters of its SHA-256.
- *
- * It is NOT a prefix of the key. A prefix would leak key material into an approval file, an audit
- * line and a terminal an operator may screen-share; a hash prefix identifies "the same key as
- * last time" without carrying any of it.
- */
+/** A HASH prefix, not a key prefix: it identifies "the same key" without carrying any of it. */
 export function keyFingerprint(key: string | null, sha256Hex: (s: string) => string): string {
   if (key === null) return "none";
   return sha256Hex(key).slice(0, 8);
 }
 
-/**
- * The hosts allowed to be reached over plain `http:`.
- *
- * Nothing else may be: the write path sends `Authorization: Bearer <key>`, and a cleartext
- * credential on a network is a leaked credential no matter which origin a human approved.
- */
+/** The only hosts reachable over plain `http:`; the write path sends a bearer credential. */
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
 
 function isLoopback(hostname: string): boolean {
@@ -78,13 +57,8 @@ const SHAPE_RULE =
   "query or fragment is refused because the write approval binds the ORIGIN, so two bases that " +
   "differ only after the host would produce the same approval and reach different endpoints.";
 
-/**
- * Parse and vet `RFPHUB_API_BASE`.
- *
- * NO FAILURE HERE EVER ECHOES THE VALUE. `https://user:password@host` is a perfectly ordinary URL
- * to write by accident, and quoting the offending base back into an error message — which reaches
- * stderr, an audit line and the model's context — would publish those credentials.
- */
+/** NO FAILURE HERE ECHOES THE VALUE: `https://user:pw@host` is an easy accident, and the message
+ * reaches stderr, an audit line and the model's context. */
 function parseBase(base: string): URL {
   let url: URL;
   try {
@@ -140,8 +114,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
     apiOrigin,
     apiKey: apiKeyRaw ? apiKeyRaw : null,
     submitEnabled: env.RFPHUB_MCP_ENABLE_SUBMIT === "1",
-    // RFPHUB_MCP_HOME WINS over HOME and over `os.homedir()`: a service account or a container may
-    // have no home directory at all, or one shared with something else.
+    // Wins over HOME and `os.homedir()`: a container may have no home, or a shared one.
     home: env.RFPHUB_MCP_HOME?.trim() || path.join(os.homedir(), ".rfphub"),
     timeoutMs: resolveTimeoutMs(env.RFPHUB_MCP_TIMEOUT_MS),
   };

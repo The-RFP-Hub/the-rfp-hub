@@ -1,27 +1,13 @@
 /**
  * `submit_opportunity` — the only tool that writes, in three phases with a human in the middle.
  *
- * PHASE 0 — refuse a credential inside the document, before anything else happens. The API accepts
- * free text in `description`, `eligibility` and a dozen other places, so a key pasted into one of
- * them would be PERSISTED and only then redacted out of the reply. Output redaction cannot save
- * that; the document has to be refused before a request exists.
- *
- * PHASE 1 — preview. The document is validated locally with the same implementation the API runs,
- * a public digest is computed over five bindings, a pending record is written 0600, and the caller
- * gets back `status: "pending"` and the digest. NO SECRET IS RETURNED. A confirmation token that
- * comes back in the tool's own response is spendable by the same model in the same turn, which is
- * input-binding, not consent.
- *
- * PHASE 2 — a person runs `rfphub-mcp approve <id>` in a terminal, reads the five bindings and the
- * document that is printed there, and confirms. That happens outside this file and outside the MCP
- * channel. It is NOT isolated from an agent holding a shell as the same user — see `approvals.ts`
- * and ADR 0012 for what is and is not claimed.
- *
- * PHASE 3 — commit. The five bindings are recomputed FROM CURRENT STATE (including which API and
- * which credential are configured right now), the approval is claimed by an atomic rename BEFORE
- * any network call, and only then is the POST made. The approval is never restored, at any
- * outcome: after a timeout the honest state is "may have been written", and a restored approval
- * invites a second write.
+ * PHASE 0 refuses a credential inside the document before a request exists: the API stores the text
+ * it is given, so a key in `description` would be persisted and only then redacted out of the reply.
+ * PHASE 1 validates locally, writes a 0600 pending record and returns `status: "pending"` plus a
+ * public digest — NO SECRET, because a token returned in the tool's own response is spendable by
+ * the same model in the same turn. PHASE 2 happens at a person's terminal, outside this file.
+ * PHASE 3 recomputes the five bindings FROM CURRENT STATE, claims the approval by atomic rename
+ * BEFORE any network call, and never restores it at any outcome.
  */
 import { humanizeIssues, validateOpportunity } from "rfphub-validate";
 import { z } from "zod";
@@ -48,14 +34,8 @@ import type { ToolContext, ToolSuccess } from "./context.js";
 export const TOOL_NAME = "submit_opportunity";
 
 /**
- * How much of a suspected duplicate's title comes back.
- *
- * These titles are SOMEBODY ELSE'S text, arriving on the write path — the one place where the
- * caller is already primed to act — and they are the only third-party strings in this tool's
- * output. Bounding and labeling them the way the search results are bounded and labeled is the
- * whole point; leaving them raw would have made the write tool the soft spot in a projection the
- * read tools take seriously. They are kept rather than dropped because a bare id and a score
- * cannot be judged: deciding "is this the same program" needs the name.
+ * Third-party text on the write path, bounded like the search projection's. Kept rather than
+ * dropped because a bare id and a score cannot answer "is this the same program".
  */
 export const DUPLICATE_TITLE_MAX = 140;
 
@@ -130,7 +110,7 @@ const submittedSchema = z.object({
 
 export const outputSchema = z.discriminatedUnion("status", [pendingSchema, submittedSchema]);
 
-/** The three states of `duplicateCheck`, each said in full so none reads as "no duplicates". */
+/** Each state said in full, so none of them reads as "no duplicates". */
 export function explainDuplicateCheck(
   status: SubmissionResult["duplicateCheck"],
   found: number,
@@ -159,39 +139,25 @@ export function explainDuplicateCheck(
 }
 
 /**
- * The API's admission limits, mirrored here so a preview refuses what the submission would.
- *
- * These are NOT schema rules — a document can be perfectly conformant and still be over them, so
- * local validation passes and the write fails. Checking them only at commit time would mean a
- * person reads a document, approves it, and only then finds out it was never admissible: their
- * approval is spent, the round trip is wasted, and the failure arrives at the point where it is
- * most expensive.
- *
- * They are a COPY of values that live in the API, which is a real cost: if the API loosens a cap,
- * this refuses something that would now be accepted. That is the safe direction, and it is why the
- * numbers are stated here with their source rather than buried as literals. Source: the write
- * service's field caps and the submission route's body limit.
+ * NOT schema rules: a conformant document can be over them, so local validation passes and the
+ * write fails. Checked at PREVIEW time, or a person approves something that was never admissible.
+ * A copy of values that live in the API — if the API loosens a cap this refuses early, which is
+ * the safe direction. Source: the write service's field caps and the route's body limit.
  */
 export const ADMISSION_CAPS = {
   title: 256,
   summary: 1_000,
   description: 50_000,
   /**
-   * TOP-LEVEL arrays only, which is exactly the rule the API applies: it walks the document's own
-   * entries and checks each one that is an array. A nested array — `operatingOrganizations[0]
-   * .ecosystems`, a milestone list inside `fundingDetails` — is NOT checked against this, and is
-   * bounded only by the body limit below.
-   *
-   * Checking more here than the API checks would be its own bug, and a quiet one: a document the
-   * API would have accepted comes back refused, with a reason that names a limit nobody enforces.
-   * A local mirror of somebody else's rule is only useful while it is the same rule.
+   * TOP-LEVEL arrays only, exactly as the API applies it. Checking more here would refuse a
+   * document the API would have accepted, naming a limit nobody enforces.
    */
   arrayEntries: 100,
   /** The route's body limit, applied to the serialized document. */
   bodyBytes: 256 * 1024,
 } as const;
 
-/** The document's own array-valued fields. Deliberately not recursive — see `arrayEntries`. */
+/** Deliberately not recursive — see `arrayEntries`. */
 function topLevelArrays(document: Record<string, unknown>): { path: string; length: number }[] {
   const out: { path: string; length: number }[] = [];
   for (const [key, value] of Object.entries(document)) {
@@ -200,10 +166,7 @@ function topLevelArrays(document: Record<string, unknown>): { path: string; leng
   return out;
 }
 
-/**
- * Refuse, at PREVIEW time, anything the API would refuse on admission. Nothing is sent either way;
- * the point is that nobody is asked to approve a request that cannot succeed.
- */
+/** Nobody is asked to approve a request that cannot succeed. */
 export function assertWithinAdmissionCaps(document: Record<string, unknown>): void {
   const problems: string[] = [];
 
@@ -255,7 +218,7 @@ interface DocumentFacts {
   deadlineCount: number;
 }
 
-/** The namespace rule, applied to the document as given: `source.publisher ?? orgs[0].slug`. */
+/** The namespace rule as given: `source.publisher ?? orgs[0].slug`. */
 export function deriveFacts(document: Record<string, unknown>): DocumentFacts {
   const source = asRecord(document.source);
   const orgs = Array.isArray(document.operatingOrganizations)
@@ -289,7 +252,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/** Phase 0. Runs before validation, before the digest, before anything touches the network. */
+/** Phase 0: before validation, before the digest, before anything touches the network. */
 export function rejectEmbeddedCredential(document: unknown): void {
   const hits = findSecretPaths(document);
   if (hits.length === 0) return;
@@ -300,12 +263,7 @@ export function rejectEmbeddedCredential(document: unknown): void {
   );
 }
 
-/**
- * Whether the document's own id is `<namespace>:<local>` for the namespace derived from it.
- *
- * The API decides this, and a mismatch is a 400 the caller cannot see coming — so the preview says
- * it in the one place a person is being asked to read before approving.
- */
+/** A mismatch is a 400 the caller cannot see coming, so the preview says it before approval. */
 export function describeIdRule(facts: DocumentFacts): { text: string; matches: boolean } {
   const prefix = `${facts.namespace}:`;
   const matches =
@@ -327,7 +285,6 @@ function bindingFor(document: Record<string, unknown>, ctx: ToolContext): Approv
 }
 
 export async function run(input: SubmitInput, ctx: ToolContext): Promise<ToolSuccess> {
-  // ── phase 0 ────────────────────────────────────────────────────────────────
   rejectEmbeddedCredential(input.document);
 
   if (ctx.config.apiKey === null) {
@@ -340,7 +297,6 @@ export async function run(input: SubmitInput, ctx: ToolContext): Promise<ToolSuc
     );
   }
 
-  // ── phase 1 ────────────────────────────────────────────────────────────────
   const result = validateOpportunity(input.document);
   if (!result.valid) {
     const issues = humanizeIssues(result.errors, input.document);
@@ -361,7 +317,6 @@ export async function run(input: SubmitInput, ctx: ToolContext): Promise<ToolSuc
     return preview(input.document, binding, approvalId, facts, validatorWarnings, ctx);
   }
 
-  // ── phase 3 ────────────────────────────────────────────────────────────────
   return commit(input.document, input.approvalId, binding, approvalId, ctx);
 }
 
@@ -383,9 +338,8 @@ function preview(
     expiresAt: new Date(now.getTime() + PENDING_TTL_MS).toISOString(),
   });
 
-  // The first four sentences are PRESCRIBED, word for word. They are what a model reads before
-  // deciding what it just did, and a paraphrase that drops `status: "pending"` or softens "must"
-  // is the difference between "nothing happened" and "something might have".
+  // The first four sentences are PRESCRIBED, word for word: dropping `status: "pending"` or
+  // softening "must" is the difference between "nothing happened" and "something might have".
   const instruction = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`rfphub-mcp approve ${approvalId}\` in their own terminal and read what it prints. No approval secret is ever returned here. Then call this tool again with the SAME document and \`approvalId: "${approvalId}"\`. The approval expires ${PENDING_TTL_MS / 60000} minutes after this preview.`;
   const idRule = describeIdRule(facts);
 
@@ -474,20 +428,14 @@ async function commit(
     );
   }
 
-  // ORDER MATTERS HERE, AND THIS IS THE ORDER.
-  //
-  // The write budget is reserved FIRST, because it is the cheap resource and the approval is the
-  // expensive one: a person spent attention on the approval, and running out of daily writes after
-  // the approval has been claimed would burn it for nothing — the caller would have to go back and
-  // ask them again for a submission that never left. Reserving first means a purely local refusal
-  // costs nothing.
+  // ORDER MATTERS. The budget is reserved FIRST because the approval is the expensive resource:
+  // running out of daily writes after claiming it would burn a person's attention for nothing.
   const budget = ctx.policy.reserve("commit");
 
   let claim: ReturnType<typeof claimApproval>;
   try {
-    // THE CLAIM HAPPENS BEFORE THE NETWORK. An atomic rename means two processes racing this
-    // approval produce exactly one winner; claiming after a successful response would leave the
-    // approval spendable again whenever the response never arrives.
+    // BEFORE THE NETWORK: claiming after a response would leave the approval spendable again
+    // whenever the response never arrives.
     claim = claimApproval(ctx.config.home, approvalId);
   } catch (err) {
     budget.release();
@@ -503,9 +451,8 @@ async function commit(
     );
   }
 
-  // From this line on the request is going out, so the unit stays spent whatever comes back —
-  // including nothing at all. A timeout that refunded the budget would invite exactly the blind
-  // retry the ambiguous-outcome message tells the caller not to make.
+  // From here the request is going out, so the unit stays spent whatever comes back. A refund on
+  // timeout would invite the blind retry the ambiguous-outcome message warns against.
   budget.commit();
   ctx.spentCommitBudget?.();
 

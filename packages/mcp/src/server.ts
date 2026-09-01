@@ -1,27 +1,13 @@
 /**
- * Tool registration, and the one boundary every failure goes through.
+ * Tool registration, and the one boundary every failure goes through. Nothing here knows about a
+ * transport, so an HTTP entry point is a new file rather than a refactor.
  *
- * NOTHING HERE KNOWS ABOUT A TRANSPORT. `createServer()` returns a configured server;
- * `cli.ts` decides that it is served over stdio. Adding an HTTP entry later is a new file that
- * calls this one, not a refactor of it.
+ * `guard` spends the invocation's budget, redacts the result and every error message, writes one
+ * audit line, and turns any failure into a coded `isError` result. `installErrorBoundary` extends
+ * that to the SDK's own argument-validation and unknown-tool paths, which quote arguments back.
  *
- * Four cross-cutting rules live in `guard`, so no tool can forget one:
- *   - the policy budget for the invocation's kind is spent before the work starts;
- *   - the result — text, structured content, and every error message — passes through redaction;
- *   - one audit line is written per call, recording key names and byte counts, never values;
- *   - a failure becomes an `isError` result carrying a code from the single error map, and an
- *     unexpected exception becomes `exec_failed` rather than a stack trace on the wire.
- *
- * ARGUMENT VALIDATION GOES THROUGH THE SAME BOUNDARY. The SDK validates a tool's arguments against
- * its declared schema BEFORE the callback runs, and its own failure quotes the offending arguments
- * back — outside `guard`, so uncoded, unaudited and unredacted. `installErrorBoundary` wraps that
- * step so a malformed call is refused the way every other refusal is. Redaction additionally sits
- * on the transport (`transport.ts`), because the SDK has error paths this package does not author
- * at all, such as an unknown tool name echoed in a JSON-RPC error.
- *
- * FAIL-CLOSED REGISTRATION. The write tool is registered only when `RFPHUB_MCP_ENABLE_SUBMIT=1`.
- * Without it `tools/list` returns two tools, and a poisoned search result has no write tool to
- * reach for — which is a stronger property than a write tool that exists and refuses.
+ * The write tool is registered ONLY when `RFPHUB_MCP_ENABLE_SUBMIT=1`: a poisoned search result
+ * then has no write tool to reach for, which is stronger than one that exists and refuses.
  */
 import { type CallToolResult, McpServer } from "@modelcontextprotocol/server";
 import { appendAudit, summarizeInput } from "./audit.js";
@@ -39,21 +25,10 @@ export const SERVER_NAME = "rfp-hub";
 export const SERVER_VERSION = "0.1.0";
 
 /**
- * The MCP revision this server is built against, and one of the five components an approval binds
- * to.
- *
- * NOT the SDK's `LATEST_PROTOCOL_VERSION`, despite the name: in v2 that constant is `2025-11-25`,
- * the newest revision of the LEGACY era, and it appears in `SUPPORTED_PROTOCOL_VERSIONS` alongside
- * the older ones. The 2026-07-28 rewrite is a separate era — stateless, no `initialize`, no
- * session id — which the SDK handles through its era machinery and does not publish as an exported
- * constant. `enums.test.ts` asserts the value below is absent from `SUPPORTED_PROTOCOL_VERSIONS`,
- * so if a future SDK folds the two together this constant gets revisited rather than silently
- * becoming wrong.
- *
- * What binding it into an approval buys: an approval granted by one build of this server cannot be
- * spent by a build speaking a different revision. It does not vary per connection — `serveStdio`
- * serves a 2025-era client from the same registrations, and the approval records what this server
- * IS, not what a given client negotiated.
+ * NOT the SDK's `LATEST_PROTOCOL_VERSION`: in v2 that is `2025-11-25`, the newest LEGACY-era
+ * revision. The 2026-07-28 era is handled through the SDK's era machinery and is not exported as a
+ * constant, so `enums.test.ts` asserts this value is absent from `SUPPORTED_PROTOCOL_VERSIONS` —
+ * a future SDK that folds the two together revisits this line rather than silently outdating it.
  */
 export const PROTOCOL_VERSION = "2026-07-28";
 
@@ -66,16 +41,7 @@ export interface CreateServerOptions {
   now?: () => Date;
 }
 
-/**
- * The two seams inside the SDK's `tools/call` dispatch that this package needs to reach.
- *
- * Both are ordinary prototype methods at run time, but the published types mark them `private`, so
- * a subclass cannot override them and this interface has to describe them separately. That is a
- * real coupling to an internal shape, and it is handled the only honest way: `installErrorBoundary`
- * REFUSES TO START if either seam is missing, rather than continuing with a security boundary that
- * silently is not there. An SDK upgrade that moves them fails immediately and loudly, in CI, on the
- * first server this package constructs.
- */
+/** A real coupling to a `private` internal shape, handled by refusing to start when it moves. */
 interface RegisteredToolLike {
   enabled?: boolean;
   executor?: (args: unknown, ctx: unknown) => unknown;
@@ -88,21 +54,9 @@ interface ToolDispatchSeams {
 }
 
 /**
- * Route the SDK's argument validation and its error funnel through this package's boundary.
- *
- * WHY. The SDK validates a tool's arguments against its declared schema BEFORE the registered
- * callback runs, and its own rejection quotes the offending arguments back. That happens outside
- * `guard`: uncoded, unaudited, and unredacted — so an unknown property whose NAME is a credential
- * would be echoed to the caller verbatim. Wrapping the seam keeps the schema published in
- * `tools/list` exactly as authored (registering a permissive schema instead would hide the contract
- * from every client) while making a malformed call fail like every other failure here.
- *
- * The instance properties SHADOW the prototype methods, which is what makes this work: the
- * dispatcher calls them through `this`.
- *
- * This is also where the write tool's attempt budget is charged for a call that never reaches the
- * handler, and where an unknown tool name is turned into a coded answer instead of a bare protocol
- * error. Both are failures the dispatcher owns, and neither is visible from inside a callback.
+ * The SDK rejects malformed arguments BEFORE the callback runs and quotes them back — uncoded and
+ * unredacted, so a property whose NAME is a credential would be echoed verbatim. The instance
+ * properties assigned here shadow the prototype methods the dispatcher calls.
  */
 function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
   const seams = server as unknown as ToolDispatchSeams;
@@ -126,41 +80,28 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
     try {
       return await validate(tool, args, toolName);
     } catch (err) {
-      // THE WRITE TOOL'S ATTEMPT BUDGET IS SPENT HERE, on this path only.
-      //
-      // A call that gets past validation spends its attempt inside the handler, so charging here
-      // as well would bill every legitimate submission twice. But a call rejected BEFORE the
-      // handler never reaches that line — and rejection is the cheap, repeatable case, which is
-      // exactly what an attempt budget exists to meter. Left uncharged, malformed arguments were
-      // the one way to drive the write tool in an unmetered loop.
-      //
-      // A refusal here must never be masked by a refusal about the budget: the caller's arguments
-      // are still wrong, and `rate_limited` would send them to fix the wrong thing. So the charge
-      // is best-effort, and the schema error is what comes back either way.
+      // The attempt budget is charged HERE for a call that never reaches the handler — otherwise
+      // malformed arguments are the one unmetered loop into the write tool. Best-effort, because
+      // `rate_limited` would send the caller to fix the wrong thing: the arguments are still wrong.
       const kind: ToolKind = toolName === submitTool.TOOL_NAME ? "attempt" : "read";
       if (kind === "attempt") {
         try {
           ctx.policy.consume("attempt");
         } catch {
-          // Already over budget, or the store is unusable. Either way the argument error below is
-          // the more useful thing to return.
+          // The argument error below is the more useful thing to return.
         }
       }
       const detail = redactString(err instanceof Error ? err.message : String(err));
       appendAudit(ctx.config.home, {
         at: new Date(started).toISOString(),
         tool: toolName,
-        // The audit line names the tool that was called and the budget it drew on, not a generic
-        // `read` that would make every rejected submission look like a search in the log.
         kind,
         status: "invalid_input",
         inputSummary: summarizeInput(args),
         durationMs: Date.now() - started,
       });
-      // Thrown ALREADY FORMATTED. This path does not run through `guard` — it is upstream of the
-      // callback — and the SDK's funnel takes only `error.message`, so a bare `ToolError` would
-      // arrive on the wire with its code stripped off. `formatToolError` is the one place the wire
-      // shape is defined, so both paths produce the same thing.
+      // Already formatted: this path is upstream of `guard`, and the SDK's funnel takes only
+      // `error.message`, so a bare `ToolError` would arrive with its code stripped off.
       throw new Error(
         formatToolError(
           new ToolError(
@@ -172,30 +113,17 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
     }
   };
 
-  // The funnel every throw inside the dispatcher passes through on its way to an `isError` result.
-  // Redacting here covers the SDK's own wording as well as this package's.
+  // Covers the SDK's own wording as well as this package's.
   seams.createToolError = (message: string) => createError(redactString(message));
 
-  // UNKNOWN TOOLS. The dispatcher looks a tool up in this record and throws a bare protocol error
-  // when it misses — outside its own try block, so that failure never becomes a coded result and
-  // never reaches an audit line. Interposing on the LOOKUP puts it back inside the normal path: an
-  // unknown name resolves to a tool whose only behavior is to raise `tool_not_found`, which then
-  // travels through the same funnel as everything else.
-  //
-  // This is why the proxy is installed AFTER registration: `registerTool` refuses a name that is
-  // already present, and a proxy answering every name would make every registration a duplicate.
-  //
-  // A tool that exists but is switched off — `submit_opportunity` without the env flag is not
-  // registered at all, but the SDK supports disabling — is left to the SDK, because the record
-  // holds a real entry for it and this trap never fires.
+  // The dispatcher throws a bare protocol error for an unknown tool OUTSIDE its own try block, so
+  // it never becomes a coded result or an audit line. Interposing on the lookup puts it back on
+  // the normal path. Installed after registration: `registerTool` refuses a name already present.
   const registry = seams._registeredTools;
   seams._registeredTools = new Proxy(registry, {
     get(target, name, receiver) {
-      // `Object.hasOwn`, NOT `Reflect.has`: the latter walks the prototype chain, so `toString`,
-      // `constructor`, `valueOf` and every other `Object.prototype` member would be reported as
-      // present and handed back as-is. A caller asking for a tool named `constructor` would then
-      // get the SDK trying to dispatch to a function that is not a tool at all, instead of the
-      // plain answer that no such tool exists.
+      // `Object.hasOwn`, NOT `Reflect.has`: the latter reports `constructor`, `toString` and every
+      // other prototype member as a present tool.
       if (typeof name !== "string" || Object.hasOwn(target, name)) {
         return Reflect.get(target, name, receiver);
       }
@@ -205,9 +133,7 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
           appendAudit(ctx.config.home, {
             at: new Date().toISOString(),
             tool: name,
-            // `read` because nothing was read, written or previewed — the name resolved to
-            // nothing. There is no budget to charge for a tool that does not exist, and inventing
-            // a kind for it would put a phase in the log that never happened.
+            // Inventing a kind here would put a phase in the log that never happened.
             kind: "read",
             status: "tool_not_found",
             inputSummary: { keys: [], bytes: 0 },
@@ -252,8 +178,7 @@ export function createServer(options: CreateServerOptions): McpServer {
       description: searchTool.TOOL_DESCRIPTION,
       inputSchema: searchTool.inputSchema,
       outputSchema: searchTool.outputSchema,
-      // Hints, not enforcement — only some clients act on them. Set anyway: a client that does
-      // use them should not have to guess that a search is a read.
+      // Hints, not enforcement — only some clients act on them.
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     (args) =>
@@ -287,20 +212,16 @@ export function createServer(options: CreateServerOptions): McpServer {
         outputSchema: submitTool.outputSchema,
         annotations: {
           readOnlyHint: false,
-          // Not destructive: a submission adds an entry for review. It never removes or replaces
-          // anything a caller did not name by id.
+          // A submission adds an entry for review; it removes nothing the caller did not name.
           destructiveHint: false,
-          // Not idempotent from the client's side. The API recognizes a byte-identical repeat from
-          // the same submitter, but the caller cannot know a timed-out request did not land.
+          // The API recognizes a byte-identical repeat, but a caller cannot know a timeout landed.
           idempotentHint: false,
           openWorldHint: true,
         },
       },
       (args) => {
-        // The KIND is decided by the PHASE, inside `run`: the preview spends the preview budget and
-        // the commit spends the commit budget, and only when it reaches the POST. `guard` therefore
-        // spends nothing here, and learns which phase happened from the callback below so the audit
-        // line names what actually occurred rather than what was expected.
+        // The kind is decided by the PHASE inside `run`, so `guard` spends nothing here and learns
+        // from the callback which phase actually happened.
         let kind: ToolKind = "preview";
         const phaseCtx: ToolContext = {
           ...ctx,
@@ -314,10 +235,8 @@ export function createServer(options: CreateServerOptions): McpServer {
           args,
           phaseCtx,
           () => {
-            // CHARGED BEFORE ANY WORK, on every invocation, successful or not. The phase budgets
-            // only meter calls that got somewhere; without this, refusals — a bogus approval id, a
-            // document over the caps, a key hidden in a field — are free, and the refusal path is
-            // an unmetered loop through validation and the filesystem.
+            // Before any work, on every invocation: the phase budgets meter only calls that got
+            // somewhere, which would leave the refusal path an unmetered loop.
             phaseCtx.policy.consume("attempt");
             return submitTool.run(args, phaseCtx);
           },
@@ -327,20 +246,13 @@ export function createServer(options: CreateServerOptions): McpServer {
     );
   }
 
-  // AFTER the registrations: the SDK installs its `tools/call` dispatcher lazily, on the first
-  // `registerTool`, and the seams do not exist to be wrapped until it has.
+  // After the registrations: the dispatcher is installed lazily on the first `registerTool`.
   installErrorBoundary(server, ctx);
 
   return server;
 }
 
-/**
- * Spend the budget (unless the tool does it itself), run, redact, audit, and turn any failure into
- * a coded error result.
- *
- * `kind` is either fixed or a thunk read AFTER the work finishes — the write tool does not know
- * which phase it is in until it gets there.
- */
+/** `kind` is a thunk when the tool learns its phase only as it runs. */
 async function guard(
   tool: string,
   kind: ToolKind | (() => ToolKind),
@@ -358,11 +270,7 @@ async function guard(
     const result = await work();
     const structured = redact(result.structured);
 
-    // OUTPUT VALIDATION HAPPENS HERE, not after this function returns. The SDK checks
-    // `structuredContent` against the declared schema too — but it does so downstream, so a
-    // malformed body would already have been recorded as `ok` in the audit log and would come back
-    // in the SDK's own words rather than as one of this package's codes. Validating inside means a
-    // 2xx whose shape is wrong fails like anything else fails.
+    // Here, not downstream where the SDK checks it: by then the audit line already says `ok`.
     const parsed = options.outputSchema?.safeParse(structured);
     if (parsed !== undefined && !parsed.success) {
       throw new ToolError(
@@ -395,10 +303,7 @@ async function guard(
   }
 }
 
-/**
- * Just enough of a schema for `guard` to check a result against, so this file does not take a
- * dependency on a particular validation library's type surface.
- */
+/** Just enough of a schema to avoid depending on one validation library's type surface. */
 interface OutputValidator {
   safeParse(
     value: unknown,
@@ -407,21 +312,12 @@ interface OutputValidator {
     | { success: false; error: { issues: { path: PropertyKey[]; message: string }[] } };
 }
 
-/**
- * The ONE wire format for a coded failure: the code in brackets, then the sentence, redacted.
- *
- * Two paths produce these — `guard`, and the argument-validation wrapper that runs upstream of it —
- * and a client that branches on the code needs both to look the same.
- */
+/** The ONE wire format for a coded failure. Two paths produce these and must agree. */
 export function formatToolError(error: ToolError): string {
   return redactString(`[${error.code}] ${error.message}`);
 }
 
-/**
- * Every failure leaves as a code from the map. An exception this package did not raise becomes
- * `exec_failed` with its message redacted — never a stack trace, which can carry file paths and,
- * in an `fs` error, a directory name derived from an environment value.
- */
+/** Never a stack trace: an `fs` error carries file paths derived from environment values. */
 export function toToolError(err: unknown): ToolError {
   if (err instanceof ToolError) return err;
   const message = err instanceof Error ? err.message : String(err);

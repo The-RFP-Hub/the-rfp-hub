@@ -1,14 +1,7 @@
 /**
- * The search tool's input contract, checked against the API's OWN query schema.
- *
- * These two schemas are written in different files, in different packages, in different schema
- * languages. Nothing but this test stops them drifting — and drift here is not cosmetic: a
- * parameter this server accepts and the API does not becomes a 400 the caller cannot fix, and a
- * value out of either enum becomes the same.
- *
- * The API module is loaded through a variable specifier so this package's own build never reaches
- * for it: the dependency is test-only and must stay that way. It is a monorepo sibling, not a
- * declared dependency, so a checkout that does not have it skips rather than fails.
+ * The search tool's input contract against the API's OWN query schema: nothing else stops two
+ * schemas in different packages and languages drifting into a 400 the caller cannot fix. Loaded
+ * through a variable specifier so this package's build never reaches for a test-only sibling.
  */
 import path from "node:path";
 import { describe, expect, it } from "vitest";

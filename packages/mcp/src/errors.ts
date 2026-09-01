@@ -1,13 +1,7 @@
 /**
- * ONE map from failure to code, for every tool.
- *
- * Each tool inventing its own vocabulary is how a client ends up unable to tell "you are not
- * allowed to do that" from "that did not parse" — both arrive as prose. A closed set of codes, and
- * a test that asserts nothing outside it is ever emitted, keeps the distinction machine-readable.
- *
- * No message built here ever carries a credential: the API's own error bodies are passed through
- * the redactor before they reach a message, and the 401/403 branches name the ENV VAR, never the
- * value it holds.
+ * ONE map from failure to code, for every tool: per-tool vocabularies leave a client unable to tell
+ * "not allowed" from "did not parse", since both arrive as prose. No message here carries a
+ * credential — the 401/403 branches name the ENV VAR, never the value.
  */
 
 export const ERROR_CODES = [
@@ -24,7 +18,7 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 
 export class ToolError extends Error {
   readonly code: ErrorCode;
-  /** Extra machine-readable context (field reports, the diverging digest component, …). */
+  /** Field reports, the diverging digest component, and so on. */
   readonly details?: Record<string, unknown>;
 
   constructor(code: ErrorCode, message: string, details?: Record<string, unknown>) {
@@ -45,14 +39,14 @@ export interface ApiErrorBody {
   mergedInto?: unknown;
 }
 
-/** The `<namespace>:<local>` rule, repeated wherever a 400 could be about it. */
+/** Repeated wherever a 400 could be about it. */
 export const ID_RULE =
   "A public id must be `<namespace>:<local>`, where `<namespace>` is `source.publisher` (or, " +
   "when that is absent, `operatingOrganizations[0].slug`) and must also appear in " +
   "`operatingOrganizations[].slug` — you may only publish under an organization that operates " +
   "the program.";
 
-/** Operations where the caller supplies a public id, and so where the id rule is about them. */
+/** Operations where the caller supplies a public id. */
 function mentionsIdRule(operation: string): boolean {
   return operation === "submit_opportunity" || operation === "fetch_opportunity";
 }
@@ -77,10 +71,7 @@ function fieldReport(body: ApiErrorBody): string[] {
   return out;
 }
 
-/**
- * The `{ id, title }` an `opportunity_merged` 404 points at, or null when the body is any other
- * kind of 404. Shape-checked rather than trusted: this is a network body.
- */
+/** Shape-checked rather than trusted: this is a network body. */
 export function mergedInto(body: ApiErrorBody | undefined): { id: string; title: string } | null {
   const raw = body?.mergedInto;
   if (raw === null || typeof raw !== "object") return null;
@@ -89,14 +80,8 @@ export function mergedInto(body: ApiErrorBody | undefined): { id: string; title:
   return { id, title };
 }
 
-/**
- * Map one HTTP failure to a `ToolError`.
- *
- * `status` is the HTTP status; `body` is the parsed JSON envelope when there was one. A body that
- * did not parse as JSON is a DIFFERENT failure from a server error — a proxy returning an HTML 502
- * is not the API answering — so callers pass `body: undefined` and get `exec_failed` with that
- * said plainly.
- */
+/** A body that did not parse is a DIFFERENT failure from a server error: an HTML 502 from a proxy
+ * is not the API answering, so callers pass `body: undefined`. */
 export function apiErrorToToolError(
   status: number,
   body: ApiErrorBody | undefined,
@@ -115,10 +100,8 @@ export function apiErrorToToolError(
         { status, apiError: code, fields },
       );
     }
-    // The id rule is appended ONLY where an id is the caller's to get right — a submission, or a
-    // fetch by id. On a search, `<namespace>:<local>` is a rule about something the caller never
-    // supplied: it explains a field they did not send, in a message about a query they did, and
-    // sends them looking in the wrong place.
+    // ONLY where the id is the caller's to get right: on a search it explains a field they never
+    // sent, and sends them looking in the wrong place.
     const idRule = mentionsIdRule(context.operation) ? `\n${ID_RULE}` : "";
     return new ToolError("invalid_input", `${code ?? "bad_request"}${suffix}${idRule}`, {
       status,
@@ -162,10 +145,8 @@ export function apiErrorToToolError(
   }
 
   if (status === 404) {
-    // Two different situations wear the same status, and collapsing them loses a followable
-    // pointer. `opportunity_merged` means the id RESOLVED — it named an entry a reviewer merged
-    // into another — and the body carries where it went. Reporting that as a bare "not found"
-    // sends a caller looking for a typo in an id that was perfectly correct.
+    // `opportunity_merged` means the id RESOLVED, and the body carries where it went. Reporting
+    // that as "not found" sends a caller hunting for a typo in a correct id.
     const merged = mergedInto(body);
     if (merged !== null) {
       return new ToolError(
@@ -207,7 +188,7 @@ export function apiErrorToToolError(
   );
 }
 
-/** A response whose body was not the API's JSON envelope — a proxy page, a truncated stream. */
+/** A proxy page, a truncated stream — not the API's JSON envelope. */
 export function nonJsonResponseError(status: number, operation: string): ToolError {
   return new ToolError(
     "exec_failed",
@@ -217,13 +198,8 @@ export function nonJsonResponseError(status: number, operation: string): ToolErr
 }
 
 /**
- * A write whose outcome is genuinely UNKNOWN.
- *
- * Every failure once the request has left this process lands here: a dropped connection, a body
- * that stops mid-stream, a body that is not JSON, a body over the cap. None of them says anything
- * about whether the row was written, and the one thing a caller must not do is assume. The
- * approval stays consumed — see `approvals.ts` — precisely so this state cannot be resolved by
- * blindly trying again.
+ * Every failure once the request has left lands here, and none of them says whether the row was
+ * written. The approval stays consumed so the state cannot be resolved by blindly trying again.
  */
 export function ambiguousWriteError(
   origin: string,

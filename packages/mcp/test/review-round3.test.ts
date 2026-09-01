@@ -277,8 +277,11 @@ describe("a stale lock is broken atomically", () => {
 
   it("renames rather than removes, so a live lock cannot be deleted by a racing breaker", () => {
     const source = fs.readFileSync(path.join(PKG, "src/lock.ts"), "utf8");
-    expect(source).toContain("BREAKING A STALE LOCK IS ITSELF ATOMIC");
+    expect(source).toContain("breaking is itself atomic");
     expect(source).toContain("fs.renameSync(dir, tombstone)");
+    expect(source).not.toContain(
+      "fs.rmSync(dir, { recursive: true, force: true });\n  } catch {\n    return",
+    );
   });
 });
 

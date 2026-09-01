@@ -1,18 +1,13 @@
 /**
- * `fetch_opportunity` — one full record, wrapped but not altered.
+ * `fetch_opportunity` — one full record in an envelope (`notice`, `opportunity`, `links`), so the
+ * labeling has somewhere to live and the counted redirect URLs need not be invented inside
+ * somebody else's document.
  *
- * The document goes into an ENVELOPE (`notice`, `opportunity`, `links`) rather than being returned
- * bare, so the labeling has somewhere to live and the two counted redirect URLs can be handed
- * over without inventing fields inside somebody else's document.
+ * THE PROMISE IS STRUCTURAL EQUIVALENCE, NOT BYTE EQUIVALENCE: the body is parsed and
+ * re-serialized, so key order and whitespace may differ. No field removed, added or changed.
  *
- * THE PROMISE IS STRUCTURAL EQUIVALENCE, NOT BYTE EQUIVALENCE. The body is parsed and
- * re-serialized on the way through, so key order and whitespace may differ from the bytes the API
- * sent. What is promised, and what the tests assert: no field removed, no field added, no value
- * changed. Saying "verbatim" would be a promise the transport does not keep.
- *
- * This is the tool that DOES return `description` and `summary` — free prose written by a third
- * party. That is the point of it: a caller who needs the full text asks for it by id, one record
- * at a time, rather than receiving twenty of them as a side effect of a search.
+ * This is the tool that DOES return `description` and `summary` — asked for by id, one record at a
+ * time, rather than arriving as a side effect of a search.
  */
 import { z } from "zod";
 import { FETCH_NOTICE, delimit } from "../untrusted.js";

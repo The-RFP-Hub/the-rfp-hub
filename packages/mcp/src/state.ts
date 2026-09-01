@@ -1,15 +1,10 @@
 /**
  * The local state directory, and the properties it must actually have before anything trusts it.
  *
- * `RFPHUB_MCP_HOME` (default `~/.rfphub`) holds the write approvals and the rate-limit counters.
- * Both are security decisions kept in files, so "the directory is 0700 and the files are 0600" is
- * not documentation — it is a precondition, and it has to be CHECKED rather than requested. A mode
- * asked for at creation time says nothing about a path that already existed, and a path that is a
- * symlink is not the path that was configured.
- *
- * SO THE RULE IS: establish it, or refuse. Approvals and counters fail closed when the state
- * cannot be secured; the audit log stays non-fatal, but declines to append rather than writing
- * into something it could not secure.
+ * `RFPHUB_MCP_HOME` holds write approvals and rate-limit counters — security decisions kept in
+ * files — so "0700 directory, 0600 files" is a precondition to be CHECKED, not requested: a mode
+ * asked for at creation says nothing about a path that already existed, and a path that is a
+ * symlink is not the path that was configured. Establish it, or refuse.
  */
 import fs from "node:fs";
 import { ToolError } from "./errors.js";
@@ -34,12 +29,7 @@ function octal(mode: number): string {
   return (mode & 0o777).toString(8).padStart(3, "0");
 }
 
-/**
- * Bring an existing path to `mode`, then read it back.
- *
- * The read-back is the point. `chmod` can report success on filesystems that do not carry POSIX
- * modes at all, and a mode that was requested is not a mode that is in force.
- */
+/** The read-back is the point: `chmod` can report success where modes are not carried at all. */
 function enforceMode(target: string, mode: number, stats: fs.Stats): void {
   if (!MODES_ENFORCED || (stats.mode & 0o777) === mode) return;
   try {
@@ -62,8 +52,7 @@ export function ensureDir(dir: string): void {
   try {
     fs.mkdirSync(dir, { recursive: true, mode: DIR_MODE });
   } catch (err) {
-    // Diagnosed below rather than rethrown: a symlink — dangling or not — where the directory
-    // belongs surfaces here as EEXIST or ENOENT, and the useful message is about the symlink.
+    // Diagnosed below: a symlink where the directory belongs surfaces here as EEXIST or ENOENT.
     failure = err;
   }
 
@@ -89,8 +78,7 @@ export function secureFile(file: string): void {
   }
   if (stats.isSymbolicLink()) throw new InsecureStateError(file, "is a symbolic link");
   if (!stats.isFile()) throw new InsecureStateError(file, "is not a regular file");
-  // A second name for the same inode is a second way to read it that this directory's mode does
-  // not cover.
+  // A second name for the same inode is a read path this directory's mode does not cover.
   if (stats.nlink > 1) throw new InsecureStateError(file, "has more than one hard link");
   enforceMode(file, FILE_MODE, stats);
 }

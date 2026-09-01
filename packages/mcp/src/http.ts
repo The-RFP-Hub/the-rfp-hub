@@ -1,30 +1,10 @@
 /**
- * A thin, dependency-free client for the public `/v1/` API — the same shape as the repository's
- * TypeScript example, with five rules this server needs and a general client does not.
- *
- * 1. READS ARE ANONYMOUS. No `Authorization` header is attached to a GET even when a key is
- *    configured. Search results are public data; sending a credential to fetch them would tie
- *    every model-driven read to an identity for no benefit, and would put the key on the wire far
- *    more often than submitting does.
- * 2. A `POST` IS NEVER RETRIED, AND ANY FAILURE ONCE IT IS IN FLIGHT IS AMBIGUOUS. The API is
- *    idempotent for a byte-identical repeat from the same submitter, but the CLIENT cannot tell a
- *    lost request from a lost response. Crucially that is true *after* the response headers arrive
- *    too: a body that is cut off, unparseable, over the cap or simply not the documented shape says
- *    nothing about whether the row was written, and neither does a `5xx` — a server that failed
- *    while answering may well have committed first. Every one of those is reported as "may have
- *    landed", never as a plain failure. A CODED `4xx` is different: the API read the request,
- *    decided, and said no.
- * 2b. A `POST` NEVER FOLLOWS A REDIRECT. `redirect: "manual"` means a `3xx` comes back as a `3xx`
- *    instead of the runtime silently re-sending the body — and the credential — somewhere this
- *    server never resolved and no human ever approved.
- * 3. RESPONSES ARE CAPPED AT 1 MB WHILE STREAMING, AND EVERY REQUEST HAS A DEADLINE. Both bound
- *    what a hostile or broken upstream can cost: memory in one case, and in the other a connection
- *    that accepts and then says nothing, which without a deadline hangs the tool call forever.
- * 4. A `404` ON A DETAIL FETCH IS A REAL ANSWER, and one shape of it carries the id of the entry
- *    the old one was merged into. Losing that turns a followable pointer into "not found".
- * 5. A `2xx` BODY IS VALIDATED BEFORE IT IS BELIEVED. Casting an arbitrary JSON body to the
- *    expected type turns a proxy's `{}` into a successful empty record, and an unknown
- *    `duplicateCheck` value into a crash after the write.
+ * A dependency-free client for the public `/v1/` API, with four rules a general client would not
+ * have. Reads are anonymous — no credential goes on the wire for public data. A POST is never
+ * retried, and every failure once it is in flight is reported as "may have landed", including a
+ * 5xx, an unreadable body and a redirect (which is never followed). Responses are capped at 1 MB
+ * while streaming and every request has a deadline. And a 2xx body is validated before it is
+ * believed, so a proxy's `{}` is not a successful empty record.
  */
 import type { Opportunity } from "@the-rfp-hub/standard";
 import type { McpConfig } from "./config.js";
@@ -52,18 +32,11 @@ export interface Paginated<T> {
   page: number;
   limit: number;
   total: number;
-  /**
-   * `Math.max(1, ceil(total / limit))` on the server, so an EMPTY page reports `totalPages: 1`,
-   * not 0. Anything deciding "is this empty" must test `total === 0`.
-   */
+  /** Server-side `max(1, ceil(total/limit))`: an EMPTY page reports 1. Emptiness is `total === 0`. */
   totalPages: number;
 }
 
-/**
- * Strip the generated type's `[k: string]: unknown` index signature so `Omit` can drop a named key.
- * Without this, `Omit<Opportunity, "fundingDetails">` collapses to the index signature alone and
- * every field read off it is `unknown`.
- */
+/** Without this, `Omit<Opportunity, "fundingDetails">` collapses to the index signature alone. */
 type RemoveIndex<T> = {
   [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
 };
@@ -101,13 +74,7 @@ export interface ApiClientOptions {
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/**
- * Parse `Retry-After` (delta-seconds or HTTP-date) into a delay clamped to 0…5 s.
- *
- * A header is a value from the network, so every branch here ends inside the clamp: a negative
- * delta, an enormous one, a date in the past and an unparseable string all have to produce a wait
- * this process can survive, and the single retry above is the only one there ever is.
- */
+/** Delta-seconds or HTTP-date, clamped to 0…5 s. Every branch ends inside the clamp. */
 export function retryAfterMs(header: string | null, now: number): number {
   if (!header) return 1_000;
   const trimmed = header.trim();
@@ -120,7 +87,6 @@ export function retryAfterMs(header: string | null, now: number): number {
   return 1_000;
 }
 
-/** Raised while draining a body that went past the cap. Carries the operation for the message. */
 export class ResponseTooLargeError extends Error {
   readonly bytes: number;
   constructor(bytes: number) {
@@ -130,7 +96,6 @@ export class ResponseTooLargeError extends Error {
   }
 }
 
-/** Raised when a request passed its deadline, whether waiting for headers or mid-body. */
 export class RequestTimeoutError extends Error {
   readonly timeoutMs: number;
   constructor(timeoutMs: number) {
@@ -150,9 +115,7 @@ export class RequestTimeoutError extends Error {
 export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promise<string> {
   const declared = Number(res.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > cap) {
-    // Canceled, not merely abandoned. An un-canceled body holds its socket out of the connection
-    // pool until the runtime gets around to collecting it, so refusing enormous responses would
-    // slowly starve the pool — the failure mode being avoided here would cause a different one.
+    // Canceled, not abandoned: an unread body holds its socket out of the connection pool.
     await res.body?.cancel().catch(() => {});
     throw new ResponseTooLargeError(declared);
   }
@@ -175,8 +138,7 @@ export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promi
     text += decoder.decode();
     return text;
   } finally {
-    // Releasing rather than canceling on the success path would leave a half-read stream open on
-    // the over-cap path, which is the one that matters.
+    // Cancel, not release: the over-cap path would otherwise leave a half-read stream open.
     await reader.cancel().catch(() => {});
   }
 }
@@ -190,12 +152,8 @@ function isCount(value: unknown, min: number): boolean {
 }
 
 /**
- * Whether a 2xx body is a list page this server can project.
- *
- * FORWARD-COMPATIBLE BY CONSTRUCTION: unknown members are ignored, and only the fields the
- * projection actually reads are required. What is not tolerated is a body that is missing them —
- * `{}` from a proxy, a page whose `total` is a string, a negative page number — because every one
- * of those renders as a perfectly ordinary empty result set.
+ * Only the fields the projection reads are required, and unknown members are ignored — but a body
+ * missing them is refused, because every such body renders as an ordinary empty result set.
  */
 export function isListPage(body: unknown): body is Paginated<OpportunitySummary> {
   if (!isRecord(body) || !Array.isArray(body.items)) return false;
@@ -204,13 +162,7 @@ export function isListPage(body: unknown): body is Paginated<OpportunitySummary>
   return body.items.every(isOpportunityLike);
 }
 
-/**
- * Whether a value carries the four members every consumer of a document here reads.
- *
- * Not a schema check: validating the whole standard at the transport boundary would reject a
- * document that is merely newer than this package, which is the opposite of what a client should
- * do with a contract it does not own.
- */
+/** Not a schema check: rejecting a document that is merely NEWER is the wrong failure here. */
 export function isOpportunityLike(value: unknown): boolean {
   if (!isRecord(value)) return false;
   for (const field of ["id", "title", "fundingType", "status"]) {
@@ -223,12 +175,8 @@ const REVIEW_STATUSES = new Set(["pending", "approved", "rejected"]);
 const DUPLICATE_CHECKS = new Set(["ok", "unavailable", "disabled"]);
 
 /**
- * Whether a 2xx body really is the API's submission result.
- *
- * EVERY member the renderer consumes is checked, including the two closed enums. The renderer has
- * an exhaustive switch on `duplicateCheck`; letting an unknown value through here would turn a
- * completed write into a generic crash further down, at the one point where the caller most needs
- * to be told the row may exist.
+ * Every member the renderer consumes, including both closed enums: an unknown `duplicateCheck`
+ * would otherwise crash the exhaustive switch AFTER the row was written.
  */
 export function isSubmissionResult(body: unknown): body is SubmissionResult {
   if (!isRecord(body)) return false;
@@ -284,14 +232,7 @@ export class ApiClient {
     return body as Opportunity;
   }
 
-  /**
-   * `POST /v1/opportunities` with the configured credential. NO retry, at any status.
-   *
-   * Once the request has left, every failure is reported as ambiguous — including one that happens
-   * after the response headers arrived. The caller is told the write may have landed and that
-   * `/v1/me/opportunities` is where to find out, because that owner-scoped route lists pending
-   * entries the public read hides.
-   */
+  /** `POST /v1/opportunities`. NO retry at any status; every failure in flight is ambiguous. */
   async submitOpportunity(document: unknown): Promise<SubmissionResult> {
     if (this.config.apiKey === null) {
       throw new ToolError(
@@ -311,13 +252,7 @@ export class ApiClient {
     }
   }
 
-  /**
-   * Why a POST produced no usable answer — the deadline, or the connection.
-   *
-   * Both are ambiguous: the request had already left this process, so neither says whether the row
-   * was written. A timeout is called a timeout because "check your network" is the wrong advice
-   * for a destination that is merely slow.
-   */
+  /** Both are ambiguous; they are distinguished because "check your network" misdirects on a slow host. */
   private writeFailure(deadline: Deadline): string {
     return deadline.expired()
       ? `no complete response arrived within this server's ${this.config.timeoutMs}ms deadline, so the request was abandoned mid-flight`
@@ -342,18 +277,9 @@ export class ApiClient {
     });
 
     if (res.status >= 300 && res.status < 400) {
-      // NOT FOLLOWED, and NOT a clean refusal either.
-      //
-      // The redirect is not followed: the document and the credential are never re-sent to a host
-      // this server did not resolve and no human approved. But "not followed" is not the same as
-      // "not written". POST/Redirect/GET is the ordinary way a server acknowledges a resource it
-      // just created and sends the client to look at it, so a 303 — or a 307 from a proxy that
-      // wrote through — is entirely consistent with a row that exists. Reporting this as a refusal
-      // would tell somebody to submit again, which is how the duplicate gets made.
-      //
-      // The destination is NAMED so the operator can see where they were being sent, and it is
-      // bounded and redacted first: it is a header from whatever answered, and an unbounded one
-      // would put an arbitrary attacker-chosen string into the model's context.
+      // NOT FOLLOWED, and NOT a clean refusal either: POST/Redirect/GET is how a server
+      // acknowledges something it just created, so a 3xx is consistent with a row that exists.
+      // The Location is named for the operator, bounded and redacted because it is attacker text.
       const location = res.headers.get("location");
       await res.body?.cancel().catch(() => {});
       const where =
@@ -366,9 +292,7 @@ export class ApiClient {
       );
     }
 
-    // From here the request HAS been delivered. A body that will not read, will not parse, is over
-    // the cap or is not the documented shape tells us nothing about whether the row was written,
-    // so none of those may be reported as an ordinary failure.
+    // From here the request HAS been delivered, so nothing below may be an ordinary failure.
     let raw: string;
     try {
       raw = await readCapped(res);
@@ -396,10 +320,7 @@ export class ApiClient {
     }
 
     if (res.status >= 500) {
-      // A 5xx is NOT an answer about the write, however well-formed its body is. The API commits
-      // the row and then does more work — duplicate detection, notification queueing — so a
-      // failure while answering is entirely consistent with a row that exists. Treating it as a
-      // clean refusal is what produces the duplicate: the caller retries something that landed.
+      // A 5xx is not an answer about the write: the API commits the row and then does more work.
       throw ambiguousWriteError(
         this.config.apiOrigin,
         `the API answered ${res.status}, which says its request failed but not whether the entry was written`,
@@ -408,19 +329,14 @@ export class ApiClient {
     }
 
     if (!res.ok) {
-      // A coded 4xx IS an answer: the API read the request, decided, and the decision was "no".
-      // That is not ambiguous, and reporting it as such would send people hunting for a row nobody
-      // wrote.
+      // A coded 4xx IS an answer: read, decided, refused. Not ambiguous.
       throw apiErrorToToolError(res.status, (body ?? {}) as ApiErrorBody, {
         operation: "submit_opportunity",
         keyConfigured: true,
       });
     }
 
-    // A 2xx WHOSE BODY IS NOT A SUBMISSION RESULT IS AMBIGUOUS TOO. An empty 200, a 204, a `{}`, a
-    // `duplicateCheck` this build has never heard of, or a body from something that is not this API
-    // says the request reached a server and tells us nothing about what that server did with it —
-    // and the approval has already been claimed.
+    // A 2xx whose body is not a submission result is ambiguous too, and the approval is spent.
     if (!isSubmissionResult(body)) {
       throw ambiguousWriteError(
         this.config.apiOrigin,
@@ -437,22 +353,13 @@ export class ApiClient {
     if (first.res.status !== 429) return this.readJson(first, operation);
 
     const wait = retryAfterMs(first.res.headers.get("retry-after"), Date.now());
-    // The refused response still has a body, and an unread one keeps its socket out of the
-    // connection pool. Canceling it before sleeping means the retry reuses the connection
-    // instead of racing the runtime's cleanup for a new one.
     await first.res.body?.cancel().catch(() => {});
     first.deadline.done();
     await this.sleep(wait);
     return this.readJson(await this.attempt(url, operation), operation);
   }
 
-  /**
-   * One GET, with a deadline that stays armed until its body has been read.
-   *
-   * The deadline covers the body as well as the headers, because a peer that sends half a document
-   * and then stops is the same hang as one that never answers at all. There is no retry on this
-   * path beyond the single 429 above: a timeout is reported, never quietly attempted again.
-   */
+  /** The deadline stays armed through the body: a peer that stalls mid-body is the same hang. */
   private async attempt(url: string, operation: string): Promise<InFlight> {
     const deadline = newDeadline(this.config.timeoutMs);
     try {
@@ -474,13 +381,8 @@ export class ApiClient {
     }
   }
 
-  /**
-   * Read a READ's body once, under the cap, then decide what it was.
-   *
-   * `res.json()` consumes the stream even when it rejects, so a `res.text()` fallback after it
-   * would throw "Body is unusable" and bury the actual HTTP error — which is exactly the case that
-   * matters (a proxy answering with HTML).
-   */
+  /** Read once. `res.json()` consumes the stream even when it rejects, so a text fallback after
+   * it would bury the real error — a proxy answering with HTML being the case that matters. */
   private async readJson({ res, deadline }: InFlight, operation: string): Promise<unknown> {
     let raw: string;
     try {
@@ -512,11 +414,8 @@ export class ApiClient {
     if (!res.ok) {
       throw apiErrorToToolError(res.status, (body ?? {}) as ApiErrorBody, {
         operation,
-        // FALSE, always, and not `apiKey !== null`. This method serves READS, and reads attach no
-        // credential. The flag says whether one was sent on THIS request, because it decides which
-        // sentence a 401 gets — and "the API rejected the configured credential" is a bad thing to
-        // tell somebody about a request that carried none. A 401 on an anonymous read is the
-        // public surface asking for a credential, not a credential being refused.
+        // FALSE always, not `apiKey !== null`: reads send none, and a 401 here is the public
+        // surface asking for a credential rather than one being refused.
         keyConfigured: false,
       });
     }
@@ -554,19 +453,12 @@ interface Deadline {
   done(): void;
 }
 
-/** A response whose deadline is still armed, because its body has not been read yet. */
 interface InFlight {
   res: Response;
   deadline: Deadline;
 }
 
-/**
- * A request deadline: one `AbortController`, armed until `done()`.
- *
- * The timer is deliberately still running when `fetch` resolves — it resolves on the response
- * HEADERS, and a peer that then stops sending the body is the hang this exists to bound. Aborting
- * the signal errors the body stream too, so one timer covers both halves.
- */
+/** Armed until `done()`: `fetch` resolves on HEADERS, and aborting also errors the body stream. */
 function newDeadline(timeoutMs: number): Deadline {
   const controller = new AbortController();
   let fired = false;

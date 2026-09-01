@@ -1,8 +1,4 @@
-/**
- * The filter vocabularies must be DERIVED, not typed out. A copy would let this server advertise a
- * filter the API rejects, or stop advertising one the standard gained, and the failure would look
- * like a broken tool rather than a stale list.
- */
+/** DERIVED, not typed out: a copy advertises filters the API rejects and looks like a broken tool. */
 import { SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/server";
 import { opportunitySchema } from "@the-rfp-hub/standard";
 import { describe, expect, it } from "vitest";

@@ -1,14 +1,7 @@
 /**
- * `server.json` validated against the registry's OWN schema, not against our reading of it.
- *
- * The schema is vendored under `test/fixtures/` rather than fetched: a test that reaches the
- * network fails on an airplane, fails in a sandboxed CI runner, and — worse — starts passing or
- * failing for reasons that have nothing to do with the commit under test. Vendoring pins the
- * contract to the version this manifest declares in its own `$schema`, and the first assertion
- * below is that those two agree, so the copy cannot drift from the URL it claims to be.
- *
- * This is also what settles whether the publisher-defined `_meta` key is allowed: the schema
- * decides, and it is run here rather than argued about.
+ * `server.json` validated against the registry's OWN schema, vendored rather than fetched: a test
+ * that reaches the network passes or fails for reasons unrelated to the commit. The first
+ * assertion is that the copy matches the `$schema` the manifest claims.
  */
 import fs from "node:fs";
 import path from "node:path";

@@ -1,20 +1,14 @@
 /**
  * `search_opportunities` — the filtered list, projected down to what a caller needs to CHOOSE.
  *
- * THE PROJECTION IS THE CONTROL. `description` and `summary` do not appear in the output. They are
- * the longest free-text fields a publisher controls, they are where an instruction addressed to an
- * agent would live, and in a page of twenty results they also dwarf everything else in the
- * context. A field that is not returned cannot be acted on, which is a stronger property than any
- * amount of labeling. To read a full record — with its prose — a caller has to ask for it by id
- * through `fetch_opportunity`, which is a separate, deliberate step.
+ * THE PROJECTION IS THE CONTROL. `description` and `summary` do not appear: they are the longest
+ * publisher-controlled free-text fields, they are where an instruction addressed to an agent would
+ * live, and a field that is not returned cannot be acted on — a stronger property than any amount
+ * of labeling. A caller who wants the prose asks for one record by id.
  *
- * `title` and organization names REMAIN, and they remain third-party text. That residual risk is
- * real and is not claimed away: a hostile title still reaches the model. It is delimited in the
- * text block and quoted as a JSON string in the structured block, and the notice says both are
- * data. Nothing here makes a hostile title harmless.
- *
- * `awardSummary`, `nextDeadline` and both URLs are RENDERED BY THIS SERVER from numeric and
- * structural fields. No publisher-supplied prose passes through them.
+ * `title` and organization names REMAIN and remain third-party text. That residual risk is real
+ * and is not claimed away. `awardSummary`, `nextDeadline` and both URLs are rendered by this server
+ * from numeric and structural fields; no publisher prose passes through them.
  */
 import { z } from "zod";
 import { FUNDING_TYPES, SORT_FIELDS, SORT_ORDERS, STATUSES, asEnumValues } from "../enums.js";
@@ -164,7 +158,7 @@ export const outputSchema = z.object({
 
 const DETAIL_HINT = "Call fetch_opportunity with this id for the full record.";
 
-/** Build the API querystring. Arrays go as comma lists, which the API accepts for every filter. */
+/** Arrays go as comma lists, which the API accepts for every filter. */
 export function toQuery(input: SearchInput): URLSearchParams {
   const qs = new URLSearchParams();
   const set = (key: string, value: string | number | undefined) => {
@@ -192,7 +186,7 @@ export function toQuery(input: SearchInput): URLSearchParams {
 
 type FundingInfo = OpportunitySummary["fundingInfo"];
 
-/** A money line built only from numbers and a currency code. */
+/** Built only from numbers and a currency code. */
 export function awardSummary(funding: FundingInfo): string | null {
   if (!funding) return null;
   const currency = typeof funding.currency === "string" ? funding.currency : null;
@@ -207,13 +201,7 @@ export function awardSummary(funding: FundingInfo): string | null {
   return null;
 }
 
-/**
- * The earliest FIXED deadline still ahead of `now`.
- *
- * Derived here rather than read off the record: the API sorts on a denormalized column of this
- * value but does not publish it as a document field, so a projection that simply copied
- * `nextDeadlineAt` across would copy `undefined`.
- */
+/** Derived, not copied: the API sorts on a denormalized column it does not publish as a field. */
 export function nextDeadline(deadlines: OpportunitySummary["deadlines"], now: Date): string | null {
   if (!Array.isArray(deadlines)) return null;
   let best: { at: number; iso: string } | null = null;
@@ -221,24 +209,19 @@ export function nextDeadline(deadlines: OpportunitySummary["deadlines"], now: Da
     if (deadline.deadlineType !== "fixed" || typeof deadline.date !== "string") continue;
     const at = Date.parse(deadline.date);
     if (!Number.isFinite(at) || at <= now.getTime()) continue;
-    // Compared as INSTANTS, not as strings. The standard asks for UTC, but a publisher may send
-    // an offset form, and lexicographic order puts "2026-03-01T00:00:00+05:00" before
-    // "2026-02-28T23:00:00Z" while the second is the earlier moment. The original string is what
-    // goes to the caller — reformatting somebody's timestamp is not this server's business.
+    // INSTANTS, not strings: an offset form sorts lexicographically before an earlier UTC one.
     if (best === null || at < best.at) best = { at, iso: deadline.date };
   }
   return best?.iso ?? null;
 }
 
-/** The id's namespace half. Ids are `<namespace>:<local>`; anything else yields an empty string. */
+/** Ids are `<namespace>:<local>`; anything else yields an empty string. */
 export function namespaceOf(id: string): string {
   const at = id.indexOf(":");
   return at > 0 ? id.slice(0, at) : "";
 }
 
-/**
- * Trim the ecosystem list to the caps, reporting how much was dropped rather than hiding it.
- */
+/** Reports how much was dropped rather than hiding it. */
 export function boundEcosystems(values: unknown): { ecosystems: string[]; omitted: number } {
   if (!Array.isArray(values)) return { ecosystems: [], omitted: 0 };
   const strings = values.filter((v): v is string => typeof v === "string");
@@ -277,7 +260,7 @@ export function project(
   };
 }
 
-/** Render the rows as text, with every third-party string inside a delimited block. */
+/** Every third-party string goes inside a delimited block. */
 export function renderText(result: z.infer<typeof outputSchema>): string {
   if (result.total === 0) {
     return `${result.notice}\n\nNo opportunity matches those filters.`;

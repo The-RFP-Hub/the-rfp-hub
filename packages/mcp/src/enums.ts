@@ -1,11 +1,9 @@
 /**
  * The filter vocabularies, DERIVED from the published standard at module load.
  *
- * Hard-coding `["grant", "hackathon", ...]` here would mean this server could offer a filter the
- * API rejects with a 400, or silently stop offering one the API gained — and the failure would
- * look to the caller like a broken tool rather than a stale copy. The standard's schema is the one
- * authority; if a property ever loses its enum, this throws at boot instead of shipping an
- * unconstrained filter.
+ * A hard-coded copy could offer a filter the API rejects, or silently stop offering one it gained,
+ * and the failure would look like a broken tool rather than a stale list. If a property ever loses
+ * its enum this throws at boot rather than shipping an unconstrained filter.
  */
 import { opportunitySchema } from "@the-rfp-hub/standard";
 
@@ -25,12 +23,7 @@ export const FUNDING_TYPES = standardEnum("fundingType");
 /** `upcoming`, `open`, `closed`, … — whatever the standard currently declares. */
 export const STATUSES = standardEnum("status");
 
-/**
- * Sort keys, which belong to the API's LIST CONTRACT rather than to the standard — they name
- * derived and bookkeeping columns (`nextDeadlineAt`, `createdAt`) that no document field declares,
- * so there is nothing in the schema to derive them from. A contract test asserts this set against
- * the API's own published query schema.
- */
+/** The API's LIST CONTRACT, not the standard: these name columns no document field declares. */
 export const SORT_FIELDS = Object.freeze([
   "nextDeadlineAt",
   "opensAt",

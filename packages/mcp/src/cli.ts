@@ -1,20 +1,16 @@
 #!/usr/bin/env node
 /**
- * The executable. Four modes, and only the first one speaks MCP.
+ * The executable. Four modes, and only the first speaks MCP.
  *
  *   rfphub-mcp                  serve MCP over stdio (what an MCP client runs)
  *   rfphub-mcp pending          list previews awaiting a human, and approvals already granted
  *   rfphub-mcp approve <id>     print the five bindings and the document, ask, and grant
  *   rfphub-mcp revoke <id>      delete a pending preview and any approval for it
  *
- * NOTHING BUT PROTOCOL GOES TO STDOUT IN SERVER MODE. stdio transport means stdout IS the wire; a
- * stray `console.log` corrupts the session. Diagnostics go to stderr, and they never carry a
- * request body.
- *
- * The approval modes are the human half of the write interlock. They exist as a separate mode of
- * the same binary rather than as a tool because a tool is reachable from the model's loop and a
- * terminal command is not — with the honest caveat, stated in the README and ADR 0012, that an
- * agent holding a shell as this same user can run this command too.
+ * IN SERVER MODE STDOUT IS THE WIRE: a stray `console.log` corrupts the session, so diagnostics go
+ * to stderr and never carry a request body. The approval modes are a separate mode of the same
+ * binary rather than a tool because a tool is reachable from the model's loop — with the caveat,
+ * stated in the README and ADR 0012, that an agent holding a shell as this user can run them too.
  */
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -42,25 +38,14 @@ import { PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION, createServer } from "./s
 import { RedactingTransport } from "./transport.js";
 
 /**
- * ONE message for "that preview is not available", whichever way it became unavailable.
- *
- * There are two code paths into it — the record is gone when `approve` first reads it, and the
- * record is gone when `approve` claims it after the confirmation — and from the terminal they are
- * the same situation: the thing you were asked about is not there any more, and nothing was
- * approved. Which of the two fired depends on how a race happened to interleave, so reporting them
- * differently would give the operator a detail they cannot act on and cannot reproduce, and it
- * would make the visible outcome of a concurrent approve nondeterministic. The next step is
- * identical either way, and it is what the message says.
+ * ONE message however the preview became unavailable. Which of the two paths fired depends on how
+ * a race interleaved, so distinguishing them would report a detail nobody can act on.
  */
 function previewUnavailable(id: string): string {
   return `That preview is not available: ${id} was never pending, was revoked, or another \`approve\` for the same id completed first. NOTHING WAS APPROVED. Run \`rfphub-mcp pending\` to see what is actually waiting.`;
 }
 
-/**
- * ONE message for "that preview's window has passed", from either of the two points that can
- * notice — before the question, and after the answer. Same reasoning as above: the operator's next
- * step does not depend on which check caught it.
- */
+/** ONE message from either point that can notice it. Same reasoning as above. */
 function previewExpired(expiresAt: string): string {
   return `That preview expired at ${expiresAt}, so NOTHING WAS APPROVED. Approvals are deliberately short-lived. Ask for a fresh preview and approve that one.`;
 }
@@ -129,10 +114,8 @@ function serve(config: ReturnType<typeof loadConfig>): Promise<number> {
     `${SERVER_NAME} ${SERVER_VERSION} on stdio · protocol ${PROTOCOL_VERSION} · api ${config.apiOrigin} · ` +
       `submit ${config.submitEnabled ? "ENABLED" : "disabled"} · key ${config.apiKey ? "present" : "absent"}`,
   );
-  // The factory is called per connection; one server instance serves the connection's lifetime.
   serveStdio(() => createServer({ config }), {
-    // Wrapped so that EVERY outbound message is redacted, including the ones the SDK produces on
-    // its own error paths. See transport.ts.
+    // Wrapped so EVERY outbound message is redacted, the SDK's own error paths included.
     transport: new RedactingTransport(new StdioServerTransport()),
     onerror: (error) => say(`transport error: ${error.message}`),
   });
@@ -182,10 +165,8 @@ async function approve(
     say("usage: rfphub-mcp approve <approvalId>");
     return 2;
   }
-  // VALIDATED BEFORE IT TOUCHES A PATH. An approval id is joined onto a directory, so an argument
-  // like `../../.ssh/config` would otherwise be a traversal — a file read and printed to the
-  // terminal, or worse a file removed by `revoke`. The id is a digest and the shape is exact, so
-  // there is nothing to sanitize: anything that is not 64 lowercase hex characters is not an id.
+  // BEFORE IT TOUCHES A PATH: the id is joined onto a directory, so `../../.ssh/config` would be
+  // a traversal. Nothing to sanitize — anything but 64 lowercase hex is not an id.
   try {
     assertApprovalId(id);
   } catch (err) {
@@ -235,23 +216,17 @@ async function approve(
     return 1;
   }
 
-  // THE PREVIEW IS CLAIMED AFTER THE ANSWER, NOT BEFORE THE QUESTION.
-  //
-  // Everything above this line happened across an unbounded wait for a human, and the world can
-  // move inside it: the preview can be revoked from another terminal, its window can pass, or a
-  // second `approve` for the same id can be sitting at its own prompt. Writing the approval on the
-  // strength of what was read before the question would let two confirmations mint two approvals —
-  // two writes out of one decision. One atomic rename decides it; everyone else is refused.
+  // CLAIMED AFTER THE ANSWER, NOT BEFORE THE QUESTION: everything above happened across an
+  // unbounded wait for a human, inside which the preview can be revoked, expire, or be approved
+  // in a second terminal. One atomic rename decides it.
   const claimed = claimPending(config.home, record.approvalId);
   if (claimed === null) {
-    // Deliberately the SAME sentence the read-side miss prints. Losing this race and finding the
-    // preview already gone are one outcome as far as anybody at this terminal is concerned.
+    // Deliberately the SAME sentence the read-side miss prints.
     say(previewUnavailable(record.approvalId));
     return 1;
   }
 
-  // Re-checked against the claimed record, because the answer to "has it expired" can change while
-  // the question is being asked, and because the claimed copy is the one nobody else can alter.
+  // Re-checked: the answer to "has it expired" can change while the question is being asked.
   const approvedAt = new Date();
   if (isExpired(claimed, approvedAt)) {
     say(previewExpired(claimed.expiresAt));
@@ -298,11 +273,7 @@ function revoke(home: string, id: string | undefined): number {
   return 0;
 }
 
-/**
- * True when this file is what Node was asked to run, rather than something a test imported.
- * `fileURLToPath` + `resolve` rather than string-building a `file://` URL: the latter is wrong for
- * any path containing a space.
- */
+/** `fileURLToPath` rather than building a `file://` URL, which is wrong for a path with a space. */
 const isEntrypoint = (() => {
   const invoked = process.argv[1];
   if (invoked === undefined) return false;

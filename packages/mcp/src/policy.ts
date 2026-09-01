@@ -1,24 +1,14 @@
 /**
- * Rate caps per TOOL KIND, counted locally on disk.
+ * Rate caps per TOOL KIND, counted locally on disk, under a cross-process lock.
  *
- * `read` is generous, `preview` is narrow, `commit` is very narrow. The point of the commit cap is
- * not throughput: it is that a compromised loop which somehow reaches the write path can do it a
- * handful of times a day, not a thousand.
+ * Read-modify-write without a lock is not a counter: two processes that both read 4 and both write
+ * 5 have let two calls through a cap of five — and an MCP client and a terminal running this same
+ * package share one home directory by design.
  *
- * THE WHOLE CHECK-AND-INCREMENT IS UNDER A CROSS-PROCESS LOCK. Read-modify-write without one is
- * not a counter: two processes that both read `4`, both find `4 < 5`, and both write `5` have let
- * two calls through a cap of five. That is not hypothetical here — an MCP client and a terminal
- * running this same package share one home directory by design.
+ * FAIL-CLOSED throughout: a store that cannot be read, written or believed denies the call.
  *
- * FAIL-CLOSED. If the counter store cannot be read or written, or the lock cannot be taken, the
- * call is DENIED rather than allowed — a limiter that opens when its bookkeeping breaks is not a
- * limiter. The consequence is that `RFPHUB_MCP_HOME` (default `~/.rfphub`) has to be writable; the
- * README says so.
- *
- * THE KIND IS A PROPERTY OF THE INVOCATION, NOT OF THE TOOL. `submit_opportunity` is `preview` on
- * its first call and `commit` on its second, and only when the second call actually reaches the
- * POST. A fixed per-tool kind would either make previews spend the commit budget (so five previews
- * exhaust the day) or make the commit cap bypassable by repeating previews.
+ * The kind is a property of the INVOCATION, not of the tool. `submit_opportunity` is `preview` on
+ * its first call and `commit` on its second, and only when that reaches the POST.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -26,15 +16,7 @@ import { ToolError } from "./errors.js";
 import { LockTimeoutError, withLock } from "./lock.js";
 import { ensureDir, isRegularFile, secureFile } from "./state.js";
 
-/**
- * `attempt` is not a phase — it is every invocation of the write tool, charged before any work.
- *
- * The other three meter work that SUCCEEDED far enough to matter. That leaves the failures free:
- * a caller can send a thousand bogus approval ids, or a thousand oversized documents, and each one
- * is refused without spending anything, so the refusal path is an unmetered loop through local
- * validation and the filesystem. `attempt` closes it — the budget is spent whether or not the call
- * goes on to do anything.
- */
+/** `attempt` is not a phase: it meters every write invocation, so the refusal path is not free. */
 export type ToolKind = "read" | "preview" | "commit" | "attempt";
 
 /** The only kinds a counter file may name. Anything else is corruption, not a newer build. */
@@ -49,8 +31,6 @@ export const DEFAULT_CAPS: Readonly<Record<ToolKind, Caps>> = Object.freeze({
   read: { perMinute: 60, perDay: 5_000 },
   preview: { perMinute: 10, perDay: 200 },
   commit: { perMinute: 2, perDay: 5 },
-  // Deliberately looser than `preview` and far tighter than `read`: a legitimate session takes a
-  // few previews and a few refusals to get a document right, and nothing legitimate takes hundreds.
   attempt: { perMinute: 20, perDay: 400 },
 });
 
@@ -82,20 +62,11 @@ export interface PolicyOptions {
   lockTimeoutMs?: number;
 }
 
-/**
- * A spent unit of budget, with the ability to give it back.
- *
- * This exists for one reason: the write path has to know it *can* spend commit budget before it
- * claims the human's approval, and the approval is the scarcer resource. So the budget is reserved
- * first; if anything between the reservation and the request fails — the approval was already
- * claimed by another process, say — the reservation is released and the caller has lost nothing.
- * Once the request is actually made the reservation is committed and stays spent, including when
- * the response never arrives.
- */
+/** Budget is reserved before the human's approval is claimed, because the approval is scarcer. */
 export interface Reservation {
   /** Keep the unit spent. Idempotent. */
   commit(): void;
-  /** Give the unit back, because the work it was reserved for never happened. Idempotent. */
+  /** Give it back, because the work never happened. Idempotent. */
   release(): void;
 }
 
@@ -117,12 +88,8 @@ export class Policy {
     this.reserve(kind).commit();
   }
 
-  /**
-   * Spend one unit of `kind`'s budget up front, returning a handle that can give it back.
-   *
-   * The unit is spent on disk immediately — a "reservation" that did not write would be exactly
-   * the check-then-act race the lock exists to close.
-   */
+  /** Spent on disk immediately: a reservation that did not write would be the very race the
+   * lock exists to close. */
   reserve(kind: ToolKind): Reservation {
     const cap = this.caps[kind];
     const at = this.now().getTime();
@@ -165,9 +132,8 @@ export class Policy {
         try {
           this.locked(() => {
             const file = this.read();
-            // Only give back a unit inside the SAME window it was taken from. After a rollover the
-            // unit belongs to a window nobody is counting any more, and decrementing the new one
-            // would hand out budget that was never spent.
+            // Only inside the SAME window it was taken from: after a rollover, decrementing the
+            // new window hands out budget nobody spent.
             const minute = file.minute[kind];
             if (minute?.window === minuteWindow && minute.count > 0) minute.count -= 1;
             const day = file.day[kind];
@@ -175,9 +141,7 @@ export class Policy {
             this.write(file);
           });
         } catch {
-          // A release that cannot be written leaves the unit spent. That is the safe direction:
-          // over-counting refuses a call the caller could have made, under-counting allows one
-          // they could not.
+          // Leaves the unit spent, which is the safe direction.
         }
       },
     };
@@ -196,14 +160,13 @@ export class Policy {
 
   private locked<T>(critical: () => T): T {
     try {
-      // Before the lock, because the lock is itself a directory in this home: a home that is not
-      // this user's own 0700 directory must be refused rather than have state created inside it.
+      // Before the lock, which is itself a directory inside this home.
       ensureDir(this.home);
       return withLock(counterLockPath(this.home), critical, {
         ...(this.lockTimeoutMs === undefined ? {} : { timeoutMs: this.lockTimeoutMs }),
       });
     } catch (err) {
-      if (err instanceof ToolError) throw err; // The critical section's own refusal, not a lock failure.
+      if (err instanceof ToolError) throw err; // The critical section's own refusal.
       if (err instanceof LockTimeoutError) {
         throw new ToolError(
           "rate_limited",
@@ -219,8 +182,7 @@ export class Policy {
     const file = counterPath(this.home);
     let raw: string;
     try {
-      // A counter store that is not a plain file is not a counter store; following a symlink here
-      // would count against whatever it points at.
+      // Following a symlink here would count against whatever it points at.
       if (fs.existsSync(file) && !isRegularFile(file)) {
         throw new Error("the counter file is not a regular file");
       }
@@ -233,8 +195,7 @@ export class Policy {
     try {
       return parseCounterFile(raw);
     } catch (err) {
-      // Corrupt bookkeeping is not the same as no bookkeeping: refuse rather than reset to zero,
-      // which is what an attacker who can truncate the file would want. Nothing here writes.
+      // Corrupt bookkeeping is not no bookkeeping: refuse rather than reset to zero. No write.
       throw this.storeError(file, err);
     }
   }
@@ -249,8 +210,7 @@ export class Policy {
       fs.renameSync(tmp, target);
       secureFile(target);
     } catch (err) {
-      // An insecure-state refusal already says exactly what is wrong with which path; restating it
-      // as "the store is unusable" would replace the diagnosis with a guess.
+      // An insecure-state refusal already names the path and the problem.
       if (err instanceof ToolError) throw err;
       throw this.storeError(target, err);
     }
@@ -265,14 +225,8 @@ export class Policy {
   }
 }
 
-/**
- * The bucket to count in for `window`, given what is on disk.
- *
- * A stored window AHEAD of the current one means the clock went backwards — an NTP correction, a
- * VM resumed from a snapshot, or somebody buying budget with `date`. The stored bucket is kept and
- * counted in, so no call is granted by moving the clock; the cost is that budget stays spent until
- * real time catches up, which is the safe direction for a limiter.
- */
+/** A stored window AHEAD of `window` means the clock went backwards: keep the count, so moving
+ * a clock grants nothing. */
 function rollover(bucket: Bucket | undefined, window: number): Bucket {
   if (bucket === undefined) return { window, count: 0 };
   if (bucket.window > window) return bucket;
@@ -287,12 +241,8 @@ function fail(what: string): never {
 }
 
 /**
- * Parse the whole counter file, or refuse it.
- *
- * NOTHING HERE IS TOLERANT. A negative count hands out extra budget; a string count concatenates
- * instead of adding, so the cap is never reached; a bucket under an unknown kind is a file this
- * build cannot reason about. Every one of those has to reach `storeError` — which denies the call
- * and leaves the file untouched — rather than being normalized into something countable.
+ * NOTHING HERE IS TOLERANT: a negative count hands out budget, a string count concatenates instead
+ * of adding, and every failure must reach `storeError` rather than be normalized into a number.
  */
 export function parseCounterFile(raw: string): CounterFile {
   let parsed: unknown;
@@ -329,7 +279,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** Finite, integral, non-negative and inside the range arithmetic on it stays exact. */
+/** Finite, integral, non-negative, and inside exact-arithmetic range. */
 function isCount(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }

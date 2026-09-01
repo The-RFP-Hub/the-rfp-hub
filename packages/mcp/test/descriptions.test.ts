@@ -1,14 +1,8 @@
 /**
- * Two lints over the text a client actually shows to a model.
- *
- * ARCHITECTURE LEAK. A tool description tells a caller what a tool ANSWERS. Naming an ORM, a table,
- * a query fragment or an internal class teaches the model about a system it cannot reach, invites
- * it to construct arguments in those terms, and turns a refactor into a behavior change.
- *
- * TOOL POISONING. A description is prose the host injects into the model's context, which makes it
- * a place somebody could put an instruction addressed to the agent rather than a description
- * addressed to whoever is choosing a tool. This package's own descriptions are held to that rule
- * so the rule is real rather than aspirational.
+ * Two lints over the text a client shows a model. ARCHITECTURE LEAK: naming a table or a class
+ * teaches the model about a system it cannot reach and turns a refactor into a behavior change.
+ * TOOL POISONING: a description is prose injected into the model's context, so it is a place an
+ * instruction addressed to the agent could hide.
  */
 import { describe, expect, it } from "vitest";
 import * as fetchTool from "../src/tools/fetch.js";

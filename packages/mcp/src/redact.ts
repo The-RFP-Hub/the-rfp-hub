@@ -1,25 +1,12 @@
 /**
- * Recursive redaction of API-key-shaped strings, applied to EVERY outbound surface.
- *
- * This is a backstop, not the control. The control is that the key is only ever read from the
- * environment and only ever attached to one request header; redaction exists because an error
- * body, a stack frame or a document a caller pasted can carry a key that nothing intended to put
- * there, and because "we never log the key" is a claim that only holds until the first unexpected
- * `JSON.stringify(err)`.
- *
- * The scan is by SHAPE (`rfph_` + at least four key characters), plus any literal secret the
- * process registers — the configured key is registered at boot, so even a credential in a format
- * this pattern would miss is scrubbed.
+ * Recursive redaction of key-shaped strings on every outbound surface. A BACKSTOP, NOT THE
+ * CONTROL: it exists because an error body or a pasted document can carry a key nothing meant to
+ * put there.
  */
-
-/**
- * The credential shape. `g` is deliberately absent here: a `g`-flagged RegExp carries mutable
- * `lastIndex` state across calls, which makes `.test()` alternate true/false on the same input.
- * Every use below builds its own flagged copy.
- */
+/** No `g` flag: its mutable `lastIndex` makes `.test()` alternate on the same input. */
 const KEY_SHAPE_SOURCE = "rfph_[A-Za-z0-9_-]{4,}";
 
-/** Matches an API-key-shaped substring. A fresh instance per call — see above. */
+/** A fresh instance per call — see above. */
 export function keyShapeRegExp(): RegExp {
   return new RegExp(KEY_SHAPE_SOURCE, "g");
 }
@@ -28,12 +15,7 @@ export const REDACTED = "[REDACTED-RFPHUB-KEY]";
 
 const literalSecrets = new Set<string>();
 
-/**
- * Register an exact secret so it is scrubbed even if it does not match the shape.
- *
- * Short strings are refused: registering, say, `"a"` would turn every output into redaction
- * markers, which is worse than the leak it guards.
- */
+/** Short strings are refused: registering `"a"` would turn every output into markers. */
 export function registerSecret(secret: string | null | undefined): void {
   if (typeof secret !== "string") return;
   const trimmed = secret.trim();
@@ -68,12 +50,8 @@ export function stringHasSecret(input: string): boolean {
 }
 
 /**
- * Recursively rebuild `value` with every string redacted.
- *
- * Objects and arrays are rebuilt rather than mutated, so a caller's input is never altered under
- * it. Object KEYS are redacted too — a document could carry a key as a property name. Cycles are
- * broken with a marker rather than by throwing: a redactor that can crash on odd input is a
- * redactor that gets skipped on the error path, which is exactly the path that leaks.
+ * Rebuilt, not mutated. KEYS are redacted too. Cycles are marked rather than thrown on: a redactor
+ * that can crash gets skipped on the error path, which is the path that leaks.
  */
 export function redact<T>(value: T): T {
   return redactValue(value, new WeakSet<object>()) as T;
@@ -102,12 +80,8 @@ function redactValue(value: unknown, seen: WeakSet<object>): unknown {
 }
 
 /**
- * Whether anything ANYWHERE in `value` is key-shaped — strings, array members, object keys and
- * values, at any depth.
- *
- * Used by the write tool's first phase. Output redaction cannot help there: the API accepts free
- * text, so a key inside `description` would be PERSISTED and only then redacted out of the reply.
- * The document has to be refused before the request is built.
+ * Anything key-shaped at any depth, for the write tool's first phase. Output redaction cannot help
+ * there: a key inside `description` would be PERSISTED and only then redacted out of the reply.
  */
 export function findSecretPaths(value: unknown): string[] {
   const hits: string[] = [];

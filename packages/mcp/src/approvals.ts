@@ -1,28 +1,11 @@
 /**
  * The out-of-band write approval: a file store, and the CLI operations over it.
  *
- * WHAT THIS ACHIEVES, EXACTLY. Binding a commit to a hash of the input it previewed stops the
- * commit from executing a DIFFERENT input than the one that was shown. That is input-binding, and
- * it is necessary. It is not consent: if the confirmation token comes back in the tool's own
- * response, the same model that read it can spend it in the same turn, and nobody outside the loop
- * ever saw anything.
- *
- * So no secret is ever returned to the caller. The tool returns a public digest, and the write is
- * unlocked only by a file that appears when a person runs `rfphub-mcp approve <id>` in a terminal
- * and reads what it prints.
- *
- * WHAT THIS DOES NOT ACHIEVE — and no document in this package may claim otherwise. The approval
- * is outside the MCP channel, but it is NOT isolated from an agent that holds a shell and a
- * filesystem as the same operating-system user. Coding agents routinely hold both; such an agent
- * can run this CLI in a pseudo-terminal or write the file directly, and 0600/0700 permissions do
- * not stop it, because it is that user. The honest claim is: approving leaves the tool channel and
- * becomes a deliberate act at the operator's terminal. The trust assumption is written down in
- * ADR 0012, along with the boundaries that would actually be separate (a host-provided approval
- * UI, a distinct OS identity, a signing key the agent's process cannot reach).
- *
- * THE DIGEST BINDS THE DESTINATION, NOT ONLY THE DOCUMENT. `sha256(document)` alone would let an
- * approval granted against staging be spent against production, or with a different credential.
- * Five components go in, and the terminal prints all five before asking.
+ * Input-binding is not consent — a confirmation token returned in the tool's own response is
+ * spendable by the same model in the same turn — so no secret is ever returned, and the write is
+ * unlocked only by a file a person creates at a terminal. The digest binds FIVE components, not
+ * the document alone. What this does NOT achieve is in ADR 0012 and the README, and no document
+ * here may claim otherwise.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -38,14 +21,11 @@ export const APPROVAL_TTL_MS = 15 * 60 * 1000;
 
 /** The five things an approval is bound to. Every one is non-secret. */
 export interface ApprovalBinding {
-  /** Canonical origin of the API the write would go to. */
   apiOrigin: string;
-  /** First 8 hex chars of SHA-256 of the credential. Never the credential. */
+  /** SHA-256 prefix of the credential. Never the credential. */
   keyFingerprint: string;
   operation: "submit_opportunity";
-  /** The MCP revision this server speaks. */
   protocolVersion: string;
-  /** SHA-256 over the canonical form of the document. */
   documentHash: string;
 }
 
@@ -82,7 +62,6 @@ export function fingerprintOf(key: string | null): string {
   return key === null ? "none" : sha256Hex(key).slice(0, 8);
 }
 
-// ── paths ────────────────────────────────────────────────────────────────────────
 export function pendingDir(home: string): string {
   return path.join(home, "pending");
 }
@@ -105,13 +84,7 @@ export function assertApprovalId(id: string): void {
   }
 }
 
-/**
- * Write through a temporary file and a rename, and refuse a path that is not securable.
- *
- * The rename replaces whatever was at the target — including a symlink, which is replaced rather
- * than followed. Both names are checked: the temporary one because it is what receives the bytes,
- * the final one because it is what the next process will read.
- */
+/** The rename REPLACES a symlink at the target rather than following it. Both names are checked. */
 function writeFile0600(file: string, contents: string): void {
   ensureDir(path.dirname(file));
   const tmp = `${file}.${process.pid}.tmp`;
@@ -122,8 +95,7 @@ function writeFile0600(file: string, contents: string): void {
 }
 
 function readRecord<T>(file: string): T | null {
-  // A record that is not a plain file is not a record. Following a symlink here would read
-  // whatever it points at and treat that as an approval.
+  // Following a symlink here would read whatever it points at and treat that as an approval.
   if (!isRegularFile(file)) return null;
   let raw: string;
   try {
@@ -138,7 +110,6 @@ function readRecord<T>(file: string): T | null {
   }
 }
 
-// ── pending (written by the preview phase) ───────────────────────────────────────
 export function writePending(home: string, record: PendingRecord): void {
   writeFile0600(
     path.join(pendingDir(home), `${record.approvalId}.json`),
@@ -164,17 +135,8 @@ export function claimedPendingDir(home: string): string {
 }
 
 /**
- * Claim a PREVIEW, atomically, at the moment a person confirms it.
- *
- * Reading the preview, printing it, and waiting for a human is a long window — seconds at least,
- * and as long as somebody leaves the terminal open. Everything can change inside it: the preview
- * can be revoked, it can expire, or a second `approve` for the same id can be sitting at its own
- * prompt. Writing the approval on the strength of what was read BEFORE the question would let two
- * confirmations produce two approvals, which is two writes out of one human decision.
- *
- * So the preview is claimed exactly the way an approval is: one `rename()`, atomic, ENOENT for the
- * loser. Whoever wins may write the approval; everyone else is refused. Expiry is re-checked after
- * the claim rather than before the question, because the answer can change while it is being asked.
+ * Claimed by one atomic `rename()` AT THE MOMENT a person confirms, not when the preview was
+ * printed: the wait for a human is unbounded, and two confirmations must not mint two approvals.
  */
 export function claimPending(home: string, approvalId: string): PendingRecord | null {
   const from = path.join(pendingDir(home), `${approvalId}.json`);
@@ -189,7 +151,6 @@ export function claimPending(home: string, approvalId: string): PendingRecord | 
   return record;
 }
 
-// ── approvals (written by a person at a terminal) ────────────────────────────────
 export function writeApproval(home: string, record: ApprovalRecord): void {
   writeFile0600(
     path.join(approvalsDir(home), `${record.approvalId}.json`),
@@ -210,15 +171,8 @@ export function deleteApproval(home: string, approvalId: string): boolean {
 }
 
 /**
- * Claim an approval, ATOMICALLY, before any network call.
- *
- * `rename()` on a POSIX filesystem is atomic and fails with ENOENT when the source is gone, so two
- * processes racing the same approval produce exactly one winner and one `null`. Doing this BEFORE
- * the request — rather than deleting the file after a successful response — is what makes the
- * approval single-use even when the response never arrives.
- *
- * NOTHING EVER RENAMES IT BACK. After an ambiguous outcome the correct state is "may have been
- * written", and restoring the approval would invite a second write of the same document.
+ * One atomic `rename()` BEFORE the request, which is what makes the approval single-use even when
+ * the response never arrives. NOTHING EVER RENAMES IT BACK.
  */
 export function claimApproval(home: string, approvalId: string): ApprovalRecord | null {
   const from = path.join(approvalsDir(home), `${approvalId}.json`);
@@ -234,13 +188,8 @@ export function claimApproval(home: string, approvalId: string): ApprovalRecord 
   return record;
 }
 
-/**
- * Whether a stored decision is outside its window — including because the clock moved backwards.
- *
- * A record stamped in the FUTURE means the machine's clock went back after it was written, and the
- * only safe reading is that its window has passed: the alternative is that winding a clock back
- * revives an approval that had already expired.
- */
+/** A record stamped in the FUTURE means the clock went back; treating it as live would revive
+ * an approval that had already expired. */
 export function isExpired(
   record: { expiresAt: string; createdAt?: string; approvedAt?: string },
   now: Date,
@@ -253,14 +202,8 @@ export function isExpired(
 }
 
 /**
- * Say WHICH of the five bindings diverged, by looking for a stored record that agrees about the
- * document.
- *
- * The id is a hash of all five, so when any one of them changes the id changes and the lookup
- * simply misses — which on its own tells a caller nothing more useful than "no". Matching on
- * `documentHash` recovers the common cases (the destination moved, the credential was rotated)
- * and names them. When no record shares the document hash, the document itself is what changed,
- * and that is said instead.
+ * The id hashes all five, so any change makes the lookup simply miss — which tells a caller
+ * nothing. Matching on `documentHash` recovers and names the common divergences.
  */
 export function diagnoseMismatch(
   home: string,
@@ -318,10 +261,7 @@ function unlinkIfExists(file: string): boolean {
   }
 }
 
-/**
- * The five bindings, in the order the terminal prints them: where it goes, with which credential,
- * what operation, over which protocol, and which document.
- */
+/** The five bindings, in the order the terminal prints them. */
 export function describeBinding(binding: ApprovalBinding): string {
   return [
     `  destination : ${binding.apiOrigin}`,

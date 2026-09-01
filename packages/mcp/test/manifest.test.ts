@@ -1,15 +1,8 @@
 /**
- * `server.json` — the MCP Registry manifest — checked against the code it describes.
- *
- * THE DIGEST CATCHES DRIFT, NOT A RUG PULL. A publisher who changes a tool description, the code
- * and this digest together and publishes a new `latest` defeats it completely, and this file says
- * so rather than implying otherwise. What it does catch is the realistic failure: a description
- * edited in `src/tools/*.ts` while the manifest keeps describing the previous one, within a single
- * published version.
- *
- * The defense that actually holds against a changed `latest` is that every configuration example
- * in the README pins an exact npm version, and an npm version is immutable. That is asserted here
- * too, because it is the mitigation and not a stylistic preference.
+ * `server.json` checked against the code it describes. THE DIGEST CATCHES DRIFT, NOT A RUG PULL: a
+ * publisher who changes description, code and digest together defeats it completely. What holds
+ * against a changed `latest` is that every README example pins an immutable npm version, which is
+ * asserted here too.
  */
 import fs from "node:fs";
 import path from "node:path";
