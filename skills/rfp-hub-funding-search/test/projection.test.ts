@@ -20,6 +20,7 @@ import {
   MAX_TITLE_LEN,
   RequestError,
   SKILL_VERSION,
+  apiBase,
   assertKnownFlags,
   assertNoExtraPositionals,
   awardSummary,
@@ -399,6 +400,17 @@ describe("clampLimit", () => {
     expect(warned).toMatch(new RegExp(String(MAX_LIMIT)));
   });
 
+  it("is silent at exactly the cap and warns at one past it", () => {
+    let warned = "";
+    const recordWarning = (msg) => {
+      warned = msg;
+    };
+    expect(clampLimit(String(MAX_LIMIT), recordWarning)).toBe(MAX_LIMIT);
+    expect(warned).toBe("");
+    expect(clampLimit(String(MAX_LIMIT + 1), recordWarning)).toBe(MAX_LIMIT);
+    expect(warned).toMatch(new RegExp(String(MAX_LIMIT + 1)));
+  });
+
   it("rejects a non-positive or non-numeric limit", () => {
     expect(() => clampLimit("0")).toThrow();
     expect(() => clampLimit("nope")).toThrow();
@@ -414,6 +426,17 @@ describe("clampLimit", () => {
     for (const bad of ["1e2", "0x10", " 3.0 ", "-5", "5-", "5,0"]) {
       expect(() => clampLimit(bad), `clampLimit(${JSON.stringify(bad)})`).toThrow();
     }
+  });
+});
+
+describe("apiBase", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps a bracketed IPv6 host intact while stripping trailing slashes", () => {
+    vi.stubEnv("RFPHUB_API_BASE", "http://[::1]:3000//");
+    expect(apiBase()).toBe("http://[::1]:3000");
   });
 });
 

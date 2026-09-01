@@ -373,3 +373,60 @@ describe("an unusable response body fails loudly instead of reading as an empty 
     expect(stderr).toMatch(/exceeded this skill's/);
   });
 });
+
+describe("a self-hosted base URL on an IPv6 loopback address", () => {
+  let server: Server | undefined;
+
+  afterEach(() => {
+    server?.close();
+  });
+
+  /** Resolves null when the runner has no such address, so an IPv6-less CI box skips instead of
+   * failing on something the skill does not control. */
+  function tryListen(host: string): Promise<{ server: Server; base: string } | null> {
+    return new Promise((resolvePromise) => {
+      const created = createServer((_req, res) => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ total: 0, page: 1, totalPages: 1, limit: 10, items: [] }));
+      });
+      created.once("error", () => resolvePromise(null));
+      created.listen(0, host, () => {
+        const address = created.address();
+        const port = typeof address === "object" && address ? address.port : 0;
+        resolvePromise({ server: created, base: `http://[${host}]:${port}` });
+      });
+    });
+  }
+
+  it("reaches an API listening on ::1 through a bracketed RFPHUB_API_BASE", async (ctx) => {
+    const started = await tryListen("::1");
+    if (!started) return ctx.skip();
+    server = started.server;
+    const { code, stdout, stderr } = await run(searchScript, [], {
+      RFPHUB_API_BASE: started.base,
+    });
+    expect(stderr).toBe("");
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout).total).toBe(0);
+  });
+});
+
+describe("the --limit cap boundary", () => {
+  let server: Server;
+
+  afterEach(() => {
+    server?.close();
+  });
+
+  it("warns on stderr at one past the cap, and still exits 0", async () => {
+    const fake = await startFakeApi();
+    server = fake.server;
+    const { code, stderr } = await run(searchScript, ["--limit", "26"], {
+      RFPHUB_API_BASE: fake.base,
+    });
+    expect(code).toBe(0);
+    expect(stderr).toMatch(/--limit 26 exceeds this skill's cap of 25/);
+    const params = new URLSearchParams(fake.requestUrls[0].split("?")[1] ?? "");
+    expect(params.get("limit")).toBe("25");
+  });
+});
