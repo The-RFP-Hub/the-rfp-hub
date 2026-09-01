@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ToolError } from "./errors.js";
 import { LockTimeoutError, withLock } from "./lock.js";
-import { ensureDir, isRegularFile, secureFile } from "./state.js";
+import { ensureDir, existsSecurely, secureFile } from "./state.js";
 
 /** `attempt` is not a phase: it meters every write invocation, so the refusal path is not free. */
 export type ToolKind = "read" | "preview" | "commit" | "attempt";
@@ -96,10 +96,18 @@ export class Policy {
     const minuteWindow = Math.floor(at / 60_000);
     const dayWindow = Math.floor(at / 86_400_000);
 
+    // The windows actually COUNTED IN, which after a backwards clock are the stored ones ahead of
+    // `at`. Stamping the increment with the rolled-back window would make the bucket look stale a
+    // minute later and reset it, handing back the budget the rollback was refused.
+    let spentMinuteWindow = minuteWindow;
+    let spentDayWindow = dayWindow;
+
     this.locked(() => {
       const file = this.read();
       const minute = rollover(file.minute[kind], minuteWindow);
       const day = rollover(file.day[kind], dayWindow);
+      spentMinuteWindow = minute.window;
+      spentDayWindow = day.window;
 
       if (minute.count >= cap.perMinute) {
         throw new ToolError(
@@ -116,8 +124,8 @@ export class Policy {
         );
       }
 
-      file.minute[kind] = { window: minuteWindow, count: minute.count + 1 };
-      file.day[kind] = { window: dayWindow, count: day.count + 1 };
+      file.minute[kind] = { window: minute.window, count: minute.count + 1 };
+      file.day[kind] = { window: day.window, count: day.count + 1 };
       this.write(file);
     });
 
@@ -135,9 +143,9 @@ export class Policy {
             // Only inside the SAME window it was taken from: after a rollover, decrementing the
             // new window hands out budget nobody spent.
             const minute = file.minute[kind];
-            if (minute?.window === minuteWindow && minute.count > 0) minute.count -= 1;
+            if (minute?.window === spentMinuteWindow && minute.count > 0) minute.count -= 1;
             const day = file.day[kind];
-            if (day?.window === dayWindow && day.count > 0) day.count -= 1;
+            if (day?.window === spentDayWindow && day.count > 0) day.count -= 1;
             this.write(file);
           });
         } catch {
@@ -182,13 +190,11 @@ export class Policy {
     const file = counterPath(this.home);
     let raw: string;
     try {
-      // Following a symlink here would count against whatever it points at.
-      if (fs.existsSync(file) && !isRegularFile(file)) {
-        throw new Error("the counter file is not a regular file");
-      }
+      // A counter file anything else could have written or read is not a counter file.
+      if (!existsSecurely(file)) return structuredClone(EMPTY);
       raw = fs.readFileSync(file, "utf8");
     } catch (err) {
-      // A missing file is the normal first call, not a broken store.
+      if (err instanceof ToolError) throw err;
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return structuredClone(EMPTY);
       throw this.storeError(file, err);
     }

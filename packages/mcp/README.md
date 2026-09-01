@@ -297,10 +297,18 @@ below.
 
 **The modes are checked, not merely requested.** On every use the home is `lstat`ed and must be a
 real directory — not a symlink, not a file — and every state file must be a regular file with no
-second hard link. A pre-existing path is `chmod`ded to `0700`/`0600` and the mode is then read
-back, because a `chmod` that reports success on a filesystem without POSIX modes has established
-nothing. Approvals and counters **refuse** when any of that cannot be established. The audit log
-stays non-fatal, but it declines to write rather than appending into a path it could not secure.
+second hard link. A path this server is about to **write** is `chmod`ded to `0700`/`0600` and the
+mode is then read back, because a `chmod` that reports success on a filesystem without POSIX modes
+has established nothing.
+
+A file this server is about to **trust** is verified instead, and never repaired: an approval or a
+counter file that is already world-readable, or that has a second hard link, has already been
+exposed to whatever holds it, and tightening the mode afterwards neither un-exposes it nor makes
+the decision inside it yours. Those reads refuse — `policy_denied` — and go on refusing until the
+file is removed. `rfphub-mcp pending` simply omits a record it cannot vouch for. The audit log is
+written rather than trusted, so it is repaired; it still declines to write into a path it could not
+secure, and it is opened and judged through one descriptor so a rotation cannot slip a fresh
+default-mode file under the append.
 
 **The audit log is bounded.** At 5 MiB it is rotated to `audit.log.1` under a lock, keeping exactly
 one previous generation at `0600`. A rotation that fails costs the rotation, never the call and

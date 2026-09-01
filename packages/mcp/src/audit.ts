@@ -11,7 +11,14 @@ import path from "node:path";
 import { withLock } from "./lock.js";
 import type { ToolKind } from "./policy.js";
 import { redactString } from "./redact.js";
-import { FILE_MODE, ensureDir, secureFile } from "./state.js";
+import { FILE_MODE, ensureDir, secureFile, secureOpenFile } from "./state.js";
+
+/** `O_NOFOLLOW` refuses a symlink; the mode is supplied to the call that may create the file. */
+const APPEND_FLAGS =
+  fs.constants.O_WRONLY |
+  fs.constants.O_CREAT |
+  fs.constants.O_APPEND |
+  (fs.constants.O_NOFOLLOW ?? 0);
 
 /** Rotate at five mebibytes, keeping one previous generation. */
 export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
@@ -83,15 +90,22 @@ export function appendAudit(home: string, entry: AuditEntry): void {
     } catch {
       // A log that could not be rotated is still worth appending to.
     }
-    const file = auditPath(home);
-    try {
-      // Exclusive create at 0600. An existing path — a symlink included — fails here and is
-      // judged by `secureFile` below instead of being followed.
-      fs.closeSync(fs.openSync(file, "ax", FILE_MODE));
-    } catch {}
-    secureFile(file);
-    fs.appendFileSync(file, `${redactString(JSON.stringify(entry))}\n`);
+    appendLine(auditPath(home), `${redactString(JSON.stringify(entry))}\n`);
   } catch {
     // Deliberately swallowed: stderr noise on every call for a read-only home helps nobody.
+  }
+}
+
+/**
+ * ONE descriptor for open, judge and write: a rotation landing between a path check and an append
+ * would have the append recreate `audit.log` at the process umask.
+ */
+function appendLine(file: string, line: string): void {
+  const fd = fs.openSync(file, APPEND_FLAGS, FILE_MODE);
+  try {
+    secureOpenFile(fd, file);
+    fs.writeSync(fd, line);
+  } finally {
+    fs.closeSync(fd);
   }
 }

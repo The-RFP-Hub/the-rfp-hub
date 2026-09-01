@@ -83,11 +83,47 @@ export function secureFile(file: string): void {
   enforceMode(file, FILE_MODE, stats);
 }
 
-/** Whether `file` is a regular file this process may read as state. Never throws. */
-export function isRegularFile(file: string): boolean {
+/**
+ * Whether `file` exists, refusing outright when it exists and cannot be trusted. VERIFICATION, NOT
+ * REPAIR: a counter or approval file that was ALREADY world-readable or hard-linked has been
+ * exposed, and tightening it afterwards makes neither its counts nor its decisions trustworthy.
+ */
+export function existsSecurely(file: string): boolean {
+  let stats: fs.Stats;
   try {
-    return fs.lstatSync(file).isFile();
+    stats = fs.lstatSync(file);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw new InsecureStateError(file, "could not be inspected");
+  }
+  if (stats.isSymbolicLink()) throw new InsecureStateError(file, "is a symbolic link");
+  if (!stats.isFile()) throw new InsecureStateError(file, "is not a regular file");
+  if (stats.nlink > 1) throw new InsecureStateError(file, "has more than one hard link");
+  if (MODES_ENFORCED && (stats.mode & 0o777) !== FILE_MODE) {
+    throw new InsecureStateError(
+      file,
+      `is mode ${octal(stats.mode)} rather than ${octal(FILE_MODE)}, and a file this server is about to trust is verified rather than repaired`,
+    );
+  }
+  return true;
+}
+
+/**
+ * `secureFile`'s guarantees about the DESCRIPTOR rather than the path: the two are different files
+ * whenever anything moves the path in between — this log's own rotation, from another process.
+ */
+export function secureOpenFile(fd: number, file: string): void {
+  const stats = fs.fstatSync(fd);
+  if (!stats.isFile()) throw new InsecureStateError(file, "is not a regular file");
+  if (stats.nlink > 1) throw new InsecureStateError(file, "has more than one hard link");
+  if (!MODES_ENFORCED || (stats.mode & 0o777) === FILE_MODE) return;
+  try {
+    fs.fchmodSync(fd, FILE_MODE);
   } catch {
-    return false;
+    throw new InsecureStateError(file, `is mode ${octal(stats.mode)} and could not be changed`);
+  }
+  const after = fs.fstatSync(fd);
+  if ((after.mode & 0o777) !== FILE_MODE) {
+    throw new InsecureStateError(file, `stayed at mode ${octal(after.mode)} after a chmod`);
   }
 }

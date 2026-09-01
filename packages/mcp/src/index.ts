@@ -69,7 +69,13 @@ export {
   AUDIT_MAX_BYTES,
   type AuditEntry,
 } from "./audit.js";
-export { ensureDir, secureFile, InsecureStateError } from "./state.js";
+export {
+  ensureDir,
+  secureFile,
+  secureOpenFile,
+  existsSecurely,
+  InsecureStateError,
+} from "./state.js";
 export { canonicalStringify, digestOf, sha256Hex } from "./canonical.js";
 export {
   computeApprovalId,

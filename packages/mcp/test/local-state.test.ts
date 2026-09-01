@@ -9,9 +9,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PENDING_TTL_MS, readPending, writePending } from "../src/approvals.js";
+import {
+  PENDING_TTL_MS,
+  listApprovals,
+  readApproval,
+  readPending,
+  writePending,
+} from "../src/approvals.js";
 import { AUDIT_MAX_BYTES, appendAudit, auditPath, rotatedAuditPath } from "../src/audit.js";
-import { Policy, counterPath } from "../src/policy.js";
+import { DEFAULT_CAPS, Policy, counterPath } from "../src/policy.js";
 import { InsecureStateError, ensureDir, secureFile } from "../src/state.js";
 import { tempHome, validDocument } from "./helpers.js";
 
@@ -55,25 +61,82 @@ describe("a pre-existing path is brought to the documented mode", () => {
     expect(mode(home)).toBe("700");
   });
 
-  it("tightens a world-readable counter file, approval file and audit log to 0600", () => {
+  it("tightens a world-readable audit log, which it writes rather than trusts", () => {
     const home = tempHome();
-    fs.mkdirSync(path.join(home, "pending"), { recursive: true });
-    fs.writeFileSync(counterPath(home), '{"minute":{},"day":{}}', { mode: 0o666 });
-    fs.chmodSync(counterPath(home), 0o666);
+    ensureDir(home);
     fs.writeFileSync(auditPath(home), "", { mode: 0o666 });
     fs.chmodSync(auditPath(home), 0o666);
+
+    appendAudit(home, entry);
+
+    expect(mode(auditPath(home))).toBe("600");
+    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"status":"ok"');
+  });
+
+  it("replaces a world-readable record when it writes one", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "pending"), { recursive: true, mode: 0o700 });
     const record = path.join(home, "pending", `${ID}.json`);
     fs.writeFileSync(record, "{}", { mode: 0o666 });
     fs.chmodSync(record, 0o666);
 
-    new Policy(home, { now: () => NOW }).consume("read");
-    appendAudit(home, entry);
     writePending(home, pendingRecord());
 
-    expect(mode(counterPath(home))).toBe("600");
-    expect(mode(auditPath(home))).toBe("600");
     expect(mode(record)).toBe("600");
-    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"status":"ok"');
+  });
+});
+
+/**
+ * A file this server is about to TRUST is verified, not repaired. Tightening a counter or approval
+ * file that was already world-readable neither un-exposes it nor makes the decision inside it this
+ * user's, so those two paths refuse where the write paths chmod.
+ */
+describe("a state file that could have been written by anything else is not read", () => {
+  it("refuses a world-readable approval instead of authorizing a write with it", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "approvals"), { recursive: true, mode: 0o700 });
+    const file = path.join(home, "approvals", `${ID}.json`);
+    fs.writeFileSync(file, JSON.stringify({ approvalId: ID }), { mode: 0o600 });
+    fs.chmodSync(file, 0o666);
+
+    expect(() => readApproval(home, ID)).toThrow(InsecureStateError);
+    expect(() => readApproval(home, ID)).toThrow(/is mode 666/);
+    // And it is not offered up by the listing either.
+    expect(listApprovals(home)).toEqual([]);
+  });
+
+  it("refuses a world-readable preview instead of printing it for approval", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "pending"), { recursive: true, mode: 0o700 });
+    const file = path.join(home, "pending", `${ID}.json`);
+    fs.writeFileSync(file, JSON.stringify(pendingRecord()), { mode: 0o600 });
+    fs.chmodSync(file, 0o666);
+
+    expect(() => readPending(home, ID)).toThrow(/is mode 666/);
+  });
+
+  it("refuses a hard-linked counter file rather than counting against it", () => {
+    const home = tempHome();
+    ensureDir(home);
+    const caps = { ...DEFAULT_CAPS, read: { perMinute: 1, perDay: 1 } };
+    const policy = new Policy(home, { caps, now: () => NOW });
+    policy.consume("read");
+    expect(() => policy.consume("read")).toThrowError(/per minute/);
+
+    // A second name for the counter file at the cap: whoever holds it can rewrite the count.
+    fs.linkSync(counterPath(home), path.join(home, "counters.hardlink"));
+
+    expect(() => policy.consume("read")).toThrow(InsecureStateError);
+    expect(() => policy.usage("read")).toThrow(/more than one hard link/);
+  });
+
+  it("refuses a world-readable counter file rather than trusting its counts", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(counterPath(home), '{"minute":{},"day":{}}', { mode: 0o600 });
+    fs.chmodSync(counterPath(home), 0o666);
+
+    expect(() => new Policy(home, { now: () => NOW }).consume("read")).toThrow(/is mode 666/);
   });
 });
 
@@ -123,11 +186,11 @@ describe("a path that is not what it claims to be is refused", () => {
 
   it("does not read an approval record through a symlink", () => {
     const home = tempHome();
-    fs.mkdirSync(path.join(home, "pending"), { recursive: true });
+    fs.mkdirSync(path.join(home, "pending"), { recursive: true, mode: 0o700 });
     const decoy = path.join(home, "decoy.json");
     fs.writeFileSync(decoy, JSON.stringify({ ...pendingRecord(), apiOrigin: "https://evil.test" }));
     fs.symlinkSync(decoy, path.join(home, "pending", `${ID}.json`));
-    expect(readPending(home, ID)).toBeNull();
+    expect(() => readPending(home, ID)).toThrow(/symbolic link/);
   });
 });
 
@@ -215,6 +278,25 @@ describe("the audit log is bounded", () => {
     });
 
     expect(() => appendAudit(home, entry)).not.toThrow();
+    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"tool":"search_opportunities"');
+  });
+
+  it("recreates the log at 0600 when a rotation takes it away between the check and the write", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(auditPath(home), "", { mode: 0o600 });
+    // Another process rotating the log lands exactly here: the path was judged a moment ago, and
+    // the file the line goes into is a different one.
+    const realAppend = fs.appendFileSync;
+    vi.spyOn(fs, "appendFileSync").mockImplementation(((target, data, options) => {
+      fs.rmSync(auditPath(home), { force: true });
+      return realAppend(target, data, options);
+    }) as typeof fs.appendFileSync);
+
+    appendAudit(home, entry);
+
+    expect(fs.existsSync(auditPath(home))).toBe(true);
+    expect(mode(auditPath(home))).toBe("600");
     expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"tool":"search_opportunities"');
   });
 

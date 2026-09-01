@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { digestOf, sha256Hex } from "./canonical.js";
 import { ToolError } from "./errors.js";
-import { ensureDir, isRegularFile, secureFile } from "./state.js";
+import { ensureDir, existsSecurely, secureFile } from "./state.js";
 
 export { ensureDir } from "./state.js";
 
@@ -94,9 +94,12 @@ function writeFile0600(file: string, contents: string): void {
   secureFile(file);
 }
 
+/**
+ * A record, or `null` when there is none. THROWS when there is one that cannot be trusted: reading
+ * a decision file something else could have written lets whatever wrote it authorize a submission.
+ */
 function readRecord<T>(file: string): T | null {
-  // Following a symlink here would read whatever it points at and treat that as an approval.
-  if (!isRegularFile(file)) return null;
+  if (!existsSecurely(file)) return null;
   let raw: string;
   try {
     raw = fs.readFileSync(file, "utf8");
@@ -246,7 +249,12 @@ function listDir<T extends { approvalId: string }>(dir: string): T[] {
   const out: T[] = [];
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
-    const record = readRecord<T>(path.join(dir, name));
+    let record: T | null;
+    try {
+      record = readRecord<T>(path.join(dir, name));
+    } catch {
+      continue; // An untrustworthy record is not listed, which is the fail-closed direction.
+    }
     if (record !== null && typeof record.approvalId === "string") out.push(record);
   }
   return out;

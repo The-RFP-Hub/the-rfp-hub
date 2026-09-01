@@ -6,8 +6,9 @@
  * document, so the outcome is unknown and the caller has to be sent to the owner listing rather
  * than told "failed".
  */
-import { describe, expect, it } from "vitest";
-import { ApiClient } from "../src/http.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { ApiClient, MAX_LOCATION_CHARS } from "../src/http.js";
+import { clearRegisteredSecrets, registerSecret } from "../src/redact.js";
 import {
   listPage,
   rejection,
@@ -16,6 +17,8 @@ import {
   testConfig,
   validDocument,
 } from "./helpers.js";
+
+afterEach(() => clearRegisteredSecrets());
 
 function client(responses: Parameters<typeof stubFetch>[0]) {
   return new ApiClient(testConfig(), { fetchImpl: stubFetch(responses).fetchImpl });
@@ -140,6 +143,30 @@ describe("a write's 2xx body", () => {
     expect(error.message).not.toContain(long);
     expect(error.message).toContain("https://elsewhere.test/xxx");
     expect(error.message.length).toBeLessThan(1_200);
+  });
+
+  it("redacts a registered secret that straddles the length bound", async () => {
+    // Not `rfph_`-shaped, so only the registered literal finds it — and it starts before the
+    // 200-character bound and ends after it. Bounding first cuts it in half, and the redactor then
+    // never sees the whole of it, so the surviving half reaches the model.
+    const secret = "session-cookie-value-0123456789ab";
+    registerSecret(secret);
+    const prefix = "https://elsewhere.test/";
+    const location = `${prefix}${"x".repeat(MAX_LOCATION_CHARS - prefix.length - 10)}${secret}`;
+    expect(location.indexOf(secret)).toBeLessThan(MAX_LOCATION_CHARS);
+    expect(location.length).toBeGreaterThan(MAX_LOCATION_CHARS);
+
+    const error = await rejection(
+      new ApiClient(testConfig(), {
+        fetchImpl: stubFetch([{ status: 307, headers: { location } }]).fetchImpl,
+      }).submitOpportunity(validDocument()),
+    );
+
+    expect(error.message).not.toContain(secret);
+    expect(error.message).not.toContain(secret.slice(0, 8));
+    // The marker itself is what the bound cuts, which is the point: the redactor saw the whole
+    // secret and replaced it, and only then was the result trimmed to length.
+    expect(error.message).toContain("[REDACTED");
   });
 
   it("redacts a key-shaped Location instead of quoting it", async () => {

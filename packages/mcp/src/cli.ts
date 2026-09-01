@@ -173,7 +173,14 @@ async function approve(
     say(err instanceof Error ? err.message : String(err));
     return 2;
   }
-  const record = readPending(config.home, id);
+  let record: ReturnType<typeof readPending>;
+  try {
+    record = readPending(config.home, id);
+  } catch (err) {
+    // A preview this process cannot vouch for is not printed for a person to authorize.
+    say(err instanceof Error ? err.message : String(err));
+    return 2;
+  }
   if (record === null) {
     say(previewUnavailable(id));
     return 1;
@@ -219,7 +226,13 @@ async function approve(
   // CLAIMED AFTER THE ANSWER, NOT BEFORE THE QUESTION: everything above happened across an
   // unbounded wait for a human, inside which the preview can be revoked, expire, or be approved
   // in a second terminal. One atomic rename decides it.
-  const claimed = claimPending(config.home, record.approvalId);
+  let claimed: ReturnType<typeof claimPending>;
+  try {
+    claimed = claimPending(config.home, record.approvalId);
+  } catch (err) {
+    say(err instanceof Error ? err.message : String(err));
+    return 2;
+  }
   if (claimed === null) {
     // Deliberately the SAME sentence the read-side miss prints.
     say(previewUnavailable(record.approvalId));

@@ -282,8 +282,10 @@ export class ApiClient {
       // The Location is named for the operator, bounded and redacted because it is attacker text.
       const location = res.headers.get("location");
       await res.body?.cancel().catch(() => {});
+      // REDACTED FIRST, THEN BOUNDED: truncating first cuts a secret in half, and the redactor
+      // never sees the whole of it, so the surviving half stays in the message.
       const where =
-        location === null ? "" : ` to ${redactString(truncate(location, MAX_LOCATION_CHARS))}`;
+        location === null ? "" : ` to ${truncate(redactString(location), MAX_LOCATION_CHARS)}`;
       throw ambiguousWriteError(
         this.config.apiOrigin,
         `the API answered ${res.status}, a redirect${where}, which this server does not follow on a write — the document and credential were NOT re-sent anywhere, but a redirect is also how a server acknowledges something it has just created`,

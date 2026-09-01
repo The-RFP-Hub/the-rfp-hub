@@ -79,7 +79,7 @@ describe("fail-closed", () => {
   it("denies rather than allows when the counter file is corrupt", () => {
     const home = testConfig().home;
     fs.mkdirSync(home, { recursive: true });
-    fs.writeFileSync(counterPath(home), "{not json");
+    fs.writeFileSync(counterPath(home), "{not json", { mode: 0o600 });
     const policy = new Policy(home, { now: () => NOW });
     // Resetting to zero on a corrupt file is what an attacker who can truncate it would want.
     expect(() => policy.consume("read")).toThrowError(/fails\s+closed|unusable/);
@@ -218,8 +218,10 @@ describe("a corrupt counter file fails closed", () => {
 
   function withFile(contents: string): { policy: Policy; home: string } {
     const home = testConfig().home;
-    fs.mkdirSync(home, { recursive: true });
-    fs.writeFileSync(counterPath(home), contents);
+    fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+    // 0600, so what the store is refused for is its CONTENT and not its mode.
+    fs.writeFileSync(counterPath(home), contents, { mode: 0o600 });
+    fs.chmodSync(counterPath(home), 0o600);
     return { policy: new Policy(home, { now: () => NOW }), home };
   }
 
@@ -264,6 +266,32 @@ describe("a corrupt counter file fails closed", () => {
 });
 
 describe("a clock that moves backwards buys nothing", () => {
+  it("writes the increment into the window it counted in, not into the rolled-back one", () => {
+    const home = tempHome();
+    const caps = { ...DEFAULT_CAPS, read: { perMinute: 3, perDay: 100 } };
+    const future = new Date(NOW.getTime() + 10 * 60_000);
+    const futureWindow = Math.floor(future.getTime() / 60_000);
+
+    const ahead = new Policy(home, { caps, now: () => future });
+    ahead.consume("read");
+    ahead.consume("read");
+
+    // A process whose clock has been wound back ten minutes spends the third unit.
+    new Policy(home, { caps, now: () => NOW }).consume("read");
+
+    // Stamping that unit with the rolled-back window would make the bucket look stale one minute
+    // of wall clock later, resetting the count and handing back the budget the rollback was denied.
+    const stored = JSON.parse(fs.readFileSync(counterPath(home), "utf8")) as {
+      minute: { read: { window: number; count: number } };
+    };
+    expect(stored.minute.read).toEqual({ window: futureWindow, count: 3 });
+
+    const oneMinuteOn = new Date(NOW.getTime() + 60_000);
+    const later = new Policy(home, { caps, now: () => oneMinuteOn });
+    expect(later.usage("read").minute).toBe(3);
+    expect(() => later.consume("read")).toThrowError(/per minute/);
+  });
+
   it("keeps counting in the stored window rather than resetting to zero", () => {
     const home = testConfig().home;
     const caps = { ...DEFAULT_CAPS, commit: { perMinute: 2, perDay: 2 } };
