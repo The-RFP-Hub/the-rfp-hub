@@ -1,59 +1,37 @@
 /**
  * Who a request is metered as, and the hook chain that meters it.
  *
- * ── The key ────────────────────────────────────────────────────────────────────────────────────
- * A credentialed route is bucketed per CREDENTIAL-HOLDER, not per address. Two accounts behind one
- * office NAT are two budgets; one account calling from a laptop and from CI is one budget. Keying
- * a write surface by address gets both halves wrong — it punishes the shared egress and it hands a
- * cheap reset to anyone with a second address.
- *
- * The address is the FALLBACK, and only for a request that proved nothing. It is GROUPED BEFORE IT
- * IS USED — see `addressBucket` — because a raw IPv6 address is not a caller, it is one of the
- * 18 quintillion a caller was handed. Nothing here is stored: the grouped address becomes a key in
- * an in-memory counter that expires with its window, and is never written to a row, a log line or
- * an analytics event.
- *
- * ── The chain ──────────────────────────────────────────────────────────────────────────────────
- * `meteredAuth` exists because the obvious wiring does not work, in two different ways.
- *
- * 1. A GATE ANSWERS, AND ANSWERING ENDS THE CHAIN. `onRequest: requireAuth` plus
- *    `config: { rateLimit }` composes to `[requireAuth, limiter]` — @fastify/rate-limit APPENDS
- *    its handler to whatever the route declared for that hook (`addRouteRateHook`). A request with
- *    a junk Bearer is refused by `requireAuth` and the limiter never runs, so unauthenticated
- *    write traffic was unlimited. The fix is to resolve quietly, meter, and only then gate.
- * 2. TWO LIMITERS DO NOT BOTH RUN. Every handler minted by one registration of the plugin shares a
- *    `rateLimitRan` symbol on the request and returns early once any of them has run — so
- *    `[ipLimiter, requireAuth, accountLimiter]` produces one bucket, not two. There is exactly one
- *    limiter here; which bucket it charges is a decision made by `rateLimitKey`, not by a second
- *    handler.
- *
- * The limiter is built with `router.rateLimit(...)` rather than declared as `config.rateLimit`
- * precisely so its POSITION in the array is ours: the plugin's own registration path can only
- * append. Each call mints an independent store child, so the buckets are per route exactly as the
- * declarative form's were.
- *
- * `config.rateLimit` is still the right form for a route with no credential at all — the two
- * redirects — where there is nothing to resolve and the address is the only key there could be.
+ * A credentialed route is bucketed per CREDENTIAL-HOLDER: two accounts behind one office NAT are
+ * two budgets, and one account calling from a laptop and from CI is one budget. The address is the
+ * fallback, for a request that proved nothing. Nothing here is stored — the key lives in an
+ * in-memory counter that expires with its window.
  */
 import { isIPv4, isIPv6 } from "node:net";
 import type { FastifyInstance, FastifyRequest, onRequestHookHandler } from "fastify";
 
-/** What @fastify/rate-limit's own default generator groups an IPv6 caller by. Match it. */
 const IPV6_SUBNET_BITS = 64;
 const IPV6_GROUPS = IPV6_SUBNET_BITS / 16;
 
 /**
+ * The two namespaces are DISJOINT, and that is a security property rather than tidiness. Behind a
+ * trusted proxy `request.ip` is whichever `X-Forwarded-For` token the hop count selected, so a
+ * caller who can reach that proxy can put arbitrary text there — `acct:1` included. Sharing one
+ * namespace would let that text land in an account's bucket.
+ */
+const ACCOUNT_PREFIX = "acct:";
+const ADDRESS_PREFIX = "ip:";
+/** Where every unparseable address goes. One fixed bucket, never the caller's own text as a key. */
+const INVALID_ADDRESS = `${ADDRESS_PREFIX}invalid`;
+
+/**
  * The eight 16-bit groups of an IPv6 address, or null if it does not parse.
  *
- * Written out rather than delegated because the library that would do it (`ip-address`) is
- * @fastify/rate-limit's dependency, not ours — reaching into it would be a phantom import that
- * pnpm's layout is specifically built to refuse, and vendoring a whole address library to truncate
- * four groups is worse than truncating four groups.
+ * Written out rather than delegated: the library that would do it (`ip-address`) is
+ * @fastify/rate-limit's dependency, not ours, and reaching into it is a phantom import pnpm's
+ * layout exists to refuse.
  */
 function ipv6Groups(address: string): number[] | null {
-  // A scope id (`fe80::1%eth0`) names an interface on THIS host, never a caller identity.
-  const bare = address.split("%")[0] ?? "";
-  const halves = bare.split("::");
+  const halves = address.split("::");
   if (halves.length > 2) return null;
   const parse = (part: string): number[] | null => {
     const out: number[] = [];
@@ -84,30 +62,48 @@ function ipv6Groups(address: string): number[] | null {
 }
 
 /**
+ * The host part of an address that may carry brackets, a port or a scope id.
+ *
+ * A port must never reach the key: one bucket per source port is one fresh bucket per connection.
+ * The IPv4 port form is matched as a whole so a value like `acct:7` — one colon, digits after it —
+ * is not mistaken for a host and a port.
+ */
+function hostOf(value: string): string {
+  const trimmed = value.trim();
+  const bracketed = /^\[([^\]]*)\](?::\d{1,5})?$/.exec(trimmed);
+  const host =
+    bracketed?.[1] ?? /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(trimmed)?.[1] ?? trimmed;
+  // A scope id (`fe80::1%eth0`) names an interface on THIS host, never a caller identity.
+  return host.split("%")[0] ?? "";
+}
+
+/**
  * The address, grouped into the smallest unit a caller cannot trivially move within.
  *
- * AN IPv6 HOST ADDRESS IS NOT AN IDENTITY. The smallest thing a residential or cloud IPv6 customer
- * is assigned is a /64, and every one of the 2^64 addresses inside it is theirs to use — so a
- * limiter keyed on the full address hands an attacker a fresh, empty bucket on every single
- * request by incrementing the host bits. `@fastify/rate-limit`'s own default generator groups by
- * /64 for exactly this reason (`normalizeIP`, `defaultIPv6Subnet = 64`); supplying a custom
- * `keyGenerator` replaces that generator wholesale, so the grouping has to be carried over with it
- * or it is silently lost. IPv4 is left alone: a v4 address is not handed out 2^64 at a time.
+ * AN IPv6 HOST ADDRESS IS NOT AN IDENTITY. The smallest allocation a residential or cloud IPv6
+ * customer receives is a /64, and all 2^64 addresses in it are theirs — so a limiter keyed on the
+ * full address hands out a fresh, empty bucket on every request. `@fastify/rate-limit`'s own
+ * default generator groups by /64 for this reason, and supplying a custom `keyGenerator` replaces
+ * that generator wholesale, so the grouping has to be carried over with it. IPv4 is left alone.
  *
- * An IPv4-mapped address (`::ffff:203.0.113.9`) is folded to the IPv4 address it carries — without
- * that step its first four groups are all zero and EVERY mapped caller would share one bucket,
- * which is the opposite failure and a worse one.
+ * The two IPv6 forms that EMBED an IPv4 address are folded back to it: the mapped `::ffff:a.b.c.d`
+ * a dual-stack listener reports for a v4 client, and the deprecated compatible `::a.b.c.d`. Both
+ * have zeros where the /64 lives, so without the fold every such caller would share one bucket.
  */
 export function addressBucket(address: string): string {
-  if (isIPv4(address)) return address;
-  if (!isIPv6(address)) return address.toLowerCase();
-  const groups = ipv6Groups(address);
-  if (groups === null) return address.toLowerCase();
+  const host = hostOf(address);
+  if (isIPv4(host)) return ADDRESS_PREFIX + host;
+  if (!isIPv6(host)) return INVALID_ADDRESS;
+  const groups = ipv6Groups(host);
+  if (groups === null) return INVALID_ADDRESS;
   const [a = 0, b = 0, c = 0, d = 0, e = 0, marker = 0, hi = 0, lo = 0] = groups;
-  if (a === 0 && b === 0 && c === 0 && d === 0 && e === 0 && marker === 0xffff) {
-    return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+  const zeroPrefix = a === 0 && b === 0 && c === 0 && d === 0 && e === 0;
+  // `marker === 0` is the compatible form, and only a written dotted quad distinguishes it from
+  // `::1` or `::` — which are not callers and may share a bucket.
+  if (zeroPrefix && (marker === 0xffff || (marker === 0 && host.includes(".")))) {
+    return `${ADDRESS_PREFIX}${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
   }
-  return `${groups
+  return `${ADDRESS_PREFIX}${groups
     .slice(0, IPV6_GROUPS)
     .map((group) => group.toString(16))
     .join(":")}::/${IPV6_SUBNET_BITS}`;
@@ -115,7 +111,7 @@ export function addressBucket(address: string): string {
 
 /** Who this request is being metered as. An account when one is proven; the address otherwise. */
 export const rateLimitKey = (req: FastifyRequest): string =>
-  req.principal ? `acct:${req.principal.accountId}` : addressBucket(req.ip);
+  req.principal ? `${ACCOUNT_PREFIX}${req.principal.accountId}` : addressBucket(req.ip);
 
 export interface MeteredLimit {
   max: number;
@@ -126,9 +122,17 @@ export interface MeteredLimit {
 /**
  * The `onRequest` chain for a credentialed, metered route: resolve → meter → gate.
  *
- * `gate` is whichever refusal the route actually wants (`requireAuth`, `requireSession`,
- * `requireRole("reviewer")`, …). It runs unchanged and answers exactly what it answered before;
- * the only difference is that the request has already been counted by the time it does.
+ * The obvious wiring does not work, in two ways. A GATE ANSWERS, AND ANSWERING ENDS THE CHAIN:
+ * `onRequest: requireAuth` plus `config: { rateLimit }` composes to `[requireAuth, limiter]`,
+ * because the plugin APPENDS its handler to whatever the route declared — so a junk Bearer was
+ * refused before the limiter ever ran and unauthenticated write traffic was unlimited. And TWO
+ * LIMITERS DO NOT BOTH RUN: every handler minted by one registration shares a `rateLimitRan`
+ * symbol and returns early once any of them has run, so `[ipLimiter, gate, accountLimiter]` is one
+ * bucket, not two. There is exactly one limiter here; which bucket it charges is `rateLimitKey`'s
+ * decision. `router.rateLimit(...)` rather than `config.rateLimit` is what puts its POSITION in
+ * this array under our control.
+ *
+ * `config.rateLimit` remains right for a route with no credential at all — the two redirects.
  */
 export function meteredAuth(
   router: FastifyInstance,

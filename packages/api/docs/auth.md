@@ -312,16 +312,33 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 ### Rate limits
 
 **Keyed per credential-holder, not per address.** A metered route counts against
-`acct:<accountId>` whenever the request proved an account, and falls back to the caller's address
-only when it proved nothing. Two people behind one office egress are two budgets; one account
-calling from a laptop and from CI is one budget. Nothing is stored: the key lives in an in-memory
-counter that expires with its window and never reaches a row, a log line or an analytics event.
+`acct:<accountId>` whenever the request proved an account, and falls back to `ip:<address>` only
+when it proved nothing. Two people behind one office egress are two budgets; one account calling
+from a laptop and from CI is one budget. Nothing is stored: the key lives in an in-memory counter
+that expires with its window and never reaches a row, a log line or an analytics event.
 
-**The address fallback is grouped by /64 for IPv6**, IPv4 unchanged. The smallest allocation an
-IPv6 customer receives is a /64, so a key on the full address would hand a fresh bucket to anyone
-willing to increment the host bits — no limit at all for the caller best equipped to abuse it.
-(An IPv4-mapped address is folded back to the IPv4 address it carries, or every mapped caller would
-share one bucket instead.)
+**The two namespaces are disjoint, and that is a security property.** With `TRUST_PROXY` set,
+`request.ip` is a token out of `X-Forwarded-For` — text a caller who can reach the proxy chooses.
+`acct:` and `ip:` therefore cannot collide, and an address that is not a valid address never
+becomes a key: it goes to one fixed `ip:invalid` bucket rather than being used verbatim.
+
+**The address fallback is canonicalized before it is used** (`modules/routes/shared/rate-limit-key.ts`):
+
+| Form | Bucket |
+|---|---|
+| IPv4 `203.0.113.9` | `ip:203.0.113.9` — unchanged |
+| IPv6 `2001:db8:1:1::9` | `ip:2001:db8:1:1::/64` — grouped |
+| IPv4-mapped `::ffff:203.0.113.9`, IPv4-compatible `::203.0.113.9` | `ip:203.0.113.9` — folded to the address they embed |
+| Port-bearing `203.0.113.9:4000`, `[2001:db8::1]:4000` | the port is stripped |
+| Scope id `fe80::1%eth0` | the scope is dropped |
+| Anything else — empty, whitespace, a header value, `acct:1` | `ip:invalid` |
+
+The /64 grouping is the load-bearing one: the smallest allocation an IPv6 customer receives is a
+/64, so a key on the full address hands a fresh bucket to anyone willing to increment the host bits
+— no limit at all for the caller best equipped to abuse it. The two embedded-IPv4 folds are the
+opposite failure: both forms are zero where the /64 lives, so without them every mapped caller —
+which is every v4 client of a dual-stack listener — would share one bucket. Stripping the port
+matters for the same reason as the /64: a source port changes on every connection.
 
 **An invalid credential is metered by address, and is refused for being over the limit before it is
 refused for being invalid.** Resolving the credential is split from rejecting it
