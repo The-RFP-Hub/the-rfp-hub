@@ -1,12 +1,10 @@
 /**
- * Argument parsing and refusals for `scripts/accept-m4.mjs`, which WRITES. The target guard is
- * DEFAULT-DENY against an explicit allowlist of this project's staging origins plus loopback, and
- * THERE IS NO FLAG TO FORCE PRODUCTION.
+ * Argument parsing and refusals for `scripts/accept-m4.mjs`, which WRITES. DEFAULT-DENY against an
+ * explicit allowlist of this project's staging origins plus loopback, and NO FLAG FORCES PRODUCTION.
  *
- * Not the M3 checker's hostname heuristic: asking whether any segment reads like a non-production
- * environment admits `not-staging-anymore`, `production-staging` and any CNAME an attacker
- * controls. Hostname text cannot prove which deployment answers, and being wrong here means a real
- * write to production plus a reviewer credential on the wire.
+ * Not the M3 checker's hostname heuristic: "does any segment read like a non-production
+ * environment" admits `not-staging-anymore`, `production-staging` and any CNAME an attacker
+ * controls. Hostname text cannot prove which deployment answers.
  */
 import { isLoopbackHost, request } from "../../m2-compliance/http.mjs";
 import { normalizeMcpSpec } from "../options.mjs";

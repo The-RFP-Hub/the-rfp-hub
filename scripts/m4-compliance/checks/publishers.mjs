@@ -8,21 +8,17 @@ import { request } from "../../m2-compliance/http.mjs";
  * slugs shown equals the API's, and that the browser's own request to the API carried no
  * `Authorization` header — the page must not smuggle a credential into an otherwise-public listing.
  *
- * EVERY UNPROVEN CASE IS A FAILURE, NOT A WARNING. Not being able to find the cards, not observing
- * the browser's request, and a response whose shape this checker does not recognize were all
- * warnings, and warnings were green — so with production answering `{"items":[],"total":0}` the
- * criterion could pass having established nothing at all. An empty listing has its own evidence:
- * the page renders the empty state, and that is what is asserted.
+ * EVERY UNPROVEN CASE IS A FAILURE, NOT A WARNING: not finding the cards, not observing the
+ * browser's request, and an unrecognized response shape were warnings, and warnings were green, so
+ * production's `{"items":[],"total":0}` could pass having established nothing. An empty listing has
+ * its own evidence — the page renders the empty state — and that is what is asserted.
  */
 import { withPage } from "../browser.mjs";
 
 /**
- * The slugs the rendered `/publishers` page shows, and how they were found: the purpose-built
- * `[data-publisher-slug]` attribute on `PublisherCard`, else each card's `<code>{slug}:…</code>`
- * (a Standard slug cannot contain a colon, so the text before the first one is the slug).
- *
- * `extractionUsed: "none"` means neither selector matched — the caller treats that as "cannot
- * verify", never as "the rendered set is empty".
+ * The slugs the rendered page shows: `[data-publisher-slug]` on `PublisherCard`, else each card's
+ * `<code>{slug}:…</code>` (a Standard slug cannot contain a colon). `extractionUsed: "none"` means
+ * neither selector matched — "cannot verify", never "the rendered set is empty".
  */
 export async function extractRenderedSlugs(page) {
   const viaAttribute = await page.$$eval("[data-publisher-slug]", (elements) =>

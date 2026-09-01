@@ -131,10 +131,8 @@ async function main() {
       `reviewStatus=${entry.reviewStatus}, expected "pending"`,
     );
   } catch (err) {
-    // `state.commitAttempted` is set immediately before the phase-3 POST — once true, a throw does
-    // NOT mean "nothing was created": the request may have reached the API even though this process
-    // never saw the reply. `state.candidateOpportunityId` is the id the document itself declared,
-    // known since before phase 1, which is exactly what lets this recover and still tear down.
+    // Once `commitAttempted` is true, a throw does NOT mean "nothing was created": the POST may
+    // have reached the API unseen. The candidate id — the document's own — lets this tear it down.
     if (state.commitAttempted && state.candidateOpportunityId) {
       c.fail(
         "preview → out-of-band approval → commit completes",

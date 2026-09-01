@@ -1,13 +1,12 @@
 /**
- * The real 3-phase MCP submission, driven end to end against a staging deployment — including the
- * things a happy path never touches: an owner SNAPSHOT before anything, so "the preview created
- * nothing" is a fact rather than a specification restated, and a phase-3 commit attempted WITHOUT
- * an approval, which must be refused with that snapshot unchanged.
+ * The real 3-phase MCP submission against staging, including what a happy path never touches: an
+ * owner SNAPSHOT before anything, and a phase-3 commit attempted WITHOUT an approval that must be
+ * refused with that snapshot unchanged.
  *
  * WHAT THE APPROVAL PROVES. By default this driver writes the literal `approve` into the CLI's
- * stdin: that automates the CLI, it does not demonstrate a human decision, and the report says
- * `approval: SIMULATED (non-interactive)`. `--interactive-approval` waits for an operator and the
- * report says `approval: HUMAN`. Both are honest; only one is evidence of the human step.
+ * stdin — that automates the CLI, it does not demonstrate a human decision, and the report says
+ * `approval: SIMULATED (non-interactive)`. `--interactive-approval` waits for an operator and says
+ * `approval: HUMAN`. Both are honest; only one is evidence of the human step.
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -94,7 +93,7 @@ function runApprove(command, args, { cwd, env, timeoutMs }) {
   });
 }
 
-/** Wait for a human to run the approval in another terminal, polling for the approval to be gone. */
+/** Wait for a human to run the approval in another terminal. */
 function waitForHumanApproval(state, { command, timeoutMs, onPrompt }) {
   onPrompt(
     [
@@ -127,7 +126,7 @@ function extractPayload(response) {
   return response?.result?.structuredContent;
 }
 
-/** Every entry this credential owns, following pagination past the first 100. */
+/** Every entry this credential owns, past the first 100. */
 export async function ownedIds(ctx) {
   const ids = [];
   for (let page = 1; page <= 50; page++) {
@@ -146,9 +145,9 @@ export async function ownedIds(ctx) {
 }
 
 /**
- * Runs the full cycle, recording each assertion into `c`. MUTATES `state` BEFORE each network call:
- * `commitAttempted` is set immediately before the phase-3 POST, the one request whose failure is
- * AMBIGUOUS because it may have reached the API even though this process never saw the reply.
+ * MUTATES `state` BEFORE each network call: `commitAttempted` is set immediately before the phase-3
+ * POST, the one request whose failure is AMBIGUOUS — it may have reached the API even though this
+ * process never saw the reply.
  */
 export async function runSubmissionCycle(ctx, state, c) {
   const resolved = resolveCommand(ctx);

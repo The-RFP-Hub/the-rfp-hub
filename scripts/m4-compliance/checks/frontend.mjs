@@ -1,11 +1,7 @@
 /**
- * M4-3 — the reference frontend is alive, and behaves. Everything that needs the RENDERED page is
- * a requirement, not a nicety: without `--browser` those rows are unmet and the criterion is
- * incomplete.
- *
- * The two deep-link hrefs are inspected, never followed: the API records a view before the 302
- * fires, so a request from this checker would register as a real click against whichever
- * publisher's analytics the fixture points at.
+ * M4-3 — the reference frontend is alive, and behaves. The deep-link hrefs are inspected, never
+ * followed: the API records a view before the 302 fires, so a request from this checker would
+ * register as a real click against whichever publisher's analytics the fixture points at.
  */
 import { isLoopbackHost, probeTls, request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
@@ -20,12 +16,10 @@ const VIEWPORTS = [
 ];
 
 /**
- * The opportunity ids the rendered directory table is showing, one per row, in page order.
- *
- * `tbody a.row-title` is what `DirectoryRow` renders; there is no purpose-built test attribute in
- * `packages/frontend/src`. The looser `a[href*="/opportunities/"]` an earlier revision fell back to
- * also matched `/publishers`' links and double-counted them. Ids are decoded out of the href rather
- * than counted, so two pages with the same NUMBER of different rows still read as a change.
+ * The ids the rendered directory table is showing, in page order. `tbody a.row-title` is what
+ * `DirectoryRow` renders; the looser `a[href*="/opportunities/"]` an earlier revision used also
+ * matched `/publishers`' links. Ids are decoded out of the href rather than counted, so two pages
+ * with the same NUMBER of different rows still read as a change.
  */
 async function renderedOpportunityIds(page) {
   return await page.evaluate(() =>
@@ -38,18 +32,16 @@ async function renderedOpportunityIds(page) {
 }
 
 /**
- * The minimum touch target, in CSS pixels — `--control-touch` in the frontend's own `globals.css`,
- * and the same number `packages/e2e/tests/m4-responsive.spec.ts` asserts. HEIGHT is the measure
- * there and here: a full-width search box is 311 px wide and still fails a thumb if it is 40 tall.
+ * `--control-touch` in the frontend's `globals.css`, and the number `m4-responsive.spec.ts`
+ * asserts. HEIGHT is the measure: a 311 px wide search box still fails a thumb at 40 tall.
  */
 export const MIN_TARGET_PX = 44;
 
 const sameSet = (a, b) => a.size === b.size && [...a].every((value) => b.has(value));
 
 /**
- * Which entries are on screen changed — not merely that something did. An EMPTY result is as
- * consistent with a broken filter as with a working one, and a REORDERING of the same ids is not a
- * different result set at all; `JSON.stringify` inequality accepted both.
+ * WHICH entries are on screen changed, not merely that something did: `JSON.stringify` inequality
+ * accepted an empty result and a reordering of the same ids as proof that a filter works.
  */
 export function expectResultSetChanged(c, name, newIds, baselineIds, emptyHint) {
   if (newIds.length === 0) {
@@ -114,9 +106,8 @@ export async function deriveFilterValues(ctx) {
 }
 
 /**
- * Every control a thumb has to hit that is shorter than the minimum. Text links are exempt — their
- * hit area is the line box and enlarging one would break the sentence around it — which is the same
- * scope `m4-responsive.spec.ts` asserts by naming the filter controls and the two deep links.
+ * Controls shorter than the minimum. Text links are exempt (their hit area is the line box), which
+ * is the scope `m4-responsive.spec.ts` asserts by naming the filter controls and the deep links.
  */
 async function undersizedTargets(page, min) {
   return await page.evaluate((minPx) => {
@@ -392,10 +383,7 @@ export async function checkFrontend(report, ctx) {
   return c.finish();
 }
 
-/**
- * Index state is REPORTED, not held to a contract, because the decision is the operator's — unless
- * `--expect-indexable` says the deployment is meant to be indexed.
- */
+/** REPORTED, not a contract — the decision is the operator's — unless `--expect-indexable`. */
 function checkIndexability(c, ctx, homeRes, robotsRes) {
   const robots = robotsRes.ok && robotsRes.status === 200 ? robotsRes.body : undefined;
   const detail = robots
