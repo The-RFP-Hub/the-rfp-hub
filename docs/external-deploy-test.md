@@ -178,7 +178,10 @@ it would, **before** you spent time on it. Record:
 
 ### Block 5 — the report
 
-Twenty minutes, and the numbered list of questions is the most important part.
+Twenty minutes, and the numbered list of questions is the most important part. The report is
+published in this repository, and it is **scanned for credentials and personal data before it is
+committed** — the rules under the template below say what the scan looks for, so write with them in
+mind rather than editing them out afterwards.
 
 ---
 
