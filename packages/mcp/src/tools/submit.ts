@@ -312,12 +312,7 @@ export function describeIdRule(facts: DocumentFacts): { text: string; matches: b
     facts.namespace !== "" && facts.id.startsWith(prefix) && facts.id.length > prefix.length;
   return {
     matches,
-    text:
-      `A public id must be \`<namespace>:<local>\`. This server derives the namespace from the ` +
-      `document as \`${facts.namespace || "(none)"}\` (\`source.publisher\`, or ` +
-      `\`operatingOrganizations[0].slug\` when that is absent), so the id has to start ` +
-      `\`${prefix}\`. The id in this document is \`${facts.id}\`, which ` +
-      `${matches ? "satisfies that rule" : "does NOT satisfy that rule — the API will refuse it"}.`,
+    text: `A public id must be \`<namespace>:<local>\`. This server derives the namespace from the document as \`${facts.namespace || "(none)"}\` (\`source.publisher\`, or \`operatingOrganizations[0].slug\` when that is absent), so the id has to start \`${prefix}\`. The id in this document is \`${facts.id}\`, which ${matches ? "satisfies that rule" : "does NOT satisfy that rule — the API will refuse it"}.`,
   };
 }
 
