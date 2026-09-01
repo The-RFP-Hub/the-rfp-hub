@@ -4,7 +4,15 @@
  */
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractLinks, isAbsoluteHttpLink, isAnchorLink, resolveRelativeLink } from "../links.mjs";
+import {
+  extractLinks,
+  githubSlug,
+  headingSlugs,
+  isAbsoluteHttpLink,
+  isAnchorLink,
+  isUnresolvedReference,
+  resolveRelativeLink,
+} from "../links.mjs";
 
 describe("extractLinks", () => {
   it("finds inline links, ignoring a title", () => {
@@ -37,6 +45,36 @@ describe("extractLinks", () => {
   it("returns nothing for plain prose", () => {
     expect(extractLinks("No links here at all.")).toEqual([]);
   });
+
+  it("resolves a reference-style link through its definition", () => {
+    const md = "See [the guide][g] and [deploy].\n\n[g]: ./guide.md\n[deploy]: ./deployment.md\n";
+    expect(extractLinks(md)).toEqual([
+      { href: "./guide.md", kind: "reference" },
+      { href: "./deployment.md", kind: "reference" },
+    ]);
+  });
+
+  it("names a reference whose definition is missing instead of dropping it", () => {
+    const [link] = extractLinks("See [the guide][missing].");
+    expect(isUnresolvedReference(link.href)).toBe(true);
+  });
+
+  it("finds a bare URL written as prose", () => {
+    expect(extractLinks("Fetch https://example.org/data.json for the dataset.")).toEqual([
+      { href: "https://example.org/data.json", kind: "bare" },
+    ]);
+  });
+
+  it("ignores URLs inside fenced and inline code", () => {
+    const md = [
+      "```sh safe-read",
+      'curl -s "https://example.org/x"',
+      "```",
+      "",
+      "`https://y.example`",
+    ].join("\n");
+    expect(extractLinks(md)).toEqual([]);
+  });
 });
 
 describe("isAbsoluteHttpLink", () => {
@@ -57,27 +95,53 @@ describe("isAnchorLink", () => {
 });
 
 describe("resolveRelativeLink", () => {
+  const at = (href) =>
+    resolveRelativeLink(href, { fileDir: "/repo/docs", repoRoot: "/repo", path });
+
   it("resolves a same-directory relative link against repoRoot", () => {
-    const resolved = resolveRelativeLink("./api-integration.md", {
-      fileDir: "/repo/docs",
-      repoRoot: "/repo",
-      path,
+    expect(at("./api-integration.md")).toMatchObject({
+      path: "docs/api-integration.md",
+      fragment: undefined,
+      escapesRepo: false,
     });
-    expect(resolved).toBe("docs/api-integration.md");
   });
 
-  it("strips a trailing fragment before resolving", () => {
-    const resolved = resolveRelativeLink("../GOVERNANCE.md#appeals", {
-      fileDir: "/repo/docs",
-      repoRoot: "/repo",
-      path,
+  it("separates the fragment rather than discarding it", () => {
+    expect(at("../GOVERNANCE.md#appeals")).toMatchObject({
+      path: "GOVERNANCE.md",
+      fragment: "appeals",
     });
-    expect(resolved).toBe("GOVERNANCE.md");
   });
 
   it("returns null for a pure same-file anchor", () => {
-    expect(
-      resolveRelativeLink("#section", { fileDir: "/repo/docs", repoRoot: "/repo", path }),
-    ).toBeNull();
+    expect(at("#section")).toBeNull();
+  });
+
+  it("reports a ../ that walks out of the checkout", () => {
+    // It may resolve on the author's disk and cannot resolve on the published mirror.
+    expect(at("../../secrets/keys.md")).toMatchObject({ escapesRepo: true });
+    expect(at("../../../etc/passwd")).toMatchObject({ escapesRepo: true });
+  });
+});
+
+describe("githubSlug / headingSlugs", () => {
+  it("lowercases, drops punctuation and hyphenates spaces", () => {
+    expect(githubSlug("RFC process")).toBe("rfc-process");
+    expect(githubSlug("What this is — and what it is not")).toBe(
+      "what-this-is--and-what-it-is-not",
+    );
+    expect(githubSlug("`code` in a heading")).toBe("code-in-a-heading");
+  });
+
+  it("collects every heading level and suffixes repeats the way GitHub does", () => {
+    const slugs = headingSlugs(
+      ["# Deploy", "## Steps", "### Steps", "text", "## Steps"].join("\n"),
+    );
+    expect([...slugs]).toEqual(["deploy", "steps", "steps-1", "steps-2"]);
+  });
+
+  it("ignores headings inside a fenced block", () => {
+    const slugs = headingSlugs(["# Real", "", "```sh", "# not a heading", "```"].join("\n"));
+    expect([...slugs]).toEqual(["real"]);
   });
 });

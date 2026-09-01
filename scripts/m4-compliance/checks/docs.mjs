@@ -16,7 +16,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as nodePath from "node:path";
 import { mapLimit, request } from "../../m2-compliance/http.mjs";
-import { extractLinks, isAbsoluteHttpLink, isAnchorLink, resolveRelativeLink } from "../links.mjs";
+import {
+  extractLinks,
+  headingSlugs,
+  isAbsoluteHttpLink,
+  isAnchorLink,
+  isUnresolvedReference,
+  resolveRelativeLink,
+} from "../links.mjs";
 import { MARKERS, shellBlocks } from "../markers.mjs";
 import { parseSafeReadBlock, runSafeReadBlock } from "../safe-read.mjs";
 
@@ -48,32 +55,71 @@ export async function checkDocs(report, ctx) {
   }
   if (present.length === 0) return c.finish();
 
-  // ── links ────────────────────────────────────────────────────────────────
   const absoluteToCheck = [];
+  const slugCache = new Map();
+  const slugsOf = (fullPath) => {
+    if (!slugCache.has(fullPath)) {
+      slugCache.set(
+        fullPath,
+        existsSync(fullPath) ? headingSlugs(readFileSync(fullPath, "utf8")) : null,
+      );
+    }
+    return slugCache.get(fullPath);
+  };
+
   for (const relPath of present) {
     const full = join(ctx.repoRoot, relPath);
     const text = readFileSync(full, "utf8");
     const fileDir = dirname(full);
-    const links = extractLinks(text);
 
-    for (const { href } of links) {
-      if (isAnchorLink(href)) continue;
-      if (isAbsoluteHttpLink(href)) {
-        absoluteToCheck.push({ relPath, href });
+    for (const { href, kind } of extractLinks(text)) {
+      if (isUnresolvedReference(href)) {
+        c.fail(`${relPath}: reference link resolves`, `${href} has no [ref]: definition`);
         continue;
       }
+      if (isAnchorLink(href)) {
+        const fragment = href.slice(1);
+        c.expect(
+          slugsOf(full)?.has(fragment) === true,
+          `${relPath}: anchor "${href}" names a heading`,
+          `matches a heading in ${relPath}`,
+          `no heading in ${relPath} produces the anchor "${fragment}"`,
+        );
+        continue;
+      }
+      if (isAbsoluteHttpLink(href)) {
+        absoluteToCheck.push({ relPath, href, kind });
+        continue;
+      }
+      if (/^[a-z][a-z0-9+.-]*:/i.test(href)) continue; // mailto: and friends
       const resolved = resolveRelativeLink(href, {
         fileDir,
         repoRoot: ctx.repoRoot,
         path: nodePath,
       });
       if (resolved === null) continue;
-      const targetFull = join(ctx.repoRoot, resolved.split("#")[0]);
+      if (resolved.escapesRepo) {
+        c.fail(
+          `${relPath}: relative link "${href}" stays inside the repository`,
+          `resolves to ${resolved.path}, outside the checkout — it cannot resolve on the published mirror`,
+        );
+        continue;
+      }
+      const targetFull = join(ctx.repoRoot, resolved.path);
+      const exists = existsSync(targetFull);
       c.expect(
-        existsSync(targetFull),
+        exists,
         `${relPath}: relative link "${href}" resolves`,
         targetFull,
         `${relPath} links to "${href}", which does not exist at ${targetFull}`,
+      );
+      if (!exists || resolved.fragment === undefined) continue;
+      if (!targetFull.endsWith(".md")) continue;
+      c.expect(
+        slugsOf(targetFull)?.has(resolved.fragment) === true,
+        `${relPath}: fragment "#${resolved.fragment}" names a heading in ${resolved.path}`,
+        `matches a heading in ${resolved.path}`,
+        `no heading in ${resolved.path} produces the anchor "${resolved.fragment}"`,
       );
     }
   }
