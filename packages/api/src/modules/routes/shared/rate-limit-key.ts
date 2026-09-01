@@ -139,9 +139,26 @@ export function meteredAuth(
   gate: onRequestHookHandler,
   limit: MeteredLimit,
 ): onRequestHookHandler[] {
-  return [
-    router.auth.resolvePrincipal,
-    router.rateLimit({ ...limit, keyGenerator: rateLimitKey }),
-    gate,
-  ];
+  const meter = router.rateLimit({
+    ...limit,
+    keyGenerator: rateLimitKey,
+    allowList: authUnavailable,
+  });
+  // Named so the route-inventory test can see which hook in a chain is the limiter; the plugin's
+  // own handler is anonymous. `call` because its declared `this` is the instance that minted it.
+  const rateLimiter: onRequestHookHandler = async (request, reply) => {
+    await meter.call(router, request, reply);
+  };
+  return [router.auth.resolvePrincipal, rateLimiter, gate];
 }
+
+/**
+ * Skip the increment entirely when the credential could not be CHECKED.
+ *
+ * A 5xx from the auth store is ours, not a verdict on the caller: metering it would spend their
+ * budget on our outage and, past the ceiling, replace the 503 an operator is watching for with a
+ * 429. `allowList` is what skips without writing headers, so "not counted" is visible from outside
+ * as their absence. The gate behind the limiter still emits the preserved 5xx.
+ */
+const authUnavailable = (request: FastifyRequest): boolean =>
+  request.principalResolution?.kind === "unavailable";

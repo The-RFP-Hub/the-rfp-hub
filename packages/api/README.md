@@ -333,7 +333,11 @@ offline tooling and documented with it, under
   is written down here and in `src/app.ts`.
 - **Rate limiting**: registered with `global: false` — no route is limited unless it opts in. A
   blanket limit would cap the public read surface this project exists to serve, and would be
-  measured per IP, which behind a shared egress is one number for a whole organization.
+  measured per IP, which behind a shared egress is one number for a whole organization. Every
+  authenticated `/v1` mutation opts in, keyed per credential-holder; an auth-store outage is not
+  metered, and any other response — including a `5xx` raised after the limiter ran — is. The
+  ceilings, the address canonicalization and the two operational caveats are in
+  [Rate limits](docs/auth.md#rate-limits).
 - **Graceful shutdown**: `SIGTERM`/`SIGINT` stop new connections, let in-flight requests finish and
   close the pg pool (a Fastify `onClose` hook) before exiting 0. A 10s forced-exit timeout means a
   hung close can never leave an un-killable process.

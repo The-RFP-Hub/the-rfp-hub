@@ -25,17 +25,16 @@
  * therefore never saw a request with a bad credential: hammering a write route with a junk Bearer
  * cost nothing. `resolvePrincipal` is the same resolution WITHOUT the answer — it populates
  * `request.principal` when the credential is good, records why it was refused when it is not, and
- * replies to nothing. Put it first, meter second, gate third, and the refusal still happens, one
- * hook later, after the request has been counted. See `modules/routes/shared/rate-limit-key.ts`.
+ * replies to nothing at all. Put it first, meter second, gate third, and the refusal still happens,
+ * one hook later, after the request has been counted.
  *
- * WITH ONE EXCEPTION, AND IT IS THE POINT OF THE SPLIT RATHER THAN A HOLE IN IT: a 5xx is OUR
- * failure, not a verdict on the caller. `SessionService.verify` answers 503 `auth_unavailable`
- * when the lookup could not be PERFORMED, deliberately, so that a database outage does not appear
- * as every signed-in user's session being invalid. Metering that would re-collapse the same
- * distinction one layer up: the outage would spend the address's budget and, past the ceiling, be
- * served as 429 — an outage disguised as the caller's own fault, and one that suppresses the 503
- * an operator is watching for. So `resolvePrincipal` ANSWERS a 5xx immediately, before the
- * limiter, and it is never counted. Only genuine credential refusals (401/403) go quietly past.
+ * `unavailable` IS A SEPARATE ARM BECAUSE ONLY ONE OF THE TWO MAY BE COUNTED. A 5xx is OUR failure,
+ * not a verdict on the caller: `SessionService.verify` answers 503 `auth_unavailable` when the
+ * lookup could not be PERFORMED, so that an outage does not appear as every signed-in user's
+ * session being invalid. Metering it would re-collapse that distinction one layer up — the outage
+ * would spend the caller's budget and, past the ceiling, be served as 429. The limiter reads this
+ * arm and skips the increment (`meteredAuth`'s `allowList` in
+ * `modules/routes/shared/rate-limit-key.ts`); the gate behind it then sends the preserved 5xx.
  *
  * The outcome is cached on the request (`request.principalResolution`), so a chain that resolves
  * and then gates verifies the credential ONCE — one session lookup or one key hash, as before.
@@ -84,14 +83,10 @@ export interface AuthDecorators {
   auth: Auth;
   principals: PrincipalService;
   /**
-   * Resolve the request's credential and answer nothing the caller is responsible for — the half of
-   * a gate that is safe to run before a rate limiter. Sets `request.principal` when a valid Bearer
-   * is presented; leaves it `null` for an absent or invalid one, without a 401, a 403 or a throw. A
-   * gate placed after it still refuses; it just refuses one hook later, with the request counted.
-   *
-   * It DOES answer a 5xx immediately — a lookup that could not be performed is not a credential
-   * that failed, and metering it would let an outage spend the caller's budget and then be served
-   * as a 429. See the header for why that distinction is worth a branch here.
+   * Resolve the request's credential and answer NOTHING — the half of a gate that is safe to run
+   * before a rate limiter. Sets `request.principal` for a valid Bearer, records why an invalid one
+   * was refused, and never sends, throws or ends the chain. A gate placed after it still refuses;
+   * it just refuses one hook later, with the request counted.
    */
   resolvePrincipal: onRequestAsyncHookHandler;
   requireAuth: preHandlerHookHandler;
@@ -214,13 +209,8 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     return true;
   }
 
-  const resolvePrincipal: onRequestAsyncHookHandler = async (request, reply) => {
-    const outcome = await resolveOnce(request);
-    // The one thing this resolver refuses to stay quiet about. Answering here ends the chain BEFORE
-    // the limiter, so an outage costs the caller nothing and reaches them as itself.
-    if (outcome.kind === "unavailable") {
-      send(reply, outcome.status, outcome.code, outcome.message);
-    }
+  const resolvePrincipal: onRequestAsyncHookHandler = async (request) => {
+    await resolveOnce(request);
   };
 
   const requireAuth: preHandlerHookHandler = async (request, reply) => {

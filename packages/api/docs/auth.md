@@ -347,10 +347,18 @@ refused for being invalid.** Resolving the credential is split from rejecting it
 spent. Before the split the gate answered inside the same `onRequest` chain and ended it, so the
 limiter never ran and anonymous write traffic was unlimited.
 
-**A failure to CHECK a credential is never metered.** A `503 auth_unavailable` — the session
-lookup could not be performed — is answered by the resolver before the limiter runs, so an outage
-does not spend the caller's budget and is never replaced by a `429`. Only genuine `401`/`403`
-refusals go quietly past and are counted.
+**An auth-store outage is not metered; any other response is.** `resolvePrincipal` replies to
+nothing at all — it resolves the credential and records the outcome. When that outcome is "could
+not be CHECKED" (a `503 auth_unavailable` from the session lookup, a `500` from a broken key
+lookup) the limiter skips the increment and emits no rate headers, and the gate behind it sends the
+preserved status and code. An outage therefore never spends the caller's budget and is never
+replaced by a `429`, even from an address whose bucket is already empty.
+
+That exemption is the only one. **Every other response counts, including a `5xx` produced after
+the limiter has run** — a handler, a service, a serializer or a later hook that fails has already
+incremented the bucket, so a run of server failures can eventually be answered with `429`. A refund
+for post-limiter failures needs a store that can atomically decrement the same route/key/window and
+is not built; the honest statement is the one above, not "5xx is never metered".
 
 **Metered routes** are the write, credential and link-out surfaces: `POST`/`PUT /v1/opportunities`
 and `POST /v1/opportunities/:id/claim` (60/min), `POST /v1/review/opportunities/:id/verify`,

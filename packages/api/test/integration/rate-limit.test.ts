@@ -28,7 +28,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import type { Auth } from "../../src/auth/better-auth.js";
-import { pool } from "../../src/db/client.js";
+import { type DB, db, pool } from "../../src/db/client.js";
 import { bearer, seedIdentity, testAuth } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
@@ -43,8 +43,9 @@ const SECOND_HANDLE = "m4rate-second";
 /** Two addresses that are unmistakably distinct, and neither of them the inject default. */
 const IP_A = "198.51.100.11";
 const IP_B = "203.0.113.22";
-/** A third, for the outage case, so it starts on an untouched budget. */
+/** Two more, for the outage cases, so each starts on an untouched budget. */
 const IP_C = "198.51.100.33";
+const IP_D = "198.51.100.44";
 /** Three IPv6 hosts: the first two are one customer's, the third is somebody else's. */
 const IPV6_HOST = "2001:db8:5:5::1";
 const IPV6_SAME_64 = "2001:db8:5:5:ffff:ffff:ffff:ffff";
@@ -256,6 +257,45 @@ run("M4RATE rate-limit keys", () => {
     }
   }, 120_000);
 
+  it("never meters — or masks — a failure to CHECK an API KEY either", async () => {
+    // The session lookup is not the only thing that can be down. A key is verified by a query, so
+    // a database that stops answering makes the SAME distinction: the credential was not refused,
+    // it could not be checked. The two arms are one decision and must not drift apart.
+    const broken = await buildApp({
+      auth: { auth: await testAuth(), db: brokenKeyLookupDb() },
+    });
+    await broken.ready();
+    try {
+      const call = (headers: Record<string, string>) =>
+        broken.inject({
+          method: "DELETE",
+          url: `/v1/keys/${ABSENT_KEY_ID}`,
+          headers,
+          remoteAddress: IP_D,
+        });
+
+      const outage = await call(bearer(JUNK_KEY));
+      expect(outage.statusCode).toBe(500);
+      expect(outage.json()).toMatchObject({ error: "internal_error" });
+      expect(outage.headers["x-ratelimit-remaining"]).toBeUndefined();
+
+      // A request carrying NO credential needs no lookup, so it is refused for real and counted.
+      // Its being the FIRST charge is what proves the outage above cost nothing.
+      const first = await call({});
+      expect(first.statusCode).toBe(401);
+      expect(Number(first.headers["x-ratelimit-remaining"])).toBe(KEYS_MAX - 1);
+
+      for (let i = 1; i < KEYS_MAX; i++) expect((await call({})).statusCode).toBe(401);
+      expect((await call({})).statusCode).toBe(429);
+
+      const stillOutage = await call(bearer(JUNK_KEY));
+      expect(stillOutage.statusCode).toBe(500);
+      expect(stillOutage.json()).toMatchObject({ error: "internal_error" });
+    } finally {
+      await broken.close();
+    }
+  }, 120_000);
+
   it("leaves the public read uncapped, which is the point of `global: false`", async () => {
     // The list, the feeds and the export are the traffic this project exists to serve, and they are
     // measured per address — which behind a shared egress is one number for a whole organization.
@@ -295,4 +335,16 @@ function brokenSessionAuth(real: Auth): Auth {
       });
     },
   }) as Auth;
+}
+
+/** The same database with the read a key is verified by broken, and nothing else changed. */
+function brokenKeyLookupDb(): DB {
+  return new Proxy(db, {
+    get(target, property, receiver) {
+      if (property !== "select") return Reflect.get(target, property, receiver);
+      return () => {
+        throw new Error("m4rate: simulated key-store outage");
+      };
+    },
+  });
 }
