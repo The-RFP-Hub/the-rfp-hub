@@ -184,6 +184,33 @@ describe("ErrorState", () => {
     expect(within(details).getByText("forbidden")).toBeTruthy();
   });
 
+  it("does not invite an immediate retry after a 429, and says how long to wait", () => {
+    render(
+      <ErrorState
+        error={new ApiError(429, "rate_limited", "Too many requests.", undefined, 30)}
+        what="the directory"
+        onRetry={() => {}}
+      />,
+    );
+
+    // A retry button here fires the request that was just refused, and gets refused again.
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.getByText(/Wait about 30 seconds/)).toBeTruthy();
+  });
+
+  it("falls back to a vaguer wait when no Retry-After was readable", () => {
+    render(
+      <ErrorState
+        error={new ApiError(429, "rate_limited", "Too many requests.")}
+        what="the directory"
+        onRetry={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/Wait a moment/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
   it("keeps generic diagnostics in a closed disclosure", () => {
     render(
       <ErrorState

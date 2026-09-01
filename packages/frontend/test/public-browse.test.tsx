@@ -462,6 +462,19 @@ describe("the public directory list", () => {
     expect(screen.getByText(/must match format/)).toBeTruthy();
   });
 
+  it("backs off rather than offering a retry when the API says too many requests", async () => {
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(429, "rate_limited", "Too many requests.", undefined, 12);
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByText(/Wait about 12 seconds/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
   it("does NOT use the filter-specific 400 panel for a non-400 failure", async () => {
     const { client } = stub({
       list: async () => {
