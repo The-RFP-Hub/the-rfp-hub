@@ -310,6 +310,13 @@ What an integrator has to build around:
   `Access-Control-Expose-Headers` list, so browser JavaScript can read them cross-origin — most
   APIs send these headers and hide them, and a fetch client that sees `429` with no readable
   `Retry-After` is usually looking at that mistake rather than at a missing header.
+
+  ```json
+  { "error": "rate_limited", "message": "Rate limit exceeded, retry in 60 seconds" }
+  ```
+
+  Branch on `error === "rate_limited"` and obey `Retry-After`; the message names the same number of
+  seconds and is for humans.
 * **The `429` is in the published contract.** `GET /v1/docs/json` carries the response and its
   headers on every metered operation, so a generated client models the throttle instead of
   discovering it.
