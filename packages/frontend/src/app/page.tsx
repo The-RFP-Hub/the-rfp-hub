@@ -19,6 +19,7 @@
  * where the signed-in overview moved to.
  */
 import { DirectoryList } from "@/components/DirectoryList";
+import { NoScriptNotice } from "@/components/NoScriptNotice";
 import { AuthUnavailable, Loading } from "@/components/states";
 import { HOW_IT_WORKS } from "@/lib/links";
 import { useSession } from "@/lib/session";
@@ -36,6 +37,8 @@ export default function DirectoryPage() {
         We link you to each program&rsquo;s own application page;{" "}
         <strong>we never take applications ourselves</strong>.
       </p>
+
+      <NoScriptNotice />
 
       {/*
        * The filter state lives in `searchParams`, which a client component may only read inside a

@@ -20,12 +20,23 @@ import {
 } from "@/components/badges";
 import { EmptyState, ErrorState, Loading, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { useResource } from "@/lib/resource";
+import { RESOURCE_TIMEOUT_MS, useResource } from "@/lib/resource";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useCallback, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 /* ------------------------------------------------------------------ useResource --- */
+
+/** A read that never settles, so the hook's own timeout is the only thing that can end it. */
+function NeverSettles({ timeoutMs }: { timeoutMs: number }) {
+  const load = useCallback(() => new Promise<string>(() => {}), []);
+  const { state, reload } = useResource(load, { timeoutMs });
+  return (
+    <ResourceView resource={state} what="the list" onRetry={reload}>
+      {(data) => <p>{data}</p>}
+    </ResourceView>
+  );
+}
 
 /**
  * A harness whose loader can be resolved by hand, so the IN-FLIGHT moment — the one this change is
@@ -53,6 +64,23 @@ function Harness({ load }: { load: (attempt: number) => Promise<string> }) {
 }
 
 describe("useResource", () => {
+  it("gives up on a read that never answers, instead of spinning forever", async () => {
+    // An API that accepts the connection and then goes quiet leaves a loading state with no end of
+    // its own — the reader's only exit is closing the tab. Turning that into the error state is
+    // what gives them a retry and something to report.
+    render(<NeverSettles timeoutMs={20} />);
+    expect(screen.getByText(/Loading the list/)).toBeTruthy();
+
+    expect(await screen.findByText(/We couldn’t load the list/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(within(details).getByText("timeout")).toBeTruthy();
+  });
+
+  it("defaults to a bound a reader would actually wait out", () => {
+    expect(RESOURCE_TIMEOUT_MS).toBe(30_000);
+  });
+
   /** A promise with its resolver pulled out, so a test can decide when a read finishes. */
   function deferred<T>() {
     let settle!: (value: T) => void;
