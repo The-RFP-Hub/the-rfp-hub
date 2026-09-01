@@ -289,29 +289,40 @@ allowlist, and it is a configuration change on the API side.
 ### 4.8 Rate limits are per credential, and a `429` tells you when to come back
 
 The public read surface — the list, the detail, the feeds, the export — is deliberately
-**uncapped**. It is the traffic this project exists to serve. The write, credential and link-out
-routes are metered, and the per-route ceilings are in
+**uncapped**. It is the traffic this project exists to serve. **Every `/v1` mutation is metered**,
+along with the credential and link-out routes, and the per-route ceilings are in
 [`packages/api/docs/auth.md` § Rate limits](../packages/api/docs/auth.md#rate-limits) rather than
 repeated here, because that is where they are maintained.
 
 What an integrator has to build around:
 
-* **The key is your account, not your address.** A metered route counts against your account
-  whenever the request proved one, and falls back to the caller's address only when it proved
-  nothing. Two people behind one office egress are two budgets; one account calling from a laptop
-  and from CI is **one**. Nothing is stored — the counter expires with its window and never reaches
-  a row or a log line.
-* **A `429` carries `retry-after` in seconds**, plus `x-ratelimit-limit`, `-remaining` and
-  `-reset`. Read them rather than backing off blindly.
-* **An invalid credential is refused for being over the limit before it is refused for being
-  invalid.** Hammering a write route with a junk Bearer gets `401` for the whole budget and `429`
-  once it is spent — so a sudden `429` on a request you believe is unauthenticated is the limiter,
-  not a bug.
+* **The key is your account, not your address.** A metered route counts against `acct:<accountId>`
+  whenever the request proved a credential, and against `ip:<address>` when it proved nothing. The
+  two namespaces are disjoint, so no address can land in an account's bucket. Two people behind one
+  office egress are two budgets; one account calling from a laptop and from CI is **one**. Nothing
+  is stored — the counter expires with its window and never reaches a row or a log line.
+* **Anonymous and invalid-credential traffic is metered too, by address, and the limiter answers
+  first.** Hammering a write route with a missing or junk Bearer gets `401` for the whole budget
+  and `429` once it is spent — so a `429` on a request you believe is unauthenticated is the
+  limiter, not a bug.
+* **A `429` carries `Retry-After` in seconds**, plus `x-ratelimit-limit`, `-remaining` and
+  `-reset`. Read them rather than backing off blindly. All four are on the CORS
+  `Access-Control-Expose-Headers` list, so browser JavaScript can read them cross-origin — most
+  APIs send these headers and hide them, and a fetch client that sees `429` with no readable
+  `Retry-After` is usually looking at that mistake rather than at a missing header.
+* **The `429` is in the published contract.** `GET /v1/docs/json` carries the response and its
+  headers on every metered operation, so a generated client models the throttle instead of
+  discovering it.
 * **A `503 auth_unavailable` is never metered.** A failure to *check* your credential does not
-  spend your budget, so an outage never turns into a `429`.
-* **The ceilings are per process.** With several tasks behind a load balancer the effective number
-  is a multiple of the published one. Do not build a client that paces itself exactly at the
-  documented ceiling and assume the margin is real in either direction.
+  spend your budget, so an outage never turns into a `429`. Every other `5xx` **does** spend it:
+  a request that reached the handler has already been counted, so a client retrying into a server
+  fault can exhaust its window and start seeing `429` instead of the real error.
+* **The ceilings are per API process.** With several tasks behind a load balancer the effective
+  number is a multiple of the published one, because each process counts in its own memory. Do not
+  build a client that paces itself exactly at the documented ceiling and assume the margin is real
+  in either direction. Whether the address half of the key works at all is a deployment setting
+  (`TRUST_PROXY`); the operator's side of both facts is in
+  [`deployment.md` §4](./deployment.md#rate-limits-are-per-process--n-tasks-multiply-every-ceiling).
 
 ### 4.9 Errors have one shape, and unverified accounts have a queue cap
 

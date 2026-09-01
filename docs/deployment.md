@@ -176,13 +176,15 @@ without:
   A shared store (Redis) would fix it and is not built. Size the numbers, and any statement made to
   an integrator, against the task count actually running.
 * **`TRUST_PROXY` decides whether the address half works at all**, per the checklist item above.
-  The key is `acct:<accountId>` when the request proved an account and the caller's address
-  otherwise (grouped by /64 for IPv6), so without it every anonymous caller shares one bucket.
+  The key is `acct:<accountId>` when the request proved a credential and `ip:<address>` otherwise
+  (grouped by /64 for IPv6), so without it every anonymous caller shares one bucket.
 
-Two behaviors worth knowing before reading a graph of `429`s: an invalid credential is metered by
-address and is refused for being **over the limit before** it is refused for being invalid, and a
-`503 auth_unavailable` — a failure to *check* a credential — is never metered, so an outage does
-not spend anybody's budget.
+Three behaviors worth knowing before reading a graph of `429`s: an anonymous or invalid credential
+is metered by address and is refused for being **over the limit before** it is refused for being
+invalid; a `503 auth_unavailable` — a failure to *check* a credential — is never metered, so an
+outage does not spend anybody's budget; and every other `5xx` **is** metered, so a client retrying
+into a fault of ours eventually sees `429` instead of the fault. The integrator's side of the same
+facts is [`api-integration.md` §4.8](./api-integration.md#48-rate-limits-are-per-credential-and-a-429-tells-you-when-to-come-back).
 
 ### The frontend's variables
 
