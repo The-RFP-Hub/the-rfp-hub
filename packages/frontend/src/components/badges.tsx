@@ -62,7 +62,7 @@ export function ReviewStatusBadge({ status }: { status: string }) {
  * The publisher's own lifecycle status, as the directory column reads it.
  *
  * It is a DIFFERENT AXIS from review status and the two are routinely confused: `open` is a
- * statement about whether the programme is taking applications, `approved` is a statement about
+ * statement about whether the program is taking applications, `approved` is a statement about
  * whether the Hub has published the listing. A closed listing is still published; a pending listing
  * may well be open. Rendering them with the same vocabulary of shapes and never merging them into
  * one column is what keeps that distinction visible.
@@ -76,7 +76,7 @@ export function StatusBadge({ status }: { status: string }) {
         : status === "closed"
           ? "No longer taking applications"
           : status === "archived"
-            ? "Kept for the record; the programme is over"
+            ? "Kept for the record; the program is over"
             : status;
   return (
     <span className={`badge badge-${status}`} title={explanation}>
@@ -176,7 +176,7 @@ export function VerifiedBadge({ verified, gloss }: { verified: boolean; gloss?: 
  * The verification-assist verdict on a listing's `applicationUrl`.
  *
  * `matched` is a LOW-BAR anti-spam signal — the page exists and its title is about the same
- * programme — and never a fact-check. The title text says that, because a tick that reads as
+ * program — and never a fact-check. The title text says that, because a tick that reads as
  * "these details are correct" would be the single most misleading thing on this frontend.
  */
 export function MatchBadge({
@@ -203,14 +203,14 @@ export function MatchBadge({
     existsAtSource === false
       ? "The application link could not be reached"
       : existsAtSource === true
-        ? "The linked page was reached, but its title does not look like this programme"
+        ? "The linked page was reached, but its title does not look like this program"
         : "The link check failed; no more specific result is available";
   return (
     <span
       className={matched ? "badge badge-matched" : "badge badge-unmatched"}
       title={
         matched
-          ? "The linked page exists and its title is about this programme. A low-bar anti-spam signal, not a fact-check."
+          ? "The linked page exists and its title is about this program. A low-bar anti-spam signal, not a fact-check."
           : failedTitle
       }
     >

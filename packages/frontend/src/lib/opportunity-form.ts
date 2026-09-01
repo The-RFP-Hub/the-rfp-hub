@@ -832,7 +832,7 @@ export interface PublishConsequence {
  * "Publishes as X — immediately / pending review, because …".
  *
  * The single most misread thing on this form: "Submit" means two different things depending on the
- * namespace before the colon, and a publisher who thinks their programme is live when it is sitting
+ * namespace before the colon, and a publisher who thinks their program is live when it is sitting
  * in a queue has been misled by the button, not by the API.
  */
 export function describePublish(
