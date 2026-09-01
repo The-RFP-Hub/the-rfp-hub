@@ -1,32 +1,9 @@
-# The mobile-responsive evidence, gated: `packages/e2e/tests/m4-responsive.spec.ts` asserts the
-# three breakpoints the M4 criterion requires (no horizontal scroll, touch targets >= 44px, a
-# usable nav) on `/`, `/opportunities/[id]` and `/publishers`, but nothing ran it — the root
-# `vitest.config.ts` excludes `packages/e2e/**` on purpose (it is a Playwright suite driven by its
-# own external runner, not a `vitest` file), and no CI workflow ever invoked `pnpm e2e`. This file
-# is the minimal fix: it runs ONLY that one spec, via the real runner, so the evidence is a gate
-# rather than something only ever executed by hand.
-#
-# WHY THE REAL RUNNER, NOT A BARE `playwright test`. `packages/e2e` is not a config on top of an
-# already-running app: `src/run.ts` is a runner that owns the whole stack for one disposable run —
-# a run-scoped Postgres via `docker-compose.e2e.yml` (safe to tear down; never the shared
-# `rfphub-postgres` this repo's other tests use), the API on a restricted role, and the frontend via
-# `next dev --webpack` — and only then execs Playwright as its child, pointed at that run's state
-# file. A bare `playwright test` fails immediately with "E2E_STATE_FILE is not set" (verified
-# locally) — there is no config that skips the runner.
-#
-# WHY ONE SPEC, MECHANICALLY. `src/run.ts` forwards its own argv (minus its one recognised flag,
-# `--check-m3`) straight through to `playwright test`, and Playwright's own CLI takes a positional
-# `[test-filter...]` — any test FILE whose path contains one of those strings runs, everything else
-# is skipped (`playwright test --help`, confirmed against the version this package pins). So
-# `pnpm e2e -- m4-responsive.spec.ts` runs exactly this one file without touching the ~99 specs
-# beside it, while still paying the full stack bring-up cost the runner requires regardless of how
-# many tests are selected — there is no cheaper way to exercise a real browser against a real build
-# of this frontend.
-#
-# WHAT THE OPERATOR MUST SUPPLY: nothing. `packages/e2e/README.md`'s own headline — identities are
-# minted per run against a `.invalid` domain the runner's own outbox intercepts, so this needs no
-# secret, no account and no environment file, which is what makes it safe to run unattended on every
-# PR.
+# Runs packages/e2e/tests/m4-responsive.spec.ts — and only that spec — through the real E2E runner
+# (`packages/e2e/src/run.ts`), which owns the disposable Postgres, API and frontend it needs; a bare
+# `playwright test` has no stack and refuses to start. Nothing else runs this suite: the root vitest
+# config excludes `packages/e2e/**`. The two guard steps exist because both halves of the selection
+# fail open — a filter that matches nothing and a spec that skips itself are each a green run that
+# proved nothing. Runner and bring-up details: `packages/e2e/README.md`.
 name: Frontend responsive E2E
 
 on:
@@ -88,8 +65,38 @@ jobs:
       - name: Install Chromium for Playwright
         run: pnpm --filter @the-rfp-hub/e2e exec playwright install --with-deps chromium
 
+      # `playwright test <filter>` exits 0 when the filter matches nothing, so renaming the spec
+      # would disarm this job silently. The config reads the runner's state file at import time,
+      # and listing needs no real stack behind it.
+      - name: The filter still selects the spec
+        shell: bash
+        working-directory: packages/e2e
+        run: |
+          state="$RUNNER_TEMP/e2e-list-state.json"
+          echo '{"urls":{"frontend":"http://127.0.0.1:1"},"storageStatePath":"/dev/null"}' > "$state"
+          listing=$(E2E_STATE_FILE="$state" pnpm exec playwright test m4-responsive.spec.ts --list)
+          echo "$listing"
+          grep -qE 'Total: [1-9]' <<<"$listing"
+
       - name: Run m4-responsive.spec.ts through the real E2E runner
         run: pnpm e2e -- m4-responsive.spec.ts
+
+      # A skipped case is a green gate that asserted nothing, which is the one outcome this job
+      # exists to rule out. Scoped to the spec: the setup project skips one case by design on a run
+      # with no earlier administrator recorded.
+      - name: Every responsive case ran
+        shell: bash
+        run: |
+          cases=$(jq '[.tests[] | select(.file | endswith("m4-responsive.spec.ts"))]' \
+            packages/e2e/test-results/m3-e2e.json)
+          total=$(jq 'length' <<<"$cases")
+          skipped=$(jq '[.[] | select(.status == "skipped")] | length' <<<"$cases")
+          echo "m4-responsive.spec.ts: total=$total skipped=$skipped"
+          if [ "$total" -lt 1 ] || [ "$skipped" -ne 0 ]; then
+            jq -r '.[] | "\(.status)\t\(.title)\t\(.reason // "")"' <<<"$cases"
+            echo "::error::the responsive gate must execute every case in m4-responsive.spec.ts"
+            exit 1
+          fi
 
       - name: Upload the Playwright report (only on failure)
         if: failure()
