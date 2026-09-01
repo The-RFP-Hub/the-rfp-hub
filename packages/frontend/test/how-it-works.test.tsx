@@ -6,6 +6,7 @@
  * pin that public structure while leaving the explanatory copy free to improve.
  */
 import HowItWorksPage from "@/app/how-it-works/page";
+import { GOVERNANCE, PUBLISHERS_DOC, REVIEW_CRITERIA, RFC_PROCESS } from "@/lib/links";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -78,5 +79,23 @@ describe("the how-it-works reference page", () => {
       expect(detail.open).toBe(false);
     }
     expect(container.querySelector(".button-primary")).toBeNull();
+  });
+
+  it("links how decisions are made to the four governance documents, inside that section", () => {
+    const { container } = render(<HowItWorksPage />);
+
+    // The region, not the page: scoping to the nearest `<section>` used to resolve to the page's
+    // single root element, so the four links could have sat anywhere and the test still passed.
+    const decisions = screen.getByRole("region", { name: "How decisions are made" });
+    expect(container.querySelector("#decisions")).toBe(decisions.querySelector("h2#decisions"));
+
+    for (const [name, href] of [
+      ["Governance", GOVERNANCE],
+      ["Publishers", PUBLISHERS_DOC],
+      ["Review criteria", REVIEW_CRITERIA],
+      ["RFC process", RFC_PROCESS],
+    ] as const) {
+      expect(within(decisions).getByRole("link", { name }).getAttribute("href")).toBe(href);
+    }
   });
 });

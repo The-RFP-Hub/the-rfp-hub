@@ -12,6 +12,10 @@
 # Vercel's "preview" environment IS this project's staging — the alias below gives it the stable
 # address. Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID (project-scoped; Settings →
 # General). Environment variables live in Vercel (Settings → Environment Variables), never here.
+#
+# `NEXT_PUBLIC_SITE_ORIGIN` MUST NOT BE SET on this (Preview) environment — it is what makes this
+# alias, and every other preview, resolve `noindex` / `Disallow: /` instead of competing with
+# production in search results. See frontend-production.yml and the frontend README.
 name: Staging frontend
 
 on:
