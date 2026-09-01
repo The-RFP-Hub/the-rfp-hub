@@ -200,6 +200,39 @@ unset means `noindex` and `Disallow: /`, which is the fail-closed direction: for
 production its search presence rather than costing a preview its privacy. Setting it on a second
 copy makes that copy index itself and compete with the real site in search results.
 
+### Indexing is decided by a string comparison, so the string has to be exact
+
+`NEXT_PUBLIC_SITE_ORIGIN` is compared, character for character, against the origin the **incoming
+request** carries. Getting it wrong does not fail a build, a deploy or a health check: the site
+serves perfectly and is quietly `noindex`, with `robots.txt` answering `Disallow: /`. The only
+symptom is that production never appears in search, weeks later.
+
+Three ways to get the string wrong:
+
+* **It is scheme plus host, with the default port dropped** — `https://example.org`, never
+  `https://example.org:443`, never a trailing slash or a path. The value is normalized through
+  `URL().origin`, which is also what the request side produces, so anything a `URL` cannot parse
+  falls back to "not canonical" and is indistinguishable from unset.
+* **The host is the one the browser typed, not the one the container sees.** The request origin is
+  derived from `X-Forwarded-Host` when a proxy sets it, otherwise `Host`, with the scheme from
+  `X-Forwarded-Proto` (defaulting to `https`). Behind a CDN or a load balancer, set the variable to
+  the public hostname.
+* **An alias is not a second deployment.** `www.example.org` and any other alias must **redirect**
+  to the apex at the edge. Pointing a second deployment at the alias and setting the variable there
+  too produces two indexable copies of the same directory competing for the same listings; leaving
+  the variable unset there produces an alias that is reachable and invisible.
+
+Verify it from outside, on the real hostname, right after the first production deploy:
+
+```sh no-run
+curl -sS https://example.org/robots.txt      # must NOT be "Disallow: /"
+curl -sS https://example.org/sitemap.xml | head -5
+```
+
+`pnpm check:m4 --site https://example.org --expect-indexable` makes that robots row a **required**
+check rather than an informational one — pass it for production, and leave it off for staging and
+for any copy that is supposed to stay unindexed.
+
 ---
 
 ## 5. The first deploy, in order
