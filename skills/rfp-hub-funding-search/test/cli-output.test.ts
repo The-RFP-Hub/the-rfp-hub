@@ -453,3 +453,35 @@ describe("the --limit cap boundary", () => {
     expect(params.get("limit")).toBe("25");
   });
 });
+
+describe("a merged opportunity's title is bounded like any other third-party title", () => {
+  let server: Server;
+
+  afterEach(() => {
+    server?.closeAllConnections?.();
+    server?.close();
+  });
+
+  it("truncates the merged entry's title to the projection's own cap before printing it", async () => {
+    const TITLE_CAP = 140;
+    const longTitle = "M".repeat(400);
+    const fake = await startServerWith((_req, res) => {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          error: "opportunity_merged",
+          message: "merged",
+          mergedInto: { id: "fixture:winner", title: longTitle },
+        }),
+      );
+    });
+    server = fake.server;
+    const { code, stderr } = await run(getScript, ["fixture:loser"], {
+      RFPHUB_API_BASE: fake.base,
+    });
+    expect(code).toBe(3);
+    expect(stderr).toContain("fixture:winner");
+    expect(stderr).not.toContain("M".repeat(TITLE_CAP + 1));
+    expect(stderr).toContain(`${"M".repeat(TITLE_CAP - 1)}\u2026`);
+  });
+});

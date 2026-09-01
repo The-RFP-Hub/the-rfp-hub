@@ -5,6 +5,7 @@
  */
 import {
   EXIT,
+  MAX_TITLE_LEN,
   RequestError,
   apiBase,
   assertKnownFlags,
@@ -15,7 +16,7 @@ import {
   newInvocationId,
   parseArgs,
   projectDetail,
-  sanitizeText,
+  truncateText,
   validateFormat,
 } from "./lib.mjs";
 
@@ -76,12 +77,12 @@ async function main(argv) {
     if (err instanceof RequestError) {
       if (err.status === 404 && err.body?.error === "opportunity_merged") {
         // `mergedInto` is `{ id, title }`, never a bare string. That `title` is ANOTHER entry's
-        // third-party text, so it goes through the same sanitizer as everything else printed here.
+        // third-party text, so it gets the projection's own title treatment before being printed.
         const merged = err.body.mergedInto;
         const mergedId = merged && typeof merged === "object" ? merged.id : merged;
         const mergedTitle =
           merged && typeof merged === "object" && typeof merged.title === "string"
-            ? sanitizeText(merged.title)
+            ? truncateText(merged.title, MAX_TITLE_LEN)
             : undefined;
         const suffix = mergedTitle ? ` ("${mergedTitle}")` : "";
         process.stderr.write(
