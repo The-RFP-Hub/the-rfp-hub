@@ -14,6 +14,7 @@
  * the README rather than pretended away.
  */
 import { RequireSession } from "@/components/Chrome";
+import { IconLabel } from "@/components/IconLabel";
 import { PublisherJourney } from "@/components/PublisherJourney";
 import { UntrustedText } from "@/components/UntrustedText";
 import { MatchBadge, PublisherStatusBadge } from "@/components/badges";
@@ -32,6 +33,7 @@ import {
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { ManagedOpportunity, Me } from "@/lib/types";
+import { PlusIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
@@ -115,7 +117,7 @@ function Listings({ me }: { me: Me }) {
       <div className="row-between">
         <h1>Your listings</h1>
         <Link className="button-primary" href="/listings/new">
-          Submit an opportunity
+          <IconLabel icon={PlusIcon}>Submit an opportunity</IconLabel>
         </Link>
       </div>
 

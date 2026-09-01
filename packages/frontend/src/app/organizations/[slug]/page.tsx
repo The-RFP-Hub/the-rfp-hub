@@ -802,13 +802,13 @@ function PendingRow({
                   <label htmlFor={`reject-reason-${item.id}`}>Reason</label>
                   <p className="hint">
                     Written for the submitter. Say what is wrong with the record, not what you think
-                    of the programme.
+                    of the program.
                   </p>
                   <input
                     id={`reject-reason-${item.id}`}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
-                    placeholder="e.g. this is not our programme — we have never run it"
+                    placeholder="e.g. this is not our program — we have never run it"
                   />
                 </div>
               </ConfirmPanel>

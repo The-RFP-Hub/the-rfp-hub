@@ -30,7 +30,7 @@ describe("contentSecurityPolicy", () => {
   // production header must never permit — so a suite that let the ambient environment pick would be
   // asserting whichever policy it happened to be run under. Passing `false` names the one these
   // tests are about; the dev allowance has its own test at the bottom of this file.
-  const policy = contentSecurityPolicy("nonce123", "https://api.example.com/v1", false);
+  const policy = contentSecurityPolicy("nonce123", "https://api.example.com/v1", undefined, false);
 
   it("nonces scripts and never allows inline ones", () => {
     const scripts = directive(policy, "script-src");
@@ -59,9 +59,11 @@ describe("contentSecurityPolicy", () => {
     expect(sources).not.toContain("https:");
   });
 
-  it("names no third-party origin anywhere in the policy", () => {
+  it("names no third-party origin anywhere in the policy WHEN ANALYTICS IS OFF", () => {
     // The browser talks to one host. Google sign-in is a top-level navigation, not an embedded
-    // widget, so it earns no allowance here either.
+    // widget, so it earns no allowance here either. The GA origins are the one exception, and
+    // they have their own describe block below — this pins that an unset `NEXT_PUBLIC_GA_ID`
+    // (every fork's default) still yields a policy naming no one.
     for (const directiveName of ["connect-src", "frame-src", "script-src", "img-src", "font-src"]) {
       const sources = directive(policy, directiveName)
         .split(" ")
@@ -72,7 +74,8 @@ describe("contentSecurityPolicy", () => {
 
   it("does not widen to a wildcard when the API URL is missing or malformed", () => {
     for (const bad of [undefined, "", "not a url"]) {
-      expect(directive(contentSecurityPolicy("n", bad, false), "connect-src")).toBe("'self'");
+      const withoutApi = contentSecurityPolicy("n", bad, undefined, false);
+      expect(directive(withoutApi, "connect-src")).toBe("'self'");
     }
   });
 
@@ -100,6 +103,68 @@ describe("contentSecurityPolicy", () => {
     // A remote stylesheet is the other way a font CDN gets reached; `style-src` names no host.
     const styles = directive(policy, "style-src").split(" ");
     expect(styles.filter((source) => source.startsWith("http"))).toEqual([]);
+  });
+});
+
+/**
+ * THE ONE THIRD-PARTY THE POLICY MAY NAME, pinned exactly.
+ *
+ * Setting `NEXT_PUBLIC_GA_ID` is the deployment saying "this instance reports usage to Google
+ * Analytics", and the header must open precisely the origins GA4 needs — the loader from
+ * `googletagmanager.com`, hits to the two collection domains (wildcarded for Google's regional
+ * `region1.`-style endpoints) — and not one origin more. The exact literals are the regression
+ * guard: a future SDK update that "just needs one more host" has to show up here as a failing
+ * test, the same way the auth vendor's eight origins once did.
+ */
+describe("the Google Analytics allowance", () => {
+  const withGa = contentSecurityPolicy(
+    "nonce123",
+    "https://api.example.com/v1",
+    "G-TEST123",
+    false,
+  );
+
+  it("admits the gtag loader alongside the nonce, never 'unsafe-inline'", () => {
+    expect(directive(withGa, "script-src")).toBe(
+      "'self' 'nonce-nonce123' https://*.googletagmanager.com",
+    );
+  });
+
+  it("admits Google's collection endpoints in connect-src and img-src only", () => {
+    expect(directive(withGa, "connect-src")).toBe(
+      "'self' https://api.example.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+    );
+    expect(directive(withGa, "img-src")).toBe(
+      "'self' data: https://*.google-analytics.com https://*.googletagmanager.com",
+    );
+  });
+
+  it("leaves every other directive exactly as strict as without analytics", () => {
+    const without = contentSecurityPolicy(
+      "nonce123",
+      "https://api.example.com/v1",
+      undefined,
+      false,
+    );
+    for (const name of [
+      "default-src",
+      "style-src",
+      "font-src",
+      "frame-src",
+      "worker-src",
+      "object-src",
+      "base-uri",
+      "form-action",
+      "frame-ancestors",
+    ]) {
+      expect(directive(withGa, name)).toBe(directive(without, name));
+    }
+  });
+
+  it("is absent for the empty string, not only for undefined", () => {
+    // An operator clearing the variable in Vercel leaves "", and "" must mean OFF.
+    const cleared = contentSecurityPolicy("n", "https://api.example.com", "", false);
+    expect(cleared).not.toContain("google");
   });
 });
 
@@ -191,13 +256,13 @@ describe("the development allowance", () => {
     // `next dev` compiles with an eval-based devtool, so the client bundle evaluates strings. Under
     // the production policy the browser refuses and the page hangs before it can restore a session —
     // which is exactly what `pnpm dev` did, and what the end-to-end suite caught.
-    expect(contentSecurityPolicy("n0nce", "https://api.example.org", true)).toContain(
+    expect(contentSecurityPolicy("n0nce", "https://api.example.org", undefined, true)).toContain(
       "'unsafe-eval'",
     );
 
     // The shipped header is unchanged: `script-src` stays absolute. This is the assertion that stops
     // the dev allowance from quietly becoming a deployed one.
-    const production = contentSecurityPolicy("n0nce", "https://api.example.org", false);
+    const production = contentSecurityPolicy("n0nce", "https://api.example.org", undefined, false);
     expect(production).not.toContain("'unsafe-eval'");
     expect(production).toContain("script-src 'self' 'nonce-n0nce';");
   });

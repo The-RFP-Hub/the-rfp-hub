@@ -31,13 +31,15 @@ and nothing else, whoever asks.
 
 ## Environment
 
-**One** variable, `NEXT_PUBLIC_`, **inlined at build time**. Setting it on a running host changes
-nothing until the next build — the frontend says so on screen when it is missing, because it is the
-most common way to lose an afternoon here. Copy `.env-example` to `.env.local` to start.
+**One required** variable and one optional, both `NEXT_PUBLIC_`, **inlined at build time**. Setting
+either on a running host changes nothing until the next build — the frontend says so on screen when
+the required one is missing, because it is the most common way to lose an afternoon here. Copy
+`.env-example` to `.env.local` to start.
 
 | Variable | What it is |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
+| `NEXT_PUBLIC_GA_ID` | *Optional.* A Google Analytics 4 measurement id (`G-…`). When set, the layout loads gtag.js and the CSP opens exactly the Google origins GA4 needs; when unset — the default, and what every fork inherits — no analytics loads and the policy names no Google origin at all. Enabling it is a per-deployment decision with privacy-page consequences: see `src/app/privacy/page.tsx`. |
 
 It is not a secret — an API origin is an identifier, readable by anyone who loads the page.
 **Nothing secret may ever be added with this prefix.** This package holds no server-side credential

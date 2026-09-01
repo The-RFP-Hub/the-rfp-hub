@@ -9,6 +9,7 @@
  * would silently delete milestones, social links and prizes that a publisher entered elsewhere.
  */
 import { RequireSession } from "@/components/Chrome";
+import { IconLabel } from "@/components/IconLabel";
 import { MergedOpportunityBanner } from "@/components/MergedOpportunityBanner";
 import { OpportunityForm } from "@/components/OpportunityForm";
 import { ResourceView } from "@/components/states";
@@ -18,6 +19,7 @@ import { ROUTE_GATE_COPY } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
 import { useApi } from "@/lib/session";
 import type { Me } from "@/lib/types";
+import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback } from "react";
@@ -50,7 +52,9 @@ function EditForm({ id, me }: { id: string; me: Me }) {
   return (
     <section>
       <p>
-        <Link href={`/listings/${encodeURIComponent(id)}`}>← Back to listing</Link>
+        <Link href={`/listings/${encodeURIComponent(id)}`}>
+          <IconLabel icon={ArrowLeftIcon}>Back to listing</IconLabel>
+        </Link>
       </p>
       <ResourceView resource={state} what="this listing" onRetry={reload}>
         {({ entry, managed }) => {

@@ -15,7 +15,7 @@ export default function PrivacyPage() {
         The RFP Hub is an open index of funding opportunities. No account is required to read the
         directory; like any web service, it still processes request metadata, described below. This
         page says what the Hub stores, what leaves its servers, what is public forever, and how to
-        leave. Effective 25&nbsp;August&nbsp;2026.
+        leave. Effective 31&nbsp;August&nbsp;2026.
       </p>
 
       <h2>What we store when you sign in</h2>
@@ -65,6 +65,18 @@ export default function PrivacyPage() {
         reduced to their host. Raw events are deleted after 180 days by a nightly job; aggregated
         daily counts remain.
       </p>
+      <p>
+        Separately from those publisher counts, the hosted site uses{" "}
+        <strong>Google Analytics</strong> to measure overall site usage — pages visited and the
+        coarse device and region information Google derives from a request. It is a standard
+        third-party tool: when a page loads, your browser talks to Google&rsquo;s servers, which see
+        your IP address, subject to{" "}
+        <a href="https://policies.google.com/privacy" rel="noreferrer noopener" target="_blank">
+          Google&rsquo;s privacy policy
+        </a>
+        . It runs only on deployments explicitly configured for it; the open-source code ships with
+        it off, so a self-hosted Hub carries no Google Analytics unless its operator turns it on.
+      </p>
 
       <h2>What is public forever</h2>
       <p>
@@ -90,7 +102,8 @@ export default function PrivacyPage() {
         The Hub runs on infrastructure providers that process data to provide the service: the site
         is hosted on Vercel, the API and database on AWS, and public dataset snapshots are published
         to GitHub. The email delivery provider sees your address in order to carry your sign-in
-        codes, the way any mail carrier does. Google is involved only if you choose Google sign-in.
+        codes, the way any mail carrier does. Google is involved if you choose Google sign-in, and
+        through Google Analytics as described above.
       </p>
       <p>
         Listing text is processed for duplicate detection{" "}
@@ -100,7 +113,8 @@ export default function PrivacyPage() {
         servers with a Hub user-agent, carrying no cookies and no referrer.
       </p>
       <p>
-        The Hub does not sell personal data, runs no third-party trackers, and shows no advertising.
+        The Hub does not sell personal data and shows no advertising. Google Analytics, described
+        above, is the only third-party measurement it runs.
       </p>
 
       <h2>How to leave</h2>
