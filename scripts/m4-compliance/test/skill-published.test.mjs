@@ -1,9 +1,7 @@
 /**
- * M4-5: the bytes that are validated must be the bytes that are published.
- *
- * The revision this replaces asked GitHub raw for a 200 and then validated a LOCAL file, so a
- * stale published skill passed publication while the local copy passed validation and nothing
- * compared them. These tests serve a "published" tree from a local server and drift it on purpose.
+ * The bytes that are validated must be the bytes that are published: a stale published skill used
+ * to pass while the local copy passed validation and nothing compared them. These tests serve a
+ * "published" tree from a local server and drift it on purpose.
  */
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";

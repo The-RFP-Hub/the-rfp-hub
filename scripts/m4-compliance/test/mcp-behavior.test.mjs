@@ -1,11 +1,8 @@
 /**
- * M4-4's behavior assertions, each shown to fail on a server that violates it.
- *
- * The audit's finding was that this criterion reduced tools to names and compared one page of ids
- * for one hard-coded query, so it reported 11 passes while `outputSchema`, annotations,
- * `structuredContent`, page 2 and the pagination envelope were never looked at. A stand-in server
- * (`fixtures/fake-mcp-server.mjs`) speaks the same wire protocol and takes a defect by name, which
- * is the only way to know an assertion is doing anything.
+ * M4-4's assertions, each shown to fail on a server that violates it. The criterion reported 11
+ * passes while `outputSchema`, annotations, `structuredContent`, page 2 and the pagination envelope
+ * were never looked at; a stand-in server that takes a defect by name is the only way to know an
+ * assertion is doing anything.
  */
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";

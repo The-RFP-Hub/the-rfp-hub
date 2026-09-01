@@ -1,8 +1,7 @@
 /**
- * The acceptance flow's own invariants, without a deployment: the fixture identity has to be
- * unique per PROCESS (two runs in the same minute shared an id, so the second one "found" the
- * first one's entry) and the owner snapshot has to see past the first page (a submitter with more
- * than 100 entries would never find the fixture it just created).
+ * The acceptance flow's invariants, without a deployment: a fixture id unique per PROCESS (two runs
+ * in the same minute shared one, so the second "found" the first's entry) and an owner snapshot
+ * that sees past the first page (a submitter with 100+ entries never found its own fixture).
  */
 import { describe, expect, it, vi } from "vitest";
 

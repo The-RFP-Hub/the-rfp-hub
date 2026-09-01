@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 /**
- * A stand-in MCP server for `checks/mcp.mjs`'s own tests: newline-delimited JSON-RPC on stdio,
- * the same wire shape `packages/mcp` speaks. Its defects are chosen by `FAKE_MCP_DEFECT`, so each
- * assertion the M4-4 criterion makes can be shown to fail on a server that violates it — which is
- * the only way to know the assertion is doing anything.
+ * A stand-in MCP server for `checks/mcp.mjs`'s tests: the same newline-delimited JSON-RPC wire
+ * shape `packages/mcp` speaks, with its defects chosen by `FAKE_MCP_DEFECT`.
  */
 import { createInterface } from "node:readline";
 

@@ -1,25 +1,15 @@
 /**
- * M4-4 — the MCP server is installable and behaves.
+ * M4-4 — the MCP server is installable and behaves. M4-4b, at the bottom of this file, is the
+ * separate question of whether it is PUBLISHED: a server behaves identically whether it came from
+ * npm, the Registry or a local build, so that needs its own evidence.
  *
- * WHAT "installable" MEANS HERE, AND WHY THE DEFAULT CHANGED. An earlier revision of this file
- * silently preferred a LOCAL build (`packages/mcp/dist/cli.js`) whenever one happened to exist,
- * with the registry only ever a last resort. That let a full "MCP server installable and callable"
- * PASS be reported without npm — or anyone — ever having resolved the package from the real
- * registry, which is exactly the over-claim the criterion's own name makes: "installable" has to
- * mean installable from where a real user installs it. The default now DOES test that:
+ * "Installable" has to mean installable from where a real user installs it, so the default resolves
+ * the package from the real npm registry and FAILS by name before publish. `--mcp-spec local` is
+ * the explicit opt-out for developing the package, and says plainly it is not publication evidence.
  *
- *   - No `--mcp-spec`, or `--mcp-spec <version>` / `--mcp-spec next` → `npx -y
- *     @the-rfp-hub/mcp@<spec>` (default spec `next`). Before the package is published this FAILS,
- *     honestly, naming the npm 404 — it is not downgraded to a note.
- *   - `--mcp-spec local` → the EXPLICIT opt-out, for developing this checker (or `packages/mcp`
- *     itself) before publish: `node <repo-root>/packages/mcp/dist/cli.js`. The criterion is
- *     renamed and its own description says plainly that this mode is not evidence of publication.
- *
- * The transport is newline-delimited JSON-RPC (see `mcp-client.mjs` for why it is hand-rolled
- * rather than pulled from an SDK this repo does not depend on). Separate server processes are
- * spawned across the sub-checks below, each with the minimum environment the case calls for —
- * sharing one process across cases would let state from an earlier call (a rate-limit counter, a
- * cached tool list) leak into a later assertion.
+ * Each sub-check spawns its own server process with the minimum environment its case calls for:
+ * sharing one would let a rate-limit counter or a cached tool list from an earlier call leak into
+ * a later assertion.
  */
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
@@ -35,12 +25,8 @@ import { RecordingServer } from "../mock-server.mjs";
 const execFileAsync = promisify(execFile);
 
 /**
- * Exported for `accept/flow.mjs`: the write-acceptance tool drives the exact same server binary
- * this read-only check does, and resolving it twice — possibly differently — would be its own bug.
- *
- * Throws when `--mcp-spec local` is given and there is nothing to run — a caller-facing mistake
- * (forgot to build, or pointed `--repo-root` at the wrong checkout), reported as a clean failure by
- * the caller rather than an uncaught exception.
+ * Exported for `accept/flow.mjs`: both tools drive the same binary, and resolving it twice —
+ * possibly differently — would be its own bug. Throws when `--mcp-spec local` has nothing to run.
  */
 export function resolveCommand(ctx, extraArgs = []) {
   // A seam, used by this checker's own tests to point the criterion at a stand-in server: the
@@ -55,16 +41,10 @@ export function resolveCommand(ctx, extraArgs = []) {
         `--mcp-spec local: packages/mcp/dist/cli.js not found under --repo-root (${ctx.repoRoot}). Build it first: pnpm --filter @the-rfp-hub/mcp build.`,
       );
     }
-    // REAL, not merely absolute. `cli.ts`'s own entrypoint guard compares
-    // `fileURLToPath(import.meta.url)` (which Node resolves through any symlink in the path) to
-    // `path.resolve(process.argv[1])` (which does NOT resolve symlinks). Passing `local` as given
-    // — through, say, macOS's `/tmp` → `/private/tmp` symlink, which is exactly what a `--repo-root`
-    // under `os.tmpdir()` looks like — makes the two disagree, `isEntrypoint` comes back false,
-    // `main()` never runs, and the process exits 0 having done nothing: no banner, no error, no
-    // response, silence indistinguishable from "hung" until this checker's own timeout fires. Found
-    // by actually spawning a real built `packages/mcp` — not a hypothetical, and not specific to
-    // this one package: any well-behaved CLI using this common `isEntrypoint` idiom would hit the
-    // same thing under a symlinked repo root.
+    // REAL, not merely absolute. `cli.ts`'s entrypoint guard compares `fileURLToPath(import.meta
+    // .url)` (symlinks resolved) against `path.resolve(process.argv[1])` (not resolved), so a
+    // `--repo-root` under `os.tmpdir()` — macOS's `/tmp` → `/private/tmp` — made the two disagree:
+    // `main()` never ran and the process exited 0 in silence, indistinguishable from "hung".
     const resolvedPath = realpathSync(local);
     const args = [resolvedPath, ...extraArgs];
     return {
@@ -81,13 +61,9 @@ export function resolveCommand(ctx, extraArgs = []) {
 }
 
 /**
- * The installability check itself: does `npx -y @the-rfp-hub/mcp@<spec>` actually resolve from the
- * npm registry and run at all? `--version` is cheap (`cli.ts`'s own `--version`/`-v` mode prints
- * `SERVER_VERSION` and exits 0 immediately, no stdio server involved) and, critically, forces npx
- * to complete a REAL install before it can even get that far — an unpublished package fails here
- * with npm's own 404, in a single, clearly-named check, rather than as a confusing raw error
- * surfacing later inside "tools/list succeeds" (a message shaped for a protocol bug, not a missing
- * package).
+ * `--version` is cheap and still forces npx to complete a REAL install first, so an unpublished
+ * package fails here with npm's own 404 in one clearly-named check, rather than as a raw error
+ * inside "tools/list succeeds" — a message shaped for a protocol bug, not a missing package.
  */
 async function probeRegistryInstall(spec, ctx) {
   const args = ["-y", `@the-rfp-hub/mcp@${spec}`, "--version"];
@@ -104,10 +80,8 @@ async function probeRegistryInstall(spec, ctx) {
 }
 
 /**
- * `findCredentialLeak` over every value given, PLUS the client's own `stderr` and any stdout
- * lines that weren't valid JSON-RPC. A key-shaped string can leak into a diagnostic log line or a
- * stray `console.log` just as easily as into a tool's JSON output, and scanning only the parsed
- * response objects — what every leak check here did before — would miss exactly that surface.
+ * Every value given, PLUS the client's `stderr` and any stdout line that was not valid JSON-RPC: a
+ * key-shaped string leaks into a diagnostic line as easily as into a tool's JSON output.
  */
 function scanClientForLeak(client, ...values) {
   for (const value of values) {
@@ -194,9 +168,8 @@ function checkToolDefinitions(c, tools, { label, readOnly }) {
 }
 
 /**
- * The structured contract, with no text fallback. `structuredContent` is what the tool's own
- * outputSchema promises; accepting a JSON-shaped text block instead let a server that never
- * produced structured output pass this criterion.
+ * The structured contract, with no text fallback: accepting a JSON-shaped text block instead let a
+ * server that never produced structured output pass this criterion.
  */
 function structuredPayload(c, response, tool, name) {
   const structured = response?.result?.structuredContent;
@@ -215,9 +188,8 @@ function structuredPayload(c, response, tool, name) {
 }
 
 /**
- * A query the live corpus can actually answer with MORE THAN ONE PAGE, so page 2 proves something.
- * Hard-coding `q=grant` made the pagination assertion pass vacuously the day the corpus stopped
- * matching it; two empty pages are equal, and equality was the whole test.
+ * A query the live corpus answers with MORE THAN ONE PAGE, so page 2 proves something. Hard-coding
+ * `q=grant` made this vacuous the day the corpus stopped matching: two empty pages compare equal.
  */
 export async function deriveSearchQuery(ctx, limit = 5) {
   for (const q of ["grant", "funding", "ethereum", "open", "public goods"]) {
@@ -340,9 +312,8 @@ export async function checkMcp(report, ctx) {
     }
   }
 
-  // A real server appends an audit line under `RFPHUB_MCP_HOME` (default `~/.rfphub`) for EVERY
-  // tool call, and case C's preview would land in `~/.rfphub/pending/` indistinguishable from a
-  // real one. One disposable directory for the whole check keeps every fixture out of real state.
+  // A real server appends an audit line under `RFPHUB_MCP_HOME` for every tool call, and the
+  // preview below would land in `~/.rfphub/pending/` indistinguishable from a real one.
   const mcpHome = await mkdtemp(join(tmpdir(), "m4-check-mcp-home-"));
   try {
     let readClient;
@@ -405,8 +376,8 @@ export async function checkMcp(report, ctx) {
     } catch (err) {
       c.fail("MCP server starts and answers tools/list", err.message);
     } finally {
-      // Scanned AFTER the child has fully exited: a shutdown path that logs configuration is
-      // exactly the surface a scan taken while the process was still running would miss.
+      // AFTER the child has fully exited: a shutdown path that logs configuration is exactly the
+      // surface a scan taken while the process was still running would miss.
       await readClient?.close();
       const exitLeak = readClient ? scanClientForLeak(readClient) : null;
       c.expect(
@@ -526,7 +497,7 @@ export async function checkMcp(report, ctx) {
   return checkMcpPublication(report, ctx);
 }
 
-/** The document phase 1 previews. Declared here so both the fixture id and the title stay `m4check`. */
+/** The document phase 1 previews, in the `m4check` namespace so it is recognizable anywhere. */
 export function fixtureDocument() {
   return {
     specVersion: "1.0.0",
@@ -566,10 +537,9 @@ async function npmView(fields, spec, ctx) {
 }
 
 /**
- * Every configuration snippet a reader would copy must pin an exact, immutable version. A moving
- * tag is the one thing that turns "the description digest in server.json binds this build" into a
- * promise about a build nobody has seen. Only `npx`/`-y` lines are examined: `pnpm --filter
- * @the-rfp-hub/mcp build` names a workspace package, not a version to install.
+ * Every snippet a reader copies must pin an exact version: a moving tag turns "the description
+ * digest binds this build" into a promise about a build nobody has seen. Only `npx`/`-y` lines are
+ * examined — `pnpm --filter @the-rfp-hub/mcp build` names a workspace package, not an install.
  */
 export function unpinnedReadmeSpecs(readme) {
   const offenders = [];
@@ -587,11 +557,7 @@ export function unpinnedReadmeSpecs(readme) {
   return offenders;
 }
 
-/**
- * M4-4b — the RELEASE CHANNEL, which the behavior criterion above cannot establish: the server
- * behaves the same whether it came from npm, the Registry or a local build, so "installable from a
- * documented endpoint" needs its own evidence. It FAILS while unpublished; that is correct.
- */
+/** M4-4b — the release channel. It FAILS while unpublished; that is correct, not a gap. */
 export async function checkMcpPublication(report, ctx) {
   const c = report.criterion(
     "M4-4b",
@@ -706,7 +672,7 @@ function declaredMcpName(repoRoot) {
       const value = JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"))[field];
       if (typeof value === "string" && value) return value;
     } catch {
-      // the next candidate, or a named failure at the call site
+      // try the next candidate; the call site reports the failure by name
     }
   }
   return undefined;

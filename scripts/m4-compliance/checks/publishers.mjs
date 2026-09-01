@@ -17,27 +17,12 @@ import { request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
 
 /**
- * Extract the set of slugs the rendered `/publishers` page actually shows, and how.
+ * The slugs the rendered `/publishers` page shows, and how they were found: the purpose-built
+ * `[data-publisher-slug]` attribute on `PublisherCard`, else each card's `<code>{slug}:…</code>`
+ * (a Standard slug cannot contain a colon, so the text before the first one is the slug).
  *
- * Two selectors, tried in order of preference:
- *
- *   1. `[data-publisher-slug]` — the robust, purpose-built attribute. It DOES exist in the markup
- *      (`packages/frontend/src/app/publishers/page.tsx`'s `PublisherCard`, on the `<article
- *      className="card publisher-card" data-publisher-slug={publisher.slug}>` element itself) —
- *      added by the frontend stream specifically because an earlier revision of this check's WARN
- *      named the attribute explicitly when extraction found nothing. This is now the path that
- *      actually runs; a prior revision of this comment still described it as aspirational, which
- *      it no longer is.
- *   2. `article.publisher-card code` — the fallback, kept for robustness against a markup change
- *      that ever drops the attribute again: each card also carries `<code>{slug}:…</code>` as "the
- *      namespace every one of this organization's ids is prefixed with" (the component's own
- *      comment). The slug is the text before the first `:` — the trailing `:…` is decoration, not
- *      part of the identifier, and a Standard slug cannot itself contain a colon (ids are
- *      `<namespace>:<local>`, so a colon inside the namespace half would make an id unparseable).
- *
- * Returns `{ renderedSlugs, extractionUsed }`, where `extractionUsed` is `"data-publisher-slug"`,
- * `"article.publisher-card code"`, or `"none"` when neither selector matched anything — the caller
- * treats that last case as "cannot verify", never as "the rendered set is empty".
+ * `extractionUsed: "none"` means neither selector matched — the caller treats that as "cannot
+ * verify", never as "the rendered set is empty".
  */
 export async function extractRenderedSlugs(page) {
   const viaAttribute = await page.$$eval("[data-publisher-slug]", (elements) =>
@@ -60,7 +45,7 @@ export async function extractRenderedSlugs(page) {
   return { renderedSlugs: [], extractionUsed: "none" };
 }
 
-/** The response shape this criterion is entitled to assume, checked rather than assumed. */
+/** The response shape this criterion depends on, checked rather than assumed. */
 export function publisherPayloadErrors(json) {
   const errors = [];
   if (!json || typeof json !== "object" || Array.isArray(json))
@@ -174,8 +159,8 @@ export async function checkPublishers(report, ctx) {
           : "no .state.empty element — an empty listing must SAY it is empty, not render a blank page",
       );
     } else if (extractionUsed === "none") {
-      // Not "the set happens to be empty" — the API says there ARE publishers, so this is "the
-      // cards cannot be found at all", which establishes nothing and must not be green.
+      // Not "the set happens to be empty": the API says there ARE publishers, so the cards cannot
+      // be found at all, which establishes nothing.
       c.fail(
         "every API slug appears in the rendered page, and only those slugs",
         `could not extract any rendered slug (looked for "[data-publisher-slug]", then "article.publisher-card code") while ${apiSlugs.size} publisher(s) are expected — the markup has been renamed or removed; check PublisherCard in packages/frontend/src/app/publishers/page.tsx`,

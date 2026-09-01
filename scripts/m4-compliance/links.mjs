@@ -1,15 +1,10 @@
 /**
- * Markdown link extraction and fragment resolution — pure, no I/O.
- *
- * Used by the docs check to find every link a handoff guide makes, so each one can be resolved
- * (relative), requested (absolute) or matched against a heading (fragment). Parsing only; the
- * caller does the filesystem and the network, which is what makes this testable without either.
- *
- * Code fences and inline code are skipped: a `curl https://…` inside a `safe-read` block is an
- * example, not a link the guide promises resolves.
+ * Markdown link extraction and fragment resolution — pure, no I/O, so the docs check's parsing is
+ * testable without a network or a checkout. Code fences and inline code are skipped: a
+ * `curl https://…` inside a `safe-read` block is an example, not a link the guide promises.
  */
 
-/** Blank out fenced blocks so their contents are never mistaken for links or headings. */
+/** Blank fenced blocks, so their contents are never mistaken for links or headings. */
 function withoutFences(markdown) {
   return markdown.replace(/^(~~~|```)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, (block) =>
     block.replace(/[^\n]/g, " "),
@@ -22,10 +17,9 @@ function withoutCode(markdown) {
 }
 
 /**
- * Every link, by kind: `inline` (`[t](href)`), `autolink` (`<https://…>`), `reference`
- * (`[t][ref]` / `[ref]`, resolved through its `[ref]: href` definition) and `bare` (a URL written
- * as prose). Reference and bare forms are here because a guide that uses one still promises it
- * resolves, and the previous parser silently ignored both.
+ * Every link, by kind: `inline`, `autolink`, `reference` (resolved through its `[ref]: href`
+ * definition) and `bare`. The last two are here because a guide that uses one still promises it
+ * resolves, and the previous parser ignored both silently.
  */
 export function extractLinks(markdown) {
   const text = withoutCode(markdown);
@@ -60,8 +54,7 @@ export function extractLinks(markdown) {
   for (const match of text.matchAll(/<((?:https?|mailto):[^\s<>]+)>/g)) {
     add(match[1], "autolink");
   }
-  // A bare URL in prose: not already inside `](…)`, `<…>` or a definition, and not trailing
-  // sentence punctuation.
+  // A bare URL in prose: not already inside `](…)`, `<…>` or a definition.
   const stripped = text
     .replace(/\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/<[^>]*>/g, " ")
@@ -73,26 +66,22 @@ export function extractLinks(markdown) {
   return links;
 }
 
-/** A reference link whose definition is missing — reported by name rather than dropped. */
+/** A reference whose definition is missing — reported by name rather than dropped. */
 export function isUnresolvedReference(href) {
   return href.startsWith("[unresolved reference: ");
 }
 
-/** True for `https://…` / `http://…`; false for a relative path, an anchor, or `mailto:`. */
+/** True for `http(s)://…`; false for a relative path, an anchor, or `mailto:`. */
 export function isAbsoluteHttpLink(href) {
   return /^https?:\/\//i.test(href);
 }
 
-/** True for a same-document anchor (`#section`) — resolved against THIS file's own headings. */
+/** A same-document anchor, resolved against THIS file's own headings. */
 export function isAnchorLink(href) {
   return href.startsWith("#");
 }
 
-/**
- * GitHub's heading anchor rule: lowercase, punctuation dropped, spaces to hyphens, and a repeated
- * slug suffixed `-1`, `-2`, … in document order. Reimplemented rather than assumed, because
- * "the fragment resolves by definition" was how every anchor in the guides passed before.
- */
+/** GitHub's anchor rule: lowercase, punctuation dropped, each space to a hyphen, repeats suffixed. */
 export function githubSlug(text) {
   return text
     .trim()
@@ -107,7 +96,7 @@ export function headingSlugs(markdown) {
   const slugs = new Set();
   const counts = new Map();
   // Fences only: a heading legitimately carries inline code, and blanking it would change the
-  // anchor GitHub actually generates for `### 4.6 The counted path is \`/v1/r/:id/apply\``.
+  // anchor GitHub generates.
   for (const match of withoutFences(markdown).matchAll(/^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/gm)) {
     const base = githubSlug(match[2]);
     if (!base) continue;
@@ -119,11 +108,8 @@ export function headingSlugs(markdown) {
 }
 
 /**
- * Resolve a relative link against the markdown file's own path.
- *
- * Returns `{ path, fragment, escapesRepo }` — `path` relative to `repoRoot`, `fragment` without
- * its `#`, and `escapesRepo` true when `../` walked out of the checkout, which is a broken link on
- * the published mirror however well it resolves on the author's disk.
+ * `{ path, fragment, escapesRepo }` — `escapesRepo` is true when `../` walked out of the checkout,
+ * which is a broken link on the published mirror however well it resolves on the author's disk.
  */
 export function resolveRelativeLink(href, { fileDir, repoRoot, path }) {
   const [target, fragment] = splitFragment(href);

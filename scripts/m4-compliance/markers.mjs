@@ -1,28 +1,13 @@
 /**
- * Marker parsing for ` ```sh ` code blocks in the handoff docs — pure, no I/O.
- *
- * The contract (confirmed against `docs/README.md` on the `m4-handoff-docs` branch, which is the
- * stream that actually owns `docs/**`): every fenced `sh`/`bash` block carries the marker as the
- * SECOND WORD OF THE INFO STRING — ` ```sh safe-read ` — and nothing else. There is no
- * preceding-comment form; an earlier revision of this file supported one speculatively, before the
- * docs stream's own convention could be read, and it is gone now that the real one is known.
- *
- *   safe-read      a GET against a public endpoint, no credential — the ONLY kind this checker runs
- *   staging-write  mints a key, requests an OTP, submits/reviews/revokes — never run automatically
- *   no-run         deployment or infrastructure mutation — never run automatically, ever
- *
- * A `sh`/`bash` block with no marker (or an unrecognized second word) is a hard failure — an
- * unmarked block is one this checker cannot tell is safe to run, and treating "unmarked" as "don't
- * run" silently would let a real safe-read command go unexercised without anyone noticing.
+ * Marker parsing for ` ```sh ` blocks in the handoff docs — pure, no I/O. The convention is the
+ * docs stream's own: the marker is the SECOND WORD OF THE INFO STRING (` ```sh safe-read `) and
+ * there is no preceding-comment form. `safe-read` is the only kind this checker executes;
+ * `staging-write` and `no-run` are never run. See scripts/m4-compliance/README.md for the scope.
  */
 
 export const MARKERS = ["safe-read", "no-run", "staging-write"];
 
-/**
- * Extract every fenced code block from markdown, with its language, its marker (the second word of
- * the info string, when it is one of `MARKERS`; otherwise `null`), and its source line number
- * (1-based, of the opening fence).
- */
+/** Every fenced block, with its language, marker (or `null`) and 1-based opening-fence line. */
 export function parseMarkedBlocks(markdown) {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const blocks = [];

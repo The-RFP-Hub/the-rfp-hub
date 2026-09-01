@@ -1,37 +1,15 @@
 #!/usr/bin/env node
 /**
- * M4 write-acceptance — the real 3-phase MCP submission interlock, driven end to end.
+ * M4 write-acceptance — the real 3-phase MCP submission interlock, driven end to end against a
+ * writable STAGING deployment. `check-m4.mjs` proves phase 1 writes nothing, against a local mock;
+ * this is the other half. See scripts/m4-compliance/README.md for the phases and the target guard.
  *
- * `check-m4.mjs` is entirely read-only, including its MCP check: the one case that looks like a
- * write (`submit_opportunity` with the fail-closed env) runs against a LOCAL mock server, never
- * against a real deployment. This tool is the other half — it drives the actual interlock against
- * a real, writable STAGING deployment:
+ * THERE IS NO FLAG TO FORCE PRODUCTION: default-deny against an explicit staging allowlist plus
+ * loopback, https off loopback, and the redirect chain --api answers with must end inside the
+ * allowlist too — a staging-looking CNAME pointed at production passes every hostname rule there is.
  *
- *   0. snapshot  `GET /v1/me/opportunities`, so "the preview created nothing" is a fact
- *   1. preview   `submit_opportunity` phase 1 — exact `status: "pending"`, snapshot unchanged
- *   2. refuse    phase 3 WITHOUT an approval — must be refused, snapshot still unchanged
- *   3. approve   a SEPARATE process runs `rfphub-mcp approve <approvalId>`. Driven
- *                non-interactively by default and reported as `approval: SIMULATED`;
- *                `--interactive-approval` waits for a person and reports `approval: HUMAN`
- *   4. commit    `submit_opportunity` phase 3 — the actual `POST`, now that an approval exists
- *
- * ...then verifies the fixture landed `pending` via `GET /v1/me/opportunities` (never the public
- * read surface, which hides pending entries by design), and tears it down — rejected and unlisted
- * by a reviewer — the same as `m3-compliance/cleanup.mjs`.
- *
- * THERE IS NO FLAG TO FORCE PRODUCTION. The target guard is default-deny against an explicit
- * allowlist of this project's staging origins plus loopback, https required off loopback, and the
- * redirect chain `--api` answers with is followed before the first write — a staging-looking CNAME
- * pointed at production passes every hostname rule there is.
- *
- * Usage:
- *   RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
- *     node scripts/accept-m4.mjs --api https://api.staging.example.org
- *
- * Exit codes: 0 the cycle completed, landed pending, AND was torn down · 1 any phase failed, OR
- * teardown itself failed, OR `--keep-fixture` deliberately left a fixture behind (teardown is its
- * own criterion — see below — so a run that leaves a fixture in place is never reported as a
- * clean pass) · 2 the run could not be made (refused, or a programmer error).
+ * Exit codes: 0 the cycle completed, landed pending AND was torn down · 1 any phase failed,
+ * teardown failed, or `--keep-fixture` left a fixture behind · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
 import { normalizeBase } from "./m2-compliance/http.mjs";
@@ -133,14 +111,9 @@ async function main() {
     "Real 3-phase MCP submission interlock",
     "preview → out-of-band approval → commit lands a fixture pending, verified via /v1/me/opportunities, then torn down.",
   );
-  // A SEPARATE criterion, on purpose — the same reasoning as `m3-compliance/cleanup.mjs`'s own
-  // "M3-T" criterion. If teardown were just another CHECK inside "M4-ACCEPT", a `--keep-fixture`
-  // run would still be reported PASS: `Criterion.status` is only SKIP when EVERY check in it is
-  // skip/info, and the submission-cycle checks above it would still have passed. Making teardown
-  // its own criterion means a `--keep-fixture` run (or one where nothing to tear down was ever
-  // established) makes THIS criterion SKIP, which makes the overall run `incomplete` — not green,
-  // and not exit 0 — exactly the property "a run that deliberately leaves a fixture behind must
-  // not report success" needs.
+  // A SEPARATE criterion, not a check inside M4-ACCEPT: a criterion is only SKIP when EVERY check
+  // in it is skipped, so a `--keep-fixture` run would still have been green on the strength of the
+  // submission checks above it. At this level, leaving a fixture behind makes the run incomplete.
   const t = report.criterion(
     "M4-ACCEPT-T",
     "Fixture teardown",

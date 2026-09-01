@@ -1,38 +1,21 @@
 /**
  * A minimal MCP client over stdio — just enough to drive `tools/list` and `tools/call`.
  *
- * WHY HAND-ROLLED. The M4 plan pins the server to MCP protocol revision `2026-07-28`, spoken by
- * `@modelcontextprotocol/server@2.0.0` / `@modelcontextprotocol/client`. Neither is a dependency of
- * this repo (`packages/mcp` is being built by another stream) or of this checker, and installing a
- * client SDK here just to drive a handful of requests would be a second thing to keep in sync with
- * whatever `packages/mcp` actually ends up depending on. So: if `@modelcontextprotocol/client` is
- * resolvable at run time (from this package's own `node_modules`, or from `packages/mcp`'s once it
- * exists), a future revision of this file can prefer it. Absent that, this client speaks the wire
- * format directly:
- *
- *   - **Transport**: newline-delimited JSON-RPC 2.0 over stdin/stdout. No `Content-Length` framing
- *     (that is LSP's convention, not MCP's) — one complete JSON value per line, in each direction.
- *   - **No `initialize` handshake.** Revision `2026-07-28` is stateless per the plan: there is no
- *     `initialize`/`initialized` exchange and no `Mcp-Session-Id`. This client goes straight to
- *     `tools/list` / `tools/call`. If a server under test still expects the older handshake (e.g.
- *     it was built against an earlier SDK before the D1 confirmation in the plan landed), the first
- *     request will come back as a JSON-RPC error or simply time out, and the caller reports that
- *     verbatim rather than silently retrying with a different protocol.
- *
- * Every method here is a thin RPC call; the tool-shaped assertions (which ids came back, whether
- * `submit_opportunity` is present, whether `rfph_` leaked) live in `checks/mcp.mjs`, which is the
- * part that actually knows what the contract means.
+ * Hand-rolled because neither `@modelcontextprotocol/client` nor the server SDK is a dependency of
+ * this repo or this checker, and adding one would be a second thing to keep in sync with whatever
+ * `packages/mcp` ends up depending on. The wire format is newline-delimited JSON-RPC 2.0 — no
+ * `Content-Length` framing, that is LSP's convention — and protocol revision `2026-07-28` is
+ * stateless, so there is no `initialize` handshake to perform. A server that still expects one
+ * answers with a JSON-RPC error or times out, and the caller reports that verbatim rather than
+ * silently retrying with a different protocol.
  */
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
 /**
- * The child's environment: `base` (normally `process.env`) merged with `env`, then every name in
- * `unset` deleted — in that order, so `unset` always wins even over an explicit `env` entry.
- * Pulled out of `McpStdioClient.start()` as a pure function so the guarantee behind item 7 (the
- * read-only MCP case must not merely "not set" `RFPHUB_API_KEY`/`RFPHUB_MCP_ENABLE_SUBMIT`, but
- * actively strip them from whatever the checker's own process inherited) is unit-testable without
- * spawning a process.
+ * `base` merged with `env`, then every name in `unset` deleted — in that order, so `unset` wins
+ * even over an explicit `env` entry. That ordering is the guarantee: the read-only case must
+ * actively STRIP `RFPHUB_API_KEY`/`RFPHUB_MCP_ENABLE_SUBMIT`, not merely decline to set them.
  */
 export function buildChildEnv(base, env = {}, unset = []) {
   const merged = { ...base, ...env };
@@ -52,15 +35,6 @@ export class McpStdioClient {
   #spawnError = null;
   #exited;
 
-  /**
-   * `unset`: environment variable NAMES to remove from the child's environment even if this
-   * checker's own process happens to have them set (a developer's shell exporting
-   * `RFPHUB_API_KEY` for unrelated reasons, say). Applied AFTER merging `process.env` with `env`,
-   * so it always wins — the read-only case in `checks/mcp.mjs` uses this to guarantee the
-   * "default env, read-only tools only" case is actually tested with no credential and no submit
-   * flag present, rather than merely not-explicitly-setting them and hoping the ambient
-   * environment agrees.
-   */
   constructor(command, args = [], { env = {}, cwd, unset = [] } = {}) {
     this.command = command;
     this.args = args;
@@ -87,8 +61,8 @@ export class McpStdioClient {
       this.#stderr += chunk.toString("utf8");
     });
 
-    // ENOENT (no `npx`, no `node`, a mistyped binary) arrives here, never as an exit — without
-    // this listener it surfaced as an unhandled 'error' event that took the whole run down.
+    // ENOENT arrives here, never as an exit: without this listener it was an unhandled 'error'
+    // event that took the whole run down.
     this.#child.on("error", (err) => {
       this.#closed = true;
       this.#spawnError = err;
@@ -101,8 +75,7 @@ export class McpStdioClient {
     this.#child.on("exit", (code, signal) => {
       this.#closed = true;
       this.#exitInfo = { code, signal };
-      // Any request still waiting will never get a response now — fail it with the exit reason
-      // rather than hanging until its own timeout.
+      // Nothing still waiting will be answered now: fail it with the exit reason.
       for (const [, pending] of this.#pending) {
         pending.reject(
           new Error(
@@ -113,8 +86,8 @@ export class McpStdioClient {
       this.#pending.clear();
     });
 
-    // `close` rather than `exit`: it fires once every stdio stream has ended too, so a caller
-    // scanning `stderr` after this resolves has the child's LAST line, not most of them.
+    // `close`, not `exit`: it fires once the stdio streams have ended, so a caller scanning
+    // `stderr` afterwards has the child's LAST line.
     this.#child.on("close", () => this.#resolveExited?.());
 
     this.startedAt = Date.now();
@@ -127,9 +100,8 @@ export class McpStdioClient {
     try {
       message = JSON.parse(trimmed);
     } catch {
-      // Not every line on stdout has to be a JSON-RPC message in a server that logs to stdout by
-      // mistake — but the plan requires "nothing but the protocol on stdout", so callers that care
-      // read `stdoutNonJsonLines` rather than this silently swallowing it.
+      // The plan requires nothing but the protocol on stdout, so a non-JSON line is kept for
+      // callers to assert on rather than silently swallowed.
       this.stdoutNonJsonLines ??= [];
       this.stdoutNonJsonLines.push(trimmed);
       return;
@@ -189,10 +161,8 @@ export class McpStdioClient {
   }
 
   /**
-   * Terminate and AWAIT the exit, so a caller that scans `stderr` afterwards sees everything the
-   * child wrote on its way out — a shutdown path that logs configuration is exactly the surface a
-   * scan taken while the process was still running would miss. SIGTERM first; SIGKILL if the child
-   * ignores it, so one unresponsive server cannot hang the whole run.
+   * Terminate and AWAIT the exit, so a caller scanning `stderr` afterwards sees what the child
+   * wrote on its way out. SIGKILL if it ignores SIGTERM, so one server cannot hang the run.
    */
   async close({ graceMs = 2000 } = {}) {
     if (this.#spawnError) return;
@@ -215,10 +185,7 @@ export class McpStdioClient {
   }
 }
 
-/**
- * Recursively search a value for a `rfph_` credential-shaped substring, in keys or string values.
- * Used to assert that no MCP surface (tool output, error text, structuredContent) ever leaks one.
- */
+/** Any `rfph_`-shaped substring anywhere in a value — the assertion that no MCP surface leaks one. */
 export function findCredentialLeak(value, path = "$") {
   const pattern = /rfph_[A-Za-z0-9_-]{4,}/;
   if (typeof value === "string") {

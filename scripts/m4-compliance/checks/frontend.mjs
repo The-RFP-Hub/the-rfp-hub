@@ -1,16 +1,11 @@
 /**
- * M4-3 — the reference frontend is alive, and behaves.
+ * M4-3 — the reference frontend is alive, and behaves. Everything that needs the RENDERED page is
+ * a requirement, not a nicety: without `--browser` those rows are unmet and the criterion is
+ * incomplete.
  *
- * Read-only in every part: TLS, a plain `/` fetch, and `/robots.txt` need no browser. Everything
- * that requires seeing the RENDERED page — search changing the result set, a filter changing it,
- * pagination, the detail page's title, the two deep-link hrefs, and the three responsive
- * viewports — needs `--browser`, and per the brief §4.4 row "3c" the responsive check in
- * particular is REQUIRED, not skippable, once `--browser` is on.
- *
- * The two deep-link hrefs are inspected, never followed: `captureViews` records a view before the
- * 302 fires, and a `HEAD`/`GET` from this checker would register as a real click against
- * whichever publisher's analytics the fixture happens to point at. `getAttribute('href')` in the
- * page context never triggers navigation.
+ * The two deep-link hrefs are inspected, never followed: the API records a view before the 302
+ * fires, so a request from this checker would register as a real click against whichever
+ * publisher's analytics the fixture points at.
  */
 import { isLoopbackHost, probeTls, request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
@@ -22,22 +17,12 @@ const VIEWPORTS = [
 ];
 
 /**
- * Pull the opportunity ids the rendered directory table is currently showing — one per row, in
- * page order.
+ * The opportunity ids the rendered directory table is showing, one per row, in page order.
  *
- * `tbody a.row-title` is what `DirectoryRow` in `packages/frontend/src/components/DirectoryList.tsx`
- * actually renders: `<Link href={`/opportunities/${encodeURIComponent(item.id)}`} className="row-title">`.
- * There is no `data-opportunity-id` (or any other purpose-built test attribute) anywhere in
- * `packages/frontend/src` — an earlier revision of this file assumed one existed and silently fell
- * back to a looser `a[href*="/opportunities/"]` selector that this checker never actually exercised
- * against a real page, because `/publishers` (unrelated) also links to `/opportunities/…`-shaped
- * search results and would have double-counted them. `.row-title` is reused elsewhere in the
- * frontend (organizations, review, account pages), but never on the public directory route this
- * function is only ever called against, so `tbody a.row-title` is unambiguous here.
- *
- * The id is decoded back out of the href rather than read off a data attribute, which is a
- * STRONGER assertion than a bare count: two pages rendering the same NUMBER of rows with
- * DIFFERENT ids still correctly counts as "the result set changed".
+ * `tbody a.row-title` is what `DirectoryRow` renders; there is no purpose-built test attribute in
+ * `packages/frontend/src`. The looser `a[href*="/opportunities/"]` an earlier revision fell back to
+ * also matched `/publishers`' links and double-counted them. Ids are decoded out of the href rather
+ * than counted, so two pages with the same NUMBER of different rows still read as a change.
  */
 async function renderedOpportunityIds(page) {
   return await page.evaluate(() =>
@@ -55,13 +40,9 @@ export const MIN_TARGET_PX = 44;
 const sameSet = (a, b) => a.size === b.size && [...a].every((value) => b.has(value));
 
 /**
- * Assert that a filter/search/pagination change actually changed WHICH entries are on screen.
- *
- * Two failure modes this closes, both of which used to pass. An EMPTY result satisfies "different
- * from the baseline" while proving nothing except that the param maybe reached the query string —
- * it is exactly as consistent with a broken filter matching nothing. And a REORDERING of the same
- * ids is not a different result set at all: `JSON.stringify` inequality accepted it, and the unit
- * test locked that in.
+ * Which entries are on screen changed — not merely that something did. An EMPTY result is as
+ * consistent with a broken filter as with a working one, and a REORDERING of the same ids is not a
+ * different result set at all; `JSON.stringify` inequality accepted both.
  */
 export function expectResultSetChanged(c, name, newIds, baselineIds, emptyHint) {
   if (newIds.length === 0) {
@@ -104,9 +85,8 @@ async function listIds(ctx, qs) {
 }
 
 /**
- * Two filter values the LIVE corpus can actually answer, one per filter the plan names. Hard-coding
- * `type=grant` made the assertion fail for the wrong reason the day the corpus stopped matching it,
- * and there was no second filter at all.
+ * Two filter values the LIVE corpus can answer. Hard-coding `type=grant` made the assertion fail
+ * for the wrong reason as the corpus moved, and there was no second filter at all.
  */
 export async function deriveFilterValues(ctx) {
   const res = await request(`${ctx.api}/v1/opportunities?status=open&limit=100`, {
@@ -127,8 +107,8 @@ export async function deriveFilterValues(ctx) {
 }
 
 /**
- * Every control small enough to miss on a touch screen. Inline links inside running text are
- * exempt: their hit area is the line box, and enlarging one would break the paragraph it sits in.
+ * Every control small enough to miss on a touch screen. Inline links in running text are exempt:
+ * their hit area is the line box, and enlarging one would break the paragraph it sits in.
  */
 async function undersizedTargets(page, min) {
   return await page.evaluate((minPx) => {
@@ -179,7 +159,7 @@ export async function checkFrontend(report, ctx) {
   } else if (isLoopbackHost(new URL(ctx.site).hostname)) {
     c.skipOptional("TLS certificate is valid", `${ctx.site} is loopback — no transport to inspect`);
   } else {
-    // Recorded as a SKIP before, which meant a remote plaintext deployment passed this criterion.
+    // A SKIP before, which let a remote plaintext deployment pass this criterion.
     c.fail("TLS certificate is valid", `${ctx.site} is served over ${tls.protocol}, not https`);
   }
 
@@ -238,10 +218,8 @@ export async function checkFrontend(report, ctx) {
         "the query param may not be wired to the list.",
       );
 
-      // The URL param is `type`, NOT `fundingType` — `selectionFromParams` in
-      // packages/frontend/src/lib/directory.ts reads `type` and maps it onto the internal
-      // `fundingType` field. `?fundingType=` would be an unrecognized param the directory silently
-      // ignores, failing this check for the wrong reason.
+      // The URL param is `type`, not `fundingType`: `selectionFromParams` reads `type` and maps it
+      // onto the internal field. `?fundingType=` is silently ignored by the directory.
       for (const [param, key, label] of [
         ["ecosystem", "ecosystem", "ecosystem"],
         ["type", "fundingType", "funding-type"],
@@ -324,9 +302,8 @@ export async function checkFrontend(report, ctx) {
           `HTTP ${response?.status()}`,
           `HTTP ${response?.status()}`,
         );
-        // The RENDERED heading, not `page.content()`: a substring search over the serialized HTML
-        // matched Next.js's own flight payload (a pass with nothing visible on screen) and missed a
-        // correctly displayed title whose `&` had been escaped (a failure with nothing wrong).
+        // The RENDERED heading, not `page.content()`: a substring search over serialized HTML
+        // matched Next.js's flight payload, and missed a displayed title whose `&` was escaped.
         const heading = await page.evaluate(
           () => document.querySelector("h1")?.innerText?.replace(/\s+/g, " ").trim() ?? "",
         );
@@ -403,8 +380,7 @@ export async function checkFrontend(report, ctx) {
 
 /**
  * Index state is REPORTED, not held to a contract, because the decision is the operator's — unless
- * `--expect-indexable` says the deployment is meant to be indexed, in which case a whole-site
- * Disallow or a noindex meta tag is a failure rather than a note.
+ * `--expect-indexable` says the deployment is meant to be indexed.
  */
 function checkIndexability(c, ctx, homeRes, robotsRes) {
   const robots = robotsRes.ok && robotsRes.status === 200 ? robotsRes.body : undefined;

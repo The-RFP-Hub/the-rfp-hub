@@ -1,22 +1,13 @@
 /**
- * The real 3-phase MCP submission, driven end to end against a staging deployment.
+ * The real 3-phase MCP submission, driven end to end against a staging deployment — including the
+ * things a happy path never touches: an owner SNAPSHOT before anything, so "the preview created
+ * nothing" is a fact rather than a specification restated, and a phase-3 commit attempted WITHOUT
+ * an approval, which must be refused with that snapshot unchanged.
  *
- * `check-m4.mjs` proves phase 1 writes nothing, against a local mock. This is the tool that proves
- * the whole interlock actually holds against a deployment that can be written to, which means it
- * has to assert the things a happy path never touches:
- *
- *   - an owner SNAPSHOT before anything, so "the preview created nothing" is a fact rather than a
- *     specification being restated;
- *   - a phase-3 commit attempted WITHOUT an approval, which must be refused and must leave that
- *     snapshot unchanged — the interlock's whole point, and previously never exercised;
- *   - the approval itself, out of band, in a separate process.
- *
- * WHAT THE APPROVAL PROVES, AND WHAT IT DOES NOT. By default this driver writes the literal
- * `approve` that `rfphub-mcp approve <id>` requires into the subprocess's stdin. That automates the
- * CLI; it does not demonstrate a human decision, and the report says `approval: SIMULATED
- * (non-interactive)` so nobody can read it as one. `--interactive-approval` prints the exact
- * command and waits for an operator to run it in another terminal, and the report then says
- * `approval: HUMAN`. Both are honest; only one is evidence of the human step.
+ * WHAT THE APPROVAL PROVES. By default this driver writes the literal `approve` into the CLI's
+ * stdin: that automates the CLI, it does not demonstrate a human decision, and the report says
+ * `approval: SIMULATED (non-interactive)`. `--interactive-approval` waits for an operator and the
+ * report says `approval: HUMAN`. Both are honest; only one is evidence of the human step.
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -31,8 +22,8 @@ const READ_TOOLS = ["fetch_opportunity", "search_opportunities"];
 const SUBMIT_TOOL = "submit_opportunity";
 
 /**
- * Collision-resistant per run. A timestamp truncated to the minute gave two runs started in the
- * same minute the same fixture id, and the second one then "found" the first one's entry.
+ * Collision-resistant per PROCESS: a timestamp truncated to the minute gave two runs started in
+ * the same minute the same fixture id, and the second one then "found" the first one's entry.
  */
 export function runToken(now = new Date()) {
   const stamp = now
@@ -61,10 +52,7 @@ export function fixtureDocument(run) {
   };
 }
 
-/**
- * Run `rfphub-mcp approve <id>`, answering its prompt with the literal it requires. Rejects with an
- * Error carrying `.stdout`/`.stderr` on a non-zero exit, a spawn error, or a timeout.
- */
+/** Run `rfphub-mcp approve <id>`, answering its prompt with the literal it requires. */
 function runApprove(command, args, { cwd, env, timeoutMs }) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
@@ -158,12 +146,9 @@ export async function ownedIds(ctx) {
 }
 
 /**
- * Runs the full cycle, recording each assertion into `c`. Returns the opportunity id on success.
- *
- * MUTATES `state` BEFORE each network call rather than after: `candidateOpportunityId` is the id
- * the document itself declares, known before phase 1, and `commitAttempted` is set immediately
- * before the phase-3 POST — the one request whose failure is AMBIGUOUS, because it may have reached
- * the API even though this process never saw the reply.
+ * Runs the full cycle, recording each assertion into `c`. MUTATES `state` BEFORE each network call:
+ * `commitAttempted` is set immediately before the phase-3 POST, the one request whose failure is
+ * AMBIGUOUS because it may have reached the API even though this process never saw the reply.
  */
 export async function runSubmissionCycle(ctx, state, c) {
   const resolved = resolveCommand(ctx);
@@ -173,9 +158,8 @@ export async function runSubmissionCycle(ctx, state, c) {
   const document = fixtureDocument(state.run);
   state.candidateOpportunityId = document.id;
 
-  // A disposable home, always removed: without it every run leaves approvals, rate-limit counters
-  // and audit lines in the OPERATOR's own ~/.rfphub, and a leftover approval from an earlier run
-  // could satisfy the "commit without approval is refused" assertion for the wrong reason.
+  // Disposable, always removed: otherwise every run leaves state in the OPERATOR's own ~/.rfphub,
+  // and a leftover approval could satisfy the "commit without approval is refused" case wrongly.
   const mcpHome = await mkdtemp(join(tmpdir(), "m4-accept-mcp-home-"));
   state.mcpHome = mcpHome;
   const env = {
@@ -269,7 +253,7 @@ export async function runSubmissionCycle(ctx, state, c) {
             { name: SUBMIT_TOOL, arguments: { document, approvalId } },
             { timeoutMs: ctx.timeoutMs },
           );
-          // Only a consumed approval lets the commit through; anything else means "still waiting".
+          // Only a consumed approval lets the commit through; anything else is "still waiting".
           const text = JSON.stringify(pending.result ?? pending.error ?? {});
           if (/confirmation_required|confirmation_invalid/.test(text)) return false;
           state.commitAttempted = true;
@@ -329,9 +313,8 @@ export async function runSubmissionCycle(ctx, state, c) {
 }
 
 /**
- * Verifies the fixture landed `pending` — via `GET /v1/me/opportunities` with the SAME write
- * credential that submitted it, never the public read surface, which hides pending entries by
- * design (the same distinction `m3-compliance/checks/namespace.mjs` draws).
+ * Via `GET /v1/me/opportunities` with the SAME write credential that submitted it, never the public
+ * read surface, which hides pending entries by design.
  */
 export async function verifyLandedPending(ctx, opportunityId) {
   const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", {
@@ -353,11 +336,7 @@ export async function verifyLandedPending(ctx, opportunityId) {
   return entry;
 }
 
-/**
- * Reject and unlist the fixture with the reviewer credential — the write-acceptance equivalent of
- * `m3-compliance/cleanup.mjs`, reused rather than reimplemented where the shape matches: same
- * reject endpoint, same "leave it named rather than silently drop it" behavior on failure.
- */
+/** Reject and unlist the fixture with the reviewer credential, as `m3-compliance/cleanup.mjs` does. */
 export async function teardown(ctx, opportunityId) {
   if (!opportunityId) return { skipped: "no fixture was created" };
   const rejected = await callJson(
@@ -379,9 +358,8 @@ export async function teardown(ctx, opportunityId) {
 }
 
 /**
- * Teardown is not done when the reject endpoint answers 200 — it is done when the entry is gone
- * from the surfaces a reader can reach. Both are checked: the owner listing must no longer show it
- * as pending, and the public detail route must not serve it.
+ * Teardown is done when the entry is gone from the surfaces a reader can reach, not when the reject
+ * endpoint answers 200.
  */
 export async function verifyTornDown(ctx, opportunityId) {
   const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", {

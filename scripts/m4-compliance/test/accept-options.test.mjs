@@ -1,9 +1,6 @@
 /**
- * Argument parsing for `scripts/accept-m4.mjs` — in particular `--timeout`, which an earlier
- * revision passed straight through `Number()` with no validation at all, unlike every other
- * numeric flag in this repo's checkers (`--views`/`--timeout`/`--concurrency` in
- * `m3-compliance/options.mjs`, `--timeout`/`--concurrency` in `m4-compliance/options.mjs`), so
- * `--timeout abc` silently became `NaN` and `--timeout -1` was accepted outright.
+ * `scripts/accept-m4.mjs`'s argument parsing and — below — its target guard, which is the whole
+ * safety contract now that there is no flag to force production.
  */
 import { createServer } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

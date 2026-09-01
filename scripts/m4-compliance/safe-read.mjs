@@ -1,30 +1,14 @@
 /**
- * Parse and run a `safe-read` block from the handoff docs.
+ * Parse and run a `safe-read` block from the handoff docs. THERE IS NO SHELL: each line becomes a
+ * pipeline of argv arrays, validated against a narrow grammar and spawned directly. The previous
+ * implementation passed the block to `bash -c` with the caller's full `process.env`, so a checker
+ * advertised as read-only executed arbitrary commands chosen by a markdown file, with whatever
+ * credentials the operator's shell had exported.
  *
- * THE PROBLEM THIS REPLACES. The previous implementation handed the block's text to
- * `bash -c` with the caller's full `process.env`. A checker that advertises itself as
- * "100% read-only, safe to point at production" was therefore executing arbitrary shell, chosen
- * by whatever a markdown file happened to say, with whatever npm/cloud credentials the operator's
- * shell had exported. A typo or a docs change could POST, delete, or read `~/.npmrc`.
- *
- * There is no shell here at all. Each line is parsed into a pipeline of argv arrays, validated
- * against a narrow grammar, and spawned directly:
- *
- *   - stage 0 is `curl` with GET/HEAD semantics only — no `-d/-F/-T`, no `Authorization`/`Cookie`
- *     header, no `-u`, no `-X POST`;
- *   - later stages may only be `jq`, `head`, `sed -n` or `python3 -m json.tool`;
- *   - command substitution exists in exactly one form, `NAME=$(<pipeline>)`, whose inside must
- *     itself satisfy this grammar — that is what `docs/api-integration.md`'s real blocks use to
- *     pick a sample id, and it is not a general escape hatch;
- *   - backticks, redirection, `;`, `&`, `&&` and any other `||` are rejected outright;
- *   - every URL must expand to the `--api`/`--site` origin under test, and a `/v1/r/` link-out
- *     must carry `DNT: 1` or the block is refused before it can record a click;
- *   - the child environment is an allowlist, never `process.env`.
- *
- * Running the stages ourselves also closes the `pipefail` gap honestly. `curl -f … | jq` under
- * bash reports only `jq`'s status, so a 404 "succeeded"; adding `pipefail` broke `curl … | head`,
- * because head closing the pipe makes curl's own write fail. Buffering between stages removes
- * that conflict: head reads all of a completed capture, and curl's exit code is examined directly.
+ * The grammar is documented in scripts/m4-compliance/README.md. Running the stages ourselves also
+ * closes the pipefail gap: under bash `curl -f … | jq` reported only jq's status so a 404
+ * "succeeded", while adding pipefail broke `curl … | head` (head closing the pipe makes curl's own
+ * write fail). Buffering between stages examines curl's exit code directly and lets head finish.
  */
 import { spawn } from "node:child_process";
 
@@ -75,9 +59,9 @@ const fail = (reason) => {
 };
 
 /**
- * Split one line into tokens and `|` separators, honoring quotes, and refusing every shell
- * construct this grammar does not have. Returns `{ tokens, allowFailure }` where a token is
- * `{ parts: [{ text, quoted }] }` — `quoted` marks a single-quoted run, where `$` is literal.
+ * Tokens and `|` separators, honoring quotes, refusing every construct this grammar does not have.
+ * A token is `{ parts: [{ text, quoted }] }`; `quoted` marks a single-quoted run, where `$` is
+ * literal.
  */
 export function tokenize(line) {
   const tokens = [];
@@ -280,10 +264,7 @@ function checkPipeStage(tokens) {
   }
 }
 
-/**
- * Parse a whole block. Returns `{ ok: true, lines }` or `{ ok: false, reason }` — never throws,
- * because a malformed block is a criterion FAILURE with a reason, not a crash.
- */
+/** Never throws: a malformed block is a criterion FAILURE with a reason, not a crash. */
 export function parseSafeReadBlock(source, { api, site }) {
   const allowedOrigins = [...new Set([api, site].filter(Boolean).map((b) => new URL(b).origin))];
   const parseVars = { API: api, ...(site ? { SITE: site } : {}) };
@@ -304,8 +285,8 @@ export function parseSafeReadBlock(source, { api, site }) {
       checkCurl(stages[0], { vars: parseVars, allowedOrigins });
       for (const stage of stages.slice(1)) checkPipeStage(stage);
       lines.push({ source: line, assignTo, stages, allowFailure });
-      // A value produced by an earlier line may appear in a later URL's PATH. It can never
-      // introduce a host: the origin is checked again, against the real value, before spawning.
+      // A captured value may appear in a later URL's PATH; the origin is checked again, against
+      // the real value, before spawning.
       if (assignTo) parseVars[assignTo] = "captured";
     }
   } catch (err) {
@@ -350,8 +331,8 @@ function runOne(command, args, input, { cwd, env, timeoutMs }) {
       clearTimeout(timer);
       resolve({ code, stdout: Buffer.concat(out), stderr: Buffer.concat(err).toString("utf8") });
     });
-    // `head` exits as soon as it has its lines; writing the rest then raises EPIPE, which is the
-    // normal end of that conversation and not an error.
+    // `head` exits as soon as it has its lines; the EPIPE that follows is the normal end of that
+    // conversation, not an error.
     child.stdin.on("error", () => {});
     if (input) child.stdin.end(input);
     else child.stdin.end();
@@ -394,10 +375,9 @@ export async function runSafeReadBlock(parsed, { cwd, timeoutMs = 15000, api, si
 }
 
 /**
- * `--fail` is added when the block did not ask for it: without it curl answers 0 for a 404 and
- * the pipeline "succeeds" on an error body. Re-validating the expanded URL here is the second
- * half of the runtime check — a value captured from an earlier line lands in a path, and this is
- * where that is proved rather than assumed.
+ * `--fail` is added when the block did not ask for it: without it curl answers 0 for a 404 and the
+ * pipeline "succeeds" on an error body. The expanded URL is re-validated here because a value
+ * captured from an earlier line only becomes real at this point.
  */
 function withFailFlag(args, { allowedOrigins }) {
   const url = args.find((a) => /^https?:\/\//i.test(a));

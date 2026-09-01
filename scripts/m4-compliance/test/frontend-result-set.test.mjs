@@ -1,9 +1,7 @@
 /**
- * `expectResultSetChanged` — an independent acceptance audit's finding: `JSON.stringify(a) !==
- * JSON.stringify(b)` alone is satisfied just as well by "0 items vs 20 items" as by "20 different
- * items", so an EMPTY filtered result was passing as proof a filter works, when it is equally
- * consistent with a broken filter (or param) matching nothing — and a REORDERING of the same ids
- * passed too. An empty result and an unchanged membership are both named failures.
+ * `expectResultSetChanged`: `JSON.stringify(a) !== JSON.stringify(b)` is satisfied by "0 items vs
+ * 20" and by a REORDERING of the same ids, so an empty result and a re-sort both passed as proof
+ * that a filter works. Both are named failures now.
  */
 import { describe, expect, it } from "vitest";
 import { expectResultSetChanged } from "../checks/frontend.mjs";

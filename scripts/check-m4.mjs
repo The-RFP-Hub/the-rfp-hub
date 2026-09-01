@@ -1,31 +1,16 @@
 #!/usr/bin/env node
 /**
- * M4 sign-off compliance checker.
+ * M4 sign-off compliance checker — the M4 completion criteria against a LIVE, PUBLIC deployment.
+ * One criterion per row of the plan's table; see scripts/m4-compliance/README.md for what each
+ * establishes and what makes a run incomplete rather than green.
  *
- * Mechanically verifies the M4 completion criteria against a LIVE, PUBLIC deployment:
+ * Like `check-m2.mjs`, and unlike `check-m3.mjs`, this tool is READ-ONLY: it never mints a key,
+ * submits an entry, or asks a reviewer to do anything. The one case that could look like a write —
+ * `submit_opportunity` under M4-4 — runs against a LOCAL recording server this checker starts
+ * itself, never against `--api`, which is what lets it default to production.
  *
- *   1. Governance      the four governance documents exist and are linked from the site
- *   2. Publishers      the public /publishers page matches GET /v1/publishers, unauthenticated
- *   3. Frontend        the reference frontend is live, searchable, filterable, paginated, and
- *                      responsive at three viewports, with both deep-link hrefs correct
- *   4. MCP             the MCP server is installable, lists the right tools, matches the API, never
- *                      leaks a credential-shaped string, and fails closed on submission
- *   5. Skill           the published skill is the audited skill, and its helper leaks nothing
- *   6. Docs            the four handoff guides exist, every link resolves, and only safe-read
- *                      shell blocks are ever executed
- *
- * HOW THIS DIFFERS FROM `check-m3.mjs`, AND WHY IT NEEDS NO `--allow-production`.
- * Like `check-m2.mjs`, this tool is 100% READ-ONLY: it never mints a key, never submits a real
- * entry, never asks a reviewer to do anything. The one thing that could look like a write —
- * `submit_opportunity` under M4-4 — is deliberately run against a LOCAL recording HTTP server this
- * checker starts itself, never against `--api`, precisely so this tool can default to production
- * and cost the deployment nothing to run, same as check-m2.
- *
- * Usage:
- *   node scripts/check-m4.mjs --site https://ethrfps.app --api https://api.ethrfps.app --browser
- *
- * Exit codes: 0 every criterion exercised and held · 1 a criterion failed, or one was never
- * exercised · 2 the run could not be made.
+ * Exit codes: 0 every criterion exercised and held · 1 a criterion failed, or a requirement was
+ * never exercised · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -129,10 +114,8 @@ async function main() {
     node: process.version,
   });
 
-  // `--only` EXCLUDES a check from running at all — no criterion is registered for it, so it
-  // cannot turn the run `incomplete`. `--skip` (handled inside each check module) still registers
-  // a `skip` criterion, which does. See options.mjs's docstring for why these are not the same
-  // flag and are refused together.
+  // `--only` registers no criterion for the checks it excludes, so a scoped run cannot be
+  // "incomplete" for work outside its scope; `--skip` does register one. See options.mjs.
   const runs = [
     ["governance", checkGovernance],
     ["publishers", checkPublishers],
@@ -148,9 +131,8 @@ async function main() {
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 
-  // The OS temp dir, not the repo root: a "safe to run anywhere, including production" tool must
-  // not write into the caller's own checkout. Unique per run, because a constant name lets two
-  // concurrent runs silently overwrite each other's evidence. Printed either way.
+  // The OS temp dir, not the repo root: a tool safe to run anywhere must not write into the
+  // caller's checkout. Unique per run, because a constant name lets two runs overwrite evidence.
   const jsonPath = opts.json ?? join(tmpdir(), defaultReportName());
   const serialized = `${JSON.stringify(report.toJSON(), null, 2)}\n`;
   if (jsonPath === "-") {

@@ -1,20 +1,11 @@
 /**
- * Argument parsing for the M4 compliance checker.
+ * Argument parsing for the M4 compliance checker. This tool is read-only, so there is no
+ * credential handling and no production opt-in: every default points at the live deployment.
  *
- * Unlike `m3-compliance/options.mjs`, THIS TOOL IS READ-ONLY: it never mints a key, never submits
- * an entry, never asks a reviewer to do anything. So there is no `--allow-production` and no
- * credential handling here — every default points at the live production deployment on purpose,
- * because reading it costs the deployment nothing and that is the whole value of a read-only
- * checker (same reasoning as `check-m2.mjs`).
- *
- * `--only` vs `--skip`: THEY MEAN DIFFERENT THINGS AND ARE NOT INTERCHANGEABLE. `--skip` still
- * REGISTERS the criterion — as a `skip` outcome — which is what makes `Report.result` correctly
- * report `incomplete` (and exit 1) for a run that only looked at part of the contract. `--only`
- * does not register the excluded criteria AT ALL, so a run scoped to one check that passes is a
- * clean PASS, exit 0. That distinction is exactly what the `docs-links` CI job needs: it runs only
- * the `docs` check, has no deployment to hold the other five against, and must not fail on
- * "incomplete" for work outside its own job's scope. The two flags are refused together, since
- * combining "only run X" with "explicitly skip Y" has no single sensible meaning.
+ * `--only` and `--skip` are NOT interchangeable. `--skip` still registers the criterion, as an
+ * unmet one, so a run that looked at part of the contract reports incomplete; `--only` does not
+ * register the excluded criteria at all, which is what the `docs-links` CI job needs — it has no
+ * deployment to hold the other five against. Refused together: the combination has no one meaning.
  */
 
 const CHECK_IDS = ["governance", "publishers", "frontend", "mcp", "skill", "docs"];
@@ -27,12 +18,10 @@ const MCP_SPEC_HELP =
   'a dist-tag ("next"), an exact version ("0.1.0"), or "local"; a full "@the-rfp-hub/mcp@<x>" is accepted and normalized to "<x>"';
 
 /**
- * Normalize `--mcp-spec` to what `npx -y @the-rfp-hub/mcp@<spec>` needs after it.
- *
- * The full-package form is accepted and stripped because the operator runbook spells it that way,
- * and concatenating it produced `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next` — an npm ENOENT nobody
- * could read back to the flag. A range (`^1.0.0`, `1.x`, `*`) is refused rather than passed
- * through: this criterion is about ONE immutable published artifact, and a range does not name one.
+ * Normalize `--mcp-spec` to what follows `npx -y @the-rfp-hub/mcp@`. The full-package form is
+ * accepted and stripped because the runbook spells it that way, and concatenating it produced
+ * `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next` — an npm ENOENT nobody could read back to the flag. A
+ * range is refused: this criterion is about one immutable artifact, and a range does not name one.
  */
 export function normalizeMcpSpec(raw) {
   const value = String(raw ?? "").trim();
@@ -145,11 +134,7 @@ export function parseArgs(argv) {
   return opts;
 }
 
-/**
- * What a scoped run answers, when it is not the whole question. A run narrowed by --only/--skip,
- * or one that did not make the docs criterion's requests at all, cannot be presented as an M4
- * sign-off, so its headline never renders the bare PASS that answer wears.
- */
+/** A run narrowed by --only/--skip/--offline is not an M4 sign-off, and must not read as one. */
 export function describeScope(opts) {
   const parts = [];
   if (opts.only.size > 0) parts.push(`--only ${[...opts.only].join(", ")}`);

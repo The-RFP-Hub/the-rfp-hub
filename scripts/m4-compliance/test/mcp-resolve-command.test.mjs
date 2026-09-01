@@ -1,20 +1,9 @@
 /**
- * `resolveCommand` — the registry-by-default / explicit-local-opt-out split (an independent
- * acceptance audit's finding: an earlier revision silently preferred a local build whenever one
- * existed, so "MCP server installable and callable" could PASS without npm ever being involved),
- * and the local-build path's symlink-canonicalization fix within it.
- *
- * The symlink fix itself was found by actually spawning a real built `packages/mcp` under a
- * `--repo-root` through a symlink (macOS's `/tmp` → `/private/tmp`, exactly what `os.tmpdir()`
- * gives every `mkdtemp`-based fixture, including this checker's own): `packages/mcp/src/cli.ts`
- * decides whether to run at all with
- *   `fileURLToPath(import.meta.url) === path.resolve(process.argv[1])`
- * Node resolves `import.meta.url` through any symlink when it loads the module; `path.resolve`
- * does not touch symlinks at all. Pass a path that still has a symlink component and the two
- * disagree, the CLI silently does nothing, and the process exits 0 with no output whatsoever —
- * indistinguishable from "hung" until this checker's own timeout. This test doesn't need a real
- * MCP build: any file will do, since the property under test is purely "did resolveCommand hand
- * back the canonical path".
+ * `resolveCommand` — registry by default, local only as an explicit opt-out (an earlier revision
+ * silently preferred a local build, so "installable" could PASS without npm being involved), and
+ * the local path's symlink canonicalization: `cli.ts` compares `fileURLToPath(import.meta.url)`
+ * (symlinks resolved) against `path.resolve(process.argv[1])` (not resolved), so a `--repo-root`
+ * through a symlink made the CLI silently do nothing and exit 0.
  */
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

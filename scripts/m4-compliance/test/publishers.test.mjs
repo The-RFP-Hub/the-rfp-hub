@@ -1,15 +1,7 @@
 /**
- * `extractRenderedSlugs` — the slug-extraction half of the M4-2 check (item 8 of the Codex
- * review). It never touches a real browser: it only calls `page.$$eval(selector, fn)`, so a fake
- * `page` that runs `fn` against an in-memory element list is enough to test the selector fallback
- * and the text-parsing rule (slug is the text before the first `:`) without Playwright at all.
- *
- * The second `describe` below (`checkPublishers`) exercises the whole check, with `request` and
- * `withPage` mocked, specifically to catch a regression Codex round 2 found: an earlier revision
- * of the `withPage` callback returned only `extractRenderedSlugs`'s result, dropping the captured
- * `requests` array, so `requests.length` on the success path threw — a bug that never surfaced in
- * manual runs because `/publishers` didn't exist in production yet (the check returns early on
- * that 404, before ever reaching the code that crashed).
+ * M4-2's slug extraction and the whole 200 success path, with `request` and `withPage` mocked —
+ * production 404s on `/publishers` until the frontend stream lands, so nothing else exercises it.
+ * The extraction only calls `page.$$eval(selector, fn)`, so an in-memory element list is enough.
  */
 import { describe, expect, it, vi } from "vitest";
 

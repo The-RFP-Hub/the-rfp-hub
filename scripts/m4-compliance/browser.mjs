@@ -1,14 +1,7 @@
 /**
- * Playwright access for the checks that need a real DOM — the frontend is client-rendered, so a
- * plain `fetch` of `/` or `/publishers` sees an (almost) empty shell, not the rendered content the
- * criteria in §4.4 actually ask about.
- *
- * This checker does NOT depend on Playwright at the repo root — only `packages/e2e` does. Rather
- * than duplicate that dependency at the root (and have two versions to keep in sync), this module
- * resolves `@playwright/test` THROUGH `packages/e2e`'s own `node_modules`, via `createRequire`
- * anchored at that package's `package.json`. When it is not there — a checkout that never ran
- * `pnpm install` for that workspace member — every `--browser` check reports a named WARN rather
- * than crashing the whole run.
+ * Playwright for the checks that need a real DOM. Resolved THROUGH `packages/e2e`'s own
+ * `node_modules` rather than added as a second root dependency with its own version to keep in
+ * sync; when it is not there, `--browser` checks fail by name instead of crashing the run.
  */
 import { createRequire } from "node:module";
 import { join } from "node:path";

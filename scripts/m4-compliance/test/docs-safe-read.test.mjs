@@ -1,16 +1,9 @@
 import { mkdtemp, rm } from "node:fs/promises";
 /**
- * The `safe-read` grammar and executor.
- *
- * The implementation this replaces handed a documentation code block to `bash -c` with the
- * operator's full environment, so a checker advertised as read-only would execute whatever a
- * markdown file said, with whatever credentials the shell had exported. These tests are the
- * contract of the replacement: what the real docs write is accepted, and every hostile shape the
- * audit named is refused BEFORE anything is spawned.
- *
- * The execution half spawns real `curl`/`jq`/`head` against a local server this file starts —
- * never the network — because the property being locked in (a failed request cannot be hidden by
- * a downstream `jq`) is an interaction between processes that mocking would not prove.
+ * The `safe-read` grammar and executor: what the real guides write is accepted, and every hostile
+ * shape the audit named is refused BEFORE anything is spawned. The execution half spawns real
+ * `curl`/`jq`/`head` against a local server this file starts — never the network — because "a
+ * failed request cannot be hidden by a downstream jq" is an interaction mocking would not prove.
  */
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";

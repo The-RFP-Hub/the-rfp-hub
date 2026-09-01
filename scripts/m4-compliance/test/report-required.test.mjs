@@ -1,10 +1,7 @@
 /**
- * Report semantics: a REQUIRED check that could not be performed must not produce a green run.
- *
- * The M2 report treats a criterion with warnings as passing, which is right for its own meaning of
- * "warn" (the check held, but see this) and wrong for M4's "needs --browser": the requirement was
- * never exercised at all. Before this, `--only frontend` without `--browser` printed RESULT: PASS
- * and exited 0 with nine required browser checks at WARN.
+ * A REQUIRED check that could not be performed must not produce a green run. `--only frontend`
+ * without `--browser` printed RESULT: PASS and exited 0 with nine browser checks at WARN, because
+ * the M2 report treats a criterion with warnings as passing.
  */
 import { describe, expect, it } from "vitest";
 import { describeScope } from "../options.mjs";

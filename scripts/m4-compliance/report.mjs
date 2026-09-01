@@ -1,16 +1,10 @@
 /**
- * The M4 report — the M2 one, plus the distinction M4 sign-off needs and M2 does not draw:
- * whether a check that could not be performed was a REQUIREMENT.
- *
- * M2's rule is that a criterion nothing could be checked in is `skip`, never `pass`. M4 needs one
- * level finer: a criterion where one required check could not be performed (no `--browser`, an
- * `--offline` run, a local MCP build standing in for a published one) is not a passed criterion
- * either, even when every other check in it held. `unmet()` records exactly that, and a criterion
- * carrying one is INCOMPLETE — which `Report.notExercised` counts, so the run exits non-zero.
- *
- * `warn()` keeps its M2 meaning (the check HELD, but something should be seen) and
- * `skipOptional()` is for a check the criterion genuinely does not depend on — a loopback origin
- * has no TLS to inspect.
+ * The M4 report — the M2 one, plus the distinction M4 needs and M2 does not draw: whether a check
+ * that could not be performed was a REQUIREMENT. A criterion where one required check went
+ * unexercised (no `--browser`, a local MCP build standing in for a published one) is not a passed
+ * criterion either, so `unmet()` makes it INCOMPLETE and the run exits non-zero. `warn()` keeps its
+ * M2 meaning — the check HELD, but see this — and `skipOptional()` covers a check the criterion
+ * genuinely does not depend on, such as TLS against a loopback origin.
  */
 import {
   FAIL,

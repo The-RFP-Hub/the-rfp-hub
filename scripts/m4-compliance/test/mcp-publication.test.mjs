@@ -1,8 +1,7 @@
 /**
- * M4-4b's README rule: every configuration snippet a reader copies must pin an exact, immutable
- * version. A moving tag is what turns "the description digest binds this build" into a promise
- * about a build nobody has seen. `pnpm --filter @the-rfp-hub/mcp build` names a workspace package
- * rather than something to install, so it is not a configuration snippet and must not be flagged.
+ * M4-4b's README rule: every configuration snippet pins an exact version, because a moving tag
+ * turns "the description digest binds this build" into a promise about a build nobody has seen.
+ * `pnpm --filter @the-rfp-hub/mcp build` is not a configuration snippet and must not be flagged.
  */
 import { describe, expect, it } from "vitest";
 import { unpinnedReadmeSpecs } from "../checks/mcp.mjs";
