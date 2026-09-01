@@ -152,6 +152,34 @@ write to, and a sign-off tool needing a standing publisher credential in reposit
 a worse thing to have than a tool somebody runs. See
 [`scripts/m3-compliance/README.md`](./scripts/m3-compliance/README.md).
 
+`scripts/check-m4.mjs` covers governance, the reference frontend, the MCP server, the agent skill,
+and the handoff docs:
+
+```bash no-run
+pnpm check:m4 --site https://ethrfps.app --api https://api.ethrfps.app --browser
+```
+
+It is **read-only**, same as `check-m2` — the one case that could look like a write
+(`submit_opportunity`'s fail-closed behavior) runs against a local recording server this checker
+starts itself, never against `--api` — so its defaults already point at production. Pass
+`--browser` for the checks that need a rendered page (search/filter/pagination, `/publishers`, the
+three responsive viewports); without it those requirements are reported unmet, which makes their
+criterion incomplete and the run exit non-zero. `--offline` applies to the docs criterion only, so
+the combination that means anything is `--only docs --offline` — a docs lint, labeled as such and
+never an M4 sign-off. See [`scripts/m4-compliance/README.md`](./scripts/m4-compliance/README.md).
+
+`scripts/accept-m4.mjs` is the write-acceptance counterpart, staging only: it drives the real MCP
+`submit_opportunity` interlock end to end — preview, an out-of-band `rfphub-mcp approve`, commit —
+and tears the fixture down afterwards:
+
+```bash staging-write
+RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... pnpm accept:m4 --api https://api.staging.example.org
+```
+
+No run without both credentials, and **no flag forces production**: the target must be loopback or
+one of this project's staging origins, https off loopback, and the redirect chain the API answers
+with must end inside that allowlist too.
+
 ## Open data
 
 The dataset is published to [`exports/`](./exports) on the default branch by a scheduled workflow
