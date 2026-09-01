@@ -144,13 +144,13 @@ export class RequestTimeoutError extends Error {
  * Read a body chunk by chunk, stopping the moment it goes past the cap.
  *
  * Buffering the whole thing and measuring afterwards means a hostile or broken upstream can make
- * this process hold an arbitrary amount of memory before being told no. The reader is cancelled on
+ * this process hold an arbitrary amount of memory before being told no. The reader is canceled on
  * the way out so the connection is not left draining.
  */
 export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promise<string> {
   const declared = Number(res.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > cap) {
-    // Cancelled, not merely abandoned. An un-cancelled body holds its socket out of the connection
+    // Canceled, not merely abandoned. An un-canceled body holds its socket out of the connection
     // pool until the runtime gets around to collecting it, so refusing enormous responses would
     // slowly starve the pool — the failure mode being avoided here would cause a different one.
     await res.body?.cancel().catch(() => {});
@@ -175,7 +175,7 @@ export async function readCapped(res: Response, cap = MAX_RESPONSE_BYTES): Promi
     text += decoder.decode();
     return text;
   } finally {
-    // Releasing rather than cancelling on the success path would leave a half-read stream open on
+    // Releasing rather than canceling on the success path would leave a half-read stream open on
     // the over-cap path, which is the one that matters.
     await reader.cancel().catch(() => {});
   }
@@ -438,7 +438,7 @@ export class ApiClient {
 
     const wait = retryAfterMs(first.res.headers.get("retry-after"), Date.now());
     // The refused response still has a body, and an unread one keeps its socket out of the
-    // connection pool. Cancelling it before sleeping means the retry reuses the connection
+    // connection pool. Canceling it before sleeping means the retry reuses the connection
     // instead of racing the runtime's cleanup for a new one.
     await first.res.body?.cancel().catch(() => {});
     first.deadline.done();

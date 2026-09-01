@@ -1,9 +1,9 @@
 /**
- * Labelling and delimiting for third-party text.
+ * Labeling and delimiting for third-party text.
  *
  * Be precise about what this does and does not do. Every title, organization name and description
  * that reaches a caller through these tools was written by somebody else and published through the
- * hub; none of it is vouched for. Labelling it is a HINT to the model, and hints are not controls.
+ * hub; none of it is vouched for. Labeling it is a HINT to the model, and hints are not controls.
  *
  * The control is the projection: the search tool does not return `description` or `summary` at
  * all, so the field most likely to carry an instruction addressed to an agent never arrives. What

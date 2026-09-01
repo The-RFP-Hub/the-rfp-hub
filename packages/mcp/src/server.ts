@@ -179,7 +179,7 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
   // UNKNOWN TOOLS. The dispatcher looks a tool up in this record and throws a bare protocol error
   // when it misses — outside its own try block, so that failure never becomes a coded result and
   // never reaches an audit line. Interposing on the LOOKUP puts it back inside the normal path: an
-  // unknown name resolves to a tool whose only behaviour is to raise `tool_not_found`, which then
+  // unknown name resolves to a tool whose only behavior is to raise `tool_not_found`, which then
   // travels through the same funnel as everything else.
   //
   // This is why the proxy is installed AFTER registration: `registerTool` refuses a name that is
@@ -290,7 +290,7 @@ export function createServer(options: CreateServerOptions): McpServer {
           // Not destructive: a submission adds an entry for review. It never removes or replaces
           // anything a caller did not name by id.
           destructiveHint: false,
-          // Not idempotent from the client's side. The API recognises a byte-identical repeat from
+          // Not idempotent from the client's side. The API recognizes a byte-identical repeat from
           // the same submitter, but the caller cannot know a timed-out request did not land.
           idempotentHint: false,
           openWorldHint: true,

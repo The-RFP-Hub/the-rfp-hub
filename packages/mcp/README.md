@@ -291,7 +291,7 @@ Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per d
   the standard — no registry, no enum — so leaving it unbounded would have made it the obvious
   place to park a payload.
 - **Residual risk, stated plainly:** `title`, organization names and ecosystem labels are
-  third-party text and they do reach the model. They are delimited and labelled. Labelling is a
+  third-party text and they do reach the model. They are delimited and labeled. Labeling is a
   hint, not a control, and a hostile title is not made harmless by it. The projection — the missing
   `description` — is the control.
 - **A preview refuses what the API would refuse.** The API's admission limits (title 256, summary
@@ -300,7 +300,7 @@ Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per d
   top-level only, exactly as the API applies it — checking more here would refuse documents the API
   would have taken.
 - **Suspected-duplicate titles are third-party text too.** They come back truncated to 140
-  characters, delimited, and labelled — the write path is where a caller is most primed to act, so
+  characters, delimited, and labeled — the write path is where a caller is most primed to act, so
   it gets the same treatment the search results get.
 - **`structuredContent` is not a safety boundary.** It is delivered to the model like any other
   output. It exists here for contract and validation.

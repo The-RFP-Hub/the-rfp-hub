@@ -231,7 +231,7 @@ async function approve(
     rl.close();
   }
   if (answer !== "approve") {
-    process.stdout.write("Cancelled. Nothing was approved.\n");
+    process.stdout.write("Canceled. Nothing was approved.\n");
     return 1;
   }
 

@@ -5,7 +5,7 @@
  * the longest free-text fields a publisher controls, they are where an instruction addressed to an
  * agent would live, and in a page of twenty results they also dwarf everything else in the
  * context. A field that is not returned cannot be acted on, which is a stronger property than any
- * amount of labelling. To read a full record — with its prose — a caller has to ask for it by id
+ * amount of labeling. To read a full record — with its prose — a caller has to ask for it by id
  * through `fetch_opportunity`, which is a separate, deliberate step.
  *
  * `title` and organization names REMAIN, and they remain third-party text. That residual risk is

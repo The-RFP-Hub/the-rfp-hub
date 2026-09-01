@@ -4,7 +4,7 @@
  * Two themes. Most of them are about a claim being narrower than it sounded — "we did not follow
  * the redirect" is not "nothing was written", a 2xx is not a submission result, `keyConfigured` is
  * not "a key exists". The rest are resource hygiene: bodies that were abandoned rather than
- * cancelled, and a stale-lock break that could delete a live lock.
+ * canceled, and a stale-lock break that could delete a live lock.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -390,17 +390,17 @@ describe("a 401 on a read never claims a credential was rejected", () => {
   });
 });
 
-// ──────────────────────────────── 9 & 10. bodies are cancelled, not abandoned ──
+// ──────────────────────────────── 9 & 10. bodies are canceled, not abandoned ──
 describe("refused responses release their connection", () => {
   it("cancels the first 429's body before sleeping and retrying", async () => {
-    let cancelled = false;
+    let canceled = false;
     const first = new Response(
       new ReadableStream<Uint8Array>({
         pull(controller) {
           controller.enqueue(new TextEncoder().encode("{}"));
         },
         cancel() {
-          cancelled = true;
+          canceled = true;
         },
       }),
       { status: 429, headers: { "retry-after": "0" } },
@@ -409,7 +409,7 @@ describe("refused responses release their connection", () => {
     const client = new ApiClient(testConfig(), {
       sleep: async () => {
         // By the time the retry waits, the refused body must already be released.
-        expect(cancelled).toBe(true);
+        expect(canceled).toBe(true);
       },
       fetchImpl: async () => {
         call += 1;
@@ -418,41 +418,41 @@ describe("refused responses release their connection", () => {
     });
     const page = await client.listOpportunities(new URLSearchParams());
     expect(page.total).toBe(0);
-    expect(cancelled).toBe(true);
+    expect(canceled).toBe(true);
   });
 
   it("cancels the body when Content-Length alone puts it over the cap", async () => {
-    let cancelled = false;
+    let canceled = false;
     const res = new Response(
       new ReadableStream<Uint8Array>({
         pull() {
           throw new Error("the body was read despite an over-cap content-length");
         },
         cancel() {
-          cancelled = true;
+          canceled = true;
         },
       }),
       { headers: { "content-length": String(MAX_RESPONSE_BYTES + 1) } },
     );
     await expect(readCapped(res)).rejects.toThrow();
-    expect(cancelled).toBe(true);
+    expect(canceled).toBe(true);
   });
 
   it("cancels the body of an unfollowed redirect on a write", async () => {
-    let cancelled = false;
+    let canceled = false;
     const res = new Response(
       new ReadableStream<Uint8Array>({
         pull(controller) {
           controller.enqueue(new TextEncoder().encode("ignored"));
         },
         cancel() {
-          cancelled = true;
+          canceled = true;
         },
       }),
       { status: 303, headers: { location: "https://elsewhere.test/x" } },
     );
     const client = new ApiClient(testConfig(), { fetchImpl: async () => res });
     await rejection(client.submitOpportunity(validDocument()));
-    expect(cancelled).toBe(true);
+    expect(canceled).toBe(true);
   });
 });

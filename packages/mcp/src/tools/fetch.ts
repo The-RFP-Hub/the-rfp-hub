@@ -2,7 +2,7 @@
  * `fetch_opportunity` — one full record, wrapped but not altered.
  *
  * The document goes into an ENVELOPE (`notice`, `opportunity`, `links`) rather than being returned
- * bare, so the labelling has somewhere to live and the two counted redirect URLs can be handed
+ * bare, so the labeling has somewhere to live and the two counted redirect URLs can be handed
  * over without inventing fields inside somebody else's document.
  *
  * THE PROMISE IS STRUCTURAL EQUIVALENCE, NOT BYTE EQUIVALENCE. The body is parsed and

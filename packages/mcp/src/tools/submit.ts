@@ -52,7 +52,7 @@ export const TOOL_NAME = "submit_opportunity";
  *
  * These titles are SOMEBODY ELSE'S text, arriving on the write path — the one place where the
  * caller is already primed to act — and they are the only third-party strings in this tool's
- * output. Bounding and labelling them the way the search results are bounded and labelled is the
+ * output. Bounding and labeling them the way the search results are bounded and labeled is the
  * whole point; leaving them raw would have made the write tool the soft spot in a projection the
  * read tools take seriously. They are kept rather than dropped because a bare id and a score
  * cannot be judged: deciding "is this the same program" needs the name.

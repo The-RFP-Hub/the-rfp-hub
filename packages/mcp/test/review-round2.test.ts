@@ -216,9 +216,9 @@ describe("approving is decided once, against the state at the moment of the answ
 
     const { code, out } = approve(home, id, "yes");
     expect(code).toBe(1);
-    expect(out).toContain("Cancelled");
+    expect(out).toContain("Canceled");
     expect(listApprovals(home)).toHaveLength(0);
-    // The preview survives a cancellation — cancelling is not revoking.
+    // The preview survives a cancellation — canceling is not revoking.
     expect(listPending(home).map((r) => r.approvalId)).toEqual([id]);
   });
 
@@ -564,7 +564,7 @@ describe("suspected-duplicate titles get the same treatment as search results", 
     expect(duplicates[0]?.title.endsWith("…")).toBe(true);
   });
 
-  it("keeps the id and the score, because a title alone is not a judgement", () => {
+  it("keeps the id and the score, because a title alone is not a judgment", () => {
     const duplicates = renderSubmission(submission).structured.duplicates as {
       id: string;
       similarity: number | null;
