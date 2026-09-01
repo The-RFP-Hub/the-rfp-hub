@@ -162,7 +162,7 @@ test.describe("M4 responsive layout", () => {
       const stamp = Date.now();
       const document = opportunityFixture(stack.namespaces.publisher, `responsive-${stamp}`, {
         title: `Responsive layout probe ${stamp}`,
-        // `seedDocument`'s default carries `applicationUrl` but not `website` — and the "Programme
+        // `seedDocument`'s default carries `applicationUrl` but not `website` — and the "Program
         // site" (source) link only renders when `website` is set. Both are asserted below, so both
         // need to be true of this fixture.
         website: stack.urls.programme,
@@ -199,7 +199,7 @@ test.describe("M4 responsive layout", () => {
 
         // ── `/opportunities/{id}` — one entry ────────────────────────────────────────────────
         await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
-        const apply = page.getByRole("link", { name: /Apply on the programme’s own site/ });
+        const apply = page.getByRole("link", { name: /Apply on the program’s own site/ });
         // The apply action only renders once the entry's own data has loaded, so this doubles as
         // the content signal `waitForLoaded` races against empty/error.
         await waitForLoaded(page, apply);
@@ -208,8 +208,8 @@ test.describe("M4 responsive layout", () => {
 
         if (isMobile) {
           await expectTouchTarget(apply, "the Apply link");
-          const source = page.getByRole("link", { name: "Programme site" });
-          await expectTouchTarget(source, "the Programme site (source) link");
+          const source = page.getByRole("link", { name: "Program site" });
+          await expectTouchTarget(source, "the Program site (source) link");
         }
 
         // "/publishers" soft-skips ONLY on an exact 404: this route belongs to another M4

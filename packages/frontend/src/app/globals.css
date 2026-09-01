@@ -1642,12 +1642,12 @@ pre.untrusted-block {
   }
 
   /*
-   * A PLAIN LINK STANDING NEXT TO A PRIMARY BUTTON — "Programme site" beside "Apply", say — is
+   * A PLAIN LINK STANDING NEXT TO A PRIMARY BUTTON — "Program site" beside "Apply", say — is
    * deliberately not styled as a second button (see `.button-primary`'s own comment: it is "the
    * only FILLED thing on any screen"). But on a touch device it is still a distinct action a thumb
    * has to hit, not a word inside a sentence, so it gets the same minimum tap height as every other
    * control here without gaining a border or a fill. `inline-flex` + `align-items: center` is what
-   * makes the extra block size centre the text rather than push it to the top of a taller box.
+   * makes the extra block size center the text rather than push it to the top of a taller box.
    */
   .row-action-link {
     display: inline-flex;

@@ -85,7 +85,7 @@ describe("the directory querystring", () => {
 
     expect(query.category).toBe("infrastructure");
     // Matches ANY operating OR sponsoring organization on the API side — this module just forwards
-    // the slug; the wider match is the endpoint's own behaviour, not something computed here.
+    // the slug; the wider match is the endpoint's own behavior, not something computed here.
     expect(query.organization).toBe("acme");
     expect(query.minAward).toBe(5000);
     expect(query.maxAward).toBe(50000);

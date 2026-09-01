@@ -272,7 +272,7 @@ export function DirectoryList() {
               placeholder="No minimum"
             />
             <p className="hint">
-              Compares a listing&rsquo;s award amount; one that states only a total programme budget
+              Compares a listing&rsquo;s award amount; one that states only a total program budget
               (no award range) is compared using that budget instead.
             </p>
           </div>
@@ -289,7 +289,7 @@ export function DirectoryList() {
               placeholder="No maximum"
             />
             <p className="hint">
-              Compares a listing&rsquo;s award amount; one that states only a total programme budget
+              Compares a listing&rsquo;s award amount; one that states only a total program budget
               (no award range) is compared using that budget instead.
             </p>
           </div>
@@ -375,7 +375,7 @@ export function DirectoryList() {
        * the same way every time, and a reader who typed `2026-13-40` into a date box needs to be told
        * WHICH filter is wrong, not invited to try again. `additionalProperties: false` means the
        * endpoint's own message already names the offending parameter for most cases (a bad type or
-       * format carries its field in `instancePath`); an unrecognised param name is the one case where
+       * format carries its field in `instancePath`); an unrecognized param name is the one case where
        * it does not, and `issues` (empty here — this is a querystring rejection, not a document
        * validation one) would carry it structurally if the API ever adds that.
        */}

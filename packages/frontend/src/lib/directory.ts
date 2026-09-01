@@ -283,7 +283,7 @@ export function isFiltered(selection: DirectorySelection): boolean {
  */
 export const ANY_STATUS = "any";
 
-/** Parse whatever is in the address bar, falling back to the default for anything unrecognised. */
+/** Parse whatever is in the address bar, falling back to the default for anything unrecognized. */
 export function selectionFromParams(params: URLSearchParams): DirectorySelection {
   const get = (key: string) => params.get(key)?.trim() ?? "";
 
