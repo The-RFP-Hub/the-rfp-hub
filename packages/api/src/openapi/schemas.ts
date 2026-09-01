@@ -1164,19 +1164,13 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
   },
 ];
 
-/**
- * The `429` half of every metered operation's published contract, headers included.
- *
- * Without it a client generated from this document cannot model throttling at all: it sees the
- * domain responses and then, in production, a status it was never told about. Referenced rather
- * than repeated so the four header schemas cannot drift between operations.
- */
+/** The `429` half of every metered operation's contract, referenced so the four header schemas
+ * cannot drift between them. */
 export const RATE_LIMITED = {
   $ref: "RateLimitedResponse#",
   description:
     "Rate limit exceeded. Metered per credential-holder (`acct:<id>`), or per client address for a request that proved no credential. Wait `Retry-After` seconds.",
-  // A header entry is the raw JSON Schema plus a description: @fastify/swagger wraps it in
-  // `schema` itself, so a nested `schema` key publishes `{"schema":{"schema":…}}`.
+  // @fastify/swagger adds the `schema` wrapper itself; a nested one publishes `schema.schema`.
   headers: {
     "retry-after": {
       type: "integer",

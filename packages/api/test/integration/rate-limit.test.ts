@@ -1,28 +1,8 @@
 /**
- * WHO a metered route counts, and WHETHER an unauthenticated caller is counted at all.
+ * WHO a metered route counts, and whether an unauthenticated caller is counted at all.
  *
- * The existing coverage (`better-auth-mount.test.ts`) asserts that the two auth routes advertise
- * DIFFERENT ceilings. Nothing asserted what a bucket is keyed on, and the answer used to be wrong
- * in both directions:
- *
- *   · every credentialed route was keyed by ADDRESS, so one office egress was one budget for
- *     everybody behind it, and a second address was a free reset;
- *   · a request whose credential was refused was never counted at ALL, because the gate answered
- *     401 during `onRequest` and answering ends that hook chain before the limiter appended after
- *     it could run. Hammering `POST /v1/opportunities` with a junk Bearer cost nothing.
- *
- * The four cases below pin the fix from the outside: per-credential keys, address as the fallback,
- * a real 429 for the anonymous hammer, and the public read still uncapped. `remoteAddress` is what
- * makes the address half testable — `config.trustProxy` is unset here, so `request.ip` is the
- * socket address `inject` was given.
- *
- * TWO ROUTES, DELIBERATELY. `DELETE /v1/keys/:id` carries the smallest useful ceiling and a
- * nonexistent id has no side effect, so the key-identity cases can read
- * `x-ratelimit-remaining` after a handful of calls instead of exhausting anything.
- * `POST /v1/opportunities` is the route the threat model actually cares about, so the exhaustion
- * case is run there for real.
- *
- * Isolation tag: `M4RATE` / `m4rate-*@rfphub.invalid`.
+ * `config.trustProxy` is unset here, so `remoteAddress` is `request.ip` and the address half is
+ * testable. Isolation tag: `M4RATE` / `m4rate-*@rfphub.invalid`.
  */
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -47,50 +27,35 @@ const EMAILS = {
 const HANDLES = ["m4rate-first", "m4rate-second", "m4rate-third"];
 const [FIRST_HANDLE, SECOND_HANDLE, THIRD_HANDLE] = HANDLES;
 
-/** Two addresses that are unmistakably distinct, and neither of them the inject default. */
 const IP_A = "198.51.100.11";
 const IP_B = "203.0.113.22";
-/** Two more, for the outage cases, so each starts on an untouched budget. */
 const IP_C = "198.51.100.33";
 const IP_D = "198.51.100.44";
-/** One for the CORS case, which has to exhaust a bucket of its own to reach a 429. */
 const IP_E = "198.51.100.55";
-/** And one for the revoked-credential case, which must land on an untouched address bucket. */
 const IP_F = "198.51.100.66";
 
-/** A page on some other origin. What CORS is the enforcement point for. */
 const BROWSER_ORIGIN = "https://dashboard.example";
 /** The one origin the auth mount's exact allowlist admits — see `test/helpers/auth.ts`. */
 const AUTH_ORIGIN = "http://127.0.0.1:3005";
 
-/** What a browser on another origin is permitted to read off the response. */
 const exposedHeadersOf = (headers: Record<string, unknown>): string[] =>
   String(headers["access-control-expose-headers"] ?? "").split(", ");
-/** Three IPv6 hosts: the first two are one customer's, the third is somebody else's. */
+/** The first two are one customer's /64, the third is somebody else's. */
 const IPV6_HOST = "2001:db8:5:5::1";
 const IPV6_SAME_64 = "2001:db8:5:5:ffff:ffff:ffff:ffff";
 const IPV6_OTHER_64 = "2001:db8:5:6::1";
 
-/**
- * Synthetic bearers. Neither is a credential of any kind — what matters is which PATH each takes:
- * the `rfph_` marker routes to the API-key verifier (a plain 401 refusal), anything else routes to
- * the session verifier, which is the one the outage case breaks.
- */
+/** `rfph_` routes to the key verifier, anything else to the session one. Neither is real. */
 const JUNK_KEY = "rfph_aaaaaaaa_this-is-not-a-real-secret";
 const JUNK_SESSION = "m4rate-not-a-real-credential";
 
-/** A key id no account owns: the route answers 404 having changed nothing, and still counts. */
 const ABSENT_KEY_ID = "999999999";
-/** `DELETE /v1/keys/:id` — see `modules/routes/keys/index.ts`. */
 const KEYS_MAX = 30;
-/** `POST /v1/opportunities` — see `modules/routes/submissions/index.ts`. */
 const SUBMIT_MAX = 60;
+const REDIRECT_MAX = 120;
 
-/** This suite's own namespace, for the redirect fixture. */
 const NS = "m4rate";
 const REDIRECT_ID = `${NS}:link`;
-/** `GET /v1/r/:id/{apply,source}` — see `modules/routes/redirects/index.ts`. */
-const REDIRECT_MAX = 120;
 
 const run = describeWithDb;
 
@@ -98,7 +63,6 @@ run("M4RATE rate-limit keys", () => {
   let app: FastifyInstance;
   let firstToken: string;
   let secondToken: string;
-  /** One account, three credentials: two keys and the session that owns them. */
   let thirdToken: string;
   let thirdKeyA: string;
   let thirdKeyB: string;
@@ -164,39 +128,25 @@ run("M4RATE rate-limit keys", () => {
   }, 60_000);
 
   it("gives two accounts on ONE address two separate budgets", async () => {
-    // The case that keying by address gets wrong: a shared egress — an office, a CI runner, a
-    // university — would have made these two people one budget, and the second person's 429 would
-    // have been caused entirely by the first person's traffic.
     const one = await meteredDelete(firstToken, IP_A);
     const two = await meteredDelete(firstToken, IP_A);
     const other = await meteredDelete(secondToken, IP_A);
 
-    // The route ran to completion each time: the limiter counts a request the handler then 404s.
     expect([one.status, two.status, other.status]).toEqual([404, 404, 404]);
 
     expect(one.remaining).toBe(KEYS_MAX - 1);
     expect(two.remaining).toBe(KEYS_MAX - 2);
-    // Same address, different credential — a budget of its own, untouched by the two above.
     expect(other.remaining).toBe(KEYS_MAX - 1);
   }, 60_000);
 
   it("gives ONE account on two addresses a single budget", async () => {
-    // The other half of the same decision. An account is not entitled to a fresh budget by moving
-    // — a laptop, a CI job and a phone are one caller, and a limit a second address resets is not
-    // a limit. This continues the first account's window from the case above.
     const moved = await meteredDelete(firstToken, IP_B);
     expect(moved.status).toBe(404);
     expect(moved.remaining).toBe(KEYS_MAX - 3);
   }, 60_000);
 
   it("counts — and eventually refuses — an anonymous hammer with a junk Bearer", async () => {
-    // THE GAP THIS SUITE EXISTS FOR. Before the split, every one of these was a 401 forever: the
-    // gate answered inside `onRequest` and the limiter that came after it never ran.
-    //
-    // The designed sequence is explicit: the credential is refused every time, so the caller sees
-    // 401 for the whole budget and 429 the moment it is spent. The 429 REPLACES the 401 rather
-    // than following it — once the limiter answers, the gate behind it never runs — which is the
-    // right way round: a caller over its ceiling learns it is over its ceiling.
+    // The 429 REPLACES the 401: once the limiter answers, the gate behind it never runs.
     const junk = bearer(JUNK_SESSION);
     const statuses: number[] = [];
     for (let i = 0; i < SUBMIT_MAX; i++) {
@@ -217,13 +167,10 @@ run("M4RATE rate-limit keys", () => {
       remoteAddress: IP_A,
     });
     expect(exceeded.statusCode).toBe(429);
-    // Case (e): a 429 without this is a wall with no clock on it. `@fastify/rate-limit` emits it
-    // in seconds, which is what an agent's backoff reads.
     expect(Number(exceeded.headers["retry-after"])).toBeGreaterThan(0);
 
-    // Keyed by ADDRESS, not globally: the same junk credential from somewhere else is still on its
-    // first request. Without this the case above would also pass on a single shared bucket, which
-    // is a denial-of-service on every anonymous caller at once.
+    // Keyed by ADDRESS, not globally — one shared bucket is a denial of service on every
+    // anonymous caller at once, and would also pass the assertion above.
     const elsewhere = await app.inject({
       method: "POST",
       url: "/v1/opportunities",
@@ -232,8 +179,6 @@ run("M4RATE rate-limit keys", () => {
     });
     expect(elsewhere.statusCode).toBe(401);
 
-    // And the address the hammer spent is NOT the address a signed-in account is charged to: the
-    // same route, the same exhausted address, a real credential — a bucket of its own.
     const credentialed = await app.inject({
       method: "POST",
       url: "/v1/opportunities",
@@ -245,12 +190,7 @@ run("M4RATE rate-limit keys", () => {
   }, 120_000);
 
   it("meters an IPv6 caller by /64, not by the address they picked this second", async () => {
-    // The bucket an attacker would otherwise never share with themselves. A residential or cloud
-    // IPv6 customer is assigned a /64 and may use any of its 2^64 addresses, so a key on the full
-    // address is a free reset on every request — the limit would be no limit at all for exactly
-    // the caller best equipped to abuse it. `@fastify/rate-limit`'s default generator groups by
-    // /64 for this reason; supplying a `keyGenerator` replaces that generator, so the grouping has
-    // to be carried across with it.
+    // An IPv6 customer holds a whole /64: a key on the full address is a free reset per request.
     const junk = bearer(JUNK_SESSION);
     const spend = async (ip: string) => {
       const res = await app.inject({
@@ -264,34 +204,26 @@ run("M4RATE rate-limit keys", () => {
     };
 
     expect(await spend(IPV6_HOST)).toBe(SUBMIT_MAX - 1);
-    // Same allocation, every host bit different: the same caller, and the same budget.
     expect(await spend(IPV6_SAME_64)).toBe(SUBMIT_MAX - 2);
-    // A different /64 is a different customer, and must NOT inherit the two above.
     expect(await spend(IPV6_OTHER_64)).toBe(SUBMIT_MAX - 1);
   }, 60_000);
 
   it("charges every credential of ONE account to the same bucket", async () => {
-    // A bucket is the CREDENTIAL-HOLDER's, not the credential's. Keying on the key would make a
-    // ceiling a function of how many keys somebody minted, which is not a limit.
     const keyA = await meteredDelete(thirdKeyA, IP_A);
     const keyB = await meteredDelete(thirdKeyB, IP_A);
     const session = await meteredDelete(thirdToken, IP_A);
 
-    // `DELETE /v1/keys/:id` is session-only, so a key is refused — AFTER the limiter counted it,
-    // which is exactly the ordering being asserted. The session reaches the handler and 404s.
+    // Session-only, so a key is refused AFTER the limiter counted it — the ordering asserted here.
     expect([keyA.status, keyB.status, session.status]).toEqual([403, 403, 404]);
 
     expect(keyA.remaining).toBe(KEYS_MAX - 1);
-    // A second key of the same account continues the first key's count, and the session continues
-    // both: three credentials, one budget.
     expect(keyB.remaining).toBe(KEYS_MAX - 2);
     expect(session.remaining).toBe(KEYS_MAX - 3);
   }, 60_000);
 
   it("moves a credential revoked mid-window onto the address bucket", async () => {
-    // The transition the account bucket depends on: a credential that can no longer be PROVEN is
-    // not the account any more, so its traffic must fall back to the address like any other
-    // anonymous caller — and must not keep spending, or inherit, the account's budget.
+    // A credential that can no longer be PROVEN is not the account, and must neither spend nor
+    // inherit its budget.
     await db
       .update(apiKeys)
       .set({ revokedAt: new Date() })
@@ -299,21 +231,16 @@ run("M4RATE rate-limit keys", () => {
 
     const revoked = await meteredDelete(thirdKeyA, IP_F);
     expect(revoked.status).toBe(401);
-    // The FIRST charge on an untouched address: not the account's fourth.
     expect(revoked.remaining).toBe(KEYS_MAX - 1);
 
-    // And the account's own budget is where it was — the revoked key spent none of it.
     const stillTheAccount = await meteredDelete(thirdToken, IP_F);
     expect(stillTheAccount.status).toBe(404);
     expect(stillTheAccount.remaining).toBe(KEYS_MAX - 4);
   }, 60_000);
 
   it("never meters — or masks — a failure to CHECK the credential", async () => {
-    // `SessionService.verify` answers 503 `auth_unavailable` when the lookup could not be performed,
-    // deliberately, so an outage does not appear as every signed-in user's session being invalid.
-    // Metering that would undo the distinction one layer up: the outage would spend the address's
-    // budget and then be served as 429 — the operator's 503 signal replaced by one that reads as
-    // the caller's own fault. So the resolver answers a 5xx BEFORE the limiter, uncounted.
+    // A 503 `auth_unavailable` is ours: metering it would spend the caller's budget on our outage
+    // and then serve it as 429.
     const broken = await buildApp({ auth: { auth: brokenSessionAuth(await testAuth()) } });
     await broken.ready();
     try {
@@ -328,22 +255,17 @@ run("M4RATE rate-limit keys", () => {
       const outage = await call(JUNK_SESSION);
       expect(outage.statusCode).toBe(503);
       expect(outage.json()).toMatchObject({ error: "auth_unavailable" });
-      // The limiter never ran, so it never wrote its headers — the visible form of "not counted".
+      // The limiter never ran, so it wrote no headers — the visible form of "not counted".
       expect(outage.headers["x-ratelimit-remaining"]).toBeUndefined();
 
-      // And the budget really is untouched: the next real refusal is the FIRST charge, not the
-      // second. This is the assertion an `allowList` or a post-hoc refund could not satisfy.
+      // The budget really is untouched: the next real refusal is the FIRST charge, not the second.
       const first = await call(JUNK_KEY);
       expect(first.statusCode).toBe(401);
       expect(Number(first.headers["x-ratelimit-remaining"])).toBe(KEYS_MAX - 1);
 
-      // Spend the rest of the address's budget on genuine refusals, then confirm it is spent.
       for (let i = 1; i < KEYS_MAX; i++) expect((await call(JUNK_KEY)).statusCode).toBe(401);
       expect((await call(JUNK_KEY)).statusCode).toBe(429);
 
-      // The case the split exists for: with the bucket exhausted, an outage is STILL a 503. A 429
-      // here would tell an operator watching for auth failures that a database outage was a caller
-      // exceeding its quota.
       const stillOutage = await call(JUNK_SESSION);
       expect(stillOutage.statusCode).toBe(503);
       expect(stillOutage.json()).toMatchObject({ error: "auth_unavailable" });
@@ -353,9 +275,8 @@ run("M4RATE rate-limit keys", () => {
   }, 120_000);
 
   it("never meters — or masks — a failure to CHECK an API KEY either", async () => {
-    // The session lookup is not the only thing that can be down. A key is verified by a query, so
-    // a database that stops answering makes the SAME distinction: the credential was not refused,
-    // it could not be checked. The two arms are one decision and must not drift apart.
+    // A key is verified by a query, so a broken database is the same distinction as a broken
+    // session lookup. One decision, two arms, and they must not drift apart.
     const broken = await buildApp({
       auth: { auth: await testAuth(), db: brokenKeyLookupDb() },
     });
@@ -374,8 +295,8 @@ run("M4RATE rate-limit keys", () => {
       expect(outage.json()).toMatchObject({ error: "internal_error" });
       expect(outage.headers["x-ratelimit-remaining"]).toBeUndefined();
 
-      // A request carrying NO credential needs no lookup, so it is refused for real and counted.
-      // Its being the FIRST charge is what proves the outage above cost nothing.
+      // No credential needs no lookup, so this is refused for real — and its being the FIRST
+      // charge is what proves the outage above cost nothing.
       const first = await call({});
       expect(first.statusCode).toBe(401);
       expect(Number(first.headers["x-ratelimit-remaining"])).toBe(KEYS_MAX - 1);
@@ -392,9 +313,6 @@ run("M4RATE rate-limit keys", () => {
   }, 120_000);
 
   it("lets a BROWSER read the limit and the backoff, on both CORS policies", async () => {
-    // The limiter emitted all four headers already; a cross-origin page could read none of them,
-    // because `Access-Control-Expose-Headers` did not name them. A 429 a client cannot inspect is
-    // a wall with the clock on the other side of it.
     const junk = bearer(JUNK_SESSION);
     const cors = { ...junk, origin: BROWSER_ORIGIN };
 
@@ -428,10 +346,7 @@ run("M4RATE rate-limit keys", () => {
   }, 120_000);
 
   it("does the same on the auth mount, which is the OTHER CORS policy", async () => {
-    // Two policies, one registration: `/api/auth/*` gets an exact-origin allowlist because it
-    // mints credentials. Its ceilings are the tighter pair, so a client here needs the backoff
-    // headers at least as much — and a second policy is exactly the kind of place a header list
-    // gets added once and forgotten.
+    // A second policy is where a header list gets added once and forgotten.
     const mounted = await buildApp({
       auth: { auth: await testAuth(), config: testAuthConfig() },
     });
@@ -464,8 +379,6 @@ run("M4RATE rate-limit keys", () => {
   }, 120_000);
 
   it("emits `Retry-After` as a positive whole number of seconds", async () => {
-    // An agent's backoff parses this. A fractional or millisecond value would be obeyed as
-    // seconds and back off by three orders of magnitude too little.
     const junk = bearer(JUNK_SESSION);
     const exceeded = await app.inject({
       method: "POST",
@@ -480,9 +393,6 @@ run("M4RATE rate-limit keys", () => {
   }, 60_000);
 
   it("does not meter an OPTIONS preflight", async () => {
-    // A preflight is the browser asking permission, not the caller acting. Metering it would let
-    // one cross-origin write cost two, and would answer the preflight itself with a 429 — which a
-    // browser reports as a CORS failure rather than as a rate limit.
     for (let i = 0; i < 8; i++) {
       const res = await app.inject({
         method: "OPTIONS",
@@ -501,19 +411,10 @@ run("M4RATE rate-limit keys", () => {
   }, 60_000);
 
   it("meters a HEAD on a redirect, and records no click for it", async () => {
-    // Fastify serves HEAD off the GET route, so the click-counting handler runs and the body is
-    // dropped afterwards. A HEAD is a link checker, a preview crawler or a monitor — never
-    // somebody leaving for the programme's page — so counting it would inflate the one number a
-    // publisher is given about whether their listing works.
-    //
-    // Its METERING is the other half, and is stated here rather than left to be discovered:
-    // Fastify registers the automatic HEAD as its OWN route, so it carries the same 120/min
-    // ceiling on a bucket of its own. A HEAD is therefore bounded, and cannot spend — or be used
-    // to probe — the GET budget. That is harmless because a HEAD now does nothing: no body, and,
-    // by the assertion above, no click.
+    // HEAD is served off the GET route, so the click-counting handler ran and only the body was
+    // dropped. The automatic HEAD is its OWN route, so it is bounded on a bucket of its own.
     const reader = { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) TestReader/1.0" };
-    // The buffer is a module singleton and every `buildApp` close shuts it, so the second app the
-    // outage cases above build and close leaves it refusing to record. Reopen it explicitly.
+    // Every `buildApp` close shuts this module singleton, and the outage cases above closed two.
     analyticsEvents.reopen();
     for (const kind of ["apply", "source"] as const) {
       await analyticsEvents.flush();
@@ -527,7 +428,6 @@ run("M4RATE rate-limit keys", () => {
       });
       expect(head.statusCode, kind).toBe(302);
       expect(analyticsEvents.depth, kind).toBe(before);
-      // Metered, on the redirect's own address-keyed ceiling.
       expect(Number(head.headers["x-ratelimit-limit"]), kind).toBe(REDIRECT_MAX);
 
       const get = await app.inject({
@@ -537,19 +437,12 @@ run("M4RATE rate-limit keys", () => {
         remoteAddress: IP_F,
       });
       expect(get.statusCode, kind).toBe(302);
-      // The GET is what a click is, and it still counts — otherwise the case above would pass on
-      // a fixture that records nothing at all.
       expect(analyticsEvents.depth, kind).toBe(before + 1);
-      // The GET's OWN first charge — the HEAD above spent the HEAD route's bucket, not this one.
       expect(Number(get.headers["x-ratelimit-remaining"]), kind).toBe(REDIRECT_MAX - 1);
     }
   }, 60_000);
 
   it("leaves the public read uncapped, which is the point of `global: false`", async () => {
-    // The list, the feeds and the export are the traffic this project exists to serve, and they are
-    // measured per address — which behind a shared egress is one number for a whole organization.
-    // No limiter is attached to them at all, and the absence of the headers is how that is visible
-    // from outside: a capped route always advertises its ceiling.
     for (let i = 0; i < 8; i++) {
       const res = await app.inject({
         method: "GET",
@@ -564,10 +457,8 @@ run("M4RATE rate-limit keys", () => {
 });
 
 /**
- * The same auth instance with ONE thing broken: the session lookup throws, exactly as it would if
- * the database behind it stopped answering. A proxy rather than a stub because everything else —
- * the mount, the cookie name, the context — has to keep working, or the case would be testing a
- * half-built app instead of an outage.
+ * The same auth instance with ONE thing broken: the session lookup throws. A proxy rather than a
+ * stub because everything else has to keep working, or the case tests a half-built app.
  */
 function brokenSessionAuth(real: Auth): Auth {
   return new Proxy(real, {
@@ -586,7 +477,7 @@ function brokenSessionAuth(real: Auth): Auth {
   }) as Auth;
 }
 
-/** The same database with the read a key is verified by broken, and nothing else changed. */
+/** The same database with the read that verifies a key broken, and nothing else changed. */
 function brokenKeyLookupDb(): DB {
   return new Proxy(db, {
     get(target, property, receiver) {

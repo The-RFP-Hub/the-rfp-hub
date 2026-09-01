@@ -90,8 +90,7 @@ run("M3MOUNT the auth mount", () => {
     });
     const exposed = String(actual.headers["access-control-expose-headers"]).split(", ");
     expect(exposed).toContain("set-auth-token");
-    // This mount carries the TIGHTER of the two ceilings, so a client here needs the backoff
-    // headers at least as much as one on `/v1`.
+    // This mount carries the tighter ceilings, so a client here needs the backoff headers most.
     expect(exposed).toEqual(expect.arrayContaining(RATE_LIMIT_HEADERS));
   }, 60_000);
 

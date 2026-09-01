@@ -48,13 +48,8 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
     {
       // Bounded, because this route emits a `Location` and is the obvious thing to point a script
       // at if the goal is to inflate a publisher's apply count.
-      //
-      // THE TWO REDIRECTS STAY ADDRESS-KEYED, and stay on the declarative `config.rateLimit`. They
-      // accept no credential — a link-out is followed by a browser that was never asked to sign in
-      // — so there is no account to meter and nothing for `meteredAuth`'s resolve step to resolve.
-      // The address is not a weaker key here, it is the only key there is; the credentialed routes
-      // are the ones where keying by address would have been the wrong choice. Nothing is stored:
-      // the key lives in an in-memory counter that expires with its window.
+      // ADDRESS-KEYED, on the declarative form: a link-out is followed by a browser that was
+      // never asked to sign in, so there is no account to meter and nothing to resolve.
       config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
       schema: {
         operationId: "followApplicationLink",

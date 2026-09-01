@@ -1,12 +1,6 @@
 /**
- * Every `/v1` mutation is metered — asserted over the ROUTER, not over a list somebody maintains.
- *
- * The defect this exists to prevent is a route that is simply forgotten. Ten of the thirty-two
- * `/v1` write declarations were behind a limiter and twenty-two were not, and nothing failed:
- * `global: false` means an unmetered route looks exactly like a deliberately public one. So the
- * inventory is read back out of the built app and the rule is applied to all of it.
- *
- * Isolation tag: none — this suite reads the route table and issues no request.
+ * Every `/v1` mutation is metered — asserted over the ROUTER, not a list somebody maintains. With
+ * `global: false` a forgotten route looks exactly like a deliberately public one.
  */
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -23,10 +17,9 @@ interface RouteRow {
 }
 
 /**
- * `printRoutes` renders the radix tree, one node per line, its `onRequest` names underneath.
- * `commonPrefix: false` stops the tree compressing a path into shared fragments, so a node's label
- * appended to its parent's is the whole path. Indentation is four characters per level, and a
- * node's methods and hooks are printed at its OWN level, its children one deeper.
+ * `commonPrefix: false` stops the tree compressing paths, so a node's label appended to its
+ * parent's is the whole path. Four characters per level; methods and hooks print at the node's
+ * own level, children one deeper.
  */
 function inventory(app: FastifyInstance): RouteRow[] {
   const rows: RouteRow[] = [];
@@ -79,7 +72,7 @@ run("route inventory", () => {
   }, 60_000);
 
   it("reads the router back, and finds the surface it is supposed to find", () => {
-    // A parser that silently matched nothing would make every assertion below vacuous.
+    // A parser matching nothing would make every assertion below vacuous.
     expect(routes.length).toBeGreaterThan(100);
     expect(routes.filter((r) => r.path.startsWith("/v1/") && isMutation(r)).length).toBeGreaterThan(
       30,
@@ -88,9 +81,8 @@ run("route inventory", () => {
   });
 
   it("puts exactly one limiter between the resolver and the gate on every /v1 mutation", () => {
-    // The limiter must sit BETWEEN the two: before it nothing has answered yet, and after it a
-    // gate refuses a request that has already been counted. Exactly one, because every handler
-    // from one plugin registration shares a marker and only the first of them runs.
+    // BETWEEN the two, and exactly one: handlers from one registration share a marker, so a
+    // second would never run.
     const wired = (row: RouteRow): boolean => {
       const resolver = row.onRequest.indexOf("resolvePrincipal");
       return (
@@ -108,8 +100,7 @@ run("route inventory", () => {
   });
 
   it("leaves the mutations outside /v1 to the auth mount, and nothing else", () => {
-    // The Better Auth surface keeps its own two ceilings (mail 10/min, session 120/min) and does
-    // not run the principal resolver: it is where a credential is MINTED, so there is none yet.
+    // The auth mount keeps its own ceilings and runs no resolver: it MINTS credentials.
     expect(
       routes.filter((row) => isMutation(row) && !row.path.startsWith("/v1/")).map((r) => r.path),
     ).toEqual([
@@ -129,9 +120,7 @@ run("route inventory", () => {
   });
 
   it("publishes the 429 contract on every metered operation", async () => {
-    // A client generated from this document used to see the domain responses and then, in
-    // production, a status it had never been told about. The assertion is against the LIVE
-    // document rather than the route sources, because the document is what a client is built from.
+    // Against the LIVE document, because that is what a client is generated from.
     const doc = (await app.inject({ method: "GET", url: "/v1/docs/json" })).json<OpenApiDocument>();
 
     const documented = Object.entries(doc.paths).flatMap(([path, operations]) =>
@@ -139,12 +128,10 @@ run("route inventory", () => {
         .filter(([verb]) => !["get", "head", "options"].includes(verb))
         .map(([verb, operation]) => ({ name: `${verb.toUpperCase()} ${path}`, operation })),
     );
-    // Every `/v1` mutation is metered (above), so every documented one must carry the contract.
     expect(documented.length).toBe(
       routes.filter((row) => row.path.startsWith("/v1/") && isMutation(row)).length,
     );
 
-    // The two redirects are GETs and metered by address, so they are named explicitly.
     const redirects = ["/v1/r/{id}/apply", "/v1/r/{id}/source"].map((path) => ({
       name: `GET ${path}`,
       operation: doc.paths[path]?.get,
@@ -158,8 +145,7 @@ run("route inventory", () => {
       expect(Object.keys(response?.headers ?? {}).sort(), name).toEqual(
         [...RATE_LIMIT_HEADERS].sort(),
       );
-      // The header object is `{ schema, description }` — a nested `schema.schema` is the shape a
-      // raw JSON Schema wrapped twice produces, and no generator reads it.
+      // A nested `schema.schema` is a raw JSON Schema wrapped twice, which no generator reads.
       for (const header of Object.values(response?.headers ?? {})) {
         expect(header.schema.type, name).toBe("integer");
       }

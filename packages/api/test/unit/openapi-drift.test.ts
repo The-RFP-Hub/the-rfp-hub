@@ -739,8 +739,7 @@ describe("M3 closed components vs their view types", () => {
       error: "opportunity_merged",
       mergedInto: { id: "example-org:survivor", title: "The survivor" },
     },
-    // Not a view type either: the limiter throws a plain Error with `statusCode: 429`, so the body
-    // comes out of app.ts's generic 4xx branch rather than from any producer of ours.
+    // Not a view type: the limiter throws a plain Error, so the body is app.ts's generic 4xx one.
     RateLimitedResponse: {
       error: "client_error",
       message: "Rate limit exceeded, retry in 1 minute",

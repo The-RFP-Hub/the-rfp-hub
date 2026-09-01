@@ -19,25 +19,10 @@
  * and serving the anonymous view would mean a caller with an expired token silently sees less than
  * they asked for, and never learns why.
  *
- * RESOLVING IS SPLIT FROM REJECTING, and the split is what makes anonymous traffic meterable.
- * Every gate above ANSWERS — `reply.send(401)` — and answering ends the hook chain it is running
- * in, so anything registered after it never runs. A rate limiter registered after `requireAuth`
- * therefore never saw a request with a bad credential: hammering a write route with a junk Bearer
- * cost nothing. `resolvePrincipal` is the same resolution WITHOUT the answer — it populates
- * `request.principal` when the credential is good, records why it was refused when it is not, and
- * replies to nothing at all. Put it first, meter second, gate third, and the refusal still happens,
- * one hook later, after the request has been counted.
- *
- * `unavailable` IS A SEPARATE ARM BECAUSE ONLY ONE OF THE TWO MAY BE COUNTED. A 5xx is OUR failure,
- * not a verdict on the caller: `SessionService.verify` answers 503 `auth_unavailable` when the
- * lookup could not be PERFORMED, so that an outage does not appear as every signed-in user's
- * session being invalid. Metering it would re-collapse that distinction one layer up — the outage
- * would spend the caller's budget and, past the ceiling, be served as 429. The limiter reads this
- * arm and skips the increment (`meteredAuth`'s `allowList` in
- * `modules/routes/shared/rate-limit-key.ts`); the gate behind it then sends the preserved 5xx.
- *
- * The outcome is cached on the request (`request.principalResolution`), so a chain that resolves
- * and then gates verifies the credential ONCE — one session lookup or one key hash, as before.
+ * RESOLVING IS SPLIT FROM REJECTING, and the split is what makes anonymous traffic meterable: a
+ * gate ANSWERS, answering ends the hook chain, and a limiter behind one therefore never saw a bad
+ * credential. `resolvePrincipal` is the same resolution with no answer — resolve, meter, gate —
+ * and its outcome is cached, so the chain still costs ONE credential verification.
  */
 import type {
   FastifyInstance,
@@ -82,12 +67,7 @@ export interface AuthDecorators {
    */
   auth: Auth;
   principals: PrincipalService;
-  /**
-   * Resolve the request's credential and answer NOTHING — the half of a gate that is safe to run
-   * before a rate limiter. Sets `request.principal` for a valid Bearer, records why an invalid one
-   * was refused, and never sends, throws or ends the chain. A gate placed after it still refuses;
-   * it just refuses one hook later, with the request counted.
-   */
+  /** Resolve the credential and answer NOTHING — the half of a gate safe to run before a limiter. */
   resolvePrincipal: onRequestAsyncHookHandler;
   requireAuth: preHandlerHookHandler;
   requireSession: preHandlerHookHandler;
@@ -119,21 +99,14 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
   void reply.code(status).send({ error, message });
 }
 
-/**
- * What resolving this request's credential concluded — computed once, then reused.
- *
- * The two failing arms carry the answer a gate WOULD have sent rather than the error itself,
- * because the refusal has to survive the resolver returning quietly: the gate that runs later must
- * reproduce exactly the status, code and message the un-split `resolve()` produced, without
- * verifying the credential a second time. They are SEPARATE arms because only one of them may be
- * counted — see the header.
- */
+/** The failing arms carry the answer a gate WOULD have sent, so a later gate reproduces it
+ * exactly without verifying a second time. */
 export type PrincipalResolution =
   | { kind: "anonymous" }
   | { kind: "principal" }
-  /** The credential was PRESENTED AND REFUSED — a 4xx. Meterable: the caller caused it. */
+  /** PRESENTED AND REFUSED — a 4xx. Metered: the caller caused it. */
   | { kind: "refused"; status: number; code: string; message: string }
-  /** The credential could not be CHECKED — a 5xx. Never metered: we caused it. */
+  /** Could not be CHECKED — a 5xx. Never metered: we caused it, so `meteredAuth` skips it. */
   | { kind: "unavailable"; status: number; code: string; message: string };
 
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
@@ -150,11 +123,8 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   // Declared so `request.principal` exists on every request object rather than being added as a
   // property later, which would deoptimise the shared shape Fastify allocates per request.
   app.decorateRequest("principal", null);
-  // The cache slot for the resolution above. Declared for the same reason, and so a chain of
-  // [resolvePrincipal, limiter, gate] costs ONE credential verification rather than two.
   app.decorateRequest("principalResolution", null);
 
-  /** Verify the credential. Populates `request.principal`; answers nothing, throws nothing. */
   async function computeResolution(request: FastifyRequest): Promise<PrincipalResolution> {
     const token = bearerOf(request);
     if (token === undefined) return { kind: "anonymous" };
@@ -163,7 +133,6 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
       return { kind: "principal" };
     } catch (error) {
       if (isHttpError(error)) {
-        // The 4xx/5xx split is the whole decision: a refusal is the caller's, an outage is ours.
         const kind = error.status >= 500 ? "unavailable" : "refused";
         return { kind, status: error.status, code: error.code, message: error.message };
       }
@@ -177,7 +146,6 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     }
   }
 
-  /** The cached form. Every gate and the quiet resolver go through this one. */
   async function resolveOnce(request: FastifyRequest): Promise<PrincipalResolution> {
     const cached = request.principalResolution;
     if (cached) return cached;
@@ -234,8 +202,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   };
 
   const requireScope = (scope: ApiKeyScope): preHandlerHookHandler => {
-    // Named, not anonymous: `printRoutes({ includeHooks: true })` prints hook names, and the
-    // route-inventory test reads that to see where each chain's gate is.
+    // Named: route-inventory.test.ts reads hook names out of `printRoutes`.
     return async function scopeGate(request, reply) {
       if (!(await resolve(request, reply, true))) return;
       const principal = request.principal;

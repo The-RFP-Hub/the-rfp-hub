@@ -84,9 +84,8 @@ export function authCorsOptions(config: AuthConfig): FastifyCorsOptions {
     credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    // `set-auth-token` is the whole point of the split policy: it is the header the client reads
-    // its session out of. The rate-limit four are here for the same reason they are on the public
-    // policy — this mount has the tighter ceilings of the two.
+    // `set-auth-token` is the point of the split policy — the header a client reads its session
+    // out of. The rate-limit four are here because this mount has the tighter ceilings.
     exposedHeaders: ["set-auth-token", ...RATE_LIMIT_HEADERS],
     maxAge: 600,
   };

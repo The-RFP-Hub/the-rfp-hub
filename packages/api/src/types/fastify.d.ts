@@ -24,11 +24,8 @@ declare module "fastify" {
      */
     principal: RequestPrincipal | null;
 
-    /**
-     * What resolving this request's credential concluded, cached so that a chain which resolves
-     * quietly and then gates verifies the credential once. Written only by `plugins/auth.ts`; no
-     * handler reads it.
-     */
+    /** Cached so a chain that resolves then gates verifies the credential once. Written only by
+     * `plugins/auth.ts`. */
     principalResolution: PrincipalResolution | null;
 
     /**

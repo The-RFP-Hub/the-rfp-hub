@@ -1,35 +1,16 @@
-/**
- * Who a request is metered as, and the hook chain that meters it.
- *
- * A credentialed route is bucketed per CREDENTIAL-HOLDER: two accounts behind one office NAT are
- * two budgets, and one account calling from a laptop and from CI is one budget. The address is the
- * fallback, for a request that proved nothing. Nothing here is stored — the key lives in an
- * in-memory counter that expires with its window.
- */
+/** Who a request is metered as, and the chain that meters it. See `docs/auth.md` §Rate limits. */
 import { isIPv4, isIPv6 } from "node:net";
 import type { FastifyInstance, FastifyRequest, onRequestHookHandler } from "fastify";
 
 const IPV6_SUBNET_BITS = 64;
 const IPV6_GROUPS = IPV6_SUBNET_BITS / 16;
 
-/**
- * The two namespaces are DISJOINT, and that is a security property rather than tidiness. Behind a
- * trusted proxy `request.ip` is whichever `X-Forwarded-For` token the hop count selected, so a
- * caller who can reach that proxy can put arbitrary text there — `acct:1` included. Sharing one
- * namespace would let that text land in an account's bucket.
- */
+/** DISJOINT: behind a trusted proxy `request.ip` is attacker-written text, `acct:1` included. */
 const ACCOUNT_PREFIX = "acct:";
 const ADDRESS_PREFIX = "ip:";
-/** Where every unparseable address goes. One fixed bucket, never the caller's own text as a key. */
 const INVALID_ADDRESS = `${ADDRESS_PREFIX}invalid`;
 
-/**
- * What the limiter emits, and what BOTH CORS policies have to expose.
- *
- * A header a browser cannot read is a header the client does not have: without this list every one
- * of these is invisible to the cross-origin fetch that received it, so a 429 reaches the page as a
- * bare status with no backoff to obey and no budget to pace against.
- */
+/** What the limiter emits, and what BOTH CORS policies must expose or a browser cannot read it. */
 export const RATE_LIMIT_HEADERS = [
   "retry-after",
   "x-ratelimit-limit",
@@ -37,13 +18,7 @@ export const RATE_LIMIT_HEADERS = [
   "x-ratelimit-reset",
 ];
 
-/**
- * The eight 16-bit groups of an IPv6 address, or null if it does not parse.
- *
- * Written out rather than delegated: the library that would do it (`ip-address`) is
- * @fastify/rate-limit's dependency, not ours, and reaching into it is a phantom import pnpm's
- * layout exists to refuse.
- */
+/** The eight 16-bit groups, or null. Hand-rolled: `ip-address` is not our dependency. */
 function ipv6Groups(address: string): number[] | null {
   const halves = address.split("::");
   if (halves.length > 2) return null;
@@ -51,7 +26,6 @@ function ipv6Groups(address: string): number[] | null {
     const out: number[] = [];
     for (const token of part.split(":")) {
       if (token === "") continue;
-      // A trailing dotted quad (`::ffff:203.0.113.9`) is two groups, not one.
       if (token.includes(".")) {
         const octets = token.split(".").map(Number);
         if (octets.length !== 4 || octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
@@ -75,34 +49,21 @@ function ipv6Groups(address: string): number[] | null {
   return [...head, ...Array<number>(missing).fill(0), ...tail];
 }
 
-/**
- * The host part of an address that may carry brackets, a port or a scope id.
- *
- * A port must never reach the key: one bucket per source port is one fresh bucket per connection.
- * The IPv4 port form is matched as a whole so a value like `acct:7` — one colon, digits after it —
- * is not mistaken for a host and a port.
- */
+/** The IPv4 port form is matched whole, so `acct:7` is not mistaken for a host and a port. */
 function hostOf(value: string): string {
   const trimmed = value.trim();
   const bracketed = /^\[([^\]]*)\](?::\d{1,5})?$/.exec(trimmed);
   const host =
     bracketed?.[1] ?? /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(trimmed)?.[1] ?? trimmed;
-  // A scope id (`fe80::1%eth0`) names an interface on THIS host, never a caller identity.
   return host.split("%")[0] ?? "";
 }
 
 /**
- * The address, grouped into the smallest unit a caller cannot trivially move within.
- *
- * AN IPv6 HOST ADDRESS IS NOT AN IDENTITY. The smallest allocation a residential or cloud IPv6
- * customer receives is a /64, and all 2^64 addresses in it are theirs — so a limiter keyed on the
- * full address hands out a fresh, empty bucket on every request. `@fastify/rate-limit`'s own
- * default generator groups by /64 for this reason, and supplying a custom `keyGenerator` replaces
- * that generator wholesale, so the grouping has to be carried over with it. IPv4 is left alone.
- *
- * The two IPv6 forms that EMBED an IPv4 address are folded back to it: the mapped `::ffff:a.b.c.d`
- * a dual-stack listener reports for a v4 client, and the deprecated compatible `::a.b.c.d`. Both
- * have zeros where the /64 lives, so without the fold every such caller would share one bucket.
+ * AN IPv6 HOST ADDRESS IS NOT AN IDENTITY: a customer holds a whole /64, so a key on the full
+ * address is a fresh bucket per request. @fastify/rate-limit groups by /64 for this reason and a
+ * custom `keyGenerator` replaces its generator wholesale, so the grouping is carried over here.
+ * The two forms embedding an IPv4 address fold back to it, or every v4 client of a dual-stack
+ * listener shares the one bucket their zero /64 gives them.
  */
 export function addressBucket(address: string): string {
   const host = hostOf(address);
@@ -112,8 +73,6 @@ export function addressBucket(address: string): string {
   if (groups === null) return INVALID_ADDRESS;
   const [a = 0, b = 0, c = 0, d = 0, e = 0, marker = 0, hi = 0, lo = 0] = groups;
   const zeroPrefix = a === 0 && b === 0 && c === 0 && d === 0 && e === 0;
-  // `marker === 0` is the compatible form, and only a written dotted quad distinguishes it from
-  // `::1` or `::` — which are not callers and may share a bucket.
   if (zeroPrefix && (marker === 0xffff || (marker === 0 && host.includes(".")))) {
     return `${ADDRESS_PREFIX}${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
   }
@@ -123,30 +82,19 @@ export function addressBucket(address: string): string {
     .join(":")}::/${IPV6_SUBNET_BITS}`;
 }
 
-/** Who this request is being metered as. An account when one is proven; the address otherwise. */
 export const rateLimitKey = (req: FastifyRequest): string =>
   req.principal ? `${ACCOUNT_PREFIX}${req.principal.accountId}` : addressBucket(req.ip);
 
 export interface MeteredLimit {
   max: number;
-  /** A window in `@fastify/rate-limit` syntax, e.g. `"1 minute"`. */
   timeWindow: string;
 }
 
 /**
- * The `onRequest` chain for a credentialed, metered route: resolve → meter → gate.
- *
- * The obvious wiring does not work, in two ways. A GATE ANSWERS, AND ANSWERING ENDS THE CHAIN:
- * `onRequest: requireAuth` plus `config: { rateLimit }` composes to `[requireAuth, limiter]`,
- * because the plugin APPENDS its handler to whatever the route declared — so a junk Bearer was
- * refused before the limiter ever ran and unauthenticated write traffic was unlimited. And TWO
- * LIMITERS DO NOT BOTH RUN: every handler minted by one registration shares a `rateLimitRan`
- * symbol and returns early once any of them has run, so `[ipLimiter, gate, accountLimiter]` is one
- * bucket, not two. There is exactly one limiter here; which bucket it charges is `rateLimitKey`'s
- * decision. `router.rateLimit(...)` rather than `config.rateLimit` is what puts its POSITION in
- * this array under our control.
- *
- * `config.rateLimit` remains right for a route with no credential at all — the two redirects.
+ * resolve → meter → gate. `config.rateLimit` is APPENDED after the route's own hooks, so a gate
+ * answered first and the limiter never ran for a junk Bearer; `router.rateLimit(...)` puts its
+ * POSITION under our control. TWO LIMITERS DO NOT BOTH RUN — handlers from one registration share
+ * a `rateLimitRan` symbol — so there is exactly one, and `rateLimitKey` picks its bucket.
  */
 export function meteredAuth(
   router: FastifyInstance,
@@ -158,8 +106,7 @@ export function meteredAuth(
     keyGenerator: rateLimitKey,
     allowList: authUnavailable,
   });
-  // Named so the route-inventory test can see which hook in a chain is the limiter; the plugin's
-  // own handler is anonymous. `call` because its declared `this` is the instance that minted it.
+  // Named — route-inventory.test.ts reads hook names; `call` because `this` is the minting instance.
   const rateLimiter: onRequestHookHandler = async (request, reply) => {
     await meter.call(router, request, reply);
   };
@@ -167,12 +114,9 @@ export function meteredAuth(
 }
 
 /**
- * Skip the increment entirely when the credential could not be CHECKED.
- *
- * A 5xx from the auth store is ours, not a verdict on the caller: metering it would spend their
- * budget on our outage and, past the ceiling, replace the 503 an operator is watching for with a
- * 429. `allowList` is what skips without writing headers, so "not counted" is visible from outside
- * as their absence. The gate behind the limiter still emits the preserved 5xx.
+ * Skip the increment when the credential could not be CHECKED: that 5xx is ours, and metering it
+ * would spend the caller's budget on our outage and then replace the 503 an operator watches for
+ * with a 429. The gate behind the limiter still emits it.
  */
 const authUnavailable = (request: FastifyRequest): boolean =>
   request.principalResolution?.kind === "unavailable";

@@ -12,18 +12,12 @@ import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { reviewController } from "./review.controller.js";
 
-/**
- * A reviewer decides at human pace — read the entry, then click once. 30/min is far above what
- * that looks like and far below what a runaway client or a stolen session could spend.
- */
+/** A reviewer decides at human pace: 30/min is far above that and far below a stolen session. */
 const REVIEW_DECISION = { max: 30, timeWindow: "1 minute" } as const;
 
 export const review = async (router: FastifyInstance): Promise<void> => {
   const guard = router.auth.requireRole("reviewer");
-  /**
-   * The chain every review WRITE uses: resolve, meter, then the role gate. Called PER ROUTE, since
-   * each call mints its own store child and therefore its own bucket, as everywhere else.
-   */
+  /** Called PER ROUTE: each call mints its own store child, and so its own bucket. */
   const metered = () => meteredAuth(router, guard, REVIEW_DECISION);
   const slugParams = {
     type: "object",
@@ -206,8 +200,8 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/verify",
     {
-      // The one review action that reaches the network: the limit is also what stops a reviewer
-      // holding the button down from turning this service into an amplifier against somebody's site.
+      // The one review action that reaches the network, so the limit is also what stops this
+      // service becoming a request amplifier against somebody's site.
       onRequest: metered(),
       schema: {
         operationId: "verifyOpportunitySource",
