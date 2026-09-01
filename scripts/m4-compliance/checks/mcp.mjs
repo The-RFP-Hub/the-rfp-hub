@@ -250,8 +250,11 @@ async function checkSearchPage(c, client, ctx, tool, { q, limit, page }) {
     { timeoutMs: ctx.timeoutMs },
   );
   if (response.error) {
+    // The envelope still comes back to the caller: an error message is exactly the kind of
+    // diagnostic that interpolates configuration, and returning null skipped the leak scan AND
+    // made the caller dereference it.
     c.fail(`${label} succeeds`, `JSON-RPC error: ${JSON.stringify(response.error)}`);
-    return null;
+    return { response, ids: null };
   }
   const payload = structuredPayload(c, response, tool, `${label} returns valid structuredContent`);
   if (!payload) return { response, ids: null };

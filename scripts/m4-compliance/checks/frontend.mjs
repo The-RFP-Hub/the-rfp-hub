@@ -165,9 +165,13 @@ export function robotsBlocksAll(text) {
     if (name === "disallow") current.disallow.push(value);
     if (name === "allow") current.allow.push(value);
   }
-  const wildcard = groups.find((group) => group.agents.includes("*"));
-  if (!wildcard) return false; // no group addresses every crawler, so nothing blocks them
-  return wildcard.disallow.includes("/") && !wildcard.allow.includes("/");
+  // MERGED, not the first one found: a file may address `*` more than once, and the standard
+  // combines those groups' rules rather than letting the earlier one win.
+  const wildcard = groups.filter((group) => group.agents.includes("*"));
+  if (wildcard.length === 0) return false; // nothing addresses every crawler
+  const disallow = wildcard.flatMap((group) => group.disallow);
+  const allow = wildcard.flatMap((group) => group.allow);
+  return disallow.includes("/") && !allow.includes("/");
 }
 
 /** `<meta name="robots" content="…noindex…">` in any attribute order — the regex required one. */

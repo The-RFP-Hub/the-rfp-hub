@@ -152,6 +152,20 @@ describe("6 — robots.txt is parsed by group", () => {
     expect(robotsBlocksAll(robots)).toBe(false);
   });
 
+  it("merges repeated wildcard groups rather than using only the first", () => {
+    // The standard combines groups that name the same agent; taking the first meant a later
+    // `Disallow: /` under a second `User-agent: *` was never seen.
+    const robots = ["User-agent: *", "Disallow: /private", "", "User-agent: *", "Disallow: /"].join(
+      "\n",
+    );
+    expect(robotsBlocksAll(robots)).toBe(true);
+  });
+
+  it("still lets an Allow: / in a later wildcard group win the tie", () => {
+    const robots = ["User-agent: *", "Disallow: /", "", "User-agent: *", "Allow: /"].join("\n");
+    expect(robotsBlocksAll(robots)).toBe(false);
+  });
+
   it("reports a real site-wide block", () => {
     expect(robotsBlocksAll("User-agent: *\nDisallow: /")).toBe(true);
   });

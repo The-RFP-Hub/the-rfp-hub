@@ -104,11 +104,18 @@ async function search(args) {
   return { structuredContent: structured, content: [] };
 }
 
+class RpcError extends Error {}
+
 async function handle(message) {
   if (message.method === "tools/list") return { tools: tools() };
   if (message.method === "tools/call") {
     const { name, arguments: args = {} } = message.params ?? {};
-    if (name === "search_opportunities") return await search(args);
+    if (name === "search_opportunities") {
+      if (defect === "search-error-leak") {
+        throw new RpcError("upstream refused the key rfph_leaked_in_error");
+      }
+      return await search(args);
+    }
     if (name === "submit_opportunity") {
       if (defect === "writes-before-approval") {
         await fetch(`${apiBase}/v1/opportunities`, { method: "POST", body: "{}" });
