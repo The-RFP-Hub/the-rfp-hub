@@ -1,13 +1,9 @@
 /**
- * A minimal MCP client over stdio — just enough to drive `tools/list` and `tools/call`.
- *
- * Hand-rolled because neither `@modelcontextprotocol/client` nor the server SDK is a dependency of
- * this repo or this checker, and adding one would be a second thing to keep in sync with whatever
- * `packages/mcp` ends up depending on. The wire format is newline-delimited JSON-RPC 2.0 — no
- * `Content-Length` framing, that is LSP's convention — and protocol revision `2026-07-28` is
- * stateless, so there is no `initialize` handshake to perform. A server that still expects one
- * answers with a JSON-RPC error or times out, and the caller reports that verbatim rather than
- * silently retrying with a different protocol.
+ * A minimal MCP client over stdio, hand-rolled because neither `@modelcontextprotocol/client` nor
+ * the server SDK is a dependency here, and adding one would be a second thing to keep in sync with
+ * whatever `packages/mcp` depends on. Newline-delimited JSON-RPC 2.0 — no `Content-Length` framing,
+ * that is LSP's convention — and revision `2026-07-28` is stateless, so there is no `initialize`
+ * handshake. A server that still expects one errors or times out, reported verbatim.
  */
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -160,10 +156,7 @@ export class McpStdioClient {
     return this.#exitInfo;
   }
 
-  /**
-   * Terminate and AWAIT the exit, so a caller scanning `stderr` afterwards sees what the child
-   * wrote on its way out. SIGKILL if it ignores SIGTERM, so one server cannot hang the run.
-   */
+  /** AWAIT the exit, so a caller scanning `stderr` sees the last line. SIGKILL if SIGTERM is ignored. */
   async close({ graceMs = 2000 } = {}) {
     if (this.#spawnError) return;
     if (this.#closed) {

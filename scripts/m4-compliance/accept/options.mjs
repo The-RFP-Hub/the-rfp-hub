@@ -24,10 +24,7 @@ const CREDENTIAL_ENV = {
   writeKey: "RFPHUB_WRITE_KEY",
 };
 
-/**
- * Scheme + host + non-default port, lowercased, trailing root dot stripped, userinfo refused.
- * `null` for anything unclassifiable, which the caller refuses: it is certainly not a safe target.
- */
+/** Scheme + host + non-default port, normalized. `null` — unclassifiable — is refused by callers. */
 export function normalizeOrigin(raw) {
   let url;
   try {
@@ -44,10 +41,7 @@ export function normalizeOrigin(raw) {
   return { origin: `${url.protocol}//${host}${port}`, protocol: url.protocol, host };
 }
 
-/**
- * https, and a full dot-delimited label naming staging. `production-staging.example.org` is refused
- * even here: a label carrying `prod` is not made safe by also carrying `staging`.
- */
+/** https, and a label naming staging: one carrying `prod` is not made safe by also saying staging. */
 function namesStaging(host) {
   const labels = host.split(".");
   if (labels.some((label) => label.includes("prod"))) return false;
@@ -82,10 +76,7 @@ export function targetRefusal(api, env = process.env) {
   return `${production}${parsed.origin} is not an allowed write target. This tool writes a real entry through the MCP interlock, so it accepts only loopback or ${allowed.join(", ")}. There is no flag to force production; add another staging origin with ${EXTRA_ORIGIN_ENV}=<https origin whose hostname carries a "staging" label>`;
 }
 
-/**
- * Follow the redirect chain `--api` answers with and refuse when it leaves the allowlist: a
- * staging-looking CNAME pointed at production passes every hostname rule there is.
- */
+/** Refuse when the redirect chain leaves the allowlist: a CNAME passes every hostname rule there is. */
 export async function redirectRefusal(api, { timeoutMs = 10000, env = process.env } = {}) {
   let target = `${api}/v1/health`;
   for (let hop = 0; hop < 5; hop++) {

@@ -33,6 +33,20 @@ export const HANDOFF_DOCS = [
   "docs/external-deploy-test.md",
 ];
 
+/** Every `*.md` under `<repoRoot>/<dir>`, at any depth, as repo-root-relative paths. */
+function markdownUnder(repoRoot, dir, depth = 0) {
+  const found = [];
+  if (depth > 6) return found;
+  const full = join(repoRoot, dir);
+  if (!existsSync(full)) return found;
+  for (const entry of readdirSync(full, { withFileTypes: true })) {
+    if (entry.isDirectory())
+      found.push(...markdownUnder(repoRoot, `${dir}/${entry.name}`, depth + 1));
+    else if (entry.isFile() && entry.name.endsWith(".md")) found.push(`${dir}/${entry.name}`);
+  }
+  return found;
+}
+
 /** Markdown outside `docs/**` whose links this criterion still holds to the same standard. */
 export function extraLinkSources(repoRoot) {
   const sources = [];
@@ -47,13 +61,8 @@ export function extraLinkSources(repoRoot) {
     // an unreadable repo root is the caller's problem; the guides above already reported it
   }
   add("packages/mcp/README.md");
-  const skills = join(repoRoot, "skills");
-  if (existsSync(skills)) {
-    for (const entry of readdirSync(skills, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith(".md")) add(`skills/${entry.name}`);
-      if (entry.isDirectory()) add(`skills/${entry.name}/SKILL.md`);
-    }
-  }
+  // Recursively: `references/*.md` beside a SKILL.md is documentation a reader follows too.
+  for (const relPath of markdownUnder(repoRoot, "skills")) add(relPath);
   return sources;
 }
 

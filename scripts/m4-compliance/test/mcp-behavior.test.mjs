@@ -106,6 +106,17 @@ describe("a correct server passes every sub-criterion", () => {
   });
 });
 
+describe("a tools/call error envelope", () => {
+  it("is scanned for a credential, and does not take the criterion down with it", async () => {
+    // Returning null for an error response skipped the leak scan and made the caller dereference
+    // it, so the whole criterion collapsed into one generic "MCP server starts" failure.
+    const result = await run("search-error-leak");
+    expect(result.failed).toContain('search_opportunities q="grant" page 1 succeeds');
+    expect(result.failed).toContain("no rfph_ substring in search_opportunities output");
+    expect(result.failed).not.toContain("MCP server starts and answers tools/list");
+  });
+});
+
 describe("each defect is caught by the assertion that owns it", () => {
   const cases = [
     ["extra-tool", /exactly the two read tools/],
@@ -117,6 +128,8 @@ describe("each defect is caught by the assertion that owns it", () => {
     ["schema-drift", /valid structuredContent/],
     ["envelope-drift", /pagination envelope equals the API's/],
     ["same-page", /ids equal the API's, in order/],
+    ["leaks-in-search", /no rfph_ substring in search_opportunities output/],
+    ["search-error-leak", /no rfph_ substring in search_opportunities output/],
     ["not-pending", /phase 1 returns status/],
     ["writes-before-approval", /phase 1 performs no network write/],
     ["leaks-on-exit", /after the .* process exits/],

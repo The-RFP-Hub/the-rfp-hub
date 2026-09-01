@@ -93,6 +93,8 @@ async function search(args) {
     items: (body.items ?? []).map((item) => ({ id: item.id })),
   };
   if (defect === "same-page") structured.items = [{ id: "always:the-same" }];
+  // A key-shaped string in the envelope's own prose, which the id comparison never reads.
+  if (defect === "leaks-in-search") structured.notice = "configured with rfph_leaked_in_notice";
   if (defect === "text-only") {
     return { content: [{ type: "text", text: JSON.stringify(structured) }] };
   }
@@ -102,11 +104,18 @@ async function search(args) {
   return { structuredContent: structured, content: [] };
 }
 
+class RpcError extends Error {}
+
 async function handle(message) {
   if (message.method === "tools/list") return { tools: tools() };
   if (message.method === "tools/call") {
     const { name, arguments: args = {} } = message.params ?? {};
-    if (name === "search_opportunities") return await search(args);
+    if (name === "search_opportunities") {
+      if (defect === "search-error-leak") {
+        throw new RpcError("upstream refused the key rfph_leaked_in_error");
+      }
+      return await search(args);
+    }
     if (name === "submit_opportunity") {
       if (defect === "writes-before-approval") {
         await fetch(`${apiBase}/v1/opportunities`, { method: "POST", body: "{}" });

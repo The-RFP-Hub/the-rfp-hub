@@ -131,9 +131,8 @@ export function schemaErrors(schema, value) {
 const READ_TOOLS = ["fetch_opportunity", "search_opportunities"];
 
 /**
- * `RFPHUB_API_BASE` must be a BARE ORIGIN — https off loopback, and no path, query, fragment or
- * userinfo — or the server refuses to start. Passing `--api` through unchanged would surface that
- * as an opaque startup failure inside "tools/list succeeds"; this names it instead.
+ * `RFPHUB_API_BASE` must be a BARE ORIGIN, https off loopback, or the server refuses to start —
+ * which would surface as an opaque failure inside "tools/list succeeds". This names it instead.
  */
 export function mcpApiBase(api) {
   const url = new URL(api);
@@ -251,16 +250,19 @@ async function checkSearchPage(c, client, ctx, tool, { q, limit, page }) {
     { timeoutMs: ctx.timeoutMs },
   );
   if (response.error) {
+    // The envelope still comes back to the caller: an error message is exactly the kind of
+    // diagnostic that interpolates configuration, and returning null skipped the leak scan AND
+    // made the caller dereference it.
     c.fail(`${label} succeeds`, `JSON-RPC error: ${JSON.stringify(response.error)}`);
-    return null;
+    return { response, ids: null };
   }
   const payload = structuredPayload(c, response, tool, `${label} returns valid structuredContent`);
-  if (!payload) return null;
+  if (!payload) return { response, ids: null };
 
   const api = await apiPage(ctx, { q, limit, page });
   if (!api) {
     c.fail(`${label} matches GET /v1/opportunities`, "could not fetch the comparison page");
-    return null;
+    return { response, ids: null };
   }
   const mcpIds = (payload.items ?? []).map((i) => i.id);
   const apiIds = (api.items ?? []).map((i) => i.id);
@@ -286,7 +288,7 @@ async function checkSearchPage(c, client, ctx, tool, { q, limit, page }) {
       .map((k) => `${k}: MCP ${JSON.stringify(payload[k])} vs API ${JSON.stringify(api[k])}`)
       .join("; "),
   );
-  return mcpIds;
+  return { response, ids: mcpIds };
 }
 
 export async function checkMcp(report, ctx) {
@@ -394,15 +396,17 @@ export async function checkMcp(report, ctx) {
       } else {
         const first = await checkSearchPage(c, readClient, ctx, searchTool, { ...query, page: 1 });
         const second = await checkSearchPage(c, readClient, ctx, searchTool, { ...query, page: 2 });
-        if (first && second) {
+        if (first.ids && second.ids) {
           c.expect(
-            JSON.stringify(first) !== JSON.stringify(second),
+            JSON.stringify(first.ids) !== JSON.stringify(second.ids),
             "page 2 returns different ids from page 1",
-            `${first.length} then ${second.length} item(s), different`,
-            `both pages returned [${first.join(", ")}] — pagination is not reaching the API`,
+            `${first.ids.length} then ${second.ids.length} item(s), different`,
+            `both pages returned [${first.ids.join(", ")}] — pagination is not reaching the API`,
           );
         }
-        const leak = scanClientForLeak(readClient);
+        // The whole envelopes, not just stderr: a key can leak into a `notice` or an error message,
+        // which the id comparison above never reads.
+        const leak = scanClientForLeak(readClient, first.response, second.response);
         c.expect(
           !leak,
           "no rfph_ substring in search_opportunities output",
@@ -575,14 +579,17 @@ async function npmView(fields, spec, ctx) {
 
 /**
  * Every snippet a reader copies must pin an exact version: a moving tag turns "the description
- * digest binds this build" into a promise about a build nobody has seen. Only `npx`/`-y` lines are
- * examined — `pnpm --filter @the-rfp-hub/mcp build` names a workspace package, not an install.
+ * digest binds this build" into a promise about a build nobody has seen.
+ *
+ * EVERY package reference inside a fence counts, not only lines that also say `npx`/`-y`: a JSON
+ * config spreads `"args": [` over several lines, leaving `"@the-rfp-hub/mcp@next"` alone on one of
+ * them. The one exemption is `--filter`, which names a workspace package, not an install.
  */
 export function unpinnedReadmeSpecs(readme) {
   const offenders = [];
   for (const block of readme.split(/^```/m).filter((_, i) => i % 2 === 1)) {
     for (const line of block.split("\n")) {
-      if (line.includes("--filter") || !/npx|"-y"|'-y'/.test(line)) continue;
+      if (line.includes("--filter")) continue;
       for (const match of line.matchAll(/@the-rfp-hub\/mcp(@[^"'\s\],]*)?/g)) {
         const version = match[1]?.slice(1);
         if (!version || !EXACT_VERSION.test(version)) {

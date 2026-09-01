@@ -53,6 +53,13 @@ export class M4Criterion extends M2Criterion {
   }
 }
 
+/** accept-m4 registers M4-ACCEPT criteria, not the M4 rows: it can never be a milestone sign-off. */
+export const ACCEPTANCE_SCOPE = "write acceptance — NOT an M4 sign-off";
+
+export function acceptanceReport(meta) {
+  return new Report({ ...meta, scopeLabel: ACCEPTANCE_SCOPE });
+}
+
 export class Report extends M2Report {
   criterion(id, name, describes) {
     const c = new M4Criterion(id, name, describes);

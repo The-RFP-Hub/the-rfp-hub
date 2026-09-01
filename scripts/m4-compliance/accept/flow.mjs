@@ -4,9 +4,8 @@
  * refused with that snapshot unchanged.
  *
  * WHAT THE APPROVAL PROVES. By default this driver writes the literal `approve` into the CLI's
- * stdin — that automates the CLI, it does not demonstrate a human decision, and the report says
- * `approval: SIMULATED (non-interactive)`. `--interactive-approval` waits for an operator and says
- * `approval: HUMAN`. Both are honest; only one is evidence of the human step.
+ * stdin — that automates the CLI, it does not demonstrate a human decision, and the report says so.
+ * `--interactive-approval` waits for an operator and says `approval: HUMAN`.
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -93,8 +92,13 @@ function runApprove(command, args, { cwd, env, timeoutMs }) {
   });
 }
 
-/** Wait for a human to run the approval in another terminal. */
-function waitForHumanApproval(state, { command, timeoutMs, onPrompt }) {
+/**
+ * Wait for a human to run the approval in another terminal. A rejection from `approvalConsumed` used
+ * to escape the interval callback unhandled — which Node's default mode turns into a process crash,
+ * so nothing tore the fixture down. Any polling error now rejects this promise instead, which the
+ * caller's `finally` turns into a best-effort teardown.
+ */
+export function waitForHumanApproval(state, { command, timeoutMs, onPrompt, pollMs = 1000 }) {
   onPrompt(
     [
       "",
@@ -108,17 +112,24 @@ function waitForHumanApproval(state, { command, timeoutMs, onPrompt }) {
   );
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
-    const poll = setInterval(async () => {
+    const poll = setInterval(() => {
       if (Date.now() - startedAt > timeoutMs) {
         clearInterval(poll);
         reject(new Error(`no approval was recorded within ${timeoutMs}ms`));
         return;
       }
-      if (await state.approvalConsumed()) {
-        clearInterval(poll);
-        resolve({ stdout: "(approved by the operator, out of band)", stderr: "" });
-      }
-    }, 1000);
+      state.approvalConsumed().then(
+        (consumed) => {
+          if (!consumed) return;
+          clearInterval(poll);
+          resolve({ stdout: "(approved by the operator, out of band)", stderr: "" });
+        },
+        (err) => {
+          clearInterval(poll);
+          reject(new Error(`polling for the operator's approval failed: ${err.message}`));
+        },
+      );
+    }, pollMs);
   });
 }
 
@@ -366,10 +377,19 @@ export async function verifyTornDown(ctx, opportunityId) {
     token: ctx.writeKey,
     agent: "rfphub-m4-accept",
   });
-  const owned = (mine.json?.items ?? []).find((item) => item.id === opportunityId);
   const publicRes = await callJson(ctx, `/v1/opportunities/${encodeURIComponent(opportunityId)}`, {
     agent: "rfphub-m4-accept",
   });
+  // A 401, a 500 or a body without `items` made `find` return undefined, which read as "the entry
+  // is gone". An owner listing that did not answer is not evidence of anything.
+  if (!mine.ok || mine.status !== 200 || !Array.isArray(mine.json?.items)) {
+    return {
+      ownerStatus: `unverified (GET /v1/me/opportunities answered ${mine.status ?? mine.error}${Array.isArray(mine.json?.items) ? "" : ", with no items array"})`,
+      publicStatus: publicRes.status,
+      ok: false,
+    };
+  }
+  const owned = mine.json.items.find((item) => item.id === opportunityId);
   return {
     ownerStatus: owned?.reviewStatus ?? "(absent)",
     publicStatus: publicRes.status,
