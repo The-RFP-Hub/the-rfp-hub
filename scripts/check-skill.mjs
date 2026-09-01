@@ -1,19 +1,9 @@
 #!/usr/bin/env node
-// Agent Skills validation, repo-wide over `skills/*/SKILL.md`.
+// Agent Skills validation over `skills/*/SKILL.md`, run by `pnpm check:skill`.
 //
-// Checks what a generic markdown linter can't: the frontmatter fields the Agent Skills spec
-// (agentskills.io, 2025-12-18) actually requires and forbids — most importantly that `version`
-// and `tags` never appear as TOP-LEVEL frontmatter keys (they are not part of the spec; they
-// belong under `metadata`, whose values must be strings), that `name` matches its parent
-// directory exactly, that `description` fits the 1024-character budget agents load at startup for
-// every skill, and that SKILL.md stays under the spec's own 500-line recommendation so it stays
-// cheap to load in full once activated.
-//
-// Also cross-checks the plugin/marketplace wiring (`.claude-plugin/marketplace.json` at the repo
-// root and each skill's own `.claude-plugin/plugin.json`, when present) so a renamed skill
+// What a markdown linter can't check: the frontmatter the Agent Skills spec (agentskills.io,
+// 2025-12-18) requires and forbids, and the plugin/marketplace wiring, so a renamed skill
 // directory can't silently leave a marketplace entry pointing at nothing.
-//
-// Run with `pnpm check:skill`. Exits non-zero on any hit.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -60,11 +50,8 @@ function warn(msg) {
   warnings.push(msg);
 }
 
-// ── minimal YAML frontmatter parser ─────────────────────────────────────────────
-// Deliberately not a general YAML parser — just enough structure for a SKILL.md frontmatter
-// block: flat `key: value` scalars, one level of nested mapping (for `metadata:`), and a folded
-// (`>-`/`>`) or literal (`|`/`|-`) block scalar (for `compatibility:`). Good enough because this
-// repository's own SKILL.md files are the only input, and they're simple by the spec's own design.
+// Not a general YAML parser: flat scalars, one level of nesting (`metadata:`) and a block scalar
+// (`compatibility:`) is all a SKILL.md frontmatter block holds.
 function stripQuotes(v) {
   const t = v.trim();
   if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
@@ -259,16 +246,10 @@ function checkMarketplace() {
 }
 
 /**
- * `skills-ref validate` is a reference implementation of the spec this script hand-rolls checks
- * for. It is a PINNED root devDependency (exact version — see package.json/pnpm-lock.yaml), run
- * via `pnpm exec` so this always invokes the locked copy, never a version `npx -y` might fetch
- * fresh from the registry on a given CI run (mutable, unpinned, and a supply-chain surface for a
- * tool that never even needs write access to publish). Whether it's actually installed is checked
- * by looking for its bin shim rather than by invoking anything — see `skillsRefInstalled` below.
- * It stays best-effort in one direction only: a runner where `pnpm install` didn't pull it (e.g.
- * a partial/offline install) gets a WARNING, not a failure, because this tool is supplementary to
- * this script's own checks, not a replacement for them; but once it IS installed and running, a
- * real violation it reports is a hard failure, same as any other check here.
+ * `skills-ref validate` is the spec's reference implementation, pinned as a root devDependency and
+ * run through `pnpm exec` so this never invokes whatever version `npx -y` would fetch that day.
+ * Best-effort in one direction: absent (a partial or offline install) is a warning, but a real
+ * violation from an installed copy is a hard failure, like any other check here.
  */
 function skillsRefInstalled() {
   const bin = process.platform === "win32" ? "skills-ref.cmd" : "skills-ref";
@@ -285,8 +266,6 @@ function runSkillsRefValidate() {
   for (const dir of skillDirs()) {
     const target = join(skillsDir, dir);
     try {
-      // `pnpm exec` resolves to the LOCKED version this repo pinned — never a version `npx`
-      // might fetch fresh from the registry.
       execFileSync("pnpm", ["exec", "skills-ref", "validate", target], {
         cwd: repoRoot,
         encoding: "utf8",
@@ -299,9 +278,8 @@ function runSkillsRefValidate() {
   }
 }
 
-/** `claude plugin validate --strict` is the plugin host's own manifest check, and `--strict` is the
- * mode it recommends for CI. Best-effort in the same one direction as `skills-ref`: absent CLI →
- * warning; present CLI reporting a real violation → failure. */
+/** The plugin host's own manifest check, in the `--strict` mode it recommends for CI. Best-effort
+ * the same way `skills-ref` is: absent CLI warns, an installed CLI's violation fails. */
 function claudeCliInstalled() {
   try {
     execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], {

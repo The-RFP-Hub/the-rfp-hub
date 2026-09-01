@@ -1,17 +1,7 @@
 #!/usr/bin/env node
 /**
- * Fallback CLI for the rfp-hub-funding-search skill: `GET /v1/opportunities/{id}`, projected the
- * same way as search.mjs (see lib.mjs's `project`), plus the two link-outs. See ../SKILL.md.
- *
- * Usage:
- *   node get.mjs <id> [--format json|table]
- *   node get.mjs --id <id> [--format json|table]
- *
- * Env:
- *   RFPHUB_API_BASE   default https://api.ethrfps.app
- *   RFPHUB_TIMEOUT_MS default 10000, clamped to 60000
- *
- * Exit codes: see EXIT in lib.mjs / references/api-reference.md.
+ * `GET /v1/opportunities/{id}`, projected the same way as search.mjs plus the two link-outs. Run
+ * `--help` for the options; see ../SKILL.md and ../references/api-reference.md for the rest.
  */
 import {
   EXIT,
@@ -43,7 +33,6 @@ Options:
 Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (default 10000, clamped to 60000).
 `;
 
-/** Every flag this script accepts. `--id` is the alternative to the positional argument. */
 const GET_ALLOWED_FLAGS = new Set(["id", "format", "help"]);
 
 async function main(argv) {
@@ -86,11 +75,8 @@ async function main(argv) {
   } catch (err) {
     if (err instanceof RequestError) {
       if (err.status === 404 && err.body?.error === "opportunity_merged") {
-        // The API's contract for this field is `{ id, title }` (see
-        // OpportunityService#findMergedDestination), never a bare string — read `.id`. `title` is
-        // ANOTHER entry's third-party title, so it goes through the same sanitizer as every other
-        // publisher-supplied string this file ever prints (see lib.mjs's `sanitizeText`) before
-        // being interpolated into this message.
+        // `mergedInto` is `{ id, title }`, never a bare string. That `title` is ANOTHER entry's
+        // third-party text, so it goes through the same sanitizer as everything else printed here.
         const merged = err.body.mergedInto;
         const mergedId = merged && typeof merged === "object" ? merged.id : merged;
         const mergedTitle =
@@ -119,11 +105,8 @@ async function main(argv) {
   return EXIT.OK;
 }
 
-// `process.exitCode = n` (never `process.exit(n)`) so Node exits only once every pending write —
-// including a large `process.stdout.write()` above, when piped to a slow reader — has actually
-// flushed. `process.exit()` right after a write to a pipe is a documented truncation hazard: pipe
-// writes are asynchronous on POSIX, and `exit()` tears the process down before a queued write can
-// complete.
+// `process.exitCode = n`, never `process.exit(n)`: pipe writes are asynchronous on POSIX, and
+// `exit()` tears the process down before a queued `stdout.write` can flush.
 main(process.argv.slice(2)).then(
   (code) => {
     process.exitCode = code;

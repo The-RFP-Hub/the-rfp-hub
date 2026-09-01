@@ -1,24 +1,11 @@
 #!/usr/bin/env node
 /**
- * Fallback CLI for the rfp-hub-funding-search skill: `GET /v1/opportunities`, with the tracking
- * headers and the projection applied BEFORE anything reaches stdout (and therefore before it can
- * reach an agent's context). See ../SKILL.md and ../references/api-reference.md.
+ * `GET /v1/opportunities` with the tracking headers and the projection applied BEFORE anything
+ * reaches stdout, and therefore before it can reach an agent's context. Run `--help` for the
+ * options; see ../SKILL.md and ../references/api-reference.md for everything else.
  *
- * This is the ONLY documented way to call the API without the `@the-rfp-hub/mcp` server: never
- * `curl` the API directly from this skill (curl and jq are not guaranteed to exist, especially on
- * Windows, and neither one applies the projection for you).
- *
- * Usage:
- *   node search.mjs [--q text] [--fundingType a,b] [--status a,b] [--ecosystem a,b]
- *                    [--category a,b] [--organization slug] [--minAward n] [--maxAward n]
- *                    [--deadlineAfter iso] [--deadlineBefore iso] [--sort field] [--order asc|desc]
- *                    [--page n] [--limit n] [--format json|table]
- *
- * Env:
- *   RFPHUB_API_BASE   default https://api.ethrfps.app
- *   RFPHUB_TIMEOUT_MS default 10000, clamped to 60000
- *
- * Exit codes: see EXIT in lib.mjs / references/api-reference.md.
+ * This is the ONLY documented way to call the API without the `@the-rfp-hub/mcp` server: `curl`
+ * is not guaranteed to exist on Windows, and it applies no projection.
  */
 import {
   EXIT,
@@ -73,8 +60,7 @@ Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (defau
 See references/api-reference.md for the full parameter table and enum values.
 `;
 
-/** Every flag this script itself accepts, beyond the API's own query params: `--format` never
- * reaches the API, and `--help` short-circuits before anything else runs. */
+/** `--format` never reaches the API; `--help` short-circuits before anything else runs. */
 const SEARCH_ALLOWED_FLAGS = new Set([...SEARCH_PARAMS, "format", "help"]);
 
 async function main(argv) {
@@ -146,11 +132,8 @@ async function main(argv) {
   return EXIT.OK;
 }
 
-// `process.exitCode = n` (never `process.exit(n)`) so Node exits only once every pending write —
-// including a large `process.stdout.write()` above, when piped to a slow reader — has actually
-// flushed. `process.exit()` right after a write to a pipe is a documented truncation hazard: pipe
-// writes are asynchronous on POSIX, and `exit()` tears the process down before a queued write can
-// complete.
+// `process.exitCode = n`, never `process.exit(n)`: pipe writes are asynchronous on POSIX, and
+// `exit()` tears the process down before a queued `stdout.write` can flush.
 main(process.argv.slice(2)).then(
   (code) => {
     process.exitCode = code;
