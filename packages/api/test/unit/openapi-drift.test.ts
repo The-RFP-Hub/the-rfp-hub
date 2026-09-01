@@ -321,6 +321,7 @@ describe("closed response components vs their producers", () => {
       "PaginatedOpportunities",
       "Publisher",
       "PublisherList",
+      "RateLimitedResponse",
       "ReviewDecision",
       "Stats",
       "SubmissionResult",
@@ -737,6 +738,12 @@ describe("M3 closed components vs their view types", () => {
     MergedOpportunityErrorResponse: {
       error: "opportunity_merged",
       mergedInto: { id: "example-org:survivor", title: "The survivor" },
+    },
+    // Not a view type either: the limiter throws a plain Error with `statusCode: 429`, so the body
+    // comes out of app.ts's generic 4xx branch rather than from any producer of ours.
+    RateLimitedResponse: {
+      error: "client_error",
+      message: "Rate limit exceeded, retry in 1 minute",
     },
     // Not a view type: the error body is assembled by `HttpError.toBody()`.
     ValidationErrorResponse: {
