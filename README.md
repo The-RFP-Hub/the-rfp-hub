@@ -93,6 +93,32 @@ job, linking to the per-package detail rather than duplicating it:
 Every shell block in those guides is marked `no-run`, `safe-read` or `staging-write`; the
 convention is defined in [`docs/README.md`](./docs/README.md).
 
+## Deploy your own copy, or install the skill
+
+**Deploy your own copy of the frontend** with the one-click Deploy Button in
+[`packages/frontend/README.md`](./packages/frontend/README.md#deploying-your-own-copy). It lives in
+exactly one place on purpose — a Deploy Button URL carries the whole build configuration in its
+query string, so a second copy of the button is a second configuration that drifts. The other two
+paths, and the read-only limitation every copy inherits, are in
+[`docs/deployment.md` §9](./docs/deployment.md#9-the-frontend-three-ways-to-deploy-a-copy).
+
+**Install the agent skill** through any of three channels, all of which install the same directory:
+
+```sh no-run
+# 1. multi-agent installer: detects the agents you have and copies the skill into each
+npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
+
+# 2. Claude Code plugin marketplace
+claude plugin marketplace add The-RFP-Hub/the-rfp-hub
+claude plugin install rfp-hub-funding-search@rfp-hub
+
+# 3. a plain copy into whichever agent's skill directory applies
+cp -R skills/rfp-hub-funding-search ~/.claude/skills/
+```
+
+Every agent's directory, with the citation for each, is in
+[`skills/README.md`](./skills/README.md).
+
 ## Repo topology
 
 Developed as one pnpm workspace for fast iteration (the schema and its generated types move
