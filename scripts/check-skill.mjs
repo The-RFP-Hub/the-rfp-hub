@@ -279,12 +279,13 @@ function runSkillsRefValidate() {
 }
 
 /** The plugin host's own manifest check, in the `--strict` mode it recommends for CI. Best-effort
- * the same way `skills-ref` is: absent CLI warns, an installed CLI's violation fails. */
-function claudeCliInstalled() {
+ * the same way `skills-ref` is: absent CLI warns, an installed CLI's violation fails. Probes the
+ * subcommand rather than the binary, so a CLI too old to have it warns instead of failing. */
+function claudePluginValidateAvailable() {
   try {
-    execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], {
+    execFileSync("claude", ["plugin", "validate", "--help"], {
       stdio: "ignore",
-      timeout: 10_000,
+      timeout: 30_000,
     });
     return true;
   } catch {
@@ -299,9 +300,9 @@ function runClaudePluginValidate() {
   const marketplacePath = join(repoRoot, ".claude-plugin", "marketplace.json");
   if (existsSync(marketplacePath)) targets.push(marketplacePath);
   if (targets.length === 0) return;
-  if (!claudeCliInstalled()) {
+  if (!claudePluginValidateAvailable()) {
     warn(
-      "the claude CLI is not on PATH — skipping `claude plugin validate --strict` on the plugin/marketplace manifests",
+      "`claude plugin validate` is unavailable (no claude CLI on PATH, or one without that command) — skipping the strict manifest validation",
     );
     return;
   }
