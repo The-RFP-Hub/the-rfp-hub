@@ -43,6 +43,7 @@ import {
   awardInputValue,
   dateInputValue,
   directoryQuery,
+  emptyResultHints,
   isFiltered,
   selectionFromParams,
   selectionToHref,
@@ -449,28 +450,7 @@ export function DirectoryList() {
               />
 
               {list.items.length === 0 ? (
-                <EmptyState
-                  title={
-                    isFiltered(applied)
-                      ? "Nothing matches those filters."
-                      : "Nothing published yet."
-                  }
-                  detail={
-                    isFiltered(applied)
-                      ? "Funding type and status match exactly; the search box matches words in the title, summary and description."
-                      : "This directory lists opportunities a reviewer has approved and listed. There are none yet."
-                  }
-                  action={
-                    isFiltered(applied) ? (
-                      <>
-                        <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
-                        <Link href={HOW_IT_WORKS}>Do you run a program?</Link>
-                      </>
-                    ) : (
-                      <Link href={HOW_IT_WORKS}>Do you run a program?</Link>
-                    )
-                  }
-                />
+                <EmptyResult applied={applied} page={list.page} />
               ) : (
                 <>
                   <div className="table-scroll">
@@ -522,6 +502,45 @@ export function DirectoryList() {
         </ResourceView>
       )}
     </>
+  );
+}
+
+/**
+ * An empty result, with the reason whenever the filters themselves supply one.
+ *
+ * "Nothing matches those filters" reads as a fact about the corpus, and for an inverted range or a
+ * page past the end it is not one — the reader's own query is what cannot match. Each of those also
+ * needs a way out that is not "Clear the filters": paging too far should not cost somebody the
+ * search that got them there.
+ */
+function EmptyResult({ applied, page }: { applied: DirectorySelection; page: number }) {
+  const filtered = isFiltered(applied);
+  const pastEnd = page > 1;
+  const hints = emptyResultHints(applied);
+  if (pastEnd) hints.unshift(`Page ${page} is past the end of this result.`);
+
+  return (
+    <EmptyState
+      title={filtered ? "Nothing matches those filters." : "Nothing published yet."}
+      detail={
+        hints.length > 0
+          ? hints.join(" ")
+          : filtered
+            ? "Funding type and status match exactly; the search box matches words in the title, summary and description."
+            : "This directory lists opportunities a reviewer has approved and listed. There are none yet."
+      }
+      action={
+        <>
+          {pastEnd ? (
+            <Link href={selectionToHref({ ...applied, page: 1 })}>Back to page 1</Link>
+          ) : null}
+          {filtered ? (
+            <Link href={selectionToHref(DEFAULT_SELECTION)}>Clear the filters</Link>
+          ) : null}
+          <Link href={HOW_IT_WORKS}>Do you run a program?</Link>
+        </>
+      }
+    />
   );
 }
 

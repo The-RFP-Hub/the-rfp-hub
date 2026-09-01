@@ -372,6 +372,44 @@ describe("the public directory list", () => {
     expect(invitation.getAttribute("href")).toBe("/how-it-works");
   });
 
+  it("explains an inverted range instead of the generic 'nothing matches'", async () => {
+    const empty: PaginatedOpportunities = {
+      items: [],
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 1,
+    };
+    navigation.params = new URLSearchParams("minAward=100&maxAward=1");
+    const { client } = stub({ list: async () => empty });
+    mount(client, <DirectoryList />);
+
+    expect(await screen.findByText(/Your minimum award is above your maximum/)).toBeTruthy();
+    expect(
+      screen.queryByText(/Funding type and status match exactly/),
+      "the generic explanation must give way to the specific one",
+    ).toBeNull();
+  });
+
+  it("offers a way back from a page past the end that keeps the filters", async () => {
+    const empty: PaginatedOpportunities = {
+      items: [],
+      page: 9,
+      limit: 20,
+      total: 2,
+      totalPages: 1,
+    };
+    navigation.params = new URLSearchParams("q=zk&page=9");
+    const { client } = stub({ list: async () => empty });
+    mount(client, <DirectoryList />);
+
+    expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
+    // "Clear the filters" would also throw away the search that produced the result — it must not
+    // be the only way out of a page number.
+    const back = screen.getByRole("link", { name: "Back to page 1" });
+    expect(back.getAttribute("href")).toBe("/?q=zk");
+  });
+
   it("shows the API's own failure rather than an empty table", async () => {
     const { client } = stub({
       list: async () => {

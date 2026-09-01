@@ -231,6 +231,16 @@ export function dateInputValue(value: string): string {
 export const RETAINED_VALUE_DISPLAY_LIMIT = 200;
 
 /**
+ * How much of a free-text filter read out of the address bar is kept.
+ *
+ * A query parameter carries no length limit of its own, so `?category=<200 KB>` would otherwise be
+ * forwarded verbatim to the endpoint and rendered into the control. Bounding it HERE — where the
+ * URL becomes the selection — keeps the control, the address bar and the request agreeing on one
+ * value, which a bound applied only on the way out would not.
+ */
+export const FREE_TEXT_FILTER_LIMIT = 200;
+
+/**
  * Bounds how much of an arbitrary, reader-supplied URL value ever reaches the DOM as text.
  *
  * The value this feeds (`deadlineAfter`/`deadlineBefore`'s raw, untouched selection field) comes
@@ -244,6 +254,36 @@ export function truncateForDisplay(
   limit: number = RETAINED_VALUE_DISPLAY_LIMIT,
 ): string {
   return value.length > limit ? `${value.slice(0, limit)}…` : value;
+}
+
+/**
+ * Why an empty result is empty, when the filters themselves say so.
+ *
+ * An inverted range can never match anything, and a reader who typed one is owed that sentence
+ * rather than the generic "nothing matches those filters" — which reads as a fact about the corpus.
+ * `organization` earns its own line for a different reason: it takes a slug, the control's
+ * placeholder says so, and until now the empty state did not.
+ */
+export function emptyResultHints(selection: DirectorySelection): string[] {
+  const hints: string[] = [];
+
+  const min = finiteNumber(selection.minAward);
+  const max = finiteNumber(selection.maxAward);
+  if (min !== undefined && max !== undefined && min > max) {
+    hints.push("Your minimum award is above your maximum, so nothing can match.");
+  }
+
+  const after = Date.parse(instant(selection.deadlineAfter, "start") ?? "");
+  const before = Date.parse(instant(selection.deadlineBefore, "end") ?? "");
+  if (!Number.isNaN(after) && !Number.isNaN(before) && after > before) {
+    hints.push("Your deadline range runs backwards: the after date is later than the before date.");
+  }
+
+  if (filled(selection.organization) !== undefined) {
+    hints.push("Organization takes an organization slug, such as acme, not its display name.");
+  }
+
+  return hints;
 }
 
 /**
@@ -311,6 +351,7 @@ export const ANY_STATUS = "any";
 /** Parse whatever is in the address bar, falling back to the default for anything unrecognized. */
 export function selectionFromParams(params: URLSearchParams): DirectorySelection {
   const get = (key: string) => params.get(key)?.trim() ?? "";
+  const getBounded = (key: string) => get(key).slice(0, FREE_TEXT_FILTER_LIMIT);
 
   const status = get("status");
   const fundingType = get("type");
@@ -340,10 +381,10 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
     // `category` and `organization` are free text on the API side too (no enum to validate against),
     // so — like `ecosystem` — whatever is here is passed straight through; a value the endpoint
     // rejects becomes the 400 this page already renders, not a silent drop.
-    category: get("category"),
+    category: getBounded("category"),
     // Matches the URL a verified-publisher card links with (`/?organization=<slug>`) exactly: the
     // same param name on both sides of that link.
-    organization: get("organization"),
+    organization: getBounded("organization"),
     // `minAward`/`maxAward`/the two deadline params are likewise forwarded as typed. `directoryQuery`
     // is where a non-numeric award or a malformed instant either gets dropped (award) or reaches the
     // endpoint to be validated (deadline) — see its comments for why those two differ.

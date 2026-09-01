@@ -10,6 +10,7 @@
 import {
   ANY_STATUS,
   DEFAULT_SELECTION,
+  FREE_TEXT_FILTER_LIMIT,
   FUNDING_TYPES,
   ORDERINGS,
   RETAINED_VALUE_DISPLAY_LIMIT,
@@ -18,6 +19,7 @@ import {
   awardInputValue,
   dateInputValue,
   directoryQuery,
+  emptyResultHints,
   isFiltered,
   selectionFromParams,
   selectionToHref,
@@ -307,6 +309,64 @@ describe("the directory querystring", () => {
     expect(awardInputValue("abc")).toBe("");
     expect(awardInputValue("1e400")).toBe("");
     expect(awardInputValue("")).toBe("");
+  });
+});
+
+describe("why an empty result is empty", () => {
+  it("says nothing when the filters are ordinary", () => {
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, q: "zk" })).toEqual([]);
+  });
+
+  it("names an inverted award range rather than blaming the corpus", () => {
+    const hints = emptyResultHints({ ...DEFAULT_SELECTION, minAward: "100", maxAward: "1" });
+    expect(hints.join(" ")).toContain("Your minimum award is above your maximum");
+    // The same pair the right way round is a perfectly ordinary filter.
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, minAward: "1", maxAward: "100" })).toEqual([]);
+  });
+
+  it("names an inverted deadline range, comparing the instants the query actually sends", () => {
+    const hints = emptyResultHints({
+      ...DEFAULT_SELECTION,
+      deadlineAfter: "2027-01-01",
+      deadlineBefore: "2020-01-01",
+    });
+    expect(hints.join(" ")).toContain("runs backwards");
+    // A single day is NOT inverted: the two ends widen to that day's first and last instant.
+    expect(
+      emptyResultHints({
+        ...DEFAULT_SELECTION,
+        deadlineAfter: "2026-09-01",
+        deadlineBefore: "2026-09-01",
+      }),
+    ).toEqual([]);
+  });
+
+  it("says the organization filter takes a slug, which only the control's placeholder said before", () => {
+    expect(
+      emptyResultHints({ ...DEFAULT_SELECTION, organization: "Acme Foundation" }).join(" "),
+    ).toContain("slug");
+  });
+});
+
+describe("free text read out of the address bar", () => {
+  it("bounds category and organization, so a hostile link cannot send kilobytes", () => {
+    const huge = "x".repeat(FREE_TEXT_FILTER_LIMIT * 10);
+    const selection = selectionFromParams(
+      new URLSearchParams({ category: huge, organization: huge }),
+    );
+    expect(selection.category).toHaveLength(FREE_TEXT_FILTER_LIMIT);
+    expect(selection.organization).toHaveLength(FREE_TEXT_FILTER_LIMIT);
+    // The control, the address bar and the request all see the same bounded value — a bound applied
+    // only on the way out would leave the box showing something the endpoint never received.
+    expect(directoryQuery(selection).category).toHaveLength(FREE_TEXT_FILTER_LIMIT);
+  });
+
+  it("leaves an ordinary value untouched", () => {
+    const selection = selectionFromParams(
+      new URLSearchParams({ category: "infrastructure", organization: "acme" }),
+    );
+    expect(selection.category).toBe("infrastructure");
+    expect(selection.organization).toBe("acme");
   });
 });
 
