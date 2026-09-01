@@ -363,9 +363,13 @@ configuration snippet for each client.
 | `submit_opportunity` | write | Not registered at all unless `RFPHUB_MCP_ENABLE_SUBMIT=1`. `tools/list` shows two tools without it |
 
 Configuration is read **from the environment only**, never as a tool parameter: `RFPHUB_API_BASE`
-(default the production API), `RFPHUB_API_KEY` (needed only to submit, never sent on a read),
-`RFPHUB_MCP_ENABLE_SUBMIT`, and `RFPHUB_MCP_HOME` (default `~/.rfphub`, where approvals, rate-limit
-counters and the local audit log live — it must be writable).
+(default the production API, and it **must be `https:`** unless it points at loopback — a plain
+`http:` host is refused at startup rather than quietly carrying a key in the clear),
+`RFPHUB_API_KEY` (needed only to submit, never sent on a read), `RFPHUB_MCP_ENABLE_SUBMIT`,
+`RFPHUB_MCP_TIMEOUT_MS` (the per-request timeout), and `RFPHUB_MCP_HOME` (default `~/.rfphub`,
+where approvals, rate-limit counters and the local audit log live — it must be writable). Exact
+defaults, the precedence `RFPHUB_MCP_HOME` takes over that default, and the companion agent skill
+are in [`packages/mcp/README.md`](../packages/mcp/README.md).
 
 **Submitting is two calls with a person in between.** The first returns
 `{ status: "pending", approvalId, preview }` and writes nothing. A human then runs
