@@ -237,7 +237,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   postedAt: "Posted at",
   operatingOrganizations: "Running organizations",
   sponsoringOrganizations: "Sponsoring organizations",
-  programModel: "Programme model",
+  programModel: "Program model",
 };
 
 function issueLabel(path: string | null): string | null {
@@ -470,7 +470,7 @@ export function OpportunityForm({
    *
    * Derived rather than demanded, because the id is the one field on this form with no natural
    * answer and permanent consequences. It stays editable — a publisher who already has a key for
-   * this programme should use it — and the moment they touch it, the derivation stops.
+   * this program should use it — and the moment they touch it, the derivation stops.
    */
   const derives = mode === "create";
   const retitle = (title: string) =>
@@ -667,7 +667,7 @@ export function OpportunityForm({
           {...at("title")}
           required
           label="Title"
-          hint="The name the programme is published under."
+          hint="The name the program is published under."
           maxLength={300}
           value={form.title}
           onChange={retitle}
@@ -789,7 +789,7 @@ export function OpportunityForm({
           hint={
             mode === "edit"
               ? "An id is immutable. Everything that has ever linked to this listing links to this string."
-              : "Proposed from the primary organization's slug and the title. Edit it if you already have a key for this programme."
+              : "Proposed from the primary organization's slug and the title. Edit it if you already have a key for this program."
           }
           readOnly={mode === "edit"}
           maxLength={128}
@@ -927,7 +927,7 @@ export function OpportunityForm({
           name="deadlines"
           rows={form.deadlines}
           addLabel="+ Add a deadline"
-          emptyLabel="No deadlines. A programme with none states no closing date at all."
+          emptyLabel="No deadlines. A program with none states no closing date at all."
           onAdd={() => set("deadlines", [...form.deadlines, emptyDeadline()])}
           onRemove={(index) => set("deadlines", removeRow(form.deadlines, index))}
           rowLabel={(row, index) => row.label.trim() || `Deadline ${index + 1}`}
@@ -1067,14 +1067,14 @@ export function OpportunityForm({
               path="details.grant.fundingMechanisms"
               legend="Funding mechanisms"
               optional
-              hint="More than one is normal: a funder can offer a fixed grant and a matching grant in the same programme."
+              hint="More than one is normal: a funder can offer a fixed grant and a matching grant in the same program."
               options={FUNDING_MECHANISMS}
               selected={details.grant.fundingMechanisms}
               onChange={(fundingMechanisms) => setDetails("grant", { fundingMechanisms })}
             />
             <SuggestField
               {...at("details.grant.programModel")}
-              label="Programme model"
+              label="Program model"
               optional
               hint="The operating model, as distinct from the funding instrument. The listed values are conventional, not exhaustive — your own is valid."
               options={PROGRAM_MODELS}
@@ -1215,7 +1215,7 @@ export function OpportunityForm({
                 {...at("details.accelerator.equity")}
                 label="Equity taken"
                 optional
-                hint="Free text — programmes state this in incomparable ways."
+                hint="Free text — programs state this in incomparable ways."
                 placeholder="up to 7% SAFE"
                 value={details.accelerator.equity}
                 onChange={(equity) => setDetails("accelerator", { equity })}
@@ -1719,7 +1719,7 @@ function BountyDetails({
           {...at("details.bounty.rewardPoolStatus")}
           label="Reward pool"
           optional
-          hint="'unknown' is the honest value where the programme says nothing."
+          hint="'unknown' is the honest value where the program says nothing."
           options={REWARD_POOL_STATUSES}
           labels={LABELS}
           blank="not stated"
@@ -2126,8 +2126,7 @@ function SubmissionOutcome({
         <p>{describeDuplicateCheck(result.duplicateCheck, 0)}</p>
       ) : duplicatesAcknowledged ? (
         <p className="muted">
-          Marked as a different programme on this screen. Reviewers will still see the possible
-          match.
+          Marked as a different program on this screen. Reviewers will still see the possible match.
         </p>
       ) : (
         <section className={styles.duplicateWarning} aria-labelledby="duplicate-warning-heading">
@@ -2159,7 +2158,7 @@ function SubmissionOutcome({
               : "A reviewer will also see this match."}
           </p>
           <button type="button" onClick={() => setDuplicatesAcknowledged(true)}>
-            This is a different programme
+            This is a different program
           </button>
         </section>
       )}

@@ -322,7 +322,7 @@ export function SuggestField({
  * The Standard's nullable booleans, as the three states they actually have.
  *
  * A checkbox has two, and the missing one is the one most publishers are in: "nobody said". A
- * checkbox here would have every submission asserting `recurring: false` about a programme whose
+ * checkbox here would have every submission asserting `recurring: false` about a program whose
  * publisher was never asked.
  */
 export function TriField({

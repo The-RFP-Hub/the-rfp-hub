@@ -46,8 +46,8 @@ const memberships: MeMembership[] = [
 
 const account = (memberOf: MeMembership[] = memberships): Me => ({
   accountId: 7,
-  handle: "programme-operator",
-  displayName: "Programme Operator",
+  handle: "program-operator",
+  displayName: "Program Operator",
   email: "operator@acme.example.org",
   role: "submitter",
   directCreate: false,
@@ -96,7 +96,7 @@ function renderForm(client: ApiClient, me = account()) {
       <ClaimForm id="acme:round-4" me={me} />
     </ApiClientProvider>,
   );
-  fireEvent.click(screen.getByText("This is my programme — claim it"));
+  fireEvent.click(screen.getByText("This is my program — claim it"));
 }
 
 beforeEach(() => {
@@ -127,7 +127,7 @@ describe("the public claim control", () => {
       </AuthRoot>,
     );
 
-    fireEvent.click(screen.getByText("This is my programme — claim it"));
+    fireEvent.click(screen.getByText("This is my program — claim it"));
     fireEvent.click(screen.getByRole("button", { name: "Sign in to claim" }));
 
     expect(await screen.findByRole("dialog")).toBeTruthy();
@@ -146,8 +146,8 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    expect(await screen.findByText("This is my programme — claim it")).toBeTruthy();
-    fireEvent.click(screen.getByText("This is my programme — claim it"));
+    expect(await screen.findByText("This is my program — claim it")).toBeTruthy();
+    fireEvent.click(screen.getByText("This is my program — claim it"));
     expect(screen.getByText(/A reviewer grants membership\./)).toBeTruthy();
     expect(client.me.get).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "File the claim" })).toBeNull();
@@ -161,7 +161,7 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    const summary = screen.getByText("This is my programme — claim it");
+    const summary = screen.getByText("This is my program — claim it");
     const disclosure = summary.closest("details") as HTMLDetailsElement;
     fireEvent.click(summary);
     expect(disclosure.open).toBe(true);
@@ -174,7 +174,7 @@ describe("the public claim control", () => {
     );
 
     expect(await screen.findByRole("button", { name: "File the claim" })).toBeTruthy();
-    expect(screen.getByText("This is my programme — claim it")).toBe(summary);
+    expect(screen.getByText("This is my program — claim it")).toBe(summary);
     expect(disclosure.open).toBe(true);
   });
 
@@ -187,7 +187,7 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    const summary = await screen.findByText("This is my programme — claim it");
+    const summary = await screen.findByText("This is my program — claim it");
     fireEvent.click(summary);
     await screen.findByRole("button", { name: "File the claim" });
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
@@ -228,7 +228,7 @@ describe("the public claim control", () => {
       </ApiClientProvider>,
     );
 
-    fireEvent.click(await screen.findByText("This is my programme — claim it"));
+    fireEvent.click(await screen.findByText("This is my program — claim it"));
     fireEvent.click(await screen.findByRole("button", { name: "File the claim" }));
 
     const filing = await screen.findByRole("button", { name: "Filing…" });
@@ -282,7 +282,7 @@ describe("the extracted claim form", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    const summary = screen.getByText("This is my programme — claim it");
+    const summary = screen.getByText("This is my program — claim it");
     expect((summary.closest("details") as HTMLDetailsElement).open).toBe(false);
     fireEvent.click(summary);
     expect((screen.getByLabelText("Organization") as HTMLSelectElement).value).toBe("acme");
@@ -297,14 +297,14 @@ describe("the extracted claim form", () => {
 
     fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "beta" } });
     fireEvent.change(screen.getByLabelText("Note for the reviewer (optional)"), {
-      target: { value: "I operate this programme for Beta." },
+      target: { value: "I operate this program for Beta." },
     });
     fireEvent.click(screen.getByRole("button", { name: "File the claim" }));
 
     await waitFor(() =>
       expect(claim).toHaveBeenCalledWith("acme:round-4", {
         organizationSlug: "beta",
-        note: "I operate this programme for Beta.",
+        note: "I operate this program for Beta.",
       }),
     );
     expect(claim).toHaveBeenCalledTimes(1);
@@ -368,6 +368,6 @@ describe("the extracted claim form", () => {
 
     expect(source).not.toContain("ClaimForm");
     expect(source).not.toContain("opportunities.claim");
-    expect(source).not.toContain("This is my programme — claim it");
+    expect(source).not.toContain("This is my program — claim it");
   });
 });

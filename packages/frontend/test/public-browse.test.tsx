@@ -92,8 +92,8 @@ const page: PaginatedOpportunities = {
       specVersion: "1.0.0",
       id: "beta:bounty-1",
       fundingType: "bounty",
-      title: "Continuous Disclosure Programme",
-      description: "A standing programme.",
+      title: "Continuous Disclosure Program",
+      description: "A standing program.",
       status: "open",
       operatingOrganizations: [{ name: "Beta Collective", slug: "beta" }],
       source: {},
@@ -229,6 +229,23 @@ describe("the public directory list", () => {
     expect(screen.getByRole("link", { name: "Include closed and upcoming" })).toBeTruthy();
   });
 
+  it("pairs filter icons with text labels instead of replacing their accessible names", async () => {
+    const { client } = stub();
+    const { container } = mount(client, <DirectoryList />);
+
+    await screen.findByText("Acme Foundation");
+    for (const [id, name] of [
+      ["directory-q", "Search"],
+      ["directory-ecosystem", "Ecosystem"],
+      ["directory-type", "Funding type"],
+      ["directory-status", "Status"],
+      ["directory-order", "Order by"],
+    ] as const) {
+      expect(screen.getByLabelText(name).getAttribute("id")).toBe(id);
+      expect(container.querySelector(`label[for="${id}"] svg[aria-hidden="true"]`)).toBeTruthy();
+    }
+  });
+
   it("renders the fields the thin list projection actually carries", async () => {
     const { client } = stub();
     mount(client, <DirectoryList />);
@@ -249,13 +266,25 @@ describe("the public directory list", () => {
     expect(screen.getAllByText("Open", { selector: ".badge" })).toHaveLength(2);
 
     // The next FIXED deadline, derived from the array, not the last entry in it.
-    expect(screen.getByText("30 Sep 23:59 UTC")).toBeTruthy();
+    expect(screen.getByText("Sep 30, 2099")).toBeTruthy();
     // A rolling-only record says so rather than showing a blank.
     expect(screen.getByText("Rolling")).toBeTruthy();
 
     // The count line names the narrowing it is describing.
     expect(screen.getByText(/2 open opportunities/)).toBeTruthy();
     expect(screen.getByText(/page 1 of 1/)).toBeTruthy();
+  });
+
+  it("adds the matching opportunity-type icon without replacing the written type", async () => {
+    const { client } = stub();
+    const { container } = mount(client, <DirectoryList />);
+
+    await screen.findByText("Acme Foundation");
+    for (const type of ["Grant", "Bounty"]) {
+      const icon = container.querySelector(`.opportunity-type-icon[title="${type}"]`);
+      expect(icon?.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+      expect(screen.getByText(type, { selector: "td" })).toBeTruthy();
+    }
   });
 
   it("carries status as a shape and a word, never as a colour", async () => {
@@ -333,7 +362,7 @@ describe("the public directory list", () => {
     mount(client, <DirectoryList />);
 
     await screen.findByText("Nothing published yet.");
-    const invitation = screen.getByRole("link", { name: "Do you run a programme?" });
+    const invitation = screen.getByRole("link", { name: "Do you run a program?" });
     expect(invitation.getAttribute("href")).toBe("/how-it-works");
   });
 
@@ -577,7 +606,7 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
-    const claim = screen.getByText("This is my programme — claim it");
+    const claim = screen.getByText("This is my program — claim it");
     expect(claim).toBeTruthy();
     fireEvent.click(claim);
     expect(screen.getByRole("button", { name: "Sign in to claim" })).toBeTruthy();
@@ -589,7 +618,7 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
-    fireEvent.click(screen.getByText("This is my programme — claim it"));
+    fireEvent.click(screen.getByText("This is my program — claim it"));
     expect(screen.getByText("Restoring your session…")).toBeTruthy();
   });
 
@@ -597,9 +626,9 @@ describe("the public opportunity page", () => {
     authSession.data = { user: { id: "user_7" } };
     const me: Me = {
       accountId: 7,
-      handle: "acme-programmes",
+      handle: "acme-programs",
       displayName: null,
-      email: "programmes@acme.example.org",
+      email: "programs@acme.example.org",
       role: "submitter",
       directCreate: false,
       credentialKind: "session",
@@ -626,7 +655,7 @@ describe("the public opportunity page", () => {
 
     mount(client, <PublicOpportunity id="legacy:round-4" />);
 
-    fireEvent.click(await screen.findByText("This is my programme — claim it"));
+    fireEvent.click(await screen.findByText("This is my program — claim it"));
     fireEvent.click(await screen.findByRole("button", { name: "File the claim" }));
     await waitFor(() =>
       expect(claim).toHaveBeenCalledWith("acme:round-4", {
@@ -683,29 +712,30 @@ describe("the public opportunity page", () => {
 
     // NAMED FOR WHERE IT GOES. The action this page exists for is leaving it, and the label says
     // whose site the reader lands on before they click rather than after.
-    const apply = await screen.findByRole("link", { name: /Apply on the programme’s own site/ });
+    const apply = await screen.findByRole("link", { name: /Apply on the program’s own site/ });
     expect(apply.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/apply`);
     expect(apply.getAttribute("target")).toBe("_blank");
     expect(apply.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(apply.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
     // It is the one filled control on the page, which is how "this one does the thing" is said
     // without a colour.
     expect(apply.className).toContain("button-primary");
 
-    const source = screen.getByRole("link", { name: "Programme site" });
+    const source = screen.getByRole("link", { name: "Program site" });
     expect(source.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/source`);
   });
 
   it("does not dead-end a listing that states no application link", async () => {
     // Roughly one published listing in eight carries no `applicationUrl`. The page used to say so
     // and stop, leaving the reader holding a description and nowhere to go; it now says the same
-    // true thing and hands over the programme's own site.
+    // true thing and hands over the program's own site.
     const { title, ...rest } = entry;
     const noApply: Opportunity = { ...rest, title, applicationUrl: null };
     const { client } = stub({ find: async () => noApply });
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByText("This listing states no application link.")).toBeTruthy();
-    const fallback = screen.getByRole("link", { name: /Open the programme site/ });
+    const fallback = screen.getByRole("link", { name: /Open the program site/ });
     expect(fallback.getAttribute("href")).toBe(`${BASE_URL}/v1/r/acme%3Around-4/source`);
     expect(fallback.className).toContain("button-primary");
   });

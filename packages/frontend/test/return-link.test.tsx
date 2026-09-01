@@ -31,6 +31,7 @@ describe("the labelled way back", () => {
     const link = screen.getByRole("link", { name: /Back to the claims queue/ });
     // The origin's own query state survives, so the reader returns to the tab they left.
     expect(link.getAttribute("href")).toBe("/review?tab=claims");
+    expect(link.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
   });
 
   it("names an organization by the name the origin supplied, not by its slug", () => {

@@ -362,7 +362,7 @@ describe("deciding as a verified member", () => {
     expect(screen.getByRole("button", { name: "Refuse it" })).toHaveProperty("disabled", true);
 
     fireEvent.change(screen.getByLabelText("Reason"), {
-      target: { value: "we have never run this programme" },
+      target: { value: "we have never run this program" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Refuse it" }));
 
@@ -370,7 +370,7 @@ describe("deciding as a verified member", () => {
       expect(reject).toHaveBeenCalledWith(
         "filecoin",
         "filecoin:pending-1",
-        "we have never run this programme",
+        "we have never run this program",
       ),
     );
     expect(
