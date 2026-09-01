@@ -149,7 +149,7 @@ a worse thing to have than a tool somebody runs. See
 `scripts/check-m4.mjs` covers governance, the reference frontend, the MCP server, the agent skill,
 and the handoff docs:
 
-```bash
+```bash no-run
 pnpm check:m4 --site https://ethrfps.app --api https://api.ethrfps.app --browser
 ```
 
@@ -166,7 +166,7 @@ never an M4 sign-off. See [`scripts/m4-compliance/README.md`](./scripts/m4-compl
 `submit_opportunity` interlock end to end — preview, an out-of-band `rfphub-mcp approve`, commit —
 and tears the fixture down afterwards:
 
-```bash
+```bash staging-write
 RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... pnpm accept:m4 --api https://api.staging.example.org
 ```
 
