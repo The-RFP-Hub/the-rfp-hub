@@ -182,6 +182,11 @@ export function parseArgs(argv, env = process.env) {
   for (const [key, variable] of Object.entries(CREDENTIAL_ENV)) {
     if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
   }
+  // Waiting on a person is not waiting on a process: 15s is right for a driven CLI and absurd for
+  // an operator who has to open another terminal.
+  if (opts.interactiveApproval && !argv.includes("--approve-timeout")) {
+    opts.approveTimeoutMs = 300000;
+  }
 
   return opts;
 }

@@ -1,37 +1,73 @@
 /**
  * The real 3-phase MCP submission, driven end to end against a staging deployment.
  *
- * This is the one place in the M4 tooling that exercises the interlock for real: `submit_opportunity`
- * phase 1 (preview, no network write) → a SEPARATE process running `rfphub-mcp approve <id>`,
- * simulating the human step the plan requires never be automatable from inside the MCP channel
- * itself → `submit_opportunity` phase 3 (commit, the actual `POST`). `check-m4.mjs`'s MCP check
- * never does this — it only proves phase 1 writes nothing, against a local mock. This is the tool
- * that proves the whole cycle actually lands an entry.
+ * `check-m4.mjs` proves phase 1 writes nothing, against a local mock. This is the tool that proves
+ * the whole interlock actually holds against a deployment that can be written to, which means it
+ * has to assert the things a happy path never touches:
  *
- * WHY THE APPROVAL SUBPROCESS GETS "approve\n" ON STDIN. `rfphub-mcp approve <id>` (`packages/mcp/
- * src/cli.ts`) prompts `Type \`approve\` to authorize, anything else to cancel: ` and compares the
- * TRIMMED answer against the literal string `"approve"` — nothing else counts, including "y". An
- * acceptance run has no operator; it stands in for one by writing that exact literal to the
- * subprocess's stdin, which is the same trust boundary the plan itself names as NOT isolated from
- * an agent that already has shell access under the same user (README "What this does — and what it
- * does not"). That is exactly why this driver lives in `accept-m4.mjs`, a tool a human runs
- * deliberately against staging, and not in the read-only `check-m4.mjs` that defaults to
- * production. `execFile`'s callback/promise form has no `input` option (that exists only on the
- * `*Sync` variants), so this spawns the subprocess directly and writes to `child.stdin` itself.
+ *   - an owner SNAPSHOT before anything, so "the preview created nothing" is a fact rather than a
+ *     specification being restated;
+ *   - a phase-3 commit attempted WITHOUT an approval, which must be refused and must leave that
+ *     snapshot unchanged — the interlock's whole point, and previously never exercised;
+ *   - the approval itself, out of band, in a separate process.
+ *
+ * WHAT THE APPROVAL PROVES, AND WHAT IT DOES NOT. By default this driver writes the literal
+ * `approve` that `rfphub-mcp approve <id>` requires into the subprocess's stdin. That automates the
+ * CLI; it does not demonstrate a human decision, and the report says `approval: SIMULATED
+ * (non-interactive)` so nobody can read it as one. `--interactive-approval` prints the exact
+ * command and waits for an operator to run it in another terminal, and the report then says
+ * `approval: HUMAN`. Both are honest; only one is evidence of the human step.
  */
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { callJson } from "../../m3-compliance/client.mjs";
 import { resolveCommand } from "../checks/mcp.mjs";
 import { McpStdioClient } from "../mcp-client.mjs";
 
+const READ_TOOLS = ["fetch_opportunity", "search_opportunities"];
+const SUBMIT_TOOL = "submit_opportunity";
+
 /**
- * Run `rfphub-mcp approve <id>`, answering its confirmation prompt with the literal it requires.
- * Rejects with an Error carrying `.stdout`/`.stderr` on a non-zero exit, a spawn error, or a
- * timeout — the caller decides what a failure here means for the overall cycle.
+ * Collision-resistant per run. A timestamp truncated to the minute gave two runs started in the
+ * same minute the same fixture id, and the second one then "found" the first one's entry.
  */
-function runApprove(command, args, { cwd, timeoutMs }) {
+export function runToken(now = new Date()) {
+  const stamp = now
+    .toISOString()
+    .replace(/[-:TZ.]/g, "")
+    .slice(0, 14);
+  return `${stamp}-${process.pid.toString(36)}-${randomBytes(3).toString("hex")}`;
+}
+
+export function fixtureDocument(run) {
+  return {
+    specVersion: "1.0.0",
+    id: `m4check:m4check-${run}`,
+    fundingType: "grant",
+    title: `m4check-${run} — M4 acceptance fixture`,
+    summary:
+      "Created by scripts/accept-m4.mjs to verify the real MCP 3-phase submission interlock.",
+    description:
+      "Created by the RFP Hub M4 acceptance tool to verify the submit_opportunity interlock end to end against staging. Not a real funding opportunity — reject and unlist after the run.",
+    status: "open",
+    operatingOrganizations: [{ name: "m4check", slug: "m4check" }],
+    ecosystems: ["Ethereum"],
+    categories: ["tooling"],
+    source: {},
+    fundingDetails: { fundingType: "grant" },
+  };
+}
+
+/**
+ * Run `rfphub-mcp approve <id>`, answering its prompt with the literal it requires. Rejects with an
+ * Error carrying `.stdout`/`.stderr` on a non-zero exit, a spawn error, or a timeout.
+ */
+function runApprove(command, args, { cwd, env, timeoutMs }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(command, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -59,11 +95,8 @@ function runApprove(command, args, { cwd, timeoutMs }) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        reject(Object.assign(new Error(`exited with code ${code}`), { stdout, stderr }));
-      }
+      if (code === 0) resolve({ stdout, stderr });
+      else reject(Object.assign(new Error(`exited with code ${code}`), { stdout, stderr }));
     });
 
     // The exact, trimmed literal `approve()` in cli.ts requires — anything else, "y" included, is
@@ -73,83 +106,106 @@ function runApprove(command, args, { cwd, timeoutMs }) {
   });
 }
 
-function extractPayload(response) {
-  const result = response?.result;
-  if (!result) return undefined;
-  if (result.structuredContent !== undefined) return result.structuredContent;
-  const text = result.content?.find((block) => block.type === "text")?.text;
-  if (typeof text === "string") {
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
-    }
-  }
-  return result.content;
+/** Wait for a human to run the approval in another terminal, polling for the approval to be gone. */
+function waitForHumanApproval(state, { command, timeoutMs, onPrompt }) {
+  onPrompt(
+    [
+      "",
+      "  ACTION REQUIRED — approve this submission in ANOTHER terminal:",
+      "",
+      `      ${command}`,
+      "",
+      `  Waiting up to ${Math.round(timeoutMs / 1000)}s. Ctrl-C cancels the run (the fixture has not been created).`,
+      "",
+    ].join("\n"),
+  );
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const poll = setInterval(async () => {
+      if (Date.now() - startedAt > timeoutMs) {
+        clearInterval(poll);
+        reject(new Error(`no approval was recorded within ${timeoutMs}ms`));
+        return;
+      }
+      if (await state.approvalConsumed()) {
+        clearInterval(poll);
+        resolve({ stdout: "(approved by the operator, out of band)", stderr: "" });
+      }
+    }, 1000);
+  });
 }
 
-function fixtureDocument(run) {
-  return {
-    specVersion: "1.0.0",
-    id: `m4check:m4check-${run}`,
-    fundingType: "grant",
-    title: `m4check-${run} — M4 acceptance fixture`,
-    summary:
-      "Created by scripts/accept-m4.mjs to verify the real MCP 3-phase submission interlock.",
-    description:
-      "Created by the RFP Hub M4 acceptance tool to verify the submit_opportunity interlock end to end against staging. Not a real funding opportunity — reject and unlist after the run.",
-    status: "open",
-    operatingOrganizations: [{ name: "m4check", slug: "m4check" }],
-    ecosystems: ["Ethereum"],
-    categories: ["tooling"],
-    source: {},
-    fundingDetails: { fundingType: "grant" },
-  };
+function extractPayload(response) {
+  return response?.result?.structuredContent;
+}
+
+/** Every entry this credential owns, following pagination past the first 100. */
+export async function ownedIds(ctx) {
+  const ids = [];
+  for (let page = 1; page <= 50; page++) {
+    const res = await callJson(ctx, `/v1/me/opportunities?limit=100&page=${page}`, {
+      token: ctx.writeKey,
+      agent: "rfphub-m4-accept",
+    });
+    if (!res.ok || res.status !== 200) {
+      throw new Error(`GET /v1/me/opportunities answered ${res.status ?? res.error}`);
+    }
+    const items = res.json?.items ?? [];
+    for (const item of items) ids.push(item.id);
+    if (items.length < 100 || ids.length >= (res.json?.total ?? ids.length)) break;
+  }
+  return ids;
 }
 
 /**
- * Runs the full cycle. Returns `{ approvalId, opportunityId, submitResult }` on success; throws
- * with a message naming exactly which phase failed otherwise. The caller (accept-m4.mjs) is
- * responsible for reporting into a Report criterion and for calling `teardown` afterwards.
+ * Runs the full cycle, recording each assertion into `c`. Returns the opportunity id on success.
  *
- * MUTATES `state` as it goes, and does so BEFORE each network call rather than after, on purpose:
- *
- *   - `state.candidateOpportunityId` is set from the document's own declared `id` before phase 1
- *     ever runs — the document CHOOSES its id, so this is known with certainty from the start, not
- *     derived from a response that might never arrive.
- *   - `state.commitAttempted` is set immediately before the phase-3 `tools/call`, which is the one
- *     request whose failure is AMBIGUOUS: a `POST` that this process never got a reply for may
- *     still have reached the API (see submit.ts's own "never restore a claimed approval" rule for
- *     why). Phase 1 and phase 2 have no such ambiguity — phase 1 is specified not to write, and
- *     phase 2 is a local file operation — so a throw before `commitAttempted` is set means nothing
- *     was created.
- *
- * The caller (`accept-m4.mjs`) reads `state.candidateOpportunityId` and `state.commitAttempted`
- * from a catch block to decide whether an ambiguous outcome needs verifying and tearing down even
- * though this function threw.
+ * MUTATES `state` BEFORE each network call rather than after: `candidateOpportunityId` is the id
+ * the document itself declares, known before phase 1, and `commitAttempted` is set immediately
+ * before the phase-3 POST — the one request whose failure is AMBIGUOUS, because it may have reached
+ * the API even though this process never saw the reply.
  */
-export async function runSubmissionCycle(ctx, state) {
+export async function runSubmissionCycle(ctx, state, c) {
   const resolved = resolveCommand(ctx);
   state.serverDescribe = resolved.describe;
+  c.info("MCP server under test", resolved.describe);
 
   const document = fixtureDocument(state.run);
   state.candidateOpportunityId = document.id;
 
-  const client = new McpStdioClient(resolved.command, resolved.args, {
-    cwd: ctx.repoRoot,
-    env: {
-      RFPHUB_API_BASE: ctx.api,
-      RFPHUB_API_KEY: ctx.writeKey,
-      RFPHUB_MCP_ENABLE_SUBMIT: "1",
-    },
-  });
+  // A disposable home, always removed: without it every run leaves approvals, rate-limit counters
+  // and audit lines in the OPERATOR's own ~/.rfphub, and a leftover approval from an earlier run
+  // could satisfy the "commit without approval is refused" assertion for the wrong reason.
+  const mcpHome = await mkdtemp(join(tmpdir(), "m4-accept-mcp-home-"));
+  state.mcpHome = mcpHome;
+  const env = {
+    RFPHUB_API_BASE: ctx.api,
+    RFPHUB_API_KEY: ctx.writeKey,
+    RFPHUB_MCP_ENABLE_SUBMIT: "1",
+    RFPHUB_MCP_HOME: mcpHome,
+  };
+  const client = new McpStdioClient(resolved.command, resolved.args, { cwd: ctx.repoRoot, env });
   client.start();
 
   try {
-    // ── phase 1: preview (specified not to write) ───────────────────────────
+    const listResponse = await client.request("tools/list", {}, { timeoutMs: ctx.timeoutMs });
+    const names = (listResponse.result?.tools ?? []).map((t) => t.name).sort();
+    c.expect(
+      names.length === 3 && [...READ_TOOLS, SUBMIT_TOOL].every((n) => names.includes(n)),
+      "tools/list is exactly three tools with RFPHUB_MCP_ENABLE_SUBMIT=1",
+      names.join(", "),
+      `expected exactly [${[...READ_TOOLS, SUBMIT_TOOL].sort().join(", ")}], got [${names.join(", ")}]`,
+    );
+
+    const before = await ownedIds(ctx);
+    c.pass(
+      "owner snapshot taken before anything is submitted",
+      `${before.length} entry(ies) owned`,
+    );
+
     const previewResponse = await client.request(
       "tools/call",
-      { name: "submit_opportunity", arguments: { document } },
+      { name: SUBMIT_TOOL, arguments: { document } },
       { timeoutMs: ctx.timeoutMs },
     );
     if (previewResponse.error) {
@@ -158,57 +214,117 @@ export async function runSubmissionCycle(ctx, state) {
       );
     }
     const preview = extractPayload(previewResponse);
+    c.expect(
+      preview?.status === "pending",
+      'phase 1 (preview) returns status: "pending"',
+      JSON.stringify(preview).slice(0, 300),
+      `status is ${JSON.stringify(preview?.status)}, expected "pending" — a missing status used to be accepted`,
+    );
     const approvalId = preview?.approvalId;
     if (!approvalId) {
       throw new Error(
         `phase 1 (preview) did not return an approvalId: ${JSON.stringify(preview).slice(0, 500)}`,
       );
     }
-    const status = preview?.status;
-    if (status && status !== "pending") {
-      throw new Error(`phase 1 (preview) returned status "${status}", expected "pending"`);
-    }
     state.approvalId = approvalId;
     state.previewPayload = preview;
 
-    // ── phase 2: approval, in a SEPARATE process (a local file operation — not ambiguous) ──────
-    const approveArgs = resolveCommand(ctx, ["approve", approvalId]);
-    let approveResult;
-    try {
-      approveResult = await runApprove(approveArgs.command, approveArgs.args, {
-        cwd: ctx.repoRoot,
-        timeoutMs: ctx.approveTimeoutMs,
-      });
-    } catch (err) {
-      throw new Error(
-        `phase 2 (rfphub-mcp approve ${approvalId}) failed: ${err.message}${err.stderr ? `\nstderr: ${err.stderr}` : ""}`,
-      );
-    }
-    state.approveOutput = `${approveResult.stdout}${approveResult.stderr ?? ""}`;
+    const afterPreview = await ownedIds(ctx);
+    c.expect(
+      afterPreview.length === before.length && !afterPreview.includes(document.id),
+      "phase 1 created nothing, proved against /v1/me/opportunities",
+      `${afterPreview.length} entry(ies) owned, unchanged, and ${document.id} is absent`,
+      `the owner listing changed after the preview: ${before.length} → ${afterPreview.length}${afterPreview.includes(document.id) ? `, and ${document.id} is present` : ""}`,
+    );
 
-    // ── phase 3: commit — from here, a throw means AMBIGUOUS, not "nothing happened" ───────────
-    state.commitAttempted = true;
-    const commitResponse = await client.request(
+    // The interlock's whole point, and the case a happy path never reaches.
+    const unapproved = await client.request(
       "tools/call",
-      { name: "submit_opportunity", arguments: { document, approvalId } },
+      { name: SUBMIT_TOOL, arguments: { document, approvalId: "0".repeat(64) } },
       { timeoutMs: ctx.timeoutMs },
     );
+    const refusal = JSON.stringify(unapproved.result ?? unapproved.error ?? {});
+    c.expect(
+      /confirmation_required|confirmation_invalid/.test(refusal),
+      "phase 3 without a valid approval is refused",
+      refusal.slice(0, 300),
+      `expected confirmation_required/confirmation_invalid, got ${refusal.slice(0, 400)}`,
+    );
+    const afterRefusal = await ownedIds(ctx);
+    c.expect(
+      afterRefusal.length === before.length && !afterRefusal.includes(document.id),
+      "the refused commit created nothing",
+      `${afterRefusal.length} entry(ies) owned, unchanged`,
+      `the owner listing changed after a REFUSED commit: ${before.length} → ${afterRefusal.length}`,
+    );
+
+    const approveArgs = resolveCommand(ctx, ["approve", approvalId]);
+    const approveCommand = `${approveArgs.command} ${approveArgs.args.join(" ")}`;
+    state.approvalMode = ctx.interactiveApproval ? "HUMAN" : "SIMULATED (non-interactive)";
+    try {
+      if (ctx.interactiveApproval) {
+        state.approvalConsumed = async () => {
+          const pending = await client.request(
+            "tools/call",
+            { name: SUBMIT_TOOL, arguments: { document, approvalId } },
+            { timeoutMs: ctx.timeoutMs },
+          );
+          // Only a consumed approval lets the commit through; anything else means "still waiting".
+          const text = JSON.stringify(pending.result ?? pending.error ?? {});
+          if (/confirmation_required|confirmation_invalid/.test(text)) return false;
+          state.commitAttempted = true;
+          state.interactiveCommitResponse = pending;
+          return true;
+        };
+        await waitForHumanApproval(state, {
+          command: `RFPHUB_MCP_HOME=${mcpHome} ${approveCommand}`,
+          timeoutMs: ctx.approveTimeoutMs,
+          onPrompt: (text) => process.stderr.write(`${text}\n`),
+        });
+      } else {
+        const approveResult = await runApprove(approveArgs.command, approveArgs.args, {
+          cwd: ctx.repoRoot,
+          env: { ...process.env, ...env },
+          timeoutMs: ctx.approveTimeoutMs,
+        });
+        state.approveOutput = `${approveResult.stdout}${approveResult.stderr ?? ""}`;
+      }
+    } catch (err) {
+      throw new Error(
+        `phase 2 (${approveCommand}) failed: ${err.message}${err.stderr ? `\nstderr: ${err.stderr}` : ""}`,
+      );
+    }
+    c.info("approval", `approval: ${state.approvalMode} — ${approveCommand}`);
+
+    let commitResponse = state.interactiveCommitResponse;
+    if (!commitResponse) {
+      state.commitAttempted = true;
+      commitResponse = await client.request(
+        "tools/call",
+        { name: SUBMIT_TOOL, arguments: { document, approvalId } },
+        { timeoutMs: ctx.timeoutMs },
+      );
+    }
     if (commitResponse.error) {
       throw new Error(
         `phase 3 (commit) failed: JSON-RPC error ${JSON.stringify(commitResponse.error)}`,
       );
     }
     const commit = extractPayload(commitResponse);
-    // `commit.id` is always present per the real submittedSchema (packages/mcp/src/tools/
-    // submit.ts), but the candidate is a sound fallback either way — it is the id the document
-    // itself declared, and the API does not get to choose a different one for a client-supplied id.
+    // `commit.id` is always present per the real submittedSchema; the candidate is a sound fallback
+    // either way — it is the id the document itself declared.
     const opportunityId = commit?.id ?? state.candidateOpportunityId;
     state.opportunityId = opportunityId;
     state.commitPayload = commit;
+    c.pass(
+      "preview → out-of-band approval → commit completes",
+      `approvalId=${approvalId}, opportunityId=${opportunityId}, approval: ${state.approvalMode}`,
+    );
 
-    return { approvalId, opportunityId, submitResult: commit };
+    return opportunityId;
   } finally {
     await client.close();
+    await rm(mcpHome, { recursive: true, force: true });
   }
 }
 
@@ -228,9 +344,7 @@ export async function verifyLandedPending(ctx, opportunityId) {
     );
   }
   const entry = (mine.json?.items ?? []).find((item) => item.id === opportunityId);
-  if (!entry) {
-    throw new Error(`${opportunityId} is not in GET /v1/me/opportunities at all`);
-  }
+  if (!entry) throw new Error(`${opportunityId} is not in GET /v1/me/opportunities at all`);
   if (entry.reviewStatus !== "pending") {
     throw new Error(
       `${opportunityId} has reviewStatus "${entry.reviewStatus}", expected "pending"`,
@@ -264,4 +378,23 @@ export async function teardown(ctx, opportunityId) {
   return { rejected: true };
 }
 
-export { fixtureDocument };
+/**
+ * Teardown is not done when the reject endpoint answers 200 — it is done when the entry is gone
+ * from the surfaces a reader can reach. Both are checked: the owner listing must no longer show it
+ * as pending, and the public detail route must not serve it.
+ */
+export async function verifyTornDown(ctx, opportunityId) {
+  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", {
+    token: ctx.writeKey,
+    agent: "rfphub-m4-accept",
+  });
+  const owned = (mine.json?.items ?? []).find((item) => item.id === opportunityId);
+  const publicRes = await callJson(ctx, `/v1/opportunities/${encodeURIComponent(opportunityId)}`, {
+    agent: "rfphub-m4-accept",
+  });
+  return {
+    ownerStatus: owned?.reviewStatus ?? "(absent)",
+    publicStatus: publicRes.status,
+    ok: (owned === undefined || owned.reviewStatus !== "pending") && publicRes.status === 404,
+  };
+}

@@ -7,10 +7,13 @@
  * against a real deployment. This tool is the other half — it drives the actual interlock against
  * a real, writable STAGING deployment:
  *
- *   1. preview   `submit_opportunity` phase 1 — no network write, returns `pending` + an approvalId
- *   2. approve   a SEPARATE process runs `rfphub-mcp approve <approvalId>`, simulating the human
- *                step the plan requires never be reachable from inside the MCP channel itself
- *   3. commit    `submit_opportunity` phase 3 — the actual `POST`, now that an approval exists
+ *   0. snapshot  `GET /v1/me/opportunities`, so "the preview created nothing" is a fact
+ *   1. preview   `submit_opportunity` phase 1 — exact `status: "pending"`, snapshot unchanged
+ *   2. refuse    phase 3 WITHOUT an approval — must be refused, snapshot still unchanged
+ *   3. approve   a SEPARATE process runs `rfphub-mcp approve <approvalId>`. Driven
+ *                non-interactively by default and reported as `approval: SIMULATED`;
+ *                `--interactive-approval` waits for a person and reports `approval: HUMAN`
+ *   4. commit    `submit_opportunity` phase 3 — the actual `POST`, now that an approval exists
  *
  * ...then verifies the fixture landed `pending` via `GET /v1/me/opportunities` (never the public
  * read surface, which hides pending entries by design), and tears it down — rejected and unlisted
@@ -32,7 +35,13 @@
  */
 import { writeFileSync } from "node:fs";
 import { normalizeBase } from "./m2-compliance/http.mjs";
-import { runSubmissionCycle, teardown, verifyLandedPending } from "./m4-compliance/accept/flow.mjs";
+import {
+  runSubmissionCycle,
+  runToken,
+  teardown,
+  verifyLandedPending,
+  verifyTornDown,
+} from "./m4-compliance/accept/flow.mjs";
 import { parseArgs, redirectRefusal, refusals } from "./m4-compliance/accept/options.mjs";
 import { Report } from "./m4-compliance/report.mjs";
 
@@ -41,8 +50,9 @@ const USAGE = `M4 write-acceptance — real 3-phase MCP submission, staging only
   RFPHUB_REVIEWER_TOKEN=<token> RFPHUB_WRITE_KEY=<rfph_key> node scripts/accept-m4.mjs --api <url>
 
 THIS TOOL WRITES a real entry (title prefixed \`m4check-\`) to the deployment it is pointed at,
-through the real MCP submit_opportunity interlock, including a simulated human approval step.
-It tears the entry down (rejected + unlisted) at the end when the reviewer credential is available.
+through the real MCP submit_opportunity interlock. The approval step is DRIVEN, not human, unless
+--interactive-approval is passed; the report says which. It tears the entry down (rejected and
+unlisted, then verified gone from the owner listing and the public route) at the end.
 
 Required
   --api <url>              Origin of the deployed /v1/ API. Loopback, or one of this project's
@@ -110,13 +120,7 @@ async function main() {
     // ctx.baseUrl; this tool's own flag is --api, so it is aliased rather than renamed everywhere.
     baseUrl: opts.api,
   };
-  const state = {
-    run: new Date()
-      .toISOString()
-      .replace(/[-:]/g, "")
-      .replace(/\.\d+Z$/, "")
-      .slice(0, 13),
-  };
+  const state = { run: runToken() };
 
   const report = new Report({
     siteUrl: "(n/a — write acceptance targets the API only)",
@@ -144,12 +148,7 @@ async function main() {
   );
 
   try {
-    c.info("MCP server under test", "resolved at run time — see the next check's detail");
-    const { approvalId, opportunityId } = await runSubmissionCycle(ctx, state);
-    c.pass(
-      "preview → approve → commit completes",
-      `approvalId=${approvalId}, opportunityId=${opportunityId}`,
-    );
+    const opportunityId = await runSubmissionCycle(ctx, state, c);
 
     const entry = await verifyLandedPending(ctx, opportunityId);
     c.expect(
@@ -159,22 +158,17 @@ async function main() {
       `reviewStatus=${entry.reviewStatus}, expected "pending"`,
     );
   } catch (err) {
-    // `state.commitAttempted` is set by runSubmissionCycle immediately before the phase-3 `POST` —
-    // once that is true, a throw here does NOT mean "nothing was created". The request may have
-    // reached the API despite this process never seeing the reply (timeout, connection reset), and
-    // `state.candidateOpportunityId` (the document's own declared id, known since before phase 1)
-    // is exactly what lets this recover: check for it, and if it landed, still tear it down rather
-    // than leaving an unaccounted-for entry in the deployment. Either way this run is NOT a pass —
-    // an ambiguous outcome is not a demonstrated one.
+    // `state.commitAttempted` is set immediately before the phase-3 POST — once true, a throw does
+    // NOT mean "nothing was created": the request may have reached the API even though this process
+    // never saw the reply. `state.candidateOpportunityId` is the id the document itself declared,
+    // known since before phase 1, which is exactly what lets this recover and still tear down.
     if (state.commitAttempted && state.candidateOpportunityId) {
       c.fail(
-        "preview → approve → commit completes",
-        `${err.message} — the outcome is AMBIGUOUS (the POST may have reached the API even though this call did not return); checking /v1/me/opportunities for the candidate id ${state.candidateOpportunityId}`,
+        "preview → out-of-band approval → commit completes",
+        `${err.message} — the outcome is AMBIGUOUS (the POST may have reached the API even though this call did not return); checking /v1/me/opportunities for ${state.candidateOpportunityId}`,
       );
       try {
         const entry = await verifyLandedPending(ctx, state.candidateOpportunityId);
-        // It landed despite the error above: record the id so the teardown block below tears it
-        // down, and say plainly that it was found this way.
         state.opportunityId = state.candidateOpportunityId;
         c.warn(
           "ambiguous commit actually landed",
@@ -187,9 +181,10 @@ async function main() {
         );
       }
     } else {
-      c.fail("preview → approve → commit completes", err.message);
+      c.fail("preview → out-of-band approval → commit completes", err.message);
     }
   } finally {
+    c.info("approval mode", state.approvalMode ?? "(never reached)");
     c.finish();
     if (opts.keepFixture) {
       t.skip(
@@ -201,11 +196,18 @@ async function main() {
     } else {
       try {
         await teardown(ctx, state.opportunityId);
-        t.pass("teardown", `${state.opportunityId} rejected and unlisted`);
+        // A 200 from the reject endpoint is not the same fact as "the entry is gone from every
+        // surface a reader can reach", which is what teardown is for.
+        const gone = await verifyTornDown(ctx, state.opportunityId);
+        t.expect(
+          gone.ok,
+          "teardown",
+          `${state.opportunityId} rejected; owner listing shows ${gone.ownerStatus} and the public route answers ${gone.publicStatus}`,
+          `${state.opportunityId} was rejected but is still reachable: owner listing shows ${gone.ownerStatus}, the public route answers ${gone.publicStatus} — REJECT/UNLIST IT BY HAND`,
+        );
       } catch (err) {
-        // A teardown failure leaves a real (if prefixed) entry behind in the deployment this tool
-        // just wrote to — that is a FAILED run, not a warning on an otherwise-green one. Silently
-        // downgrading it would let `accept-m4` exit 0 while a fixture sits in staging unreviewed.
+        // A teardown failure leaves a real entry behind in the deployment this tool just wrote to.
+        // That is a FAILED run, not a warning on an otherwise-green one.
         t.fail("teardown", err.message);
       }
     }
