@@ -80,6 +80,11 @@ jobs:
       - name: Source neutrality (repo-wide)
         run: pnpm check:neutral
 
+      # Agent Skills frontmatter (name/dir match, no top-level version/tags, description length,
+      # required sections, <500 lines) + the marketplace/plugin wiring under skills/*.
+      - name: Skill checks
+        run: pnpm check:skill
+
       # No secret may reach the container image or the buildx layer cache, which for this public
       # repository is stored in its own Actions cache. Runs before the build, because the thing it
       # protects is the build.
