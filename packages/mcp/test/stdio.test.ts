@@ -58,6 +58,8 @@ afterAll(async () => {
 interface Session {
   child: ChildProcessWithoutNullStreams;
   send(message: unknown): Promise<Record<string, unknown>>;
+  /** For a payload too deep for this process's own `JSON.stringify` to build. */
+  sendRaw(line: string): Promise<Record<string, unknown>>;
   stop(): void;
 }
 
@@ -83,13 +85,16 @@ function session(env: Record<string, string>): Session {
   return {
     child,
     send(message) {
+      return this.sendRaw(JSON.stringify(message));
+    },
+    sendRaw(line) {
       return new Promise<Record<string, unknown>>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("no response in 10s")), 10_000);
-        pending.push((line) => {
+        pending.push((reply) => {
           clearTimeout(timer);
-          resolve(line);
+          resolve(reply);
         });
-        child.stdin.write(`${JSON.stringify(message)}\n`);
+        child.stdin.write(`${line}\n`);
       });
     },
     stop() {
@@ -228,6 +233,66 @@ describe("stdout discipline", () => {
       // Every stdout line parsed as JSON-RPC above; a banner there would have thrown.
       expect(reply.result).toBeDefined();
       expect(stderr.join("")).toContain("on stdio");
+    } finally {
+      s.stop();
+    }
+  });
+});
+
+/**
+ * Two things the process has to survive at the edges of the protocol: a document nested far
+ * deeper than anything can walk, and a client that goes away mid-answer.
+ */
+describe("the edges of the stdio boundary", () => {
+  /** Built as text: at this depth `JSON.stringify` would overflow THIS process's stack. */
+  function nested(depth: number): string {
+    return `${'{"deeper":'.repeat(depth)}{"leaf":true}${"}".repeat(depth)}`;
+  }
+
+  it("answers a pathologically nested document with a code, and sends nothing to the API", async () => {
+    const before = requests.length;
+    const s = session({
+      RFPHUB_MCP_HOME: tempHome(),
+      RFPHUB_MCP_ENABLE_SUBMIT: "1",
+      RFPHUB_API_KEY: FAKE_KEY,
+    });
+    try {
+      const reply = await s.sendRaw(
+        '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"submit_opportunity",' +
+          `"arguments":{"document":{"id":"example-org:x","nested":${nested(5_000)}}}}}`,
+      );
+      const text = JSON.stringify(reply);
+      expect(text).toMatch(/\[(invalid_input|exec_failed)\]/);
+      expect(text).not.toContain(FAKE_KEY);
+      expect(requests.length).toBe(before);
+    } finally {
+      s.stop();
+    }
+  });
+
+  it("exits quietly when the client closes stdout mid-session", async () => {
+    const s = session({ RFPHUB_MCP_HOME: tempHome(), RFPHUB_API_KEY: FAKE_KEY });
+    let stderr = "";
+    s.child.stderr.setEncoding("utf8");
+    s.child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+
+    const exited = new Promise<number | null>((resolve) => s.child.on("exit", resolve));
+    s.child.stdout.destroy();
+    s.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`);
+    s.child.stdin.end();
+
+    const code = await Promise.race([
+      exited,
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 8_000)),
+    ]);
+    try {
+      expect(code).not.toBe("timeout");
+      expect(stderr).not.toContain(FAKE_KEY);
+      // No stack frames: an `at ...` line carries file paths and, in an fs error, a directory name
+      // derived from an environment value.
+      expect(stderr).not.toMatch(/\n\s+at\s/);
     } finally {
       s.stop();
     }

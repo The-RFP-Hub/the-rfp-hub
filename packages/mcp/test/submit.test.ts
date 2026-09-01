@@ -15,7 +15,7 @@ import {
   renderSubmission,
   run,
 } from "../src/tools/submit.js";
-import { FAKE_KEY, rejection, stubFetch, testConfig, validDocument } from "./helpers.js";
+import { FAKE_KEY, rejection, stubFetch, tempHome, testConfig, validDocument } from "./helpers.js";
 
 afterEach(() => clearRegisteredSecrets());
 
@@ -167,5 +167,60 @@ describe("the submission result", () => {
 
   it("says a pending entry is not on the public site and names the owner route", () => {
     expect(renderSubmission(result).text).toContain("/v1/me/opportunities");
+  });
+});
+
+/**
+ * The preview's own words, checked literally.
+ *
+ * This sentence is the one a model reads to decide what just happened, and every clause in it is
+ * load-bearing: `status: "pending"` says the call produced a record and not a submission, "the
+ * person at this machine" says the next step is not the model's, and "no approval secret" says
+ * there is nothing in this response to spend.
+ */
+describe("the preview says exactly what it is required to say", () => {
+  async function previewOf(document: Record<string, unknown> = validDocument()) {
+    const home = tempHome();
+    const config = testConfig({ submitEnabled: true, home });
+    const ctx: ToolContext = {
+      config,
+      api: new ApiClient(config, { fetchImpl: stubFetch([{ body: {} }]).fetchImpl }),
+      policy: new Policy(home),
+      now: () => new Date(),
+      protocolVersion: "2026-07-28",
+    };
+    return run({ document }, ctx);
+  }
+
+  it("opens with the prescribed sentence, verbatim", async () => {
+    const preview = await previewOf();
+    const id = String(preview.structured.approvalId);
+    const prescribed = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`rfphub-mcp approve ${id}\` in their own terminal and read what it prints. No approval secret is ever returned here.`;
+    expect(String(preview.structured.instruction).startsWith(prescribed)).toBe(true);
+    expect(preview.text).toContain('Nothing has been submitted. `status: "pending"`.');
+  });
+
+  it("states the derived namespace and whether the id satisfies the rule", async () => {
+    const preview = await previewOf();
+    const structured = preview.structured as { preview: Record<string, unknown> };
+    expect(structured.preview.idMatchesNamespace).toBe(true);
+    expect(String(structured.preview.idRule)).toBe(
+      "A public id must be `<namespace>:<local>`. This server derives the namespace from the " +
+        "document as `example-org` (`source.publisher`, or `operatingOrganizations[0].slug` when " +
+        "that is absent), so the id has to start `example-org:`. The id in this document is " +
+        "`example-org:test-grant`, which satisfies that rule.",
+    );
+    expect(preview.text).toContain("so the id has to start `example-org:`");
+  });
+
+  it("says so when the id does not carry the derived namespace", async () => {
+    const preview = await previewOf(
+      validDocument({ id: "somebody-else:test-grant", source: { publisher: "example-org" } }),
+    );
+    const structured = preview.structured as { preview: Record<string, unknown> };
+    expect(structured.preview.idMatchesNamespace).toBe(false);
+    expect(String(structured.preview.idRule)).toContain(
+      "does NOT satisfy that rule — the API will refuse it",
+    );
   });
 });

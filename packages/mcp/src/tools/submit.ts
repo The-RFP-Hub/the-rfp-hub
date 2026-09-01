@@ -96,6 +96,10 @@ const pendingSchema = z.object({
     validatorWarnings: z.array(z.string()),
     destination: z.string(),
     credentialFingerprint: z.string(),
+    idRule: z
+      .string()
+      .describe("Says which namespace this server derived, and whether the id agrees with it."),
+    idMatchesNamespace: z.boolean(),
   }),
   instruction: z.string(),
 });
@@ -296,6 +300,27 @@ export function rejectEmbeddedCredential(document: unknown): void {
   );
 }
 
+/**
+ * Whether the document's own id is `<namespace>:<local>` for the namespace derived from it.
+ *
+ * The API decides this, and a mismatch is a 400 the caller cannot see coming — so the preview says
+ * it in the one place a person is being asked to read before approving.
+ */
+export function describeIdRule(facts: DocumentFacts): { text: string; matches: boolean } {
+  const prefix = `${facts.namespace}:`;
+  const matches =
+    facts.namespace !== "" && facts.id.startsWith(prefix) && facts.id.length > prefix.length;
+  return {
+    matches,
+    text:
+      `A public id must be \`<namespace>:<local>\`. This server derives the namespace from the ` +
+      `document as \`${facts.namespace || "(none)"}\` (\`source.publisher\`, or ` +
+      `\`operatingOrganizations[0].slug\` when that is absent), so the id has to start ` +
+      `\`${prefix}\`. The id in this document is \`${facts.id}\`, which ` +
+      `${matches ? "satisfies that rule" : "does NOT satisfy that rule — the API will refuse it"}.`,
+  };
+}
+
 function bindingFor(document: Record<string, unknown>, ctx: ToolContext): ApprovalBinding {
   return {
     apiOrigin: ctx.config.apiOrigin,
@@ -363,7 +388,11 @@ function preview(
     expiresAt: new Date(now.getTime() + PENDING_TTL_MS).toISOString(),
   });
 
-  const instruction = `Nothing has been submitted. To submit, the person at this machine must run \`rfphub-mcp approve ${approvalId}\` in their own terminal and read what it prints. No approval secret is ever returned here. Then call this tool again with the SAME document and \`approvalId: "${approvalId}"\`. The approval expires ${PENDING_TTL_MS / 60000} minutes after this preview.`;
+  // The first four sentences are PRESCRIBED, word for word. They are what a model reads before
+  // deciding what it just did, and a paraphrase that drops `status: "pending"` or softens "must"
+  // is the difference between "nothing happened" and "something might have".
+  const instruction = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`rfphub-mcp approve ${approvalId}\` in their own terminal and read what it prints. No approval secret is ever returned here. Then call this tool again with the SAME document and \`approvalId: "${approvalId}"\`. The approval expires ${PENDING_TTL_MS / 60000} minutes after this preview.`;
+  const idRule = describeIdRule(facts);
 
   const structured = {
     status: "pending" as const,
@@ -380,6 +409,8 @@ function preview(
       validatorWarnings,
       destination: binding.apiOrigin,
       credentialFingerprint: binding.keyFingerprint,
+      idRule: idRule.text,
+      idMatchesNamespace: idRule.matches,
     },
     instruction,
   };
@@ -396,6 +427,8 @@ function preview(
     `  deadlines     : ${facts.deadlineCount}`,
     ...Object.entries(facts.awardFields).map(([k, v]) => `  ${k.padEnd(14)}: ${v}`),
     delimit("title as supplied", facts.title),
+    "",
+    idRule.text,
     "",
     validatorWarnings.length
       ? `Advisory warnings (not fatal):\n${validatorWarnings.map((w) => `  - ${w}`).join("\n")}`
