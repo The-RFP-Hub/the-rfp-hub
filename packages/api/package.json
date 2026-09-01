@@ -14,6 +14,8 @@
     "start": "node dist/server.js",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run test/integration",
     "db:generate": "drizzle-kit generate",
     "db:create": "tsx scripts/create-db.ts",
     "migrate": "tsx scripts/migrate.ts",

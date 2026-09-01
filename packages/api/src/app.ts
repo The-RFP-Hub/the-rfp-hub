@@ -6,6 +6,7 @@ import { authConfigFromEnvironment } from "./auth/better-auth.js";
 import { config } from "./config.js";
 import { pool } from "./db/client.js";
 import { registerRoutes } from "./modules/routes/index.js";
+import { RATE_LIMIT_HEADERS, rateLimitedError } from "./modules/routes/shared/rate-limit-key.js";
 import { analyticsEvents } from "./modules/services/insights/event-buffer.js";
 import { canonicalDocuments } from "./modules/shared/canonical-documents.js";
 import { isHttpError } from "./modules/shared/http-error.js";
@@ -82,6 +83,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     origin: "*" as const,
     methods: ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: RATE_LIMIT_HEADERS,
     credentials: false,
     maxAge: 600,
   };
@@ -96,7 +98,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // export — which is the traffic this project exists to serve, and would be measured per IP,
   // which behind a shared egress is one number for a whole organization. The write, auth and
   // redirect routes attach their own `config.rateLimit` where a limit is meaningful.
-  await app.register(rateLimit, { global: false });
+  // `errorResponseBuilder` here, not per route: every limiter is minted from this registration.
+  await app.register(rateLimit, { global: false, errorResponseBuilder: rateLimitedError });
 
   // Shared response schemas → OpenAPI components + response serialization (before routes ref them).
   for (const schema of responseSchemas) app.addSchema(schema);

@@ -13,6 +13,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { createAuth } from "../../src/auth/better-auth.js";
 import { db, pool } from "../../src/db/client.js";
+import { RATE_LIMIT_HEADERS } from "../../src/modules/routes/shared/rate-limit-key.js";
 import { testAuth, testAuthConfig } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
@@ -63,7 +64,7 @@ run("M3MOUNT the auth mount", () => {
     expect(res.statusCode).toBeLessThan(500);
   });
 
-  it("allows exactly the configured origin, and exposes only the session header", async () => {
+  it("allows exactly the configured origin, and exposes the session header", async () => {
     const preflight = await app.inject({
       method: "OPTIONS",
       url: "/api/auth/sign-in/email-otp",
@@ -78,8 +79,7 @@ run("M3MOUNT the auth mount", () => {
     // the trusted origin's sign-in fetch, or every Google callback dies on `state_mismatch` (the
     // browser discards the Set-Cookie in `omit` mode). The safety envelope is the pairing this
     // test pins: the answer names exactly one origin (never `*`, which the spec forbids with
-    // credentials anyway) and exposes exactly one header. `/v1` keeps its own wide,
-    // credential-free policy, asserted elsewhere.
+    // credentials anyway). `/v1` keeps its own wide, credential-free policy, asserted elsewhere.
     expect(preflight.headers["access-control-allow-credentials"]).toBe("true");
 
     const actual = await app.inject({
@@ -88,7 +88,10 @@ run("M3MOUNT the auth mount", () => {
       headers: { origin: ALLOWED, "content-type": "application/json" },
       payload: JSON.stringify({ email: EMAIL, otp: "000000" }),
     });
-    expect(actual.headers["access-control-expose-headers"]).toBe("set-auth-token");
+    const exposed = String(actual.headers["access-control-expose-headers"]).split(", ");
+    expect(exposed).toContain("set-auth-token");
+    // This mount carries the tighter ceilings, so a client here needs the backoff headers most.
+    expect(exposed).toEqual(expect.arrayContaining(RATE_LIMIT_HEADERS));
   }, 60_000);
 
   it("does NOT answer a disallowed origin, however plausible", async () => {
@@ -118,7 +121,10 @@ run("M3MOUNT the auth mount", () => {
     });
     // Every `/v1` credential is header-borne, so a cross-site read carries no ambient authority.
     expect(res.headers["access-control-allow-origin"]).toBe("*");
-    expect(res.headers["access-control-expose-headers"]).toBeUndefined();
+    // The session header is NOT on this policy — only the auth mount mints one.
+    expect(String(res.headers["access-control-expose-headers"]).split(", ")).toEqual(
+      RATE_LIMIT_HEADERS,
+    );
   });
 
   it("publishes none of it — `/api/auth` is not part of the versioned contract", async () => {
