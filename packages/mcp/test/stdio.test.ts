@@ -257,9 +257,9 @@ describe("the edges of the stdio boundary", () => {
       RFPHUB_API_KEY: FAKE_KEY,
     });
     try {
+      const document = `{"id":"example-org:x","nested":${nested(5_000)}}`;
       const reply = await s.sendRaw(
-        '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"submit_opportunity",' +
-          `"arguments":{"document":{"id":"example-org:x","nested":${nested(5_000)}}}}}`,
+        `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"submit_opportunity","arguments":{"document":${document}}}}`,
       );
       const text = JSON.stringify(reply);
       expect(text).toMatch(/\[(invalid_input|exec_failed)\]/);
