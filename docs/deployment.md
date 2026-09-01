@@ -356,29 +356,49 @@ rejected and unlisted at the end.
 pnpm check:m4 --site https://example.org --api https://api.example.org --browser
 ```
 
-`check:m4` is read-only and needs no `--allow-production`: its defaults already point at
-production, and the one case that looks like a write — the MCP server's fail-closed submit — runs
-against a local recording server the checker starts itself. It covers the governance documents and
-their links from the site, the public `/publishers` page, the reference frontend's search, filters,
-paging, detail and both deep-links, three responsive viewports, the MCP server being installable
-and callable, the agent skill, and these guides' links and `safe-read` blocks.
+`check:m4` is read-only: its defaults already point at production, and the one case that looks like
+a write — the MCP server's fail-closed submit — runs against a local recording server the checker
+starts itself. It covers the governance documents and their links from the site, the public
+`/publishers` page, the reference frontend's search, filters, paging, detail and both deep-links,
+three responsive viewports, the MCP server being installable and callable, the agent skill, and
+these guides' links and `safe-read` blocks.
 
 **`--browser` is not optional in practice.** The directory and `/publishers` are client-rendered,
 so without it every check that needs a rendered page reports a named `WARN` — never a silent pass,
-and never a fail for something the tool did not look at. `--skip <id>` and `--only <id>` select
-checks; `--offline` skips every network request (what the CI `docs-links` job uses); `--json`
-writes the machine-readable report. See
-[`scripts/m4-compliance/README.md`](../scripts/m4-compliance/README.md).
+and never a fail for something the tool did not look at. A **required** check that ends `WARN` or
+`SKIP` makes the whole run `INCOMPLETE` and exits non-zero, so a green sign-off cannot be assembled
+out of things the tool did not actually look at.
+
+`--skip <id>` and `--only <id>` select checks. `--mcp-spec` chooses which MCP server is exercised —
+a dist-tag (`next`), an exact version, or `local` for the checkout. `--json` writes the
+machine-readable report; with no path it goes to a unique temporary file whose location is printed
+on the last line, so two runs never overwrite each other.
+
+**`--offline` applies to the documentation criterion only.** It is what the CI `docs-links` job
+uses, and it does not put the rest of the tool offline: every other criterion still talks to the
+site, the API, npm and the MCP Registry. Offline, the docs criterion still walks every `sh` block's
+marker and still resolves every relative link and `#anchor`; what it drops is the absolute-link
+requests and the execution of `safe-read` blocks. Run it as `--only docs --offline` — the
+combination that means what it says — rather than expecting `--offline` alone to make a full run
+network-free. See [`scripts/m4-compliance/README.md`](../scripts/m4-compliance/README.md).
 
 ```sh staging-write
 RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
-  pnpm accept:m4 --api https://api-staging.example.org
+  pnpm accept:m4 --api https://api-staging.example.org --interactive-approval
 ```
 
-`accept:m4` is the write-acceptance counterpart, staging only: it drives the real MCP
-`submit_opportunity` interlock end to end — preview, an out-of-band `rfphub-mcp approve`, commit —
-and tears its fixture down afterwards. Same refusal shape as `check:m3`: no run without both
-credentials, and no production target without `--allow-production`.
+`accept:m4` is the write-acceptance counterpart, **staging only** — there is no flag that points it
+at production. It drives the real MCP `submit_opportunity` interlock end to end — preview, an
+out-of-band `rfphub-mcp approve`, commit — and tears its fixture down afterwards. Same refusal
+shape as `check:m3`: no run without both credentials, and no target that does not look like
+staging.
+
+`--interactive-approval` is the difference between evidence and a rehearsal. With it, the run
+**pauses** and asks you to run `rfphub-mcp approve <id>` in a second terminal; the report then
+labels the approval `HUMAN`. Without it the checker drives the approval CLI itself and labels it
+`SIMULATED (non-interactive)` — honest, and useful in a loop, but it proves the plumbing rather
+than the interlock. **The acceptance report handed to the client must be produced with
+`--interactive-approval`**, and the label in the report is what says so.
 
 ---
 
