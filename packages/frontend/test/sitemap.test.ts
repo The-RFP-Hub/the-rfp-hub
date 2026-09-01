@@ -1,7 +1,6 @@
 /**
- * `sitemap.ts` covers exactly the static public surface, and — the load-bearing rule — publishes it
- * ONLY on the declared canonical origin. Staging and every Vercel preview must get an empty sitemap,
- * never one that duplicates production's.
+ * `sitemap.ts` covers the static public surface and — the load-bearing rule — publishes it only on
+ * the declared canonical origin. Staging and every preview must get an empty sitemap.
  */
 import sitemap from "@/app/sitemap";
 import { afterEach, describe, expect, it, vi } from "vitest";

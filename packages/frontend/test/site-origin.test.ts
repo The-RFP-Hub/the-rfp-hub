@@ -1,9 +1,6 @@
 /**
- * `sitemap.ts` and `robots.ts` need two facts: the absolute origin this request landed on (never
- * `NEXT_PUBLIC_API_URL`, which names the API, and never a literal, which would make every
- * self-hosted fork's sitemap describe production's address) and whether that origin is the ONE
- * origin this deployment declares itself canonical for. These are the pure rules for both, plus the
- * one call that actually reads a request and an environment variable.
+ * The two facts `sitemap.ts`, `robots.ts` and `root-metadata.ts` need: the origin this request landed
+ * on, and whether it is the one origin this deployment declares itself canonical for.
  */
 import {
   canonicalSiteOrigin,

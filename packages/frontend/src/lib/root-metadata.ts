@@ -1,13 +1,6 @@
 /**
- * The root layout's `generateMetadata`, pulled out of `src/app/layout.tsx` so it is importable
- * without also importing `next/font/google` (via `lib/fonts.ts`) and the whole provider tree —
- * neither of which this function touches, and the font loader in particular has no transform under
- * the package's own test runner (Vitest, not a Next build), so importing the layout module directly
- * in a unit test throws before a single assertion runs.
- *
- * `robots` IS THE ONE FIELD HERE THAT CANNOT BE A BUILD-TIME CONSTANT any more — see
- * `lib/site-origin.ts` for the full reasoning. Everything else is exactly what it was when this was
- * a static `metadata` object.
+ * The root layout's `generateMetadata`, in its own module: importing `src/app/layout.tsx` in a unit
+ * test pulls in `next/font/google`, which throws under Vitest before an assertion runs.
  */
 import { isCanonicalRequest } from "@/lib/site-origin";
 import type { Metadata } from "next";

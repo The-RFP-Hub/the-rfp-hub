@@ -1,19 +1,8 @@
 /**
- * `/publishers`, PROVEN RATHER THAN EYEBALLED.
- *
- * Three things about this page have to be true and none of them is visible in an API test:
- *
- *   1. It reads the PUBLIC route. `GET /v1/publishers` is unauthenticated, and this page never
- *      attaches a token — asserted against the client's recorded calls.
- *   2. Every publisher-supplied string — name, description, ecosystem — renders as TEXT, never as
- *      markup, so the fixtures below carry markup and the assertions insist it stays inert.
- *   3. `logoUrl` NEVER becomes an `<img>`. This package's CSP has no allowance for a remote image
- *      (`src/lib/csp.ts`), so an `<img src="https://…">` here would be silently blocked by the
- *      browser and a broken-image icon would be the reader's only clue that something was wrong;
- *      the component must never emit the tag at all.
- *
- * The API client is injected through the same context the application uses, so the component
- * fetches and renders exactly as it does in a browser. No network, no auth SDK.
+ * `/publishers`. Three things have to be true here and none is visible in an API test: the page
+ * reads the unauthenticated route with no token, every publisher-supplied string renders as text
+ * rather than markup (hence the hostile fixtures below), and `logoUrl` never becomes an `<img>` —
+ * the CSP would block it silently and a broken-image icon would be the only clue.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -101,13 +90,11 @@ describe("the public publishers page", () => {
     const { client: c } = client();
     mount(c);
 
-    // The hostile string appears verbatim as a text node — an injected <img> tag would not render
-    // as this literal string, it would render as a broken image with no alt text.
+    // The hostile string appears verbatim as a text node; an injected <img> would not.
     expect(await screen.findByText(HOSTILE)).toBeTruthy();
     expect(screen.getByText("Grants for public-goods infrastructure on Filecoin.")).toBeTruthy();
     expect(screen.getByText("<script>evil()</script>")).toBeTruthy();
 
-    // Confirm no injected element actually mounted.
     expect(document.querySelector('img[src="x"]')).toBeNull();
     expect(document.querySelector("script")).toBeNull();
   });
@@ -118,7 +105,6 @@ describe("the public publishers page", () => {
 
     await screen.findByText(HOSTILE);
     expect(document.querySelectorAll("img")).toHaveLength(0);
-    // It is still reachable, as a link — never silently dropped.
     expect(screen.getByText("linked, not embedded").closest("a")?.getAttribute("href")).toBe(
       filecoin.logoUrl,
     );
@@ -132,7 +118,6 @@ describe("the public publishers page", () => {
     expect(filecoinLink.getAttribute("href")).toBe(filecoin.website);
     expect(filecoinLink.getAttribute("rel")).toBe("noopener noreferrer");
 
-    // `javascript:` is shown, but never as a clickable link.
     expect(screen.getByText("javascript:alert(1)").closest("a")).toBeNull();
   });
 
@@ -159,9 +144,6 @@ describe("the public publishers page", () => {
     mount(c);
 
     await screen.findByText(HOSTILE);
-    // Not a comment in the source and not only on the directory it links to: `organization` matches
-    // the sponsoring organization as well as the operating one, and the reader decides whether to
-    // click here.
     expect(
       screen.getAllByText("Every listing this organization operates or sponsors."),
     ).toHaveLength(2);

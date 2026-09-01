@@ -24,11 +24,8 @@ function pageRoutes(directory = appRoot): string[] {
 }
 
 /**
- * The routes this app WANTS a search engine to carry — everything else is the workbench or an
- * auth-mechanics page, and must stay `noindex` on every origin including the canonical one. This is
- * the exact set `src/app/sitemap.ts` publishes, plus `/opportunities/[id]`: a public detail page a
- * crawler reaches by following a directory link rather than one the sitemap enumerates itself
- * (`sitemap.ts`'s own comment explains why it does not fetch and list every opportunity).
+ * The routes this app WANTS a search engine to carry: the set `src/app/sitemap.ts` publishes, plus
+ * `/opportunities/[id]`, which a crawler reaches by following a directory link.
  */
 const PUBLIC_ROUTES = [
   "/",
@@ -40,10 +37,8 @@ const PUBLIC_ROUTES = [
 ];
 
 /**
- * The other half, written out rather than computed as "everything else". The previous version of
- * this test compared `pageRoutes().filter(not public)` with the very expression that produced it,
- * so no change to the app could make it fail; both halves are now literals, checked against what
- * the layouts on disk actually say.
+ * The other half, written out rather than computed as "everything else": the previous version of
+ * this test compared a filter with the expression that produced it, so it could not fail.
  */
 const NOINDEX_ROUTES = [
   "/account",
@@ -75,10 +70,7 @@ function noindexInSource(route: string): boolean {
 
 describe("route metadata", () => {
   it("uses the directory title as the root default and templates every child title", () => {
-    // The literal moved out of layout.tsx and into lib/root-metadata.ts (see that file's own
-    // comment): generateMetadata there needs no import from the font/provider tree that has no
-    // transform under this package's test runner. Either file carrying the literal satisfies the
-    // invariant this test exists to pin.
+    // Either file may carry the literal: it moved to lib/root-metadata.ts so a test can import it.
     const source =
       readFileSync(join(appRoot, "layout.tsx"), "utf8") +
       readFileSync(join(process.cwd(), "src", "lib", "root-metadata.ts"), "utf8");
@@ -142,16 +134,7 @@ describe("route metadata", () => {
     });
   });
 
-  /**
-   * THE ROOT LAYOUT'S `index: true` CASCADES TO EVERY ROUTE THAT DOES NOT OVERRIDE IT (Codex review,
-   * round 2) — Next's metadata merge means a child route with no `robots` field of its own inherits
-   * the nearest ancestor's, so turning indexing on at the root silently turned it on for
-   * `/dashboard`, every `/listings/*` and `/organizations/*` route, `/keys`, `/account`, `/admin`,
-   * `/review`, `/duplicates`, `/notifications` and `/auth/complete` too, unless each of them said
-   * otherwise. These two tests pin that every NON-public route says otherwise, and that the set
-   * saying so is exactly "every route minus the public ones" — neither a route quietly left off nor
-   * a public route accidentally caught by an overbroad prefix.
-   */
+  // The root layout's `index: true` cascades to every route that does not override it.
   describe("every non-public route overrides indexing off", () => {
     const noindexRoutes = NOINDEX_ROUTES;
 
@@ -183,10 +166,8 @@ describe("route metadata", () => {
       }
     });
 
-    // The layout that actually OWNS `NOINDEX_ROBOTS` for each prefix — the shallowest one, since
-    // every route nested beneath it (e.g. /listings/[id] under /listings) inherits rather than
-    // repeating it. Listed explicitly because the folder that holds a prefix's layout is not always
-    // the prefix's own name (there is no src/app/auth/layout.tsx — only .../auth/complete/ has one).
+    // The shallowest layout that owns each prefix — listed, because the folder is not always the
+    // prefix's own name (there is no src/app/auth/layout.tsx, only .../auth/complete/).
     const OWNING_LAYOUT: Record<(typeof NOINDEX_ROUTE_PREFIXES)[number], string> = {
       "/account": "account/layout.tsx",
       "/admin": "admin/layout.tsx",

@@ -1,26 +1,13 @@
 "use client";
 
 /**
- * The verified publisher directory: every organization a Hub reviewer has verified, and nothing
- * else.
+ * The verified publisher directory. No session, no token: `GET /v1/publishers` is unauthenticated and
+ * returns the whole set in one deterministic order, hence no pagination and no sort control.
  *
- * NO SESSION IS INVOLVED. `GET /v1/publishers` is unauthenticated — the same route
- * `/organizations/[slug]` already reads for a member's own "verified on" line — and this page never
- * attaches a token, so it renders identically for a stranger and for a signed-in publisher.
- *
- * ONE CALL, NO PAGINATION. The endpoint returns the whole verified set in one page and orders it
- * deterministically by slug (`organization.repository.ts`), which is also why this page does not
- * offer a sort control: there is one order, and it does not depend on when you asked.
- *
- * EVERY STRING ON THIS PAGE THAT A PUBLISHER WROTE — name, description, ecosystems, website — is
- * rendered through `UntrustedText`/`UntrustedLink`, never interpolated into prose or markup. A
- * verified organization is trusted to publish without a second review; it is not trusted to inject
- * HTML into this page, and those are different kinds of trust.
- *
- * `logoUrl` NEVER BECOMES AN `<img>`. This package's CSP never allows a publisher-named host in
- * `img-src` (`src/lib/csp.ts`), for exactly this reason: loading a remote image would leak every
- * reader's IP address to whatever host a publisher named. The field is shown as a link instead, or
- * omitted.
+ * Every string a publisher wrote goes through `UntrustedText`/`UntrustedLink` — a verified
+ * organization is trusted to publish without a second review, not to inject HTML here — and
+ * `logoUrl` NEVER becomes an `<img>`: the CSP never allows a publisher-named host in `img-src`
+ * (`src/lib/csp.ts`), because loading it would leak every reader's IP to whatever host it named.
  */
 import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
@@ -80,10 +67,8 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
   const directoryHref = `/?organization=${encodeURIComponent(publisher.slug)}`;
   const name = publisher.name.trim() || publisher.slug;
   return (
-    // `data-testid`/`data-publisher-slug`: this package otherwise has no test-hook attribute
-    // convention (its own tests select by role and text, like the rest of the codebase) — these two
-    // exist so an external checker can extract the rendered slug set without depending on prose or
-    // markup that is free to change.
+    // The two data attributes are this package's only test hooks: an external checker reads the
+    // rendered slug set from them rather than from prose that is free to change.
     <article
       className="card publisher-card"
       data-testid="publisher-card"
@@ -92,12 +77,8 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       <h2>
         <UntrustedText value={publisher.name} fallback={publisher.slug} />
       </h2>
-      {/*
-       * THE NAMESPACE, not just an identifier. `<slug>:` is the prefix every one of this
-       * organization's listing ids carries, so showing it here is what lets a reader connect a
-       * listing id they already have to the organization that owns it. A screen reader gets the
-       * word, because a bare `filecoin:…` announced on its own is not a fact about anything.
-       */}
+      {/* The namespace, not just an identifier: `<slug>:` prefixes every listing id this
+          organization owns. Labeled, because a bare `filecoin:…` announces as nothing. */}
       <p className="muted">
         <span className="visually-hidden">Namespace: </span>
         <code>{publisher.slug}:…</code>
@@ -124,11 +105,6 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
         <UntrustedLink href={publisher.website} />
       </p>
 
-      {/*
-       * NEVER an <img>. `logoUrl` is publisher-supplied and the CSP's `img-src` never allows a
-       * publisher-named host (see `src/lib/csp.ts`) — loading it would leak every reader's IP to
-       * whatever host the publisher named. A labeled link costs nothing and leaks nothing.
-       */}
       {publisher.logoUrl ? (
         <p className="muted footnote">
           Logo:{" "}
@@ -147,12 +123,8 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       <p>
         <Link href={directoryHref}>View this publisher&rsquo;s listings</Link>
       </p>
-      {/*
-       * The filter is "involves this organization", not "submitted by it", and the reader has to be
-       * told before they click: `organization` matches the operating OR the sponsoring organization
-       * on the endpoint (`listQuerySchema`'s own description), so a listing this publisher only
-       * sponsors is in that result too.
-       */}
+      {/* `organization` matches the operating OR the sponsoring organization, and the reader has
+          to be told which before they click. */}
       <p className="muted footnote">Every listing this organization operates or sponsors.</p>
     </article>
   );

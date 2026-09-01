@@ -1,17 +1,7 @@
 /**
- * THE RULE THIS FILE ENFORCES: every governance document this frontend links to is named ONCE, in
- * `src/lib/links.ts`.
- *
- * `src/lib/links.ts`'s own header explains why — three different spellings of the same outbound
- * address is how a public, source-neutral repository ends up with one of them 404ing, and the fix
- * is a single greppable module rather than a literal repeated at every call site. That module
- * already collects `REPOSITORY` and `STANDARD`; `GOVERNANCE`, `PUBLISHERS_DOC`, `REVIEW_CRITERIA`
- * and `RFC_PROCESS` are the same pattern for the governance framework, and this scan is what keeps
- * a future edit — a footer link added the fast way, a URL pasted straight into a page — from
- * quietly reintroducing a second spelling.
- *
- * The scan reads the SOURCE TREE from disk rather than importing modules, for the same reason
- * `no-raw-html.test.ts` does: the point is to cover code no test happens to execute.
+ * Every governance document is named ONCE, in `src/lib/links.ts` — three spellings of one outbound
+ * address is how a repository ends up with one of them 404ing. Reads the source tree from disk
+ * rather than importing it, like `no-raw-html.test.ts`: to cover code no test executes.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";

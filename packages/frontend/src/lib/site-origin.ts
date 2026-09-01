@@ -1,24 +1,6 @@
 /**
- * The origin THIS DEPLOYMENT is being reached at, and whether that origin is the ONE canonical
- * production host — the two facts `sitemap.ts` and `robots.ts` need in order to avoid indexing a
- * staging alias or a Vercel preview as if it were a second copy of the real site.
- *
- * THE REQUEST ORIGIN IS DERIVED, NEVER HARD-CODED. `X-Forwarded-Host` and `Host` are how a reverse
- * proxy or the platform's own edge names the address a visitor actually typed, and
- * `X-Forwarded-Proto` is how it says the original request was `https` even though it forwards over
- * plain HTTP internally. A self-hosted copy of this reference frontend can be reached at any
- * hostname its operator chooses, so a literal here would make every fork's sitemap and robots.txt
- * describe production's address rather than their own.
- *
- * THE CANONICAL ORIGIN IS ONE ENVIRONMENT VARIABLE, `NEXT_PUBLIC_SITE_ORIGIN`, set ONLY on the
- * production deployment (see the README's Deployment section and
- * `.github/workflows/frontend-production.yml`). Staging and every Vercel preview leave it unset on
- * purpose: without a canonical origin to compare against, `isCanonicalRequest` can never return
- * true, so those environments stay `noindex` and never publish a sitemap — a preview URL that
- * indexed would compete with the real one for every listing it carries. This is also why the
- * variable is not a literal in this file: `pnpm check:neutral` refuses a plaintext production
- * hostname in source, and an env var is the correct shape for a value that legitimately differs by
- * environment anyway.
+ * The origin this deployment is reached at, and whether it is the ONE canonical production host.
+ * Derived, never hard-coded: a self-hosted copy answers at whatever hostname its operator chose.
  */
 import { headers } from "next/headers";
 
@@ -28,11 +10,8 @@ function firstValue(header: string | null | undefined): string | undefined {
 }
 
 /**
- * `X-Forwarded-Host` WINS OVER `Host`, because a CDN or load balancer in front of this app is free
- * to rewrite `Host` to an internal name — and a deployment where it does would otherwise never
- * match its own canonical origin and would serve `noindex` forever, silently. Both headers are set
- * by the same hop and are equally forgeable by a client that reaches the app directly, so
- * preferring the forwarded one costs nothing that `Host` was not already exposed to.
+ * `X-Forwarded-Host` wins over `Host`: a CDN or load balancer may rewrite `Host` to an internal
+ * name, and such a deployment would otherwise never match its canonical origin — silently, forever.
  */
 export function originFromHeaders(
   host: string | null,
@@ -44,7 +23,7 @@ export function originFromHeaders(
   return `${firstValue(forwardedProto) ?? "https"}://${authority}`;
 }
 
-/** The one call that actually reads the incoming request. Everything else here is pure. */
+/** The one call that reads the request. Everything else here is pure. */
 export async function requestOrigin(): Promise<string | null> {
   const list = await headers();
   return originFromHeaders(
@@ -54,13 +33,7 @@ export async function requestOrigin(): Promise<string | null> {
   );
 }
 
-/**
- * The ONE origin this deployment considers itself canonical for, or `undefined` when the operator
- * has not declared one — which is the normal, correct state for staging and every preview.
- *
- * Normalized through `URL().origin` so a trailing slash or a stray path segment in the variable
- * cannot make an otherwise-correct value fail to match a request origin, which never carries either.
- */
+/** `undefined` when none was declared — the normal state off production. */
 export function canonicalSiteOrigin(): string | undefined {
   const raw = process.env.NEXT_PUBLIC_SITE_ORIGIN;
   if (!raw) return undefined;
@@ -71,14 +44,7 @@ export function canonicalSiteOrigin(): string | undefined {
   }
 }
 
-/**
- * Whether THIS REQUEST landed on the declared canonical origin.
- *
- * False whenever `NEXT_PUBLIC_SITE_ORIGIN` is unset, unparsable, or simply different from what the
- * request's own `Host` header says — which is the fail-closed direction: an operator who forgets to
- * set the variable gets a deployment that is quietly not indexed, never one that is indexed by
- * accident on every alias and preview it happens to be reachable at.
- */
+/** Fail-closed: an unset, unparsable or different value costs indexing, never a preview's privacy. */
 export async function isCanonicalRequest(): Promise<boolean> {
   const canonical = canonicalSiteOrigin();
   if (!canonical) return false;

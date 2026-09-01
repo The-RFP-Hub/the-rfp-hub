@@ -1,16 +1,7 @@
 /**
- * The handful of addresses this frontend links OUT to, in one module.
- *
- * They were scattered as literals across a footer, a sign-in panel and two prose paragraphs, which
- * is how a project ends up with three different spellings of its own repository URL and one of them
- * 404ing. Collected here, they are also greppable — which matters for a public, source-neutral
- * repository where every outbound address is something a reader may check.
- *
- * IN-APP ROUTES ARE RELATIVE and are constants rather than strings, so a rename is one edit.
- *
- * THE API'S OWN PAGES ARE DERIVED FROM THE CONFIGURED ORIGIN, never hard-coded: a deployment
- * pointed at a different API must link to THAT API's documentation, and a literal here would send
- * every reader of a preview deployment to production's docs.
+ * Every address this frontend links OUT to, in one module — greppable, and a rename is one edit
+ * (`test/no-governance-literals.test.ts` keeps it that way). The API's own pages are derived from
+ * the CONFIGURED origin: a deployment pointed at another API links to that API's documentation.
  */
 
 /** In-app. */
@@ -19,50 +10,18 @@ export const HOW_IT_WORKS_ROLES = `${HOW_IT_WORKS}#roles`;
 export const DIRECTORY = "/";
 export const PUBLISHERS = "/publishers";
 
-/**
- * The project's source, and the Standard that lives inside it.
- *
- * A literal, because there is no environment variable for it and inventing one would make the
- * footer of a correctly-built deployment depend on a variable nobody sets. It is the project's own
- * canonical repository — the same address `package.json` names — and a fork that wants its own is
- * editing one line.
- */
+/** A literal: the address `package.json` names. A fork that wants its own edits one line. */
 export const REPOSITORY = "https://github.com/The-RFP-Hub/the-rfp-hub";
 
-/**
- * The Standard: the schema, its documentation and its changelog, as a human reads them.
- *
- * The machine-readable `$id`s live on the canonical spec domain; this is the README beside them,
- * which is what somebody clicking "The Standard" in a footer is actually after.
- */
+/** The Standard as a human reads it — the README, not the machine-readable `$id`s. */
 export const STANDARD = `${REPOSITORY}/tree/main/packages/standard`;
 
-/**
- * The governance framework: who decides what, and how a reader appeals or disagrees.
- *
- * Also a literal for the same reason as `REPOSITORY` and `STANDARD` above — one file at one path in
- * this project's own repository, not something a deployment's environment could sensibly vary.
- */
 export const GOVERNANCE = `${REPOSITORY}/blob/main/GOVERNANCE.md`;
 
-/** How an organization becomes a verified publisher, and what that changes. */
 export const PUBLISHERS_DOC = `${REPOSITORY}/blob/main/PUBLISHERS.md`;
 
-/**
- * What is checked on one listing, what is not a criterion, and who decides.
- *
- * The document itself lands in a separate PR (the governance-framework stream); this link is
- * correct on merge day but 404s until that PR is in `main`.
- */
 export const REVIEW_CRITERIA = `${REPOSITORY}/blob/main/REVIEW-CRITERIA.md`;
 
-/**
- * How a change to the Standard itself gets proposed, reviewed and released.
- *
- * The `#rfc-process` section lands in a separate PR (the governance-framework stream, same one as
- * `REVIEW_CRITERIA` above); this link is correct on merge day but resolves to the top of `PROCESS.md`
- * rather than the section until that PR is in `main`.
- */
 export const RFC_PROCESS = `${REPOSITORY}/blob/main/packages/standard/PROCESS.md#rfc-process`;
 
 /** The API's interactive documentation, on whichever API this build talks to. */

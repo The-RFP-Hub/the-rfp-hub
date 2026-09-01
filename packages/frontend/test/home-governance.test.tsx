@@ -1,9 +1,6 @@
 /**
- * The home page's own governance link, and why it is asserted against `<main>` rather than the
- * document: the global footer carries a Governance link on every route, so a check that merely
- * finds the URL somewhere on the home page passes without the home page linking anything. The
- * contractual claim is that the governance documents are reachable from the site's front door, and
- * a footer link is the one piece of evidence that cannot distinguish the two.
+ * Asserted against `<main>` rather than the document: the global footer carries a Governance link on
+ * every route, so finding the URL somewhere on the home page proves nothing about the home page.
  */
 import DirectoryPage from "@/app/page";
 import { Chrome } from "@/components/Chrome";
@@ -35,8 +32,7 @@ vi.mock("@/lib/auth-client", () => ({
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 
-// The directory is a whole surface of its own with its own suite (`public-browse.test.tsx`); this
-// file is about what surrounds it.
+// The directory has its own suite (`public-browse.test.tsx`); this file is about what surrounds it.
 vi.mock("@/components/DirectoryList", () => ({
   DirectoryList: () => <p>The directory</p>,
 }));

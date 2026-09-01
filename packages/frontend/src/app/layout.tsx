@@ -6,19 +6,9 @@ import { AppProviders } from "@/lib/session";
 import "./globals.css";
 
 /**
- * `generateMetadata`, NOT a static `metadata` object — because `robots` is the one field here that
- * cannot be a build-time constant any more, and its logic lives in `lib/root-metadata.ts` (see that
- * file's own comment for why it is not defined inline: it needs to be importable without also
- * importing `next/font/google` by way of `lib/fonts.ts` below, which has no transform under this
- * package's test runner).
- *
- * INDEXING IS CONDITIONAL ON THE CANONICAL ORIGIN, not unconditionally on. It was off while nothing
- * here was served from a canonical public host at all — a preview URL that indexed would compete
- * with the real one for every listing it carries — and that reasoning has not gone away, it has
- * just moved from "no deployment qualifies" to "exactly one does". See `lib/site-origin.ts` for the
- * mechanism: staging and every Vercel preview leave `NEXT_PUBLIC_SITE_ORIGIN` unset, so they stay
- * `noindex` — the fail-closed direction: forgetting to set the variable costs production its
- * indexing rather than costing staging its privacy.
+ * `generateMetadata`, not a static `metadata`: `robots` depends on the request (`lib/site-origin.ts`).
+ * It lives in its own module so a unit test can import it without `next/font/google`, which has no
+ * transform under this package's test runner.
  */
 export { generateMetadata } from "@/lib/root-metadata";
 

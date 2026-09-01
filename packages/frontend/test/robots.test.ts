@@ -1,7 +1,6 @@
 /**
- * `robots.ts` allows the public surface and disallows the workbench ONLY on the declared canonical
- * origin, and disallows everything — never a hard-coded sitemap URL — everywhere else, including
- * staging and every Vercel preview.
+ * `robots.ts` allows the public surface and disallows the workbench only on the declared canonical
+ * origin; everywhere else, including staging and every preview, it disallows everything.
  */
 import robots from "@/app/robots";
 import { NOINDEX_ROUTE_PREFIXES } from "@/lib/noindex-routes";
@@ -69,8 +68,7 @@ describe("robots.txt", () => {
   });
 
   it("disallows everything when NEXT_PUBLIC_SITE_ORIGIN is malformed", async () => {
-    // The whole fail-closed chain, not just the helper that parses the value: a typo in the
-    // production variable costs the deployment its indexing, never a preview its privacy.
+    // The whole fail-closed chain, not just the helper that parses the value.
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
     await mockHost("ethrfps.app");
 
