@@ -16,7 +16,13 @@ import {
   readPending,
   writePending,
 } from "../src/approvals.js";
-import { AUDIT_MAX_BYTES, appendAudit, auditPath, rotatedAuditPath } from "../src/audit.js";
+import {
+  AUDIT_MAX_BYTES,
+  appendAudit,
+  appendLine,
+  auditPath,
+  rotatedAuditPath,
+} from "../src/audit.js";
 import { DEFAULT_CAPS, Policy, counterPath } from "../src/policy.js";
 import { InsecureStateError, ensureDir, secureFile } from "../src/state.js";
 import { tempHome, validDocument } from "./helpers.js";
@@ -233,6 +239,28 @@ describe("the audit log stays non-fatal, but does not write where it cannot", ()
 
     expect(() => appendAudit(home, entry)).not.toThrow();
     expect(fs.readFileSync(target, "utf8")).toBe("original\n");
+  });
+
+  it("declines through a symlink on a platform with no O_NOFOLLOW, where lstat is the only guard", () => {
+    const home = tempHome();
+    ensureDir(home);
+    const target = path.join(home, "somebody-elses-file");
+    fs.writeFileSync(target, "original\n");
+    fs.symlinkSync(target, auditPath(home));
+
+    // 0 is what `fs.constants.O_NOFOLLOW ?? 0` yields where the platform has no such flag: the
+    // open would follow the link, and `fstat` would then be inspecting a file that is not this
+    // one. The check before the open is what refuses.
+    expect(() => appendLine(auditPath(home), "audited\n", 0)).toThrow(/symbolic link/);
+    expect(fs.readFileSync(target, "utf8")).toBe("original\n");
+  });
+
+  it("declines when the log path is not a regular file at all", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.mkdirSync(auditPath(home));
+    expect(() => appendLine(auditPath(home), "audited\n", 0)).toThrow(/not a regular file/);
+    expect(() => appendAudit(home, entry)).not.toThrow();
   });
 
   it("swallows a home that cannot be created at all", () => {

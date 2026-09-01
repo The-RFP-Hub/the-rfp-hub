@@ -308,7 +308,10 @@ the decision inside it yours. Those reads refuse — `policy_denied` — and go 
 file is removed. `rfphub-mcp pending` simply omits a record it cannot vouch for. The audit log is
 written rather than trusted, so it is repaired; it still declines to write into a path it could not
 secure, and it is opened and judged through one descriptor so a rotation cannot slip a fresh
-default-mode file under the append.
+default-mode file under the append. A log path that is a symlink, or anything but a regular file,
+is declined rather than followed — `O_NOFOLLOW` where the platform has it, and an `lstat` before
+the open everywhere, which is the only guard on a platform that does not (a small window between
+the two, failing closed into dropping a line rather than into writing through the link).
 
 **The audit log is bounded.** At 5 MiB it is rotated to `audit.log.1` under a lock, keeping exactly
 one previous generation at `0600`. A rotation that fails costs the rotation, never the call and

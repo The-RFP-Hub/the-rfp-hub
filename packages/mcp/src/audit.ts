@@ -11,14 +11,13 @@ import path from "node:path";
 import { withLock } from "./lock.js";
 import type { ToolKind } from "./policy.js";
 import { redactString } from "./redact.js";
-import { FILE_MODE, ensureDir, secureFile, secureOpenFile } from "./state.js";
+import { FILE_MODE, InsecureStateError, ensureDir, secureFile, secureOpenFile } from "./state.js";
 
-/** `O_NOFOLLOW` refuses a symlink; the mode is supplied to the call that may create the file. */
-const APPEND_FLAGS =
-  fs.constants.O_WRONLY |
-  fs.constants.O_CREAT |
-  fs.constants.O_APPEND |
-  (fs.constants.O_NOFOLLOW ?? 0);
+/** The mode is supplied to the same call that may create the file, so it never exists at umask. */
+const APPEND_FLAGS = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_APPEND;
+
+/** `O_NOFOLLOW` where the platform has it. Windows does not; see `appendLine`. */
+export const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
 
 /** Rotate at five mebibytes, keeping one previous generation. */
 export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
@@ -99,9 +98,29 @@ export function appendAudit(home: string, entry: AuditEntry): void {
 /**
  * ONE descriptor for open, judge and write: a rotation landing between a path check and an append
  * would have the append recreate `audit.log` at the process umask.
+ *
+ * The `lstat` before it is the symlink guard, and it runs on every platform because it is the ONLY
+ * guard where `O_NOFOLLOW` does not exist (Windows). `secureOpenFile` cannot stand in for it: on a
+ * followed symlink it inspects the TARGET, which may be a perfectly ordinary 0600 file belonging
+ * to somebody else. Without the flag this leaves a window between the check and the open; it fails
+ * closed into declining a line, never into writing through the link.
+ *
+ * `noFollow` is a parameter so the fallback branch is reachable from a test on a platform that has
+ * the flag.
  */
-function appendLine(file: string, line: string): void {
-  const fd = fs.openSync(file, APPEND_FLAGS, FILE_MODE);
+export function appendLine(file: string, line: string, noFollow: number = O_NOFOLLOW): void {
+  let stats: fs.Stats | null;
+  try {
+    stats = fs.lstatSync(file);
+  } catch {
+    stats = null; // Absent is the ordinary first call; the open below creates it.
+  }
+  if (stats?.isSymbolicLink() === true) throw new InsecureStateError(file, "is a symbolic link");
+  if (stats !== null && !stats.isFile()) {
+    throw new InsecureStateError(file, "is not a regular file");
+  }
+
+  const fd = fs.openSync(file, APPEND_FLAGS | noFollow, FILE_MODE);
   try {
     secureOpenFile(fd, file);
     fs.writeSync(fd, line);
