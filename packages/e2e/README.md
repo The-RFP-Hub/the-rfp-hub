@@ -12,6 +12,7 @@ as `vitest`; the root test run excludes this package (see `vitest.config.ts`).
 ```sh
 pnpm --filter @the-rfp-hub/e2e exec playwright install chromium   # once, after pnpm install
 pnpm e2e                                                           # full run, from the repo root
+pnpm e2e -- m4-responsive.spec.ts                                  # one spec, same bring-up
 ```
 
 **This package needs Node 20 or newer**, and declares it in its own `engines`. The rest of the
