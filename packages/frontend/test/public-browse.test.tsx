@@ -391,6 +391,28 @@ describe("the public directory list", () => {
     ).toBeNull();
   });
 
+  it("titles a past-the-end page for the page, not for the filters", async () => {
+    const empty: PaginatedOpportunities = {
+      items: [],
+      page: 9,
+      limit: 20,
+      total: 2,
+      totalPages: 1,
+    };
+    navigation.params = new URLSearchParams("q=zk&page=9");
+    const { client } = stub({ list: async () => empty });
+    const filtered = mount(client, <DirectoryList />);
+    expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
+    expect(screen.queryByText("Nothing matches those filters.")).toBeNull();
+    filtered.unmount();
+
+    // Unfiltered, the old title was "Nothing published yet." — equally wrong about page 9.
+    navigation.params = new URLSearchParams("status=any&page=9");
+    mount(client, <DirectoryList />);
+    expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
+    expect(screen.queryByText("Nothing published yet.")).toBeNull();
+  });
+
   it("offers a way back from a page past the end that keeps the filters", async () => {
     const empty: PaginatedOpportunities = {
       items: [],

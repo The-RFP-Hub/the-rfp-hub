@@ -326,10 +326,16 @@ describe("why an empty result is empty", () => {
     ).toEqual([]);
   });
 
-  it("says the organization filter takes a slug, which only the control's placeholder said before", () => {
+  it("says the organization filter takes a slug only when the value cannot be one", () => {
     expect(
       emptyResultHints({ ...DEFAULT_SELECTION, organization: "Acme Foundation" }).join(" "),
     ).toContain("slug");
+    // A well-formed slug that simply matched nothing is an ordinary empty result. Telling that
+    // reader their slug is not a slug sends them to fix the one thing that was already right.
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, organization: "acme" })).toEqual([]);
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, organization: "example-foundation" })).toEqual(
+      [],
+    );
   });
 });
 

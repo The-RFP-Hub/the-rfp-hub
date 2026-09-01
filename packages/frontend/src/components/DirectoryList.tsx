@@ -493,11 +493,18 @@ function EmptyResult({ applied, page }: { applied: DirectorySelection; page: num
   const filtered = isFiltered(applied);
   const pastEnd = page > 1;
   const hints = emptyResultHints(applied);
-  if (pastEnd) hints.unshift(`Page ${page} is past the end of this result.`);
 
   return (
     <EmptyState
-      title={filtered ? "Nothing matches those filters." : "Nothing published yet."}
+      // A page past the end is why THIS page is empty, whatever the filters are doing, so it owns
+      // the title: "nothing matches those filters" is about the result, not about page 9 of it.
+      title={
+        pastEnd
+          ? `Page ${page} is past the end of this result.`
+          : filtered
+            ? "Nothing matches those filters."
+            : "Nothing published yet."
+      }
       detail={
         hints.length > 0
           ? hints.join(" ")

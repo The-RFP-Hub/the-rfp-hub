@@ -35,6 +35,23 @@ function schemaEnum(name: string): string[] {
   return values.map(String);
 }
 
+/** Read rather than re-typed, for the same reason the enums are: a hint that disagreed with the
+ *  rule the API validates against would call a reader's perfectly good slug malformed. */
+function organizationSlugPattern(): RegExp {
+  const defs = (
+    opportunitySchema as {
+      $defs?: Record<string, { properties?: Record<string, { pattern?: unknown }> }>;
+    }
+  ).$defs;
+  const pattern = defs?.organization?.properties?.slug?.pattern;
+  if (typeof pattern !== "string") {
+    throw new Error("the Standard's organization.slug property declares no pattern");
+  }
+  return new RegExp(pattern);
+}
+
+const ORGANIZATION_SLUG = organizationSlugPattern();
+
 const schemaFundingTypes = schemaEnum("fundingType");
 
 export const FUNDING_TYPES = [
@@ -223,7 +240,10 @@ export function emptyResultHints(selection: DirectorySelection): string[] {
     hints.push("Your deadline range runs backwards: the after date is later than the before date.");
   }
 
-  if (filled(selection.organization) !== undefined) {
+  // Only when the value CANNOT be a slug. A valid one that simply matched nothing is an ordinary
+  // empty result, and telling that reader their slug is not a slug is worse than saying nothing.
+  const organization = filled(selection.organization);
+  if (organization !== undefined && !ORGANIZATION_SLUG.test(organization)) {
     hints.push("Organization takes an organization slug, such as acme, not its display name.");
   }
 
