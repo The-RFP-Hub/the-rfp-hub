@@ -6,7 +6,7 @@
  * The page says up front what happens to it, because "submit" means two different things depending
  * on the account: a member of a verified organization publishes immediately, everybody else files
  * something a reviewer will look at. A form that implies the first to somebody in the second case
- * has misled them about whether their programme is visible.
+ * has misled them about whether their program is visible.
  */
 import { RequireSession } from "@/components/Chrome";
 import { OpportunityForm } from "@/components/OpportunityForm";

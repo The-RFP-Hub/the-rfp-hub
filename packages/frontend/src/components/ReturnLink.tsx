@@ -1,5 +1,6 @@
 "use client";
 
+import { IconLabel } from "@/components/IconLabel";
 /**
  * The labelled way back, rendered only when the origin asked for one and the ask is safe.
  *
@@ -18,6 +19,7 @@
  */
 import { UntrustedText } from "@/components/UntrustedText";
 import { RETURN_LABEL_PARAM, RETURN_PARAM, parseReturnLink } from "@/lib/return-to";
+import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -29,7 +31,9 @@ export function ReturnLink() {
   return (
     <p className="muted">
       <Link href={link.href}>
-        ← Back to <UntrustedText value={link.label} />
+        <IconLabel icon={ArrowLeftIcon}>
+          Back to <UntrustedText value={link.label} />
+        </IconLabel>
       </Link>
     </p>
   );

@@ -503,7 +503,7 @@ describe("deciding a claim", () => {
     claimedBy: "hub-reviewer",
     claimedByAccountId: me.accountId,
     status: "pending" as const,
-    note: "This is our programme.",
+    note: "This is our program.",
     createdAt: "2026-08-20T00:00:00Z",
     decidedAt: null,
   };
@@ -674,15 +674,15 @@ describe("merging duplicates", () => {
       id === duplicatePair.left.id
         ? opportunity(id, {
             title: duplicatePair.left.title,
-            summary: "Current programme summary.",
-            description: "Current programme description.",
+            summary: "Current program summary.",
+            description: "Current program description.",
             applicationUrl: "https://acme.example/apply",
           })
         : opportunity(id, {
             title: duplicatePair.right.title,
             fundingType: "rfp",
-            summary: "Legacy programme summary.",
-            description: "Legacy programme description.",
+            summary: "Legacy program summary.",
+            description: "Legacy program description.",
             applicationUrl: "https://legacy.example/apply",
           }),
     );
@@ -706,8 +706,8 @@ describe("merging duplicates", () => {
         duplicatePair.right.id,
       ]),
     );
-    expect(await screen.findByText("Current programme description.")).toBeTruthy();
-    expect(screen.getByText("Legacy programme description.")).toBeTruthy();
+    expect(await screen.findByText("Current program description.")).toBeTruthy();
+    expect(screen.getByText("Legacy program description.")).toBeTruthy();
     expect(screen.getByText("https://acme.example/apply")).toBeTruthy();
     expect(screen.getAllByText("Different").length).toBeGreaterThan(0);
     expect(screen.getByText("Description").querySelector(".badge")).toBeNull();
