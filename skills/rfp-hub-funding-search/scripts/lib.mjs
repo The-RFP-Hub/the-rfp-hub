@@ -396,11 +396,19 @@ export function sanitizeText(value) {
   return value.replace(/[\u0000-\u001F\u007F\u2028\u2029]+/g, " ");
 }
 
-/** Truncate `title` to `max` characters (default 140), the one free-text field this skill keeps
- * (short, and needed to identify the result — see SKILL.md for why it's still labelled DATA).
- * Sanitized BEFORE truncation, so the 140-char budget is spent on visible characters. */
-export function truncateTitle(title, max = 140) {
-  const t = sanitizeText(typeof title === "string" ? title : "") ?? "";
+/** Every third-party string this skill keeps, with its own cap. `title` and `organization` are the
+ * two free-text fields that reach the model at all (SKILL.md §2); the rest are enum-like values a
+ * publisher can still write anything into. */
+export const MAX_TITLE_LEN = 140;
+export const MAX_ORGANIZATION_LEN = 80;
+export const MAX_ECOSYSTEM_VALUE_LEN = 40;
+export const MAX_CURRENCY_LEN = 40;
+export const MAX_ECOSYSTEMS = 8;
+
+/** Sanitize, then truncate to `max` characters. Sanitized BEFORE truncation, so the budget is
+ * spent on visible characters rather than on control characters that collapse to a space. */
+export function truncateText(value, max) {
+  const t = sanitizeText(typeof value === "string" ? value : "") ?? "";
   if (t.length <= max) return t;
   return `${t.slice(0, Math.max(0, max - 1))}…`;
 }
@@ -440,11 +448,12 @@ export function awardSummary(fundingInfo) {
   return null;
 }
 
-/** The primary organization's display name (`operatingOrganizations[0].name`), or null,
- * sanitized like every other third-party string this file interpolates into output. */
+/** The primary organization's display name (`operatingOrganizations[0].name`), or null. Bounded
+ * like `title`: the Standard's own `maxLength: 256` is a write-time bound on the Hub, not anything
+ * a response from an arbitrary `RFPHUB_API_BASE` has to respect. */
 export function primaryOrganization(o) {
   const org = Array.isArray(o?.operatingOrganizations) ? o.operatingOrganizations[0] : null;
-  return typeof org?.name === "string" ? sanitizeText(org.name) : null;
+  return typeof org?.name === "string" ? truncateText(org.name, MAX_ORGANIZATION_LEN) : null;
 }
 
 /** `/v1/r/{id}/apply` or `/v1/r/{id}/source` — the measured link-outs, never a raw stored URL. */
@@ -457,33 +466,13 @@ function isUsableUrl(v) {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-/**
- * Per-value and aggregate limits on the (open-vocabulary, publisher-supplied) `ecosystems` list.
- * A publisher can name anything here — it's free text with no registry (see
- * references/api-reference.md) — so, unlike the enum-backed `fundingType`/`status`, it needs the
- * same truncation discipline as `title`: a short per-value cap so one absurdly long or
- * injection-shaped entry can't smuggle a paragraph past the projection, and a small aggregate cap
- * so a record padded with dozens of ecosystem strings can't inflate every result in a page.
- */
-const MAX_ECOSYSTEM_VALUE_LEN = 40;
-const MAX_ECOSYSTEMS = 8;
-
-/** Sanitize, then truncate, one ecosystem string to `MAX_ECOSYSTEM_VALUE_LEN`, with the same `…`
- * convention as `truncateTitle`. Reused here rather than calling `truncateTitle` because the two
- * limits are independent and documented separately — this list's cap must be able to change
- * without moving the title's. */
-function truncateEcosystem(value) {
-  const clean = sanitizeText(value);
-  if (clean.length <= MAX_ECOSYSTEM_VALUE_LEN) return clean;
-  return `${clean.slice(0, Math.max(0, MAX_ECOSYSTEM_VALUE_LEN - 1))}…`;
-}
-
 /** Project `ecosystems[]`: drop non-strings, cap each value's length, cap the list length, and
- * say so with a trailing `"+N more"` marker rather than silently dropping the tail. */
+ * say so with a trailing `"+N more"` marker rather than silently dropping the tail. The aggregate
+ * cap is what stops a record padded with dozens of ecosystem strings from inflating every row. */
 export function projectEcosystems(ecosystems) {
   if (!Array.isArray(ecosystems)) return [];
   const strings = ecosystems.filter((e) => typeof e === "string" && e.length > 0);
-  const kept = strings.slice(0, MAX_ECOSYSTEMS).map(truncateEcosystem);
+  const kept = strings.slice(0, MAX_ECOSYSTEMS).map((e) => truncateText(e, MAX_ECOSYSTEM_VALUE_LEN));
   if (strings.length > MAX_ECOSYSTEMS) {
     kept.push(`+${strings.length - MAX_ECOSYSTEMS} more`);
   }
@@ -504,7 +493,7 @@ export function projectEcosystems(ecosystems) {
 export function project(o, base) {
   return {
     id: typeof o?.id === "string" ? o.id : null,
-    title: truncateTitle(o?.title),
+    title: truncateText(o?.title, MAX_TITLE_LEN),
     fundingType: typeof o?.fundingType === "string" ? o.fundingType : null,
     status: typeof o?.status === "string" ? o.status : null,
     organization: primaryOrganization(o),

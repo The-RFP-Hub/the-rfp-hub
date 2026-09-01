@@ -22,9 +22,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const searchScript = resolve(here, "../scripts/search.mjs");
 const getScript = resolve(here, "../scripts/get.mjs");
 
-// Comfortably larger than any common OS pipe buffer (16KB on macOS, 64KB on Linux by default).
-const BIG_ORG_NAME_LEN = 6000;
-const ITEM_COUNT = 25;
+// The projection bounds every per-item field, so the payload only exceeds a common OS pipe buffer
+// (16KB on macOS, 64KB on Linux) through the item COUNT — the fake API below ignores `limit` and
+// always serves the whole fixture page, which is what makes the transfer big enough to matter.
+const LONG_ORG_NAME_LEN = 300;
+const ORG_NAME_CAP = 80;
+const ITEM_COUNT = 300;
 
 function fakeItem(i: number) {
   return {
@@ -32,7 +35,7 @@ function fakeItem(i: number) {
     title: `Fixture Opportunity Number ${i}`,
     fundingType: "grant",
     status: "open",
-    operatingOrganizations: [{ name: "A".repeat(BIG_ORG_NAME_LEN) }],
+    operatingOrganizations: [{ name: "A".repeat(LONG_ORG_NAME_LEN) }],
     ecosystems: ["Ethereum"],
     deadlines: [{ deadlineType: "fixed", date: "2099-01-01T00:00:00.000Z", label: "application" }],
     fundingInfo: { currency: "USD", budget: 1000 + i },
@@ -107,7 +110,7 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
 
   it("search.mjs delivers every byte of a large piped payload and exits 0", async () => {
     ({ server, base } = await startFakeApi());
-    const { code, stdout, stderr } = await run(searchScript, ["--limit", String(ITEM_COUNT)], {
+    const { code, stdout, stderr } = await run(searchScript, ["--limit", "25"], {
       RFPHUB_API_BASE: base,
     });
 
@@ -116,8 +119,9 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
     // A truncated write would fail to parse, or parse short — either way this proves it didn't.
     const parsed = JSON.parse(stdout);
     expect(parsed.items).toHaveLength(ITEM_COUNT);
-    // The whole point: a large per-item field (organization name) survived byte-for-byte.
-    expect(parsed.items.at(-1).organization).toHaveLength(BIG_ORG_NAME_LEN);
+    // The tail of the payload is what a truncated pipe write loses first.
+    expect(parsed.items.at(-1).title).toBe(`Fixture Opportunity Number ${ITEM_COUNT - 1}`);
+    expect(parsed.items.at(-1).organization).toHaveLength(ORG_NAME_CAP);
     expect(stdout.length).toBeGreaterThan(64 * 1024); // actually exceeded a typical pipe buffer
   });
 
@@ -130,7 +134,7 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
     expect(stderr).toBe("");
     expect(code).toBe(0);
     const parsed = JSON.parse(stdout);
-    expect(parsed.organization).toHaveLength(BIG_ORG_NAME_LEN);
+    expect(parsed.organization).toHaveLength(ORG_NAME_CAP);
     expect(parsed.links).toEqual({
       apply: `${base}/v1/r/fixture%3A0/apply`,
       source: `${base}/v1/r/fixture%3A0/source`,
@@ -139,11 +143,9 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
 
   it("search.mjs --format table also survives the full transfer", async () => {
     ({ server, base } = await startFakeApi());
-    const { code, stdout } = await run(
-      searchScript,
-      ["--limit", String(ITEM_COUNT), "--format", "table"],
-      { RFPHUB_API_BASE: base },
-    );
+    const { code, stdout } = await run(searchScript, ["--limit", "25", "--format", "table"], {
+      RFPHUB_API_BASE: base,
+    });
     expect(code).toBe(0);
     // Every item's title must be present, including the LAST one — a truncated pipe write drops
     // the tail of the payload first, so a missing final title is exactly what this would catch.

@@ -47,6 +47,11 @@ never arrives cannot be misread as an instruction, no matter how it's phrased. S
 `test/projection.test.ts` for a test that proves an instruction-shaped `description` never survives
 the projection.
 
+**Two third-party text fields still reach the model, and both are bounded.** `title` (140
+characters) and `organization` (80) are the free text the projection keeps, because a result is
+unidentifiable without them; every other publisher prose field is dropped outright. Both are
+truncated in code, so neither can carry a paragraph — see §9 for the full list of caps.
+
 **Even a KEPT field is normalized before display.** `title`, `organization` and `ecosystems` are
 still third-party text, and a raw newline or other control character embedded in one of them could
 otherwise make a single field's text *look* like several lines of the table output — including a
@@ -186,9 +191,9 @@ site) alongside `links.apply`.
   context window, not the API's own ceiling of 100. Use `page` to see more.
 - `q` truncates functionally around 200 characters server-side; keep search text short and
   specific.
-- Titles in results are truncated to 140 characters. If a user needs the full title or any other
-  publisher-authored prose, that's exactly the free text this skill deliberately does not surface —
-  point them at the opportunity's own page or `applyUrl` instead.
+- Titles in results are truncated to 140 characters and organization names to 80. If a user needs
+  the full title or any other publisher-authored prose, that's exactly the free text this skill
+  deliberately does not surface — point them at the opportunity's own page or `applyUrl` instead.
 - `ecosystems` is open-vocabulary publisher text (no registry, no length cap on the API side), so
   the projection caps it too: each value at 40 characters and the list at 8 entries, with a
   trailing `"+N more"` marker when a record names more than that. A single absurdly long or

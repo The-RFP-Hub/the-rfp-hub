@@ -12,6 +12,8 @@ import {
   DEFAULT_LIMIT,
   EXIT,
   MAX_LIMIT,
+  MAX_ORGANIZATION_LEN,
+  MAX_TITLE_LEN,
   RequestError,
   SKILL_VERSION,
   assertKnownFlags,
@@ -33,7 +35,7 @@ import {
   projectPage,
   sanitizeText,
   trackingHeaders,
-  truncateTitle,
+  truncateText,
   validateFormat,
   withDefaultStatus,
 } from "../scripts/lib.mjs";
@@ -41,25 +43,25 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const BASE = "https://api.ethrfps.app";
 
-describe("truncateTitle", () => {
-  it("returns short titles unchanged", () => {
-    expect(truncateTitle("Short title")).toBe("Short title");
+describe("truncateText", () => {
+  it("returns short values unchanged", () => {
+    expect(truncateText("Short title", MAX_TITLE_LEN)).toBe("Short title");
   });
 
-  it("truncates to 140 chars with an ellipsis by default", () => {
+  it("truncates to the given max with an ellipsis", () => {
     const long = "x".repeat(200);
-    const out = truncateTitle(long);
-    expect(out.length).toBe(140);
+    const out = truncateText(long, MAX_TITLE_LEN);
+    expect(out.length).toBe(MAX_TITLE_LEN);
     expect(out.endsWith("…")).toBe(true);
   });
 
   it("respects a custom max", () => {
-    expect(truncateTitle("abcdefgh", 5)).toBe("abcd…");
+    expect(truncateText("abcdefgh", 5)).toBe("abcd…");
   });
 
   it("treats non-string input as empty", () => {
-    expect(truncateTitle(undefined)).toBe("");
-    expect(truncateTitle(null)).toBe("");
+    expect(truncateText(undefined, MAX_TITLE_LEN)).toBe("");
+    expect(truncateText(null, MAX_TITLE_LEN)).toBe("");
   });
 });
 
@@ -133,6 +135,13 @@ describe("primaryOrganization / linkOut", () => {
     expect(primaryOrganization({ operatingOrganizations: [{ name: "Acme Foundation" }] })).toBe(
       "Acme Foundation",
     );
+  });
+
+  it("truncates a long organization name to its own cap, with an ellipsis", () => {
+    const huge = "A".repeat(6000);
+    const out = primaryOrganization({ operatingOrganizations: [{ name: huge }] });
+    expect(out.length).toBe(MAX_ORGANIZATION_LEN);
+    expect(out.endsWith("…")).toBe(true);
   });
 
   it("is null with no operating organizations", () => {
