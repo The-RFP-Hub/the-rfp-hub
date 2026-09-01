@@ -1642,6 +1642,19 @@ pre.untrusted-block {
   }
 
   /*
+   * A NAV LINK IS A TARGET, not a word in a sentence. `.shell-nav a` is inline text with 2px of
+   * padding — about a 20px tall tap area on a phone, sitting a few pixels from the next one, in the
+   * one place where a mis-tap costs a reader the page they were on. `align-items: flex-end` rather
+   * than `center` so the current-section underline stays against the text and the extra tap area
+   * grows upward, into the header's own padding.
+   */
+  .shell-nav a {
+    display: inline-flex;
+    align-items: flex-end;
+    min-block-size: var(--control-touch);
+  }
+
+  /*
    * A PLAIN LINK STANDING NEXT TO A PRIMARY BUTTON — "Program site" beside "Apply", say — is
    * deliberately not styled as a second button (see `.button-primary`'s own comment: it is "the
    * only FILLED thing on any screen"). But on a touch device it is still a distinct action a thumb

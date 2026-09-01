@@ -88,6 +88,10 @@ describe("the visual-system token boundary", () => {
     expect(globalCss).toMatch(
       /\.duplicate-actions button\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*white-space:\s*nowrap;/s,
     );
+    // The header's own links: inline text until a coarse pointer makes them a thumb target.
+    expect(globalCss).toMatch(
+      /@media \(pointer: coarse\)\s*\{[\s\S]*?\.shell-nav a\s*\{[^}]*min-block-size:\s*var\(--control-touch\);/s,
+    );
     expect(formCss).toMatch(/\.itemHead\s*\{[^}]*flex-wrap:\s*wrap;/s);
     expect(formCss).toMatch(
       /\.small\s*\{[^}]*min-block-size:\s*var\(--control-touch\);[^}]*min-inline-size:\s*var\(--control-touch\);[^}]*padding:\s*var\(--space-2\);/s,

@@ -297,6 +297,19 @@ export function requireActor(stack: RunState, actor: ActorName) {
 }
 
 /**
+ * A skip locally, a FAILURE in CI.
+ *
+ * Playwright exits 0 on a skip, so a job whose whole purpose is evidence can be green having
+ * asserted nothing — and a bring-up failure is exactly the case that skips every spec at once.
+ * Locally the skip is still the useful answer: a developer running one part of the suite has not
+ * broken anything by not having brought the rest of it up.
+ */
+function blocked(reason: string): void {
+  if (process.env.CI) throw new Error(`${reason} In CI this is a failure, not a skip.`);
+  test.skip(true, reason);
+}
+
+/**
  * Declares a spec unable to run, and says why.
  *
  * THIS USED TO BE THE MOST-CALLED FUNCTION IN THE SUITE. Identities came from a third-party tenant
@@ -313,8 +326,7 @@ export function requireActor(stack: RunState, actor: ActorName) {
 export function skipUnlessActor(stack: RunState, ...actors: ActorName[]): void {
   const missing = actors.filter((actor) => !stack.actors[actor]);
   if (missing.length > 0) {
-    test.skip(
-      true,
+    blocked(
       `BLOCKED: no ${missing.join(", ")} identity was established for this run. Identities need no external configuration, so this indicates a bring-up failure — see the runner's output.`,
     );
     return;
@@ -331,8 +343,7 @@ export function skipUnlessActor(stack: RunState, ...actors: ActorName[]): void {
     const group = stack.actors[name]?.aliasGroup;
     const otherGroup = other ? stack.actors[other]?.aliasGroup : undefined;
     if (other && !(group !== undefined && group === otherGroup)) {
-      test.skip(
-        true,
+      blocked(
         `BLOCKED: "${name}" and "${other}" resolve to the same identity, so this criterion cannot distinguish them.`,
       );
       return;
