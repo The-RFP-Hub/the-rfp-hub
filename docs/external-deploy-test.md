@@ -281,7 +281,8 @@ starts the standalone server, and makes real requests against the public API. It
 waits for a row to actually render from a live fetch, because the plain HTTP check would pass on a
 `200` shell whose client-side request never reached the API. It asserts that the build completes
 and the server **answers with data**, deliberately not a fixed route count: a number would fail
-exactly when a new page was added.
+exactly when a new page was added. `/publishers` is the one named exception — whenever the copied
+source carries that route, a `404` on it fails the job, with no input to turn the assertion on.
 
 This is strong evidence for **Path B**, and it is the only regression guard on portability — it is
 the exact scenario that failed twice before the three packaging fixes landed. It proves nothing
