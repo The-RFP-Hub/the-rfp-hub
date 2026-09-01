@@ -45,7 +45,8 @@ allow-listed output fields, computed in code before anything is printed or retur
 never arrives cannot be misread as an instruction, no matter how it's phrased. See
 `scripts/lib.mjs`'s `project()` for the exact allow-list, and
 `test/projection.test.ts` for a test that proves an instruction-shaped `description` never survives
-the projection.
+the projection — and `test/clean-room.test.ts` for the same proof through the shipped script,
+copy-installed outside the repository and run against a poisoned API.
 
 **Two third-party text fields still reach the model, and both are bounded.** `title` (140
 characters) and `organization` (80) are the free text the projection keeps, because a result is
