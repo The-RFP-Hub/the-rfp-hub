@@ -266,7 +266,15 @@ async function checkRouteInBrowser(browser, base, apiUrl, path, { label }) {
           if (rows.length > 0) {
             const line = document.querySelector(".result-line")?.textContent ?? "";
             const pages = /page\s+\d+\s+of\s+(\d+)/i.exec(line);
-            return { kind: "items", rows, pages: pages ? Number(pages[1]) : 1 };
+            const total = /^([\d,]+)/.exec(
+              (document.querySelector(".result-line strong")?.textContent ?? "").trim(),
+            );
+            return {
+              kind: "items",
+              rows,
+              pages: pages ? Number(pages[1]) : 1,
+              total: total ? Number(total[1].replace(/,/g, "")) : null,
+            };
           }
           const errors = Array.from(document.querySelectorAll(".state.error[role='alert']"));
           const directoryError = errors.find(
@@ -319,6 +327,7 @@ async function checkRouteInBrowser(browser, base, apiUrl, path, { label }) {
       level: "pass",
       rows: outcome.rows,
       pages: outcome.pages,
+      total: outcome.total,
       detail: `${outcome.rows.length} item(s) rendered, from a request to ${apiOrigin}`,
     };
   } catch (err) {
@@ -328,8 +337,9 @@ async function checkRouteInBrowser(browser, base, apiUrl, path, { label }) {
   }
 }
 
-// A search that returns the whole directory is a filter the copy is not applying — unless the
-// corpus fits one page, where a term matching everything is plausible rather than broken.
+// A search that returns the whole directory is a filter the copy is not applying. The ids alone are
+// not enough: a working filter whose every match happens to be on page one returns the SAME first
+// page and differs only in the totals, so a narrowed total or page count is just as good a proof.
 function checkSearchNarrows(all, filtered) {
   const path = "/?q= vs /";
   const label = "the search term changes the result set";
@@ -352,13 +362,23 @@ function checkSearchNarrows(all, filtered) {
       detail: `${all.rows.length} unfiltered vs ${filtered.rows.length} filtered, different ids`,
     };
   }
+  const counts = (r) => `${r.total ?? "?"} in ${r.pages ?? 1} page(s)`;
+  if (all.total !== filtered.total || all.pages !== filtered.pages) {
+    return {
+      path,
+      label,
+      ok: true,
+      level: "pass",
+      detail: `same first page, but ${counts(all)} unfiltered vs ${counts(filtered)} filtered`,
+    };
+  }
   if ((all.pages ?? 1) > 1) {
     return {
       path,
       label,
       ok: false,
       level: "fail",
-      detail: `identical ids over ${all.pages} pages of corpus — the search parameter is not reaching the API`,
+      detail: `identical ids and identical totals (${counts(all)}) — the search parameter is not reaching the API`,
     };
   }
   return {
@@ -366,7 +386,7 @@ function checkSearchNarrows(all, filtered) {
     label,
     ok: true,
     level: "warn",
-    detail: "identical ids, but the whole corpus fits one page",
+    detail: `identical ids and totals (${counts(all)}), but the whole corpus fits one page`,
   };
 }
 

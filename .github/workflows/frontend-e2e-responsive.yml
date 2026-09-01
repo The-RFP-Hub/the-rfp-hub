@@ -1,7 +1,7 @@
-# packages/e2e/tests/m4-responsive.spec.ts — and only that spec — through the real E2E runner
-# (`packages/e2e/src/run.ts`), which owns the Postgres, API and frontend it needs; a bare
-# `playwright test` has no stack. The two guard steps exist because both halves of the selection
-# fail open: a filter matching nothing, and a spec skipping itself, are each a green run of nothing.
+# Runs one spec through the real E2E runner (`packages/e2e/src/run.ts`), which owns the Postgres,
+# API and frontend it needs. Requires packages/e2e/tests/m4-responsive.spec.ts (merged with the
+# directory-filters change). The two guard steps exist because both halves of the selection fail
+# open: a filter matching nothing, and a spec skipping itself, are each a green run of nothing.
 name: Frontend responsive E2E
 
 on:
