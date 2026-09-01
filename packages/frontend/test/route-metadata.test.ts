@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { generateMetadata as listingMetadata } from "@/app/listings/[id]/layout";
 import { metadata as listingsMetadata } from "@/app/listings/layout";
@@ -38,6 +38,40 @@ const PUBLIC_ROUTES = [
   "/publishers",
   "/terms",
 ];
+
+/**
+ * The other half, written out rather than computed as "everything else". The previous version of
+ * this test compared `pageRoutes().filter(not public)` with the very expression that produced it,
+ * so no change to the app could make it fail; both halves are now literals, checked against what
+ * the layouts on disk actually say.
+ */
+const NOINDEX_ROUTES = [
+  "/account",
+  "/admin",
+  "/auth/complete",
+  "/dashboard",
+  "/duplicates",
+  "/keys",
+  "/listings",
+  "/listings/[id]",
+  "/listings/[id]/edit",
+  "/listings/new",
+  "/notifications",
+  "/organisations/[[...rest]]",
+  "/organizations",
+  "/organizations/[slug]",
+  "/review",
+];
+
+/** Next merges metadata down the tree, so a route inherits the nearest ancestor layout's robots. */
+function noindexInSource(route: string): boolean {
+  const segments = route === "/" ? [] : route.slice(1).split("/");
+  for (let depth = segments.length; depth >= 0; depth--) {
+    const layout = join(appRoot, ...segments.slice(0, depth), "layout.tsx");
+    if (existsSync(layout) && readFileSync(layout, "utf8").includes("NOINDEX_ROBOTS")) return true;
+  }
+  return false;
+}
 
 describe("route metadata", () => {
   it("uses the directory title as the root default and templates every child title", () => {
@@ -119,21 +153,17 @@ describe("route metadata", () => {
    * a public route accidentally caught by an overbroad prefix.
    */
   describe("every non-public route overrides indexing off", () => {
-    const noindexRoutes = pageRoutes().filter((route) => !PUBLIC_ROUTES.includes(route));
+    const noindexRoutes = NOINDEX_ROUTES;
 
-    it("is exactly every page route minus the public set — nothing left uncovered, nothing wrongly covered", () => {
-      expect(noindexRoutes.sort()).toEqual(
-        pageRoutes()
-          .filter((route) => !PUBLIC_ROUTES.includes(route))
-          .sort(),
+    it("is exactly what the layouts on disk mark noindex, and the two halves cover every route", () => {
+      // A public route that gains NOINDEX_ROBOTS, or a workbench route that loses it, moves between
+      // these two lists and fails here.
+      expect(pageRoutes().filter(noindexInSource)).toEqual([...NOINDEX_ROUTES].sort());
+      expect(pageRoutes().filter((route) => !noindexInSource(route))).toEqual(
+        [...PUBLIC_ROUTES].sort(),
       );
-      // The partition is exhaustive: every route is EITHER public OR noindex, never both, never
-      // neither.
-      for (const route of pageRoutes()) {
-        const isPublic = PUBLIC_ROUTES.includes(route);
-        const isNoindex = noindexRoutes.includes(route);
-        expect(isPublic).toBe(!isNoindex);
-      }
+      // And a route added to neither list fails too: the partition has to be exhaustive.
+      expect([...PUBLIC_ROUTES, ...NOINDEX_ROUTES].sort()).toEqual(pageRoutes());
     });
 
     it("has NOINDEX_ROUTE_PREFIXES cover every noindex route and no public route", () => {
