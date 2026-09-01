@@ -1,0 +1,64 @@
+# The issue labels this repository's written process depends on.
+#
+# WHY THIS FILE EXISTS. `packages/standard/PROCESS.md` triages every reported defect into exactly
+# one of four errata labels, and GOVERNANCE.md routes disagreement to an appeal. Naming a label in
+# prose does not create it: before this file, all four errata labels and both new routing labels
+# existed only as words in a document, so the triage step the process requires could not actually
+# be performed. A process that cannot be carried out is worse than none, because it tells
+# contributors to expect a step nobody will run.
+#
+# NOTHING CONSUMES THIS FILE. There is no label-sync workflow and deliberately so: a sync action
+# with delete-on-drift is a foot-gun on a repo whose labels are also created by hand, and one that
+# only adds is a workflow run doing what the block below does in ten seconds. This is a manifest a
+# maintainer applies, and the record of what the labels are FOR.
+#
+# TO APPLY (idempotent — `--force` updates an existing label rather than failing). All seven are
+# missing from the repository until an operator runs this block — a form naming a label that does
+# not exist has that label silently dropped from the issue GitHub creates:
+#
+#   gh label create erratum-editorial     --color c5def5 --force --description "Erratum: typo, broken link, unclear sentence, stale number. Changes nothing that validates."
+#   gh label create erratum-technical     --color d93f0b --force --description "Erratum: normative artifacts disagree, or a description says something the schema does not do."
+#   gh label create held-for-next-cut     --color fbca04 --force --description "Real defect whose fix would change what validates. Parked until the next spec version opens."
+#   gh label create redesign              --color 5319e7 --force --description "Not a defect: asks the standard to mean something different. Becomes a proposed feature."
+#   gh label create rfc                   --color 0e8a16 --force --description "A proposal at the 'proposed' stage: a field, a registry value, or a change to the process."
+#   gh label create appeal                --color b60205 --force --description "A decision is being appealed. Answered on the issue, in public, with the reasoning."
+#   gh label create publisher-application --color 1d76db --force --description "An organization applying to become a verified publisher."
+#
+# The two below are GitHub's own repository defaults, already present, and listed only so this
+# file is the whole picture rather than most of it.
+#
+#   gh label create bug                   --color d73a4a --force --description "Something is broken in the standard, the CLI, or the API."
+#   gh label create enhancement           --color a2eeef --force --description "A feature request that is not (yet) a change to the standard."
+
+# Errata — the four-way triage in PROCESS.md § Errata. Every reported defect gets exactly one.
+- name: erratum-editorial
+  color: c5def5
+  description: "Erratum: typo, broken link, unclear sentence, stale number. Changes nothing that validates."
+- name: erratum-technical
+  color: d93f0b
+  description: "Erratum: normative artifacts disagree, or a description says something the schema does not do."
+- name: held-for-next-cut
+  color: fbca04
+  description: "Real defect whose fix would change what validates. Parked until the next spec version opens."
+- name: redesign
+  color: 5319e7
+  description: "Not a defect: asks the standard to mean something different. Becomes a proposed feature."
+
+# Routing — the two doors added so the paths GOVERNANCE.md describes are reachable.
+- name: rfc
+  color: 0e8a16
+  description: "A proposal at the 'proposed' stage: a field, a registry value, or a change to the process."
+- name: appeal
+  color: b60205
+  description: "A decision is being appealed. Answered on the issue, in public, with the reasoning."
+
+# Already in use by the existing issue forms.
+- name: bug
+  color: d73a4a
+  description: "Something is broken in the standard, the CLI, or the API."
+- name: enhancement
+  color: a2eeef
+  description: "A feature request that is not (yet) a change to the standard."
+- name: publisher-application
+  color: 1d76db
+  description: "An organization applying to become a verified publisher."
