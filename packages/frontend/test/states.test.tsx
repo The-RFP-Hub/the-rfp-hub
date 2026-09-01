@@ -68,7 +68,9 @@ describe("useResource", () => {
     const first = deferred<string>();
     render(<Harness load={() => first.promise} />);
 
-    expect(screen.getByText(/Loading the list/)).toBeTruthy();
+    const loading = screen.getByText(/Loading the list/).closest("output");
+    expect(loading).toBeTruthy();
+    expect(loading?.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
     await act(async () => first.settle("first answer"));
     expect(screen.getByText("first answer")).toBeTruthy();
   });

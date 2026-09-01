@@ -199,7 +199,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         tags: ["review"],
         summary: "Fetch this entry's applicationUrl now and record what it says",
         description:
-          "Records a run whatever happens — a refused address, a timeout and a soft 404 are all answers a reviewer needs. `matched` is a LOW-BAR anti-spam signal (the page exists and its title is about the same programme), not a fact-check: an administrator still approves. 400 when the entry carries no `applicationUrl`, because there is then nothing to check it against.",
+          "Records a run whatever happens — a refused address, a timeout and a soft 404 are all answers a reviewer needs. `matched` is a LOW-BAR anti-spam signal (the page exists and its title is about the same program), not a fact-check: an administrator still approves. 400 when the entry carries no `applicationUrl`, because there is then nothing to check it against.",
         security: [{ bearerAuth: [] }],
         params: idParams,
         response: {
@@ -248,7 +248,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "confirmDuplicate",
         tags: ["review"],
-        summary: "Record that two entries really are the same programme",
+        summary: "Record that two entries really are the same program",
         description:
           "Changes the pair's status only. Neither entry is touched — deciding which one survives is a separate, destructive action.",
         security: [{ bearerAuth: [] }],
@@ -266,7 +266,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
       schema: {
         operationId: "dismissDuplicate",
         tags: ["review"],
-        summary: "Record that two similar entries are different programmes",
+        summary: "Record that two similar entries are different programs",
         description:
           "A dismissal is permanent as far as the detector is concerned: re-running detection never resurrects a dismissed pair, because a re-run has no new information about a judgement somebody already made.",
         security: [{ bearerAuth: [] }],

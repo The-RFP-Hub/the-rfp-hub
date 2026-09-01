@@ -769,7 +769,7 @@ describe("when problems appear", () => {
     const field = title.closest('[data-field-path="title"]') as HTMLElement;
     const labelRow = title.labels?.[0]?.parentElement as HTMLElement;
     const control = title.closest(`.${styles.control}`) as HTMLElement;
-    const helper = within(field).getByText("The name the programme is published under.");
+    const helper = within(field).getByText("The name the program is published under.");
     const guidance = helper.closest(`.${styles.guidanceRow}`) as HTMLElement;
     const counter = within(field).getByText("0 / 300");
     const problem = within(field).getByText("A title is required.");
@@ -816,7 +816,7 @@ describe("when problems appear", () => {
     ).toBe("#form-error-summary");
     expect(
       within(summary)
-        .getByRole("link", { name: /Programme model/ })
+        .getByRole("link", { name: /Program model/ })
         .getAttribute("href"),
     ).toBe("#f-details-grant-programModel");
     expect(
@@ -1096,7 +1096,7 @@ describe("after a submission", () => {
     expect(screen.getByRole("link", { name: "View it as applicants see it" })).toBeTruthy();
   });
 
-  it("acknowledges a different programme locally without disturbing the success actions", async () => {
+  it("acknowledges a different program locally without disturbing the success actions", async () => {
     const api = mount(
       {},
       {
@@ -1122,7 +1122,7 @@ describe("after a submission", () => {
     expect(
       await screen.findByText("A reviewer will compare the pair before publication."),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "This is a different programme" }));
+    fireEvent.click(screen.getByRole("button", { name: "This is a different program" }));
 
     expect(screen.queryByRole("heading", { name: "Possible duplicate" })).toBeNull();
     expect(screen.getByText(/Reviewers will still see the possible match/)).toBeTruthy();
