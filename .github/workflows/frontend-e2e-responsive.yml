@@ -50,8 +50,8 @@ jobs:
       - name: Install Chromium for Playwright
         run: pnpm --filter @the-rfp-hub/e2e exec playwright install --with-deps chromium
 
-      # `playwright test <filter>` exits 0 when the filter matches nothing, so a rename would
-      # disarm this job silently. The config reads a state file at import time; listing needs no stack.
+      # A rename of the spec has to fail here, not fifteen minutes into a stack bring-up. The
+      # config reads a state file at import time, so listing needs a stub but no stack.
       - name: The filter still selects the spec
         shell: bash
         working-directory: packages/e2e
