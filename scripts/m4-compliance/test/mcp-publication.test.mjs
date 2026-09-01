@@ -4,7 +4,7 @@
  * `pnpm --filter @the-rfp-hub/mcp build` is not a configuration snippet and must not be flagged.
  */
 import { describe, expect, it } from "vitest";
-import { mcpApiBase, unpinnedReadmeSpecs } from "../checks/mcp.mjs";
+import { mcpApiBase, schemaErrors, unpinnedReadmeSpecs } from "../checks/mcp.mjs";
 
 const fenced = (...lines) => ["```json", ...lines, "```"].join("\n");
 
@@ -57,5 +57,28 @@ describe("mcpApiBase", () => {
     expect(mcpApiBase("http://127.0.0.1:3150").refusedByServer).toBe(false);
     expect(mcpApiBase("http://localhost:3150").refusedByServer).toBe(false);
     expect(mcpApiBase("https://api.example.org").refusedByServer).toBe(false);
+  });
+});
+
+describe("schemaErrors", () => {
+  const schema2020 = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    required: ["total"],
+    properties: { total: { type: "number" } },
+  };
+
+  it("compiles the 2020-12 dialect the real server's schemas declare", () => {
+    // The draft-07 build refuses this outright with "no schema with key or ref …/2020-12/schema",
+    // which read as "the tool's output is invalid" when the tool's output was fine.
+    expect(schemaErrors(schema2020, { total: 3 })).toBeNull();
+  });
+
+  it("still reports a real mismatch under that dialect", () => {
+    expect(schemaErrors(schema2020, { total: "many" })).toMatch(/total/);
+  });
+
+  it("compiles a schema with no $schema at all", () => {
+    expect(schemaErrors({ type: "object" }, {})).toBeNull();
   });
 });

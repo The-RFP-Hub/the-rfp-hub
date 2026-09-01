@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import AjvModule from "ajv";
+import Ajv2020Module from "ajv/dist/2020.js";
 import { isLoopbackHost, request } from "../../m2-compliance/http.mjs";
 import { McpStdioClient, findCredentialLeak } from "../mcp-client.mjs";
 import { RecordingServer } from "../mock-server.mjs";
@@ -109,11 +110,16 @@ async function spawnClient(resolved, env, ctx, unset = []) {
   return client;
 }
 
-/** ajv is a root devDependency; its CJS default export needs unwrapping under ESM. */
+// ajv is a root devDependency; its CJS default export needs unwrapping under ESM, and the two
+// dialects need different classes — the real server's zod-generated schemas declare
+// `$schema: …/2020-12/schema`, which the draft-07 build refuses to compile at all.
 const Ajv = AjvModule.default ?? AjvModule;
-const ajv = new Ajv({ strict: false, allErrors: true, validateFormats: false });
+const Ajv2020 = Ajv2020Module.default?.default ?? Ajv2020Module.default ?? Ajv2020Module;
+const AJV_OPTIONS = { strict: false, allErrors: true, validateFormats: false };
 
-function schemaErrors(schema, value) {
+export function schemaErrors(schema, value) {
+  const dialect = String(schema?.$schema ?? "");
+  const ajv = dialect.includes("2020-12") ? new Ajv2020(AJV_OPTIONS) : new Ajv(AJV_OPTIONS);
   try {
     const validate = ajv.compile(schema);
     return validate(value) ? null : ajv.errorsText(validate.errors, { separator: "; " });
@@ -487,8 +493,8 @@ export async function checkMcp(report, ctx) {
         c.expect(
           preview?.status === "pending",
           'submit_opportunity phase 1 returns status: "pending"',
-          JSON.stringify(preview).slice(0, 300),
-          `status is not "pending": ${JSON.stringify(preview ?? submitResponse.result).slice(0, 500)}`,
+          JSON.stringify(preview ?? null).slice(0, 300),
+          `status is not "pending": ${JSON.stringify(preview ?? submitResponse.result ?? null).slice(0, 500)}`,
         );
         const leak = scanClientForLeak(submitClient, submitResponse);
         c.expect(

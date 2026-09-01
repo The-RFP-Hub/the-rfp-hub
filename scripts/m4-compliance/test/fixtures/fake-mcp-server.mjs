@@ -9,7 +9,12 @@ const defect = process.env.FAKE_MCP_DEFECT ?? "none";
 const submitEnabled = process.env.RFPHUB_MCP_ENABLE_SUBMIT === "1";
 const apiBase = process.env.RFPHUB_API_BASE ?? "";
 
+// The real server's schemas are zod-generated and carry this dialect, which the draft-07 ajv build
+// refuses to compile at all — so the fixture declares it too.
+const DIALECT = "https://json-schema.org/draft/2020-12/schema";
+
 const searchOutputSchema = {
+  $schema: DIALECT,
   type: "object",
   required: ["notice", "total", "page", "limit", "totalPages", "items"],
   properties: {
@@ -26,6 +31,7 @@ const searchOutputSchema = {
 };
 
 const submitOutputSchema = {
+  $schema: DIALECT,
   type: "object",
   required: ["status"],
   properties: { status: { type: "string" }, approvalId: { type: "string" } },
@@ -44,7 +50,7 @@ function tools() {
       name: "fetch_opportunity",
       description: "fetch",
       inputSchema: { type: "object" },
-      ...(defect === "no-output-schema" ? {} : { outputSchema: { type: "object" } }),
+      ...(defect === "no-output-schema" ? {} : { outputSchema: { $schema: DIALECT, type: "object" } }),
       annotations: { readOnlyHint: true, openWorldHint: defect === "non-boolean-hint" ? "yes" : true },
     },
   ];
@@ -53,7 +59,7 @@ function tools() {
       name: "debug_tool",
       description: "extra",
       inputSchema: { type: "object" },
-      outputSchema: { type: "object" },
+      outputSchema: { $schema: DIALECT, type: "object" },
       annotations: { readOnlyHint: true, openWorldHint: true },
     });
   }
