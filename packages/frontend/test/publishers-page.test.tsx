@@ -15,6 +15,8 @@
  * The API client is injected through the same context the application uses, so the component
  * fetches and renders exactly as it does in a browser. No network, no auth SDK.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import PublishersPage from "@/app/publishers/page";
 import { type ApiClient, ApiError } from "@/lib/api";
 import { ApiClientProvider } from "@/lib/api-context";
@@ -33,6 +35,19 @@ const filecoin: Publisher = {
   logoUrl: "https://filecoin.example.org/logo.png",
   ecosystems: ["Filecoin", "<script>evil()</script>"],
   verifiedAt: "2026-08-14T00:00:00Z",
+};
+
+/** One unbroken token: a name with spaces wraps on its own, so it would prove nothing. */
+const UNBROKEN_NAME = "Loooooongestpublishernameimaginable".repeat(30);
+
+const marathon: Publisher = {
+  slug: "marathon",
+  name: UNBROKEN_NAME,
+  description: `${"Unbroken".repeat(120)}.`,
+  website: null,
+  logoUrl: null,
+  ecosystems: [],
+  verifiedAt: null,
 };
 
 const beta: Publisher = {
@@ -150,6 +165,46 @@ describe("the public publishers page", () => {
     expect(
       screen.getAllByText("Every listing this organization operates or sponsors."),
     ).toHaveLength(2);
+  });
+
+  it("labels the namespace for a reader who cannot see it is a namespace", async () => {
+    const { client: c } = client();
+    mount(c);
+
+    await screen.findByText(HOSTILE);
+    const labels = screen.getAllByText("Namespace:");
+    expect(labels).toHaveLength(2);
+    expect(labels[0]?.className).toContain("visually-hidden");
+    expect(labels[0]?.parentElement?.querySelector("code")?.textContent).toBe("filecoin:…");
+  });
+
+  it("names the publisher in the logo link, which every card otherwise labels identically", async () => {
+    const { client: c } = client();
+    mount(c);
+
+    await screen.findByText(HOSTILE);
+    const logo = screen.getByRole("link", { name: `${HOSTILE} logo (external link)` });
+    expect(logo.getAttribute("href")).toBe(filecoin.logoUrl);
+  });
+
+  it("wraps an unbroken publisher name rather than widening the card", async () => {
+    const { client: c } = client({ list: async () => ({ items: [marathon], total: 1 }) });
+    mount(c);
+
+    expect(await screen.findByText(UNBROKEN_NAME)).toBeTruthy();
+
+    // jsdom lays nothing out, so what protects a 375px viewport is the rule itself.
+    const css = readFileSync(join(process.cwd(), "src", "app", "globals.css"), "utf8").replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const wrapping = css
+      .split("}")
+      .map((block) => block.split("{"))
+      .filter(([, body]) => body?.includes("overflow-wrap: anywhere"))
+      .flatMap(([selector]) => (selector ?? "").split(",").map((one) => one.trim()));
+    expect(wrapping).toContain(".publisher-card h2");
+    expect(wrapping).toContain(".publisher-description");
   });
 
   it("stamps a stable, checkable slug on each card's root element", async () => {

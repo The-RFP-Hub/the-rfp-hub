@@ -1604,6 +1604,13 @@ pre.untrusted-block {
   margin: var(--space-4) 0;
 }
 
+/* A publisher writes its own name and description; an unbroken 2000-character token is theirs to
+   send and must not be allowed to widen the card past the viewport. */
+.publisher-card h2,
+.publisher-description {
+  overflow-wrap: anywhere;
+}
+
 .publisher-card h2 {
   margin-top: 0;
   font-size: var(--text-h3);

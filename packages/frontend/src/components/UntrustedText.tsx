@@ -54,7 +54,13 @@ export function UntrustedBlock({
 export function UntrustedLink({
   href,
   label,
-}: { href: string | null | undefined; label?: string }) {
+  ariaLabel,
+}: {
+  href: string | null | undefined;
+  label?: string;
+  /** For a repeated label ("linked, not embedded") that needs saying WHOSE it is out of context. */
+  ariaLabel?: string;
+}) {
   if (!href) return <span className="muted untrusted-link">—</span>;
   let safe = false;
   try {
@@ -74,7 +80,13 @@ export function UntrustedLink({
     );
   }
   return (
-    <a className="untrusted-link" href={href} target="_blank" rel="noopener noreferrer">
+    <a
+      className="untrusted-link"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={ariaLabel}
+    >
       {label ?? href}
     </a>
   );

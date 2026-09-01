@@ -17,9 +17,10 @@
  * verified organization is trusted to publish without a second review; it is not trusted to inject
  * HTML into this page, and those are different kinds of trust.
  *
- * `logoUrl` NEVER BECOMES AN `<img>`. This package's CSP is `img-src 'self' data:` for exactly this
- * reason (`src/lib/csp.ts`): loading a remote image would leak every reader's IP address to
- * whatever host a publisher named. The field is shown as a link instead, or omitted.
+ * `logoUrl` NEVER BECOMES AN `<img>`. This package's CSP never allows a publisher-named host in
+ * `img-src` (`src/lib/csp.ts`), for exactly this reason: loading a remote image would leak every
+ * reader's IP address to whatever host a publisher named. The field is shown as a link instead, or
+ * omitted.
  */
 import { UntrustedLink, UntrustedText } from "@/components/UntrustedText";
 import { EmptyState, ResourceView } from "@/components/states";
@@ -77,6 +78,7 @@ export default function PublishersPage() {
 
 function PublisherCard({ publisher }: { publisher: Publisher }) {
   const directoryHref = `/?organization=${encodeURIComponent(publisher.slug)}`;
+  const name = publisher.name.trim() || publisher.slug;
   return (
     // `data-testid`/`data-publisher-slug`: this package otherwise has no test-hook attribute
     // convention (its own tests select by role and text, like the rest of the codebase) — these two
@@ -93,9 +95,11 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       {/*
        * THE NAMESPACE, not just an identifier. `<slug>:` is the prefix every one of this
        * organization's listing ids carries, so showing it here is what lets a reader connect a
-       * listing id they already have to the organization that owns it.
+       * listing id they already have to the organization that owns it. A screen reader gets the
+       * word, because a bare `filecoin:…` announced on its own is not a fact about anything.
        */}
       <p className="muted">
+        <span className="visually-hidden">Namespace: </span>
         <code>{publisher.slug}:…</code>
       </p>
 
@@ -121,13 +125,18 @@ function PublisherCard({ publisher }: { publisher: Publisher }) {
       </p>
 
       {/*
-       * NEVER an <img>. `logoUrl` is publisher-supplied and the CSP's `img-src` is `'self' data:`
-       * on purpose (see `src/lib/csp.ts`) — loading it would leak every reader's IP to whatever host
-       * the publisher named. A labelled link costs nothing and leaks nothing.
+       * NEVER an <img>. `logoUrl` is publisher-supplied and the CSP's `img-src` never allows a
+       * publisher-named host (see `src/lib/csp.ts`) — loading it would leak every reader's IP to
+       * whatever host the publisher named. A labeled link costs nothing and leaks nothing.
        */}
       {publisher.logoUrl ? (
         <p className="muted footnote">
-          Logo: <UntrustedLink href={publisher.logoUrl} label="linked, not embedded" />
+          Logo:{" "}
+          <UntrustedLink
+            href={publisher.logoUrl}
+            label="linked, not embedded"
+            ariaLabel={`${name} logo (external link)`}
+          />
         </p>
       ) : null}
 
