@@ -21,7 +21,7 @@ import {
   verifyTornDown,
 } from "./m4-compliance/accept/flow.mjs";
 import { parseArgs, redirectRefusal, refusals } from "./m4-compliance/accept/options.mjs";
-import { Report } from "./m4-compliance/report.mjs";
+import { acceptanceReport } from "./m4-compliance/report.mjs";
 
 const USAGE = `M4 write-acceptance — real 3-phase MCP submission, staging only
 
@@ -100,7 +100,7 @@ async function main() {
   };
   const state = { run: runToken() };
 
-  const report = new Report({
+  const report = acceptanceReport({
     siteUrl: "(n/a — write acceptance targets the API only)",
     baseUrl: ctx.api,
     node: process.version,

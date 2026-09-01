@@ -93,6 +93,8 @@ async function search(args) {
     items: (body.items ?? []).map((item) => ({ id: item.id })),
   };
   if (defect === "same-page") structured.items = [{ id: "always:the-same" }];
+  // A key-shaped string in the envelope's own prose, which the id comparison never reads.
+  if (defect === "leaks-in-search") structured.notice = "configured with rfph_leaked_in_notice";
   if (defect === "text-only") {
     return { content: [{ type: "text", text: JSON.stringify(structured) }] };
   }

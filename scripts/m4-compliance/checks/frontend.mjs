@@ -135,6 +135,54 @@ async function undersizedTargets(page, min) {
   }, min);
 }
 
+/**
+ * Whether `robots.txt` blocks `/` for every crawler. Parsed by GROUP: one regex over the whole file
+ * crossed group boundaries, so a file that allows everyone and then blocks one misbehaving bot read
+ * as a site-wide block. For the path `/` the only competing rules are `Disallow: /` and `Allow: /`,
+ * and the tie goes to Allow.
+ */
+export function robotsBlocksAll(text) {
+  const groups = [];
+  let current = null;
+  let namingAgents = false;
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.replace(/#.*$/, "").trim();
+    if (!line) continue;
+    const [field, ...rest] = line.split(":");
+    const name = field.trim().toLowerCase();
+    const value = rest.join(":").trim();
+    if (name === "user-agent") {
+      if (!namingAgents) {
+        current = { agents: [], disallow: [], allow: [] };
+        groups.push(current);
+        namingAgents = true;
+      }
+      current.agents.push(value.toLowerCase());
+      continue;
+    }
+    namingAgents = false;
+    if (!current) continue;
+    if (name === "disallow") current.disallow.push(value);
+    if (name === "allow") current.allow.push(value);
+  }
+  const wildcard = groups.find((group) => group.agents.includes("*"));
+  if (!wildcard) return false; // no group addresses every crawler, so nothing blocks them
+  return wildcard.disallow.includes("/") && !wildcard.allow.includes("/");
+}
+
+/** `<meta name="robots" content="…noindex…">` in any attribute order — the regex required one. */
+export function hasNoindexMeta(html) {
+  for (const tag of String(html).matchAll(/<meta\b[^>]*>/gi)) {
+    const attributes = {};
+    for (const attr of tag[0].matchAll(/([a-z-]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi)) {
+      attributes[attr[1].toLowerCase()] = attr[2].replace(/^["']|["']$/g, "");
+    }
+    if (attributes.name?.toLowerCase() !== "robots") continue;
+    if (/\bnoindex\b/i.test(attributes.content ?? "")) return true;
+  }
+  return false;
+}
+
 export async function checkFrontend(report, ctx) {
   const c = report.criterion(
     "M4-3",
@@ -398,13 +446,9 @@ function checkIndexability(c, ctx, homeRes, robotsRes) {
     : robotsRes.ok
       ? `HTTP ${robotsRes.status}`
       : `transport: ${robotsRes.error}`;
-  const blanket = robots
-    ? /^\s*user-agent:\s*\*[\s\S]*?^\s*disallow:\s*\/\s*$/im.test(robots)
-    : false;
+  const blanket = robots ? robotsBlocksAll(robots) : false;
   const noindex =
-    homeRes.ok && typeof homeRes.body === "string"
-      ? /<meta[^>]+name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(homeRes.body)
-      : false;
+    homeRes.ok && typeof homeRes.body === "string" ? hasNoindexMeta(homeRes.body) : false;
 
   if (!ctx.expectIndexable) {
     c.info("robots.txt", detail);
