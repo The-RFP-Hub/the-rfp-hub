@@ -20,7 +20,7 @@
  */
 import { DirectoryList } from "@/components/DirectoryList";
 import { AuthUnavailable, Loading } from "@/components/states";
-import { HOW_IT_WORKS } from "@/lib/links";
+import { GOVERNANCE, HOW_IT_WORKS, REVIEW_CRITERIA } from "@/lib/links";
 import { useSession } from "@/lib/session";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -62,8 +62,6 @@ export default function DirectoryPage() {
 function PublisherInvitation() {
   const session = useSession();
 
-  if (session.error) return <AuthUnavailable error={session.error} />;
-
   return (
     <section className="card" aria-labelledby="publish-heading">
       <h2 id="publish-heading">Do you run one of these programs?</h2>
@@ -73,7 +71,26 @@ function PublisherInvitation() {
         requires membership of a verified organization, which a reviewer grants.{" "}
         <Link href={HOW_IT_WORKS}>Who can do what</Link> sets out the whole of it.
       </p>
-      {!session.ready ? (
+      {/*
+       * The governance link belongs on the page, not only in the global footer: what a listing is
+       * checked against, and who may change that, is the first thing a publisher deciding whether
+       * to submit here needs to be able to read. It sits above the session branch so that it is
+       * still there when sign-in itself is unavailable.
+       */}
+      <p className="footnote">
+        The rules are public and so is the appeal against one:{" "}
+        <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
+          Governance
+        </a>{" "}
+        sets out who decides and how to disagree, and{" "}
+        <a href={REVIEW_CRITERIA} target="_blank" rel="noopener noreferrer">
+          Review criteria
+        </a>{" "}
+        sets out what one listing is checked against before it publishes.
+      </p>
+      {session.error ? (
+        <AuthUnavailable error={session.error} />
+      ) : !session.ready ? (
         <p className="muted">Restoring your session…</p>
       ) : session.authenticated ? (
         <p>
