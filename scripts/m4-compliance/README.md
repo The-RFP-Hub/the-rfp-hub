@@ -153,7 +153,6 @@ scripts/m4-compliance/
   mcp-client.mjs         a hand-rolled newline-delimited JSON-RPC stdio client (see its docstring
                          for why this isn't pulled from an SDK)
   mock-server.mjs        the local recording HTTP server used only by the MCP submit case
-  frontmatter.mjs       Agent Skills frontmatter parsing/validation      (test/frontmatter.test.mjs)
   links.mjs             markdown link extraction                        (test/links.test.mjs)
   markers.mjs           sh-block marker parsing                         (test/markers.test.mjs)
   checks/*.mjs          one file per check (governance, publishers, frontend, mcp, skill, docs)

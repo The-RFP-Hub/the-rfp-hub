@@ -10,7 +10,7 @@
  *                      responsive at three viewports, with both deep-link hrefs correct
  *   4. MCP             the MCP server is installable, lists the right tools, matches the API, never
  *                      leaks a credential-shaped string, and fails closed on submission
- *   5. Skill           the agent skill's frontmatter is valid and its helper never emits `description`
+ *   5. Skill           the published skill is the audited skill, and its helper leaks nothing
  *   6. Docs            the four handoff guides exist, every link resolves, and only safe-read
  *                      shell blocks are ever executed
  *
