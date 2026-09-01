@@ -13,6 +13,9 @@ import type { FastifyInstance } from "fastify";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { meController } from "./me.controller.js";
 
+/** Clearing an inbox is one call per row, so this is bursty where a decision route is not. */
+const NOTIFICATION_WRITE = { max: 60, timeWindow: "1 minute" } as const;
+
 export const me = async (router: FastifyInstance): Promise<void> => {
   router.get(
     "/",
@@ -179,7 +182,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/notifications/read-all",
     {
-      onRequest: router.auth.requireAuth,
+      onRequest: meteredAuth(router, router.auth.requireAuth, NOTIFICATION_WRITE),
       schema: {
         operationId: "markAllMyNotificationsRead",
         tags: ["account"],
@@ -197,7 +200,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/notifications/:id/read",
     {
-      onRequest: router.auth.requireAuth,
+      onRequest: meteredAuth(router, router.auth.requireAuth, NOTIFICATION_WRITE),
       schema: {
         operationId: "markMyNotificationRead",
         tags: ["account"],

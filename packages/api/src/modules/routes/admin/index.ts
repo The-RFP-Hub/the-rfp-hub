@@ -10,7 +10,15 @@
  */
 import type { FastifyInstance } from "fastify";
 import { JOB_NAMES } from "../../services/jobs/registry.js";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { adminController } from "./admin.controller.js";
+
+/** Granting a role or a direct-create flag is a deliberate, one-at-a-time act. */
+const ADMIN_GRANT = { max: 20, timeWindow: "1 minute" } as const;
+/** Matches the reviewer verify ceiling: the same outbound fetch, on the administrator prefix. */
+const ADMIN_VERIFY = { max: 30, timeWindow: "1 minute" } as const;
+/** Each call starts real work under an advisory lock; a dashboard button needs nothing more. */
+const JOB_RUN = { max: 10, timeWindow: "1 minute" } as const;
 
 export const admin = async (router: FastifyInstance): Promise<void> => {
   const guard = router.auth.requireRole("admin");
@@ -29,7 +37,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/accounts/:id/role",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, ADMIN_GRANT),
       schema: {
         operationId: "assignAccountRole",
         tags: ["admin"],
@@ -57,7 +65,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/accounts/:id/direct-create",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, ADMIN_GRANT),
       schema: {
         operationId: "setAccountDirectCreate",
         tags: ["admin"],
@@ -85,7 +93,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/verify",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, ADMIN_VERIFY),
       schema: {
         operationId: "adminVerifyOpportunitySource",
         tags: ["admin"],
@@ -103,7 +111,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/jobs/:job/run",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, JOB_RUN),
       schema: {
         operationId: "runMaintenanceJob",
         tags: ["admin"],

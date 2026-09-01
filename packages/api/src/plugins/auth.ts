@@ -234,7 +234,9 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   };
 
   const requireScope = (scope: ApiKeyScope): preHandlerHookHandler => {
-    return async (request, reply) => {
+    // Named, not anonymous: `printRoutes({ includeHooks: true })` prints hook names, and the
+    // route-inventory test reads that to see where each chain's gate is.
+    return async function scopeGate(request, reply) {
       if (!(await resolve(request, reply, true))) return;
       const principal = request.principal;
       if (!principal) return;
@@ -248,7 +250,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   };
 
   const requireRole = (role: Exclude<AccountRole, "submitter">): preHandlerHookHandler => {
-    return async (request, reply) => {
+    return async function roleGate(request, reply) {
       if (!(await resolve(request, reply, true))) return;
       const principal = request.principal;
       if (!principal) return;

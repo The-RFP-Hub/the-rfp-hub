@@ -11,8 +11,19 @@ import type { FastifyInstance } from "fastify";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { reviewController } from "./review.controller.js";
 
+/**
+ * A reviewer decides at human pace — read the entry, then click once. 30/min is far above what
+ * that looks like and far below what a runaway client or a stolen session could spend.
+ */
+const REVIEW_DECISION = { max: 30, timeWindow: "1 minute" } as const;
+
 export const review = async (router: FastifyInstance): Promise<void> => {
   const guard = router.auth.requireRole("reviewer");
+  /**
+   * The chain every review WRITE uses: resolve, meter, then the role gate. Called PER ROUTE, since
+   * each call mints its own store child and therefore its own bucket, as everywhere else.
+   */
+  const metered = () => meteredAuth(router, guard, REVIEW_DECISION);
   const slugParams = {
     type: "object",
     required: ["slug"],
@@ -115,7 +126,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/approve",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "approveOpportunity",
         tags: ["review"],
@@ -140,7 +151,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/reject",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "rejectOpportunity",
         tags: ["review"],
@@ -165,7 +176,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.patch(
     "/opportunities/:id",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "updateReviewOpportunity",
         tags: ["review"],
@@ -191,9 +202,9 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/verify",
     {
-      // The one review action that reaches the network. Rate-limited so a reviewer holding the
-      // button down cannot turn this service into a request amplifier against somebody's site.
-      onRequest: meteredAuth(router, guard, { max: 30, timeWindow: "1 minute" }),
+      // The one review action that reaches the network: the limit is also what stops a reviewer
+      // holding the button down from turning this service into an amplifier against somebody's site.
+      onRequest: metered(),
       schema: {
         operationId: "verifyOpportunitySource",
         tags: ["review"],
@@ -212,7 +223,6 @@ export const review = async (router: FastifyInstance): Promise<void> => {
     reviewController.verifySource,
   );
 
-  // ── duplicates ────────────────────────────────────────────────────────────────
   router.get(
     "/duplicates",
     {
@@ -244,7 +254,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/duplicates/:id/confirm",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "confirmDuplicate",
         tags: ["review"],
@@ -262,7 +272,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/duplicates/:id/dismiss",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "dismissDuplicate",
         tags: ["review"],
@@ -280,7 +290,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/duplicates/:pairId/reopen",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "reopenDuplicate",
         tags: ["review"],
@@ -302,7 +312,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/duplicates/:id/merge",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "mergeDuplicate",
         tags: ["review"],
@@ -354,7 +364,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/claims/:id/approve",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "approveClaim",
         tags: ["review"],
@@ -382,7 +392,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/claims/:id/reject",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "rejectClaim",
         tags: ["review"],
@@ -402,7 +412,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/organizations/:slug/verify",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "verifyOrganization",
         tags: ["review"],
@@ -418,7 +428,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/organizations/:slug/unverify",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "unverifyOrganization",
         tags: ["review"],
@@ -434,7 +444,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.patch(
     "/organizations/:slug",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "updateOrganizationAsReviewer",
         tags: ["review"],
@@ -455,7 +465,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/organizations/:slug/members",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "grantOrganizationMembership",
         tags: ["review"],
@@ -484,7 +494,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.delete(
     "/organizations/:slug/members/:accountId",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "revokeOrganizationMembership",
         tags: ["review"],
@@ -507,7 +517,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/organizations/:slug/invites",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "createOrganizationMembershipInvite",
         tags: ["review"],
@@ -554,7 +564,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
   router.delete(
     "/organizations/:slug/invites/:inviteId",
     {
-      onRequest: guard,
+      onRequest: metered(),
       schema: {
         operationId: "revokeOrganizationMembershipInvite",
         tags: ["review"],

@@ -360,15 +360,32 @@ incremented the bucket, so a run of server failures can eventually be answered w
 for post-limiter failures needs a store that can atomically decrement the same route/key/window and
 is not built; the honest statement is the one above, not "5xx is never metered".
 
-**Metered routes** are the write, credential and link-out surfaces: `POST`/`PUT /v1/opportunities`
-and `POST /v1/opportunities/:id/claim` (60/min), `POST /v1/review/opportunities/:id/verify`,
-`DELETE /v1/keys/:id` and the two organization decisions (30/min), `PATCH /v1/me` and
-`PATCH /v1/organizations/:slug` (20/min), `POST /v1/keys` (10/min), and the two redirects
-`GET /v1/r/:id/{apply,source}` (120/min). The redirects stay **address-keyed**: they accept no
-credential, so there is no account to meter. The public read surface — the list, the detail, the
-feeds, the export — is deliberately **uncapped** (`global: false` in `app.ts`); it is the traffic
-this project exists to serve, and an address-keyed cap on it would be one number for a whole
-organization.
+**Every authenticated `/v1` mutation is metered.** Not a chosen subset: an unmetered write route
+is indistinguishable from a deliberately public one, so the rule is the whole surface and
+`test/integration/route-inventory.test.ts` reads the router back and fails on any exception.
+
+| Metered surface | Ceiling | Why that number |
+|---|---|---|
+| `POST`/`PUT /v1/opportunities`, `POST /v1/opportunities/:id/claim` | 60/min | a publisher's own bulk sync is the fastest legitimate caller here |
+| `POST /v1/me/notifications/read-all`, `POST /v1/me/notifications/:id/read` | 60/min | clearing an inbox is one call per row, so it is bursty |
+| Every `/v1/review` write (17 routes), `DELETE /v1/keys/:id`, the two organization decisions | 30/min | a review decision is human-paced: read the entry, click once |
+| `POST /v1/admin/opportunities/:id/verify` | 30/min | the same outbound fetch as the reviewer's verify |
+| `PATCH /v1/me`, `PATCH /v1/organizations/:slug`, `POST /v1/admin/accounts/:id/{role,direct-create}` | 20/min | a deliberate, one-at-a-time act |
+| `POST /v1/keys` | 10/min | minting a credential |
+| `POST /v1/admin/jobs/:job/run` | 10/min | each call starts real work under an advisory lock |
+| `GET /v1/r/:id/{apply,source}` | 120/min | **address-keyed** — a link-out accepts no credential, so there is no account to meter |
+
+Each route holds its OWN bucket: the ceilings are per route per credential-holder, not one budget
+across a surface.
+
+Two documented exceptions, and only two. The **Better Auth mount** (`/api/auth/*`) is where a
+credential is minted, so there is nothing for the resolver to resolve; it keeps its own
+address-keyed pair of ceilings (10/min for the four mail-sending routes, 120/min for the rest). The
+**two redirects** are anonymous by construction, as above.
+
+The public read surface — the list, the detail, the feeds, the export — is deliberately **uncapped**
+(`global: false` in `app.ts`); it is the traffic this project exists to serve, and an address-keyed
+cap on it would be one number for a whole organization.
 
 A `429` carries `retry-after` in seconds, plus `x-ratelimit-limit`/`-remaining`/`-reset`.
 
