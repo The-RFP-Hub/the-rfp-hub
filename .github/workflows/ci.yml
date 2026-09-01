@@ -343,18 +343,13 @@ jobs:
       # job outright (`pnpm --filter` errors when nothing matches), which is exactly backwards for
       # a checker meant to keep passing while another stream builds the package concurrently.
 
-  # Read-only, and deliberately independent of the job above: the doc link check needs no Postgres,
-  # no seed, no build — `scripts/check-m4.mjs`'s docs check (`m4-compliance/checks/docs.mjs`) has
-  # zero runtime dependencies beyond Node itself (see scripts/m2-compliance/http.mjs, its only
-  # import) plus `bash`/`jq`, both preinstalled on this runner image, for the `safe-read` blocks'
-  # own `curl | jq` pipelines. `--offline` skips every network request the check would otherwise
-  # make (absolute-link 2xx/3xx, executing `safe-read` blocks), which is the only way to run it in
-  # CI at all: a GitHub Actions runner has no staging deployment to talk to.
+  # Read-only, and independent of the job above: the doc link check needs no Postgres, no seed and
+  # no build. `--offline` scopes out the network requests the docs criterion would otherwise make
+  # (absolute links, executing `safe-read` blocks), which is the only way to run it on a runner
+  # with no deployment to talk to; the run then reports SCOPED PASS, never an M4 sign-off.
   #
-  # `--only docs`, NOT `--skip` five times: `--skip` still REGISTERS the other five criteria as
-  # skipped, which makes the report `incomplete` and the exit code 1 even when the one criterion
-  # this job is actually responsible for passes cleanly. `--only` excludes them from the run
-  # entirely, so this job is green exactly when the docs criterion is green.
+  # `--only docs`, NOT `--skip` five times: `--skip` registers the other five criteria as unmet,
+  # which makes the run incomplete and the exit code 1 even when this job's own criterion is green.
   docs-links:
     runs-on: ubuntu-latest
     permissions:

@@ -117,6 +117,11 @@ against `path.resolve(process.argv[1])` (which does not), and a `--repo-root` un
 `/tmp` → `/private/tmp` on macOS — made the two disagree: the CLI silently did nothing and exited 0,
 indistinguishable from "hung" until this checker's timeout fired.
 
+`RFPHUB_API_BASE` is handed to the server as a **bare origin** — the server requires https off
+loopback and rejects any path, query, fragment or userinfo at startup — so a `--api` carrying a
+path is trimmed (and said so), and a plaintext non-loopback `--api` fails by name rather than as an
+opaque startup error inside "tools/list succeeds".
+
 Every server process gets its own disposable `RFPHUB_MCP_HOME`, removed afterwards: a real server's
 `guard()` writes an audit line for every tool call, so without it even the read-only cases would
 leave entries in whoever runs this checker's own `~/.rfphub/audit.log`, and the submit-enabled

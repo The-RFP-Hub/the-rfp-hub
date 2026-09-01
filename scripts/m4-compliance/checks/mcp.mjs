@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import AjvModule from "ajv";
-import { request } from "../../m2-compliance/http.mjs";
+import { isLoopbackHost, request } from "../../m2-compliance/http.mjs";
 import { McpStdioClient, findCredentialLeak } from "../mcp-client.mjs";
 import { RecordingServer } from "../mock-server.mjs";
 
@@ -123,6 +123,21 @@ function schemaErrors(schema, value) {
 }
 
 const READ_TOOLS = ["fetch_opportunity", "search_opportunities"];
+
+/**
+ * `RFPHUB_API_BASE` must be a BARE ORIGIN — https off loopback, and no path, query, fragment or
+ * userinfo — or the server refuses to start. Passing `--api` through unchanged would surface that
+ * as an opaque startup failure inside "tools/list succeeds"; this names it instead.
+ */
+export function mcpApiBase(api) {
+  const url = new URL(api);
+  const loopback = isLoopbackHost(url.hostname);
+  return {
+    origin: url.origin,
+    trimmed: url.origin !== String(api).replace(/\/+$/, ""),
+    refusedByServer: !loopback && url.protocol !== "https:",
+  };
+}
 const SUBMIT_TOOL = "submit_opportunity";
 
 /** Every tool's shape: an outputSchema, and annotations whose values are booleans. */
@@ -294,6 +309,22 @@ export async function checkMcp(report, ctx) {
   }
   c.info("MCP server under test", resolved.describe);
 
+  const apiBase = mcpApiBase(ctx.api);
+  if (apiBase.refusedByServer) {
+    c.fail(
+      "the API base is one the MCP server will accept",
+      `${ctx.api} is plaintext and not loopback; the server requires https off loopback and would refuse to start`,
+    );
+    c.finish();
+    return checkMcpPublication(report, ctx);
+  }
+  if (apiBase.trimmed) {
+    c.info(
+      "API base passed to the server",
+      `${apiBase.origin} — the server accepts a bare origin only`,
+    );
+  }
+
   if (!resolved.local) {
     const probe = await probeRegistryInstall(resolved.spec, ctx);
     c.expect(
@@ -320,7 +351,7 @@ export async function checkMcp(report, ctx) {
     try {
       readClient = await spawnClient(
         resolved,
-        { RFPHUB_API_BASE: ctx.api, RFPHUB_MCP_HOME: mcpHome },
+        { RFPHUB_API_BASE: apiBase.origin, RFPHUB_MCP_HOME: mcpHome },
         ctx,
         ["RFPHUB_API_KEY", "RFPHUB_MCP_ENABLE_SUBMIT"],
       );

@@ -163,7 +163,8 @@ export async function runSubmissionCycle(ctx, state, c) {
   const mcpHome = await mkdtemp(join(tmpdir(), "m4-accept-mcp-home-"));
   state.mcpHome = mcpHome;
   const env = {
-    RFPHUB_API_BASE: ctx.api,
+    // A bare origin: the server refuses a base carrying a path, query, fragment or userinfo.
+    RFPHUB_API_BASE: new URL(ctx.api).origin,
     RFPHUB_API_KEY: ctx.writeKey,
     RFPHUB_MCP_ENABLE_SUBMIT: "1",
     RFPHUB_MCP_HOME: mcpHome,

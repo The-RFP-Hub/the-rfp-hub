@@ -4,7 +4,7 @@
  * `pnpm --filter @the-rfp-hub/mcp build` is not a configuration snippet and must not be flagged.
  */
 import { describe, expect, it } from "vitest";
-import { unpinnedReadmeSpecs } from "../checks/mcp.mjs";
+import { mcpApiBase, unpinnedReadmeSpecs } from "../checks/mcp.mjs";
 
 const fenced = (...lines) => ["```json", ...lines, "```"].join("\n");
 
@@ -42,5 +42,20 @@ describe("unpinnedReadmeSpecs", () => {
       "The `@the-rfp-hub/mcp` package speaks MCP over stdio.",
     ].join("\n");
     expect(unpinnedReadmeSpecs(readme)).toEqual([]);
+  });
+});
+
+describe("mcpApiBase", () => {
+  it("hands the server a bare origin, whatever --api spelled", () => {
+    expect(mcpApiBase("https://api.example.org/v1/").origin).toBe("https://api.example.org");
+    expect(mcpApiBase("https://api.example.org/base?x=1#y").trimmed).toBe(true);
+    expect(mcpApiBase("https://api.example.org").trimmed).toBe(false);
+  });
+
+  it("names a plaintext non-loopback base the server would refuse at startup", () => {
+    expect(mcpApiBase("http://api.example.org").refusedByServer).toBe(true);
+    expect(mcpApiBase("http://127.0.0.1:3150").refusedByServer).toBe(false);
+    expect(mcpApiBase("http://localhost:3150").refusedByServer).toBe(false);
+    expect(mcpApiBase("https://api.example.org").refusedByServer).toBe(false);
   });
 });
