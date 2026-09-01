@@ -118,6 +118,13 @@ async function undersizedTargets(page, min) {
       const style = getComputedStyle(el);
       if (style.visibility === "hidden" || style.display === "none") continue;
       if (rect.width === 0 || rect.height === 0) continue;
+      // Positioned off-screen: a skip link is a keyboard affordance, never a touch target.
+      const offScreen =
+        rect.bottom <= 0 ||
+        rect.right <= 0 ||
+        rect.top >= window.innerHeight ||
+        rect.left >= window.innerWidth;
+      if (offScreen) continue;
       if (el.tagName === "A" && style.display.startsWith("inline")) continue;
       if (rect.height >= minPx) continue;
       offenders.push(

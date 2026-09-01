@@ -80,3 +80,36 @@ describe("unknown arguments", () => {
     expect(() => parseArgs(["--not-a-real-flag"])).toThrow(/unknown argument "--not-a-real-flag"/);
   });
 });
+
+describe("--expect-indexable", () => {
+  it("is off by default and set by the flag", () => {
+    expect(parseArgs([]).expectIndexable).toBe(false);
+    expect(parseArgs(["--expect-indexable"]).expectIndexable).toBe(true);
+  });
+});
+
+describe("--mcp-spec", () => {
+  it("accepts a dist-tag, an exact version and local", () => {
+    expect(parseArgs(["--mcp-spec", "next"]).mcpSpec).toBe("next");
+    expect(parseArgs(["--mcp-spec", "0.1.0"]).mcpSpec).toBe("0.1.0");
+    expect(parseArgs(["--mcp-spec", "1.0.0-rc.1"]).mcpSpec).toBe("1.0.0-rc.1");
+    expect(parseArgs(["--mcp-spec", "local"]).mcpSpec).toBe("local");
+  });
+
+  it("normalizes the full package form the operator runbook spells out", () => {
+    // Concatenated, this produced `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next` and an npm ENOENT
+    // nobody could read back to the flag.
+    expect(parseArgs(["--mcp-spec", "@the-rfp-hub/mcp@next"]).mcpSpec).toBe("next");
+    expect(parseArgs(["--mcp-spec", "@the-rfp-hub/mcp@0.1.0"]).mcpSpec).toBe("0.1.0");
+  });
+
+  it("refuses a range, a wildcard and an empty value, with an actionable message", () => {
+    for (const bad of ["*", "1.x", "^1.0.0", ">=1", "", "  "]) {
+      expect(() => parseArgs(["--mcp-spec", bad])).toThrow(/--mcp-spec/);
+    }
+  });
+
+  it("refuses a missing value rather than swallowing the next flag", () => {
+    expect(() => parseArgs(["--mcp-spec"])).toThrow(/--mcp-spec needs a value/);
+  });
+});
