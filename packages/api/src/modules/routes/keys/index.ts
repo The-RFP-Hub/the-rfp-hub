@@ -13,6 +13,7 @@
  * two calls do not already do, in an order the caller controls.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { keysController } from "./keys.controller.js";
 
@@ -65,6 +66,7 @@ export const keys = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           201: { $ref: "ApiKeyCreated#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },
@@ -95,6 +97,7 @@ export const keys = async (router: FastifyInstance): Promise<void> => {
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ApiKey#" },
           401: { $ref: "ErrorResponse#" },
           403: { $ref: "ErrorResponse#" },

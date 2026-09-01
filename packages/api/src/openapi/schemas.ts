@@ -1150,4 +1150,53 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       message: { type: "string", description: "Human-readable detail." },
     },
   },
+  {
+    $id: "RateLimitedResponse",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The request was refused for exceeding this operation's ceiling. The STATUS is the discriminator — `error` is the generic client-error code, because the limiter's refusal is raised before any handler and carries no domain code of its own.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", enum: ["client_error"] },
+      message: { type: "string" },
+    },
+  },
 ];
+
+/**
+ * The `429` half of every metered operation's published contract, headers included.
+ *
+ * Without it a client generated from this document cannot model throttling at all: it sees the
+ * domain responses and then, in production, a status it was never told about. Referenced rather
+ * than repeated so the four header schemas cannot drift between operations.
+ */
+export const RATE_LIMITED = {
+  $ref: "RateLimitedResponse#",
+  description:
+    "Rate limit exceeded. Metered per credential-holder (`acct:<id>`), or per client address for a request that proved no credential. Wait `Retry-After` seconds.",
+  // A header entry is the raw JSON Schema plus a description: @fastify/swagger wraps it in
+  // `schema` itself, so a nested `schema` key publishes `{"schema":{"schema":…}}`.
+  headers: {
+    "retry-after": {
+      type: "integer",
+      minimum: 1,
+      description: "Whole seconds until this bucket's window resets.",
+    },
+    "x-ratelimit-limit": {
+      type: "integer",
+      minimum: 0,
+      description: "This operation's ceiling for the window.",
+    },
+    "x-ratelimit-remaining": {
+      type: "integer",
+      minimum: 0,
+      description: "Requests left in the window. `0` on a 429.",
+    },
+    "x-ratelimit-reset": {
+      type: "integer",
+      minimum: 0,
+      description: "Whole seconds until the window resets.",
+    },
+  },
+} as const;

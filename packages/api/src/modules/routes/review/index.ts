@@ -8,6 +8,7 @@
  * the system has. The T4 route survives alongside it for bulk and scripted use.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { reviewController } from "./review.controller.js";
 
@@ -139,6 +140,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           properties: { reason: { type: ["string", "null"] } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -164,6 +166,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           properties: { reason: { type: ["string", "null"] } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -190,6 +193,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           properties: { isListed: { type: "boolean" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -214,6 +218,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         security: [{ bearerAuth: [] }],
         params: idParams,
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "VerificationRun#" },
           400: { $ref: "ErrorResponse#" },
           ...errors,
@@ -263,7 +268,12 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           "Changes the pair's status only. Neither entry is touched — deciding which one survives is a separate, destructive action.",
         security: [{ bearerAuth: [] }],
         params: pairParams,
-        response: { 200: { $ref: "DuplicatePair#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "DuplicatePair#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.confirmDuplicate,
@@ -281,7 +291,12 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           "A dismissal is permanent as far as the detector is concerned: re-running detection never resurrects a dismissed pair, because a re-run has no new information about a judgement somebody already made.",
         security: [{ bearerAuth: [] }],
         params: pairParams,
-        response: { 200: { $ref: "DuplicatePair#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "DuplicatePair#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.dismissDuplicate,
@@ -300,6 +315,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         security: [{ bearerAuth: [] }],
         params: reopenPairParams,
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "DuplicatePair#" },
           409: duplicateReopenConflict,
           ...errors,
@@ -333,7 +349,12 @@ export const review = async (router: FastifyInstance): Promise<void> => {
             fields: { type: "array", items: { type: "string" } },
           },
         },
-        response: { 200: { $ref: "MergeResult#" }, 409: { $ref: "ErrorResponse#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "MergeResult#" },
+          409: { $ref: "ErrorResponse#" },
+          ...errors,
+        },
       },
     },
     reviewController.mergeDuplicate,
@@ -383,7 +404,12 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           additionalProperties: false,
           properties: { verifyOrganization: { type: "boolean" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: claimApprovalConflict, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "ClaimResult#" },
+          409: claimApprovalConflict,
+          ...errors,
+        },
       },
     },
     reviewController.approveClaim,
@@ -403,7 +429,12 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           required: ["id"],
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
-        response: { 200: { $ref: "ClaimResult#" }, 409: claimDecidedConflict, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "ClaimResult#" },
+          409: claimDecidedConflict,
+          ...errors,
+        },
       },
     },
     reviewController.rejectClaim,
@@ -419,7 +450,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         summary: "Verify an organization — every member becomes a publisher of its namespace",
         security: [{ bearerAuth: [] }],
         params: slugParams,
-        response: { 200: { $ref: "OrganizationSummary#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "OrganizationSummary#" },
+          ...errors,
+        },
       },
     },
     reviewController.verifyOrganization,
@@ -435,7 +470,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         summary: "Withdraw verification — auto-approval for that namespace stops immediately",
         security: [{ bearerAuth: [] }],
         params: slugParams,
-        response: { 200: { $ref: "OrganizationSummary#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "OrganizationSummary#" },
+          ...errors,
+        },
       },
     },
     reviewController.unverifyOrganization,
@@ -453,6 +492,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
         params: slugParams,
         body: organizationMetadataSchema,
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "OrganizationSummary#" },
           400: { $ref: "ErrorResponse#" },
           ...errors,
@@ -482,6 +522,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "MembershipResult#" },
           400: { $ref: "ErrorResponse#" },
           ...errors,
@@ -508,7 +549,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
             accountId: { type: "string", pattern: "^[0-9]+$" },
           },
         },
-        response: { 200: { $ref: "MembershipResult#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "MembershipResult#" },
+          ...errors,
+        },
       },
     },
     reviewController.revokeMembership,
@@ -536,6 +581,7 @@ export const review = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "MembershipInvite#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -578,7 +624,11 @@ export const review = async (router: FastifyInstance): Promise<void> => {
             inviteId: { type: "string", pattern: "^[0-9]+$" },
           },
         },
-        response: { 200: { $ref: "MembershipInvite#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "MembershipInvite#" },
+          ...errors,
+        },
       },
     },
     reviewController.revokeMembershipInvite,

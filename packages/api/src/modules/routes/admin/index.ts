@@ -9,6 +9,7 @@
  * deployment's own credentials, never through a public endpoint.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { JOB_NAMES } from "../../services/jobs/registry.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { adminController } from "./admin.controller.js";
@@ -53,6 +54,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           properties: { role: { type: "string", enum: ["submitter", "reviewer", "admin"] } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "AccountSummary#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -81,6 +83,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           properties: { directCreate: { type: "boolean" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "AccountSummary#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -102,7 +105,11 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           "The same action `/v1/review/opportunities/{id}/verify` performs, on the administrator prefix — kept for bulk and scripted runs over many entries. Triggering a single verification is a REVIEWER capability, and the review route is where an interactive reviewer does it.",
         security: [{ bearerAuth: [] }],
         params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
-        response: { 200: { $ref: "VerificationRun#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "VerificationRun#" },
+          ...errors,
+        },
       },
     },
     adminController.verifySource,
@@ -136,7 +143,11 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
             },
           },
         },
-        response: { 200: { $ref: "JobRunResult#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "JobRunResult#" },
+          ...errors,
+        },
       },
     },
     adminController.runJob,

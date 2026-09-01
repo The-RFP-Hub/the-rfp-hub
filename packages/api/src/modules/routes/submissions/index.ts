@@ -22,6 +22,7 @@
  * `.trim()` call on whatever the caller sent.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { submissionsController } from "./submissions.controller.js";
 
@@ -44,6 +45,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
       403: { $ref: "ErrorResponse#" },
       409: { $ref: "ErrorResponse#" },
       413: { $ref: "ErrorResponse#" },
+      429: RATE_LIMITED,
     },
   };
 
@@ -109,6 +111,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ClaimResult#" },
           202: { $ref: "ClaimResult#" },
           400: { $ref: "ErrorResponse#" },

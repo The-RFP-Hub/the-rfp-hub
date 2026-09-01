@@ -12,6 +12,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import { pool } from "../../src/db/client.js";
+import { RATE_LIMIT_HEADERS } from "../../src/modules/routes/shared/rate-limit-key.js";
 import { testAuth } from "../helpers/auth.js";
 import { describeWithDb } from "./db-gate.js";
 
@@ -126,4 +127,60 @@ run("route inventory", () => {
       .map((row) => row.path);
     expect(capped).toEqual([]);
   });
+
+  it("publishes the 429 contract on every metered operation", async () => {
+    // A client generated from this document used to see the domain responses and then, in
+    // production, a status it had never been told about. The assertion is against the LIVE
+    // document rather than the route sources, because the document is what a client is built from.
+    const doc = (await app.inject({ method: "GET", url: "/v1/docs/json" })).json<OpenApiDocument>();
+
+    const documented = Object.entries(doc.paths).flatMap(([path, operations]) =>
+      Object.entries(operations)
+        .filter(([verb]) => !["get", "head", "options"].includes(verb))
+        .map(([verb, operation]) => ({ name: `${verb.toUpperCase()} ${path}`, operation })),
+    );
+    // Every `/v1` mutation is metered (above), so every documented one must carry the contract.
+    expect(documented.length).toBe(
+      routes.filter((row) => row.path.startsWith("/v1/") && isMutation(row)).length,
+    );
+
+    // The two redirects are GETs and metered by address, so they are named explicitly.
+    const redirects = ["/v1/r/{id}/apply", "/v1/r/{id}/source"].map((path) => ({
+      name: `GET ${path}`,
+      operation: doc.paths[path]?.get,
+    }));
+
+    for (const { name, operation } of [...documented, ...redirects]) {
+      const response = operation?.responses?.["429"];
+      expect(response?.content?.["application/json"]?.schema?.$ref, name).toBe(
+        "#/components/schemas/RateLimitedResponse",
+      );
+      expect(Object.keys(response?.headers ?? {}).sort(), name).toEqual(
+        [...RATE_LIMIT_HEADERS].sort(),
+      );
+      // The header object is `{ schema, description }` — a nested `schema.schema` is the shape a
+      // raw JSON Schema wrapped twice produces, and no generator reads it.
+      for (const header of Object.values(response?.headers ?? {})) {
+        expect(header.schema.type, name).toBe("integer");
+      }
+    }
+  }, 60_000);
 });
+
+interface OpenApiHeader {
+  schema: { type?: string };
+}
+
+interface OpenApiOperation {
+  responses?: Record<
+    string,
+    {
+      headers?: Record<string, OpenApiHeader>;
+      content?: Record<string, { schema?: { $ref?: string } }>;
+    }
+  >;
+}
+
+interface OpenApiDocument {
+  paths: Record<string, Record<string, OpenApiOperation>>;
+}

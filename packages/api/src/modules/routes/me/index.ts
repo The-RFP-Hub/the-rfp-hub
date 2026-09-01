@@ -10,6 +10,7 @@
  * that account has ever published.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { meController } from "./me.controller.js";
 
@@ -62,6 +63,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "Me#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },
@@ -189,6 +191,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
         summary: "Mark every unread notification for this account as read",
         security: [{ bearerAuth: [] }],
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "NotificationReadAll#" },
           401: { $ref: "ErrorResponse#" },
         },
@@ -212,6 +215,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "Notification#" },
           401: { $ref: "ErrorResponse#" },
           404: { $ref: "ErrorResponse#" },

@@ -22,6 +22,7 @@
  * Standard opportunity.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { redirectController } from "./redirect.controller.js";
 
 export const redirects = async (router: FastifyInstance): Promise<void> => {
@@ -35,10 +36,11 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
       description:
         "The stored link-out. `Location` is a URL from the record itself — never one supplied by the caller.",
       headers: {
-        Location: { schema: { type: "string", format: "uri" }, description: "The destination." },
+        Location: { type: "string", format: "uri", description: "The destination." },
       },
     },
     404: { $ref: "ErrorResponse#" },
+    429: RATE_LIMITED,
   };
 
   router.get(

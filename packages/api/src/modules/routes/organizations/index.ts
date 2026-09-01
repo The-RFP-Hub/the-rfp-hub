@@ -15,6 +15,7 @@
  * requires a written reason — see the route's description for why that is the counterweight.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { organizationMetadataSchema } from "../review/index.js";
 import { meteredAuth } from "../shared/rate-limit-key.js";
 import { organizationsController } from "./organizations.controller.js";
@@ -35,6 +36,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
         params: { type: "object", required: ["slug"], properties: { slug: { type: "string" } } },
         body: organizationMetadataSchema,
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "OrganizationSummary#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },
@@ -103,6 +105,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
           properties: { slug: { type: "string" }, id: { type: "string" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           401: { $ref: "ErrorResponse#" },
           403: { $ref: "ErrorResponse#" },
@@ -140,6 +143,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
           properties: { reason: { type: "string", minLength: 1 } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },
