@@ -7,6 +7,12 @@ import { request } from "../../m2-compliance/http.mjs";
  * only prove the route answers 200; WITH `--browser` it renders the page and asserts the set of
  * slugs shown equals the API's, and that the browser's own request to the API carried no
  * `Authorization` header — the page must not smuggle a credential into an otherwise-public listing.
+ *
+ * EVERY UNPROVEN CASE IS A FAILURE, NOT A WARNING. Not being able to find the cards, not observing
+ * the browser's request, and a response whose shape this checker does not recognize were all
+ * warnings, and warnings were green — so with production answering `{"items":[],"total":0}` the
+ * criterion could pass having established nothing at all. An empty listing has its own evidence:
+ * the page renders the empty state, and that is what is asserted.
  */
 import { withPage } from "../browser.mjs";
 
@@ -54,11 +60,32 @@ export async function extractRenderedSlugs(page) {
   return { renderedSlugs: [], extractionUsed: "none" };
 }
 
+/** The response shape this criterion is entitled to assume, checked rather than assumed. */
+export function publisherPayloadErrors(json) {
+  const errors = [];
+  if (!json || typeof json !== "object" || Array.isArray(json))
+    return ["body is not a JSON object"];
+  if (!Array.isArray(json.items)) errors.push("items is not an array");
+  if (!Number.isInteger(json.total))
+    errors.push(`total is not an integer (${JSON.stringify(json.total)})`);
+  if (Array.isArray(json.items)) {
+    const slugs = json.items.map((item) => item?.slug);
+    if (slugs.some((slug) => typeof slug !== "string" || slug.length === 0)) {
+      errors.push("an items[] entry has no string slug");
+    }
+    if (new Set(slugs).size !== slugs.length) errors.push("items[] repeats a slug");
+    if (Number.isInteger(json.total) && json.total !== json.items.length) {
+      errors.push(`total is ${json.total} but items has ${json.items.length} entries`);
+    }
+  }
+  return errors;
+}
+
 export async function checkPublishers(report, ctx) {
   const c = report.criterion(
     "M4-2",
     "Public /publishers page",
-    "The page answers 200, and — rendered — shows exactly the slugs GET /v1/publishers returns, requesting them without an Authorization header.",
+    "The page answers 200, the API's response has the shape it promises, and — rendered — the page shows exactly those slugs (or the empty state when there are none), requesting them without an Authorization header.",
   );
 
   if (ctx.skip.has("publishers")) {
@@ -85,14 +112,23 @@ export async function checkPublishers(report, ctx) {
     );
     return c.finish();
   }
-  let apiSlugs;
+  let json;
   try {
-    const json = JSON.parse(apiRes.body);
-    apiSlugs = new Set((json.items ?? []).map((item) => item.slug));
+    json = JSON.parse(apiRes.body);
   } catch (err) {
     c.fail(`GET ${apiUrl} → 200 (source of truth)`, `response is not valid JSON: ${err.message}`);
     return c.finish();
   }
+  const shapeErrors = publisherPayloadErrors(json);
+  c.expect(
+    shapeErrors.length === 0,
+    `${apiUrl} answers { items: [...], total: <count> }`,
+    `${json.total} publisher(s)`,
+    shapeErrors.join("; "),
+  );
+  if (shapeErrors.length > 0) return c.finish();
+
+  const apiSlugs = new Set(json.items.map((item) => item.slug));
   c.info(
     "publishers reported by the API",
     `${apiSlugs.size} slug(s): ${[...apiSlugs].join(", ") || "(none)"}`,
@@ -111,7 +147,7 @@ export async function checkPublishers(report, ctx) {
   }
 
   try {
-    const { renderedSlugs, extractionUsed, requests } = await withPage(
+    const { renderedSlugs, extractionUsed, requests, emptyState } = await withPage(
       ctx.repoRoot,
       async (page) => {
         const seen = [];
@@ -122,36 +158,40 @@ export async function checkPublishers(report, ctx) {
         });
         await page.goto(pageUrl, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
         const extracted = await extractRenderedSlugs(page);
-        // `seen` (the captured /v1/publishers requests) has to come back too — an earlier
-        // revision of this callback returned only `extractRenderedSlugs`'s result, so `requests`
-        // at the call site was `undefined` and `requests.length` below threw on every SUCCESSFUL
-        // extraction. It went unnoticed only because /publishers didn't exist yet in production
-        // (the check returns early on the 404 before ever reaching this code).
-        return { ...extracted, requests: seen };
+        // `EmptyState` in packages/frontend/src/components/states.tsx renders `.state.empty`.
+        const empty = await page.evaluate(() => document.querySelector(".state.empty") !== null);
+        return { ...extracted, requests: seen, emptyState: empty };
       },
     );
 
-    if (extractionUsed === "none") {
-      // Neither selector below matched anything: this is not "the set happens to be empty" (an
-      // empty verified-publisher set still renders an EmptyState, a different element entirely),
-      // it is "this checker cannot find the publisher cards at all". Report it by name rather than
-      // silently comparing an empty extracted set against the API's and calling every slug
-      // "missing" — that would be a wrong diagnosis, not a right one.
-      c.warn(
+    if (apiSlugs.size === 0) {
+      c.expect(
+        emptyState && renderedSlugs.length === 0,
+        "with no verified publishers, the page renders the empty state",
+        "the empty state is on screen and no card is rendered",
+        emptyState
+          ? `the empty state is present but ${renderedSlugs.length} card(s) are rendered too`
+          : "no .state.empty element — an empty listing must SAY it is empty, not render a blank page",
+      );
+    } else if (extractionUsed === "none") {
+      // Not "the set happens to be empty" — the API says there ARE publishers, so this is "the
+      // cards cannot be found at all", which establishes nothing and must not be green.
+      c.fail(
         "every API slug appears in the rendered page, and only those slugs",
-        `could not extract any rendered slug (looked for "[data-publisher-slug]", then "article.publisher-card code") — both exist in packages/frontend/src/app/publishers/page.tsx today, so this means the markup has since been renamed or removed; check PublisherCard directly`,
+        `could not extract any rendered slug (looked for "[data-publisher-slug]", then "article.publisher-card code") while ${apiSlugs.size} publisher(s) are expected — the markup has been renamed or removed; check PublisherCard in packages/frontend/src/app/publishers/page.tsx`,
       );
     } else {
       const rendered = new Set(renderedSlugs);
       const missing = [...apiSlugs].filter((slug) => !rendered.has(slug));
       const extra = [...rendered].filter((slug) => !apiSlugs.has(slug));
       c.expect(
-        missing.length === 0 && extra.length === 0,
+        missing.length === 0 && extra.length === 0 && rendered.size === renderedSlugs.length,
         `every API slug appears in the rendered page, and only those slugs (via ${extractionUsed})`,
         `${apiSlugs.size} slug(s) match exactly`,
         [
           missing.length > 0 ? `missing from the rendered page: ${missing.join(", ")}` : null,
           extra.length > 0 ? `rendered but not in GET /v1/publishers: ${extra.join(", ")}` : null,
+          rendered.size !== renderedSlugs.length ? "a slug is rendered more than once" : null,
         ]
           .filter(Boolean)
           .join("; "),
@@ -159,9 +199,9 @@ export async function checkPublishers(report, ctx) {
     }
 
     if (requests.length === 0) {
-      c.warn(
+      c.fail(
         "the browser's request to /v1/publishers carries no Authorization header",
-        "no request to a URL containing /v1/publishers was observed — the page may fetch through a proxy path; cannot verify",
+        "no request to a URL containing /v1/publishers was observed, so anonymity was not established — if the page fetches through a proxy path, this check needs to learn that path",
       );
     } else {
       const withAuth = requests.filter((r) => r.headers.authorization);

@@ -18,7 +18,11 @@ vi.mock("../browser.mjs", () => ({ withPage: vi.fn() }));
 
 import { request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
-import { checkPublishers, extractRenderedSlugs } from "../checks/publishers.mjs";
+import {
+  checkPublishers,
+  extractRenderedSlugs,
+  publisherPayloadErrors,
+} from "../checks/publishers.mjs";
 import { Report } from "../report.mjs";
 
 /** A fake Playwright `page`: `$$eval(selector, fn)` runs `fn` over whatever `dom[selector]` lists. */
@@ -99,7 +103,7 @@ describe("extractRenderedSlugs", () => {
  * observe. `apiRequestUrl` is this fake's stand-in for that side effect: on `goto`, it simulates
  * the page having made that one request, the way a real browser would once the page mounts.
  */
-function fakeBrowserPage(dom, apiRequestUrl) {
+function fakeBrowserPage(dom, apiRequestUrl, { emptyState = false } = {}) {
   const handlers = {};
   return {
     on: (event, handler) => {
@@ -110,6 +114,9 @@ function fakeBrowserPage(dom, apiRequestUrl) {
     },
     async $$eval(selector, fn) {
       return fn(dom[selector] ?? []);
+    },
+    async evaluate() {
+      return emptyState;
     },
   };
 }
@@ -122,7 +129,11 @@ describe("checkPublishers — the 200 success path with a fake page", () => {
     request.mockImplementation(async (url) => {
       if (url === `${SITE}/publishers`) return { ok: true, status: 200, body: "<html></html>" };
       if (url === `${API}/v1/publishers`) {
-        return { ok: true, status: 200, body: JSON.stringify({ items: [{ slug: "acme" }] }) };
+        return {
+          ok: true,
+          status: 200,
+          body: JSON.stringify({ items: [{ slug: "acme" }], total: 1 }),
+        };
       }
       throw new Error(`unexpected request to ${url}`);
     });
@@ -164,5 +175,36 @@ describe("checkPublishers — the 200 success path with a fake page", () => {
         (c) => c.name === "the browser's request to /v1/publishers carries no Authorization header",
       )?.status,
     ).toBe("pass");
+  });
+});
+
+describe("publisherPayloadErrors", () => {
+  it("accepts the shape the API promises", () => {
+    expect(publisherPayloadErrors({ items: [{ slug: "acme" }], total: 1 })).toEqual([]);
+    expect(publisherPayloadErrors({ items: [], total: 0 })).toEqual([]);
+  });
+
+  it("rejects the shapes the previous `json.items ?? []` silently accepted as empty", () => {
+    // Every one of these produced an empty Set and then compared it against an empty API result,
+    // which is how a malformed response passed as "the page matches the API".
+    expect(publisherPayloadErrors({})).not.toEqual([]);
+    expect(publisherPayloadErrors({ items: null, total: 0 })).not.toEqual([]);
+    expect(publisherPayloadErrors({ items: {}, total: 0 })).not.toEqual([]);
+    expect(publisherPayloadErrors([])).not.toEqual([]);
+  });
+
+  it("rejects a total that disagrees with items, and a repeated slug", () => {
+    expect(publisherPayloadErrors({ items: [{ slug: "a" }], total: 7 }).join(" ")).toContain(
+      "total is 7",
+    );
+    expect(
+      publisherPayloadErrors({ items: [{ slug: "a" }, { slug: "a" }], total: 2 }).join(" "),
+    ).toContain("repeats a slug");
+  });
+
+  it("rejects an entry with no slug", () => {
+    expect(publisherPayloadErrors({ items: [{ name: "Acme" }], total: 1 }).join(" ")).toContain(
+      "slug",
+    );
   });
 });

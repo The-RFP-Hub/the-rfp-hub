@@ -1,16 +1,15 @@
 /**
  * M4-1 — Governance framework published, and LINKED.
  *
- * Two different kinds of evidence, and neither substitutes for the other:
+ * Three kinds of evidence, none of which substitutes for another:
  *
- *   1. The four documents exist in the repository (a filesystem fact) and their GitHub URLs
- *      answer 200 (a fact about the public mirror a reader actually clicks through to).
- *   2. The site LINKS to at least the non-discrimination policy from its home page and from
- *      `/how-it-works`. The page is client-rendered, so a plain `fetch` of the server HTML often
- *      sees an all-but-empty shell — this checker does NOT fall back to fetching Next.js's RSC/
- *      flight payload to work around that (parsing an undocumented internal wire format would be
- *      a second, unofficial contract to keep in sync). It reports a fully rendered check as a WARN
- *      naming exactly what is needed, rather than fabricating a pass or a fail.
+ *   1. The four documents exist in the repository, and their GitHub URLs answer 200 — a fact about
+ *      the public mirror a reader actually clicks through to.
+ *   2. The home page and `/how-it-works` carry an ANCHOR whose href is each of those four exact
+ *      URLs. Searching the whole HTML for the substring "GOVERNANCE.md" (what this did before)
+ *      matched a serialized flight payload, a code sample, or three of the four being absent.
+ *   3. On the home page at least one of them sits OUTSIDE `<footer>`: the plan is explicit that a
+ *      link every page carries in its chrome is not the home page linking to the framework.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -19,31 +18,56 @@ import { withPage } from "../browser.mjs";
 
 /** The four governance documents, per §3.1 of the M4 plan. Paths are repo-root relative. */
 export const GOVERNANCE_DOCS = [
-  { path: "GOVERNANCE.md", section: "## Non-discrimination and ranking" },
-  { path: "REVIEW-CRITERIA.md", section: null },
-  { path: "packages/standard/PROCESS.md", section: "## RFC process" },
-  { path: "PUBLISHERS.md", section: null },
+  { path: "GOVERNANCE.md", section: "## Non-discrimination and ranking", constant: "GOVERNANCE" },
+  { path: "REVIEW-CRITERIA.md", section: null, constant: "REVIEW_CRITERIA" },
+  { path: "packages/standard/PROCESS.md", section: "## RFC process", constant: "RFC_PROCESS" },
+  { path: "PUBLISHERS.md", section: null, constant: "PUBLISHERS_DOC" },
 ];
 
-/** The project's own repository URL, read from the single module the frontend centralizes it in
- * (`packages/frontend/src/lib/links.ts`) rather than restated as a second literal here that could
- * drift from it. Falls back to the known canonical address if that file is missing or reshaped. */
-function repositoryUrl(repoRoot) {
-  const fallback = "https://github.com/The-RFP-Hub/the-rfp-hub";
+const LINKS_MODULE = "packages/frontend/src/lib/links.ts";
+const FALLBACK_REPOSITORY = "https://github.com/The-RFP-Hub/the-rfp-hub";
+
+/**
+ * The exact hrefs the site is expected to render, read from the single module the frontend
+ * centralizes them in rather than restated here as a second set of literals that could drift.
+ * Falls back to the canonical construction when that module is not in this checkout.
+ */
+export function canonicalGovernanceLinks(repoRoot) {
+  let source = "";
   try {
-    const src = readFileSync(join(repoRoot, "packages/frontend/src/lib/links.ts"), "utf8");
-    const match = /REPOSITORY\s*=\s*"([^"]+)"/.exec(src);
-    return match ? match[1] : fallback;
+    source = readFileSync(join(repoRoot, LINKS_MODULE), "utf8");
   } catch {
-    return fallback;
+    // no frontend in this checkout — the fallback below is the same address by construction
   }
+  const repository = /REPOSITORY\s*=\s*"([^"]+)"/.exec(source)?.[1] ?? FALLBACK_REPOSITORY;
+  return GOVERNANCE_DOCS.map((doc) => {
+    const declared = new RegExp(
+      `export const ${doc.constant}\\s*=\\s*\`\\$\\{REPOSITORY\\}([^\`]*)\``,
+    ).exec(source)?.[1];
+    return {
+      ...doc,
+      href: declared ? `${repository}${declared}` : `${repository}/blob/main/${doc.path}`,
+      repository,
+    };
+  });
+}
+
+/** Every `<a href>` on the page, and whether it sits inside the global footer. */
+async function anchors(page) {
+  return await page.evaluate(() =>
+    [...document.querySelectorAll("a[href]")].map((a) => ({
+      href: a.getAttribute("href") ?? "",
+      inFooter: a.closest("footer") !== null,
+    })),
+  );
 }
 
 export async function checkGovernance(report, ctx) {
+  const links = canonicalGovernanceLinks(ctx.repoRoot);
   const c = report.criterion(
     "M4-1",
     "Governance framework published and linked",
-    "The four governance documents exist in the repo, their GitHub URLs resolve, and the site links to the policy from the home page and /how-it-works.",
+    "The four governance documents exist, their GitHub URLs resolve, the home page and /how-it-works each carry an anchor to all four exact URLs, and at least one of them on the home page is outside the footer.",
   );
 
   if (ctx.skip.has("governance")) {
@@ -51,9 +75,8 @@ export async function checkGovernance(report, ctx) {
     return c.finish();
   }
 
-  // ── (1) the four documents exist ──────────────────────────────────────────
   const present = [];
-  for (const doc of GOVERNANCE_DOCS) {
+  for (const doc of links) {
     const full = join(ctx.repoRoot, doc.path);
     const exists = existsSync(full);
     c.expect(
@@ -65,9 +88,8 @@ export async function checkGovernance(report, ctx) {
     if (exists) present.push(doc);
 
     if (exists && doc.section) {
-      const text = readFileSync(full, "utf8");
       c.expect(
-        text.includes(doc.section),
+        readFileSync(full, "utf8").includes(doc.section),
         `${doc.path} carries the "${doc.section.replace(/^##\s*/, "")}" section`,
         `found "${doc.section}"`,
         `${doc.path} does not contain a "${doc.section}" heading`,
@@ -75,68 +97,66 @@ export async function checkGovernance(report, ctx) {
     }
   }
 
-  // ── (2) GitHub URLs 200 ─────────────────────────────────────────────────
-  const repo = repositoryUrl(ctx.repoRoot);
-  const ghResults = await mapLimit(present, ctx.concurrency, async (doc) => {
-    const ghUrl = `${repo}/blob/main/${doc.path}`;
-    const res = await request(ghUrl, { timeoutMs: ctx.timeoutMs, follow: true });
-    return { doc, ghUrl, res };
-  });
-  for (const { doc, ghUrl, res } of ghResults) {
+  const ghResults = await mapLimit(present, ctx.concurrency, async (doc) => ({
+    doc,
+    res: await request(doc.href.split("#")[0], { timeoutMs: ctx.timeoutMs, follow: true }),
+  }));
+  for (const { doc, res } of ghResults) {
     c.expect(
       res.ok && res.status === 200,
-      `${ghUrl} responds 200`,
+      `${doc.href.split("#")[0]} responds 200`,
       `HTTP ${res.status}`,
       res.ok ? `HTTP ${res.status}` : `transport: ${res.error}`,
     );
   }
 
-  // ── (3) linked from the site ────────────────────────────────────────────
-  const govHref = "GOVERNANCE.md";
   const pages = [
-    { path: "/", label: "home" },
-    { path: "/how-it-works", label: "/how-it-works" },
+    { path: "/", label: "home", requireOutsideFooter: true },
+    { path: "/how-it-works", label: "/how-it-works", requireOutsideFooter: false },
   ];
+
+  if (!ctx.browser) {
+    for (const page of pages) {
+      c.unmet(
+        `${page.label} links to all four governance documents`,
+        "needs --browser — the page is client-rendered, so a plain GET of the HTML cannot see the anchors",
+      );
+    }
+    return c.finish();
+  }
 
   for (const page of pages) {
     const target = `${ctx.site}${page.path}`;
-    const res = await request(target, { timeoutMs: ctx.timeoutMs });
-    const serverHasLink = res.ok && typeof res.body === "string" && res.body.includes(govHref);
-
-    if (serverHasLink) {
-      c.pass(
-        `${page.label} links to GOVERNANCE.md (server HTML)`,
-        `found "${govHref}" in the response body of ${target}`,
-      );
-      continue;
-    }
-
-    if (!ctx.browser) {
-      c.unmet(
-        `${page.label} links to GOVERNANCE.md`,
-        `not found in server HTML at ${target} (expected — the page is client-rendered); pass --browser to render it`,
-      );
-      continue;
-    }
-
+    let found;
     try {
-      const found = await withPage(ctx.repoRoot, async (browserPage) => {
+      found = await withPage(ctx.repoRoot, async (browserPage) => {
         await browserPage.goto(target, { waitUntil: "networkidle", timeout: ctx.timeoutMs });
-        const html = await browserPage.content();
-        return html.includes(govHref);
+        return anchors(browserPage);
       });
-      c.expect(
-        found,
-        `${page.label} links to GOVERNANCE.md (rendered)`,
-        `found "${govHref}" in the rendered DOM`,
-        `no link to ${govHref} found anywhere in the rendered ${page.label} page — add it to the footer (Chrome.tsx) or, for the home page, a link outside the global footer`,
-      );
     } catch (err) {
       c.fail(
-        `${page.label} links to GOVERNANCE.md (rendered)`,
+        `${page.label} links to all four governance documents`,
         `browser check failed: ${err.message}`,
       );
+      continue;
     }
+
+    const missing = links.filter((doc) => !found.some((a) => a.href === doc.href));
+    c.expect(
+      missing.length === 0,
+      `${page.label} links to all four governance documents`,
+      `all four exact hrefs present on ${target}`,
+      `no <a href="…"> on ${target} for: ${missing.map((d) => d.href).join(", ")}`,
+    );
+
+    if (!page.requireOutsideFooter) continue;
+    const outside = links.filter((doc) => found.some((a) => a.href === doc.href && !a.inFooter));
+    c.expect(
+      outside.length > 0,
+      "at least one governance link on the home page is outside the footer",
+      `${outside.length} of four are in the page's own content: ${outside.map((d) => d.path).join(", ")}`,
+      "every governance link on the home page is inside <footer> — a link the global chrome carries on every page is not the home page linking to the framework",
+    );
   }
 
   return c.finish();
