@@ -731,8 +731,9 @@ production API.
 **`--browser` is the real proof.** The plain HTTP check only sees server-rendered HTML, and the
 directory fetches its data from an effect after hydration — so a build whose client-side fetch
 cannot reach the API still returns a `200` shell and passes. `--browser` drives a real headless
-Chromium and waits for a row to render from a live request. `--require-publishers` turns a `404` on
-`/publishers` from a warning into a failure.
+Chromium and waits for a row to render from a live request. `/publishers` is **not** optional:
+whenever the copied source carries that route, a `404` on it is a failure rather than a warning,
+with no flag and no workflow input to turn on.
 
 Two environment variables select the dependency specs, one per package. **The script's own
 defaults are `RFPHUB_STANDARD_SPEC=^3.0.0` and `RFPHUB_VALIDATE_SPEC=^0.3.0`** — the versions that
@@ -783,8 +784,11 @@ Three things are easy to miss and cost an afternoon each:
   renders its "no API configured" state while the variable sits in the process environment looking
   correct. This is the single most common way to lose an afternoon on this package. The clean-room
   script passes it to the build step for exactly this reason.
-* **`.next/static` is not inside the standalone output.** Next's own documentation says so. Copy it
-  to sit beside `server.js`, as `<that directory>/.next/static`.
+* **Neither `.next/static` nor `public/` is inside the standalone output.** Next's own
+  documentation says so. Copy both to sit beside `server.js`, as `<that directory>/.next/static`
+  and `<that directory>/public`. `public/` is the one people skip because it used to be empty; it
+  now holds the icons `src/app/manifest.ts` names, and skipping it costs the app icon on every
+  installed copy.
 * **`server.js` is not at `.next/standalone/server.js` in a stand-alone copy.** The package sets
   `outputFileTracingRoot` two directories above itself — correct in the monorepo, where that is the
   workspace root — and the option is unconditional, so a build from a copy nests the output under
@@ -800,6 +804,7 @@ NEXT_PUBLIC_API_URL=https://api.example.org npm run build
 SERVER=$(find .next/standalone -name server.js -not -path '*/node_modules/*')
 echo "$SERVER"          # exactly one path. More than one means the -not -path was dropped.
 mkdir -p "$(dirname "$SERVER")/.next" && cp -r .next/static "$(dirname "$SERVER")/.next/static"
+cp -r public "$(dirname "$SERVER")/public"
 node "$SERVER"          # no variable needed here: it is already baked into the bundle
 ```
 
@@ -808,9 +813,11 @@ node "$SERVER"          # no variable needed here: it is already baked into the 
 Optional, and worth doing last. A minimal image over the standalone output: `npm install` with the
 same dependency rewrite as path B, then `npm run build` **with `NEXT_PUBLIC_API_URL` set as a build
 argument** — a runtime `ENV` in the final stage is too late — then run the server the way the
-paragraph above describes. Two things to know: the package has **no `public/` directory**, so a `COPY public/ …`
-step fails on a missing source — do not add that line; and pnpm's symlinked `node_modules` needs
-the copy to follow targets (or a prune step) if a build stage ever touches a pnpm-installed tree.
+paragraph above describes. Two things to know: **`public/` has to be copied next to `server.js`**,
+the same way `.next/static` does — it holds the icons `src/app/manifest.ts` names, and a standalone
+build does not carry it, so an image missing that step serves a manifest pointing at five `404`s;
+and pnpm's symlinked `node_modules` needs the copy to follow targets (or a prune step) if a build
+stage ever touches a pnpm-installed tree.
 
 ### The honest limitation: an external copy is read-only
 
