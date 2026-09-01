@@ -17,9 +17,16 @@
  * EVERY STATE NAMES A NEXT STEP. That is a house rule, not a nicety: an empty list that does not
  * say what would fill it is a dead end with a border around it.
  */
+import { DecorativeIcon, IconLabel } from "@/components/IconLabel";
 import { ApiError } from "@/lib/api";
 import { DIRECTORY, HOW_IT_WORKS_ROLES } from "@/lib/links";
 import type { Resource } from "@/lib/resource";
+import {
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  InboxIcon,
+} from "@heroicons/react/20/solid";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -32,7 +39,13 @@ import type { ReactNode } from "react";
  * a minimum height so the swap happens inside a box that was already the right size.
  */
 export function Loading({ what }: { what: string }) {
-  return <output className="state loading">Loading {what}…</output>;
+  return (
+    <output className="state loading">
+      <IconLabel icon={ArrowPathIcon} iconClassName="icon-label-spin">
+        Loading {what}…
+      </IconLabel>
+    </output>
+  );
 }
 
 /**
@@ -52,7 +65,9 @@ export function EmptyState({
 }) {
   return (
     <div className="state empty">
-      <p className="empty-title">{title}</p>
+      <p className="empty-title">
+        <IconLabel icon={InboxIcon}>{title}</IconLabel>
+      </p>
       {detail ? <p className="muted">{detail}</p> : null}
       {action ? <p className="row">{action}</p> : null}
     </div>
@@ -80,7 +95,9 @@ export function ErrorState({
   if (error.isUnauthenticated) {
     return (
       <div className="callout state error" role="alert">
-        <p className="empty-title">Your sign-in has ended.</p>
+        <p className="empty-title">
+          <IconLabel icon={ExclamationTriangleIcon}>Your sign-in has ended.</IconLabel>
+        </p>
         <p className="muted">
           Sign in again to continue to {what}. Nothing was lost, and you can pick up where you were.
         </p>
@@ -99,7 +116,11 @@ export function ErrorState({
   if (error.isForbidden) {
     return (
       <div className="callout state error" role="alert">
-        <p className="empty-title">You don&rsquo;t have access to {what}.</p>
+        <p className="empty-title">
+          <IconLabel icon={ExclamationTriangleIcon}>
+            You don&rsquo;t have access to {what}.
+          </IconLabel>
+        </p>
         <p className="muted">
           Your account is signed in, but its role does not include this access.
         </p>
@@ -115,7 +136,9 @@ export function ErrorState({
   if (error.isNotFound) {
     return (
       <div className="callout state error" role="alert">
-        <p className="empty-title">We couldn&rsquo;t find {what}.</p>
+        <p className="empty-title">
+          <IconLabel icon={ExclamationTriangleIcon}>We couldn&rsquo;t find {what}.</IconLabel>
+        </p>
         <p className="muted">It may have moved, been merged, or no longer be available.</p>
         <p className="row">
           <Link href={DIRECTORY}>Search the directory</Link>
@@ -127,7 +150,9 @@ export function ErrorState({
 
   return (
     <div className="callout state error" role="alert">
-      <p className="empty-title">We couldn&rsquo;t load {what}.</p>
+      <p className="empty-title">
+        <IconLabel icon={ExclamationTriangleIcon}>We couldn&rsquo;t load {what}.</IconLabel>
+      </p>
       <p className="muted">Try again. If the problem continues, the technical details can help.</p>
       {onRetry ? (
         <button type="button" onClick={onRetry}>
@@ -210,7 +235,11 @@ export function ResourceView<T>({
 export function AuthUnavailable({ error }: { error: Error }) {
   return (
     <div className="callout state error" role="alert">
-      <p className="empty-title">This deployment cannot reach its service.</p>
+      <p className="empty-title">
+        <IconLabel icon={ExclamationTriangleIcon}>
+          This deployment cannot reach its service.
+        </IconLabel>
+      </p>
       <p className="muted">Sign-in is unavailable right now. Nothing is wrong with your account.</p>
       <TechnicalDetails error={error}>
         <p>
@@ -244,6 +273,7 @@ export function ActionNote({ note }: { note: ActionNoteValue | null }) {
   return (
     <>
       <output className={note.kind === "ok" ? "note ok" : "callout note error"}>
+        <DecorativeIcon icon={note.kind === "ok" ? CheckCircleIcon : ExclamationTriangleIcon} />
         {note.message}
       </output>
       {note.error ? <TechnicalDetails error={note.error} /> : null}

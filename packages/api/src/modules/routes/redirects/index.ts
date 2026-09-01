@@ -69,7 +69,7 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
         tags: ["opportunities"],
         summary: "Redirect to an entry's website, counting the click",
         description:
-          "302 to the record's stored `website`. The re-cut removed `source.url`, so the programme's own site is what a source link-out means. 404 under the same conditions as the apply redirect.",
+          "302 to the record's stored `website`. The re-cut removed `source.url`, so the program's own site is what a source link-out means. 404 under the same conditions as the apply redirect.",
         params,
         response: responses,
       },

@@ -19,12 +19,12 @@ export default function TermsPage() {
 
       <h2>The service</h2>
       <p>
-        The Hub republishes what funding programmes and their communities state — reviewers may edit
-        submissions before publication — and links readers out to a programme&rsquo;s own
-        application page where an entry carries an application link. It takes no applications and
-        holds no money. It is provided <strong>as-is, without warranty of any kind</strong>:
-        listings can be wrong, stale, or withdrawn by their programmes, and the Hub makes no promise
-        of availability or accuracy.
+        The Hub republishes what funding programs and their communities state — reviewers may edit
+        submissions before publication — and links readers out to a program&rsquo;s own application
+        page where an entry carries an application link. It takes no applications and holds no
+        money. It is provided <strong>as-is, without warranty of any kind</strong>: listings can be
+        wrong, stale, or withdrawn by their programs, and the Hub makes no promise of availability
+        or accuracy.
       </p>
 
       <h2>What you submit</h2>

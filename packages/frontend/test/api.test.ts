@@ -463,12 +463,12 @@ describe("the organization routes", () => {
     );
     const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
 
-    await api.organizations.reject("filecoin", "filecoin:1", "not our programme");
+    await api.organizations.reject("filecoin", "filecoin:1", "not our program");
 
     expect(calls[0]?.url).toBe(
       "https://api.example.com/v1/organizations/filecoin/opportunities/filecoin%3A1/reject",
     );
-    expect(calls[0]?.init.body).toBe(JSON.stringify({ reason: "not our programme" }));
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ reason: "not our program" }));
   });
 
   it("patches the directory entry, sending null to clear rather than omitting", async () => {

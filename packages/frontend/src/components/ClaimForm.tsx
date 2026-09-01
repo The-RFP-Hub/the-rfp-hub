@@ -13,7 +13,7 @@ import { useApi, useSession } from "@/lib/session";
 import type { Me } from "@/lib/types";
 import { type ReactNode, useState } from "react";
 
-const CLAIM_SUMMARY = "This is my programme — claim it";
+const CLAIM_SUMMARY = "This is my program — claim it";
 
 export function ClaimForm({ id, me }: { id: string; me: Me }) {
   const [open, setOpen] = useState(false);
@@ -167,7 +167,7 @@ export function PublicClaimControl({ id }: { id: string }) {
     content = (
       <>
         <p className="muted footnote">
-          Sign in with the account that belongs to the organization running this programme.
+          Sign in with the account that belongs to the organization running this program.
         </p>
         <button type="button" onClick={session.login}>
           Sign in to claim

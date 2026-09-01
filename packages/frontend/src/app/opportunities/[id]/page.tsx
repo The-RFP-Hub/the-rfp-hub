@@ -1,5 +1,6 @@
 "use client";
 
+import { IconLabel } from "@/components/IconLabel";
 /**
  * The public detail page for one published opportunity.
  *
@@ -16,6 +17,7 @@
  */
 import { PublicOpportunity } from "@/components/PublicOpportunity";
 import { ReturnLink, useHasReturnLink } from "@/components/ReturnLink";
+import { ArrowLeftIcon } from "@heroicons/react/20/solid";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
@@ -37,7 +39,7 @@ export default function PublicOpportunityPage() {
       ) : (
         <p className="row muted">
           <button type="button" onClick={() => router.back()}>
-            ← Back to your search
+            <IconLabel icon={ArrowLeftIcon}>Back to your search</IconLabel>
           </button>
           <Link href="/">All opportunities</Link>
         </p>
