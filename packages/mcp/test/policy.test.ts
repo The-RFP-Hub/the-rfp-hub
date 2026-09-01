@@ -9,9 +9,10 @@ import { APPROVAL_TTL_MS, listPending, writeApproval } from "../src/approvals.js
 import { ApiClient } from "../src/http.js";
 import { DEFAULT_CAPS, Policy, counterPath } from "../src/policy.js";
 import { clearRegisteredSecrets } from "../src/redact.js";
+import { createServer } from "../src/server.js";
 import type { ToolContext } from "../src/tools/context.js";
 import { run } from "../src/tools/submit.js";
-import { stubFetch, testConfig, validDocument } from "./helpers.js";
+import { stubFetch, tempHome, testConfig, validDocument } from "./helpers.js";
 
 afterEach(() => clearRegisteredSecrets());
 
@@ -168,6 +169,41 @@ describe("submit spends the budget of the PHASE, not of the tool", () => {
     expect(stub.calls).toHaveLength(1);
     expect(policy.usage("commit").day).toBe(1);
     expect(policy.usage("preview").day).toBe(1);
+  });
+});
+
+/**
+ * `attempt` is the fourth, internal kind — an abuse meter over refused write invocations, not a
+ * phase. The invariant it must not disturb is the one the plan states: only an executed POST
+ * spends `commit`.
+ */
+describe("a refused write spends the attempt meter, never the commit budget", () => {
+  interface Registered {
+    executor(args: unknown, ctx: unknown): Promise<{ isError?: boolean }>;
+  }
+
+  it("charges attempt and leaves commit at zero when the approval is missing", async () => {
+    const home = tempHome();
+    const config = testConfig({ submitEnabled: true, home });
+    const policy = new Policy(home, { now: () => NOW });
+    const stub = stubFetch([{ body: {} }]);
+    const server = createServer({
+      config,
+      api: new ApiClient(config, { fetchImpl: stub.fetchImpl }),
+      policy,
+      now: () => NOW,
+    });
+    const tools = (server as unknown as { _registeredTools: Record<string, Registered> })
+      ._registeredTools;
+
+    const result = await tools.submit_opportunity?.executor(
+      { document: validDocument(), approvalId: "f".repeat(64) },
+      {},
+    );
+    expect(result?.isError).toBe(true);
+    expect(stub.calls).toHaveLength(0);
+    expect(policy.usage("attempt").day).toBe(1);
+    expect(policy.usage("commit").day).toBe(0);
   });
 });
 

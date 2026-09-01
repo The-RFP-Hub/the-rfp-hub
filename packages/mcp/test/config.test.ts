@@ -38,8 +38,8 @@ describe("the API base must be https, or loopback", () => {
   });
 
   it("refuses plain http for anything else, and names the rule", () => {
-    expect(() => canonicalOrigin("http://api.ethrfps.app")).toThrow(ConfigError);
-    expect(() => canonicalOrigin("http://api.ethrfps.app")).toThrow(/must use https/);
+    expect(() => canonicalOrigin("http://api.example.test")).toThrow(ConfigError);
+    expect(() => canonicalOrigin("http://api.example.test")).toThrow(/must use https/);
     // Not loopback, however much it looks like it.
     expect(() => canonicalOrigin("http://127.0.0.1.evil.test")).toThrow(/must use https/);
     expect(() => canonicalOrigin("http://localhost.evil.test")).toThrow(/must use https/);

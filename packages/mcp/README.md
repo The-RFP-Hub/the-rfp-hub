@@ -63,14 +63,55 @@ codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
 
 ---
 
+## Companion skill
+
+`rfp-hub-funding-search` is a **read-only** agent skill that teaches a client how to use this
+server's search and fetch tools well. It is **not shipped inside this npm package** — it installs
+from the repository, through whichever of these channels your client supports:
+
+```sh
+npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
+```
+
+```sh
+claude plugin marketplace add The-RFP-Hub/the-rfp-hub
+```
+
+Or copy the skill directory manually into `.claude/skills/`, `.agents/skills/` (Codex), or
+`.gemini/skills/`.
+
+---
+
 ## Configuration
 
 | Variable | Default | What it does |
 |---|---|---|
-| `RFPHUB_API_BASE` | `https://api.ethrfps.app` | Which deployment to talk to. The **origin** of this URL is bound into every write approval. |
+| `RFPHUB_API_BASE` | `https://api.ethrfps.app` | Which deployment to talk to. A **bare origin**, `https` unless it is loopback. The origin is bound into every write approval. |
 | `RFPHUB_API_KEY` | *(none)* | Credential, needed **only** to submit. Never sent on a read. |
 | `RFPHUB_MCP_ENABLE_SUBMIT` | *(unset)* | `1` registers the write tool. Without it the tool does not exist. |
 | `RFPHUB_MCP_HOME` | `~/.rfphub` | Where approvals, rate-limit counters and the audit log live. Must be **writable**. |
+| `RFPHUB_MCP_TIMEOUT_MS` | `20000` | Deadline for one API request, headers and body together. 1 000–120 000; outside that the server refuses to start. |
+
+`RFPHUB_API_BASE` is checked at startup, before any preview can exist, and four shapes are
+refused outright:
+
+- **plain `http:` for anything but `127.0.0.1`, `[::1]` or `localhost`** — the write request
+  carries a bearer credential, and a human approving an origin does not make cleartext safe;
+- **a username or password in the URL** — it would end up in every diagnostic this server writes
+  (no error message ever repeats the value of this variable, for the same reason);
+- **a path, query or fragment** — the approval binds the *origin*, so two bases that differ only
+  after the host would produce the same approval and reach different endpoints;
+- **anything that is not an absolute `http`/`https` URL.**
+
+`https://api.ethrfps.app`, `https://api.ethrfps.app/`, `https://api.ethrfps.app:443` and
+`https://API.ethrfps.app` are one destination and produce one approval id. Port 444, or a
+different host, is a different destination and a different id.
+
+**Rotating the key means restarting the server.** Configuration is read once, at startup, and the
+credential's fingerprint is one of the five things an approval binds to. A key swapped in the
+client's `env` block reaches this process only on its next start; until then previews are still
+bound to the old fingerprint, and a commit under the new one is refused as a mismatch. Restart
+before previewing under a new key.
 
 **The key goes in the client's `env` block. Never in a prompt, and never as a tool argument** —
 there is no parameter on any tool through which one could be passed, and a test asserts that.
@@ -231,7 +272,15 @@ does nothing.
 
 ## Local state
 
-Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`, files `0600`:
+Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`, files `0600`.
+
+**`RFPHUB_MCP_HOME` takes precedence over `HOME` and over the operating system's idea of this
+user's home directory.** Set it explicitly wherever that idea is unreliable: a container, a service
+account, a `systemd` unit or a launch agent may have no home directory, may have one that is
+read-only, or may share one with another identity. This server refuses rather than guesses — see
+below.
+
+
 
 | Path | Contents |
 |---|---|
@@ -242,7 +291,25 @@ Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`
 | `policy-counters.json` | Per-kind rate counters |
 | `policy-counters.lock` | Held only while a counter is being updated |
 | `policy-counters.lock.stale.*` | A lock abandoned by a crashed process, on its way out |
-| `audit.log` | One JSON line per call |
+| `audit.log` | One JSON line per call, rotated at 5 MiB |
+| `audit.log.1` | The one previous generation of the log |
+| `audit.lock` | Held only while the log is being rotated |
+
+**The modes are checked, not merely requested.** On every use the home is `lstat`ed and must be a
+real directory — not a symlink, not a file — and every state file must be a regular file with no
+second hard link. A pre-existing path is `chmod`ded to `0700`/`0600` and the mode is then read
+back, because a `chmod` that reports success on a filesystem without POSIX modes has established
+nothing. Approvals and counters **refuse** when any of that cannot be established. The audit log
+stays non-fatal, but it declines to write rather than appending into a path it could not secure.
+
+**The audit log is bounded.** At 5 MiB it is rotated to `audit.log.1` under a lock, keeping exactly
+one previous generation at `0600`. A rotation that fails costs the rotation, never the call and
+never the line.
+
+**A clock that moves backwards buys nothing.** If a counter window on disk is *ahead* of the
+current one — an NTP correction, a resumed snapshot, a hand-set clock — the stored count is kept
+and counted in rather than reset, and an approval stamped in the future reads as outside its
+window. Budget stays spent until real time catches up, which is the safe direction for a limiter.
 
 **Rate limits fail closed.** If the counter store cannot be read or written, calls are refused — a
 budget that cannot be counted cannot be enforced. Keep `RFPHUB_MCP_HOME` writable.
@@ -261,7 +328,9 @@ so nobody has to be asked to approve the same submission twice.
 claimed by an atomic rename after your confirmation, so two terminals approving the same id produce
 one approval, and a preview that was revoked or expired while it sat on screen is refused.
 
-**Refused submissions are metered too.** Every invocation of the write tool spends an `attempt`
+**Refused submissions are metered too.** The three kinds a caller can reason about are `read`,
+`preview` and `commit` — one per phase of work that actually happened. `attempt` is a **fourth,
+internal kind**: an abuse-control meter, not a phase. Every invocation of the write tool spends one
 (20/minute, 400/day) before any work — including a call whose arguments are rejected before the
 handler runs, which is the cheapest thing to repeat. A loop of bogus approval ids, malformed
 arguments or oversized documents cannot run unmetered. Running out of `attempt` never masks the
@@ -304,6 +373,14 @@ Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per d
   it gets the same treatment the search results get.
 - **`structuredContent` is not a safety boundary.** It is delivered to the model like any other
   output. It exists here for contract and validation.
+- **Every request has a deadline.** A peer that accepts a connection and then says nothing, or
+  sends half a body and stops, is abandoned after `RFPHUB_MCP_TIMEOUT_MS`. A read reports that and
+  is not retried. A write reports it as an ambiguous outcome, because the request had already left.
+- **A `2xx` is not believed until its body has been checked.** A read whose body is not the shape
+  this build knows fails rather than returning a plausible empty record; a write whose body is not
+  a submission result — including a `204`, or a `duplicateCheck` value this build predates — is
+  reported as "may have landed", with `GET /v1/me/opportunities` named as the place to find out.
+  Unknown extra members are always allowed: this client does not own the contract.
 - **Pin exact versions**, as every example above does. That is the only real defense against a
   future version of any npm package behaving differently from the one you reviewed.
 

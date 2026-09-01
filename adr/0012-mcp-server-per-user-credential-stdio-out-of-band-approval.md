@@ -132,6 +132,26 @@ policy and execution live in modules that know nothing about a transport, so an 
 a new file rather than a refactor. Discovery documents and the precedence-ordered auth chain are
 deferred with it — both only mean anything over HTTP.
 
+### A fourth, internal rate-limit kind: `attempt`
+
+The metered kinds a caller can reason about are `read`, `preview` and `commit`, one per phase of
+work that actually happened, and only an executed `POST` spends `commit`. That leaves the refusal
+path unmetered: a caller can send a thousand bogus approval ids, a thousand oversized documents or
+a thousand malformed argument objects, and each is refused after a walk through local validation
+and the filesystem without spending anything.
+
+`attempt` closes that. It is **not a phase** and it is not part of the contract a client reads: it
+is an internal abuse-control meter, charged once on every invocation of the write tool — including
+one rejected by argument validation before the handler runs — at 20 per minute and 400 per day,
+looser than `preview` and far tighter than `read`. Running out of it never masks the real error:
+the caller's arguments are still wrong, and answering `rate_limited` would send them to fix the
+wrong thing, so the charge is best-effort and the original refusal is what comes back.
+
+It is recorded here, and in the package README, because it appears in the audit log's `kind` field
+and in the counter file, so anyone reading either would otherwise find a kind no document explains.
+The invariant it must not disturb — and a test asserts this — is that a refused commit spends
+`attempt`, never `commit`.
+
 ### The trust assumption, stated explicitly
 
 **The approval is outside the MCP channel. It is not isolated from an agent holding a shell and a
@@ -166,7 +186,11 @@ converge on it. Those are post-milestone work, recorded here so the gap is a kno
 - **Bad:** rate-limit counters are per-machine files. They fail closed, but they are not a
   server-side control and they do not aggregate across machines.
 - **Neutral:** the server keeps ephemeral local state (approvals, counters, an audit line per
-  call). It is not "stateless", and this ADR deliberately avoids that word for it.
+  call). It is not "stateless", and this ADR deliberately avoids that word for it. Because that
+  state carries security decisions, its container is verified rather than assumed: the home must be
+  a real directory at `0700`, state files must be regular files at `0600` with no second hard link,
+  and approvals and counters refuse when that cannot be established.
+- **Neutral:** a fourth rate-limit kind, `attempt`, exists for abuse control. See above.
 - **Neutral:** no remote transport means no discovery documents and no `WWW-Authenticate`
   challenge — they would be answering questions nobody can currently ask.
 
