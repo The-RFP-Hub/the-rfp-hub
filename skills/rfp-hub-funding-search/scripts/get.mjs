@@ -9,7 +9,7 @@
  *
  * Env:
  *   RFPHUB_API_BASE   default https://api.ethrfps.app
- *   RFPHUB_TIMEOUT_MS default 10000
+ *   RFPHUB_TIMEOUT_MS default 10000, clamped to 60000
  *
  * Exit codes: see EXIT in lib.mjs / references/api-reference.md.
  */
@@ -40,7 +40,7 @@ Options:
   --format <json|table>  default json
   --help                 show this message
 
-Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (default 10000).
+Env: RFPHUB_API_BASE (default https://api.ethrfps.app), RFPHUB_TIMEOUT_MS (default 10000, clamped to 60000).
 `;
 
 /** Every flag this script accepts. `--id` is the alternative to the positional argument. */

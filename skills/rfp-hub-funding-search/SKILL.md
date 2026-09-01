@@ -198,6 +198,8 @@ site) alongside `links.apply`.
   the projection caps it too: each value at 40 characters and the list at 8 entries, with a
   trailing `"+N more"` marker when a record names more than that. A single absurdly long or
   injection-shaped ecosystem string cannot pass through unbounded.
+- A response body larger than 1 MiB is refused rather than buffered, and `RFPHUB_TIMEOUT_MS` is
+  clamped to 60 000 ms — both matter when `RFPHUB_API_BASE` points somewhere other than the RFP Hub.
 - `applyUrl` (and, from `get.mjs`, `links.source`) are omitted — not guessed — when the record has
   no `applicationUrl`/`website`: both are optional in the Standard, and the redirect route 404s
   without one.

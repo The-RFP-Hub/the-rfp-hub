@@ -7,12 +7,15 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_LIMIT,
+  DEFAULT_TIMEOUT_MS,
   EXIT,
+  MAX_CURRENCY_LEN,
   MAX_LIMIT,
   MAX_ORGANIZATION_LEN,
+  MAX_TIMEOUT_MS,
   MAX_TITLE_LEN,
   RequestError,
   SKILL_VERSION,
@@ -34,6 +37,7 @@ import {
   projectDetail,
   projectPage,
   sanitizeText,
+  timeoutMs,
   trackingHeaders,
   truncateText,
   validateFormat,
@@ -117,6 +121,11 @@ describe("awardSummary", () => {
   it("is null with no usable numeric field", () => {
     expect(awardSummary({ currency: "USD" })).toBeNull();
     expect(awardSummary(null)).toBeNull();
+  });
+
+  it("caps a publisher-chosen currency token instead of trusting it to be an ISO code", () => {
+    const out = awardSummary({ currency: "T".repeat(200), budget: 100 });
+    expect(out).toBe(`100 ${"T".repeat(MAX_CURRENCY_LEN - 1)}… budget`);
   });
 
   it("never reads a free-text field even if present", () => {
@@ -397,6 +406,46 @@ describe("clampLimit", () => {
     for (const bad of ["1e2", "0x10", " 3.0 ", "-5", "5-", "5,0"]) {
       expect(() => clampLimit(bad), `clampLimit(${JSON.stringify(bad)})`).toThrow();
     }
+  });
+});
+
+describe("timeoutMs", () => {
+  const original = process.env.RFPHUB_TIMEOUT_MS;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.RFPHUB_TIMEOUT_MS;
+    else process.env.RFPHUB_TIMEOUT_MS = original;
+  });
+
+  it("falls back to the default when unset, non-numeric or non-positive", () => {
+    delete process.env.RFPHUB_TIMEOUT_MS;
+    expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
+    process.env.RFPHUB_TIMEOUT_MS = "nope";
+    expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
+    process.env.RFPHUB_TIMEOUT_MS = "-1";
+    expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
+  });
+
+  it("passes a usable override through without a note", () => {
+    process.env.RFPHUB_TIMEOUT_MS = "2500";
+    let warned = "";
+    expect(
+      timeoutMs((msg) => {
+        warned = msg;
+      }),
+    ).toBe(2500);
+    expect(warned).toBe("");
+  });
+
+  it("clamps an absurd override to the ceiling instead of waiting forever", () => {
+    process.env.RFPHUB_TIMEOUT_MS = "1e12";
+    let warned = "";
+    expect(
+      timeoutMs((msg) => {
+        warned = msg;
+      }),
+    ).toBe(MAX_TIMEOUT_MS);
+    expect(warned).toMatch(new RegExp(String(MAX_TIMEOUT_MS)));
   });
 });
 

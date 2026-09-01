@@ -30,10 +30,24 @@ export function apiBase() {
   return raw ? raw.replace(/\/+$/, "") : DEFAULT_API_BASE;
 }
 
-/** Default fetch timeout, overridable with `RFPHUB_TIMEOUT_MS` for slow networks/CI. */
-export function timeoutMs() {
+export const DEFAULT_TIMEOUT_MS = 10_000;
+
+/** Ceiling on `RFPHUB_TIMEOUT_MS`. Without it, `RFPHUB_TIMEOUT_MS=1e12` disarms the one thing that
+ * can abort a stalled request, and the caller waits forever with no explanation. */
+export const MAX_TIMEOUT_MS = 60_000;
+
+/** Default fetch timeout, overridable with `RFPHUB_TIMEOUT_MS` for slow networks/CI, clamped and
+ * announced the same way `clampLimit` handles an over-large `--limit`. */
+export function timeoutMs(warn = (msg) => process.stderr.write(`${msg}\n`)) {
   const raw = Number(process.env.RFPHUB_TIMEOUT_MS);
-  return Number.isFinite(raw) && raw > 0 ? raw : 10_000;
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_TIMEOUT_MS;
+  if (raw > MAX_TIMEOUT_MS) {
+    warn(
+      `Note: RFPHUB_TIMEOUT_MS=${raw} exceeds this skill's ceiling of ${MAX_TIMEOUT_MS}ms. Using ${MAX_TIMEOUT_MS}.`,
+    );
+    return MAX_TIMEOUT_MS;
+  }
+  return raw;
 }
 
 /**
@@ -333,7 +347,8 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
   // accepts the connection and headers instantly but then stalls mid-body would otherwise hang
   // forever, because clearing the timer right after the headers arrive (in a `finally` on just
   // the `fetch()` call) disarms the one thing that could ever abort a stuck `res.text()`.
-  const timer = setTimeout(() => controller.abort(), timeoutMs());
+  const budgetMs = timeoutMs();
+  const timer = setTimeout(() => controller.abort(), budgetMs);
   try {
     let res;
     try {
@@ -344,7 +359,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
       });
     } catch (err) {
       if (err.name === "AbortError") {
-        throw new RequestError("timeout", `Request to ${url} timed out after ${timeoutMs()}ms.`);
+        throw new RequestError("timeout", `Request to ${url} timed out after ${budgetMs}ms.`);
       }
       throw new RequestError("network", `Could not reach ${url}: ${err.message}`);
     }
@@ -375,7 +390,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
       if (err.name === "AbortError") {
         throw new RequestError(
           "timeout",
-          `Request to ${url} timed out after ${timeoutMs()}ms while reading the response body.`,
+          `Request to ${url} timed out after ${budgetMs}ms while reading the response body.`,
         );
       }
       throw new RequestError("network", `Could not read the response from ${url}: ${err.message}`);
@@ -476,13 +491,13 @@ export function nextDeadlineAt(deadlines, now = new Date()) {
 }
 
 /** A one-line award summary rendered ONLY from numeric fundingInfo fields — never free text.
- * `currency` (an ISO code or a publisher-chosen token symbol — itself untrusted, if a short,
- * text field) is sanitized before interpolation, same as every other third-party string here. */
+ * `currency` is an ISO code OR a publisher-chosen token symbol, so it gets the same sanitize-then-
+ * truncate treatment as an ecosystem value rather than being trusted to be three letters. */
 export function awardSummary(fundingInfo) {
   if (!fundingInfo || typeof fundingInfo !== "object") return null;
   const { currency, budget, minAward, maxAward } = fundingInfo;
-  const cleanCurrency = typeof currency === "string" ? sanitizeText(currency) : currency;
-  const unit = typeof cleanCurrency === "string" && cleanCurrency ? ` ${cleanCurrency}` : "";
+  const cleanCurrency = typeof currency === "string" ? truncateText(currency, MAX_CURRENCY_LEN) : "";
+  const unit = cleanCurrency ? ` ${cleanCurrency}` : "";
   const fmt = (n) => Number(n).toLocaleString("en-US");
   if (typeof minAward === "number" && typeof maxAward === "number") {
     return `${fmt(minAward)}–${fmt(maxAward)}${unit}`;
