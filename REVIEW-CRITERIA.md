@@ -128,7 +128,8 @@ refused without one. That is the counterweight to an obvious conflict of interes
 submit an entry *about* an organization, so the organization refusing a third party's account of
 its own program is the decision that most needs a name against it. The trail attributes it to the
 deciding member **by handle**, and the reason is shown to the submitter on their own listing as
-`lastDecision`.
+`lastDecision` — rendered as plain text, never as markup, since a reviewer's free-text reason is
+third-party content like any other.
 
 On the **Hub reviewer** route the API accepts `reason` and does not require it. That is the honest
 state of the code, not an endorsement: a decision worth making is worth explaining, and a null
