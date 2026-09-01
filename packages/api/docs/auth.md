@@ -391,20 +391,37 @@ A `429` carries `retry-after` as a whole number of seconds, plus
 `x-ratelimit-limit`/`-remaining`/`-reset`; the last three appear on a metered response below the
 ceiling too. **All four are on `Access-Control-Expose-Headers` in both CORS policies**, or a
 cross-origin page could receive a `429` and read nothing off it. An `OPTIONS` preflight is not
-metered: it is the browser asking permission, not the caller acting.
+metered: it is the browser asking permission, not the caller acting. A `HEAD` is served off the
+`GET` route and is metered on its own bucket at the same ceiling; it records no view and no
+link-out click, because it returns no body and nobody left for anywhere.
 
-**Two operational facts a limit is meaningless without:**
+**Operational facts a limit is meaningless without:**
 
-- **The ceilings are per PROCESS.** The store is in this process's memory, so with *N* tasks behind
-  a load balancer every number above is multiplied by *N* — "60/min per account" across 3 tasks is
-  180/min in practice. A shared store (Redis) would fix it and is not built. Size the numbers, and
-  any statement made to an integrator, against the task count actually running.
+- **The ceilings are per PROCESS.** The store is this process's memory, so with *N* tasks behind a
+  load balancer every number above is multiplied by *N* — "60/min per account" across 3 tasks is
+  180/min in practice — and every bucket resets when a task restarts or is replaced. A shared store
+  (Redis) would fix both and is not built. Size the numbers, and any statement made to an
+  integrator, against the task count actually running (see [`deploy.md`](./deploy.md)).
+- **Each bucket store holds 5,000 keys.** `@fastify/rate-limit`'s in-memory store is an LRU with a
+  default bound of 5,000, and every route gets its own. That bound is part of the effective limit:
+  past 5,000 distinct keys on one route inside one window, the least recently used entry is
+  evicted and whoever it belonged to starts again from zero. Reaching it needs 5,000 distinct
+  accounts or /64s on a single route in a single minute, which is far above this deployment's
+  traffic — but it is why the address key is grouped and namespaced rather than left free-form:
+  a key an attacker can mint per request is also a key that evicts everybody else's.
 - **`TRUST_PROXY` decides whether the address half works at all.** `request.ip` is the socket peer
   unless it is set, so behind a load balancer *every* anonymous caller shares one bucket — a
   self-inflicted denial of service that looks like a working rate limit. It is **not a boolean**
   (`true` is rejected at boot): use a hop count (`1`) or a comma-separated list of proxy
   addresses/CIDRs. See `config.ts` (`readTrustProxy`) and the config table in
   [`../README.md`](../README.md).
+- **Which hop a hop count selects.** `TRUST_PROXY=1` trusts one proxy, so Fastify takes the
+  RIGHTMOST `X-Forwarded-For` entry — the address that proxy saw. With
+  `X-Forwarded-For: 198.51.100.1, 192.0.2.2` from a socket peer of `10.0.0.5`, `request.ip` is
+  `192.0.2.2`; `198.51.100.1` is whatever the client claimed and is ignored. **Set the count to
+  the number of proxies actually in front of this process.** Too low and the bucket is a proxy's
+  address (one bucket for everyone behind it); too high and it is a client-chosen string, which
+  the canonicalization then sends to `ip:invalid` — one shared bucket again, and a noisy one.
 
 ---
 

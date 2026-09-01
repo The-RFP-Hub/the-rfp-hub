@@ -24,23 +24,28 @@
  *
  * Isolation tag: `M4RATE` / `m4rate-*@rfphub.invalid`.
  */
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { buildApp } from "../../src/app.js";
 import type { Auth } from "../../src/auth/better-auth.js";
 import { type DB, db, pool } from "../../src/db/client.js";
+import { apiKeys } from "../../src/db/schema.js";
 import { RATE_LIMIT_HEADERS } from "../../src/modules/routes/shared/rate-limit-key.js";
-import { bearer, seedIdentity, testAuth, testAuthConfig } from "../helpers/auth.js";
+import { analyticsEvents } from "../../src/modules/services/insights/event-buffer.js";
+import { OpportunityService } from "../../src/modules/services/opportunities/opportunity.service.js";
+import { bearer, mintApiKeyFor, seedIdentity, testAuth, testAuthConfig } from "../helpers/auth.js";
 import { cleanupFixtures } from "../helpers/cleanup.js";
 import { describeWithDb } from "./db-gate.js";
 
 const EMAILS = {
   first: "m4rate-first@rfphub.invalid",
   second: "m4rate-second@rfphub.invalid",
+  third: "m4rate-third@rfphub.invalid",
   cors: "m4rate-cors@rfphub.invalid",
 };
-const FIRST_HANDLE = "m4rate-first";
-const SECOND_HANDLE = "m4rate-second";
+const HANDLES = ["m4rate-first", "m4rate-second", "m4rate-third"];
+const [FIRST_HANDLE, SECOND_HANDLE, THIRD_HANDLE] = HANDLES;
 
 /** Two addresses that are unmistakably distinct, and neither of them the inject default. */
 const IP_A = "198.51.100.11";
@@ -50,6 +55,8 @@ const IP_C = "198.51.100.33";
 const IP_D = "198.51.100.44";
 /** One for the CORS case, which has to exhaust a bucket of its own to reach a 429. */
 const IP_E = "198.51.100.55";
+/** And one for the revoked-credential case, which must land on an untouched address bucket. */
+const IP_F = "198.51.100.66";
 
 /** A page on some other origin. What CORS is the enforcement point for. */
 const BROWSER_ORIGIN = "https://dashboard.example";
@@ -79,12 +86,23 @@ const KEYS_MAX = 30;
 /** `POST /v1/opportunities` — see `modules/routes/submissions/index.ts`. */
 const SUBMIT_MAX = 60;
 
+/** This suite's own namespace, for the redirect fixture. */
+const NS = "m4rate";
+const REDIRECT_ID = `${NS}:link`;
+/** `GET /v1/r/:id/{apply,source}` — see `modules/routes/redirects/index.ts`. */
+const REDIRECT_MAX = 120;
+
 const run = describeWithDb;
 
 run("M4RATE rate-limit keys", () => {
   let app: FastifyInstance;
   let firstToken: string;
   let secondToken: string;
+  /** One account, three credentials: two keys and the session that owns them. */
+  let thirdToken: string;
+  let thirdKeyA: string;
+  let thirdKeyB: string;
+  let thirdAccountId: number;
   const userIds: string[] = [];
 
   /** One metered, side-effect-free call. Returns the status and what the limiter said was left. */
@@ -104,16 +122,42 @@ run("M4RATE rate-limit keys", () => {
 
     const first = await seedIdentity(EMAILS.first, { handle: FIRST_HANDLE });
     const second = await seedIdentity(EMAILS.second, { handle: SECOND_HANDLE });
-    userIds.push(first.userId, second.userId);
+    const third = await seedIdentity(EMAILS.third, { handle: THIRD_HANDLE });
+    userIds.push(first.userId, second.userId, third.userId);
     firstToken = first.token;
     secondToken = second.token;
+    thirdToken = third.token;
+    thirdAccountId = third.account.id;
+    thirdKeyA = await mintApiKeyFor(thirdAccountId);
+    thirdKeyB = await mintApiKeyFor(thirdAccountId);
+
+    await new OpportunityService().upsertFromStandard(
+      {
+        specVersion: "1.0.0",
+        id: REDIRECT_ID,
+        fundingType: "grant",
+        title: "Rate-limit redirect fixture",
+        description: "A fixture with both link-out columns filled.",
+        status: "open",
+        operatingOrganizations: [{ name: "Rate Limit Org", slug: NS }],
+        source: { publisher: NS, ingestedVia: "import", verifiedAgainstSource: null },
+        ecosystems: ["M4RATE"],
+        applicationUrl: "https://apply.example.org/m4rate",
+        website: "https://programme.example.org/m4rate",
+        fundingDetails: { fundingType: "grant" },
+        // biome-ignore lint/suspicious/noExplicitAny: a hand-built Standard fixture, not a mapper output
+      } as any,
+      { reviewStatus: "approved", isListed: true, sourceSystem: NS },
+    );
   }, 60_000);
 
   afterAll(async () => {
     await cleanupFixtures({
       userIds,
-      handles: [FIRST_HANDLE, SECOND_HANDLE],
+      handles: HANDLES.filter((handle): handle is string => handle !== undefined),
       emails: Object.values(EMAILS),
+      opportunityPrefix: `${NS}:`,
+      organizationSlugs: [NS],
     });
     await app.close();
     await pool.end();
@@ -224,6 +268,44 @@ run("M4RATE rate-limit keys", () => {
     expect(await spend(IPV6_SAME_64)).toBe(SUBMIT_MAX - 2);
     // A different /64 is a different customer, and must NOT inherit the two above.
     expect(await spend(IPV6_OTHER_64)).toBe(SUBMIT_MAX - 1);
+  }, 60_000);
+
+  it("charges every credential of ONE account to the same bucket", async () => {
+    // A bucket is the CREDENTIAL-HOLDER's, not the credential's. Keying on the key would make a
+    // ceiling a function of how many keys somebody minted, which is not a limit.
+    const keyA = await meteredDelete(thirdKeyA, IP_A);
+    const keyB = await meteredDelete(thirdKeyB, IP_A);
+    const session = await meteredDelete(thirdToken, IP_A);
+
+    // `DELETE /v1/keys/:id` is session-only, so a key is refused — AFTER the limiter counted it,
+    // which is exactly the ordering being asserted. The session reaches the handler and 404s.
+    expect([keyA.status, keyB.status, session.status]).toEqual([403, 403, 404]);
+
+    expect(keyA.remaining).toBe(KEYS_MAX - 1);
+    // A second key of the same account continues the first key's count, and the session continues
+    // both: three credentials, one budget.
+    expect(keyB.remaining).toBe(KEYS_MAX - 2);
+    expect(session.remaining).toBe(KEYS_MAX - 3);
+  }, 60_000);
+
+  it("moves a credential revoked mid-window onto the address bucket", async () => {
+    // The transition the account bucket depends on: a credential that can no longer be PROVEN is
+    // not the account any more, so its traffic must fall back to the address like any other
+    // anonymous caller — and must not keep spending, or inherit, the account's budget.
+    await db
+      .update(apiKeys)
+      .set({ revokedAt: new Date() })
+      .where(eq(apiKeys.accountId, thirdAccountId));
+
+    const revoked = await meteredDelete(thirdKeyA, IP_F);
+    expect(revoked.status).toBe(401);
+    // The FIRST charge on an untouched address: not the account's fourth.
+    expect(revoked.remaining).toBe(KEYS_MAX - 1);
+
+    // And the account's own budget is where it was — the revoked key spent none of it.
+    const stillTheAccount = await meteredDelete(thirdToken, IP_F);
+    expect(stillTheAccount.status).toBe(404);
+    expect(stillTheAccount.remaining).toBe(KEYS_MAX - 4);
   }, 60_000);
 
   it("never meters — or masks — a failure to CHECK the credential", async () => {
@@ -415,6 +497,51 @@ run("M4RATE rate-limit keys", () => {
       expect(res.statusCode).toBe(204);
       expect(res.headers["x-ratelimit-limit"]).toBeUndefined();
       expect(res.headers["retry-after"]).toBeUndefined();
+    }
+  }, 60_000);
+
+  it("meters a HEAD on a redirect, and records no click for it", async () => {
+    // Fastify serves HEAD off the GET route, so the click-counting handler runs and the body is
+    // dropped afterwards. A HEAD is a link checker, a preview crawler or a monitor — never
+    // somebody leaving for the programme's page — so counting it would inflate the one number a
+    // publisher is given about whether their listing works.
+    //
+    // Its METERING is the other half, and is stated here rather than left to be discovered:
+    // Fastify registers the automatic HEAD as its OWN route, so it carries the same 120/min
+    // ceiling on a bucket of its own. A HEAD is therefore bounded, and cannot spend — or be used
+    // to probe — the GET budget. That is harmless because a HEAD now does nothing: no body, and,
+    // by the assertion above, no click.
+    const reader = { "user-agent": "Mozilla/5.0 (X11; Linux x86_64) TestReader/1.0" };
+    // The buffer is a module singleton and every `buildApp` close shuts it, so the second app the
+    // outage cases above build and close leaves it refusing to record. Reopen it explicitly.
+    analyticsEvents.reopen();
+    for (const kind of ["apply", "source"] as const) {
+      await analyticsEvents.flush();
+      const before = analyticsEvents.depth;
+
+      const head = await app.inject({
+        method: "HEAD",
+        url: `/v1/r/${REDIRECT_ID}/${kind}`,
+        headers: reader,
+        remoteAddress: IP_F,
+      });
+      expect(head.statusCode, kind).toBe(302);
+      expect(analyticsEvents.depth, kind).toBe(before);
+      // Metered, on the redirect's own address-keyed ceiling.
+      expect(Number(head.headers["x-ratelimit-limit"]), kind).toBe(REDIRECT_MAX);
+
+      const get = await app.inject({
+        method: "GET",
+        url: `/v1/r/${REDIRECT_ID}/${kind}`,
+        headers: reader,
+        remoteAddress: IP_F,
+      });
+      expect(get.statusCode, kind).toBe(302);
+      // The GET is what a click is, and it still counts — otherwise the case above would pass on
+      // a fixture that records nothing at all.
+      expect(analyticsEvents.depth, kind).toBe(before + 1);
+      // The GET's OWN first charge — the HEAD above spent the HEAD route's bucket, not this one.
+      expect(Number(get.headers["x-ratelimit-remaining"]), kind).toBe(REDIRECT_MAX - 1);
     }
   }, 60_000);
 
