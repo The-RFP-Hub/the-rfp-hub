@@ -27,25 +27,36 @@ Related documents that are **not** here, because they belong to the thing they d
 
 ## Shell blocks carry a marker, and the marker is a contract
 
-Every fenced `sh` or `bash` block in this directory is marked on its info string with exactly one
-of three words. The marker says what running the block would do, so a reader — or a checker — can
-tell an illustration from a live command without reading the command:
+Every fenced `sh` or `bash` block in this directory — and in the repository's root `*.md` files —
+is marked on its info string with exactly one of three words. The marker says what running the
+block would do, so a reader — or a checker — can tell an illustration from a live command without
+reading the command:
 
 | Marker | Meaning |
 |---|---|
-| ` ```sh no-run ` | **Do not paste this.** It mutates infrastructure, publishes a package, rotates a credential, or is an excerpt that would not run as written. Read it; do not run it. |
+| ` ```sh no-run ` | **Do not paste this at a deployment.** It mutates infrastructure, publishes a package, rotates a credential, needs a checkout on the machine, or is an excerpt that would not run as written. Read it; do not let a checker run it. |
 | ` ```sh safe-read ` | A public, unauthenticated `GET`. Safe against any deployment, any number of times, from anywhere. Nothing here carries a credential. |
 | ` ```sh staging-write ` | It writes: mints a key, sends a sign-in code, submits an entry, decides a review, revokes something. **Point it at staging**, never at production, and clean up what it creates. |
 
 The rule for anything automated that reads these files: **execute only `safe-read`**. A `no-run`
-block is documentation of an irreversible act and a `staging-write` block needs a credential and a
-target that a document cannot choose on the reader's behalf.
+block is documentation of something a checker has no business doing, and a `staging-write` block
+needs a credential and a target that a document cannot choose on the reader's behalf.
 
 The marker sits on the info string (` ```sh safe-read `) rather than in a comment — that is the
 only form, there is no preceding-comment alternative — so it survives copy-paste into a renderer
-and is greppable. An `sh`/`bash` block with **no marker, or an unrecognized one, is a hard
-failure** in `pnpm check:m4`: a block it cannot tell is safe to run must not silently go
-unexercised.
+and is greppable.
+
+What `pnpm check:m4` does with that, exactly:
+
+* Every `sh`/`bash` block in `docs/**` **and in the repository's root `*.md`** must carry one of the
+  three markers. A block with none, or with an unrecognized one, is a **hard failure** — a block the
+  tool cannot tell is safe to run must not silently go unexercised.
+* Every relative link in those same files is resolved, and a `#anchor` on it is checked against the
+  target document's own headings. A link to a file that exists but to a heading that does not is a
+  failure, which is the case a rename produces.
+* **Absolute links and `safe-read` execution run only online.** `--offline` — what the CI
+  `docs-links` job passes — keeps the marker and relative-link walk and drops those two, so CI
+  proves structure and a human running `pnpm check:m4` proves the requests.
 
 Two rules a `safe-read` block has to hold to, because the checker runs it for real:
 
@@ -60,6 +71,6 @@ Two rules a `safe-read` block has to hold to, because the checker runs it for re
 deliberately does not do (`pipefail`, and shimming `jq -e`) and the one gap that leaves open.
 
 ```sh no-run
-# every marked block in this directory, one per line
-grep -rn '^```\(sh\|bash\) ' docs/
+# every marked block in the files the checker walks, one per line
+grep -rn '^```\(sh\|bash\) ' docs/ *.md
 ```

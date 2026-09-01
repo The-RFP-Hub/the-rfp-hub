@@ -37,7 +37,7 @@ JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 
 Validate anything against it:
 
-```bash
+```bash no-run
 npx rfphub-validate opportunity.json
 ```
 
@@ -104,7 +104,7 @@ ranges and verify standalone install, build and test; `packages/api` is not publ
 
 ## Develop
 
-```bash
+```bash no-run
 pnpm install
 pnpm codegen        # regenerate TS types from the JSON Schema
 pnpm codegen:check  # fail if generated types drift from the schema (CI gate)
@@ -121,7 +121,7 @@ the data directory is compatible and the named volume is reused — but the C li
 changes with the image, and with it the collation provider. Run the script; it dumps first, refreshes
 the collation version, reindexes, migrates, and compares row counts before and after:
 
-```bash
+```bash no-run
 packages/api/scripts/upgrade-dev-postgres.sh
 ```
 
@@ -226,7 +226,7 @@ The API's list query contract is strict — an undefined parameter or an out-of-
 Reading is public and unauthenticated, and stays that way. **Writing** is authenticated, and the
 credential you hold decides not only whether a submission is accepted but whether it goes live:
 
-```sh
+```sh no-run
 API=https://api.ethrfps.app
 
 # Who am I, and what may I do?
