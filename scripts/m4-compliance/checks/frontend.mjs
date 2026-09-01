@@ -10,10 +10,13 @@
 import { isLoopbackHost, probeTls, request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
 
+// `touch` mirrors `packages/e2e/tests/m4-responsive.spec.ts`: only the two narrower viewports run
+// with a coarse pointer, which is what the CSS's own `(pointer: coarse)` rule keys off, and the
+// desktop one is the contrast case.
 const VIEWPORTS = [
-  { width: 375, height: 667, label: "375×667 (mobile)" },
-  { width: 768, height: 1024, label: "768×1024 (tablet)" },
-  { width: 1440, height: 900, label: "1440×900 (desktop)" },
+  { width: 375, height: 667, label: "375×667 (mobile)", touch: true },
+  { width: 768, height: 1024, label: "768×1024 (tablet)", touch: true },
+  { width: 1440, height: 900, label: "1440×900 (desktop)", touch: false },
 ];
 
 /**
@@ -34,7 +37,11 @@ async function renderedOpportunityIds(page) {
   );
 }
 
-/** The minimum touch target the plan requires of every interactive control, in CSS pixels. */
+/**
+ * The minimum touch target, in CSS pixels — `--control-touch` in the frontend's own `globals.css`,
+ * and the same number `packages/e2e/tests/m4-responsive.spec.ts` asserts. HEIGHT is the measure
+ * there and here: a full-width search box is 311 px wide and still fails a thumb if it is 40 tall.
+ */
 export const MIN_TARGET_PX = 44;
 
 const sameSet = (a, b) => a.size === b.size && [...a].every((value) => b.has(value));
@@ -107,8 +114,9 @@ export async function deriveFilterValues(ctx) {
 }
 
 /**
- * Every control small enough to miss on a touch screen. Inline links in running text are exempt:
- * their hit area is the line box, and enlarging one would break the paragraph it sits in.
+ * Every control a thumb has to hit that is shorter than the minimum. Text links are exempt — their
+ * hit area is the line box and enlarging one would break the sentence around it — which is the same
+ * scope `m4-responsive.spec.ts` asserts by naming the filter controls and the two deep links.
  */
 async function undersizedTargets(page, min) {
   return await page.evaluate((minPx) => {
@@ -119,12 +127,8 @@ async function undersizedTargets(page, min) {
       const style = getComputedStyle(el);
       if (style.visibility === "hidden" || style.display === "none") continue;
       if (rect.width === 0 || rect.height === 0) continue;
-      const inlineInProse =
-        el.tagName === "A" &&
-        style.display.startsWith("inline") &&
-        el.closest("p, li, small, figcaption, td, blockquote") !== null;
-      if (inlineInProse) continue;
-      if (rect.width >= minPx && rect.height >= minPx) continue;
+      if (el.tagName === "A" && style.display.startsWith("inline")) continue;
+      if (rect.height >= minPx) continue;
       offenders.push(
         `<${el.tagName.toLowerCase()}> "${(el.textContent ?? "").trim().slice(0, 30)}" ${Math.round(rect.width)}×${Math.round(rect.height)}`,
       );
@@ -190,7 +194,7 @@ export async function checkFrontend(report, ctx) {
       "source href equals {api}/v1/r/{id}/source",
       ...VIEWPORTS.flatMap((v) => [
         `no horizontal overflow at ${v.label}`,
-        `every interactive control is at least ${MIN_TARGET_PX}×${MIN_TARGET_PX} px at ${v.label}`,
+        ...(v.touch ? [`every control is at least ${MIN_TARGET_PX} px tall at ${v.label}`] : []),
       ]),
     ]) {
       c.unmet(name, "needs --browser");
@@ -344,32 +348,42 @@ export async function checkFrontend(report, ctx) {
   ];
   for (const viewport of VIEWPORTS) {
     try {
-      await withPage(ctx.repoRoot, async (page) => {
-        await page.setViewportSize({ width: viewport.width, height: viewport.height });
-        for (const route of routes) {
-          if (route.endsWith("/opportunities/")) continue; // no sample id available
-          await page.goto(`${ctx.site}${route}`, {
-            waitUntil: "networkidle",
-            timeout: ctx.timeoutMs,
-          });
-          const overflow = await page.evaluate(
-            () => document.documentElement.scrollWidth > window.innerWidth,
-          );
-          c.expect(
-            !overflow,
-            `no horizontal overflow at ${viewport.label} on ${route}`,
-            "scrollWidth <= innerWidth",
-            "document.documentElement.scrollWidth > window.innerWidth",
-          );
-          const offenders = await undersizedTargets(page, MIN_TARGET_PX);
-          c.expect(
-            offenders.length === 0,
-            `every interactive control is at least ${MIN_TARGET_PX}×${MIN_TARGET_PX} px at ${viewport.label} on ${route}`,
-            "every control meets the minimum",
-            `${offenders.length} control(s) under ${MIN_TARGET_PX} px: ${offenders.slice(0, 5).join("; ")}${offenders.length > 5 ? ` … and ${offenders.length - 5} more` : ""}`,
-          );
-        }
-      });
+      await withPage(
+        ctx.repoRoot,
+        async (page) => {
+          for (const route of routes) {
+            if (route.endsWith("/opportunities/")) continue; // no sample id available
+            await page.goto(`${ctx.site}${route}`, {
+              waitUntil: "networkidle",
+              timeout: ctx.timeoutMs,
+            });
+            const overflow = await page.evaluate(
+              () => document.documentElement.scrollWidth > window.innerWidth,
+            );
+            c.expect(
+              !overflow,
+              `no horizontal overflow at ${viewport.label} on ${route}`,
+              "scrollWidth <= innerWidth",
+              "document.documentElement.scrollWidth > window.innerWidth",
+            );
+            if (!viewport.touch) continue;
+            const offenders = await undersizedTargets(page, MIN_TARGET_PX);
+            c.expect(
+              offenders.length === 0,
+              `every control is at least ${MIN_TARGET_PX} px tall at ${viewport.label} on ${route}`,
+              "every control meets the minimum",
+              `${offenders.length} control(s) under ${MIN_TARGET_PX} px tall: ${offenders.slice(0, 5).join("; ")}${offenders.length > 5 ? ` … and ${offenders.length - 5} more` : ""}`,
+            );
+          }
+        },
+        {
+          viewport: { width: viewport.width, height: viewport.height },
+          hasTouch: viewport.touch,
+          // `hasTouch` alone only adds touch-event dispatch; `isMobile` is what makes
+          // `(pointer: coarse)` match, and that is the rule the CSS widens controls with.
+          isMobile: viewport.touch,
+        },
+      );
     } catch (err) {
       c.fail(`responsive checks at ${viewport.label}`, `browser check failed: ${err.message}`);
     }

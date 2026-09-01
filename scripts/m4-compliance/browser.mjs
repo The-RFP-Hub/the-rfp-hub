@@ -27,13 +27,17 @@ export const PLAYWRIGHT_MISSING =
 /**
  * Open a page, run `fn(page)`, and always close the browser — including when `fn` throws, so a
  * failed assertion inside one check never leaks a Chromium process into the next one.
+ *
+ * `contextOptions` reaches `newContext` because a viewport alone is not a phone: `isMobile` is what
+ * makes `(pointer: coarse)` match, and that is the media query the frontend's CSS uses to widen a
+ * control to its touch target. Measuring without it reads a layout no real phone shows.
  */
-export async function withPage(repoRoot, fn) {
+export async function withPage(repoRoot, fn, contextOptions = {}) {
   const pw = loadPlaywright(repoRoot);
   if (!pw) throw new Error(PLAYWRIGHT_MISSING);
   const browser = await pw.chromium.launch();
   try {
-    const context = await browser.newContext();
+    const context = await browser.newContext(contextOptions);
     const page = await context.newPage();
     return await fn(page, context);
   } finally {
