@@ -440,6 +440,8 @@ run("M4RATE rate-limit keys", () => {
       expect(analyticsEvents.depth, kind).toBe(before + 1);
       expect(Number(get.headers["x-ratelimit-remaining"]), kind).toBe(REDIRECT_MAX - 1);
     }
+    // Leave the shared buffer as it was found: another suite in this process asserts on its depth.
+    await analyticsEvents.flush();
   }, 60_000);
 
   it("leaves the public read uncapped, which is the point of `global: false`", async () => {
