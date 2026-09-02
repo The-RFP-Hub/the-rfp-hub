@@ -110,7 +110,7 @@ npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
 
 # 2. Claude Code plugin marketplace
 claude plugin marketplace add The-RFP-Hub/the-rfp-hub
-claude plugin install rfp-hub-funding-search@rfp-hub
+claude plugin install rfp-hub@rfp-hub
 
 # 3. a plain copy into whichever agent's skill directory applies
 cp -R skills/rfp-hub-funding-search ~/.claude/skills/
