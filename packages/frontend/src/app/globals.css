@@ -1607,6 +1607,47 @@ pre.untrusted-block {
   padding: var(--space-3);
 }
 
+/* ------------------------------------------------------------- publishers --- */
+
+.publisher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+/* A publisher writes its own name and description; an unbroken 2000-character token is theirs to
+   send and must not be allowed to widen the card past the viewport. */
+.publisher-card h2,
+.publisher-description {
+  overflow-wrap: anywhere;
+}
+
+.publisher-card h2 {
+  margin-top: 0;
+  font-size: var(--text-h3);
+}
+
+.publisher-description {
+  min-height: 2.6em;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.chip {
+  font-size: var(--text-xs);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
 /* ---------------------------------------------------------------- narrow --- */
 
 @media (pointer: coarse) {

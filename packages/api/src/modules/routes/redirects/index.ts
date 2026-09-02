@@ -22,6 +22,7 @@
  * Standard opportunity.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { redirectController } from "./redirect.controller.js";
 
 export const redirects = async (router: FastifyInstance): Promise<void> => {
@@ -35,10 +36,11 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
       description:
         "The stored link-out. `Location` is a URL from the record itself — never one supplied by the caller.",
       headers: {
-        Location: { schema: { type: "string", format: "uri" }, description: "The destination." },
+        Location: { type: "string", format: "uri", description: "The destination." },
       },
     },
     404: { $ref: "ErrorResponse#" },
+    429: RATE_LIMITED,
   };
 
   router.get(
@@ -46,6 +48,8 @@ export const redirects = async (router: FastifyInstance): Promise<void> => {
     {
       // Bounded, because this route emits a `Location` and is the obvious thing to point a script
       // at if the goal is to inflate a publisher's apply count.
+      // ADDRESS-KEYED, on the declarative form: a link-out is followed by a browser that was
+      // never asked to sign in, so there is no account to meter and nothing to resolve.
       config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
       schema: {
         operationId: "followApplicationLink",

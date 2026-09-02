@@ -6,7 +6,7 @@ import type { AnalyticsContext } from "../plugins/analytics-context.js";
  * Declared here rather than inline so a route module can read `app.auth` and `request.principal`
  * with full types without importing the plugin, and so the shapes are stated once.
  */
-import type { AuthDecorators } from "../plugins/auth.js";
+import type { AuthDecorators, PrincipalResolution } from "../plugins/auth.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -23,6 +23,10 @@ declare module "fastify" {
      * treating an unauthenticated request as anonymous.
      */
     principal: RequestPrincipal | null;
+
+    /** Cached so a chain that resolves then gates verifies the credential once. Written only by
+     * `plugins/auth.ts`. */
+    principalResolution: PrincipalResolution | null;
 
     /**
      * Who this request is, for counting purposes — and whether to count it at all.
