@@ -44,9 +44,12 @@ import {
   truncateText,
   validateFormat,
   withDefaultStatus,
-} from "../scripts/lib.mjs";
+} from "../../../skills/rfp-hub-funding-search/scripts/lib.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const skillDir = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../skills/rfp-hub-funding-search",
+);
 const BASE = "https://api.ethrfps.app";
 
 describe("truncateText", () => {
@@ -728,7 +731,7 @@ describe("formatTable / formatDetailTable", () => {
 
 describe("SKILL_VERSION drift guard", () => {
   it("matches SKILL.md's frontmatter metadata.version exactly", () => {
-    const skillMd = readFileSync(resolve(here, "../SKILL.md"), "utf8");
+    const skillMd = readFileSync(resolve(skillDir, "SKILL.md"), "utf8");
     const match = skillMd.match(/^metadata:\n(?:.*\n)*?\s*version:\s*"([^"]+)"/m);
     expect(match, "expected a metadata.version field in SKILL.md's frontmatter").not.toBeNull();
     expect(match[1]).toBe(SKILL_VERSION);

@@ -10,7 +10,11 @@ without needing the API's shape explained to it first.
 
 Each skill is a self-contained directory: `SKILL.md`, an optional `scripts/` with any executable
 helpers, and an optional `references/` with detail the agent loads only when needed. The same
-directory is installed as-is by every channel below — there is no per-agent build step.
+directory is installed as-is by every channel below — there is no per-agent build step, and
+**nothing that is not part of the installed artifact lives inside it**. The skill's own tests are
+therefore at [`test/skills/rfp-hub-funding-search/`](../test/skills/rfp-hub-funding-search) in the
+repository root, not in the bundle: they import `vitest`, which an installed skill has no reason
+to carry.
 
 ## Installing a skill
 
@@ -86,7 +90,8 @@ directory is the only one that exists.
 ```sh
 node scripts/check-skill.mjs        # frontmatter, name/dir match, line count, required sections
 node skills/rfp-hub-funding-search/scripts/search.mjs --q grant --limit 3   # live smoke test
-pnpm test                            # unit tests, including the projection's content-safety test
+npx vitest run test/skills          # the skill's own suites, including the clean-room install
+pnpm test                            # everything, the above included
 ```
 
 See [`scripts/check-skill.mjs`](../scripts/check-skill.mjs) at the repo root for what the CI

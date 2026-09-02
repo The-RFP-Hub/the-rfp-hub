@@ -7,7 +7,7 @@
  * emit what it names, so a schema change is silent by default instead of a silent new leak.
  */
 
-/** Must match SKILL.md's frontmatter `metadata.version` — test/projection.test.ts asserts this. */
+/** Must match SKILL.md's frontmatter `metadata.version`; the repo's tests assert the pairing. */
 export const SKILL_VERSION = "0.1.0";
 
 export const SKILL_NAME = "rfp-hub-funding-search";

@@ -17,11 +17,17 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_API_BASE, announceBase } from "../scripts/lib.mjs";
+import {
+  DEFAULT_API_BASE,
+  announceBase,
+} from "../../../skills/rfp-hub-funding-search/scripts/lib.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const searchScript = resolve(here, "../scripts/search.mjs");
-const getScript = resolve(here, "../scripts/get.mjs");
+const skillDir = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../skills/rfp-hub-funding-search",
+);
+const searchScript = resolve(skillDir, "scripts/search.mjs");
+const getScript = resolve(skillDir, "scripts/get.mjs");
 
 // The projection bounds every per-item field, so the payload only exceeds a common OS pipe buffer
 // (16KB on macOS, 64KB on Linux) through the item COUNT — the fake API below ignores `limit` and
