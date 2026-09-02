@@ -8,7 +8,7 @@
   "description": "Agent skills for the RFP Hub — a public directory of Ethereum-ecosystem funding opportunities.",
   "plugins": [
     {
-      "name": "rfp-hub-funding-search",
+      "name": "rfp-hub",
       "displayName": "RFP Hub funding search",
       "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFP Hub public API.",
       "source": "./skills/rfp-hub-funding-search",

@@ -190,14 +190,27 @@ function checkSkill(dir) {
   if (existsSync(pluginPath)) {
     try {
       const plugin = JSON.parse(readFileSync(pluginPath, "utf8"));
-      if (plugin.name !== data.name) {
+      // A plugin is a distribution unit, not a skill: it may carry the skill's own name or the
+      // marketplace's, but not a third name nothing else in the repo knows about.
+      const allowedPluginNames = [data.name, marketplaceName()].filter(Boolean);
+      if (!allowedPluginNames.includes(plugin.name)) {
         fail(
-          `skills/${dir}/.claude-plugin/plugin.json: name '${plugin.name}' does not match SKILL.md's name '${data.name}'`,
+          `skills/${dir}/.claude-plugin/plugin.json: name '${plugin.name}' must be the skill's name or the marketplace's (${allowedPluginNames.join(" | ")})`,
         );
       }
     } catch (err) {
       fail(`skills/${dir}/.claude-plugin/plugin.json: invalid JSON (${err.message})`);
     }
+  }
+}
+
+function marketplaceName() {
+  const marketplacePath = join(repoRoot, ".claude-plugin", "marketplace.json");
+  if (!existsSync(marketplacePath)) return null;
+  try {
+    return JSON.parse(readFileSync(marketplacePath, "utf8")).name ?? null;
+  } catch {
+    return null;
   }
 }
 

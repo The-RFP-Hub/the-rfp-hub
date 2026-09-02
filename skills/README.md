@@ -27,12 +27,15 @@ npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
 
 ```sh
 claude plugin marketplace add The-RFP-Hub/the-rfp-hub
-claude plugin install rfp-hub-funding-search@rfp-hub
+claude plugin install rfp-hub@rfp-hub
 ```
 
 This reads [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) at the repo
 root, which points at this skill's own
-[`.claude-plugin/plugin.json`](rfp-hub-funding-search/.claude-plugin/plugin.json).
+[`.claude-plugin/plugin.json`](rfp-hub-funding-search/.claude-plugin/plugin.json). The **plugin**
+is `rfp-hub`; the **skill** it carries keeps its own name, so this channel presents the skill as
+`rfp-hub:rfp-hub-funding-search`. The other two channels install by directory name and apply no
+namespace at all.
 
 ### 3. Manual copy
 
