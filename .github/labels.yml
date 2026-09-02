@@ -8,7 +8,7 @@
 # TO APPLY (idempotent — `--force` updates an existing label rather than failing):
 #
 #   gh label create status:next-version   --color fbca04 --force --description "Real defect whose fix would change what validates. Parked until the next spec version opens."
-#   gh label create rfc                   --color 0e8a16 --force --description "A proposal at the 'proposed' stage: a field, a registry value, a change to the process, or a defect report retriaged as not a defect."
+#   gh label create rfc                   --color 0e8a16 --force --description "A proposal: a field, a registry value, a process change, or a defect retriaged as not a defect."
 #   gh label create governance:appeal     --color b60205 --force --description "A decision is being appealed. Answered on the issue, in public, with the reasoning."
 #   gh label create publisher:application --color 1d76db --force --description "An organization applying to become a verified publisher."
 #
@@ -29,7 +29,7 @@
   description: "Real defect whose fix would change what validates. Parked until the next spec version opens."
 - name: rfc
   color: 0e8a16
-  description: "A proposal at the 'proposed' stage: a field, a registry value, a change to the process, or a defect report retriaged as not a defect."
+  description: "A proposal: a field, a registry value, a process change, or a defect retriaged as not a defect."
 
 # Routing — the door added so the appeal path GOVERNANCE.md describes is reachable.
 - name: governance:appeal
