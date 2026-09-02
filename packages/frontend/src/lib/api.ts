@@ -77,8 +77,16 @@ export class ApiError extends Error {
   readonly survivorId: string | undefined;
   /** Set on the public detail route's `opportunity_merged` 404. */
   readonly mergedInto: { id: string; title: string } | undefined;
+  /** Whole seconds from a `Retry-After` header, when the response carried a readable one. */
+  readonly retryAfterSeconds: number | undefined;
 
-  constructor(status: number, code: string, message: string, extra?: Partial<ApiErrorBody>) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    extra?: Partial<ApiErrorBody>,
+    retryAfterSeconds?: number,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -87,6 +95,7 @@ export class ApiError extends Error {
     this.issues = extra?.issues ?? [];
     this.survivorId = extra?.survivorId;
     this.mergedInto = extra?.mergedInto;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 
   /** The session is gone or was never presented. Pages offer a login rather than an error. */
@@ -102,6 +111,21 @@ export class ApiError extends Error {
   get isNotFound(): boolean {
     return this.status === 404;
   }
+
+  /** Refused for asking too often. A page must not offer an immediate retry: it would be refused. */
+  get isRateLimited(): boolean {
+    return this.status === 429;
+  }
+}
+
+/** A count or an HTTP date; an unreadable value is `undefined` rather than a guess. */
+function retryAfterSeconds(header: string | null): number | undefined {
+  const raw = header?.trim();
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, Math.ceil(seconds));
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? undefined : Math.max(0, Math.ceil((at - Date.now()) / 1000));
 }
 
 export type TokenSource = () => Promise<string | null>;
@@ -166,8 +190,9 @@ export type DirectoryQuery = {
   category?: string;
   /** Organization slug — matches any operating OR sponsoring organization. */
   organization?: string;
-  minAward?: number;
-  maxAward?: number;
+  /** Raw text when the address bar carried something else, so the endpoint names it in a 400. */
+  minAward?: number | string;
+  maxAward?: number | string;
   /** RFC 3339 instants, compared against the derived `nextDeadlineAt`. */
   deadlineAfter?: string;
   deadlineBefore?: string;
@@ -257,6 +282,7 @@ export function createApiClient(options: ApiClientOptions) {
         body.error ?? "http_error",
         body.message ?? `Request failed with status ${response.status}.`,
         body,
+        retryAfterSeconds(response.headers.get("retry-after")),
       );
     }
     return parsed as T;

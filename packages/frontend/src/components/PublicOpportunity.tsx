@@ -308,6 +308,7 @@ function ApplyAction({ entry, baseUrl }: { entry: Opportunity; baseUrl: string }
           </a>
           {entry.website ? (
             <a
+              className="row-action-link"
               href={linkOutUrl(baseUrl, entry.id, "source")}
               target="_blank"
               rel="noopener noreferrer"

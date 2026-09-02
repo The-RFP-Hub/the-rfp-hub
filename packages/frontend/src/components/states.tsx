@@ -133,6 +133,24 @@ export function ErrorState({
     );
   }
 
+  // NO RETRY BUTTON: a button that fires the just-refused request back is a second refusal.
+  if (error.isRateLimited) {
+    return (
+      <div className="callout state error" role="alert">
+        <p className="empty-title">
+          <IconLabel icon={ExclamationTriangleIcon}>Too many requests, too quickly.</IconLabel>
+        </p>
+        <p className="muted">
+          This deployment limits how fast it answers.{" "}
+          {error.retryAfterSeconds === undefined
+            ? "Wait a moment, then reload the page."
+            : `Wait about ${error.retryAfterSeconds} seconds, then reload the page.`}
+        </p>
+        <TechnicalDetails error={error} />
+      </div>
+    );
+  }
+
   if (error.isNotFound) {
     return (
       <div className="callout state error" role="alert">
