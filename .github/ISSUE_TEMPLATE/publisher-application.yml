@@ -1,7 +1,7 @@
 name: Publisher application
 description: Apply to publish your organisation's funding opportunities directly
 title: "Publisher application: <organisation>"
-labels: ["publisher-application"]
+labels: ["publisher:application"]
 body:
   - type: markdown
     attributes:

@@ -1,0 +1,88 @@
+name: RFC / proposal
+description: Propose a change to the standard, a registry value, or the process itself
+labels: ["rfc"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        This is the door described in
+        [`packages/standard/PROCESS.md` § RFC process](https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/standard/PROCESS.md#rfc-process).
+        A proposal opens at the `proposed` stage: it lives here, in the issue tracker, until an
+        editor accepts it. It stays open for at least the review window its artifact carries —
+        72 hours for anything substantive, 24 for a registry entry — and the window is a minimum,
+        not a target ([`GOVERNANCE.md` § Review windows](https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/GOVERNANCE.md#review-windows)).
+
+
+        **Reporting a defect in something already published is not this form** — that is an
+        erratum, and it goes to the bug report so it can be triaged into one of the four errata
+        labels. **Disagreeing with a decision already made is not this form either** — use the
+        appeal form.
+  - type: textarea
+    id: what-changes
+    attributes:
+      label: What changes
+      description: >
+        The proposal itself, concretely. A field, a registry value, a rule, a step in the process.
+        If it is a field, name it and give its type; if it is a registry value, give the key and
+        the one paragraph that distinguishes it from its nearest neighbor.
+    validations:
+      required: true
+  - type: dropdown
+    id: artifact
+    attributes:
+      label: Which artifact does this change?
+      description: What is normative in each is in `packages/standard/NORMATIVE.md`.
+      options:
+        - "Schema (schemas/**) — the data contract"
+        - "JSON-LD context (ns/**, meta/**)"
+        - "Registry (deadline-labels, program-models, bounty-severities, bounty-asset-types)"
+        - "Process or governance (PROCESS.md, NORMATIVE.md, GOVERNANCE.md)"
+        - "Conformance suite"
+        - "Tooling or docs only"
+    validations:
+      required: true
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Is it breaking?
+      description: >
+        "Breaking" here is bidirectional — a loosening that makes previously invalid documents
+        valid breaks consumers just as a tightening breaks publishers. PROCESS.md § What
+        "breaking" means has the definition; answer for the definition, not the intuition.
+      options:
+        - "No — additive, and every existing document stays valid"
+        - "Yes — it tightens what validates (existing documents could fail)"
+        - "Yes — it loosens what validates (existing consumers could fail)"
+        - "Not sure — please tell me"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Real use
+      description: >
+        A field enters at `experimental` on at least one real document that needs it; a registry
+        value is registered only when a real publisher already writes it. Link the live listing,
+        the program's own documentation, or the export that carries it.
+    validations:
+      required: true
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration
+      description: >
+        What existing publishers and consumers have to do, if anything, and what happens to
+        documents written before this lands. "Nothing — it is additive and optional" is a complete
+        answer when it is true.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: >
+        What else would solve the same problem, and why this instead. This is not a formality: a
+        rejected option recorded here is what stops the next person re-litigating it from scratch,
+        and it is what an ADR is built from if the change turns out to be structural.
+    validations:
+      required: true
