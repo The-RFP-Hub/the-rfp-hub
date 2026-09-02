@@ -19,6 +19,9 @@ export function captureViews(
   publicIds: string[],
 ): void {
   if (publicIds.length === 0) return;
+  // A HEAD serves the GET route and discards the body: nothing was read, and on the redirects
+  // nobody left for anywhere. Counting one puts link checkers and monitors in a publisher's stats.
+  if (request.method === "HEAD") return;
   const context = request.analyticsContext;
   if (!context.countable) return;
 

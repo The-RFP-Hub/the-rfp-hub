@@ -1150,4 +1150,50 @@ export const responseSchemas: ({ $id: string } & Record<string, unknown>)[] = [
       message: { type: "string", description: "Human-readable detail." },
     },
   },
+  {
+    $id: "RateLimitedResponse",
+    type: "object",
+    additionalProperties: false,
+    description:
+      "The request was refused for exceeding this operation's ceiling. `error` is always `rate_limited`, so a client can branch on the code rather than on the status: backing off is the one 4xx with a correct automatic response.",
+    required: ["error", "message"],
+    properties: {
+      error: { type: "string", enum: ["rate_limited"] },
+      message: {
+        type: "string",
+        description: "e.g. `Rate limit exceeded, retry in 60 seconds`. Obey `Retry-After` instead.",
+      },
+    },
+  },
 ];
+
+/** The `429` half of every metered operation's contract, referenced so the four header schemas
+ * cannot drift between them. */
+export const RATE_LIMITED = {
+  $ref: "RateLimitedResponse#",
+  description:
+    "Rate limit exceeded. Metered per credential-holder (`acct:<id>`), or per client address for a request that proved no credential. Wait `Retry-After` seconds.",
+  // @fastify/swagger adds the `schema` wrapper itself; a nested one publishes `schema.schema`.
+  headers: {
+    "retry-after": {
+      type: "integer",
+      minimum: 1,
+      description: "Whole seconds until this bucket's window resets.",
+    },
+    "x-ratelimit-limit": {
+      type: "integer",
+      minimum: 0,
+      description: "This operation's ceiling for the window.",
+    },
+    "x-ratelimit-remaining": {
+      type: "integer",
+      minimum: 0,
+      description: "Requests left in the window. `0` on a 429.",
+    },
+    "x-ratelimit-reset": {
+      type: "integer",
+      minimum: 0,
+      description: "Whole seconds until the window resets.",
+    },
+  },
+} as const;

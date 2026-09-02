@@ -10,15 +10,21 @@
 import {
   ANY_STATUS,
   DEFAULT_SELECTION,
+  FREE_TEXT_FILTER_LIMIT,
   FUNDING_TYPES,
   ORDERINGS,
+  RETAINED_VALUE_DISPLAY_LIMIT,
   STATUSES,
   SUGGESTED_ECOSYSTEMS,
+  awardInputValue,
+  dateInputValue,
   directoryQuery,
+  emptyResultHints,
   isFiltered,
   selectionFromParams,
   selectionToHref,
   selectionToParams,
+  truncateForDisplay,
 } from "@/lib/directory";
 import {
   describeAward,
@@ -51,10 +57,17 @@ const ACCEPTED = new Set([
 describe("the directory querystring", () => {
   it("emits only parameters the list endpoint declares", () => {
     const query = directoryQuery({
+      ...DEFAULT_SELECTION,
       q: "retro funding",
       fundingType: "grant",
       status: "open",
       ecosystem: "Optimism",
+      category: "infrastructure",
+      organization: "acme",
+      minAward: "5000",
+      maxAward: "50000",
+      deadlineAfter: "2026-09-01",
+      deadlineBefore: "2026-12-31",
       ordering: "postedAt:desc",
       page: 3,
     });
@@ -62,6 +75,124 @@ describe("the directory querystring", () => {
     for (const key of Object.keys(query)) expect(ACCEPTED.has(key)).toBe(true);
   });
 
+  it("emits the newer filters — category, organization, award range and deadline range", () => {
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      category: "infrastructure",
+      organization: "acme",
+      minAward: "5000",
+      maxAward: "50000",
+      deadlineAfter: "2026-09-01",
+      deadlineBefore: "2026-12-31",
+    });
+
+    expect(query.category).toBe("infrastructure");
+    // The wider operating-OR-sponsoring match is the endpoint's, not computed here.
+    expect(query.organization).toBe("acme");
+    expect(query.minAward).toBe(5000);
+    expect(query.maxAward).toBe(50000);
+    // The two ends widen to the day's first and last instant, so a single-day range is not empty.
+    expect(query.deadlineAfter).toBe("2026-09-01T00:00:00.000Z");
+    expect(query.deadlineBefore).toBe("2026-12-31T23:59:59.999Z");
+  });
+
+  it("forwards an award the control cannot parse instead of dropping it in silence", () => {
+    // Dropping it left the address bar advertising a filter the request never carried.
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      minAward: "not a number",
+      maxAward: "1e400",
+    });
+    expect(query.minAward).toBe("not a number");
+    // `Number("1e400")` is `Infinity`, which is not a value this filter can compare against.
+    expect(query.maxAward).toBe("1e400");
+  });
+
+  it("still drops a blank award control — nothing was chosen", () => {
+    const query = directoryQuery({ ...DEFAULT_SELECTION, minAward: "  ", maxAward: "" });
+    expect(query.minAward).toBeUndefined();
+    expect(query.maxAward).toBeUndefined();
+  });
+
+  it("sends zero as a number, not as the absence of a filter", () => {
+    expect(directoryQuery({ ...DEFAULT_SELECTION, minAward: "0" }).minAward).toBe(0);
+  });
+
+  it("accepts a fractional award threshold — the control is not integer-only", () => {
+    // The pure half of the `step="any"` / `inputMode="decimal"` fix on the control itself.
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      minAward: "0.5",
+      maxAward: "1500.25",
+    });
+    expect(query.minAward).toBe(0.5);
+    expect(query.maxAward).toBe(1500.25);
+  });
+
+  it("passes a deadline value that is already a full instant straight through, unwidened", () => {
+    // Widening it a second time would silently change what the reader asked for.
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      deadlineAfter: "2026-09-01T12:00:00Z",
+    });
+    expect(query.deadlineAfter).toBe("2026-09-01T12:00:00Z");
+  });
+
+  it("never re-derives the query from the date picker's truncated display value", () => {
+    // Reading `dateInputValue(...)` here would replace a link's time of day with midnight on any
+    // untouched resubmit — a precision loss `directoryQuery` must not introduce on its own.
+    const query = directoryQuery({
+      ...DEFAULT_SELECTION,
+      deadlineAfter: "2026-09-01T15:30:00.000Z",
+      deadlineBefore: "2026-09-02T15:30:00.000Z",
+    });
+    expect(query.deadlineAfter).toBe("2026-09-01T15:30:00.000Z");
+    expect(query.deadlineBefore).toBe("2026-09-02T15:30:00.000Z");
+  });
+});
+
+describe('what the <input type="date"> control displays', () => {
+  it("shows a bare date exactly as given", () => {
+    expect(dateInputValue("2026-09-01")).toBe("2026-09-01");
+  });
+
+  it("extracts the day from a full instant, so an active filter is never shown as blank", () => {
+    expect(dateInputValue("2026-09-01T12:00:00Z")).toBe("2026-09-01");
+    expect(dateInputValue("2026-09-01T00:00:00.000Z")).toBe("2026-09-01");
+  });
+
+  it("falls back to blank for anything that isn't a date or doesn't start with one", () => {
+    expect(dateInputValue("")).toBe("");
+    expect(dateInputValue("   ")).toBe("");
+    expect(dateInputValue("not a date")).toBe("");
+  });
+});
+
+describe("what the retained-value hint shows for a value the picker can't display in full", () => {
+  it("leaves a short value untouched", () => {
+    expect(truncateForDisplay("2026-09-01T15:30:00.000Z")).toBe("2026-09-01T15:30:00.000Z");
+  });
+
+  it("bounds a value at the URL's own length limit, keeping the recognizable prefix", () => {
+    const value = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
+    const shown = truncateForDisplay(value);
+    expect(shown.length).toBeLessThan(value.length);
+    expect(shown.length).toBeLessThanOrEqual(RETAINED_VALUE_DISPLAY_LIMIT + 1); // +1 for the ellipsis
+    expect(shown.startsWith("2026-09-01T15:30:00.000Z")).toBe(true);
+    expect(shown.endsWith("…")).toBe(true);
+  });
+
+  it("never sends the truncated form — directoryQuery reads the field's own raw value", () => {
+    const value = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
+    // Truncating for the DOM must never leak into what reaches the endpoint.
+    expect(directoryQuery({ ...DEFAULT_SELECTION, deadlineAfter: value }).deadlineAfter).toBe(
+      value,
+    );
+    expect(truncateForDisplay(value)).not.toBe(value);
+  });
+});
+
+describe("the directory querystring", () => {
   it("drops an empty control instead of sending it blank", () => {
     const query = directoryQuery(DEFAULT_SELECTION);
 
@@ -143,6 +274,90 @@ describe("the directory querystring", () => {
     expect(isFiltered({ ...unfiltered, q: "  " })).toBe(false);
     expect(isFiltered({ ...unfiltered, ecosystem: "Base" })).toBe(true);
   });
+
+  it("counts every one of the newer filters as narrowing the result", () => {
+    const unfiltered = { ...DEFAULT_SELECTION, status: "" };
+    expect(isFiltered({ ...unfiltered, category: "infrastructure" })).toBe(true);
+    expect(isFiltered({ ...unfiltered, organization: "acme" })).toBe(true);
+    expect(isFiltered({ ...unfiltered, minAward: "1000" })).toBe(true);
+    expect(isFiltered({ ...unfiltered, maxAward: "1000" })).toBe(true);
+    expect(isFiltered({ ...unfiltered, deadlineAfter: "2026-09-01" })).toBe(true);
+    expect(isFiltered({ ...unfiltered, deadlineBefore: "2026-09-01" })).toBe(true);
+    // A blank control is not a filter. A non-numeric one IS: it is on the wire.
+    expect(isFiltered({ ...unfiltered, minAward: "  " })).toBe(false);
+    expect(isFiltered({ ...unfiltered, minAward: "not a number" })).toBe(true);
+  });
+
+  it("shows a blank number control for an award the browser cannot render, and keeps the rest", () => {
+    expect(awardInputValue("5000")).toBe("5000");
+    expect(awardInputValue(" 0.5 ")).toBe("0.5");
+    expect(awardInputValue("0")).toBe("0");
+    expect(awardInputValue("abc")).toBe("");
+    expect(awardInputValue("1e400")).toBe("");
+    expect(awardInputValue("")).toBe("");
+  });
+});
+
+describe("why an empty result is empty", () => {
+  it("says nothing when the filters are ordinary", () => {
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, q: "zk" })).toEqual([]);
+  });
+
+  it("names an inverted award range rather than blaming the corpus", () => {
+    const hints = emptyResultHints({ ...DEFAULT_SELECTION, minAward: "100", maxAward: "1" });
+    expect(hints.join(" ")).toContain("Your minimum award is above your maximum");
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, minAward: "1", maxAward: "100" })).toEqual([]);
+  });
+
+  it("names an inverted deadline range, comparing the instants the query actually sends", () => {
+    const hints = emptyResultHints({
+      ...DEFAULT_SELECTION,
+      deadlineAfter: "2027-01-01",
+      deadlineBefore: "2020-01-01",
+    });
+    expect(hints.join(" ")).toContain("runs backwards");
+    // A single day is NOT inverted: the two ends widen to that day's first and last instant.
+    expect(
+      emptyResultHints({
+        ...DEFAULT_SELECTION,
+        deadlineAfter: "2026-09-01",
+        deadlineBefore: "2026-09-01",
+      }),
+    ).toEqual([]);
+  });
+
+  it("says the organization filter takes a slug only when the value cannot be one", () => {
+    expect(
+      emptyResultHints({ ...DEFAULT_SELECTION, organization: "Acme Foundation" }).join(" "),
+    ).toContain("slug");
+    // A well-formed slug that simply matched nothing is an ordinary empty result. Telling that
+    // reader their slug is not a slug sends them to fix the one thing that was already right.
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, organization: "acme" })).toEqual([]);
+    expect(emptyResultHints({ ...DEFAULT_SELECTION, organization: "example-foundation" })).toEqual(
+      [],
+    );
+  });
+});
+
+describe("free text read out of the address bar", () => {
+  it("bounds category and organization, so a hostile link cannot send kilobytes", () => {
+    const huge = "x".repeat(FREE_TEXT_FILTER_LIMIT * 10);
+    const selection = selectionFromParams(
+      new URLSearchParams({ category: huge, organization: huge }),
+    );
+    expect(selection.category).toHaveLength(FREE_TEXT_FILTER_LIMIT);
+    expect(selection.organization).toHaveLength(FREE_TEXT_FILTER_LIMIT);
+    // Control, address bar and request all see the same bounded value.
+    expect(directoryQuery(selection).category).toHaveLength(FREE_TEXT_FILTER_LIMIT);
+  });
+
+  it("leaves an ordinary value untouched", () => {
+    const selection = selectionFromParams(
+      new URLSearchParams({ category: "infrastructure", organization: "acme" }),
+    );
+    expect(selection.category).toBe("infrastructure");
+    expect(selection.organization).toBe("acme");
+  });
 });
 
 /**
@@ -208,6 +423,39 @@ describe("the directory's URL state", () => {
     const selection = { ...DEFAULT_SELECTION, q: "zk & rollups", ecosystem: "ZKsync Era" };
     expect(roundTrip(selection)).toEqual(selection);
     expect(selectionToHref(selection)).toContain("?");
+  });
+
+  it("round-trips category, organization, award range and deadline range through the address bar", () => {
+    const selection = {
+      ...DEFAULT_SELECTION,
+      status: "",
+      category: "infrastructure",
+      organization: "acme",
+      minAward: "5000",
+      maxAward: "50000",
+      deadlineAfter: "2026-09-01",
+      deadlineBefore: "2026-12-31",
+    };
+    expect(roundTrip(selection)).toEqual(selection);
+  });
+
+  it("uses the exact param name `/publishers` links here with, so `/?organization=<slug>` works", () => {
+    // A verified-publisher card elsewhere in this app points at this page with this literal param —
+    // this module has no idea that page exists, so the contract is the wire format, asserted here.
+    const params = new URLSearchParams("organization=acme");
+    expect(selectionFromParams(params).organization).toBe("acme");
+    expect(
+      selectionToParams({ ...DEFAULT_SELECTION, organization: "acme" }).get("organization"),
+    ).toBe("acme");
+  });
+
+  it("omits the newer filters from the URL when they are left empty", () => {
+    expect(selectionToParams(DEFAULT_SELECTION).has("category")).toBe(false);
+    expect(selectionToParams(DEFAULT_SELECTION).has("organization")).toBe(false);
+    expect(selectionToParams(DEFAULT_SELECTION).has("minAward")).toBe(false);
+    expect(selectionToParams(DEFAULT_SELECTION).has("maxAward")).toBe(false);
+    expect(selectionToParams(DEFAULT_SELECTION).has("deadlineAfter")).toBe(false);
+    expect(selectionToParams(DEFAULT_SELECTION).has("deadlineBefore")).toBe(false);
   });
 });
 

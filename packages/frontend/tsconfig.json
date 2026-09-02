@@ -1,7 +1,27 @@
 {
-  "extends": "../../tsconfig.base.json",
+  // No "extends": TypeScript resolves it relative to this file, so a copied `packages/frontend`
+  // (the clean-room deploy path in the README) has no `../../tsconfig.base.json` and `tsc` dies
+  // with TS5083. Keep the inlined options equal to tsconfig.base.json.
+  // "references" is what makes `next build` leave this file alone: Next's tsconfig auto-setup
+  // bails only when "extends" or "references" is present, and it would otherwise rewrite jsx,
+  // include, and the whole formatting of a tracked file on every build.
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "references": [],
   "compilerOptions": {
+    "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
     "jsx": "preserve",
     "allowJs": true,
     "noEmit": true,

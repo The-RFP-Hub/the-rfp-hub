@@ -167,6 +167,18 @@ run("/v1/opportunities filters, sort & pagination", () => {
     expect((await query("category=Gaming")).ids).toEqual(new Set(["ftest:b"]));
   });
 
+  it("category filter matches regardless of case", async () => {
+    // Free text in the Standard: the corpus holds whatever casing a publisher typed.
+    const canonical = await query("category=DeFi");
+    expect(canonical.ids).toEqual(new Set(["ftest:a"]));
+    expect((await query("category=defi")).ids).toEqual(canonical.ids);
+    expect((await query("category=DEFI")).ids).toEqual(canonical.ids);
+    expect((await query("category=dEfI")).ids).toEqual(canonical.ids);
+
+    // …and it is still a whole-value match, not a substring: nothing else leaks in.
+    expect((await query("category=def")).ids).toEqual(new Set());
+  });
+
   it("organization filter matches operating AND sponsoring orgs, in any position", async () => {
     // ftest:a operates under org-a; ftest:c lists Org A as its SECOND sponsor — both must match.
     expect((await query("organization=org-a")).ids).toEqual(new Set(["ftest:a", "ftest:c"]));

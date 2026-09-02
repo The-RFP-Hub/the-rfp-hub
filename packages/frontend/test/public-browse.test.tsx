@@ -240,6 +240,12 @@ describe("the public directory list", () => {
       ["directory-type", "Funding type"],
       ["directory-status", "Status"],
       ["directory-order", "Order by"],
+      ["directory-category", "Category"],
+      ["directory-organization", "Organization"],
+      ["directory-min-award", "Min award/budget"],
+      ["directory-max-award", "Max award/budget"],
+      ["directory-deadline-after", "Next fixed deadline after"],
+      ["directory-deadline-before", "Next fixed deadline before"],
     ] as const) {
       expect(screen.getByLabelText(name).getAttribute("id")).toBe(id);
       expect(container.querySelector(`label[for="${id}"] svg[aria-hidden="true"]`)).toBeTruthy();
@@ -366,6 +372,65 @@ describe("the public directory list", () => {
     expect(invitation.getAttribute("href")).toBe("/how-it-works");
   });
 
+  it("explains an inverted range instead of the generic 'nothing matches'", async () => {
+    const empty: PaginatedOpportunities = {
+      items: [],
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 1,
+    };
+    navigation.params = new URLSearchParams("minAward=100&maxAward=1");
+    const { client } = stub({ list: async () => empty });
+    mount(client, <DirectoryList />);
+
+    expect(await screen.findByText(/Your minimum award is above your maximum/)).toBeTruthy();
+    expect(
+      screen.queryByText(/Funding type and status match exactly/),
+      "the generic explanation must give way to the specific one",
+    ).toBeNull();
+  });
+
+  it("titles a past-the-end page for the page, not for the filters", async () => {
+    const empty: PaginatedOpportunities = {
+      items: [],
+      page: 9,
+      limit: 20,
+      total: 2,
+      totalPages: 1,
+    };
+    navigation.params = new URLSearchParams("q=zk&page=9");
+    const { client } = stub({ list: async () => empty });
+    const filtered = mount(client, <DirectoryList />);
+    expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
+    expect(screen.queryByText("Nothing matches those filters.")).toBeNull();
+    filtered.unmount();
+
+    // Unfiltered, the old title was "Nothing published yet." — equally wrong about page 9.
+    navigation.params = new URLSearchParams("status=any&page=9");
+    mount(client, <DirectoryList />);
+    expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
+    expect(screen.queryByText("Nothing published yet.")).toBeNull();
+  });
+
+  it("offers a way back from a page past the end that keeps the filters", async () => {
+    const empty: PaginatedOpportunities = {
+      items: [],
+      page: 9,
+      limit: 20,
+      total: 2,
+      totalPages: 1,
+    };
+    navigation.params = new URLSearchParams("q=zk&page=9");
+    const { client } = stub({ list: async () => empty });
+    mount(client, <DirectoryList />);
+
+    expect(await screen.findByText(/Page 9 is past the end/)).toBeTruthy();
+    // "Clear the filters" would also throw away the search that produced the result.
+    const back = screen.getByRole("link", { name: "Back to page 1" });
+    expect(back.getAttribute("href")).toBe("/?q=zk");
+  });
+
   it("shows the API's own failure rather than an empty table", async () => {
     const { client } = stub({
       list: async () => {
@@ -379,8 +444,66 @@ describe("the public directory list", () => {
     mount(client, <DirectoryList />);
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    expect(screen.getByText(/must NOT have additional properties/)).toBeTruthy();
+    // The message appears twice on purpose: up front, and inside the closed technical details.
+    expect(screen.getAllByText(/must NOT have additional properties/).length).toBeGreaterThan(0);
     expect(screen.getByText(/validation_failed/)).toBeTruthy();
+  });
+
+  it("names the bad parameter on a 400 from a filter, rather than a generic failure", async () => {
+    // Exactly what ajv's `instancePath` produces for a bad type on one of the new filters.
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(400, "bad_request", "querystring/minAward must be number");
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByText("These filters aren’t valid.")).toBeTruthy();
+    expect(screen.getAllByText("querystring/minAward must be number").length).toBeGreaterThan(0);
+    // A clear way out, not just a "try again" that would fail identically.
+    expect(screen.getByRole("link", { name: "Clear the filters" })).toBeTruthy();
+  });
+
+  it("lists structured issues on a 400 that carries them", async () => {
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(400, "validation_failed", "the querystring failed validation", {
+          issues: [{ path: "/deadlineAfter", message: 'must match format "date-time"' }],
+        });
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByText("/deadlineAfter", { selector: "code" })).toBeTruthy();
+    expect(screen.getByText(/must match format/)).toBeTruthy();
+  });
+
+  it("backs off rather than offering a retry when the API says too many requests", async () => {
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(429, "rate_limited", "Too many requests.", undefined, 12);
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.getByText(/Wait about 12 seconds/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("does NOT use the filter-specific 400 panel for a non-400 failure", async () => {
+    const { client } = stub({
+      list: async () => {
+        throw new ApiError(500, "internal_error", "internal server error");
+      },
+    });
+    mount(client, <DirectoryList />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(screen.queryByText("These filters aren’t valid.")).toBeNull();
+    expect(screen.getByText(/We couldn.t load the directory/)).toBeTruthy();
   });
 });
 
@@ -464,6 +587,137 @@ describe("the directory's filters", () => {
     const href = String(navigation.push.mock.calls[0]?.[0]);
     expect(href).toContain("q=retrieval");
     expect(href).toContain("type=bounty");
+  });
+
+  it("exposes the newer filters — category, organization, award range and deadline range", async () => {
+    navigation.params = new URLSearchParams(
+      "category=infrastructure&organization=acme&minAward=5000&maxAward=50000&deadlineAfter=2026-09-01&deadlineBefore=2026-12-31",
+    );
+    const { client, list } = stub();
+    mount(client, <DirectoryList />);
+
+    await screen.findByText("Acme Foundation");
+    expect(list.mock.calls[0]?.[0]).toMatchObject({
+      category: "infrastructure",
+      organization: "acme",
+      minAward: 5000,
+      maxAward: 50000,
+      deadlineAfter: "2026-09-01T00:00:00.000Z",
+      deadlineBefore: "2026-12-31T23:59:59.999Z",
+    });
+    expect((screen.getByLabelText("Category") as HTMLInputElement).value).toBe("infrastructure");
+    expect((screen.getByLabelText("Organization") as HTMLInputElement).value).toBe("acme");
+    expect((screen.getByLabelText("Min award/budget") as HTMLInputElement).value).toBe("5000");
+    expect((screen.getByLabelText("Max award/budget") as HTMLInputElement).value).toBe("50000");
+    expect((screen.getByLabelText("Next fixed deadline after") as HTMLInputElement).value).toBe(
+      "2026-09-01",
+    );
+    expect((screen.getByLabelText("Next fixed deadline before") as HTMLInputElement).value).toBe(
+      "2026-12-31",
+    );
+  });
+
+  it("accepts a fractional award threshold on a touch keyboard's decimal mode", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const min = screen.getByLabelText("Min award/budget") as HTMLInputElement;
+    const max = screen.getByLabelText("Max award/budget") as HTMLInputElement;
+    // `step="any"` lets the browser accept a non-integer; `inputMode` puts a decimal key on a phone.
+    expect(min.step).toBe("any");
+    expect(min.inputMode).toBe("decimal");
+    expect(max.step).toBe("any");
+    expect(max.inputMode).toBe("decimal");
+  });
+
+  it("shows a full-instant deadline as its day, not as a blank control", async () => {
+    // A native date input renders blank for a full instant, making an ACTIVE filter look like none.
+    navigation.params = new URLSearchParams("deadlineAfter=2026-09-01T15:30:00.000Z");
+    const { client, list } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect((screen.getByLabelText("Next fixed deadline after") as HTMLInputElement).value).toBe(
+      "2026-09-01",
+    );
+    // Nested inside the span `UntrustedText` renders, so the `<code>` wrapper is asserted apart.
+    const retained = screen.getByText("2026-09-01T15:30:00.000Z");
+    expect(retained).toBeTruthy();
+    const code = retained.closest("code");
+    expect(code, "the retained value must sit inside a <code> element").toBeTruthy();
+    expect(code?.className).toContain("wrap-anywhere");
+    expect(list.mock.calls[0]?.[0]).toMatchObject({ deadlineAfter: "2026-09-01T15:30:00.000Z" });
+  });
+
+  it("bounds and wraps an absurdly long retained URL value instead of letting it blow out the layout", async () => {
+    // The component half of `truncateForDisplay`: what actually reaches the DOM, and the class
+    // that lets whatever survives truncation wrap instead of forcing the page wider.
+    const huge = `2026-09-01T15:30:00.000Z${"x".repeat(500)}`;
+    navigation.params = new URLSearchParams({ deadlineAfter: huge });
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const hint = screen.getByText(/Filtering on the exact value from the link/).closest("p");
+    const code = hint?.querySelector("code");
+    expect(code).toBeTruthy();
+    expect(code?.textContent?.length ?? 0).toBeLessThan(huge.length);
+    expect(code?.textContent).toContain("…");
+    expect(code?.textContent?.startsWith("2026-09-01T15:30:00.000Z")).toBe(true);
+    expect(code?.className).toContain("wrap-anywhere");
+  });
+
+  it("resubmits the exact retained instant, not the day the picker displays", async () => {
+    navigation.params = new URLSearchParams("deadlineBefore=2026-09-02T09:15:00.000Z");
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    // Touch nothing about the deadline field; submit via a different control.
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "grants" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    const href = String(navigation.push.mock.calls[0]?.[0]);
+    const applied = new URLSearchParams(href.slice(href.indexOf("?")));
+    expect(applied.get("deadlineBefore")).toBe("2026-09-02T09:15:00.000Z");
+  });
+
+  it("keeps an unparseable award visible and on the wire instead of dropping it in silence", async () => {
+    // The control renders blank for this while the URL still advertises the filter; dropping it
+    // left a reader looking at unfiltered results with nothing on screen saying why.
+    navigation.params = new URLSearchParams("minAward=abc");
+    const { client, list } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect((screen.getByLabelText("Min award/budget") as HTMLInputElement).value).toBe("");
+    const retained = screen.getByText("abc");
+    expect(retained.closest("code")?.className).toContain("wrap-anywhere");
+    expect(list.mock.calls[0]?.[0]).toMatchObject({ minAward: "abc" });
+  });
+
+  it("tells the reader the organization filter matches either side of the listing", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    expect(screen.getByText(/Matches the operating OR the sponsoring organization/)).toBeTruthy();
+  });
+
+  it("carries the newer filters on submit, same as every other control", async () => {
+    const { client } = stub();
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    fireEvent.change(screen.getByLabelText("Organization"), { target: { value: "acme" } });
+    fireEvent.change(screen.getByLabelText("Min award/budget"), { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    const href = String(navigation.push.mock.calls[0]?.[0]);
+    const applied = new URLSearchParams(href.slice(href.indexOf("?")));
+    expect(applied.get("organization")).toBe("acme");
+    expect(applied.get("minAward")).toBe("1000");
   });
 
   it("makes 'include closed and upcoming' a real address rather than a hidden toggle", async () => {

@@ -22,6 +22,8 @@
  * `.trim()` call on whatever the caller sent.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { submissionsController } from "./submissions.controller.js";
 
 /** 256 KiB. A Standard document is a few kilobytes; this is the ceiling, not the expectation. */
@@ -43,6 +45,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
       403: { $ref: "ErrorResponse#" },
       409: { $ref: "ErrorResponse#" },
       413: { $ref: "ErrorResponse#" },
+      429: RATE_LIMITED,
     },
   };
 
@@ -51,8 +54,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
     {
       prefixTrailingSlash: "no-slash",
       bodyLimit: SUBMISSION_BODY_LIMIT,
-      onRequest: router.auth.requireAuth,
-      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireAuth, { max: 60, timeWindow: "1 minute" }),
       validatorCompiler: passThroughValidator,
       schema: {
         operationId: "createOpportunity",
@@ -71,8 +73,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
     "/:id",
     {
       bodyLimit: SUBMISSION_BODY_LIMIT,
-      onRequest: router.auth.requireAuth,
-      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireAuth, { max: 60, timeWindow: "1 minute" }),
       validatorCompiler: passThroughValidator,
       schema: {
         operationId: "replaceOpportunity",
@@ -91,8 +92,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/:id/claim",
     {
-      onRequest: router.auth.requireAuth,
-      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireAuth, { max: 60, timeWindow: "1 minute" }),
       schema: {
         operationId: "claimOpportunity",
         tags: ["submissions"],
@@ -111,6 +111,7 @@ export const submissions = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ClaimResult#" },
           202: { $ref: "ClaimResult#" },
           400: { $ref: "ErrorResponse#" },

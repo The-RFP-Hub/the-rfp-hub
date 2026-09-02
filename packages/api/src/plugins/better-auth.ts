@@ -35,6 +35,7 @@ import type { FastifyCorsOptions } from "@fastify/cors";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Auth } from "../auth/better-auth.js";
 import { type AuthConfig, isAllowedOrigin } from "../auth/better-auth.js";
+import { RATE_LIMIT_HEADERS } from "../modules/routes/shared/rate-limit-key.js";
 import { deliversEmail } from "../modules/services/email/email-transport.js";
 import { HttpError, badRequest, unauthorized } from "../modules/shared/http-error.js";
 
@@ -83,8 +84,9 @@ export function authCorsOptions(config: AuthConfig): FastifyCorsOptions {
     credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    // The whole point of the split policy: this is the header the client reads its session out of.
-    exposedHeaders: ["set-auth-token"],
+    // `set-auth-token` is the point of the split policy — the header a client reads its session
+    // out of. The rate-limit four are here because this mount has the tighter ceilings.
+    exposedHeaders: ["set-auth-token", ...RATE_LIMIT_HEADERS],
     maxAge: 600,
   };
 }

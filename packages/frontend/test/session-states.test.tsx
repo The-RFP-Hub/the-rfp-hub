@@ -299,7 +299,7 @@ describe("organization navigation", () => {
     expect(screen.getByRole("main").getAttribute("tabindex")).toBe("-1");
   });
 
-  it("keeps all ten admin destinations in three semantic groups with a long organization name", async () => {
+  it("keeps all eleven admin destinations in three semantic groups with a long organization name", async () => {
     const longName = "AnExtraordinarilyLongPublisherOrganizationNameWithoutConvenientBreaks";
     const admin: Me = {
       ...me,
@@ -320,7 +320,7 @@ describe("organization navigation", () => {
     const navigation = await screen.findByRole("navigation", { name: "Sections" });
     expect(navigation.querySelectorAll(":scope > ul")).toHaveLength(3);
     expect(within(navigation).getAllByRole("list")).toHaveLength(3);
-    expect(within(navigation).getAllByRole("link")).toHaveLength(10);
+    expect(within(navigation).getAllByRole("link")).toHaveLength(11);
     expect(within(navigation).getByRole("link", { name: longName })).toBeTruthy();
   });
 });
