@@ -100,6 +100,11 @@ export interface DirectorySelection {
   ecosystem: string;
   ordering: Ordering;
   page: number;
+  /**
+   * Organization slug — matches any operating OR sponsoring organization on the endpoint. Read-only
+   * here (no control yet): `/publishers` links to `/?organization=<slug>`, so it must round-trip.
+   */
+  organization?: string;
 }
 
 /**
@@ -148,6 +153,7 @@ export function directoryQuery(
     fundingType: filled(selection.fundingType),
     status: filled(selection.status),
     ecosystem: filled(selection.ecosystem),
+    organization: filled(selection.organization ?? ""),
     sort,
     order: order === "desc" ? "desc" : "asc",
     page: selection.page,
@@ -161,7 +167,8 @@ export function isFiltered(selection: DirectorySelection): boolean {
     filled(selection.q) !== undefined ||
     filled(selection.fundingType) !== undefined ||
     filled(selection.status) !== undefined ||
-    filled(selection.ecosystem) !== undefined
+    filled(selection.ecosystem) !== undefined ||
+    filled(selection.organization ?? "") !== undefined
   );
 }
 
@@ -212,6 +219,7 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
     ecosystem: get("ecosystem"),
     ordering: ORDERING_VALUES.has(ordering) ? (ordering as Ordering) : DEFAULT_SELECTION.ordering,
     page: safePage,
+    organization: get("organization") || undefined,
   };
 }
 
@@ -225,6 +233,8 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
   if (q) params.set("q", q);
   const ecosystem = filled(selection.ecosystem);
   if (ecosystem) params.set("ecosystem", ecosystem);
+  const organization = filled(selection.organization ?? "");
+  if (organization) params.set("organization", organization);
   if (selection.fundingType) params.set("type", selection.fundingType);
   if (selection.status !== DEFAULT_SELECTION.status) {
     params.set("status", selection.status === "" ? ANY_STATUS : selection.status);
