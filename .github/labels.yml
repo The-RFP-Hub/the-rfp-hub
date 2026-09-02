@@ -20,10 +20,10 @@
 # rather than getting a dedicated label of its own.
 - name: documentation
   color: 0075ca
-  description: "Erratum: typo, broken link, unclear sentence, stale number. Changes nothing that validates. (GitHub default label.)"
+  description: "Erratum in an informative document: typo, broken link, stale number. Changes nothing that validates."
 - name: bug
   color: d73a4a
-  description: "Erratum: normative artifacts disagree, or a description says something the schema does not do. (GitHub default label.)"
+  description: "Erratum in the normative artifacts: they disagree, or a description contradicts the schema."
 - name: status:next-version
   color: fbca04
   description: "Real defect whose fix would change what validates. Parked until the next spec version opens."
