@@ -321,6 +321,7 @@ describe("closed response components vs their producers", () => {
       "PaginatedOpportunities",
       "Publisher",
       "PublisherList",
+      "RateLimitedResponse",
       "ReviewDecision",
       "Stats",
       "SubmissionResult",
@@ -737,6 +738,10 @@ describe("M3 closed components vs their view types", () => {
     MergedOpportunityErrorResponse: {
       error: "opportunity_merged",
       mergedInto: { id: "example-org:survivor", title: "The survivor" },
+    },
+    RateLimitedResponse: {
+      error: "rate_limited",
+      message: "Rate limit exceeded, retry in 60 seconds",
     },
     // Not a view type: the error body is assembled by `HttpError.toBody()`.
     ValidationErrorResponse: {

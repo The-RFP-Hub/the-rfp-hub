@@ -18,8 +18,19 @@
  * A PRESENTED-BUT-INVALID credential is always a 401, including on the optional gate. Ignoring one
  * and serving the anonymous view would mean a caller with an expired token silently sees less than
  * they asked for, and never learns why.
+ *
+ * RESOLVING IS SPLIT FROM REJECTING, and the split is what makes anonymous traffic meterable: a
+ * gate ANSWERS, answering ends the hook chain, and a limiter behind one therefore never saw a bad
+ * credential. `resolvePrincipal` is the same resolution with no answer — resolve, meter, gate —
+ * and its outcome is cached, so the chain still costs ONE credential verification.
  */
-import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  onRequestAsyncHookHandler,
+  preHandlerHookHandler,
+} from "fastify";
 import { type Auth, type AuthConfig, defaultAuth } from "../auth/better-auth.js";
 import { type DB, db as defaultDb } from "../db/client.js";
 import { AccountService } from "../modules/services/auth/account.service.js";
@@ -56,6 +67,8 @@ export interface AuthDecorators {
    */
   auth: Auth;
   principals: PrincipalService;
+  /** Resolve the credential and answer NOTHING — the half of a gate safe to run before a limiter. */
+  resolvePrincipal: onRequestAsyncHookHandler;
   requireAuth: preHandlerHookHandler;
   requireSession: preHandlerHookHandler;
   optionalAuth: preHandlerHookHandler;
@@ -86,6 +99,16 @@ function send(reply: FastifyReply, status: number, error: string, message: strin
   void reply.code(status).send({ error, message });
 }
 
+/** The failing arms carry the answer a gate WOULD have sent, so a later gate reproduces it
+ * exactly without verifying a second time. */
+export type PrincipalResolution =
+  | { kind: "anonymous" }
+  | { kind: "principal" }
+  /** PRESENTED AND REFUSED — a 4xx. Metered: the caller caused it. */
+  | { kind: "refused"; status: number; code: string; message: string }
+  /** Could not be CHECKED — a 5xx. Never metered: we caused it, so `meteredAuth` skips it. */
+  | { kind: "unavailable"; status: number; code: string; message: string };
+
 export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): AuthDecorators {
   const db = options.db ?? defaultDb;
   const auth = options.auth ?? defaultAuth();
@@ -100,6 +123,36 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   // Declared so `request.principal` exists on every request object rather than being added as a
   // property later, which would deoptimise the shared shape Fastify allocates per request.
   app.decorateRequest("principal", null);
+  app.decorateRequest("principalResolution", null);
+
+  async function computeResolution(request: FastifyRequest): Promise<PrincipalResolution> {
+    const token = bearerOf(request);
+    if (token === undefined) return { kind: "anonymous" };
+    try {
+      request.principal = await principals.fromBearer(token);
+      return { kind: "principal" };
+    } catch (error) {
+      if (isHttpError(error)) {
+        const kind = error.status >= 500 ? "unavailable" : "refused";
+        return { kind, status: error.status, code: error.code, message: error.message };
+      }
+      request.log.error(error);
+      return {
+        kind: "unavailable",
+        status: 500,
+        code: "internal_error",
+        message: "internal server error",
+      };
+    }
+  }
+
+  async function resolveOnce(request: FastifyRequest): Promise<PrincipalResolution> {
+    const cached = request.principalResolution;
+    if (cached) return cached;
+    const outcome = await computeResolution(request);
+    request.principalResolution = outcome;
+    return outcome;
+  }
 
   /** Resolve, or answer. Returns true when the request may continue. */
   async function resolve(
@@ -107,9 +160,12 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
     reply: FastifyReply,
     required: boolean,
   ): Promise<boolean> {
-    const token = bearerOf(request);
-    if (token === undefined) {
-      if (!required) return true;
+    const outcome = await resolveOnce(request);
+    if (outcome.kind === "refused" || outcome.kind === "unavailable") {
+      send(reply, outcome.status, outcome.code, outcome.message);
+      return false;
+    }
+    if (outcome.kind === "anonymous" && required) {
       send(
         reply,
         401,
@@ -118,19 +174,12 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
       );
       return false;
     }
-    try {
-      request.principal = await principals.fromBearer(token);
-      return true;
-    } catch (error) {
-      if (isHttpError(error)) {
-        send(reply, error.status, error.code, error.message);
-        return false;
-      }
-      request.log.error(error);
-      send(reply, 500, "internal_error", "internal server error");
-      return false;
-    }
+    return true;
   }
+
+  const resolvePrincipal: onRequestAsyncHookHandler = async (request) => {
+    await resolveOnce(request);
+  };
 
   const requireAuth: preHandlerHookHandler = async (request, reply) => {
     await resolve(request, reply, true);
@@ -153,7 +202,8 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   };
 
   const requireScope = (scope: ApiKeyScope): preHandlerHookHandler => {
-    return async (request, reply) => {
+    // Named: route-inventory.test.ts reads hook names out of `printRoutes`.
+    return async function scopeGate(request, reply) {
       if (!(await resolve(request, reply, true))) return;
       const principal = request.principal;
       if (!principal) return;
@@ -167,7 +217,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   };
 
   const requireRole = (role: Exclude<AccountRole, "submitter">): preHandlerHookHandler => {
-    return async (request, reply) => {
+    return async function roleGate(request, reply) {
       if (!(await resolve(request, reply, true))) return;
       const principal = request.principal;
       if (!principal) return;
@@ -190,6 +240,7 @@ export function registerAuth(app: FastifyInstance, options: AuthOptions = {}): A
   const decorators: AuthDecorators = {
     auth,
     principals,
+    resolvePrincipal,
     requireAuth,
     requireSession,
     optionalAuth,

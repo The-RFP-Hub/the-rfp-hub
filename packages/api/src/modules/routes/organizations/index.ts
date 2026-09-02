@@ -15,15 +15,19 @@
  * requires a written reason — see the route's description for why that is the counterweight.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { organizationMetadataSchema } from "../review/index.js";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { organizationsController } from "./organizations.controller.js";
 
 export const organizations = async (router: FastifyInstance): Promise<void> => {
   router.patch(
     "/:slug",
     {
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 20,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "updateOwnOrganization",
         tags: ["publishers"],
@@ -32,6 +36,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
         params: { type: "object", required: ["slug"], properties: { slug: { type: "string" } } },
         body: organizationMetadataSchema,
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "OrganizationSummary#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },
@@ -83,8 +88,10 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
       // SESSION ONLY. Approving publishes unreviewed content to the world, which is exactly the
       // power a leaked key must never hold — the same rule that keeps `publish` off a session's
       // behalf and out of `canManageKeys`.
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 30,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "approveOrganizationOpportunity",
         tags: ["publishers"],
@@ -98,6 +105,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
           properties: { slug: { type: "string" }, id: { type: "string" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           401: { $ref: "ErrorResponse#" },
           403: { $ref: "ErrorResponse#" },
@@ -112,8 +120,10 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/:slug/opportunities/:id/reject",
     {
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 30,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "rejectOrganizationOpportunity",
         tags: ["publishers"],
@@ -133,6 +143,7 @@ export const organizations = async (router: FastifyInstance): Promise<void> => {
           properties: { reason: { type: "string", minLength: 1 } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "ReviewDecision#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },

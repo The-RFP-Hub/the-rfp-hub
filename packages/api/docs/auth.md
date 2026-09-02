@@ -309,6 +309,131 @@ anonymous view to somebody whose token expired tells them nothing and shows them
 | `POST /v1/admin/opportunities/:id/verify` | T4, **session** | the same action as the review route, kept for bulk/scripted runs |
 | `POST /v1/admin/jobs/:job/run` | T4, **session** | a convenience only — the schedule starts jobs as container tasks ([`jobs.md`](./jobs.md)) |
 
+### Rate limits
+
+**Keyed per credential-holder, not per address.** A metered route counts against
+`acct:<accountId>` whenever the request proved an account, and falls back to `ip:<address>` only
+when it proved nothing. Two people behind one office egress are two budgets; one account calling
+from a laptop and from CI is one budget. Nothing is stored: the key lives in an in-memory counter
+that expires with its window and never reaches a row, a log line or an analytics event.
+
+**The two namespaces are disjoint, and that is a security property.** With `TRUST_PROXY` set,
+`request.ip` is a token out of `X-Forwarded-For` — text a caller who can reach the proxy chooses.
+`acct:` and `ip:` therefore cannot collide, and an address that is not a valid address never
+becomes a key: it goes to one fixed `ip:invalid` bucket rather than being used verbatim.
+
+**The address fallback is canonicalized before it is used** (`modules/routes/shared/rate-limit-key.ts`):
+
+| Form | Bucket |
+|---|---|
+| IPv4 `203.0.113.9` | `ip:203.0.113.9` — unchanged |
+| IPv6 `2001:db8:1:1::9` | `ip:2001:db8:1:1::/64` — grouped |
+| IPv4-mapped `::ffff:203.0.113.9`, IPv4-compatible `::203.0.113.9` | `ip:203.0.113.9` — folded to the address they embed |
+| Port-bearing `203.0.113.9:4000`, `[2001:db8::1]:4000` | the port is stripped |
+| Scope id `fe80::1%eth0` | the scope is dropped |
+| Anything else — empty, whitespace, a header value, `acct:1` | `ip:invalid` |
+
+The /64 grouping is the load-bearing one: the smallest allocation an IPv6 customer receives is a
+/64, so a key on the full address hands a fresh bucket to anyone willing to increment the host bits
+— no limit at all for the caller best equipped to abuse it. The two embedded-IPv4 folds are the
+opposite failure: both forms are zero where the /64 lives, so without them every mapped caller —
+which is every v4 client of a dual-stack listener — would share one bucket. Stripping the port
+matters for the same reason as the /64: a source port changes on every connection.
+
+**An invalid credential is metered by address, and is refused for being over the limit before it is
+refused for being invalid.** Resolving the credential is split from rejecting it
+(`plugins/auth.ts`): a route runs `resolvePrincipal` → limiter → gate, so a caller hammering
+`POST /v1/opportunities` with a junk Bearer sees `401` for the whole budget and `429` once it is
+spent. Before the split the gate answered inside the same `onRequest` chain and ended it, so the
+limiter never ran and anonymous write traffic was unlimited.
+
+**An auth-store outage is not metered; any other response is.** `resolvePrincipal` replies to
+nothing at all — it resolves the credential and records the outcome. When that outcome is "could
+not be CHECKED" (a `503 auth_unavailable` from the session lookup, a `500` from a broken key
+lookup) the limiter skips the increment and emits no rate headers, and the gate behind it sends the
+preserved status and code. An outage therefore never spends the caller's budget and is never
+replaced by a `429`, even from an address whose bucket is already empty.
+
+That exemption is the only one. **Every other response counts, including a `5xx` produced after
+the limiter has run** — a handler, a service, a serializer or a later hook that fails has already
+incremented the bucket, so a run of server failures can eventually be answered with `429`. A refund
+for post-limiter failures needs a store that can atomically decrement the same route/key/window and
+is not built; the honest statement is the one above, not "5xx is never metered".
+
+**Every authenticated `/v1` mutation is metered.** Not a chosen subset: an unmetered write route
+is indistinguishable from a deliberately public one, so the rule is the whole surface and
+`test/integration/route-inventory.test.ts` reads the router back and fails on any exception.
+
+| Metered surface | Ceiling | Why that number |
+|---|---|---|
+| `POST`/`PUT /v1/opportunities`, `POST /v1/opportunities/:id/claim` | 60/min | a publisher's own bulk sync is the fastest legitimate caller here |
+| `POST /v1/me/notifications/read-all`, `POST /v1/me/notifications/:id/read` | 60/min | clearing an inbox is one call per row, so it is bursty |
+| Every `/v1/review` write (17 routes), `DELETE /v1/keys/:id`, the two organization decisions | 30/min | a review decision is human-paced: read the entry, click once |
+| `POST /v1/admin/opportunities/:id/verify` | 30/min | the same outbound fetch as the reviewer's verify |
+| `PATCH /v1/me`, `PATCH /v1/organizations/:slug`, `POST /v1/admin/accounts/:id/{role,direct-create}` | 20/min | a deliberate, one-at-a-time act |
+| `POST /v1/keys` | 10/min | minting a credential |
+| `POST /v1/admin/jobs/:job/run` | 10/min | each call starts real work under an advisory lock |
+| `GET /v1/r/:id/{apply,source}` | 120/min | **address-keyed** — a link-out accepts no credential, so there is no account to meter |
+
+Each route holds its OWN bucket: the ceilings are per route per credential-holder, not one budget
+across a surface.
+
+Two documented exceptions, and only two. The **Better Auth mount** (`/api/auth/*`) is where a
+credential is minted, so there is nothing for the resolver to resolve; it keeps its own
+address-keyed pair of ceilings (10/min for the four mail-sending routes, 120/min for the rest). The
+**two redirects** are anonymous by construction, as above.
+
+The public read surface — the list, the detail, the feeds, the export — is deliberately **uncapped**
+(`global: false` in `app.ts`); it is the traffic this project exists to serve, and an address-keyed
+cap on it would be one number for a whole organization.
+
+A `429` answers with the same stable body everywhere — the metered writes, the two redirects and
+the auth mount all take it from one `errorResponseBuilder` on the plugin registration:
+
+```json
+{ "error": "rate_limited", "message": "Rate limit exceeded, retry in 60 seconds" }
+```
+
+`error` is what a client branches on. The default body would have arrived as the generic
+`client_error`, which an integrator cannot tell from a validation failure — and backing off is the
+one `4xx` with a correct automatic response. Obey `retry-after` rather than parsing the message.
+
+The response carries `retry-after` as a whole number of seconds, plus
+`x-ratelimit-limit`/`-remaining`/`-reset`; the last three appear on a metered response below the
+ceiling too. **All four are on `Access-Control-Expose-Headers` in both CORS policies**, or a
+cross-origin page could receive a `429` and read nothing off it. An `OPTIONS` preflight is not
+metered: it is the browser asking permission, not the caller acting. A `HEAD` is served off the
+`GET` route and is metered on its own bucket at the same ceiling; it records no view and no
+link-out click, because it returns no body and nobody left for anywhere.
+
+**Operational facts a limit is meaningless without:**
+
+- **The ceilings are per PROCESS.** The store is this process's memory, so with *N* tasks behind a
+  load balancer every number above is multiplied by *N* — "60/min per account" across 3 tasks is
+  180/min in practice — and every bucket resets when a task restarts or is replaced. A shared store
+  (Redis) would fix both and is not built. Size the numbers, and any statement made to an
+  integrator, against the task count actually running (see [`deploy.md`](./deploy.md)).
+- **Each bucket store holds 5,000 keys.** `@fastify/rate-limit`'s in-memory store is an LRU with a
+  default bound of 5,000, and every route gets its own. That bound is part of the effective limit:
+  past 5,000 distinct keys on one route inside one window, the least recently used entry is
+  evicted and whoever it belonged to starts again from zero. Reaching it needs 5,000 distinct
+  accounts or /64s on a single route in a single minute, which is far above this deployment's
+  traffic — but it is why the address key is grouped and namespaced rather than left free-form:
+  a key an attacker can mint per request is also a key that evicts everybody else's.
+- **`TRUST_PROXY` decides whether the address half works at all.** `request.ip` is the socket peer
+  unless it is set, so behind a load balancer *every* anonymous caller shares one bucket — a
+  self-inflicted denial of service that looks like a working rate limit. It is **not a boolean**
+  (`true` is rejected at boot): use a hop count (`1`) or a comma-separated list of proxy
+  addresses/CIDRs. See `config.ts` (`readTrustProxy`) and the config table in
+  [`../README.md`](../README.md).
+- **Which hop a hop count selects.** `TRUST_PROXY=1` trusts one proxy, so Fastify takes the
+  RIGHTMOST `X-Forwarded-For` entry — the address that proxy saw. With
+  `X-Forwarded-For: 198.51.100.1, 192.0.2.2` from a socket peer of `10.0.0.5`, `request.ip` is
+  `192.0.2.2`; `198.51.100.1` is whatever the client claimed and is ignored. **Set the count to
+  the number of proxies actually in front of this process.** Too low and the bucket is a proxy's
+  address (one bucket for everyone behind it); too high and it is a client-chosen string, which
+  the canonicalization then sends to `ip:invalid` — one shared bucket again, and a noisy one.
+
 ---
 
 ## 6. What the server owns on a write
