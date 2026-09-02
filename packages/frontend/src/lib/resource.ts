@@ -35,6 +35,12 @@ export type Resource<T> =
   | { status: "ready"; data: T; stale: boolean }
   | { status: "error"; error: ApiError };
 
+/**
+ * A loading state has no end of its own: an API that accepts the connection and never answers
+ * leaves the page spinning until the reader closes the tab.
+ */
+export const RESOURCE_TIMEOUT_MS = 30_000;
+
 export interface ResourceHandle<T> {
   state: Resource<T>;
   /** Re-run the loader — after a mutation, or from a "try again" button on the error state. */
@@ -51,9 +57,10 @@ export interface ResourceHandle<T> {
  */
 export function useResource<T>(
   load: () => Promise<T>,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; timeoutMs?: number },
 ): ResourceHandle<T> {
   const enabled = options?.enabled ?? true;
+  const timeoutMs = options?.timeoutMs ?? RESOURCE_TIMEOUT_MS;
   const [state, setState] = useState<Resource<T>>({ status: "idle" });
   const [nonce, setNonce] = useState(0);
   // Guards against a resolved response from a superseded read overwriting a newer one, and against
@@ -79,7 +86,22 @@ export function useResource<T>(
     setState((current) =>
       current.status === "ready" ? { ...current, stale: true } : { status: "loading" },
     );
-    load()
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new ApiError(
+              0,
+              "timeout",
+              `The API did not answer within ${Math.round(timeoutMs / 1000)} seconds.`,
+            ),
+          ),
+        timeoutMs,
+      );
+    });
+
+    Promise.race([load(), expired])
       .then((data) => {
         if (generation.current === mine) setState({ status: "ready", data, stale: false });
       })
@@ -92,12 +114,14 @@ export function useResource<T>(
               ? error
               : new ApiError(0, "unexpected_error", (error as Error)?.message ?? "Unknown error"),
         });
-      });
+      })
+      .finally(() => clearTimeout(timer));
     return () => {
+      clearTimeout(timer);
       // Nothing to abort — `fetch` is left to finish — but the result is now stale by definition.
       generation.current += 1;
     };
-  }, [load, enabled, nonce]);
+  }, [load, enabled, nonce, timeoutMs]);
 
   const reload = useCallback(() => setNonce((value) => value + 1), []);
   return { state, reload };

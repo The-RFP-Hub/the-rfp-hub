@@ -10,7 +10,12 @@
  * that account has ever published.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { meController } from "./me.controller.js";
+
+/** Clearing an inbox is one call per row, so this is bursty where a decision route is not. */
+const NOTIFICATION_WRITE = { max: 60, timeWindow: "1 minute" } as const;
 
 export const me = async (router: FastifyInstance): Promise<void> => {
   router.get(
@@ -36,8 +41,10 @@ export const me = async (router: FastifyInstance): Promise<void> => {
     "/",
     {
       prefixTrailingSlash: "no-slash",
-      onRequest: router.auth.requireSession,
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      onRequest: meteredAuth(router, router.auth.requireSession, {
+        max: 20,
+        timeWindow: "1 minute",
+      }),
       schema: {
         operationId: "updateMe",
         tags: ["account"],
@@ -56,6 +63,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
           },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "Me#" },
           400: { $ref: "ErrorResponse#" },
           401: { $ref: "ErrorResponse#" },
@@ -176,13 +184,14 @@ export const me = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/notifications/read-all",
     {
-      onRequest: router.auth.requireAuth,
+      onRequest: meteredAuth(router, router.auth.requireAuth, NOTIFICATION_WRITE),
       schema: {
         operationId: "markAllMyNotificationsRead",
         tags: ["account"],
         summary: "Mark every unread notification for this account as read",
         security: [{ bearerAuth: [] }],
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "NotificationReadAll#" },
           401: { $ref: "ErrorResponse#" },
         },
@@ -194,7 +203,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/notifications/:id/read",
     {
-      onRequest: router.auth.requireAuth,
+      onRequest: meteredAuth(router, router.auth.requireAuth, NOTIFICATION_WRITE),
       schema: {
         operationId: "markMyNotificationRead",
         tags: ["account"],
@@ -206,6 +215,7 @@ export const me = async (router: FastifyInstance): Promise<void> => {
           properties: { id: { type: "string", pattern: "^[0-9]+$" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "Notification#" },
           401: { $ref: "ErrorResponse#" },
           404: { $ref: "ErrorResponse#" },

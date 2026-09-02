@@ -337,7 +337,7 @@ test.describe("M3-7 what an anonymous visitor's traffic counts", () => {
       // said neither whose page nor that the click leaves this site — and this page exists to send
       // a reader somewhere else, because the Hub takes no applications. Matched by pattern rather
       // than exactly: the label carries a trailing ↗ that says the same thing to the eye.
-      const apply = page.getByRole("link", { name: /Apply on the programme’s own site/ });
+      const apply = page.getByRole("link", { name: /Apply on the program’s own site/ });
       await expect(apply).toBeVisible();
 
       const afterRead = await pollUntil(

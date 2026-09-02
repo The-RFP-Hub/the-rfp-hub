@@ -293,7 +293,7 @@ under [the converter's README](./tools/converter/README.md).
 | `EXPORT_MIN_COUNT` | `100` | Floor below which an export writes nothing and exits non-zero (see [Open-data export](#open-data-export)). A negative or fractional value is an error, not a fallback: silently widening a guard would defeat the guard. |
 | `EXPORT_API_URL` | — | **Required by `pnpm export:api`**, ignored by everything else: the bare origin of the API to publish, e.g. `https://api.example.org`. Must be `https://` for any host that is not loopback — this value decides what gets published, so plaintext would let the network path choose the dataset. A path, query or fragment is an error rather than being trimmed off. |
 | `EXPORT_OUT_DIR` | `exports` | Where `pnpm export:api` writes its six files. Relative paths resolve against the working directory. |
-| `TRUST_PROXY` | unset | What may be believed about `X-Forwarded-For`, and therefore what `request.ip` is. **Not a boolean** — `true` is rejected at boot, because it means "believe whatever the client claims its address is", and that address is an analytics input. A hop count (`1`) or a comma-separated list of proxy addresses/CIDRs. Unset trusts nothing. |
+| `TRUST_PROXY` | unset | What may be believed about `X-Forwarded-For`, and therefore what `request.ip` is. **Not a boolean** — `true` is rejected at boot, because it means "believe whatever the client claims its address is", and that address is an analytics input. A hop count (`1`) or a comma-separated list of proxy addresses/CIDRs. Unset trusts nothing. **It is also what makes the address half of the rate limits work** — unset behind a load balancer, every anonymous caller shares one bucket; see [Rate limits](docs/auth.md#rate-limits). |
 
 ### M3 variables
 
@@ -333,7 +333,11 @@ offline tooling and documented with it, under
   is written down here and in `src/app.ts`.
 - **Rate limiting**: registered with `global: false` — no route is limited unless it opts in. A
   blanket limit would cap the public read surface this project exists to serve, and would be
-  measured per IP, which behind a shared egress is one number for a whole organization.
+  measured per IP, which behind a shared egress is one number for a whole organization. Every
+  authenticated `/v1` mutation opts in, keyed per credential-holder; an auth-store outage is not
+  metered, and any other response — including a `5xx` raised after the limiter ran — is. The
+  ceilings, the address canonicalization and the two operational caveats are in
+  [Rate limits](docs/auth.md#rate-limits).
 - **Graceful shutdown**: `SIGTERM`/`SIGINT` stop new connections, let in-flight requests finish and
   close the pg pool (a Fastify `onClose` hook) before exiting 0. A 10s forced-exit timeout means a
   hung close can never leave an un-killable process.
@@ -832,7 +836,7 @@ Run the DB-gated suites against the **throwaway** test database in
 ```bash
 docker compose -f docker-compose.test.yml up -d
 DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run migrate
-DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub npx vitest run test/integration
+DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run test:integration
 docker compose -f docker-compose.test.yml down
 ```
 

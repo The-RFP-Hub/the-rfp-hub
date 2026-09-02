@@ -9,8 +9,17 @@
  * deployment's own credentials, never through a public endpoint.
  */
 import type { FastifyInstance } from "fastify";
+import { RATE_LIMITED } from "../../../openapi/schemas.js";
 import { JOB_NAMES } from "../../services/jobs/registry.js";
+import { meteredAuth } from "../shared/rate-limit-key.js";
 import { adminController } from "./admin.controller.js";
+
+/** Granting a role or a direct-create flag is a deliberate, one-at-a-time act. */
+const ADMIN_GRANT = { max: 20, timeWindow: "1 minute" } as const;
+/** Matches the reviewer verify ceiling: the same outbound fetch, on the administrator prefix. */
+const ADMIN_VERIFY = { max: 30, timeWindow: "1 minute" } as const;
+/** Each call starts real work under an advisory lock; a dashboard button needs nothing more. */
+const JOB_RUN = { max: 10, timeWindow: "1 minute" } as const;
 
 export const admin = async (router: FastifyInstance): Promise<void> => {
   const guard = router.auth.requireRole("admin");
@@ -29,7 +38,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/accounts/:id/role",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, ADMIN_GRANT),
       schema: {
         operationId: "assignAccountRole",
         tags: ["admin"],
@@ -45,6 +54,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           properties: { role: { type: "string", enum: ["submitter", "reviewer", "admin"] } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "AccountSummary#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -57,7 +67,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/accounts/:id/direct-create",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, ADMIN_GRANT),
       schema: {
         operationId: "setAccountDirectCreate",
         tags: ["admin"],
@@ -73,6 +83,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           properties: { directCreate: { type: "boolean" } },
         },
         response: {
+          429: RATE_LIMITED,
           200: { $ref: "AccountSummary#" },
           409: { $ref: "ErrorResponse#" },
           ...errors,
@@ -85,7 +96,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/opportunities/:id/verify",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, ADMIN_VERIFY),
       schema: {
         operationId: "adminVerifyOpportunitySource",
         tags: ["admin"],
@@ -94,7 +105,11 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
           "The same action `/v1/review/opportunities/{id}/verify` performs, on the administrator prefix — kept for bulk and scripted runs over many entries. Triggering a single verification is a REVIEWER capability, and the review route is where an interactive reviewer does it.",
         security: [{ bearerAuth: [] }],
         params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
-        response: { 200: { $ref: "VerificationRun#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "VerificationRun#" },
+          ...errors,
+        },
       },
     },
     adminController.verifySource,
@@ -103,7 +118,7 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
   router.post(
     "/jobs/:job/run",
     {
-      onRequest: guard,
+      onRequest: meteredAuth(router, guard, JOB_RUN),
       schema: {
         operationId: "runMaintenanceJob",
         tags: ["admin"],
@@ -128,7 +143,11 @@ export const admin = async (router: FastifyInstance): Promise<void> => {
             },
           },
         },
-        response: { 200: { $ref: "JobRunResult#" }, ...errors },
+        response: {
+          429: RATE_LIMITED,
+          200: { $ref: "JobRunResult#" },
+          ...errors,
+        },
       },
     },
     adminController.runJob,
