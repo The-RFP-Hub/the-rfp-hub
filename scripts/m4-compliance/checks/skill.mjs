@@ -16,7 +16,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
-import { request } from "../../m2-compliance/http.mjs";
+import { requestPublished } from "../retry.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -109,7 +109,7 @@ export async function checkSkill(report, ctx) {
     let fetchedAll = true;
     for (const relPath of PUBLISHED_FILES) {
       const url = `${rawBase(ctx)}/${relPath}`;
-      const res = await request(url, { timeoutMs: ctx.timeoutMs, follow: true });
+      const res = await requestPublished(url, { timeoutMs: ctx.timeoutMs, follow: true });
       if (!res.ok || res.status !== 200) {
         fetchedAll = false;
         c.fail(

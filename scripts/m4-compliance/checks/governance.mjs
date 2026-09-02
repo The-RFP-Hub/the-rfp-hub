@@ -13,8 +13,8 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { mapLimit, request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
+import { requestPublished } from "../retry.mjs";
 
 /** The four governance documents, per §3.1 of the M4 plan. Paths are repo-root relative. */
 export const GOVERNANCE_DOCS = [
@@ -104,11 +104,13 @@ export async function checkGovernance(report, ctx) {
     }
   }
 
-  const ghResults = await mapLimit(present, ctx.concurrency, async (doc) => ({
-    doc,
-    res: await request(doc.href.split("#")[0], { timeoutMs: ctx.timeoutMs, follow: true }),
-  }));
-  for (const { doc, res } of ghResults) {
+  // SERIALIZED, not `mapLimit`: four concurrent requests are exactly the burst GitHub answers
+  // with a 502, and a gateway error here is not evidence that a document is unpublished.
+  for (const doc of present) {
+    const res = await requestPublished(doc.href.split("#")[0], {
+      timeoutMs: ctx.timeoutMs,
+      follow: true,
+    });
     c.expect(
       res.ok && res.status === 200,
       `${doc.href.split("#")[0]} responds 200`,

@@ -14,7 +14,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as nodePath from "node:path";
-import { mapLimit, request } from "../../m2-compliance/http.mjs";
+import { mapLimit } from "../../m2-compliance/http.mjs";
 import {
   extractLinks,
   headingSlugs,
@@ -24,6 +24,7 @@ import {
   resolveRelativeLink,
 } from "../links.mjs";
 import { MARKERS, shellBlocks } from "../markers.mjs";
+import { requestPublished } from "../retry.mjs";
 import { parseSafeReadBlock, runSafeReadBlock } from "../safe-read.mjs";
 
 export const HANDOFF_DOCS = [
@@ -211,7 +212,7 @@ export async function checkDocs(report, ctx) {
   } else if (absoluteToCheck.length > 0) {
     const results = await mapLimit(absoluteToCheck, ctx.concurrency, async (entry) => ({
       ...entry,
-      res: await request(entry.href, { timeoutMs: ctx.timeoutMs, follow: true }),
+      res: await requestPublished(entry.href, { timeoutMs: ctx.timeoutMs, follow: true }),
     }));
     for (const { relPath, href, res } of results) {
       c.expect(

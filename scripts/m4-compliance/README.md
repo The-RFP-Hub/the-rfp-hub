@@ -219,10 +219,21 @@ scripts/m4-compliance/
   links.mjs             markdown links, GitHub heading slugs        (test/links.test.mjs)
   markers.mjs           sh-block marker parsing                     (test/markers.test.mjs)
   safe-read.mjs         the safe-read grammar and executor          (test/docs-safe-read.test.mjs)
+  retry.mjs             one retry for the GitHub publication probes (test/retry.test.mjs)
   checks/*.mjs          one file per check
   accept/*.mjs          the write-acceptance options and flow
   test/*.test.mjs       unit tests; the ones that spawn a process use local fixtures, never the network
 ```
+
+## Transient GitHub errors
+
+The probes that ask whether a document is published — the four governance URLs, the skill files and
+the marketplace manifest — get **one** retry after 2 s on a transport failure or a 5xx from
+`github.com` / `raw.githubusercontent.com`, and the four governance requests are issued one at a
+time rather than concurrently. A sign-off run failed M4-1 with HTTP 502 on all four URLs, every one
+of which answered 200 moments later; a gateway error is not evidence that a document is
+unpublished. A **4xx is never retried** — a 404 is the answer, and asking twice would only make an
+honest red run slower.
 
 ## What it cannot establish
 
