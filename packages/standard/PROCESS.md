@@ -301,15 +301,16 @@ quietly redesigning the standard.
 
 | Label | What it is | How it is fixed |
 |---|---|---|
-| `erratum-editorial` | Typo, broken link, unclear sentence, stale number in an informative document. Changes no behaviour. | Ordinary PR, any time, no window, no version. |
-| `erratum-technical` | The normative artifacts are internally inconsistent, or a description says something the schema does not do. A correct implementation could be misled. | Fix in the current version if the fix does not change what validates; otherwise it is a change, not an erratum. Record in `CHANGELOG.md`. |
-| `held-for-next-cut` | Real defect, but fixing it would change what validates. Cannot ship inside the current version. | Stays open, labelled, and is picked up when the next spec version opens. Say so on the issue — a defect parked without a label reads as ignored. |
-| `redesign` | The report is not a defect at all: it asks the standard to mean something different. | Not an erratum. Becomes a `proposed` feature, and if accepted an ADR. |
+| `documentation` (GitHub default) | Typo, broken link, unclear sentence, stale number in an informative document. Changes no behavior. | Ordinary PR, any time, no window, no version. |
+| `bug` (GitHub default) | The normative artifacts are internally inconsistent, or a description says something the schema does not do. A correct implementation could be misled. | Fix in the current version if the fix does not change what validates; otherwise it is a change, not an erratum. Record in `CHANGELOG.md`. |
+| `status:next-version` | Real defect, but fixing it would change what validates. Cannot ship inside the current version. | Stays open, labeled, and is picked up when the next spec version opens. Say so on the issue — a defect parked without a label reads as ignored. |
+| `rfc` | The report is not a defect at all: it asks the standard to mean something different. | Not an erratum: relabel `rfc` and route it through the [RFC process](#rfc-process) below. Becomes a `proposed` feature, and if accepted an ADR. |
 
-These four become real GitHub labels only after an operator applies
+`bug` and `documentation` are GitHub's own default labels, already present on the repository.
+`status:next-version` and `rfc` are not, until an operator applies
 [`.github/labels.yml`](../../.github/labels.yml) — the manifest — with the `gh label create` block
-it carries; until then they are just names in this table. Naming a label in prose does not create
-it, and a triage step whose labels do not exist is a step nobody can perform.
+it carries. Naming a label in prose does not create it, and a triage step whose labels do not
+exist is a step nobody can perform.
 
 ---
 
@@ -326,8 +327,8 @@ asks for exactly what the review it feeds on actually needs:
 |---|---|---|
 | **Propose a new field**, or move one between stages | [Feature stages](#feature-stages) above · [**RFC / proposal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=rfc-proposal.yml) | An `rfc` issue with a use case and at least one real document that needs it — that is the `proposed` stage |
 | **Register a vocabulary value** in any of the four registries — `deadline-labels`, `program-models`, `bounty-severities`, `bounty-asset-types` | [Registering a value in a registry](#registering-a-value-in-a-registry) above · [**RFC / proposal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=rfc-proposal.yml) | An `rfc` issue naming the registry, the key, the description, the evidence of real use, and the nearest existing entry |
-| **Report a defect** in something already published | [Errata](#errata) above · [**bug report form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=bug_report.yml) | An issue, triaged into exactly one of `erratum-editorial`, `erratum-technical`, `held-for-next-cut`, `redesign` |
-| **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) · [**appeal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=appeal.yml) | An `appeal` issue. The answer goes on the issue, in public |
+| **Report a defect** in something already published | [Errata](#errata) above · [**bug report form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=bug_report.yml) | An issue, triaged into exactly one of `documentation`, `bug`, `status:next-version`, `rfc` |
+| **Disagree with a decision** that was already made | [`GOVERNANCE.md` § Appeals](../../GOVERNANCE.md#appeals) · [**appeal form**](https://github.com/The-RFP-Hub/the-rfp-hub/issues/new?template=appeal.yml) | A `governance:appeal` issue. The answer goes on the issue, in public |
 | **Make a structural decision** — the data model, the versioning policy, the process itself | [`adr/`](../../adr), starting from [`template.md`](../../adr/template.md) | A PR adding the ADR, including the options considered and rejected |
 
 Whichever door you came through, the same review windows apply, and

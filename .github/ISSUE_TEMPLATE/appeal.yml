@@ -1,6 +1,6 @@
 name: Appeal a decision
 description: A change was declined, a registry entry rejected, or a listing refused, and you think it is wrong
-labels: ["appeal"]
+labels: ["governance:appeal"]
 body:
   - type: markdown
     attributes:
