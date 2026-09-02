@@ -1,15 +1,24 @@
 /** The Codex review's findings, each written to fail against the code as it stood before the fix. */
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { extraLinkSources } from "../checks/docs.mjs";
-import { hasNoindexMeta, robotsBlocksAll } from "../checks/frontend.mjs";
+import { governanceCheckName } from "../checks/governance.mjs";
 import { unpinnedReadmeSpecs } from "../checks/mcp.mjs";
 import { ACCEPTANCE_SCOPE, acceptanceReport } from "../report.mjs";
 
 vi.mock("../../m3-compliance/client.mjs", () => ({ callJson: vi.fn() }));
+vi.mock("../../m2-compliance/http.mjs", async (importOriginal) => ({
+  ...(await importOriginal()),
+  request: vi.fn(),
+}));
 const { callJson } = await import("../../m3-compliance/client.mjs");
+const { request } = await import("../../m2-compliance/http.mjs");
+const { TARGET_SELECTOR, deriveFilterValues, hasNoindexMeta, robotsBlocksAll } = await import(
+  "../checks/frontend.mjs"
+);
 const { verifyTornDown, waitForHumanApproval } = await import("../accept/flow.mjs");
 
 describe("1 — an acceptance run is never an M4 sign-off", () => {
@@ -228,5 +237,103 @@ describe("8 — every markdown file under skills/ is link-checked", () => {
     expect(sources).toContain("skills/rfp-hub-funding-search/references/api-reference.md");
     expect(sources).toContain("skills/rfp-hub-funding-search/SKILL.md");
     expect(sources).toContain("skills/README.md");
+  });
+});
+
+describe("staging validation — the home page is held to one link, not four", () => {
+  it("names the two pages' different requirements", () => {
+    // The home deliberately carries GOVERNANCE + REVIEW-CRITERIA in its own content, not all
+    // four; requiring four there failed on correct behavior.
+    expect(governanceCheckName({ label: "home", requireAll: false })).toBe(
+      "home links to a governance document outside the footer",
+    );
+    expect(governanceCheckName({ label: "/how-it-works", requireAll: true })).toBe(
+      "/how-it-works links to all four governance documents",
+    );
+  });
+});
+
+describe("staging validation — a filter value has to narrow the corpus", () => {
+  const OPEN_TOTAL = 142;
+  // `Ethereum` is the corpus's dominant ecosystem: filtering by it returns the unfiltered total,
+  // so its first page IS the baseline page and "the filter changed the result set" cannot hold.
+  const TOTALS = { Ethereum: OPEN_TOTAL, Optimism: 115, Nowhere: 0, grant: OPEN_TOTAL, bounty: 12 };
+
+  function mockCorpus() {
+    request.mockImplementation(async (url) => {
+      const params = new URL(url).searchParams;
+      const key = params.get("ecosystem") ?? params.get("fundingType");
+      const total = key === null ? OPEN_TOTAL : (TOTALS[key] ?? 0);
+      const items =
+        params.get("limit") === "100"
+          ? [
+              { id: "a", fundingType: "grant", ecosystems: ["Ethereum", "Optimism"] },
+              { id: "b", fundingType: "bounty", ecosystems: ["Nowhere"] },
+            ]
+          : [{ id: "a", fundingType: "grant", ecosystems: ["Ethereum"] }];
+      return { ok: true, status: 200, body: JSON.stringify({ items, total }) };
+    });
+  }
+
+  it("skips a dominant value and a zero-result value, choosing one that discriminates", async () => {
+    mockCorpus();
+    const filters = await deriveFilterValues({ api: "https://api.example.org", timeoutMs: 5000 });
+    expect(filters.ecosystem).toBe("Optimism");
+    expect(filters.fundingType).toBe("bounty");
+    expect(filters.baselineTotal).toBe(OPEN_TOTAL);
+  });
+
+  it("reports the candidates it considered, so an unmet row can say why", async () => {
+    mockCorpus();
+    const filters = await deriveFilterValues({ api: "https://api.example.org", timeoutMs: 5000 });
+    expect(filters.candidates.ecosystem).toEqual(["Ethereum", "Optimism", "Nowhere"]);
+  });
+
+  it("chooses nothing when every candidate returns the unfiltered total", async () => {
+    request.mockImplementation(async (url) => {
+      const params = new URL(url).searchParams;
+      const items = [{ id: "a", fundingType: "grant", ecosystems: ["Ethereum"] }];
+      return { ok: true, status: 200, body: JSON.stringify({ items, total: OPEN_TOTAL }) };
+    });
+    const filters = await deriveFilterValues({ api: "https://api.example.org", timeoutMs: 5000 });
+    expect(filters.ecosystem).toBeUndefined();
+    expect(filters.fundingType).toBeUndefined();
+    expect(filters.candidates.ecosystem).toEqual(["Ethereum"]);
+  });
+});
+
+describe("staging validation — only form controls and nav links are measured", () => {
+  it("measures the set m4-responsive.spec.ts names, and no bare anchor", () => {
+    // Staging flagged block-level prose and footer text links ("All opportunities" 116×23,
+    // "Browse the directory"). A text link's hit area is its line box whatever its `display`, so
+    // the previous `display:inline` exemption was the wrong test — the selector is.
+    const terms = TARGET_SELECTOR.split(", ");
+    expect(terms).toEqual([
+      "input",
+      "select",
+      "textarea",
+      "button",
+      '[role="button"]',
+      "nav a[href]",
+    ]);
+    expect(terms).not.toContain("a[href]");
+    expect(terms).not.toContain('[role="link"]');
+    expect(terms.filter((t) => t.includes("a[href]")).every((t) => t.startsWith("nav "))).toBe(
+      true,
+    );
+  });
+
+  it("is the set the checker README documents", () => {
+    const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+    for (const term of [
+      "`input`",
+      "`select`",
+      "`textarea`",
+      "`button`",
+      '`[role="button"]`',
+      "`nav a`",
+    ]) {
+      expect(readme).toContain(term);
+    }
   });
 });

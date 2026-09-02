@@ -60,79 +60,110 @@ export function expectResultSetChanged(c, name, newIds, baselineIds, emptyHint) 
 }
 
 /** The API query the directory itself makes for a selection, per packages/frontend/src/lib. */
-function directoryQuery({ ecosystem, fundingType, page = 1 } = {}) {
+function directoryQuery({ ecosystem, fundingType, page = 1, limit = 20 } = {}) {
   const qs = new URLSearchParams({
     status: "open",
     sort: "nextDeadlineAt",
     order: "asc",
     page: String(page),
-    limit: "20",
+    limit: String(limit),
   });
   if (ecosystem) qs.set("ecosystem", ecosystem);
   if (fundingType) qs.set("fundingType", fundingType);
   return qs;
 }
 
-async function listIds(ctx, qs) {
+async function listPage(ctx, qs) {
   const res = await request(`${ctx.api}/v1/opportunities?${qs}`, { timeoutMs: ctx.timeoutMs });
   if (!res.ok || res.status !== 200) return null;
   try {
-    return (JSON.parse(res.body).items ?? []).map((item) => item.id);
+    const json = JSON.parse(res.body);
+    return {
+      ids: (json.items ?? []).map((item) => item.id),
+      total: json.total,
+      items: json.items ?? [],
+    };
   } catch {
     return null;
   }
 }
 
-/**
- * Two filter values the LIVE corpus can answer. Hard-coding `type=grant` made the assertion fail
- * for the wrong reason as the corpus moved, and there was no second filter at all.
- */
-export async function deriveFilterValues(ctx) {
-  const res = await request(`${ctx.api}/v1/opportunities?status=open&limit=100`, {
-    timeoutMs: ctx.timeoutMs,
-  });
-  if (!res.ok || res.status !== 200) return {};
-  let items;
-  try {
-    items = JSON.parse(res.body).items ?? [];
-  } catch {
-    return {};
-  }
-  const first = (values) => [...new Set(values.filter(Boolean))][0];
-  return {
-    fundingType: first(items.map((item) => item.fundingType)),
-    ecosystem: first(items.flatMap((item) => item.ecosystems ?? [])),
-  };
+async function listIds(ctx, qs) {
+  return (await listPage(ctx, qs))?.ids ?? null;
 }
 
 /**
- * Controls shorter than the minimum. Text links are exempt (their hit area is the line box), which
- * is the scope `m4-responsive.spec.ts` asserts by naming the filter controls and the deep links.
+ * A filter value per filter that the LIVE corpus can actually answer AND that narrows it.
+ *
+ * Taking the first value seen picked `Ethereum`, the corpus's dominant ecosystem, whose first page
+ * is the unfiltered first page — so "the filter changed the result set" failed on correct
+ * behavior. A candidate now has to come back with a total that is non-zero and different from the
+ * unfiltered total; the first that does is the one worth asserting against.
  */
-async function undersizedTargets(page, min) {
-  return await page.evaluate((minPx) => {
-    const selector = 'a[href], button, input, select, textarea, [role="button"], [role="link"]';
-    const offenders = [];
-    for (const el of document.querySelectorAll(selector)) {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      if (style.visibility === "hidden" || style.display === "none") continue;
-      if (rect.width === 0 || rect.height === 0) continue;
-      // Positioned off-screen: a skip link is a keyboard affordance, never a touch target.
-      const offScreen =
-        rect.bottom <= 0 ||
-        rect.right <= 0 ||
-        rect.top >= window.innerHeight ||
-        rect.left >= window.innerWidth;
-      if (offScreen) continue;
-      if (el.tagName === "A" && style.display.startsWith("inline")) continue;
-      if (rect.height >= minPx) continue;
-      offenders.push(
-        `<${el.tagName.toLowerCase()}> "${(el.textContent ?? "").trim().slice(0, 30)}" ${Math.round(rect.width)}×${Math.round(rect.height)}`,
-      );
+export async function deriveFilterValues(ctx) {
+  const baseline = await listPage(ctx, directoryQuery({}));
+  if (!baseline) return {};
+  const pool = (await listPage(ctx, directoryQuery({ limit: 100 })))?.items ?? baseline.items;
+  const candidates = {
+    ecosystem: [...new Set(pool.flatMap((item) => item.ecosystems ?? []).filter(Boolean))],
+    fundingType: [...new Set(pool.map((item) => item.fundingType).filter(Boolean))],
+  };
+
+  const chosen = {};
+  for (const [key, values] of Object.entries(candidates)) {
+    for (const value of values) {
+      const page = await listPage(ctx, directoryQuery({ [key]: value }));
+      if (!page) continue;
+      if (page.total > 0 && page.total !== baseline.total) {
+        chosen[key] = value;
+        break;
+      }
     }
-    return offenders;
-  }, min);
+  }
+  return { ...chosen, candidates, baselineTotal: baseline.total };
+}
+
+/**
+ * Controls shorter than the minimum: FORM CONTROLS and NAV LINKS only, which is the scope
+ * `m4-responsive.spec.ts` asserts. A text link's hit area is its line box, and enlarging one would
+ * break the sentence around it — exempt whatever its `display` happens to be, because a
+ * `display: block` breadcrumb or footer link is still a text link.
+ */
+export const TARGET_SELECTOR = [
+  "input",
+  "select",
+  "textarea",
+  "button",
+  '[role="button"]',
+  "nav a[href]",
+].join(", ");
+
+async function undersizedTargets(page, min) {
+  return await page.evaluate(
+    ([selector, minPx]) => {
+      const offenders = [];
+      for (const el of document.querySelectorAll(selector)) {
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        if (style.visibility === "hidden" || style.display === "none") continue;
+        if (rect.width === 0 || rect.height === 0) continue;
+        // Positioned off-screen: a skip link is a keyboard affordance, never a touch target.
+        const offScreen =
+          rect.bottom <= 0 ||
+          rect.right <= 0 ||
+          rect.top >= window.innerHeight ||
+          rect.left >= window.innerWidth;
+        if (offScreen) continue;
+        if (el.tagName === "INPUT" && el.type === "hidden") continue;
+        if (rect.height >= minPx) continue;
+        offenders.push(
+          `<${el.tagName.toLowerCase()}> "${(el.textContent ?? "").trim().slice(0, 30)}" ${Math.round(rect.width)}×${Math.round(rect.height)}`,
+        );
+      }
+      return offenders;
+    },
+    [TARGET_SELECTOR, min],
+  );
 }
 
 /**
@@ -281,9 +312,12 @@ export async function checkFrontend(report, ctx) {
         const value = filters[key];
         const name = `a ${label} filter changes the result set, and matches the API`;
         if (!value) {
+          const seen = filters.candidates?.[key] ?? [];
           c.unmet(
             name,
-            `no ${key} value appears in the first 100 open entries at ${ctx.api}, so this filter cannot be exercised against live data`,
+            seen.length === 0
+              ? `no ${key} value appears in the open entries at ${ctx.api}, so this filter cannot be exercised against live data`
+              : `no ${key} value narrows the corpus (every one of ${seen.length} candidate(s) returns the unfiltered total of ${filters.baselineTotal}), so this filter cannot be exercised against live data`,
           );
           continue;
         }

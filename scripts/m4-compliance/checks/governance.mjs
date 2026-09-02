@@ -52,6 +52,13 @@ export function canonicalGovernanceLinks(repoRoot) {
   });
 }
 
+/** What each page is held to: the whole framework, or one link in its own content. */
+export function governanceCheckName(page) {
+  return page.requireAll
+    ? `${page.label} links to all four governance documents`
+    : `${page.label} links to a governance document outside the footer`;
+}
+
 /** Every `<a href>` on the page, and whether it sits inside the global footer. */
 async function anchors(page) {
   return await page.evaluate(() =>
@@ -110,15 +117,18 @@ export async function checkGovernance(report, ctx) {
     );
   }
 
+  // The plan asks different things of the two pages. `/how-it-works` is the explainer and carries
+  // the whole framework; the home page has to reach it in its own content — ONE of the four,
+  // outside the global footer, is the requirement, and it deliberately carries two.
   const pages = [
-    { path: "/", label: "home", requireOutsideFooter: true },
-    { path: "/how-it-works", label: "/how-it-works", requireOutsideFooter: false },
+    { path: "/", label: "home", requireAll: false },
+    { path: "/how-it-works", label: "/how-it-works", requireAll: true },
   ];
 
   if (!ctx.browser) {
     for (const page of pages) {
       c.unmet(
-        `${page.label} links to all four governance documents`,
+        governanceCheckName(page),
         "needs --browser — the page is client-rendered, so a plain GET of the HTML cannot see the anchors",
       );
     }
@@ -134,28 +144,29 @@ export async function checkGovernance(report, ctx) {
         return anchors(browserPage);
       });
     } catch (err) {
-      c.fail(
-        `${page.label} links to all four governance documents`,
-        `browser check failed: ${err.message}`,
+      c.fail(governanceCheckName(page), `browser check failed: ${err.message}`);
+      continue;
+    }
+
+    if (page.requireAll) {
+      const missing = links.filter((doc) => !found.some((a) => a.href === doc.href));
+      c.expect(
+        missing.length === 0,
+        governanceCheckName(page),
+        `all four exact hrefs present on ${target}`,
+        `no <a href="…"> on ${target} for: ${missing.map((d) => d.href).join(", ")}`,
       );
       continue;
     }
 
-    const missing = links.filter((doc) => !found.some((a) => a.href === doc.href));
-    c.expect(
-      missing.length === 0,
-      `${page.label} links to all four governance documents`,
-      `all four exact hrefs present on ${target}`,
-      `no <a href="…"> on ${target} for: ${missing.map((d) => d.href).join(", ")}`,
-    );
-
-    if (!page.requireOutsideFooter) continue;
+    // Outside the footer, because a link the global chrome carries on every page is not this page
+    // linking to the framework. Still an EXACT href match, against the same four canonical URLs.
     const outside = links.filter((doc) => found.some((a) => a.href === doc.href && !a.inFooter));
     c.expect(
       outside.length > 0,
-      "at least one governance link on the home page is outside the footer",
-      `${outside.length} of four are in the page's own content: ${outside.map((d) => d.path).join(", ")}`,
-      "every governance link on the home page is inside <footer> — a link the global chrome carries on every page is not the home page linking to the framework",
+      governanceCheckName(page),
+      `${outside.length} of four in the page's own content: ${outside.map((d) => d.path).join(", ")}`,
+      `no <a href="…"> outside <footer> on ${target} for any of: ${links.map((d) => d.path).join(", ")}`,
     );
   }
 
