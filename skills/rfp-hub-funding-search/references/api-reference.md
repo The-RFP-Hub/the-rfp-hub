@@ -8,6 +8,17 @@ disagrees with those two, they win.
 Base URL: `https://api.ethrfps.app` (override with `RFPHUB_API_BASE`). Both endpoints below are
 public and anonymous: no `Authorization` header, no key.
 
+## Contents
+
+- [`GET /v1/opportunities`](#get-v1opportunities) — the parameter table (every flag maps 1:1)
+  - [`fundingType` values](#fundingtype-values) · [`status` values](#status-values) ·
+    [About `nextDeadlineAt`](#about-nextdeadlineat) · [Response shape](#response-shape)
+- [`GET /v1/opportunities/{id}`](#get-v1opportunitiesid) — one record, and the merged-id 404
+- [Link-outs](#link-outs) — `/v1/r/{id}/apply` and `/source`
+- [Registries (open vocabularies)](#registries-open-vocabularies)
+- [Exit codes](#exit-codes) — what each non-zero exit means
+- [Examples](#examples)
+
 ## `GET /v1/opportunities`
 
 Filtered, sorted, paginated list. The schema is **closed**
