@@ -114,7 +114,7 @@ Both `scripts/search.mjs` and `scripts/get.mjs` use the same exit codes:
 | Code | Meaning |
 |---|---|
 | `0` | Success — including an empty result set, or a page past the last one |
-| `1` | Usage error, caught BEFORE any network call: an unknown flag, a flag given twice, an invalid `--format` (only `json`/`table` are accepted), an unexpected extra positional argument, an over-long `--q`, a non-integer `--limit`/`--page`, or a missing `<id>` for `get.mjs` |
+| `1` | Usage error, caught BEFORE any network call: an unknown flag, a flag given twice, a value outside one of the four closed enums (`fundingType`, `status`, `sort`, `order` — the message names the allowed values), an invalid `--format`, an unexpected extra positional argument, an over-long `--q`, a non-integer `--limit`/`--page`, or a missing `<id>` for `get.mjs` |
 | `2` | Network error or timeout reaching the API |
 | `3` | HTTP 4xx from the API (not 429) — e.g. a validation error, or 404 |
 | `4` | HTTP 429 — rate limited; the message reports `Retry-After` when the API sends it |

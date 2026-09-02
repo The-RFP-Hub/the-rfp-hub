@@ -298,6 +298,16 @@ describe("usage errors exit 1 BEFORE any network call", () => {
     expect(stderr).toMatch(/--q is 5000 characters.*200/);
   });
 
+  it("search.mjs rejects a bad enum value before the round trip, naming the allowed values", async () => {
+    const { code, stderr } = await run(searchScript, ["--sort", "deadline"], {
+      RFPHUB_API_BASE: UNREACHABLE_BASE,
+    });
+    expect(code).toBe(USAGE_EXIT_CODE);
+    expect(code).not.toBe(NETWORK_EXIT_CODE);
+    expect(stderr).toMatch(/--sort does not accept "deadline"/);
+    expect(stderr).toMatch(/nextDeadlineAt/);
+  });
+
   it("get.mjs rejects an unknown flag", async () => {
     const { code, stderr } = await run(getScript, ["fixture:0", "--bogus", "x"], {
       RFPHUB_API_BASE: UNREACHABLE_BASE,

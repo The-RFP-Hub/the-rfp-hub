@@ -148,14 +148,14 @@ these headers identify the traffic, they don't filter it.
 
 | Situation | What happened | What to do |
 |---|---|---|
-| HTTP 4xx (not 429) | Usually a malformed parameter — the API's schema is closed (`additionalProperties: false`), so a typo'd or invented filter is a clear 400, never a silently-ignored filter. The 400 names the parameter for a bad *value* (`querystring/sort must be equal to one of the allowed values`) but reports an unknown *name* as `querystring must NOT have additional properties`; the scripts' own client-side rejection names it | Read the error message, fix the parameter, retry |
+| HTTP 4xx (not 429) | A malformed parameter the scripts could not catch locally — an out-of-range date, a non-numeric award. Unknown flag names and bad values for the four closed enums (`fundingType`, `status`, `sort`, `order`) never get this far: they are rejected before the request, naming the allowed values | Read the error message, fix the parameter, retry |
 | HTTP 429 | Rate limited | Wait for the `Retry-After` value the script reports, then retry once |
 | HTTP 5xx | API server issue | Tell the user the API is temporarily unavailable; try again shortly |
 | Timeout | Network issue or the API is unreachable | Tell the user; suggest retrying |
 | Unusable response body | Not JSON, not a JSON object, or past the scripts' 1 MiB response cap — an unexpected API change, or an `RFPHUB_API_BASE` that is not the RFP Hub API | Report it; do not attempt to interpret partial/garbled output. For the size cap, narrow the query (smaller `--limit`, more filters) and retry once |
 | Empty result (`total: 0`) | Filters matched nothing | **Not an error.** Say so plainly and suggest broadening one filter at a time. Note: an empty page still reports `totalPages: 1`, not `0` — that's the API's convention (page 1 of 1 results, zero of them), not a bug |
 | Empty page past the last one (e.g. `--page 50` when there are only 3) | Asked for a page that doesn't exist | **Also not an error** — a different case from the one above. The total/page footer (table mode) or the envelope (JSON) still reports the real `total`/`totalPages`, so say "page 50 doesn't exist, there are only 3" rather than "nothing matched" |
-| Unknown flag, a flag repeated twice, invalid `--format`, an extra positional argument, an over-long `--q`, or a non-integer `--limit`/`--page` | Usage mistake, caught locally | The script exits before making any network call — fix the invocation and retry; this is not an API problem |
+| Unknown flag, a flag repeated twice, a value outside a closed enum, invalid `--format`, an extra positional argument, an over-long `--q`, or a non-integer `--limit`/`--page` | Usage mistake, caught locally | The script exits before making any network call — fix the invocation and retry; this is not an API problem |
 
 The fallback scripts exit non-zero with a message on stderr for every row above except the two
 "not an error" rows, which exit `0`. Exact exit codes are in

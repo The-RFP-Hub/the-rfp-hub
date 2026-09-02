@@ -127,6 +127,28 @@ export const STATUSES = ["upcoming", "open", "closed", "archived"];
 export const SORT_FIELDS = ["nextDeadlineAt", "opensAt", "postedAt", "updatedAt", "createdAt"];
 export const ORDERS = ["asc", "desc"];
 
+/** The four closed enums, by parameter. A bad value here would come back as a raw AJV pattern
+ * dump after a round trip; rejecting it locally names the allowed values instead. */
+const ENUM_VALUES = new Map([
+  ["fundingType", FUNDING_TYPES],
+  ["status", STATUSES],
+  ["sort", SORT_FIELDS],
+  ["order", ORDERS],
+]);
+
+function assertEnumValue(key, asString) {
+  const allowed = ENUM_VALUES.get(key);
+  if (!allowed) return;
+  const values = LIST_PARAMS.has(key) ? asString.split(",") : [asString];
+  for (const raw of values) {
+    if (!allowed.includes(raw.trim())) {
+      throw new Error(
+        `--${key} does not accept ${JSON.stringify(raw.trim())}. Allowed value(s): ${allowed.join(", ")}${LIST_PARAMS.has(key) ? " (comma-separate to combine)" : ""}.`,
+      );
+    }
+  }
+}
+
 /** Throws a plain `Error` (a usage error, not a `RequestError`) so the CLI can exit 1 before
  * making a request. */
 export function buildSearchQuery(flags) {
@@ -145,6 +167,7 @@ export function buildSearchQuery(flags) {
         `--q is ${asString.length} characters; this skill limits it to ${MAX_Q_LEN}, which is about where the API truncates search text anyway. Shorten it.`,
       );
     }
+    assertEnumValue(key, asString);
     params.set(key, asString);
   }
   return params;

@@ -368,6 +368,34 @@ describe("buildSearchQuery", () => {
     expect(() => buildSearchQuery({ notAParam: "x" })).toThrow(/Unknown parameter/);
   });
 
+  it("rejects a bad enum value locally, naming the allowed values, for each closed enum", () => {
+    expect(() => buildSearchQuery({ sort: "deadline" })).toThrow(
+      /--sort does not accept "deadline".*nextDeadlineAt, opensAt, postedAt, updatedAt, createdAt/,
+    );
+    expect(() => buildSearchQuery({ fundingType: "grants" })).toThrow(
+      /--fundingType does not accept "grants".*grant, hackathon, bounty/,
+    );
+    // "active" is a neighboring directory's vocabulary — the typo a model carrying both makes.
+    expect(() => buildSearchQuery({ status: "active" })).toThrow(
+      /--status does not accept "active".*upcoming, open, closed, archived/,
+    );
+    expect(() => buildSearchQuery({ order: "ascending" })).toThrow(/--order does not accept/);
+  });
+
+  it("checks every member of a comma-separated list, not just the first", () => {
+    expect(() => buildSearchQuery({ status: "open,active" })).toThrow(/does not accept "active"/);
+    expect(() => buildSearchQuery({ status: "open, closed" })).not.toThrow();
+    expect(buildSearchQuery({ fundingType: "grant,bounty" }).get("fundingType")).toBe(
+      "grant,bounty",
+    );
+  });
+
+  it("leaves open-vocabulary params (ecosystem, category, organization, q) unvalidated", () => {
+    const q = buildSearchQuery({ ecosystem: "SomeNewL2", category: "ReFi", organization: "acme" });
+    expect(q.get("ecosystem")).toBe("SomeNewL2");
+    expect(q.get("category")).toBe("ReFi");
+  });
+
   it("rejects a --q longer than the documented limit, naming the limit", () => {
     expect(() => buildSearchQuery({ q: "x".repeat(MAX_Q_LEN + 1) })).toThrow(
       new RegExp(`--q is ${MAX_Q_LEN + 1} characters.*${MAX_Q_LEN}`),
