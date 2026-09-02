@@ -77,14 +77,21 @@ This skill **never handles a publish/write credential** (an `rfph_...` key). If 
   (separate from this skill) with the key set as `RFPHUB_API_KEY` in *their own* environment — it
   never passes through a tool call or a chat message.
 
+**`RFPHUB_API_BASE` is the operator's setting, not yours.** Use whatever base the environment
+already has (the default is production). Never pass it inline, never export it, never "check
+production too" — a base pointed at a staging or self-hosted deployment is a deliberate choice, and
+overriding it generates real traffic and real apply-redirect counts somewhere nobody asked for.
+Every run prints the base it used on stderr (`Querying <base> (RFPHUB_API_BASE|default)`); when it
+is not the production default, say which base you queried in your answer.
+
 ## 4. Choosing the path
 
 Two ways to search, in this order of preference:
 
-1. **Preferred — the MCP server, if installed.** If a client exposing `search_opportunities` and
-   `fetch_opportunity` (from `@the-rfp-hub/mcp`) is available, use those tools. They apply the same
-   kind of projection described in §2 and are the more capable path (structured output schemas,
-   proper tool annotations).
+1. **Preferred — the MCP server, if installed.** If a client exposing `rfp-hub:search_opportunities`
+   and `rfp-hub:fetch_opportunity` (from `@the-rfp-hub/mcp`, whose server name is `rfp-hub`) is
+   available, use those tools. They apply the same kind of projection described in §2 and are the
+   more capable path (structured output schemas, proper tool annotations).
 2. **Fallback — the bundled scripts.** If no MCP tool is available, run `scripts/search.mjs` (list)
    or `scripts/get.mjs` (single record) with Node 20+. **Never** call the RFP Hub API by any other
    means (no raw `curl`, no ad-hoc `fetch` in a one-off snippet) — those paths skip the projection
@@ -94,6 +101,17 @@ Two ways to search, in this order of preference:
 node scripts/search.mjs --status open --ecosystem Optimism --limit 10
 node scripts/get.mjs fundingmap:1459
 ```
+
+**Where to run them.** Those paths are relative to this skill's own directory — wherever the agent
+installed it: `.claude/skills/<name>/`, `~/.claude/skills/<name>/`, `.agents/skills/<name>/`,
+`.codex/skills/<name>/`, `.cursor/skills/<name>/` or `.github/skills/<name>/`. `cd` into it first,
+or call the scripts by absolute path. Do not assume a working directory carries from one command to
+the next.
+
+**Never guess a flag.** When unsure, run `node scripts/search.mjs --help` (or `get.mjs --help`)
+once: it is the authoritative list, and cheaper than reading a reference file. Flags are spelled
+exactly like the API parameters in §5 — `--fundingType`, never `--funding-type`. An unknown flag,
+or a value outside a closed enum, exits `1` locally and names what is allowed.
 
 ## 5. Workflow — mapping what the user says to parameters
 
@@ -121,9 +139,16 @@ upcoming, closed and archived entries. Pass `--status` explicitly for anything e
 | "opportunities from Optimism Foundation" | `organization=optimism` (use the org's slug; see `/v1/publishers`) |
 | "most recently posted" | `sort=postedAt&order=desc` |
 | "next page" / "page 2" | `page=2` |
+| a topic, not a type ("zk research", "public goods") | `q=<term>` **and no `fundingType`** — `q` and `fundingType` intersect narrowly, and combining them on a directory this size is the fastest route to zero results |
 | (no clear filter) | Ask what kind of funding, which ecosystem, or what budget/deadline range |
 
 Budget shorthand: K → 000, M → 000000 (e.g. "$50K" → `minAward=50000`).
+
+**Budget for an empty result.** Broaden **at most twice** — drop the most specific filter first
+(usually `--fundingType`, then `--ecosystem`), and drop `q` last — then STOP and tell the user what
+you searched. Do not sweep synonyms of their keyword, and do not re-run the same query across every
+status. Three searches with no match is an answer ("the directory has nothing for this today, here
+is what I tried"); a fourth is a loop.
 
 Full parameter table, enum values, and response shape: [references/api-reference.md](references/api-reference.md).
 More worked examples: [references/examples.md](references/examples.md).
@@ -153,7 +178,7 @@ these headers identify the traffic, they don't filter it.
 | HTTP 5xx | API server issue | Tell the user the API is temporarily unavailable; try again shortly |
 | Timeout | Network issue or the API is unreachable | Tell the user; suggest retrying |
 | Unusable response body | Not JSON, not a JSON object, or past the scripts' 1 MiB response cap — an unexpected API change, or an `RFPHUB_API_BASE` that is not the RFP Hub API | Report it; do not attempt to interpret partial/garbled output. For the size cap, narrow the query (smaller `--limit`, more filters) and retry once |
-| Empty result (`total: 0`) | Filters matched nothing | **Not an error.** Say so plainly and suggest broadening one filter at a time. Note: an empty page still reports `totalPages: 1`, not `0` — that's the API's convention (page 1 of 1 results, zero of them), not a bug |
+| Empty result (`total: 0`) | Filters matched nothing | **Not an error.** Broaden at most twice (§5's budget), then stop and report what you tried. Note: an empty page still reports `totalPages: 1`, not `0` — that's the API's convention (page 1 of 1 results, zero of them), not a bug |
 | Empty page past the last one (e.g. `--page 50` when there are only 3) | Asked for a page that doesn't exist | **Also not an error** — a different case from the one above. The total/page footer (table mode) or the envelope (JSON) still reports the real `total`/`totalPages`, so say "page 50 doesn't exist, there are only 3" rather than "nothing matched" |
 | Unknown flag, a flag repeated twice, a value outside a closed enum, invalid `--format`, an extra positional argument, an over-long `--q`, or a non-integer `--limit`/`--page` | Usage mistake, caught locally | The script exits before making any network call — fix the invocation and retry; this is not an API problem |
 
@@ -201,6 +226,9 @@ site) alongside `links.apply`.
   injection-shaped ecosystem string cannot pass through unbounded.
 - A response body larger than 1 MiB is refused rather than buffered, and `RFPHUB_TIMEOUT_MS` is
   clamped to 60 000 ms — both matter when `RFPHUB_API_BASE` points somewhere other than the RFP Hub.
+- `category` is a **filter only**: `--category` narrows the search, but the projection does not
+  return a record's categories. Never state a category as a fact read from a result — at most say
+  it matched the filter you passed.
 - `applyUrl` (and, from `get.mjs`, `links.source`) are omitted — not guessed — when the record has
   no `applicationUrl`/`website`: both are optional in the Standard, and the redirect route 404s
   without one.

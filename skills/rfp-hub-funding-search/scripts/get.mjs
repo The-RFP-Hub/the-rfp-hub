@@ -7,6 +7,7 @@ import {
   EXIT,
   MAX_TITLE_LEN,
   RequestError,
+  announceBase,
   apiBase,
   assertKnownFlags,
   assertNoExtraPositionals,
@@ -67,6 +68,7 @@ async function main(argv) {
   }
 
   const base = apiBase();
+  announceBase(base);
   const url = `${base}/v1/opportunities/${encodeURIComponent(id)}`;
   const invocationId = newInvocationId();
 

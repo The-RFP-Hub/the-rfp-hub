@@ -11,6 +11,7 @@ import {
   EXIT,
   RequestError,
   SEARCH_PARAMS,
+  announceBase,
   apiBase,
   assertKnownFlags,
   assertNoExtraPositionals,
@@ -108,6 +109,7 @@ async function main(argv) {
   }
 
   const base = apiBase();
+  announceBase(base);
   const url = `${base}/v1/opportunities?${query.toString()}`;
   const invocationId = newInvocationId();
 

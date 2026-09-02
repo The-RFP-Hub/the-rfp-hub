@@ -16,7 +16,8 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { type IncomingMessage, type Server, type ServerResponse, createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_API_BASE, announceBase } from "../scripts/lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const searchScript = resolve(here, "../scripts/search.mjs");
@@ -134,7 +135,7 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
       RFPHUB_API_BASE: base,
     });
 
-    expect(stderr).toBe("");
+    expect(stderr.trim()).toBe(`Querying ${base} (RFPHUB_API_BASE)`);
     expect(code).toBe(0);
     // A truncated write would fail to parse, or parse short — either way this proves it didn't.
     const parsed = JSON.parse(stdout);
@@ -151,7 +152,7 @@ describe("CLI output is not truncated when stdout is a pipe", () => {
       RFPHUB_API_BASE: base,
     });
 
-    expect(stderr).toBe("");
+    expect(stderr.trim()).toBe(`Querying ${base} (RFPHUB_API_BASE)`);
     expect(code).toBe(0);
     const parsed = JSON.parse(stdout);
     expect(parsed.organization).toHaveLength(ORG_NAME_CAP);
@@ -438,7 +439,7 @@ describe("a self-hosted base URL on an IPv6 loopback address", () => {
     const { code, stdout, stderr } = await run(searchScript, [], {
       RFPHUB_API_BASE: started.base,
     });
-    expect(stderr).toBe("");
+    expect(stderr.trim()).toBe(`Querying ${started.base} (RFPHUB_API_BASE)`);
     expect(code).toBe(0);
     expect(JSON.parse(stdout).total).toBe(0);
   });
@@ -493,5 +494,44 @@ describe("a merged opportunity's title is bounded like any other third-party tit
     expect(stderr).toContain("fixture:winner");
     expect(stderr).not.toContain("M".repeat(TITLE_CAP + 1));
     expect(stderr).toContain(`${"M".repeat(TITLE_CAP - 1)}\u2026`);
+  });
+});
+
+describe("the base URL that answered is announced on stderr, never on stdout", () => {
+  let server: Server;
+
+  afterEach(() => {
+    server?.closeAllConnections?.();
+    server?.close();
+  });
+
+  it("names the base and its source, and leaves stdout pure JSON", async () => {
+    const fake = await startFakeApi();
+    server = fake.server;
+    const { code, stdout, stderr } = await run(searchScript, ["--limit", "1"], {
+      RFPHUB_API_BASE: fake.base,
+    });
+    expect(code).toBe(0);
+    expect(stderr.trim()).toBe(`Querying ${fake.base} (RFPHUB_API_BASE)`);
+    expect(stdout).not.toContain("Querying");
+    expect(() => JSON.parse(stdout)).not.toThrow();
+  });
+
+  it("get.mjs announces it too", async () => {
+    const fake = await startFakeApi();
+    server = fake.server;
+    const { code, stderr } = await run(getScript, ["fixture:0"], { RFPHUB_API_BASE: fake.base });
+    expect(code).toBe(0);
+    expect(stderr.trim()).toBe(`Querying ${fake.base} (RFPHUB_API_BASE)`);
+  });
+
+  it("says the base came from the default when RFPHUB_API_BASE is unset", async () => {
+    let warned = "";
+    vi.stubEnv("RFPHUB_API_BASE", undefined);
+    announceBase(DEFAULT_API_BASE, (msg) => {
+      warned = msg;
+    });
+    vi.unstubAllEnvs();
+    expect(warned).toBe(`Querying ${DEFAULT_API_BASE} (default)`);
   });
 });

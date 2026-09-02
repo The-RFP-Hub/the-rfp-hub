@@ -20,6 +20,13 @@ export function apiBase() {
   return raw ? raw.replace(/\/+$/, "") : DEFAULT_API_BASE;
 }
 
+/** One line on stderr naming the deployment that answered, so a transcript shows which base was
+ * queried. The agent is told never to override it and to report it (SKILL.md §3). */
+export function announceBase(base, write = (msg) => process.stderr.write(`${msg}\n`)) {
+  const fromEnv = Boolean(process.env.RFPHUB_API_BASE?.trim());
+  write(`Querying ${base} (${fromEnv ? "RFPHUB_API_BASE" : "default"})`);
+}
+
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
 /** Ceiling on `RFPHUB_TIMEOUT_MS`. Without it, `RFPHUB_TIMEOUT_MS=1e12` disarms the one thing that

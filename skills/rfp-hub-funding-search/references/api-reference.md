@@ -20,7 +20,7 @@ never silently ignored.
 | `fundingType` | list | See "fundingType values" below. Comma-separate to OR values together. The API also accepts a repeated param, but **this skill's scripts reject a repeated flag** — pass `--fundingType grant,bounty` |
 | `status` | list | See "status values" below. Same comma-separate rule |
 | `ecosystem` | list | Open vocabulary, e.g. `Optimism`, `Base`, `Ethereum` — no fixed enum |
-| `category` | list | Open vocabulary, e.g. `DeFi`, `Public Goods` — no fixed enum |
+| `category` | list | Open vocabulary, e.g. `DeFi`, `Public Goods` — no fixed enum. **Filter only**: the projection does not return a record's categories |
 | `organization` | string | An organization **slug**. Matches ANY entry in `operatingOrganizations` OR `sponsoringOrganizations`, not only the primary one |
 | `minAward` | number | Major units (e.g. `50000` for $50,000) |
 | `maxAward` | number | Major units |

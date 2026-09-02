@@ -123,7 +123,7 @@ describe("a copy-installed skill never prints publisher prose", () => {
       [],
       base,
     );
-    expect(stderr).toBe("");
+    expect(stderr.trim()).toBe(`Querying ${base} (RFPHUB_API_BASE)`);
     expect(code).toBe(0);
     expect(stdout).not.toContain(POISONED_STRING);
     const parsed = JSON.parse(stdout);
