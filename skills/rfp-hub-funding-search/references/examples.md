@@ -1,8 +1,9 @@
 # Examples
 
-All examples assume Node 20+ and are run from this skill's directory
-(`skills/rfp-hub-funding-search/`). Swap `RFPHUB_API_BASE` if pointing at a non-production
-deployment.
+All examples assume Node 20+ and are run from this skill's own directory. The blocks below show
+**stdout**; every run also prints one line on stderr naming the base it queried
+(`Querying https://api.ethrfps.app (default)`). `RFPHUB_API_BASE` is the operator's setting — read
+it, report it, never override it.
 
 ## Open grants on Optimism
 
