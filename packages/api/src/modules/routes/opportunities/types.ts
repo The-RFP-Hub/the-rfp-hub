@@ -162,7 +162,7 @@ export const listQuerySchema = {
     category: {
       type: "array",
       items: { type: "string" },
-      description: `Categories. ${LIST_NOTE}`,
+      description: `Categories — free text, matched case-insensitively. ${LIST_NOTE}`,
     },
     organization: {
       type: "string",
