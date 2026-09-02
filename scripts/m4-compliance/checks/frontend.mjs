@@ -95,10 +95,11 @@ async function listIds(ctx, qs) {
 /**
  * A filter value per filter that the LIVE corpus can actually answer AND that narrows it.
  *
- * Taking the first value seen picked `Ethereum`, the corpus's dominant ecosystem, whose first page
- * is the unfiltered first page — so "the filter changed the result set" failed on correct
- * behavior. A candidate now has to come back with a total that is non-zero and different from the
- * unfiltered total; the first that does is the one worth asserting against.
+ * Taking the first value seen picked `Ethereum`, the corpus's dominant ecosystem. Its TOTAL differs
+ * from the unfiltered one (115 of 142) and its first PAGE does not — the same twenty entries, in
+ * the same order — so "the filter changed the result set" failed on correct behavior. The
+ * discriminator is therefore the property the UI assertion actually needs: a non-empty first page
+ * whose membership differs from the baseline's.
  */
 export async function deriveFilterValues(ctx) {
   const baseline = await listPage(ctx, directoryQuery({}));
@@ -109,12 +110,15 @@ export async function deriveFilterValues(ctx) {
     fundingType: [...new Set(pool.map((item) => item.fundingType).filter(Boolean))],
   };
 
+  const baselineIds = new Set(baseline.ids);
   const chosen = {};
   for (const [key, values] of Object.entries(candidates)) {
     for (const value of values) {
       const page = await listPage(ctx, directoryQuery({ [key]: value }));
-      if (!page) continue;
-      if (page.total > 0 && page.total !== baseline.total) {
+      if (!page || page.ids.length === 0) continue;
+      const sameFirstPage =
+        page.ids.length === baselineIds.size && page.ids.every((id) => baselineIds.has(id));
+      if (!sameFirstPage) {
         chosen[key] = value;
         break;
       }
@@ -317,7 +321,7 @@ export async function checkFrontend(report, ctx) {
             name,
             seen.length === 0
               ? `no ${key} value appears in the open entries at ${ctx.api}, so this filter cannot be exercised against live data`
-              : `no ${key} value narrows the corpus (every one of ${seen.length} candidate(s) returns the unfiltered total of ${filters.baselineTotal}), so this filter cannot be exercised against live data`,
+              : `no ${key} value changes the first page (all ${seen.length} candidate(s) return the same entries as the unfiltered page, out of ${filters.baselineTotal} open), so this filter cannot be exercised against live data`,
           );
           continue;
         }

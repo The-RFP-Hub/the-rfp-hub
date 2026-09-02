@@ -5,10 +5,10 @@
  *
  *   1. The four documents exist in the repository, and their GitHub URLs answer 200 — a fact about
  *      the public mirror a reader actually clicks through to.
- *   2. The home page and `/how-it-works` carry an ANCHOR whose href is each of those four exact
- *      URLs. Searching the whole HTML for the substring "GOVERNANCE.md" (what this did before)
- *      matched a serialized flight payload, a code sample, or three of the four being absent.
- *   3. On the home page at least one of them sits OUTSIDE `<footer>`: the plan is explicit that a
+ *   2. `/how-it-works` carries an ANCHOR whose href is each of those four exact URLs. Searching the
+ *      whole HTML for the substring "GOVERNANCE.md" (what this did before) matched a serialized
+ *      flight payload, a code sample, or three of the four being absent.
+ *   3. The home page carries at least ONE of them OUTSIDE `<footer>`: the plan is explicit that a
  *      link every page carries in its chrome is not the home page linking to the framework.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -74,7 +74,7 @@ export async function checkGovernance(report, ctx) {
   const c = report.criterion(
     "M4-1",
     "Governance framework published and linked",
-    "The four governance documents exist, their GitHub URLs resolve, the home page and /how-it-works each carry an anchor to all four exact URLs, and at least one of them on the home page is outside the footer.",
+    "The four governance documents exist, their GitHub URLs resolve, /how-it-works carries an anchor to all four exact URLs, and the home page carries at least one of them outside its footer.",
   );
 
   if (ctx.skip.has("governance")) {

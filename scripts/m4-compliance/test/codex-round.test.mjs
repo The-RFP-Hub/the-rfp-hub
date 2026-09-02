@@ -253,29 +253,38 @@ describe("staging validation — the home page is held to one link, not four", (
   });
 });
 
-describe("staging validation — a filter value has to narrow the corpus", () => {
+describe("staging validation — a filter value has to change the FIRST PAGE", () => {
   const OPEN_TOTAL = 142;
-  // `Ethereum` is the corpus's dominant ecosystem: filtering by it returns the unfiltered total,
-  // so its first page IS the baseline page and "the filter changed the result set" cannot hold.
-  const TOTALS = { Ethereum: OPEN_TOTAL, Optimism: 115, Nowhere: 0, grant: OPEN_TOTAL, bounty: 12 };
+  const BASELINE = ["a", "b", "c"];
+  // Staging's exact shape. `Ethereum` is the dominant ecosystem: its total DIFFERS from the
+  // unfiltered one (115 of 142) and its first page does not, so a total-based discriminator still
+  // picked it and the UI assertion failed on correct behavior. `Nowhere` matches nothing.
+  const PAGES = {
+    Ethereum: { ids: BASELINE, total: 115 },
+    Optimism: { ids: ["c", "d"], total: 40 },
+    Nowhere: { ids: [], total: 0 },
+    grant: { ids: BASELINE, total: 120 },
+    bounty: { ids: ["z"], total: 12 },
+  };
 
   function mockCorpus() {
     request.mockImplementation(async (url) => {
       const params = new URL(url).searchParams;
       const key = params.get("ecosystem") ?? params.get("fundingType");
-      const total = key === null ? OPEN_TOTAL : (TOTALS[key] ?? 0);
+      const page =
+        key === null ? { ids: BASELINE, total: OPEN_TOTAL } : (PAGES[key] ?? { ids: [], total: 0 });
       const items =
-        params.get("limit") === "100"
+        key === null && params.get("limit") === "100"
           ? [
               { id: "a", fundingType: "grant", ecosystems: ["Ethereum", "Optimism"] },
               { id: "b", fundingType: "bounty", ecosystems: ["Nowhere"] },
             ]
-          : [{ id: "a", fundingType: "grant", ecosystems: ["Ethereum"] }];
-      return { ok: true, status: 200, body: JSON.stringify({ items, total }) };
+          : page.ids.map((id) => ({ id, fundingType: "grant", ecosystems: ["Ethereum"] }));
+      return { ok: true, status: 200, body: JSON.stringify({ items, total: page.total }) };
     });
   }
 
-  it("skips a dominant value and a zero-result value, choosing one that discriminates", async () => {
+  it("skips a dominant value whose total differs but whose first page does not", async () => {
     mockCorpus();
     const filters = await deriveFilterValues({ api: "https://api.example.org", timeoutMs: 5000 });
     expect(filters.ecosystem).toBe("Optimism");
@@ -289,11 +298,13 @@ describe("staging validation — a filter value has to narrow the corpus", () =>
     expect(filters.candidates.ecosystem).toEqual(["Ethereum", "Optimism", "Nowhere"]);
   });
 
-  it("chooses nothing when every candidate returns the unfiltered total", async () => {
+  it("chooses nothing when no candidate changes the first page", async () => {
     request.mockImplementation(async (url) => {
       const params = new URL(url).searchParams;
-      const items = [{ id: "a", fundingType: "grant", ecosystems: ["Ethereum"] }];
-      return { ok: true, status: 200, body: JSON.stringify({ items, total: OPEN_TOTAL }) };
+      // Every filtered page is the unfiltered page, whatever the total says.
+      const items = BASELINE.map((id) => ({ id, fundingType: "grant", ecosystems: ["Ethereum"] }));
+      const total = params.get("ecosystem") || params.get("fundingType") ? 115 : OPEN_TOTAL;
+      return { ok: true, status: 200, body: JSON.stringify({ items, total }) };
     });
     const filters = await deriveFilterValues({ api: "https://api.example.org", timeoutMs: 5000 });
     expect(filters.ecosystem).toBeUndefined();
