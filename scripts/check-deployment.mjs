@@ -2,11 +2,10 @@
 /**
  * Read-only compliance check for a deployment.
  *
- * It fetches public documents and holds them to the contract they publish, so running it anywhere,
- * twice, costs nothing — which is why its defaults point at production. It cannot write: no
- * credential flag, no environment fallback, and no code path that submits anything. The criteria
- * that write live in `scripts/accept-writes.mjs`, behind a staging-only guard. That separation is
- * the safety property, not a convention.
+ * It fetches public documents and holds them to the contract they publish, so running it anywhere
+ * costs nothing — which is why its defaults point at production. It cannot write: no credential
+ * flag, no environment fallback, no code path that submits. That separation is the safety property,
+ * not a convention — see ./compliance/README.md.
  *
  * Usage:
  *   node scripts/check-deployment.mjs --milestone m2 --api https://api.example.org \
@@ -122,9 +121,16 @@ async function main() {
     profile: opts.milestone ? READ_MILESTONES[opts.milestone] : undefined,
   });
 
+  // `--offline` is a promise, not a hint: a criterion that reads the deployment cannot keep it, so
+  // only one whose meta declares `offline: true` survives the flag. The rest are unmet, not run.
+  const reachable = opts.offline
+    ? selection.criteria.filter((c) => c.meta.offline === true)
+    : selection.criteria;
+  const grounded = selection.criteria.filter((c) => !reachable.includes(c));
+
   // Up front, not per criterion: a run that cannot validate anything must not start and report.
   let standard;
-  if (selection.criteria.some((c) => c.meta.needs.includes("standard"))) {
+  if (reachable.some((c) => c.meta.needs.includes("standard"))) {
     try {
       standard = await loadStandardValidator();
     } catch (err) {
@@ -133,7 +139,7 @@ async function main() {
     }
   }
 
-  const needs = (name) => selection.criteria.some((c) => c.meta.needs.includes(name));
+  const needs = (name) => reachable.some((c) => c.meta.needs.includes(name));
   const report = new Report({
     title: "RFP Hub — deployment compliance check",
     milestone: opts.milestone,
@@ -151,12 +157,23 @@ async function main() {
   });
 
   const ctx = { ...opts, report, results: {}, standard };
-  for (const criterion of selection.criteria) await criterion.run(ctx);
+  for (const criterion of reachable) await criterion.run(ctx);
+  for (const criterion of grounded) {
+    const key = criterion.meta.key;
+    report
+      .criterion(
+        key,
+        key,
+        "Not performed: this criterion reads the deployment, and --offline was passed.",
+      )
+      .unmet("skipped: --offline", `${key} reads the deployment over the network`)
+      .finish();
+  }
   for (const criterion of selection.skipped) {
     const key = criterion.meta.key;
     report
       .criterion(key, key, "Not performed: excluded from this run with --skip.")
-      .unmet(key, `--skip ${key}`)
+      .unmet(`skipped: --skip ${key}`, "excluded by the caller")
       .finish();
   }
 
