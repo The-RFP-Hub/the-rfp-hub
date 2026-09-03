@@ -25,6 +25,7 @@ import {
   readApproval,
   writePending,
 } from "../approvals.js";
+import { cliCommand } from "../config.js";
 import { ToolError } from "../errors.js";
 import type { SubmissionResult } from "../http.js";
 import { findSecretPaths } from "../redact.js";
@@ -340,7 +341,8 @@ function preview(
 
   // The first four sentences are PRESCRIBED, word for word: dropping `status: "pending"` or
   // softening "must" is the difference between "nothing happened" and "something might have".
-  const instruction = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`rfphub-mcp approve ${approvalId}\` in their own terminal and read what it prints. No approval secret is ever returned here. Then call this tool again with the SAME document and \`approvalId: "${approvalId}"\`. The approval expires ${PENDING_TTL_MS / 60000} minutes after this preview.`;
+  const approve = cliCommand(ctx.config, "approve", approvalId);
+  const instruction = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`${approve}\` in their own terminal and read what it prints. No approval secret is ever returned here. Then call this tool again with the SAME document and \`approvalId: "${approvalId}"\`. The approval expires ${PENDING_TTL_MS / 60000} minutes after this preview.`;
   const idRule = describeIdRule(facts);
 
   const structured = {
@@ -416,7 +418,7 @@ async function commit(
   if (granted === null) {
     throw new ToolError(
       "confirmation_required",
-      `This document has been previewed but not approved, so nothing was sent. The person at this machine must run \`rfphub-mcp approve ${approvalId}\` in their own terminal, read the destination, credential fingerprint and document it prints, and confirm. Then call this tool again unchanged.`,
+      `This document has been previewed but not approved, so nothing was sent. The person at this machine must run \`${cliCommand(ctx.config, "approve", approvalId)}\` in their own terminal, read the destination, credential fingerprint and document it prints, and confirm. Then call this tool again unchanged.`,
       { approvalId },
     );
   }

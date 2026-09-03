@@ -13,7 +13,9 @@ export {
 export {
   loadConfig,
   canonicalOrigin,
+  cliCommand,
   defaultStateDir,
+  shellQuote,
   keyFingerprint,
   ConfigError,
   DEFAULT_API_BASE,

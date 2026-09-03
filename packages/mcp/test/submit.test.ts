@@ -2,6 +2,7 @@
  * Phase 0, local validation, and the way the three duplicate-check states are reported.
  */
 import { afterEach, describe, expect, it } from "vitest";
+import type { McpConfig } from "../src/config.js";
 import { ApiClient } from "../src/http.js";
 import { Policy } from "../src/policy.js";
 import { clearRegisteredSecrets } from "../src/redact.js";
@@ -179,9 +180,12 @@ describe("the submission result", () => {
  * there is nothing in this response to spend.
  */
 describe("the preview says exactly what it is required to say", () => {
-  async function previewOf(document: Record<string, unknown> = validDocument()) {
-    const home = tempHome();
-    const config = testConfig({ home });
+  async function previewOf(
+    document: Record<string, unknown> = validDocument(),
+    configOverrides: Partial<McpConfig> = {},
+  ) {
+    const home = configOverrides.home ?? tempHome();
+    const config = testConfig({ ...configOverrides, home });
     const ctx: ToolContext = {
       config,
       api: new ApiClient(config, { fetchImpl: stubFetch([{ body: {} }]).fetchImpl }),
@@ -198,6 +202,18 @@ describe("the preview says exactly what it is required to say", () => {
     const prescribed = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`rfphub-mcp approve ${id}\` in their own terminal and read what it prints. No approval secret is ever returned here.`;
     expect(String(preview.structured.instruction).startsWith(prescribed)).toBe(true);
     expect(preview.text).toContain('Nothing has been submitted. `status: "pending"`.');
+  });
+
+  it("names the state directory in that command when this server was given one", async () => {
+    // Without the flag the person's terminal reads ~/.rfphub, finds nothing, and the instruction
+    // that sent them there reads like a broken approval rather than a different directory.
+    const preview = await previewOf(validDocument(), {
+      home: "/tmp/rfphub state",
+      stateDirExplicit: true,
+    });
+    const id = String(preview.structured.approvalId);
+    const prescribed = `Nothing has been submitted. \`status: "pending"\`. To submit, the person at this machine must run \`rfphub-mcp --state-dir '/tmp/rfphub state' approve ${id}\` in their own terminal and read what it prints. No approval secret is ever returned here.`;
+    expect(String(preview.structured.instruction).startsWith(prescribed)).toBe(true);
   });
 
   it("states the derived namespace and whether the id satisfies the rule", async () => {

@@ -302,8 +302,10 @@ another identity. This server refuses rather than guesses — see below.
 
 **Pass the same directory to the approval commands.** The server writes the preview there and
 `rfphub-mcp approve` reads it back; given different directories, `pending` shows nothing while a
-real preview waits somewhere else. `rfphub-mcp --state-dir /var/lib/rfphub pending` prints an
-`approve` line that already carries the flag.
+real preview waits somewhere else. Every command this server prints for a person to run already
+carries the flag when one was given — the preview's `instruction`, the refusal when a commit
+arrives unapproved, and the `approve` line in `rfphub-mcp --state-dir /var/lib/rfphub pending` —
+shell-quoted, so a path with a space survives the paste.
 
 
 

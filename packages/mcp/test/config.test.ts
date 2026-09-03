@@ -6,15 +6,18 @@
  * the URL, or carries a path the origin binding cannot see has to be refused at startup — before a
  * preview exists for anyone to approve.
  */
+import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { computeApprovalId, documentHashOf } from "../src/approvals.js";
 import {
   ConfigError,
   DEFAULT_TIMEOUT_MS,
   canonicalOrigin,
+  cliCommand,
   defaultStateDir,
   loadConfig,
+  shellQuote,
 } from "../src/config.js";
 
 function load(env: Record<string, string>, options: { stateDir?: string } = {}) {
@@ -124,6 +127,28 @@ describe("the state directory", () => {
     expect(load({}, { stateDir: "  /tmp/padded  " }).home).toBe("/tmp/padded");
     expect(load({}, { stateDir: "state" }).home).toBe(path.resolve("state"));
   });
+
+  it("records that the flag was given, rather than leaving it to be inferred later", () => {
+    expect(load({}).stateDirExplicit).toBe(false);
+    expect(load({}, { stateDir: "/tmp/x" }).stateDirExplicit).toBe(true);
+    // An empty or blank flag value is refused by the CLI parser, so it never reaches here as one.
+    expect(load({}, { stateDir: "   " }).stateDirExplicit).toBe(false);
+  });
+
+  it("does NOT resolve the default when the flag is given", () => {
+    // An identity with no home and no passwd entry — a container UID — makes `os.homedir()` throw.
+    // That is precisely the case `--state-dir` exists for, so nothing may consult the default.
+    const spy = vi.spyOn(os, "homedir").mockImplementation(() => {
+      throw new Error("uv_os_homedir returned ENOENT");
+    });
+    try {
+      const config = load({}, { stateDir: "/var/lib/rfphub" });
+      expect(config.home).toBe("/var/lib/rfphub");
+      expect(cliCommand(config, "pending")).toBe("rfphub-mcp --state-dir /var/lib/rfphub pending");
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe("the environment surface", () => {
@@ -139,5 +164,43 @@ describe("the environment surface", () => {
     });
     loadConfig(env, { stateDir: "/tmp/state" });
     expect([...new Set(seen)].sort()).toEqual(["RFPHUB_API_BASE", "RFPHUB_API_KEY"]);
+  });
+});
+
+describe("shellQuote", () => {
+  it("leaves an ordinary path bare", () => {
+    for (const value of ["/var/lib/rfphub", "state", "/tmp/a-b_c.d", "/home/user/.rfphub"]) {
+      expect(shellQuote(value), value).toBe(value);
+    }
+  });
+
+  it("quotes a path a shell would otherwise split or expand", () => {
+    expect(shellQuote("/tmp/my state")).toBe("'/tmp/my state'");
+    expect(shellQuote("/tmp/$HOME")).toBe("'/tmp/$HOME'");
+    expect(shellQuote("/tmp/a;rm -rf b")).toBe("'/tmp/a;rm -rf b'");
+    expect(shellQuote("/tmp/`whoami`")).toBe("'/tmp/`whoami`'");
+    expect(shellQuote("")).toBe("''");
+  });
+
+  it("closes, escapes and reopens around a single quote — the one case quoting cannot cover", () => {
+    expect(shellQuote("/tmp/it's here")).toBe("'/tmp/it'\\''s here'");
+  });
+
+  it("quotes a value that would otherwise read as a flag", () => {
+    expect(shellQuote("--state-dir")).toBe("'--state-dir'");
+  });
+});
+
+describe("cliCommand", () => {
+  it("omits the flag when the state directory is the default", () => {
+    expect(
+      cliCommand({ home: "/home/someone/.rfphub", stateDirExplicit: false }, "approve", "x"),
+    ).toBe("rfphub-mcp approve x");
+  });
+
+  it("carries the flag, quoted, when one was given", () => {
+    expect(cliCommand({ home: "/tmp/my state", stateDirExplicit: true }, "approve", "x")).toBe(
+      "rfphub-mcp --state-dir '/tmp/my state' approve x",
+    );
   });
 });

@@ -40,6 +40,8 @@ export function testConfig(overrides: Partial<McpConfig> = {}): McpConfig {
     apiOrigin: overrides.apiOrigin ?? canonicalOrigin(apiBase),
     apiKey: overrides.apiKey !== undefined ? overrides.apiKey : FAKE_KEY,
     home: overrides.home ?? tempHome(),
+    // Defaults to false so the printed commands stay flagless unless a test is about the flag.
+    stateDirExplicit: overrides.stateDirExplicit ?? false,
     timeoutMs: overrides.timeoutMs ?? 20_000,
   };
 }

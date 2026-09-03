@@ -39,6 +39,7 @@ import {
   OTHER_FAKE_KEY,
   rejection,
   stubFetch,
+  tempHome,
   testConfig,
   validDocument,
 } from "./helpers.js";
@@ -139,12 +140,13 @@ describe("phase 1 — preview", () => {
 });
 
 describe("phase 3 — commit", () => {
-  async function previewed(): Promise<{
+  async function previewed(config: Parameters<typeof testConfig>[0] = {}): Promise<{
     ctx: ToolContext;
     stub: ReturnType<typeof stubFetch>;
     id: string;
   }> {
     const { ctx, stub } = context({
+      config,
       responses: [
         {
           body: {
@@ -180,10 +182,20 @@ describe("phase 3 — commit", () => {
 
   it("without an approval, refuses and sends nothing", async () => {
     const { ctx, stub, id } = await previewed();
-    await expect(run({ document: validDocument(), approvalId: id }, ctx)).rejects.toMatchObject({
-      code: "confirmation_required",
-    });
+    const error = await rejection(run({ document: validDocument(), approvalId: id }, ctx));
+    expect(error.code).toBe("confirmation_required");
+    expect(error.message).toContain(`must run \`rfphub-mcp approve ${id}\``);
     expect(stub.calls).toHaveLength(0);
+  });
+
+  it("names the state directory in that refusal too, when this server was given one", async () => {
+    // The refusal is the second place a person is told what to run, and it was the one that still
+    // sent them to ~/.rfphub while the preview waited somewhere else.
+    const home = tempHome();
+    const { ctx, id } = await previewed({ home, stateDirExplicit: true });
+    const error = await rejection(run({ document: validDocument(), approvalId: id }, ctx));
+    expect(error.code).toBe("confirmation_required");
+    expect(error.message).toContain(`must run \`rfphub-mcp --state-dir ${home} approve ${id}\``);
   });
 
   it("with an approval, submits exactly once", async () => {

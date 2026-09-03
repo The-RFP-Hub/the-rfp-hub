@@ -32,6 +32,12 @@ export interface McpConfig {
   apiKey: string | null;
   /** Directory for the approval, policy-counter and audit files. 0700. */
   home: string;
+  /**
+   * Whether `--state-dir` was given. Kept as a FLAG rather than derived by comparing `home` with
+   * the default: resolving the default calls `os.homedir()`, which throws for an identity with no
+   * home and no passwd entry — exactly the case the flag exists for.
+   */
+  stateDirExplicit: boolean;
   /** Per-request deadline in milliseconds. */
   timeoutMs: number;
 }
@@ -115,6 +121,35 @@ export function loadConfig(
     apiOrigin,
     apiKey: apiKeyRaw ? apiKeyRaw : null,
     home: stateDir ? path.resolve(stateDir) : defaultStateDir(),
+    stateDirExplicit: Boolean(stateDir),
     timeoutMs: DEFAULT_TIMEOUT_MS,
   };
+}
+
+/** Safe to hand a shell bare: no whitespace, no quote, no metacharacter, no leading dash. */
+const BARE_WORD = /^[A-Za-z0-9_.\/][A-Za-z0-9_.\/-]*$/;
+
+/**
+ * A shell word. Single quotes take everything literally, so the only case to handle is a single
+ * quote itself: close, escape it, reopen. A path is not a secret, but it IS attacker-adjacent —
+ * it can arrive from a container's configuration — and the command is printed for a person to
+ * paste, so it has to survive the paste unchanged.
+ */
+export function shellQuote(value: string): string {
+  if (BARE_WORD.test(value)) return value;
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/**
+ * The `rfphub-mcp` command line to PRINT for a person to run. It carries `--state-dir` whenever
+ * this process was given one: without it the person's terminal reads `~/.rfphub`, finds nothing,
+ * and the instruction that sent them there looks like a bug in the approval rather than a
+ * mismatched directory.
+ */
+export function cliCommand(
+  config: Pick<McpConfig, "home" | "stateDirExplicit">,
+  ...args: string[]
+): string {
+  const flag = config.stateDirExplicit ? ` --state-dir ${shellQuote(config.home)}` : "";
+  return `rfphub-mcp${flag} ${args.join(" ")}`;
 }

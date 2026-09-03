@@ -36,7 +36,7 @@ import {
   readPending,
   writeApproval,
 } from "./approvals.js";
-import { ConfigError, defaultStateDir, loadConfig } from "./config.js";
+import { ConfigError, cliCommand, loadConfig } from "./config.js";
 import { redactString, registerSecret } from "./redact.js";
 import { PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION, createServer } from "./server.js";
 import { RedactingTransport } from "./transport.js";
@@ -45,8 +45,8 @@ import { RedactingTransport } from "./transport.js";
  * ONE message however the preview became unavailable. Which of the two paths fired depends on how
  * a race interleaved, so distinguishing them would report a detail nobody can act on.
  */
-function previewUnavailable(id: string): string {
-  return `That preview is not available: ${id} was never pending, was revoked, or another \`approve\` for the same id completed first. NOTHING WAS APPROVED. Run \`rfphub-mcp pending\` to see what is actually waiting.`;
+function previewUnavailable(config: ReturnType<typeof loadConfig>, id: string): string {
+  return `That preview is not available: ${id} was never pending, was revoked, or another \`approve\` for the same id completed first. NOTHING WAS APPROVED. Run \`${cliCommand(config, "pending")}\` to see what is actually waiting.`;
 }
 
 /** ONE message from either point that can notice it. Same reasoning as above. */
@@ -147,7 +147,7 @@ async function main(argv: string[]): Promise<number> {
     case undefined:
       return serve(config);
     case "pending":
-      return pending(config.home);
+      return pending(config);
     case "approve":
       return approve(config, rest[0]);
     case "revoke":
@@ -172,10 +172,8 @@ function serve(config: ReturnType<typeof loadConfig>): Promise<number> {
   return new Promise<number>(() => {});
 }
 
-function pending(home: string): number {
-  // The hint has to be runnable: a listing of a directory the default would not have found must
-  // carry the flag that found it.
-  const flag = home === defaultStateDir() ? "" : ` --state-dir ${home}`;
+function pending(config: ReturnType<typeof loadConfig>): number {
+  const home = config.home;
   const previews = listPending(home);
   const approvals = listApprovals(home);
   const now = new Date();
@@ -194,7 +192,7 @@ function pending(home: string): number {
     const state = isExpired(record, now) ? "EXPIRED" : `expires ${record.expiresAt}`;
     lines.push(`  ${record.approvalId}  ${state}`);
     lines.push(describeBinding(record).replace(/^/gm, "  "));
-    lines.push(`    approve with: rfphub-mcp${flag} approve ${record.approvalId}`);
+    lines.push(`    approve with: ${cliCommand(config, "approve", record.approvalId)}`);
   }
   lines.push("");
   lines.push(`Approvals granted and not yet used (${approvalsDir(home)}):`);
@@ -234,7 +232,7 @@ async function approve(
     return 2;
   }
   if (record === null) {
-    say(previewUnavailable(id));
+    say(previewUnavailable(config, id));
     return 1;
   }
   const now = new Date();
@@ -287,7 +285,7 @@ async function approve(
   }
   if (claimed === null) {
     // Deliberately the SAME sentence the read-side miss prints.
-    say(previewUnavailable(record.approvalId));
+    say(previewUnavailable(config, record.approvalId));
     return 1;
   }
 
