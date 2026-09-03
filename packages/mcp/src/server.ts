@@ -11,6 +11,7 @@
  * and refuses.
  */
 import { type CallToolResult, McpServer } from "@modelcontextprotocol/server";
+import { version as PACKAGE_VERSION } from "../package.json";
 import { appendAudit, summarizeInput } from "./audit.js";
 import type { McpConfig } from "./config.js";
 import { ToolError } from "./errors.js";
@@ -23,7 +24,7 @@ import * as searchTool from "./tools/search.js";
 import * as submitTool from "./tools/submit.js";
 
 export const SERVER_NAME = "rfp-hub";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = PACKAGE_VERSION;
 
 /**
  * NOT the SDK's `LATEST_PROTOCOL_VERSION`: in v2 that is `2025-11-25`, the newest LEGACY-era

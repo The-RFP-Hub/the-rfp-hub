@@ -215,8 +215,13 @@ converge on it. Those are post-milestone work, recorded here so the gap is a kno
   consistent enough that it can be relied on. Never instead of it: an interlock that depends on an
   optional feature fails open where the feature is missing.
 - A shared rate-limit store, if the local per-machine counters ever prove insufficient.
-- Confirm the registry namespace casing (`io.github.the-rfp-hub`, lowercase, against a GitHub
-  organization spelled `The-RFP-Hub`) with `mcp-publisher` before the first publish. The manifest
+- ~~Confirm the registry namespace casing (`io.github.the-rfp-hub`, lowercase, against a GitHub
+  organization spelled `The-RFP-Hub`) with `mcp-publisher` before the first publish.~~ Settled
+  2026-09-03, the hard way: the registry grants `io.github.<login>/*` in the login's exact case and
+  matches it as a case-sensitive prefix, so the namespace is `io.github.The-RFP-Hub` and the
+  lowercase name that 0.1.0 and 0.1.1 carried could be published by nobody. The publish itself runs
+  from a workflow with the repository's OIDC identity, because a person's token is granted an
+  organization namespace only as an Owner (docs/deployment.md §7.7). The manifest
   itself is no longer an open question: the registry's published schema (2025-12-11) is vendored
   under `packages/mcp/test/fixtures/` and `server.json` is validated against it in CI, which is
   also what settled that the publisher-defined `_meta` key is permitted.

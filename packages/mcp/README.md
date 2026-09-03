@@ -18,10 +18,10 @@ an MCP server is code your agent runs with your permissions. Pin it, and bump it
 ### Claude Code
 
 ```sh
-claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
+claude mcp add --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.1
 
 # project-scoped instead of user-scoped — writes .mcp.json in the repo
-claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
+claude mcp add --scope project --transport stdio rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.1
 ```
 
 ### Claude Desktop and Cursor
@@ -33,7 +33,7 @@ Root key `mcpServers`, in `claude_desktop_config.json` or `.cursor/mcp.json`:
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.0"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.1"]
     }
   }
 }
@@ -49,7 +49,7 @@ Root key `servers`, in `.vscode/mcp.json`:
     "rfp-hub": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.0"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.1"]
     }
   }
 }
@@ -58,7 +58,7 @@ Root key `servers`, in `.vscode/mcp.json`:
 ### Codex CLI
 
 ```sh
-codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
+codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.1
 ```
 
 ---
@@ -131,7 +131,7 @@ there is no parameter on any tool through which one could be passed, and a test 
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.0"],
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.1"],
       "env": {
         "RFPHUB_API_KEY": "rfph_…"
       }
@@ -182,7 +182,7 @@ Two calls with a person in between. See the next section.
        { status: "pending", approvalId: "<64 hex>", preview: {...}, instruction: "..." }
 
 2. a person runs, in their own terminal:
-     npx @the-rfp-hub/mcp@0.1.0 approve <approvalId>
+     npx @the-rfp-hub/mcp@0.1.1 approve <approvalId>
      → prints the destination, the credential fingerprint, the operation, the protocol
        revision and the whole document, then asks for confirmation
 
@@ -294,7 +294,7 @@ another identity. This server refuses rather than guesses — see below.
   "mcpServers": {
     "rfp-hub": {
       "command": "npx",
-      "args": ["-y", "@the-rfp-hub/mcp@0.1.0", "--state-dir", "/var/lib/rfphub"]
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.1", "--state-dir", "/var/lib/rfphub"]
     }
   }
 }
