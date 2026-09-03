@@ -394,7 +394,13 @@ COMPLIANCE_REVIEWER_TOKEN=... COMPLIANCE_WRITE_KEY=rfph_... \
 `accept:writes --milestone m4` is the write-acceptance counterpart, **staging only** — there is no
 flag that points it at production. It drives the real MCP `submit_opportunity` interlock end to
 end — preview, an out-of-band `rfphub-mcp approve`, commit — and tears its fixture down afterwards.
-It is the same guard as the M3 profile — there is no flag that forces production.
+It is the same guard as the M3 profile — there is no flag that forces production. `--only`/`--skip`
+may name only criteria in the selected `--milestone` profile — a key from the other one is refused
+before any request is made (exit 2), because each profile's teardown only removes what that profile
+wrote. The m4 credential variables (`COMPLIANCE_REVIEWER_TOKEN`/`COMPLIANCE_WRITE_KEY`, or their
+`RFPHUB_REVIEWER_TOKEN`/`RFPHUB_WRITE_KEY` fallbacks) are read only under `--milestone m4` — the m3
+profile reads `COMPLIANCE_SESSION_TOKEN`/`COMPLIANCE_ADMIN_TOKEN`/`COMPLIANCE_API_KEY` instead, and
+flags always win over either.
 
 `--interactive-approval` is the difference between evidence and a rehearsal. With it, the run
 **pauses** and asks you to run `rfphub-mcp approve <id>` in a second terminal; the report then
