@@ -13,10 +13,10 @@
 # address. Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID (project-scoped; Settings →
 # General). Environment variables live in Vercel (Settings → Environment Variables), never here.
 #
-# `NEXT_PUBLIC_SITE_ORIGIN` MUST NOT BE SET on this (Preview) environment. Unset, this alias and
-# every other preview resolve `noindex` / `Disallow: /` — Vercel reports `VERCEL_ENV=preview`, which
-# claims no canonical origin — instead of competing with production in search results. See
-# frontend-production.yml and the frontend README.
+# `NEXT_PUBLIC_SITE_ORIGIN` MUST NOT BE SET on this (Preview) environment, and the step before the
+# build fails the deploy if it is. Unset, this alias and every other preview resolve `noindex` /
+# `Disallow: /` — Vercel reports `VERCEL_ENV=preview`, which claims no canonical origin — instead of
+# competing with production in search results. See frontend-production.yml and the frontend README.
 name: Staging frontend
 
 on:
@@ -79,6 +79,12 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+      # The mirror of the production workflow's guard, and the reason it is worth a step here too:
+      # an origin set on this environment by mistake would put a second indexable copy of the same
+      # directory in search results, competing with the real one.
+      - name: Assert the pulled environment names no canonical origin
+        run: node scripts/check-canonical-origin.mjs .vercel/.env.preview.local --expect none
 
       - name: Build
         env:
