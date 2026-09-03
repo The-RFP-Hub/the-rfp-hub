@@ -41,9 +41,9 @@ export function fixtureDocument({ id, namespace, title, applicationUrl, deadline
     id,
     fundingType: "grant",
     title,
-    summary: summary ?? "A compliance fixture created by scripts/check-m3.mjs.",
+    summary: summary ?? "A compliance fixture created by scripts/accept-writes.mjs.",
     description:
-      "Created by the RFP Hub M3 compliance checker to verify the write, provenance and analytics surfaces of a deployment. It is not a real funding opportunity and should be rejected or unlisted after the run.",
+      "Created by the RFP Hub write-acceptance checker to verify the write, provenance and analytics surfaces of a deployment. It is not a real funding opportunity and should be rejected or unlisted after the run.",
     status: "open",
     operatingOrganizations: [{ name: namespace, slug: namespace }],
     ecosystems: ["Ethereum"],

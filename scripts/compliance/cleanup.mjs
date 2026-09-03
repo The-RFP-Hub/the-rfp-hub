@@ -7,8 +7,8 @@
  *   - **Entries** are rejected and unlisted, not deleted. There is no delete endpoint, deliberately:
  *     a published id may already be in an export, a feed or somebody's bookmarks. A rejected,
  *     unlisted entry is off every public surface, which is what "cleaned up" can mean here.
- *     Rejecting requires a REVIEWER session; without one the fixtures are left and NAMED, so a
- *     reader knows exactly what is there rather than discovering it later.
+ *     Rejecting requires a REVIEWER session, which is why the tool refuses to start without one: a
+ *     run that cannot clean up after itself must not write in the first place.
  *   - **The minted key** is revoked with the session that minted it. Revocation is soft — audit rows
  *     point at keys — so it stops working and stays resolvable.
  *   - **Analytics events** for the fixture stay. They belong to an entry that is no longer public,
@@ -27,7 +27,9 @@ export async function cleanup(report, ctx, state) {
   );
 
   if (ctx.keepFixtures) {
-    c.skip("teardown", `--keep-fixtures: leaving ${state.fixtureIds.length} entries in place`, {
+    // Unmet rather than skipped: the entries are still on the deployment's public surface, which is
+    // the one thing this criterion exists to rule out. The run must not exit 0.
+    c.unmet("teardown", `--keep-fixtures: leaving ${state.fixtureIds.length} entries in place`, {
       fixtures: state.fixtureIds,
     });
     return c.finish();
@@ -56,9 +58,11 @@ export async function cleanup(report, ctx, state) {
     c.skip("fixtures are taken off the public surface", "this run created none");
     return c.finish();
   }
+  // Unreachable: a reviewer credential is a parse-time requirement. Kept as a FAIL rather than
+  // deleted so a future regression that makes it reachable again cannot be green.
   const reviewer = ctx.adminToken ?? (state.me?.canReview ? ctx.sessionToken : undefined);
   if (!reviewer) {
-    c.warn(
+    c.fail(
       "fixtures are taken off the public surface",
       `no reviewer credential, so ${state.fixtureIds.length} fixture(s) are LEFT IN PLACE and will need rejecting by hand. They are all prefixed \`compliance-\`:\n${state.fixtureIds.map((id) => `  ${id}`).join("\n")}`,
       { fixtures: state.fixtureIds },
