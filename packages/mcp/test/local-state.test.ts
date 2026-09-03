@@ -1,0 +1,338 @@
+/**
+ * The local state directory is a security boundary, so it is checked rather than assumed.
+ *
+ * The properties that matter: the home is a real directory this user owns at 0700, every file in
+ * it is a regular 0600 file, and neither is reached through a symlink. Where those cannot be
+ * established, approvals and counters REFUSE, and the audit log declines to write.
+ */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  PENDING_TTL_MS,
+  listApprovals,
+  readApproval,
+  readPending,
+  writePending,
+} from "../src/approvals.js";
+import {
+  AUDIT_MAX_BYTES,
+  appendAudit,
+  appendLine,
+  auditPath,
+  rotatedAuditPath,
+} from "../src/audit.js";
+import { DEFAULT_CAPS, Policy, counterPath } from "../src/policy.js";
+import { InsecureStateError, ensureDir, secureFile } from "../src/state.js";
+import { tempHome, validDocument } from "./helpers.js";
+
+afterEach(() => vi.restoreAllMocks());
+
+const NOW = new Date("2026-06-01T12:00:00Z");
+const ID = "a".repeat(64);
+
+function mode(target: string): string {
+  return (fs.lstatSync(target).mode & 0o777).toString(8);
+}
+
+function pendingRecord() {
+  return {
+    apiOrigin: "https://api.example.test",
+    keyFingerprint: "abcd1234",
+    operation: "submit_opportunity" as const,
+    protocolVersion: "2026-07-28",
+    documentHash: "b".repeat(64),
+    approvalId: ID,
+    document: validDocument(),
+    createdAt: NOW.toISOString(),
+    expiresAt: new Date(NOW.getTime() + PENDING_TTL_MS).toISOString(),
+  };
+}
+
+const entry = {
+  at: NOW.toISOString(),
+  tool: "search_opportunities",
+  kind: "read" as const,
+  status: "ok",
+  inputSummary: { keys: [], bytes: 2 },
+  durationMs: 1,
+};
+
+describe("a pre-existing path is brought to the documented mode", () => {
+  it("tightens a world-writable home to 0700", () => {
+    const home = tempHome();
+    fs.chmodSync(home, 0o777);
+    ensureDir(home);
+    expect(mode(home)).toBe("700");
+  });
+
+  it("tightens a world-readable audit log, which it writes rather than trusts", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(auditPath(home), "", { mode: 0o666 });
+    fs.chmodSync(auditPath(home), 0o666);
+
+    appendAudit(home, entry);
+
+    expect(mode(auditPath(home))).toBe("600");
+    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"status":"ok"');
+  });
+
+  it("replaces a world-readable record when it writes one", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "pending"), { recursive: true, mode: 0o700 });
+    const record = path.join(home, "pending", `${ID}.json`);
+    fs.writeFileSync(record, "{}", { mode: 0o666 });
+    fs.chmodSync(record, 0o666);
+
+    writePending(home, pendingRecord());
+
+    expect(mode(record)).toBe("600");
+  });
+});
+
+/**
+ * A file this server is about to TRUST is verified, not repaired. Tightening a counter or approval
+ * file that was already world-readable neither un-exposes it nor makes the decision inside it this
+ * user's, so those two paths refuse where the write paths chmod.
+ */
+describe("a state file that could have been written by anything else is not read", () => {
+  it("refuses a world-readable approval instead of authorizing a write with it", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "approvals"), { recursive: true, mode: 0o700 });
+    const file = path.join(home, "approvals", `${ID}.json`);
+    fs.writeFileSync(file, JSON.stringify({ approvalId: ID }), { mode: 0o600 });
+    fs.chmodSync(file, 0o666);
+
+    expect(() => readApproval(home, ID)).toThrow(InsecureStateError);
+    expect(() => readApproval(home, ID)).toThrow(/is mode 666/);
+    // And it is not offered up by the listing either.
+    expect(listApprovals(home)).toEqual([]);
+  });
+
+  it("refuses a world-readable preview instead of printing it for approval", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "pending"), { recursive: true, mode: 0o700 });
+    const file = path.join(home, "pending", `${ID}.json`);
+    fs.writeFileSync(file, JSON.stringify(pendingRecord()), { mode: 0o600 });
+    fs.chmodSync(file, 0o666);
+
+    expect(() => readPending(home, ID)).toThrow(/is mode 666/);
+  });
+
+  it("refuses a hard-linked counter file rather than counting against it", () => {
+    const home = tempHome();
+    ensureDir(home);
+    const caps = { ...DEFAULT_CAPS, read: { perMinute: 1, perDay: 1 } };
+    const policy = new Policy(home, { caps, now: () => NOW });
+    policy.consume("read");
+    expect(() => policy.consume("read")).toThrowError(/per minute/);
+
+    // A second name for the counter file at the cap: whoever holds it can rewrite the count.
+    fs.linkSync(counterPath(home), path.join(home, "counters.hardlink"));
+
+    expect(() => policy.consume("read")).toThrow(InsecureStateError);
+    expect(() => policy.usage("read")).toThrow(/more than one hard link/);
+  });
+
+  it("refuses a world-readable counter file rather than trusting its counts", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(counterPath(home), '{"minute":{},"day":{}}', { mode: 0o600 });
+    fs.chmodSync(counterPath(home), 0o666);
+
+    expect(() => new Policy(home, { now: () => NOW }).consume("read")).toThrow(/is mode 666/);
+  });
+});
+
+describe("a path that is not what it claims to be is refused", () => {
+  it("refuses a home that is a symlink, without using its target", () => {
+    const target = tempHome();
+    const link = path.join(os.tmpdir(), `rfphub-mcp-link-${process.pid}-${Date.now()}`);
+    fs.symlinkSync(target, link);
+    try {
+      expect(() => ensureDir(link)).toThrow(InsecureStateError);
+      expect(() => ensureDir(link)).toThrow(/symbolic link/);
+      expect(() => new Policy(link, { now: () => NOW }).consume("read")).toThrow(/symbolic link/);
+    } finally {
+      fs.unlinkSync(link);
+    }
+  });
+
+  it("refuses a dangling symlink where the home belongs", () => {
+    const link = path.join(os.tmpdir(), `rfphub-mcp-dangling-${process.pid}-${Date.now()}`);
+    fs.symlinkSync(path.join(os.tmpdir(), "rfphub-mcp-nothing-here"), link);
+    try {
+      expect(() => ensureDir(link)).toThrow(/symbolic link/);
+    } finally {
+      fs.unlinkSync(link);
+    }
+  });
+
+  it("refuses a regular file where the home belongs", () => {
+    const file = path.join(tempHome(), "home");
+    fs.writeFileSync(file, "");
+    expect(() => ensureDir(file)).toThrow(/is not a directory/);
+  });
+
+  it("refuses a state file that is a symlink or a second hard link", () => {
+    const home = tempHome();
+    const elsewhere = path.join(home, "elsewhere");
+    fs.writeFileSync(elsewhere, "{}", { mode: 0o600 });
+
+    const link = path.join(home, "linked.json");
+    fs.symlinkSync(elsewhere, link);
+    expect(() => secureFile(link)).toThrow(/symbolic link/);
+
+    const hard = path.join(home, "hard.json");
+    fs.linkSync(elsewhere, hard);
+    expect(() => secureFile(hard)).toThrow(/more than one hard link/);
+  });
+
+  it("does not read an approval record through a symlink", () => {
+    const home = tempHome();
+    fs.mkdirSync(path.join(home, "pending"), { recursive: true, mode: 0o700 });
+    const decoy = path.join(home, "decoy.json");
+    fs.writeFileSync(decoy, JSON.stringify({ ...pendingRecord(), apiOrigin: "https://evil.test" }));
+    fs.symlinkSync(decoy, path.join(home, "pending", `${ID}.json`));
+    expect(() => readPending(home, ID)).toThrow(/symbolic link/);
+  });
+});
+
+describe("a mode that cannot be established fails closed", () => {
+  it("refuses when chmod does not take", () => {
+    const home = tempHome();
+    fs.chmodSync(home, 0o777);
+    vi.spyOn(fs, "chmodSync").mockImplementation(() => {
+      throw new Error("EPERM: operation not permitted");
+    });
+    expect(() => ensureDir(home)).toThrow(InsecureStateError);
+    expect(() => ensureDir(home)).toThrow(/could not be changed/);
+  });
+
+  it("refuses when a chmod reports success but the mode does not change", () => {
+    const home = tempHome();
+    fs.chmodSync(home, 0o777);
+    vi.spyOn(fs, "chmodSync").mockImplementation(() => {});
+    expect(() => ensureDir(home)).toThrow(/stayed at mode/);
+  });
+
+  it("refuses a home under a directory it cannot create in", () => {
+    if (process.getuid?.() === 0) return; // root ignores the mode, so there is nothing to prove.
+    const parent = tempHome();
+    fs.chmodSync(parent, 0o500);
+    try {
+      expect(() => ensureDir(path.join(parent, "state"))).toThrow();
+    } finally {
+      fs.chmodSync(parent, 0o700);
+    }
+  });
+});
+
+describe("the audit log stays non-fatal, but does not write where it cannot", () => {
+  it("declines to append through a symlink, and leaves the target untouched", () => {
+    const home = tempHome();
+    const target = path.join(home, "somebody-elses-file");
+    fs.writeFileSync(target, "original\n");
+    fs.symlinkSync(target, auditPath(home));
+
+    expect(() => appendAudit(home, entry)).not.toThrow();
+    expect(fs.readFileSync(target, "utf8")).toBe("original\n");
+  });
+
+  it("declines through a symlink on a platform with no O_NOFOLLOW, where lstat is the only guard", () => {
+    const home = tempHome();
+    ensureDir(home);
+    const target = path.join(home, "somebody-elses-file");
+    fs.writeFileSync(target, "original\n");
+    fs.symlinkSync(target, auditPath(home));
+
+    // 0 is what `fs.constants.O_NOFOLLOW ?? 0` yields where the platform has no such flag: the
+    // open would follow the link, and `fstat` would then be inspecting a file that is not this
+    // one. The check before the open is what refuses.
+    expect(() => appendLine(auditPath(home), "audited\n", 0)).toThrow(/symbolic link/);
+    expect(fs.readFileSync(target, "utf8")).toBe("original\n");
+  });
+
+  it("declines when the log path is not a regular file at all", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.mkdirSync(auditPath(home));
+    expect(() => appendLine(auditPath(home), "audited\n", 0)).toThrow(/not a regular file/);
+    expect(() => appendAudit(home, entry)).not.toThrow();
+  });
+
+  it("swallows a home that cannot be created at all", () => {
+    if (process.getuid?.() === 0) return;
+    const parent = tempHome();
+    fs.chmodSync(parent, 0o500);
+    try {
+      expect(() => appendAudit(path.join(parent, "state"), entry)).not.toThrow();
+    } finally {
+      fs.chmodSync(parent, 0o700);
+    }
+  });
+});
+
+describe("the audit log is bounded", () => {
+  it("rotates at the cap, keeps exactly one generation, and keeps both at 0600", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(auditPath(home), "x".repeat(AUDIT_MAX_BYTES), { mode: 0o600 });
+
+    appendAudit(home, entry);
+
+    expect(fs.statSync(rotatedAuditPath(home)).size).toBe(AUDIT_MAX_BYTES);
+    expect(mode(rotatedAuditPath(home))).toBe("600");
+    expect(mode(auditPath(home))).toBe("600");
+    const live = fs.readFileSync(auditPath(home), "utf8");
+    expect(live.trim().split("\n")).toHaveLength(1);
+    expect(live).toContain('"tool":"search_opportunities"');
+
+    // A second rotation replaces the previous generation rather than accumulating.
+    fs.writeFileSync(auditPath(home), "y".repeat(AUDIT_MAX_BYTES), { mode: 0o600 });
+    appendAudit(home, entry);
+    expect(fs.readFileSync(rotatedAuditPath(home), "utf8").startsWith("y")).toBe(true);
+    expect(fs.existsSync(`${rotatedAuditPath(home)}.1`)).toBe(false);
+  });
+
+  it("keeps the line even when the rotation itself fails", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(auditPath(home), "x".repeat(AUDIT_MAX_BYTES), { mode: 0o600 });
+    vi.spyOn(fs, "renameSync").mockImplementation(() => {
+      throw new Error("EXDEV: cross-device link not permitted");
+    });
+
+    expect(() => appendAudit(home, entry)).not.toThrow();
+    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"tool":"search_opportunities"');
+  });
+
+  it("recreates the log at 0600 when a rotation takes it away between the check and the write", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(auditPath(home), "", { mode: 0o600 });
+    // Another process rotating the log lands exactly here: the path was judged a moment ago, and
+    // the file the line goes into is a different one.
+    const realAppend = fs.appendFileSync;
+    vi.spyOn(fs, "appendFileSync").mockImplementation(((target, data, options) => {
+      fs.rmSync(auditPath(home), { force: true });
+      return realAppend(target, data, options);
+    }) as typeof fs.appendFileSync);
+
+    appendAudit(home, entry);
+
+    expect(fs.existsSync(auditPath(home))).toBe(true);
+    expect(mode(auditPath(home))).toBe("600");
+    expect(fs.readFileSync(auditPath(home), "utf8")).toContain('"tool":"search_opportunities"');
+  });
+
+  it("leaves a log under the cap alone", () => {
+    const home = tempHome();
+    ensureDir(home);
+    fs.writeFileSync(auditPath(home), "x".repeat(1_000), { mode: 0o600 });
+    appendAudit(home, entry);
+    expect(fs.existsSync(rotatedAuditPath(home))).toBe(false);
+  });
+});

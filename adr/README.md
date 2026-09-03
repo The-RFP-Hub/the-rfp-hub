@@ -24,6 +24,7 @@ total, not one per commit.
 | [0009](./0009-land-duplicate-notifications-in-app-first.md) | Land duplicate notifications in-app first | accepted | 2026-08-26 |
 | [0010](./0010-centralize-and-dispatch-notification-email.md) | Centralize outbound email and dispatch duplicate notifications | accepted | 2026-08-26 |
 | [0011](./0011-repositories-own-all-database-access.md) | Make repositories own all database access | accepted | 2026-08-26 |
+| [0012](./0012-mcp-server-per-user-credential-stdio-out-of-band-approval.md) | Ship the MCP server as stdio, on the user's own credential, with the write approval out of band | accepted | 2026-08-27 |
 
 ## When to write one
 

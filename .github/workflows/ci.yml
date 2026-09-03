@@ -339,6 +339,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # After `Build`, and that ordering is load-bearing: the MCP integration suite spawns
+      # packages/mcp/dist/cli.js as a real process against the API and this job's Postgres, so an
+      # unbuilt package would fail the suite rather than skip it.
       - name: Test
         run: pnpm test
 

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.the-rfp-hub/rfp-hub",
+  "title": "RFP Hub",
+  "description": "Search Ethereum-ecosystem funding opportunities; submit one behind a human approval step.",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/The-RFP-Hub/the-rfp-hub/tree/main/packages/mcp",
+  "repository": {
+    "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@the-rfp-hub/mcp",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "RFPHUB_API_BASE",
+          "description": "Base URL of the RFP Hub API. Defaults to https://api.ethrfps.app. The origin of this URL is bound into every write approval.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "RFPHUB_API_KEY",
+          "description": "RFP Hub API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. Setting it is what registers the write tool at all: without it tools/list returns two tools. A write-scoped key is recommended: its submissions land pending a reviewer's decision.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--state-dir",
+          "description": "Directory for write approvals, rate-limit counters and the local audit log. Defaults to ~/.rfphub and must be writable — rate limiting fails closed. Pass it where this user has no writable home, and pass the same directory to `rfphub-mcp approve`.",
+          "isRequired": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.github.the-rfp-hub/tool-descriptions": {
+      "comment": "SHA-256 over the canonical form of {toolName: description} for every tool this version registers, asserted against the code by packages/mcp/test/manifest.test.ts. It catches ACCIDENTAL drift between the published manifest and the shipped build within a version. It is NOT protection against a publisher who changes description, code and digest together — the defense against that is that every configuration example pins an exact, immutable npm version.",
+      "algorithm": "sha256",
+      "digest": "5cd424625bc2d10901b71a7394e2004446d1067f0f7baa079420533933a4edc6"
+    }
+  }
+}

@@ -1,0 +1,130 @@
+/**
+ * A local, append-only record of what this server was asked to do.
+ *
+ * `inputSummary` is argument KEYS and a byte length, never values — a log that stored values would
+ * be a second copy of every document and every search term. A failure to audit never fails the
+ * tool, but that does not mean anything goes: a path this process cannot establish as its own 0600
+ * regular file is skipped rather than written to. And it is bounded: 5 MiB, one `.1` generation.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { withLock } from "./lock.js";
+import type { ToolKind } from "./policy.js";
+import { redactString } from "./redact.js";
+import { FILE_MODE, InsecureStateError, ensureDir, secureFile, secureOpenFile } from "./state.js";
+
+/** The mode is supplied to the same call that may create the file, so it never exists at umask. */
+const APPEND_FLAGS = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_APPEND;
+
+/** `O_NOFOLLOW` where the platform has it. Windows does not; see `appendLine`. */
+export const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
+
+/** Rotate at five mebibytes, keeping one previous generation. */
+export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+
+export interface AuditEntry {
+  at: string;
+  tool: string;
+  kind: ToolKind;
+  /** `ok` or the error code the call ended with. */
+  status: string;
+  inputSummary: { keys: string[]; bytes: number };
+  durationMs: number;
+}
+
+export function auditPath(home: string): string {
+  return path.join(home, "audit.log");
+}
+
+/** There is exactly one; an older one is replaced. */
+export function rotatedAuditPath(home: string): string {
+  return `${auditPath(home)}.1`;
+}
+
+function auditLockPath(home: string): string {
+  return path.join(home, "audit.lock");
+}
+
+/** Keys and byte length. Never values. */
+export function summarizeInput(args: unknown): { keys: string[]; bytes: number } {
+  let bytes = 0;
+  try {
+    bytes = Buffer.byteLength(JSON.stringify(args ?? null), "utf8");
+  } catch {
+    bytes = -1; // Unserializable input: record that it was, not what it was.
+  }
+  const keys =
+    args !== null && typeof args === "object" && !Array.isArray(args)
+      ? Object.keys(args as Record<string, unknown>).sort()
+      : [];
+  return { keys, bytes };
+}
+
+/** Re-measured under the lock: a second rename would discard the fresh file's first lines. */
+export function rotateAudit(home: string): void {
+  const file = auditPath(home);
+  if (sizeOf(file) < AUDIT_MAX_BYTES) return;
+  withLock(auditLockPath(home), () => {
+    if (sizeOf(file) < AUDIT_MAX_BYTES) return;
+    const previous = rotatedAuditPath(home);
+    fs.renameSync(file, previous);
+    secureFile(previous);
+  });
+}
+
+function sizeOf(file: string): number {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return 0;
+  }
+}
+
+/** Append one line. Never throws. */
+export function appendAudit(home: string, entry: AuditEntry): void {
+  try {
+    ensureDir(home);
+    try {
+      rotateAudit(home);
+    } catch {
+      // A log that could not be rotated is still worth appending to.
+    }
+    appendLine(auditPath(home), `${redactString(JSON.stringify(entry))}\n`);
+  } catch {
+    // Deliberately swallowed: stderr noise on every call for a read-only home helps nobody.
+  }
+}
+
+/**
+ * ONE descriptor for open, judge and write: a rotation landing between a path check and an append
+ * would have the append recreate `audit.log` at the process umask.
+ *
+ * The `lstat` before it is the symlink guard, and it runs on every platform because it is the ONLY
+ * guard where `O_NOFOLLOW` does not exist (Windows). `secureOpenFile` cannot stand in for it: on a
+ * followed symlink it inspects the TARGET, which may be a perfectly ordinary 0600 file belonging
+ * to somebody else. Without the flag this leaves a window between the check and the open; it fails
+ * closed into declining a line, never into writing through the link.
+ *
+ * `noFollow` is a parameter so the fallback branch is reachable from a test on a platform that has
+ * the flag.
+ */
+export function appendLine(file: string, line: string, noFollow: number = O_NOFOLLOW): void {
+  let stats: fs.Stats | null;
+  try {
+    stats = fs.lstatSync(file);
+  } catch {
+    stats = null; // Absent is the ordinary first call; the open below creates it.
+  }
+  if (stats?.isSymbolicLink() === true) throw new InsecureStateError(file, "is a symbolic link");
+  if (stats !== null && !stats.isFile()) {
+    throw new InsecureStateError(file, "is not a regular file");
+  }
+
+  const fd = fs.openSync(file, APPEND_FLAGS | noFollow, FILE_MODE);
+  try {
+    secureOpenFile(fd, file);
+    fs.writeSync(fd, line);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
