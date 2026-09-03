@@ -183,6 +183,10 @@ export function parseArgs(argv) {
 }
 
 /** Empty means go. A milestone this binary does not own is an error naming the tool that does. */
+function runsOffline(key) {
+  return READ_CRITERIA.some((c) => c.meta.key === key && c.meta.offline === true);
+}
+
 export function refusals(opts, milestones = READ_MILESTONES) {
   const reasons = [];
   if (opts.milestone !== undefined) {
@@ -208,7 +212,10 @@ export function refusals(opts, milestones = READ_MILESTONES) {
     : opts.only.size > 0
       ? [...opts.only]
       : criterionKeys(READ_CRITERIA);
-  if (selected.includes("export") && !opts.skip.has("export") && !opts.exportUrl) {
+  // What the run will actually perform: `--offline` grounds everything that reads the deployment,
+  // so demanding the export root there refused a run that was never going to fetch it.
+  const running = selected.filter((key) => !opts.offline || runsOffline(key));
+  if (running.includes("export") && !opts.skip.has("export") && !opts.exportUrl) {
     reasons.push(
       "--export-url is required when the export criterion runs — it is the root latest.json, latest.csv and LICENSE are read beneath",
     );
@@ -238,7 +245,7 @@ export function weakenings(opts) {
       `--max-details ${opts.maxDetails}, so only that many served documents were validated against the Standard rather than every one`,
     );
   }
-  if (opts.allowInsecure && !onLoopback(opts.api)) {
+  if (weakensTransport(opts)) {
     out.push(
       "--allow-insecure, so the target was not held to https on a host whose traffic leaves the machine",
     );
@@ -246,16 +253,19 @@ export function weakenings(opts) {
   return out;
 }
 
-function onLoopback(api) {
+/** `--allow-insecure` permits plaintext, it does not impose it: against https it relaxed nothing. */
+function weakensTransport(opts) {
+  if (!opts.allowInsecure) return false;
   // Only the parse is guarded: catching around `isLoopbackHost` too would swallow a missing import
   // and report every host as remote, which is the safe direction but hides the bug for good.
-  let hostname;
+  let target;
   try {
-    hostname = new URL(api).hostname;
+    target = new URL(opts.api);
   } catch {
     return false;
   }
-  return isLoopbackHost(hostname);
+  if (target.protocol !== "http:") return false;
+  return !isLoopbackHost(target.hostname);
 }
 
 export function describeScope(opts) {

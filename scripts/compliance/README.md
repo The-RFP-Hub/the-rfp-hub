@@ -60,16 +60,22 @@ the operator chose, which reads as a finding about the deployment and is not one
 `--offline` is a promise rather than a hint. A criterion that reads the deployment cannot keep it,
 so under the flag only criteria whose registry entry declares `offline: true` run at all; the rest
 are registered as unmet, which makes the run INCOMPLETE. `--offline --only liveness` therefore
-opens no socket and exits 1, rather than quietly probing the network and reporting PASS.
+opens no socket and exits 1, rather than quietly probing the network and reporting PASS. Because
+nothing that reads the deployment runs under the flag, nothing can need a prerequisite either:
+`--offline` alone does not ask for `--export-url`, and reports every criterion as unmet instead of
+refusing to start.
 
 ### Flags that weaken a run without narrowing it
 
-`--max-details N` (anything but `0`, which means every served document) and `--allow-insecure` on a
-non-loopback target leave every criterion registered — nothing is missing from the report — while
+`--max-details N` (anything but `0`, which means every served document) and `--allow-insecure`
+against a **plaintext, non-loopback** target leave every criterion registered — nothing is missing from the report — while
 holding the deployment to less than the contract says. Because nothing is missing, the narrowing
 label above never fired for them, and a run that validated 5 of 4000 documents printed the same
 green headline as one that validated all of them. Both now stamp a `weakened: …` scope label, which
 is what sets `signOff: false` in the JSON and turns the console headline into `RESULT: SCOPED …`.
+
+`--allow-insecure` against an https target is **not** counted: the flag permits plaintext, it does
+not impose it, so there it relaxed nothing that was checked.
 
 ### The two registries, and why they are two
 
