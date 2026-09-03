@@ -3,7 +3,7 @@
  * these are rules with edge cases rather than one-line conditions.
  */
 import { describe, expect, it } from "vitest";
-import { parseArgs, refusals, requiresProductionOptIn } from "../options.mjs";
+import { parseArgs, refusals, requiresProductionOptIn } from "../accept-options.mjs";
 
 const complete = {
   baseUrl: "https://api.staging.example.org",

@@ -38,10 +38,10 @@
  * exercised (the run does not establish the milestone) · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
+import { parseArgs, refusals } from "./compliance/accept-options.mjs";
 import { normalizeBase } from "./compliance/client.mjs";
 import { TEARDOWN, WRITE_CRITERIA, selectCriteria } from "./compliance/criteria.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
-import { parseArgs, refusals } from "./compliance/options.mjs";
 import { Report } from "./compliance/report.mjs";
 
 const USAGE = `M3 sign-off compliance checker
