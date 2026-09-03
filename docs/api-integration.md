@@ -369,16 +369,18 @@ configuration snippet for each client.
 |---|---|---|
 | `search_opportunities` | read | The full filter set, `limit` capped at 25. **It returns no `description` and no `summary`** — the two longest fields a publisher controls, which is where an instruction addressed to your agent would live |
 | `fetch_opportunity` | read | One record in full, structurally unmodified, wrapped in `{ notice, opportunity, links }`. Ask for it when you actually need the prose |
-| `submit_opportunity` | write | Not registered at all unless `RFPHUB_MCP_ENABLE_SUBMIT=1`. `tools/list` shows two tools without it |
+| `submit_opportunity` | write | Not registered at all unless `RFPHUB_API_KEY` is set. `tools/list` shows two tools without it, three with it — setting the key is what turns submission on, there is no separate switch |
 
 Configuration is read **from the environment only**, never as a tool parameter: `RFPHUB_API_BASE`
 (default the production API, and it **must be `https:`** unless it points at loopback — a plain
-`http:` host is refused at startup rather than quietly carrying a key in the clear),
-`RFPHUB_API_KEY` (needed only to submit, never sent on a read), `RFPHUB_MCP_ENABLE_SUBMIT`,
-`RFPHUB_MCP_TIMEOUT_MS` (the per-request timeout), and `RFPHUB_MCP_HOME` (default `~/.rfphub`,
-where approvals, rate-limit counters and the local audit log live — it must be writable). Exact
-defaults, the precedence `RFPHUB_MCP_HOME` takes over that default, and the companion agent skill
-are in [`packages/mcp/README.md`](../packages/mcp/README.md).
+`http:` host is refused at startup rather than quietly carrying a key in the clear) and
+`RFPHUB_API_KEY` (needed only to submit, never sent on a read — and setting it is what registers
+`submit_opportunity`). The request deadline is a fixed 20 seconds, not configurable. Where approvals,
+rate-limit counters and the local audit log live is not an environment variable either — it is the
+`--state-dir <dir>` flag, accepted by every CLI mode (`serve`, `approve`, `pending`, `revoke`),
+defaulting to `~/.rfphub` (`os.homedir()`); a container with no home directory must pass the flag
+explicitly. Exact defaults and the companion agent skill are in
+[`packages/mcp/README.md`](../packages/mcp/README.md).
 
 **Submitting is two calls with a person in between.** The first returns
 `{ status: "pending", approvalId, preview }` and writes nothing. A human then runs
@@ -419,9 +421,10 @@ does that yours should:
   deployment opts into analytics, because fetching a logo from a host a submitter named leaks every
   reader's IP address to it.
 * **`NEXT_PUBLIC_API_URL` is the only required variable**, it is not a secret, and it is inlined at
-  build time — so a configuration change needs a rebuild, not a restart. The two optional ones —
-  `NEXT_PUBLIC_SITE_ORIGIN`, which decides whether the copy is indexable, and `NEXT_PUBLIC_GA_ID`,
-  which is what opens those Google origins in the CSP — are in
+  build time — so a configuration change needs a rebuild, not a restart. On Vercel there is nothing
+  else to set: indexing is decided automatically from the platform's own `VERCEL_ENV`. A copy
+  deployed off Vercel opts into indexing with `NEXT_PUBLIC_SITE_ORIGIN`; `NEXT_PUBLIC_GA_ID`, which
+  is what opens those Google origins in the CSP, is optional everywhere. Both are in
   [`deployment.md` §4](./deployment.md#the-frontends-variables).
 
 Deploying a copy: [`deployment.md` §9](./deployment.md#9-the-frontend-three-ways-to-deploy-a-copy).

@@ -78,7 +78,7 @@ hold the topology.
 | Resource | Notes |
 |---|---|
 | **A Vercel project** for `packages/frontend` | Its org and project ids become repository secrets |
-| **Environment variables in Vercel**, per environment | `NEXT_PUBLIC_API_URL` is the only one the app requires; `NEXT_PUBLIC_SITE_ORIGIN` is set on **production only**. Both are **inlined at build time**, so which environment's variables `vercel pull` fetches decides which API the shipped bundle talks to and whether it lets itself be indexed |
+| **Environment variables in Vercel**, per environment | `NEXT_PUBLIC_API_URL` is the only one the app requires, and it is **inlined at build time**, so which environment's variables `vercel pull` fetches decides which API the shipped bundle talks to. Nothing has to be set for indexing: production is detected automatically from the platform-provided `VERCEL_ENV`/`VERCEL_PROJECT_PRODUCTION_URL`, and previews stay `noindex` on their own |
 | **Domains**: the apex (production) and the staging alias | The workflows alias the deployment after building |
 
 ### Repository variables and secrets the workflows read
@@ -189,41 +189,52 @@ the fault. The integrator's side of the same facts is [`api-integration.md` §4.
 
 ### The frontend's variables
 
-All three are `NEXT_PUBLIC_`, all three are **inlined at build time**, and none of them is a
-secret. Setting any of them on a running host changes nothing until the next build.
+`NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_GA_ID` are `NEXT_PUBLIC_`, **inlined at build time**, and
+neither is a secret. `NEXT_PUBLIC_SITE_ORIGIN` is the same shape, but on Vercel there is nothing to
+set for it: production indexing is detected automatically from `VERCEL_ENV` and
+`VERCEL_PROJECT_PRODUCTION_URL`, which Vercel provides on every build and which are read
+server-side, not as `NEXT_PUBLIC_` values. Setting any of these variables on a running host changes
+nothing until the next build.
 
 | Variable | Where it is set |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Every environment, and the only **required** one. The API's origin — where `/v1` lives, where sign-in lives, and what is written into the page's CSP `connect-src` |
-| `NEXT_PUBLIC_SITE_ORIGIN` | **Production only.** The one origin this deployment considers itself the canonical, indexable copy of. The layout, `sitemap.ts` and `robots.ts` compare it against the incoming request's origin and index, sitemap and allow crawling **only when they match** |
+| `NEXT_PUBLIC_SITE_ORIGIN` | **Nothing to set on Vercel.** There, the canonical, indexable origin is derived automatically: when `VERCEL_ENV === "production"` it is `https://` plus `VERCEL_PROJECT_PRODUCTION_URL`; any other `VERCEL_ENV` (preview) — or no Vercel environment at all, with the variable unset — stays `noindex`. Set this variable explicitly only on a copy deployed **off** Vercel that should opt into indexing; an explicit value always wins over the auto-detected one |
 | `NEXT_PUBLIC_GA_ID` | **Optional**, and a production-only decision. A Google Analytics 4 measurement id (`G-…`). Unset — the default, and what every fork inherits — no analytics loads and the CSP names no Google origin at all. Set, the layout loads `gtag.js` and the policy opens exactly the Google origins GA4 needs, and nothing else. Turning it on has a privacy-page consequence: `src/app/privacy/page.tsx` has to keep describing what that deployment actually does. Details in [`packages/frontend/README.md`](../packages/frontend/README.md#environment) |
 
-Leave `NEXT_PUBLIC_SITE_ORIGIN` unset on staging, on previews, and on every self-hosted copy —
-unset means `noindex` and `Disallow: /`, which is the fail-closed direction: forgetting it costs
-production its search presence rather than costing a preview its privacy. Setting it on a second
+Leave `NEXT_PUBLIC_SITE_ORIGIN` unset on Vercel — production, staging and every preview alike — and
+the platform-provided detection handles indexing with no configuration step. Set it only on a
+self-hosted copy, or a copy deployed on a platform other than Vercel, that should be the indexable
+one; unset there means `noindex` and `Disallow: /`, the fail-closed direction: forgetting it costs
+that copy its search presence rather than costing a preview its privacy. Setting it on a second
 copy makes that copy index itself and compete with the real site in search results.
 
-### Indexing is decided by a string comparison, so the string has to be exact
+### Indexing: how the canonical origin is decided
 
-`NEXT_PUBLIC_SITE_ORIGIN` is compared, character for character, against the origin the **incoming
-request** carries. Getting it wrong does not fail a build, a deploy or a health check: the site
-serves perfectly and is quietly `noindex`, with `robots.txt` answering `Disallow: /`. The only
-symptom is that production never appears in search, weeks later.
+On Vercel this is not an operator step. Whichever canonical origin resolves — the auto-detected one
+on Vercel, or an explicit `NEXT_PUBLIC_SITE_ORIGIN` on a copy deployed elsewhere — is compared
+against the incoming **request's** origin by the layout, `sitemap.ts` and `robots.ts`, and only a
+match indexes, sitemaps and allows crawling. Getting either side wrong does not fail a build, a
+deploy or a health check: the site serves perfectly and is quietly `noindex`, with `robots.txt`
+answering `Disallow: /`. The only symptom is that production never appears in search, weeks later.
 
-Three ways to get the string wrong:
+Two things worth knowing if that happens:
 
-* **It is scheme plus host, with the default port dropped** — `https://example.org`, never
-  `https://example.org:443`, never a trailing slash or a path. The value is normalized through
-  `URL().origin`, which is also what the request side produces, so anything a `URL` cannot parse
-  falls back to "not canonical" and is indistinguishable from unset.
-* **The host is the one the browser typed, not the one the container sees.** The request origin is
-  derived from `X-Forwarded-Host` when a proxy sets it, otherwise `Host`, with the scheme from
-  `X-Forwarded-Proto` (defaulting to `https`). Behind a CDN or a load balancer, set the variable to
-  the public hostname.
+* **`VERCEL_PROJECT_PRODUCTION_URL` is the host Vercel considers this project's production
+  domain** — not necessarily a custom or aliased domain a visitor typed, if the project has more
+  than one attached. If the apex is aliased or a custom domain was added after the project was
+  created, confirm what Vercel reports as the production URL before assuming the detection is
+  broken.
+* **An explicit `NEXT_PUBLIC_SITE_ORIGIN`, on a copy deployed off Vercel, is compared character for
+  character** against the request origin — scheme plus host, with the default port dropped
+  (`https://example.org`, never `https://example.org:443`, never a trailing slash or a path),
+  normalized through `URL().origin`. The request origin is derived from `X-Forwarded-Host` when a
+  proxy sets it, otherwise `Host`, with the scheme from `X-Forwarded-Proto` (defaulting to
+  `https`). Behind a CDN or a load balancer, set the variable to the public hostname.
 * **An alias is not a second deployment.** `www.example.org` and any other alias must **redirect**
-  to the apex at the edge. Pointing a second deployment at the alias and setting the variable there
-  too produces two indexable copies of the same directory competing for the same listings; leaving
-  the variable unset there produces an alias that is reachable and invisible.
+  to the apex at the edge. Pointing a second deployment at the alias and giving it its own canonical
+  origin too produces two indexable copies of the same directory competing for the same listings;
+  leaving that copy without one produces an alias that is reachable and invisible.
 
 Verify it from outside, on the real hostname, right after the first production deploy:
 
@@ -387,7 +398,7 @@ combination that means what it says — rather than expecting `--offline` alone 
 network-free. See [`scripts/compliance/README.md`](../scripts/compliance/README.md).
 
 ```sh staging-write
-COMPLIANCE_REVIEWER_TOKEN=... COMPLIANCE_WRITE_KEY=rfph_... \
+COMPLIANCE_API_KEY=rfph_... COMPLIANCE_ADMIN_TOKEN=... \
   pnpm accept:writes --milestone m4 --api https://api-staging.ethrfps.app --interactive-approval
 ```
 
@@ -397,10 +408,12 @@ end — preview, an out-of-band `rfphub-mcp approve`, commit — and tears its f
 It is the same guard as the M3 profile — there is no flag that forces production. `--only`/`--skip`
 may name only criteria in the selected `--milestone` profile — a key from the other one is refused
 before any request is made (exit 2), because each profile's teardown only removes what that profile
-wrote. The m4 credential variables (`COMPLIANCE_REVIEWER_TOKEN`/`COMPLIANCE_WRITE_KEY`, or their
-`RFPHUB_REVIEWER_TOKEN`/`RFPHUB_WRITE_KEY` fallbacks) are read only under `--milestone m4` — the m3
-profile reads `COMPLIANCE_SESSION_TOKEN`/`COMPLIANCE_ADMIN_TOKEN`/`COMPLIANCE_API_KEY` instead, and
-flags always win over either.
+wrote. **Both milestone profiles read the same three credentials** — `--session-token` /
+`COMPLIANCE_SESSION_TOKEN`, `--admin-token` / `COMPLIANCE_ADMIN_TOKEN`, `--api-key` /
+`COMPLIANCE_API_KEY` — and flags always win over the matching variable. Under `--milestone m4`,
+`--api-key` is the write-scoped `rfph_` key handed to the MCP server for `submit_opportunity`, and
+the reviewer credential that the teardown needs is `--admin-token`, or a `--session-token` belonging
+to an account that can review.
 
 `--interactive-approval` is the difference between evidence and a rehearsal. With it, the run
 **pauses** and asks you to run `rfphub-mcp approve <id>` in a second terminal; the report then
@@ -589,20 +602,20 @@ unpinned install resolves to, and it is the one decision that cannot be quietly 
 unblocks it. Pass them explicitly — the script still defaults to the previous pair at this point:
 
 ```sh no-run
-RFPHUB_STANDARD_SPEC='^3.1.0' RFPHUB_VALIDATE_SPEC='^0.3.1' \
-  pnpm frontend:clean-room --browser
+pnpm frontend:clean-room --browser --standard-spec '^3.1.0' --validate-spec '^0.3.1'
 ```
 
 **Green here is what licenses the last step of the release: flip the script's defaults.**
-`scripts/frontend-clean-room.mjs` hard-codes the fallback ranges (`^3.0.0` / `^0.3.0`), and they
-are only correct while those are the newest published versions. In one change:
+`scripts/frontend-clean-room.mjs` hard-codes the fallback ranges (`^3.0.0` / `^0.3.0`) that
+`--standard-spec` and `--validate-spec` override, and they are only correct while those are the
+newest published versions. In one change:
 
-* `scripts/frontend-clean-room.mjs` — the two `??` fallbacks, to `^3.1.0` and `^0.3.1`;
+* `scripts/frontend-clean-room.mjs` — the two fallback defaults, to `^3.1.0` and `^0.3.1`;
 * the `clean-room` job in `.github/workflows/ci.yml` — its `clean-room-mode` dispatch input
   defaults to `packed` (build the validator from the checkout) precisely because `published` could
   not work; flip that default to `published`. Its `standard-spec` / `validate-spec` inputs are
-  empty strings that fall through to the script's own defaults, so the previous bullet is what
-  fixes them;
+  empty strings that fall through to the script's own defaults (passed through as
+  `--standard-spec`/`--validate-spec` when set), so the previous bullet is what fixes them;
 * `packages/frontend/README.md` and [§9](#9-the-frontend-three-ways-to-deploy-a-copy) of this guide
   — delete the local-tarball workaround from both, and the ranges quoted alongside it.
 
@@ -769,8 +782,8 @@ subdirectory) into your own Vercel account with the root directory set to `packa
 which is what keeps `pnpm-lock.yaml` and the two workspace dependencies visible to the build —
 Vercel enables "Include source files outside of the Root Directory" by default. It carries the pnpm
 install and filtered build commands, so nothing has to be typed into the project settings. Set
-`NEXT_PUBLIC_API_URL` when prompted, and leave `NEXT_PUBLIC_SITE_ORIGIN` unset — see
-[§4](#the-frontends-variables).
+`NEXT_PUBLIC_API_URL` when prompted, and leave `NEXT_PUBLIC_SITE_ORIGIN` unset — Vercel needs
+nothing set for indexing, see [§4](#the-frontends-variables).
 
 ### Path B — copy only the package, install from npm
 
@@ -798,11 +811,11 @@ Chromium and waits for a row to render from a live request. `/publishers` is **n
 whenever the copied source carries that route, a `404` on it is a failure rather than a warning,
 with no flag and no workflow input to turn on.
 
-Two environment variables select the dependency specs, one per package. **The script's own
-defaults are `RFPHUB_STANDARD_SPEC=^3.0.0` and `RFPHUB_VALIDATE_SPEC=^0.3.0`** — the versions that
-resolve on the registry today, so a bare `pnpm frontend:clean-room` needs no arguments to reach the
-install step. Override either to test a range that is not published yet; an absolute path ending in
-`.tgz` is used as a local tarball instead of a registry range.
+Two flags select the dependency specs, one per package. **The script's own defaults are
+`--standard-spec ^3.0.0` and `--validate-spec ^0.3.0`** — the versions that resolve on the registry
+today, so a bare `pnpm frontend:clean-room` needs no arguments to reach the install step. Override
+either to test a range that is not published yet; an absolute path ending in `.tgz` is used as a
+local tarball instead of a registry range.
 
 The defaults are a fact about the registry, not a preference, so they move when the registry does:
 publishing 3.1.0 and 0.3.1 is what makes `^3.1.0` / `^0.3.1` the right defaults, and flipping them
@@ -819,7 +832,7 @@ That is the one case where the default cannot work, and the way through is a loc
 pnpm --filter @the-rfp-hub/standard build
 pnpm --filter rfphub-validate build
 pnpm --filter rfphub-validate pack --pack-destination /tmp/rfphub-pack
-RFPHUB_VALIDATE_SPEC=/tmp/rfphub-pack/rfphub-validate-0.3.0.tgz pnpm frontend:clean-room --browser
+pnpm frontend:clean-room --browser --validate-spec /tmp/rfphub-pack/rfphub-validate-0.3.0.tgz
 ```
 
 `pnpm -r build` does the same thing with one line, if you would rather not think about the order.
