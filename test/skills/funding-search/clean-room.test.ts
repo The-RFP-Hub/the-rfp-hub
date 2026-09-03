@@ -15,10 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const skillDir = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../skills/rfp-hub-funding-search",
-);
+const skillDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../skills/funding-search");
 
 // Identical to the string projection.test.ts asserts against, so both layers prove the same
 // text never survives.

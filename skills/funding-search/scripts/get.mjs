@@ -21,7 +21,7 @@ import {
   validateFormat,
 } from "./lib.mjs";
 
-const HELP = `rfp-hub-funding-search — get.mjs
+const HELP = `funding-search — get.mjs
 
 Fetch one funding opportunity by id via the RFP Hub public API.
 

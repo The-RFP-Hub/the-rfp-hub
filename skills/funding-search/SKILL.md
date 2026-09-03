@@ -1,5 +1,5 @@
 ---
-name: rfp-hub-funding-search
+name: funding-search
 description: Searches the RFP Hub directory — an open, Ethereum-ecosystem catalog of grants, hackathons, bounties, accelerators, VC funds and RFPs — through its public API. Use when someone asks to find grants, search bounties, look for hackathons on an ecosystem (e.g. "hackathons on Optimism"), explore funding opportunities, find RFPs for a topic, look for accelerators or VC funds, check what's open right now, or wants to filter opportunities by ecosystem, category, organization, award size, or deadline. Covers only the RFP Hub directory — it is not a web search and does not cover other funding registries or databases.
 license: MIT
 compatibility: >-

@@ -6,13 +6,13 @@ without needing the API's shape explained to it first.
 
 | Skill | What it does |
 |---|---|
-| [`rfp-hub-funding-search`](rfp-hub-funding-search/SKILL.md) | Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the public API |
+| [`funding-search`](funding-search/SKILL.md) | Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the public API |
 
 Each skill is a self-contained directory: `SKILL.md`, an optional `scripts/` with any executable
 helpers, and an optional `references/` with detail the agent loads only when needed. The same
 directory is installed as-is by every channel below — there is no per-agent build step, and
 **nothing that is not part of the installed artifact lives inside it**. The skill's own tests are
-therefore at [`test/skills/rfp-hub-funding-search/`](../test/skills/rfp-hub-funding-search) in the
+therefore at [`test/skills/funding-search/`](../test/skills/funding-search) in the
 repository root, not in the bundle: they import `vitest`, which an installed skill has no reason
 to carry.
 
@@ -24,7 +24,7 @@ to carry.
 agents and copies the skill into each of their skill directories:
 
 ```sh
-npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
+npx skills add The-RFP-Hub/the-rfp-hub --skill funding-search
 ```
 
 ### 2. Claude Code plugin marketplace
@@ -36,9 +36,9 @@ claude plugin install rfp-hub@rfp-hub
 
 This reads [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) at the repo
 root, which points at this skill's own
-[`.claude-plugin/plugin.json`](rfp-hub-funding-search/.claude-plugin/plugin.json). The **plugin**
+[`.claude-plugin/plugin.json`](funding-search/.claude-plugin/plugin.json). The **plugin**
 is `rfp-hub`; the **skill** it carries keeps its own name, so this channel presents the skill as
-`rfp-hub:rfp-hub-funding-search`. The other two channels install by directory name and apply no
+`rfp-hub:funding-search`. The other two channels install by directory name and apply no
 namespace at all.
 
 ### 3. Manual copy
@@ -47,25 +47,25 @@ The same directory, copied to whichever agent's skill folder applies:
 
 ```sh
 # Claude Code — project-local or global
-cp -R skills/rfp-hub-funding-search .claude/skills/
-cp -R skills/rfp-hub-funding-search ~/.claude/skills/
+cp -R skills/funding-search .claude/skills/
+cp -R skills/funding-search ~/.claude/skills/
 
 # Codex CLI — project-local or global
-cp -R skills/rfp-hub-funding-search .agents/skills/
-cp -R skills/rfp-hub-funding-search ~/.agents/skills/
+cp -R skills/funding-search .agents/skills/
+cp -R skills/funding-search ~/.agents/skills/
 
 # Cursor — project-local or global (cursor.com/docs/skills confirms both; also honors .claude/skills
 # and .codex/skills for compatibility, so the Claude Code and Codex copies above work too)
-cp -R skills/rfp-hub-funding-search .cursor/skills/
-cp -R skills/rfp-hub-funding-search ~/.cursor/skills/
+cp -R skills/funding-search .cursor/skills/
+cp -R skills/funding-search ~/.cursor/skills/
 
 # GitHub Copilot (CLI, coding agent, and IDE integrations) — repository-level or, for the CLI,
 # global (docs.github.com confirms these; .agents/skills above is ALSO a valid Copilot location)
-cp -R skills/rfp-hub-funding-search .github/skills/
-cp -R skills/rfp-hub-funding-search ~/.copilot/skills/
+cp -R skills/funding-search .github/skills/
+cp -R skills/funding-search ~/.copilot/skills/
 
 # Gemini CLI
-cp -R skills/rfp-hub-funding-search ~/.gemini/skills/
+cp -R skills/funding-search ~/.gemini/skills/
 ```
 
 Cursor and GitHub Copilot paths confirmed against their official docs:
@@ -89,7 +89,7 @@ directory is the only one that exists.
 
 ```sh
 node scripts/check-skill.mjs        # frontmatter, name/dir match, line count, required sections
-node skills/rfp-hub-funding-search/scripts/search.mjs --q grant --limit 3   # live smoke test
+node skills/funding-search/scripts/search.mjs --q grant --limit 3   # live smoke test
 npx vitest run test/skills          # the skill's own suites, including the clean-room install
 pnpm test                            # everything, the above included
 ```

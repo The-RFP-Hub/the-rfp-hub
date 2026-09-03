@@ -44,12 +44,9 @@ import {
   truncateText,
   validateFormat,
   withDefaultStatus,
-} from "../../../skills/rfp-hub-funding-search/scripts/lib.mjs";
+} from "../../../skills/funding-search/scripts/lib.mjs";
 
-const skillDir = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../skills/rfp-hub-funding-search",
-);
+const skillDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../skills/funding-search");
 const BASE = "https://api.ethrfps.app";
 
 describe("truncateText", () => {
@@ -662,7 +659,7 @@ describe("exitCodeFor", () => {
 describe("trackingHeaders", () => {
   it("sets the three documented headers", () => {
     const headers = trackingHeaders("abc-123");
-    expect(headers["X-Source"]).toBe("skill:rfp-hub-funding-search");
+    expect(headers["X-Source"]).toBe("skill:funding-search");
     expect(headers["X-Invocation-Id"]).toBe("abc-123");
     expect(headers["X-Skill-Version"]).toBe(SKILL_VERSION);
   });

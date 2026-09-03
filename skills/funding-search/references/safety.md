@@ -52,7 +52,7 @@ client to "clean" afterwards.
 
 ## What the tracking headers do and do not do
 
-The scripts send `X-Source: skill:rfp-hub-funding-search`, a fresh `X-Invocation-Id` UUID per
+The scripts send `X-Source: skill:funding-search`, a fresh `X-Invocation-Id` UUID per
 invocation, and `X-Skill-Version` (the frontmatter's `metadata.version`) on every request, so the
 RFP Hub can tell skill-driven traffic apart from a human browsing the site. The scripts set them;
 no agent has to remember to.

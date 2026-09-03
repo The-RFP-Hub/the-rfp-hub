@@ -28,7 +28,7 @@ import {
   withDefaultStatus,
 } from "./lib.mjs";
 
-const HELP = `rfp-hub-funding-search — search.mjs
+const HELP = `funding-search — search.mjs
 
 Search open Ethereum-ecosystem funding opportunities via the RFP Hub public API.
 

@@ -17,15 +17,9 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_API_BASE,
-  announceBase,
-} from "../../../skills/rfp-hub-funding-search/scripts/lib.mjs";
+import { DEFAULT_API_BASE, announceBase } from "../../../skills/funding-search/scripts/lib.mjs";
 
-const skillDir = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../skills/rfp-hub-funding-search",
-);
+const skillDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../skills/funding-search");
 const searchScript = resolve(skillDir, "scripts/search.mjs");
 const getScript = resolve(skillDir, "scripts/get.mjs");
 

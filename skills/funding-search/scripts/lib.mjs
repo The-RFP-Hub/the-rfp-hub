@@ -10,7 +10,7 @@
 /** Must match SKILL.md's frontmatter `metadata.version`; the repo's tests assert the pairing. */
 export const SKILL_VERSION = "0.1.0";
 
-export const SKILL_NAME = "rfp-hub-funding-search";
+export const SKILL_NAME = "funding-search";
 
 export const DEFAULT_API_BASE = "https://api.ethrfps.app";
 
