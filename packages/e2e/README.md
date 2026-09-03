@@ -24,8 +24,9 @@ two servers have already been started.
 Other entry points:
 
 ```sh
-pnpm --filter @the-rfp-hub/e2e e2e:check-m3   # boots the stack, then runs the milestone checker
-                                               # (scripts/check-m3.mjs) against it with a real session
+pnpm --filter @the-rfp-hub/e2e e2e:compliance  # boots the stack, then runs the write-acceptance
+                                               # checker (scripts/accept-writes.mjs) against it
+                                               # with a real session
 ```
 
 Every resource the runner creates is scoped to one run (`E2E_RUN_ID`, or 8 random hex if unset):
@@ -146,10 +147,11 @@ which the cross-run assertion in `tests/00-acceptance.setup.ts` checks rather th
 | `E2E_ACTOR_SEED` | Rotates which identity plays which part. Deterministic; recorded in the run state. |
 | `E2E_ASSIGNMENT_RECORD` | Where the cross-run assignment record is kept, for the "a fresh database grants nothing" assertion. Opt-in, outside the repository. |
 
-## `e2e:check-m3`
+## `e2e:compliance`
 
-One mode. It boots the same stack, signs in the way a person does, and runs the milestone checker
-against it.
+One mode. It boots the same stack, signs in the way a person does, and runs
+`scripts/accept-writes.mjs --milestone m3` against it over loopback, which the write target guard
+admits without an allowlist entry.
 
 There used to be two. When no provider was reachable the runner generated a key pair, booted a second
 API pinned to it, signed its own tokens and stamped the output `DOMAIN EVIDENCE ONLY` — an honest

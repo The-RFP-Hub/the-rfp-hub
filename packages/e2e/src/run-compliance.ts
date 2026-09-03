@@ -1,5 +1,5 @@
 /**
- * `scripts/check-m3.mjs`, run against the stack this suite just booted.
+ * `scripts/accept-writes.mjs`, run against the stack this suite just booted.
  *
  * The compliance checker is the broad HTTP conformance sweep — seven criteria, forty-nine checks,
  * over a live deployment. Playwright covers what only a browser can prove; this covers breadth.
@@ -19,7 +19,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkM3Env, repoRoot } from "./env.js";
+import { complianceEnv, repoRoot } from "./env.js";
 import { ApiClient, isHealthy } from "./http.js";
 import { seedDocument } from "./identity/actors.js";
 import { sessionFor } from "./identity/sessions.js";
@@ -27,7 +27,7 @@ import * as processes from "./processes.js";
 import { register } from "./redact.js";
 import type { RunState } from "./state.js";
 
-export interface CheckM3Input {
+export interface ComplianceRunInput {
   state: RunState;
   tmp: string;
   onChild?: (child: processes.ManagedChild) => void;
@@ -41,24 +41,26 @@ interface CriterionSummary {
 }
 
 /** Signs in, runs the checker against the live stack, prints per-area counts, returns its exit code. */
-export async function runCheckM3(input: CheckM3Input): Promise<number> {
+export async function runCompliance(input: ComplianceRunInput): Promise<number> {
   const children: processes.ManagedChild[] = [];
   try {
     const target = await signedInTarget(input.state);
     banner(target.baseUrl);
 
-    const namespace = `m3e2e-${input.state.runId}-check`;
-    const jsonPath = join(input.tmp, "m3-compliance-report.json");
+    const namespace = `e2e-${input.state.runId}-compliance`;
+    const jsonPath = join(input.tmp, "accept-report.json");
 
     await ensureNamespace(target, namespace, input.state.urls.programme);
 
     const result = await processes.run(
       {
-        name: "check-m3",
+        name: "accept-writes",
         command: "node",
         args: [
-          "scripts/check-m3.mjs",
-          "--base-url",
+          "scripts/accept-writes.mjs",
+          "--milestone",
+          "m3",
+          "--api",
           target.baseUrl,
           "--namespace",
           namespace,
@@ -71,7 +73,7 @@ export async function runCheckM3(input: CheckM3Input): Promise<number> {
         cwd: repoRoot,
         // Credentials go through the ENVIRONMENT, never argv: `ps` prints a command line, and
         // these are a live session token and a live administrator session.
-        env: checkM3Env({ sessionToken: target.sessionToken, adminToken: target.adminToken }),
+        env: complianceEnv({ sessionToken: target.sessionToken, adminToken: target.adminToken }),
       },
       input.onChild,
     );
@@ -139,7 +141,8 @@ async function ensureNamespace(
 async function signedInTarget(state: RunState): Promise<CheckTarget> {
   const publisher = state.actors.publisher ?? state.actors.admin;
   const admin = state.actors.admin;
-  if (!publisher || !admin) throw new Error("run-check-m3: no publisher/admin identity to run as");
+  if (!publisher || !admin)
+    throw new Error("run-compliance: no publisher/admin identity to run as");
 
   const sessionToken = (await sessionFor(publisher.email)).token;
   const adminToken = (await sessionFor(admin.email)).token;
@@ -150,7 +153,7 @@ async function signedInTarget(state: RunState): Promise<CheckTarget> {
 
 function banner(baseUrl: string): void {
   process.stdout.write(
-    `\ncheck:m3 — real sessions, obtained by signing in, against ${baseUrl}\n  This establishes nothing about Google; that lane is separate and opt-in. The email path it\n  exercises is the real one — the same sign-in a person performs.\n\n`,
+    `\naccept:writes --milestone m3 — real sessions, obtained by signing in, against ${baseUrl}\n  This establishes nothing about Google; that lane is separate and opt-in. The email path it\n  exercises is the real one — the same sign-in a person performs.\n\n`,
   );
 }
 
@@ -165,11 +168,11 @@ function summarise(jsonPath: string): void {
   try {
     report = JSON.parse(readFileSync(jsonPath, "utf8"));
   } catch (err) {
-    process.stderr.write(`run-check-m3: could not read ${jsonPath}: ${(err as Error).message}\n`);
+    process.stderr.write(`run-compliance: could not read ${jsonPath}: ${(err as Error).message}\n`);
     return;
   }
 
-  process.stdout.write("\ncheck:m3 per-area result\n");
+  process.stdout.write("\ncompliance per-area result\n");
   for (const criterion of report.criteria ?? []) {
     const { pass, fail, warn, skip } = criterion.tally;
     const extras = [

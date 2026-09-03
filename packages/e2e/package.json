@@ -10,7 +10,7 @@
   },
   "scripts": {
     "e2e": "tsx src/run.ts",
-    "e2e:check-m3": "tsx src/run.ts --check-m3",
+    "e2e:compliance": "tsx src/run.ts --compliance",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
