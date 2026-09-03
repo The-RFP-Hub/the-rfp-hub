@@ -65,12 +65,12 @@ codex mcp add rfp-hub -- npx -y @the-rfp-hub/mcp@0.1.0
 
 ## Companion skill
 
-`rfp-hub-funding-search` is a **read-only** agent skill that teaches a client how to use this
-server's search and fetch tools well. It is **not shipped inside this npm package** — it installs
-from the repository, through whichever of these channels your client supports:
+`funding-search` is a **read-only** agent skill that teaches a client how to use this server's
+search and fetch tools well. It is **not shipped inside this npm package** — it installs from the
+repository, through whichever of these channels your client supports:
 
 ```sh
-npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
+npx skills add The-RFP-Hub/the-rfp-hub --skill funding-search
 ```
 
 ```sh
