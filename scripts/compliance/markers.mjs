@@ -2,7 +2,7 @@
  * Marker parsing for ` ```sh ` blocks in the handoff docs — pure, no I/O. The convention is the
  * docs stream's own: the marker is the SECOND WORD OF THE INFO STRING (` ```sh safe-read `) and
  * there is no preceding-comment form. `safe-read` is the only kind this checker executes;
- * `staging-write` and `no-run` are never run. See scripts/m4-compliance/README.md for the scope.
+ * `staging-write` and `no-run` are never run. See scripts/compliance/README.md for the scope.
  */
 
 export const MARKERS = ["safe-read", "no-run", "staging-write"];

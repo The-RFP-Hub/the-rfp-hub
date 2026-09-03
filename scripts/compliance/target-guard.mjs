@@ -57,7 +57,7 @@ export function targetRefusal(api, env = process.env) {
   }
   if (isLoopbackHost(parsed.host)) return null;
   if (parsed.protocol !== "https:") {
-    return `${parsed.origin} is not https, and this tool sends a live publisher credential — only loopback may be plaintext`;
+    return `${parsed.origin} is not https, and this tool sends live credentials to it — a publisher credential, a reviewer session and a write-scoped key — so only loopback may be plaintext`;
   }
   const allowed = allowedOrigins(env);
   if (allowed.includes(parsed.origin)) return null;

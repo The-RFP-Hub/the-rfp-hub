@@ -5,7 +5,7 @@
  * advertised as read-only executed arbitrary commands chosen by a markdown file, with whatever
  * credentials the operator's shell had exported.
  *
- * The grammar is documented in scripts/m4-compliance/README.md. Running the stages ourselves also
+ * The grammar is documented in scripts/compliance/README.md. Running the stages ourselves also
  * closes the pipefail gap: under bash `curl -f … | jq` reported only jq's status so a 404
  * "succeeded", while adding pipefail broke `curl … | head` (head closing the pipe makes curl's own
  * write fail). Buffering between stages examines curl's exit code directly and lets head finish.

@@ -12,15 +12,22 @@
  * silently redirect a deliberate run.
  */
 import { WRITE_CRITERIA, criterionKeys } from "./criteria.mjs";
-import { defaultReportPath } from "./options.mjs";
+import { defaultReportPath, normalizeMcpSpec } from "./options.mjs";
 import { targetRefusal } from "./target-guard.mjs";
 
-const NUMERIC = new Set(["--views", "--timeout", "--concurrency"]);
+const NUMERIC = new Set(["--views", "--timeout", "--concurrency", "--approve-timeout"]);
 
+/**
+ * Env names in the order they are consulted. The `RFPHUB_` pair is what the MCP server's own
+ * documentation spells for the same two credentials, so both are accepted rather than making an
+ * operator hold two names for one token.
+ */
 const CREDENTIAL_ENV = {
-  sessionToken: "COMPLIANCE_SESSION_TOKEN",
-  adminToken: "COMPLIANCE_ADMIN_TOKEN",
-  apiKey: "COMPLIANCE_API_KEY",
+  sessionToken: ["COMPLIANCE_SESSION_TOKEN"],
+  adminToken: ["COMPLIANCE_ADMIN_TOKEN"],
+  apiKey: ["COMPLIANCE_API_KEY"],
+  reviewerToken: ["COMPLIANCE_REVIEWER_TOKEN", "RFPHUB_REVIEWER_TOKEN"],
+  writeKey: ["COMPLIANCE_WRITE_KEY", "RFPHUB_WRITE_KEY"],
 };
 
 /** A slug is the id prefix of everything this run writes, so it is held to the shape ids are. */
@@ -31,11 +38,15 @@ export function parseArgs(argv, env = process.env) {
     milestone: undefined,
     api: undefined,
     namespace: undefined,
+    repoRoot: process.cwd(),
+    mcpSpec: undefined,
+    interactiveApproval: false,
     only: new Set(),
     skip: new Set(),
     json: undefined,
     views: 5,
     timeoutMs: 20000,
+    approveTimeoutMs: 15000,
     concurrency: 4,
     keepFixtures: false,
     help: false,
@@ -95,6 +106,24 @@ export function parseArgs(argv, env = process.env) {
       case "--admin-token":
         opts.adminToken = next();
         break;
+      case "--reviewer-token":
+        opts.reviewerToken = next();
+        break;
+      case "--write-key":
+        opts.writeKey = next();
+        break;
+      case "--repo-root":
+        opts.repoRoot = next();
+        break;
+      case "--mcp-spec":
+        opts.mcpSpec = normalizeMcpSpec(next());
+        break;
+      case "--interactive-approval":
+        opts.interactiveApproval = true;
+        break;
+      case "--approve-timeout":
+        opts.approveTimeoutMs = number(next());
+        break;
       case "--application-url":
         opts.applicationUrl = next();
         break;
@@ -126,8 +155,14 @@ export function parseArgs(argv, env = process.env) {
   if (opts.only.size > 0 && opts.skip.size > 0) {
     throw new Error("--only and --skip cannot be combined: --only already says what runs");
   }
-  for (const [key, variable] of Object.entries(CREDENTIAL_ENV)) {
-    if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
+  for (const [key, variables] of Object.entries(CREDENTIAL_ENV)) {
+    for (const variable of variables) {
+      if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
+    }
+  }
+  // Waiting on a person is not waiting on a process: 15s is right for a driven CLI, absurd here.
+  if (opts.interactiveApproval && !argv.includes("--approve-timeout")) {
+    opts.approveTimeoutMs = 300000;
   }
   if (opts.json === undefined) opts.json = defaultReportPath("accept-report");
   return opts;
@@ -147,6 +182,36 @@ export function refusals(opts, milestones, env = process.env) {
     );
   }
   if (!opts.api) reasons.push("--api is required");
+  if (opts.milestone === "m4") {
+    reasons.push(...submissionRefusals(opts));
+  } else {
+    reasons.push(...publisherRefusals(opts));
+  }
+  if (opts.api) {
+    const refusal = targetRefusal(opts.api, env);
+    if (refusal) reasons.push(refusal);
+  }
+  return reasons;
+}
+
+/** The m4 profile submits through the MCP server, so it needs that server's two credentials. */
+function submissionRefusals(opts) {
+  const reasons = [];
+  if (!opts.reviewerToken) {
+    reasons.push(
+      "a reviewer credential is required (--reviewer-token, COMPLIANCE_REVIEWER_TOKEN or RFPHUB_REVIEWER_TOKEN) — the teardown rejects and unlists the entry this run submits, and a run that cannot tear down must not start",
+    );
+  }
+  if (!opts.writeKey) {
+    reasons.push(
+      "a write credential is required (--write-key, COMPLIANCE_WRITE_KEY or RFPHUB_WRITE_KEY) — a write-scoped rfph_ key, never a publish-scoped one, so the fixture lands pending by construction, which is the property this profile proves",
+    );
+  }
+  return reasons;
+}
+
+function publisherRefusals(opts) {
+  const reasons = [];
   if (!opts.namespace) {
     reasons.push(
       "--namespace is required — this run WRITES, and that is the namespace it writes in",
@@ -163,10 +228,6 @@ export function refusals(opts, milestones, env = process.env) {
     reasons.push(
       "a reviewer credential is required (--admin-token, or COMPLIANCE_ADMIN_TOKEN, or a --session-token whose account may review) — the teardown rejects and unlists everything this run creates, and a run that cannot tear down must not start",
     );
-  }
-  if (opts.api) {
-    const refusal = targetRefusal(opts.api, env);
-    if (refusal) reasons.push(refusal);
   }
   return reasons;
 }

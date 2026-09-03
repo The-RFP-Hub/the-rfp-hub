@@ -9,7 +9,7 @@
  * from a host that serves this project's published documents. A 4xx is never retried — a 404 IS
  * the answer, and repeating it would only make an honest red run slower.
  */
-import { request } from "../m2-compliance/http.mjs";
+import { request } from "./http.mjs";
 
 export const RETRY_HOSTS = ["github.com", "raw.githubusercontent.com"];
 export const RETRY_BACKOFF_MS = 2000;

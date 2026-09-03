@@ -1,5 +1,5 @@
 /**
- * M4-5 — THE BYTES THAT ARE VALIDATED ARE THE BYTES THAT ARE PUBLISHED. The previous revision asked
+ * THE BYTES THAT ARE VALIDATED ARE THE BYTES THAT ARE PUBLISHED. The previous revision asked
  * GitHub raw for a 200 and then validated a LOCAL file, so a stale published skill passed
  * publication while the local copy passed validation and nothing compared the two.
  *
@@ -94,17 +94,12 @@ async function startHostileApi() {
 
 export async function checkSkill(report, ctx) {
   const c = report.criterion(
-    "M4-5",
+    "skill",
     "Agent skill published correctly",
     "Every file the documented install channels need is on GitHub main with the same sha256 as the audited local copy; the repository's own skill lint passes against that fetched copy; and the fetched search.mjs, run against a corpus whose prose fields carry an injected instruction, emits neither the instruction nor a description field.",
   );
 
-  if (ctx.skip.has("skill")) {
-    c.skip("skill", "--skip skill");
-    return c.finish();
-  }
-
-  const workspace = await mkdtemp(join(tmpdir(), "m4-check-skill-"));
+  const workspace = await mkdtemp(join(tmpdir(), "compliance-skill-"));
   try {
     let fetchedAll = true;
     for (const relPath of PUBLISHED_FILES) {
@@ -227,4 +222,15 @@ async function runInjectionFixture(c, ctx, workspace) {
   } finally {
     await api.stop();
   }
+}
+
+export const meta = {
+  key: "skill",
+  requires: [],
+  needs: ["repoRoot"],
+  contract: { m4: "M4-5" },
+};
+
+export async function run(ctx) {
+  return checkSkill(ctx.report, ctx);
 }

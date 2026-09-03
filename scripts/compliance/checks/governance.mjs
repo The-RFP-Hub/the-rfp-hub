@@ -1,5 +1,5 @@
 /**
- * M4-1 — Governance framework published, and LINKED.
+ * Governance framework published, and LINKED.
  *
  * Three kinds of evidence, none of which substitutes for another:
  *
@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { withPage } from "../browser.mjs";
 import { requestPublished } from "../retry.mjs";
 
-/** The four governance documents, per §3.1 of the M4 plan. Paths are repo-root relative. */
+/** The four governance documents. Paths are repo-root relative. */
 export const GOVERNANCE_DOCS = [
   { path: "GOVERNANCE.md", section: "## Non-discrimination and ranking", constant: "GOVERNANCE" },
   { path: "REVIEW-CRITERIA.md", section: null, constant: "REVIEW_CRITERIA" },
@@ -72,15 +72,10 @@ async function anchors(page) {
 export async function checkGovernance(report, ctx) {
   const links = canonicalGovernanceLinks(ctx.repoRoot);
   const c = report.criterion(
-    "M4-1",
+    "governance",
     "Governance framework published and linked",
     "The four governance documents exist, their GitHub URLs resolve, /how-it-works carries an anchor to all four exact URLs, and the home page carries at least one of them outside its footer.",
   );
-
-  if (ctx.skip.has("governance")) {
-    c.skip("governance", "--skip governance");
-    return c.finish();
-  }
 
   const present = [];
   for (const doc of links) {
@@ -173,4 +168,15 @@ export async function checkGovernance(report, ctx) {
   }
 
   return c.finish();
+}
+
+export const meta = {
+  key: "governance",
+  requires: [],
+  needs: ["site", "repoRoot"],
+  contract: { m4: "M4-1" },
+};
+
+export async function run(ctx) {
+  return checkGovernance(ctx.report, ctx);
 }

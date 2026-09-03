@@ -1,5 +1,5 @@
 /**
- * M4-6 — the handoff docs exist, every link resolves, and the marked `sh` blocks behave.
+ * The handoff docs exist, every link resolves, and the marked `sh` blocks behave.
  *
  * THE MARKER RULE APPLIES TO `docs/**` ONLY. Those four guides are written for this checker and an
  * unmarked block there is a hard failure: a block this tool cannot tell is safe to run would
@@ -14,7 +14,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as nodePath from "node:path";
-import { mapLimit } from "../../m2-compliance/http.mjs";
+import { mapLimit } from "../http.mjs";
 import {
   extractLinks,
   headingSlugs,
@@ -133,7 +133,7 @@ async function checkBlocks(c, ctx, relPath, { markersRequired, scratchDir }) {
       }
       c.fail(
         `${where}: sh block carries a marker`,
-        `no ${MARKERS.join("/")} marker found as the second word of the fence's info string (e.g. \`\`\`sh safe-read) — see scripts/m4-compliance/README.md`,
+        `no ${MARKERS.join("/")} marker found as the second word of the fence's info string (e.g. \`\`\`sh safe-read) — see scripts/compliance/README.md`,
       );
       continue;
     }
@@ -148,14 +148,14 @@ async function checkBlocks(c, ctx, relPath, { markersRequired, scratchDir }) {
 
     const name = `${where}: safe-read block is a read, and succeeds`;
     if (ctx.offline) {
-      c.skipOptional(name, "--offline");
+      c.skip(name, "--offline");
       continue;
     }
     const parsed = parseSafeReadBlock(block.source, { api: ctx.api, site: ctx.site });
     if (!parsed.ok) {
       c.fail(
         name,
-        `refused before execution — ${parsed.reason}. A safe-read block is curl GETs, optionally piped into jq/head/sed -n/python3 -m json.tool; see scripts/m4-compliance/README.md`,
+        `refused before execution — ${parsed.reason}. A safe-read block is curl GETs, optionally piped into jq/head/sed -n/python3 -m json.tool; see scripts/compliance/README.md`,
       );
       continue;
     }
@@ -171,15 +171,10 @@ async function checkBlocks(c, ctx, relPath, { markersRequired, scratchDir }) {
 
 export async function checkDocs(report, ctx) {
   const c = report.criterion(
-    "M4-6",
+    "docs",
     "Handoff documentation",
     "The four guides exist; every link and #anchor in them, in the root markdown, in skills/** and in packages/mcp/README.md resolves; and only safe-read sh blocks are ever executed — those succeed.",
   );
-
-  if (ctx.skip.has("docs")) {
-    c.skip("docs", "--skip docs");
-    return c.finish();
-  }
 
   const present = [];
   for (const relPath of HANDOFF_DOCS) {
@@ -205,7 +200,7 @@ export async function checkDocs(report, ctx) {
   }
 
   if (ctx.offline) {
-    c.skipOptional(
+    c.skip(
       "absolute links answer 2xx/3xx",
       `--offline: ${absoluteToCheck.length} absolute link(s) not requested`,
     );
@@ -229,7 +224,7 @@ export async function checkDocs(report, ctx) {
   // `safe-read` blocks run in a FRESH, DISPOSABLE working directory, never `ctx.repoRoot` — a real
   // block does `curl ... -o dataset.json`, and `cwd: ctx.repoRoot` left that file in the caller's
   // own checkout after every run of a tool advertised as read-only.
-  const scratchDir = await mkdtemp(join(tmpdir(), "m4-check-docs-safe-read-"));
+  const scratchDir = await mkdtemp(join(tmpdir(), "compliance-docs-safe-read-"));
   try {
     for (const relPath of present) {
       await checkBlocks(c, ctx, relPath, { markersRequired: true, scratchDir });
@@ -242,4 +237,15 @@ export async function checkDocs(report, ctx) {
   }
 
   return c.finish();
+}
+
+export const meta = {
+  key: "docs",
+  requires: [],
+  needs: ["api", "site", "repoRoot"],
+  contract: { m4: "M4-6" },
+};
+
+export async function run(ctx) {
+  return checkDocs(ctx.report, ctx);
 }

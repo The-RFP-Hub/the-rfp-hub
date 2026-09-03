@@ -1,6 +1,5 @@
-import { request } from "../../m2-compliance/http.mjs";
 /**
- * M4-2 — the public `/publishers` page.
+ * The public `/publishers` page.
  *
  * `GET {api}/v1/publishers` is the source of truth (unauthenticated, ordered by slug — see
  * `organization.repository.ts`). The page is client-fetched, so without `--browser` this check can
@@ -14,6 +13,7 @@ import { request } from "../../m2-compliance/http.mjs";
  * its own evidence — the page renders the empty state — and that is what is asserted.
  */
 import { withPage } from "../browser.mjs";
+import { request } from "../http.mjs";
 
 /**
  * The slugs the rendered page shows: `[data-publisher-slug]` on `PublisherCard`, else each card's
@@ -64,15 +64,10 @@ export function publisherPayloadErrors(json) {
 
 export async function checkPublishers(report, ctx) {
   const c = report.criterion(
-    "M4-2",
+    "publishers",
     "Public /publishers page",
     "The page answers 200, the API's response has the shape it promises, and — rendered — the page shows exactly those slugs (or the empty state when there are none), requesting them without an Authorization header.",
   );
-
-  if (ctx.skip.has("publishers")) {
-    c.skip("publishers", "--skip publishers");
-    return c.finish();
-  }
 
   const pageUrl = `${ctx.site}/publishers`;
   const pageRes = await request(pageUrl, { timeoutMs: ctx.timeoutMs });
@@ -198,4 +193,15 @@ export async function checkPublishers(report, ctx) {
   }
 
   return c.finish();
+}
+
+export const meta = {
+  key: "publishers",
+  requires: [],
+  needs: ["api", "site"],
+  contract: { m4: "M4-2" },
+};
+
+export async function run(ctx) {
+  return checkPublishers(ctx.report, ctx);
 }

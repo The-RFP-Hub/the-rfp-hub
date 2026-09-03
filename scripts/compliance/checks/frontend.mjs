@@ -1,12 +1,13 @@
 /**
- * M4-3 — the reference frontend is alive, and behaves. The deep-link hrefs are inspected, never
+ * The reference frontend is alive, and behaves. The deep-link hrefs are inspected, never
  * followed: the API records a view before the 302 fires, so a request from this checker would
  * register as a real click against whichever publisher's analytics the fixture points at.
  */
-import { isLoopbackHost, probeTls, request } from "../../m2-compliance/http.mjs";
-import { withPage } from "../browser.mjs";
 
-// `touch` mirrors `packages/e2e/tests/m4-responsive.spec.ts`: only the two narrower viewports run
+import { withPage } from "../browser.mjs";
+import { isLoopbackHost, probeTls, request } from "../http.mjs";
+
+// `touch` mirrors `packages/e2e/tests/13-responsive.spec.ts`: only the two narrower viewports run
 // with a coarse pointer, which is what the CSS's own `(pointer: coarse)` rule keys off, and the
 // desktop one is the contrast case.
 const VIEWPORTS = [
@@ -32,7 +33,7 @@ async function renderedOpportunityIds(page) {
 }
 
 /**
- * `--control-touch` in the frontend's `globals.css`, and the number `m4-responsive.spec.ts`
+ * `--control-touch` in the frontend's `globals.css`, and the number `13-responsive.spec.ts`
  * asserts. HEIGHT is the measure: a 311 px wide search box still fails a thumb at 40 tall.
  */
 export const MIN_TARGET_PX = 44;
@@ -129,7 +130,7 @@ export async function deriveFilterValues(ctx) {
 
 /**
  * Controls shorter than the minimum: FORM CONTROLS and NAV LINKS only, which is the scope
- * `m4-responsive.spec.ts` asserts. A text link's hit area is its line box, and enlarging one would
+ * `13-responsive.spec.ts` asserts. A text link's hit area is its line box, and enlarging one would
  * break the sentence around it — exempt whatever its `display` happens to be, because a
  * `display: block` breadcrumb or footer link is still a text link.
  */
@@ -224,15 +225,10 @@ export function hasNoindexMeta(html) {
 
 export async function checkFrontend(report, ctx) {
   const c = report.criterion(
-    "M4-3",
+    "frontend",
     "Reference frontend is live and behaves",
     "TLS, liveness, search and two filters and pagination each changing WHICH entries are shown and matching the API, the detail page's visible heading, both deep-link hrefs, and three viewports with no horizontal overflow and no interactive control under 44×44 px.",
   );
-
-  if (ctx.skip.has("frontend")) {
-    c.skip("frontend", "--skip frontend");
-    return c.finish();
-  }
 
   const tls = await probeTls(ctx.site, { timeoutMs: ctx.timeoutMs });
   if (tls.applicable) {
@@ -246,7 +242,7 @@ export async function checkFrontend(report, ctx) {
       c.warn("TLS certificate lifetime", `only ${tls.daysRemaining} day(s) remaining`);
     }
   } else if (isLoopbackHost(new URL(ctx.site).hostname)) {
-    c.skipOptional("TLS certificate is valid", `${ctx.site} is loopback — no transport to inspect`);
+    c.skip("TLS certificate is valid", `${ctx.site} is loopback — no transport to inspect`);
   } else {
     // A SKIP before, which let a remote plaintext deployment pass this criterion.
     c.fail("TLS certificate is valid", `${ctx.site} is served over ${tls.protocol}, not https`);
@@ -516,4 +512,15 @@ function checkIndexability(c, ctx, homeRes, robotsRes) {
     "no robots meta tag with noindex",
     `${ctx.site}/ carries <meta name="robots" content="…noindex…">`,
   );
+}
+
+export const meta = {
+  key: "frontend",
+  requires: [],
+  needs: ["api", "site"],
+  contract: { m4: "M4-3" },
+};
+
+export async function run(ctx) {
+  return checkFrontend(ctx.report, ctx);
 }

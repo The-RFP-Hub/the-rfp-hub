@@ -12,8 +12,8 @@ import { randomBytes } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { callJson } from "../../m3-compliance/client.mjs";
 import { resolveCommand } from "../checks/mcp.mjs";
+import { callJson } from "../client.mjs";
 import { McpStdioClient } from "../mcp-client.mjs";
 
 const READ_TOOLS = ["fetch_opportunity", "search_opportunities"];
@@ -34,15 +34,15 @@ export function runToken(now = new Date()) {
 export function fixtureDocument(run) {
   return {
     specVersion: "1.0.0",
-    id: `m4check:m4check-${run}`,
+    id: `compliance:compliance-${run}`,
     fundingType: "grant",
-    title: `m4check-${run} — M4 acceptance fixture`,
+    title: `compliance-${run} — write acceptance fixture`,
     summary:
-      "Created by scripts/accept-m4.mjs to verify the real MCP 3-phase submission interlock.",
+      "Created by scripts/accept-writes.mjs to verify the real MCP 3-phase submission interlock.",
     description:
-      "Created by the RFP Hub M4 acceptance tool to verify the submit_opportunity interlock end to end against staging. Not a real funding opportunity — reject and unlist after the run.",
+      "Created by the RFP Hub write-acceptance tool to verify the submit_opportunity interlock end to end against staging. Not a real funding opportunity — reject and unlist after the run.",
     status: "open",
-    operatingOrganizations: [{ name: "m4check", slug: "m4check" }],
+    operatingOrganizations: [{ name: "compliance", slug: "compliance" }],
     ecosystems: ["Ethereum"],
     categories: ["tooling"],
     source: {},
@@ -143,7 +143,6 @@ export async function ownedIds(ctx) {
   for (let page = 1; page <= 50; page++) {
     const res = await callJson(ctx, `/v1/me/opportunities?limit=100&page=${page}`, {
       token: ctx.writeKey,
-      agent: "rfphub-m4-accept",
     });
     if (!res.ok || res.status !== 200) {
       throw new Error(`GET /v1/me/opportunities answered ${res.status ?? res.error}`);
@@ -170,7 +169,7 @@ export async function runSubmissionCycle(ctx, state, c) {
 
   // Disposable, always removed: otherwise every run leaves state in the OPERATOR's own ~/.rfphub,
   // and a leftover approval could satisfy the "commit without approval is refused" case wrongly.
-  const mcpHome = await mkdtemp(join(tmpdir(), "m4-accept-mcp-home-"));
+  const mcpHome = await mkdtemp(join(tmpdir(), "compliance-accept-mcp-home-"));
   state.mcpHome = mcpHome;
   const env = {
     // A bare origin: the server refuses a base carrying a path, query, fragment or userinfo.
@@ -328,10 +327,7 @@ export async function runSubmissionCycle(ctx, state, c) {
  * read surface, which hides pending entries by design.
  */
 export async function verifyLandedPending(ctx, opportunityId) {
-  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", {
-    token: ctx.writeKey,
-    agent: "rfphub-m4-accept",
-  });
+  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", { token: ctx.writeKey });
   if (!mine.ok || mine.status !== 200) {
     throw new Error(
       `GET /v1/me/opportunities answered ${mine.status ?? mine.error} — could not verify the fixture landed`,
@@ -347,7 +343,7 @@ export async function verifyLandedPending(ctx, opportunityId) {
   return entry;
 }
 
-/** Reject and unlist the fixture with the reviewer credential, as `m3-compliance/cleanup.mjs` does. */
+/** Reject and unlist the fixture with the reviewer credential, as `compliance/cleanup.mjs` does. */
 export async function teardown(ctx, opportunityId) {
   if (!opportunityId) return { skipped: "no fixture was created" };
   const rejected = await callJson(
@@ -356,8 +352,7 @@ export async function teardown(ctx, opportunityId) {
     {
       method: "POST",
       token: ctx.reviewerToken,
-      body: { reason: "M4 acceptance fixture" },
-      agent: "rfphub-m4-accept",
+      body: { reason: "compliance fixture" },
     },
   );
   if (!rejected.ok || rejected.status !== 200) {
@@ -373,13 +368,8 @@ export async function teardown(ctx, opportunityId) {
  * endpoint answers 200.
  */
 export async function verifyTornDown(ctx, opportunityId) {
-  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", {
-    token: ctx.writeKey,
-    agent: "rfphub-m4-accept",
-  });
-  const publicRes = await callJson(ctx, `/v1/opportunities/${encodeURIComponent(opportunityId)}`, {
-    agent: "rfphub-m4-accept",
-  });
+  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", { token: ctx.writeKey });
+  const publicRes = await callJson(ctx, `/v1/opportunities/${encodeURIComponent(opportunityId)}`);
   // A 401, a 500 or a body without `items` made `find` return undefined, which read as "the entry
   // is gone". An owner listing that did not answer is not evidence of anything.
   if (!mine.ok || mine.status !== 200 || !Array.isArray(mine.json?.items)) {

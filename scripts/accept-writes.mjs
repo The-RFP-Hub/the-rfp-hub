@@ -13,12 +13,15 @@
  * Usage:
  *   node scripts/accept-writes.mjs --milestone m3 --api https://api-staging.example.org \
  *     --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
+ *   node scripts/accept-writes.mjs --milestone m4 --api https://api-staging.example.org \
+ *     --reviewer-token "$REVIEWER" --write-key "$RFPH_KEY"
  *
  * Exit codes: 0 every selected criterion exercised and held · 1 a criterion failed, or a required
  * check was never exercised · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
 import { parseArgs, refusals } from "./compliance/accept-options.mjs";
+import { runToken } from "./compliance/accept/flow.mjs";
 import { normalizeBase } from "./compliance/client.mjs";
 import {
   TEARDOWN,
@@ -50,9 +53,11 @@ ${STAGING_ORIGINS.map((origin) => `    ${origin}`).join("\n")}
   ${EXTRA_ORIGIN_ENV}. The redirect chain the target answers with is re-checked
   to 5 hops and must also end inside the allowlist.
 
-Required
+Required, every profile
   --milestone <id>        Which acceptance profile to run. Known here: ${Object.keys(WRITE_MILESTONES).join(", ")}.
   --api <url>             Origin of the deployed /v1/ API. --base-url is an accepted alias.
+
+Required, --milestone m3 (the publisher write chain)
   --namespace <slug>      The namespace fixtures are created in. Lowercase, hyphenated.
   --session-token <token> A signed-in session. Needed for key minting and for the session-only
                           surfaces; strongly preferred over --api-key.
@@ -60,6 +65,22 @@ Required
                           report a skip rather than a pass.
   --admin-token <token>   An administrator session, unless --session-token is itself a reviewer.
                           Required: the teardown rejects and unlists with it.
+
+Required, --milestone m4 (the real 3-phase MCP submission interlock)
+  --reviewer-token <t>    A reviewer session, used only for teardown (reject + unlist).
+  --write-key <key>       A write-scoped \`rfph_\` key — write only, never publish, so the fixture
+                          lands pending by construction, which is what this profile proves.
+
+Options, --milestone m4
+  --repo-root <path>      Repo checkout, for resolving packages/mcp/dist/cli.js. Default: cwd.
+  --mcp-spec <spec>       npm version for npx (default "next" — the real registry package). Pass
+                          "local" for packages/mcp/dist/cli.js, to drive a pre-publish build.
+  --interactive-approval  Pause at phase 2 and print the exact \`rfphub-mcp approve <id>\` command
+                          for a HUMAN to run in another terminal, then wait for it. Without it the
+                          CLI is driven non-interactively and the report says the approval was
+                          SIMULATED.
+  --approve-timeout <ms>  How long phase 2 may take. Default 15000, raised to 300000 with
+                          --interactive-approval, which waits on a person.
 
 Options
   --only <key>            Repeatable. Narrows the profile to those criteria. A hard prerequisite is
@@ -83,7 +104,9 @@ Options
   -h, --help              This text.
 
 Credentials may also arrive as COMPLIANCE_SESSION_TOKEN / COMPLIANCE_ADMIN_TOKEN /
-COMPLIANCE_API_KEY, which keeps them off the command line \`ps\` prints. The flags win.
+COMPLIANCE_API_KEY / COMPLIANCE_REVIEWER_TOKEN / COMPLIANCE_WRITE_KEY, which keeps them off the
+command line \`ps\` prints; RFPHUB_REVIEWER_TOKEN and RFPHUB_WRITE_KEY are accepted for the last
+two. The flags win.
 `;
 
 async function main() {
@@ -130,18 +153,31 @@ async function main() {
     profile: opts.only.size > 0 ? undefined : WRITE_MILESTONES[opts.milestone],
   });
 
-  const state = { run: runStamp(), fixtureIds: [] };
+  const submission = opts.milestone === "m4";
+  // The submission profile writes ONE entry through the MCP server, and its id has to be unique per
+  // process: `runStamp` is a minute-resolution timestamp, so two runs started in the same minute
+  // shared a fixture id and the second one "found" the first one's entry.
+  const state = { run: submission ? runToken() : runStamp(), fixtureIds: [] };
   const report = acceptanceReport({
     title: "RFP Hub — write acceptance",
     milestone: opts.milestone,
     selection: selectionLine(opts, selection.autoIncluded),
     contractIds: contractIds(WRITE_CRITERIA, opts.milestone),
     api: opts.api,
-    namespace: opts.namespace,
-    fixturePrefix: `${opts.namespace}:compliance-${state.run}-`,
-    credentialKind: opts.sessionToken ? "session" : "api-key",
-    adminToken: Boolean(opts.adminToken),
-    views: opts.views,
+    ...(submission
+      ? {
+          repoRoot: opts.repoRoot,
+          fixturePrefix: `compliance:compliance-${state.run}`,
+          mcpSpec: opts.mcpSpec ?? "next",
+          approval: opts.interactiveApproval ? "HUMAN" : "SIMULATED (non-interactive)",
+        }
+      : {
+          namespace: opts.namespace,
+          fixturePrefix: `${opts.namespace}:compliance-${state.run}-`,
+          credentialKind: opts.sessionToken ? "session" : "api-key",
+          adminToken: Boolean(opts.adminToken),
+          views: opts.views,
+        }),
     node: process.version,
   });
 
@@ -149,7 +185,7 @@ async function main() {
     ...opts,
     // The credential the read-and-own checks use. A session where one exists, because it is the
     // account acting directly rather than a scoped delegation of it.
-    credential: opts.sessionToken ?? opts.apiKey,
+    credential: opts.sessionToken ?? opts.apiKey ?? opts.writeKey,
     report,
     results: {},
     state,
