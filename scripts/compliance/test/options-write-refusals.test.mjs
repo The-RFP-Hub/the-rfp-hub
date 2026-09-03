@@ -138,6 +138,14 @@ describe("parseArgs", () => {
     expect(flagWins.adminToken).toBe("admin-from-env");
   });
 
+  it("narrows the profile with --only, and refuses it together with --skip", () => {
+    expect([...parseArgs(["--only", "audit"]).only]).toEqual(["audit"]);
+    expect(() => parseArgs(["--only", "audit", "--skip", "staleness"])).toThrow(
+      /cannot be combined/,
+    );
+    expect(() => parseArgs(["--only", "M3-3"])).toThrow(/--only must be one of lifecycle/);
+  });
+
   it("offers no production override at all", () => {
     expect(() => parseArgs(["--allow-production"])).toThrow(/unknown argument/);
   });

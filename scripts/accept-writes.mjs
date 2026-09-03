@@ -29,9 +29,12 @@ import {
   WRITE_CRITERIA,
   WRITE_MILESTONES,
   contractIds,
+  criterionKeys,
   selectCriteria,
+  selectionRefusals,
 } from "./compliance/criteria.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
+import { selectionLine } from "./compliance/options.mjs";
 import { acceptanceReport } from "./compliance/report.mjs";
 import { EXTRA_ORIGIN_ENV, STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
 
@@ -61,6 +64,12 @@ Required
                           Required: the teardown rejects and unlists with it.
 
 Options
+  --only <key>            Repeatable. Narrows the profile to those criteria. A hard prerequisite is
+                          added and announced — --only audit on its own could only report that it
+                          had no fixture to read. Refused together with --skip.
+  --skip <key>            Repeatable. Registers the criterion as unmet, which makes the run
+                          INCOMPLETE. Refused if a selected criterion depends on it.
+                          Keys: ${criterionKeys(WRITE_CRITERIA).join(" ")}
   --application-url <url> The applicationUrl the fixtures carry. Defaults to the deployment's own
                           /v1/docs, which is always reachable; point it at a real HTML page to
                           exercise the verification snapshot digest end to end.
@@ -94,7 +103,10 @@ async function main() {
 
   // Every refusal is decided before a single request is made, so a run that must not happen costs
   // the deployment nothing at all.
-  const reasons = refusals(opts, WRITE_MILESTONES);
+  const reasons = [
+    ...refusals(opts, WRITE_MILESTONES),
+    ...selectionRefusals(WRITE_CRITERIA, { only: opts.only, skip: opts.skip }),
+  ];
   if (reasons.length > 0) {
     process.stderr.write(
       `accept-writes refuses to run:\n${reasons.map((r) => `  • ${r}`).join("\n")}\n`,
@@ -115,10 +127,17 @@ async function main() {
     return 2;
   }
 
+  const selection = selectCriteria(WRITE_CRITERIA, {
+    only: opts.only,
+    skip: opts.skip,
+    profile: opts.only.size > 0 ? undefined : WRITE_MILESTONES[opts.milestone],
+  });
+
   const state = { run: runStamp(), fixtureIds: [] };
   const report = acceptanceReport({
     title: "RFP Hub — write acceptance",
     milestone: opts.milestone,
+    selection: selectionLine(opts, selection.autoIncluded),
     contractIds: contractIds(WRITE_CRITERIA, opts.milestone),
     api: opts.api,
     namespace: opts.namespace,
@@ -139,9 +158,15 @@ async function main() {
     state,
   };
 
-  const selection = selectCriteria(WRITE_CRITERIA, { profile: WRITE_MILESTONES[opts.milestone] });
   try {
     for (const criterion of selection.criteria) await criterion.run(ctx);
+    for (const criterion of selection.skipped) {
+      const key = criterion.meta.key;
+      report
+        .criterion(key, key, "Not performed: excluded from this run with --skip.")
+        .unmet(key, `--skip ${key}`)
+        .finish();
+    }
   } finally {
     // Runs whatever happened above. A teardown skipped because a criterion threw would leave rows
     // in somebody's deployment and say nothing about it.

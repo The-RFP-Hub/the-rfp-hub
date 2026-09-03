@@ -26,7 +26,7 @@ import {
   selectionRefusals,
 } from "./compliance/criteria.mjs";
 import { normalizeBase } from "./compliance/http.mjs";
-import { describeScope, parseArgs, refusals } from "./compliance/options.mjs";
+import { describeScope, parseArgs, refusals, selectionLine } from "./compliance/options.mjs";
 import { Report } from "./compliance/report.mjs";
 import { loadStandardValidator } from "./compliance/schema.mjs";
 
@@ -78,16 +78,6 @@ Behavior
 This tool has no credential flag, no credential environment fallback and no production override,
 because it does not write. For the criteria that do, see \`pnpm accept:writes --help\`.
 `;
-
-/** The selection line, so a scoped run says what it looked at without anyone reading the flags. */
-function selectionLine(opts, autoIncluded) {
-  const parts = [];
-  if (opts.only.size > 0) parts.push(`--only ${[...opts.only].join(", ")}`);
-  if (opts.skip.size > 0) parts.push(`--skip ${[...opts.skip].join(", ")}`);
-  if (parts.length === 0) return undefined;
-  const added = autoIncluded.length > 0 ? `  (+ ${autoIncluded.join(", ")}, required)` : "";
-  return `${parts.join(" ")}${added}`;
-}
 
 async function main() {
   let opts;

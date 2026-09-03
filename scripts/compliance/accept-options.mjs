@@ -20,6 +20,7 @@
  * flags still WIN, so an exported variable left over from an earlier session cannot silently
  * redirect a deliberate run.
  */
+import { WRITE_CRITERIA, criterionKeys } from "./criteria.mjs";
 import { defaultReportPath } from "./options.mjs";
 import { targetRefusal } from "./target-guard.mjs";
 
@@ -39,6 +40,8 @@ export function parseArgs(argv, env = process.env) {
     milestone: undefined,
     api: undefined,
     namespace: undefined,
+    only: new Set(),
+    skip: new Set(),
     json: undefined,
     views: 5,
     timeoutMs: 20000,
@@ -62,6 +65,14 @@ export function parseArgs(argv, env = process.env) {
       }
       return value;
     };
+    const criterion = (flag) => {
+      const value = next();
+      const known = criterionKeys(WRITE_CRITERIA);
+      if (!known.includes(value)) {
+        throw new Error(`${flag} must be one of ${known.join(", ")}, got "${value}"`);
+      }
+      return value;
+    };
 
     switch (arg) {
       case "-h":
@@ -77,6 +88,12 @@ export function parseArgs(argv, env = process.env) {
         break;
       case "--namespace":
         opts.namespace = next();
+        break;
+      case "--only":
+        opts.only.add(criterion("--only"));
+        break;
+      case "--skip":
+        opts.skip.add(criterion("--skip"));
         break;
       case "--session-token":
         opts.sessionToken = next();
@@ -115,6 +132,9 @@ export function parseArgs(argv, env = process.env) {
     }
   }
 
+  if (opts.only.size > 0 && opts.skip.size > 0) {
+    throw new Error("--only and --skip cannot be combined: --only already says what runs");
+  }
   for (const [key, variable] of Object.entries(CREDENTIAL_ENV)) {
     if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
   }

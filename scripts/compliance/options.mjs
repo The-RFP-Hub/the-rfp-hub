@@ -220,6 +220,19 @@ export function refusals(opts, milestones = READ_MILESTONES) {
   return reasons;
 }
 
+/**
+ * The header's Selection line, so a scoped run says what it looked at without anyone reading back
+ * the flags — including a prerequisite the runner pulled in that nobody asked for.
+ */
+export function selectionLine(opts, autoIncluded = []) {
+  const parts = [];
+  if (opts.only.size > 0) parts.push(`--only ${[...opts.only].join(", ")}`);
+  if (opts.skip.size > 0) parts.push(`--skip ${[...opts.skip].join(", ")}`);
+  if (parts.length === 0) return undefined;
+  const added = autoIncluded.length > 0 ? `  (+ ${autoIncluded.join(", ")}, required)` : "";
+  return `${parts.join(" ")}${added}`;
+}
+
 /** A run narrowed by --only/--skip/--offline answers a narrower question, and must say so. */
 export function describeScope(opts) {
   const parts = [];

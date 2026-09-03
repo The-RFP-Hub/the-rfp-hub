@@ -50,7 +50,12 @@ seen the contract.
   `INCOMPLETE`. Refused together with `--only`: the combination has no single meaning.
 - `--milestone <id>` runs the criteria a contract milestone maps to, and stamps the mapping into the
   console header and into `criteria[].contractId` in the JSON. Without it, no `contractId` appears
-  anywhere.
+  anywhere. `accept:writes` requires one; `check:deployment` runs everything registered without it.
+
+`accept:writes --only audit` registers `lifecycle` too, because `audit` reads the fixture
+`lifecycle` creates and on its own could only report that it had none. `--skip lifecycle` while a
+dependent is selected is refused rather than run: the dependent would report an unmet requirement
+the operator chose, which reads as a finding about the deployment and is not one.
 
 `--milestone m3` on `check:deployment` is an error naming `accept:writes`, and `--milestone m2` on
 `accept:writes` is an error naming `check:deployment`. A milestone whose criteria are not registered
