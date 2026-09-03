@@ -11,7 +11,8 @@ import { createInterface } from "node:readline";
 /**
  * `base` merged with `env`, then every name in `unset` deleted — in that order, so `unset` wins
  * even over an explicit `env` entry. That ordering is the guarantee: the read-only case must
- * actively STRIP `RFPHUB_API_KEY`/`RFPHUB_MCP_ENABLE_SUBMIT`, not merely decline to set them.
+ * actively STRIP `RFPHUB_API_KEY`, not merely decline to set it — a key inherited from the
+ * operator's own shell would register the write tool and make the two-tool assertion vacuous.
  */
 export function buildChildEnv(base, env = {}, unset = []) {
   const merged = { ...base, ...env };

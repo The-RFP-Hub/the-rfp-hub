@@ -1,9 +1,9 @@
 /**
  * `buildChildEnv` is the pure logic behind item 7 of the Codex review: the read-only MCP case must
- * not merely omit `RFPHUB_API_KEY`/`RFPHUB_MCP_ENABLE_SUBMIT` from what IT sets — it must actively
- * strip them, so an ambient value inherited from the checker's own process (a developer's shell
- * exporting one for unrelated reasons) can never leak into the "default env, read-only tools only"
- * case and silently make that case untested.
+ * not merely omit `RFPHUB_API_KEY` from what IT sets — it must actively strip it, so an ambient
+ * value inherited from the checker's own process (a developer's shell exporting one for unrelated
+ * reasons) can never register the write tool and silently make the "read-only tools only" case
+ * untested.
  */
 import { describe, expect, it } from "vitest";
 import { McpStdioClient, buildChildEnv, findCredentialLeak } from "../mcp-client.mjs";
@@ -18,7 +18,6 @@ describe("buildChildEnv", () => {
     const base = { PATH: "/usr/bin", RFPHUB_API_KEY: "rfph_leaked_from_dev_shell" };
     const result = buildChildEnv(base, { RFPHUB_API_BASE: "https://api.example.org" }, [
       "RFPHUB_API_KEY",
-      "RFPHUB_MCP_ENABLE_SUBMIT",
     ]);
     expect(result).not.toHaveProperty("RFPHUB_API_KEY");
     expect(result.PATH).toBe("/usr/bin");

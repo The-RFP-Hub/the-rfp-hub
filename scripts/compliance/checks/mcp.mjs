@@ -100,8 +100,8 @@ function scanClientForLeak(client, ...values) {
   return null;
 }
 
-async function spawnClient(resolved, env, ctx, unset = []) {
-  const client = new McpStdioClient(resolved.command, resolved.args, {
+async function spawnClient(resolved, env, ctx, unset = [], extraArgs = []) {
+  const client = new McpStdioClient(resolved.command, [...resolved.args, ...extraArgs], {
     cwd: ctx.repoRoot,
     env: { ...env, ...ctx.childEnv },
     unset,
@@ -297,8 +297,8 @@ export async function checkMcp(report, ctx) {
     "mcp",
     local ? "MCP server callable from a local build" : "MCP server installable and callable",
     local
-      ? "--mcp-spec local: exercises packages/mcp/dist/cli.js directly. NOT evidence the package is published — see the `mcp-publication` criterion. Exactly two tools without the submit env and three with it, each with an outputSchema and boolean annotations; search returns structuredContent that validates against its own schema and matches the API page for page; no rfph_ substring leaks anywhere, including after the process exits; phase 1 returns pending and performs no network write."
-      : "npx resolves @the-rfp-hub/mcp from the real npm registry and its CLI runs; exactly two tools without the submit env and three with it, each with an outputSchema and boolean annotations; search returns structuredContent that validates against its own schema and matches the API page for page; no rfph_ substring leaks anywhere, including after the process exits; phase 1 returns pending and performs no network write.",
+      ? "--mcp-spec local: exercises packages/mcp/dist/cli.js directly. NOT evidence the package is published — see the `mcp-publication` criterion. Exactly two tools without a credential and three with one, each with an outputSchema and boolean annotations; search returns structuredContent that validates against its own schema and matches the API page for page; no rfph_ substring leaks anywhere, including after the process exits; phase 1 returns pending and performs no network write."
+      : "npx resolves @the-rfp-hub/mcp from the real npm registry and its CLI runs; exactly two tools without a credential and three with one, each with an outputSchema and boolean annotations; search returns structuredContent that validates against its own schema and matches the API page for page; no rfph_ substring leaks anywhere, including after the process exits; phase 1 returns pending and performs no network write.",
   );
 
   let resolved;
@@ -342,17 +342,19 @@ export async function checkMcp(report, ctx) {
     }
   }
 
-  // A real server appends an audit line under `RFPHUB_MCP_HOME` for every tool call, and the
-  // preview below would land in `~/.rfphub/pending/` indistinguishable from a real one.
+  // A real server appends an audit line under its state directory for every tool call, and without
+  // `--state-dir` the preview below would land in the operator's own `~/.rfphub/pending/`,
+  // indistinguishable from a real one.
   const mcpHome = await mkdtemp(join(tmpdir(), "compliance-mcp-home-"));
   try {
     let readClient;
     try {
       readClient = await spawnClient(
         resolved,
-        { RFPHUB_API_BASE: apiBase.origin, RFPHUB_MCP_HOME: mcpHome },
+        { RFPHUB_API_BASE: apiBase.origin },
         ctx,
-        ["RFPHUB_API_KEY", "RFPHUB_MCP_ENABLE_SUBMIT"],
+        ["RFPHUB_API_KEY"],
+        ["--state-dir", mcpHome],
       );
       const listResponse = await readClient.request("tools/list", {}, { timeoutMs: ctx.timeoutMs });
       let searchTool;
@@ -363,7 +365,7 @@ export async function checkMcp(report, ctx) {
         const names = tools.map((t) => t.name).sort();
         c.expect(
           names.length === 2 && READ_TOOLS.every((n) => names.includes(n)),
-          "tools/list is exactly the two read tools without RFPHUB_MCP_ENABLE_SUBMIT",
+          "tools/list is exactly the two read tools without RFPHUB_API_KEY",
           names.join(", "),
           `expected exactly [${READ_TOOLS.join(", ")}], got [${names.join(", ")}]`,
         );
@@ -426,13 +428,10 @@ export async function checkMcp(report, ctx) {
       const origin = await mock.start();
       submitClient = await spawnClient(
         resolved,
-        {
-          RFPHUB_API_BASE: origin,
-          RFPHUB_API_KEY: "rfph_test_notreal",
-          RFPHUB_MCP_ENABLE_SUBMIT: "1",
-          RFPHUB_MCP_HOME: mcpHome,
-        },
+        { RFPHUB_API_BASE: origin, RFPHUB_API_KEY: "rfph_test_notreal" },
         ctx,
+        [],
+        ["--state-dir", mcpHome],
       );
 
       const listResponse = await submitClient.request(
@@ -443,7 +442,7 @@ export async function checkMcp(report, ctx) {
       let submitTool;
       if (listResponse.error) {
         c.fail(
-          "tools/list is exactly three tools with RFPHUB_MCP_ENABLE_SUBMIT=1",
+          "tools/list is exactly three tools with RFPHUB_API_KEY set",
           `JSON-RPC error: ${JSON.stringify(listResponse.error)}`,
         );
       } else {
@@ -451,7 +450,7 @@ export async function checkMcp(report, ctx) {
         const names = tools.map((t) => t.name).sort();
         c.expect(
           names.length === 3 && [...READ_TOOLS, SUBMIT_TOOL].every((n) => names.includes(n)),
-          "tools/list is exactly three tools with RFPHUB_MCP_ENABLE_SUBMIT=1",
+          "tools/list is exactly three tools with RFPHUB_API_KEY set",
           names.join(", "),
           `expected exactly [${[...READ_TOOLS, SUBMIT_TOOL].sort().join(", ")}], got [${names.join(", ")}]`,
         );
@@ -509,7 +508,7 @@ export async function checkMcp(report, ctx) {
           .join(", ")}`,
       );
     } catch (err) {
-      c.fail("MCP server starts with RFPHUB_MCP_ENABLE_SUBMIT=1", err.message);
+      c.fail("MCP server starts with RFPHUB_API_KEY set", err.message);
     } finally {
       await submitClient?.close();
       const exitLeak = submitClient ? scanClientForLeak(submitClient) : null;

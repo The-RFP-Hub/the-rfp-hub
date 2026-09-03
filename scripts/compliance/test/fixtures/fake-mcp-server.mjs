@@ -6,7 +6,8 @@
 import { createInterface } from "node:readline";
 
 const defect = process.env.FAKE_MCP_DEFECT ?? "none";
-const submitEnabled = process.env.RFPHUB_MCP_ENABLE_SUBMIT === "1";
+// The real server registers the write tool if and only if a credential is configured.
+const submitEnabled = Boolean(process.env.RFPHUB_API_KEY);
 const apiBase = process.env.RFPHUB_API_BASE ?? "";
 
 // The real server's schemas are zod-generated and carry this dialect, which the draft-07 ajv build
