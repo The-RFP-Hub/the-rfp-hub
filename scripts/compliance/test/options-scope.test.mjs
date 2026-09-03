@@ -69,6 +69,12 @@ describe("--only, --skip and --export-url", () => {
     expect(refusals(parse("--skip", "export"))).toEqual([]);
   });
 
+  it("--offline needs no --export-url, because the export criterion will not run", () => {
+    expect(refusals(parse("--offline"))).toEqual([]);
+    expect(refusals(parse("--offline", "--milestone", "m2"))).toEqual([]);
+    expect(refusals(parse("--offline", "--only", "export"))).toEqual([]);
+  });
+
   it("--only and --skip together is refused: the combination has no one meaning", () => {
     expect(() => parse("--only", "liveness", "--skip", "export")).toThrow(/cannot be combined/);
   });
@@ -99,9 +105,20 @@ describe("weakening flags", () => {
     expect(weakenings(parse())).toEqual([]);
   });
 
-  it("--allow-insecure is a weakening off loopback, and nothing on it", () => {
+  it("--allow-insecure is a weakening on a remote plaintext target", () => {
     const remote = parse("--allow-insecure", "--api", "http://api.example.org");
     expect(weakenings(remote)[0]).toContain("--allow-insecure");
+  });
+
+  it("is not a weakening against an https target, where it changes nothing", () => {
+    expect(weakenings(parse("--allow-insecure", "--api", "https://api.example.org"))).toEqual([]);
+    expect(weakenings(parse("--allow-insecure"))).toEqual([]); // the default target is https
+    expect(
+      describeScope(parse("--allow-insecure", "--api", "https://api.example.org")),
+    ).toBeUndefined();
+  });
+
+  it("is not a weakening on loopback, where the traffic never leaves the machine", () => {
     expect(weakenings(parse("--allow-insecure", "--api", "http://127.0.0.1:3001"))).toEqual([]);
     expect(weakenings(parse("--allow-insecure", "--api", "http://localhost:3001"))).toEqual([]);
   });

@@ -74,6 +74,31 @@ describe("--offline", () => {
     expect(json.criteria.map((c) => [c.id, c.status])).toEqual([["liveness", "incomplete"]]);
   });
 
+  // Exit 2, "the run could not be made", is a different answer from an honest INCOMPLETE.
+  it("with no other flags: every criterion unmet, nothing refused, nothing requested", async () => {
+    const api = await countingApi();
+    const { code, out } = await run([
+      "--offline",
+      "--api",
+      api.origin,
+      "--json",
+      "-",
+      "--no-color",
+    ]);
+
+    expect(out).not.toContain("refuses to run");
+    expect(out).not.toContain("--export-url is required");
+    expect(api.seen).toEqual([]);
+    expect(code).toBe(1);
+
+    const json = reportOf(out);
+    expect(json.result).toBe("incomplete");
+    expect(json.signOff).toBe(false);
+    expect(json.criteria.map((c) => c.id)).toEqual(["liveness", "openapi", "dataset", "export"]);
+    expect(json.criteria.every((c) => c.status === "incomplete")).toBe(true);
+    expect(json.criteria.every((c) => c.unmet[0] === "skipped: --offline")).toBe(true);
+  });
+
   it("a weakened run reaches the deployment but is not a sign-off", async () => {
     const api = await countingApi();
     const { out } = await run([
