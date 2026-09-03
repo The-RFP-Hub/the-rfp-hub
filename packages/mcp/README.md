@@ -84,13 +84,23 @@ Or copy the skill directory manually into `.claude/skills/`, `.agents/skills/` (
 
 ## Configuration
 
+Two environment variables and one flag. A variable is for a **secret** — which must never sit on
+`argv`, where every process on the machine can read it — or for the **identity of the deployment**.
+Everything else is a flag or a fixed constant, so that running this server needs nothing from
+whoever administers your environment.
+
 | Variable | Default | What it does |
 |---|---|---|
 | `RFPHUB_API_BASE` | `https://api.ethrfps.app` | Which deployment to talk to. A **bare origin**, `https` unless it is loopback. The origin is bound into every write approval. |
-| `RFPHUB_API_KEY` | *(none)* | Credential, needed **only** to submit. Never sent on a read. |
-| `RFPHUB_MCP_ENABLE_SUBMIT` | *(unset)* | `1` registers the write tool. Without it the tool does not exist. |
-| `RFPHUB_MCP_HOME` | `~/.rfphub` | Where approvals, rate-limit counters and the audit log live. Must be **writable**. |
-| `RFPHUB_MCP_TIMEOUT_MS` | `20000` | Deadline for one API request, headers and body together. 1 000–120 000; outside that the server refuses to start. |
+| `RFPHUB_API_KEY` | *(none)* | Credential, needed **only** to submit. Never sent on a read. **Setting it is what registers the write tool**: without it, `tools/list` returns two tools and there is no write tool for a poisoned search result to reach for. |
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--state-dir <dir>` | `~/.rfphub` | Where approvals, rate-limit counters and the audit log live. Must be **writable**. Accepted in every mode, and the server and `rfphub-mcp approve` must be given the **same** directory. |
+
+The per-request deadline is a fixed 20 seconds, headers and body together. It is not configurable:
+a deadline an operator can raise is a deadline a stalled destination can hold a tool call open
+behind.
 
 `RFPHUB_API_BASE` is checked at startup, before any preview can exist, and four shapes are
 refused outright:
@@ -123,8 +133,7 @@ there is no parameter on any tool through which one could be passed, and a test 
       "command": "npx",
       "args": ["-y", "@the-rfp-hub/mcp@0.1.0"],
       "env": {
-        "RFPHUB_API_KEY": "rfph_…",
-        "RFPHUB_MCP_ENABLE_SUBMIT": "1"
+        "RFPHUB_API_KEY": "rfph_…"
       }
     }
   }
@@ -159,7 +168,7 @@ One record in full, as an RFP Hub Standard document, inside an envelope of
 none added, no value changed. Not byte-identical: it is parsed and re-serialized on the way
 through, so key order and whitespace are the transport's business.
 
-### `submit_opportunity` *(write — off by default)*
+### `submit_opportunity` *(write — registered only when a key is configured)*
 
 Two calls with a person in between. See the next section.
 
@@ -272,13 +281,29 @@ does nothing.
 
 ## Local state
 
-Everything lives under `RFPHUB_MCP_HOME` (default `~/.rfphub`), directory `0700`, files `0600`.
+Everything lives under the state directory — `--state-dir`, default `~/.rfphub` — with the
+directory at `0700` and files at `0600`.
 
-**`RFPHUB_MCP_HOME` takes precedence over `HOME` and over the operating system's idea of this
-user's home directory.** Set it explicitly wherever that idea is unreliable: a container, a service
-account, a `systemd` unit or a launch agent may have no home directory, may have one that is
-read-only, or may share one with another identity. This server refuses rather than guesses — see
-below.
+**`--state-dir` takes precedence over the operating system's idea of this user's home directory.**
+Pass it wherever that idea is unreliable: a container, a service account, a `systemd` unit or a
+launch agent may have no home directory, may have one that is read-only, or may share one with
+another identity. This server refuses rather than guesses — see below.
+
+```jsonc
+{
+  "mcpServers": {
+    "rfp-hub": {
+      "command": "npx",
+      "args": ["-y", "@the-rfp-hub/mcp@0.1.0", "--state-dir", "/var/lib/rfphub"]
+    }
+  }
+}
+```
+
+**Pass the same directory to the approval commands.** The server writes the preview there and
+`rfphub-mcp approve` reads it back; given different directories, `pending` shows nothing while a
+real preview waits somewhere else. `rfphub-mcp --state-dir /var/lib/rfphub pending` prints an
+`approve` line that already carries the flag.
 
 
 
@@ -323,7 +348,7 @@ and counted in rather than reset, and an approval stamped in the future reads as
 window. Budget stays spent until real time catches up, which is the safe direction for a limiter.
 
 **Rate limits fail closed.** If the counter store cannot be read or written, calls are refused — a
-budget that cannot be counted cannot be enforced. Keep `RFPHUB_MCP_HOME` writable.
+budget that cannot be counted cannot be enforced. Keep the state directory writable.
 
 **The counters are correct across processes.** Check-and-increment runs under a lock directory
 (`policy-counters.lock`), because an MCP client and a terminal running this same package share one
@@ -385,7 +410,7 @@ Defaults: `read` 60/minute, `preview` 10/minute, `commit` 2/minute and **5 per d
 - **`structuredContent` is not a safety boundary.** It is delivered to the model like any other
   output. It exists here for contract and validation.
 - **Every request has a deadline.** A peer that accepts a connection and then says nothing, or
-  sends half a body and stops, is abandoned after `RFPHUB_MCP_TIMEOUT_MS`. A read reports that and
+  sends half a body and stops, is abandoned after 20 seconds. A read reports that and
   is not retried. A write reports it as an ambiguous outcome, because the request had already left.
 - **A `2xx` is not believed until its body has been checked.** A read whose body is not the shape
   this build knows fails rather than returning a plausible empty record; a write whose body is not

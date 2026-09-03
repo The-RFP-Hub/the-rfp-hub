@@ -69,8 +69,10 @@ headers. Nothing here had the room to grow an authorization service.
 - Good, because `npx` is the whole installation, on every client that speaks stdio.
 - Good, because the approval does not depend on any protocol feature, so it behaves identically on
   a client that implements nothing beyond tools.
-- Good, because the write tool is *not registered* without an explicit flag, so a poisoned result
-  has no write tool to reach for rather than a write tool that says no.
+- Good, because the write tool is *not registered* unless a credential is configured, so a
+  poisoned result has no write tool to reach for rather than a write tool that says no. Presence of
+  the key is the switch: a second variable to turn writes on would be a state in which the server
+  holds a key and refuses to use it, which nobody configures on purpose.
 - Bad, because the approval is not isolated from an agent that holds a shell as the same user. See
   the trust assumption below; this is the cost, and it is real.
 - Bad, because each user has to mint and configure their own key.
@@ -195,9 +197,11 @@ converge on it. Those are post-milestone work, recorded here so the gap is a kno
   server-side control and they do not aggregate across machines.
 - **Neutral:** the server keeps ephemeral local state (approvals, counters, an audit line per
   call). It is not "stateless", and this ADR deliberately avoids that word for it. Because that
-  state carries security decisions, its container is verified rather than assumed: the home must be
-  a real directory at `0700`, state files must be regular files at `0600` with no second hard link,
-  and approvals and counters refuse when that cannot be established.
+  state carries security decisions, its container is verified rather than assumed: the state
+  directory must be a real directory at `0700`, state files must be regular files at `0600` with no
+  second hard link, and approvals and counters refuse when that cannot be established. Where it
+  goes is the `--state-dir` flag rather than a variable: a path is not a secret, an MCP client that
+  can pass `env` can pass `args`, and the approval commands must be given the same directory.
 - **Neutral:** a fourth rate-limit kind, `attempt`, exists for abuse control. See above.
 - **Neutral:** no remote transport means no discovery documents and no `WWW-Authenticate`
   challenge — they would be answering questions nobody can currently ask.
