@@ -2,7 +2,7 @@
   "name": "@the-rfp-hub/monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "RFP Hub — open standard, validation tooling, API, client, and agent libraries for Ethereum-ecosystem funding opportunities.",
+  "description": "RFP Hub \u2014 open standard, validation tooling, API, client, and agent libraries for Ethereum-ecosystem funding opportunities.",
   "packageManager": "pnpm@10.17.1",
   "engines": {
     "node": ">=20.19"
@@ -13,16 +13,16 @@
     "check": "pnpm -r --if-present check",
     "check:neutral": "node scripts/check-neutral.mjs",
     "check:deploy": "node scripts/check-deploy.mjs",
-    "check:skill": "node scripts/check-skill.mjs",
-    "check:m2": "node scripts/check-m2.mjs",
-    "check:m3": "node scripts/check-m3.mjs",
+    "check:deployment": "node scripts/check-deployment.mjs",
+    "accept:writes": "node scripts/accept-writes.mjs",
     "frontend:clean-room": "node scripts/frontend-clean-room.mjs",
     "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
     "lint": "biome check .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "check:skill": "node scripts/check-skill.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild"],
@@ -40,9 +40,9 @@
     "ajv-formats": "^3.0.1",
     "json-schema-to-typescript": "^15.0.3",
     "rfphub-validate": "workspace:*",
-    "skills-ref": "0.1.5",
     "tsup": "^8.3.5",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "skills-ref": "0.1.5"
   }
 }

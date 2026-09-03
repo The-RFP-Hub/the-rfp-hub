@@ -207,26 +207,27 @@ export function migrateEnv(adminDatabaseUrl: string): NodeJS.ProcessEnv {
   return env;
 }
 
-// ── the check-m3 child ────────────────────────────────────────────────────────────────────────
+// ── the compliance child ──────────────────────────────────────────────────────────────────────
 
-export interface CheckM3EnvInput {
+export interface ComplianceEnvInput {
   sessionToken?: string;
   adminToken?: string;
   apiKey?: string;
 }
 
 /**
- * Credentials for `scripts/check-m3.mjs` go through the ENVIRONMENT, not argv.
+ * Credentials for `scripts/accept-writes.mjs` go through the ENVIRONMENT, not argv.
  *
  * argv is world-readable through `ps`, and these are a live session token and a live API key.
- * `scripts/m3-compliance/options.mjs` accepts `M3_SESSION_TOKEN` / `M3_ADMIN_TOKEN` / `M3_API_KEY`
- * for exactly this reason; the flags still win where both are given.
+ * `scripts/compliance/accept-options.mjs` accepts `COMPLIANCE_SESSION_TOKEN` /
+ * `COMPLIANCE_ADMIN_TOKEN` / `COMPLIANCE_API_KEY` for exactly this reason; the flags still win
+ * where both are given.
  */
-export function checkM3Env(input: CheckM3EnvInput): NodeJS.ProcessEnv {
+export function complianceEnv(input: ComplianceEnvInput): NodeJS.ProcessEnv {
   const env = baseEnv();
-  if (input.sessionToken) env.M3_SESSION_TOKEN = input.sessionToken;
-  if (input.adminToken) env.M3_ADMIN_TOKEN = input.adminToken;
-  if (input.apiKey) env.M3_API_KEY = input.apiKey;
+  if (input.sessionToken) env.COMPLIANCE_SESSION_TOKEN = input.sessionToken;
+  if (input.adminToken) env.COMPLIANCE_ADMIN_TOKEN = input.adminToken;
+  if (input.apiKey) env.COMPLIANCE_API_KEY = input.apiKey;
   env.NO_COLOR = "1";
   return env;
 }

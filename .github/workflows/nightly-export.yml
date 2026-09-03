@@ -298,9 +298,9 @@ jobs:
           exit 1
 
   # ── VERIFY ──────────────────────────────────────────────────────────────────────────────────────
-  # The gate, and a THIRD job only because of what it needs: `scripts/check-m2.mjs` imports ajv and
-  # loads the workspace validator, so running it means node_modules — which is exactly what must not
-  # share a job with the write token. It therefore cannot live in `publish`, and it cannot live in
+  # The gate, and a THIRD job only because of what it needs: `scripts/check-deployment.mjs` imports
+  # ajv and loads the workspace validator, so running it means node_modules — which is exactly what
+  # must not share a job with the write token. It cannot live in `publish`, and it cannot live in
   # `build` either, because there is nothing to verify until the push has happened.
   #
   # It downloads the export from its public URL and exercises the deployed API against the M2
@@ -337,7 +337,10 @@ jobs:
         run: pnpm build
 
       - name: Verify the publication with the compliance checker
-        run: node scripts/check-m2.mjs --base-url "$API_BASE_URL" --export-url "$EXPORT_ROOT_URL"
+        run: |
+          node scripts/check-deployment.mjs --milestone m2 \
+            --api "$API_BASE_URL" --export-url "$EXPORT_ROOT_URL" \
+            --json compliance-report.json
 
       # Kept whether the check passed or failed: a failing run is exactly when the itemized report
       # is worth reading.
@@ -345,6 +348,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: m2-compliance-report
-          path: m2-compliance-report.json
+          name: compliance-report
+          path: compliance-report.json
           if-no-files-found: ignore

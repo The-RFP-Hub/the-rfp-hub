@@ -14,6 +14,12 @@
  *                   those assertions race each other rather than the product.
  *   `retries: 0`  — a flaky SECURITY assertion retried into green is a security assertion that has
  *                   been deleted. If a negative test is unstable, that instability is the finding.
+ *
+ * AND SO IS THE ORDER THE SPEC FILES RUN IN. With one worker, Playwright runs them in the
+ * alphabetical order of their paths, and several of them depend on that: the review queue's pending
+ * cap is accounted for across files, and the fixture web server records only its LAST request. Every
+ * file therefore carries a numeric prefix, so the order is stated rather than emergent — renaming a
+ * spec must keep its number, or it moves in the run and the coupling surfaces as an unrelated 409.
  */
 import { defineConfig, devices } from "@playwright/test";
 import { readState } from "./src/state.js";
