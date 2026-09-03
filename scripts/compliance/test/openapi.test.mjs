@@ -15,8 +15,8 @@
  */
 import { createServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
+import { checkOpenApi } from "../checks/openapi.mjs";
 import { Report } from "../report.mjs";
-import { checkOpenApi } from "./openapi.mjs";
 
 const FEED = "/v1/feeds/opportunities.atom";
 const HEALTH = "/v1/health";

@@ -14,9 +14,9 @@
  * Everything below returns a plain result object; a refused connection is a RESULT the report
  * renders, not an exception that aborts a run before the other criteria are looked at.
  */
-import { url, asJson, mapLimit, query, request } from "../m2-compliance/http.mjs";
+import { url, asJson, mapLimit, query, request } from "./http.mjs";
 
-export { asJson, mapLimit, normalizeBase, query, url } from "../m2-compliance/http.mjs";
+export { asJson, mapLimit, normalizeBase, query, url } from "./http.mjs";
 
 /** Identifies this tool, and is excluded from analytics capture by the API, deliberately. */
 export const CHECKER_AGENT = "rfphub-m3-compliance";

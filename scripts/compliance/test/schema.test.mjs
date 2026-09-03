@@ -17,7 +17,7 @@
  * about the deployment.
  */
 import { describe, expect, it } from "vitest";
-import { OpenApiBundle } from "./schema.mjs";
+import { OpenApiBundle } from "../schema.mjs";
 
 const ERROR_RESPONSE = {
   $id: "ErrorResponse",

@@ -19,7 +19,7 @@
  * and a tool that reddens a run over that gets ignored, which is its own kind of failure.
  */
 import { describe, expect, it } from "vitest";
-import { FAIL, INCOMPLETE, PASS, Report } from "./report.mjs";
+import { FAIL, INCOMPLETE, PASS, Report } from "../report.mjs";
 
 const meta = { baseUrl: "http://127.0.0.1:3001", exportUrl: "http://127.0.0.1:8081" };
 

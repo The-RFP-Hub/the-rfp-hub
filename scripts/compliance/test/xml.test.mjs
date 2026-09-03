@@ -12,7 +12,7 @@
  *                broken, because the checker is pointed at whatever a live deployment serves.
  */
 import { describe, expect, it } from "vitest";
-import { checkWellFormed } from "./xml.mjs";
+import { checkWellFormed } from "../xml.mjs";
 
 /** An Atom document shaped like the one packages/api's feed mapper emits. */
 const ATOM = `<?xml version="1.0" encoding="utf-8"?>

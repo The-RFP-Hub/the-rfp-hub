@@ -9,7 +9,7 @@
  * What actually differs between the two tools is the header: this one targets one API and writes
  * fixtures into a namespace, rather than targeting an API and an export root.
  */
-import { Report as M2Report } from "../m2-compliance/report.mjs";
+import { Report as M2Report } from "./report.mjs";
 
 export {
   PASS,
@@ -18,7 +18,7 @@ export {
   SKIP,
   INFO,
   INCOMPLETE,
-} from "../m2-compliance/report.mjs";
+} from "./report.mjs";
 
 export class Report extends M2Report {
   toJSON() {

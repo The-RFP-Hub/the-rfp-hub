@@ -38,18 +38,18 @@
  * exercised (the run does not establish the milestone) · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
-import { checkAnalytics } from "./m3-compliance/checks/analytics.mjs";
-import { checkAudit } from "./m3-compliance/checks/audit.mjs";
-import { checkDuplicates } from "./m3-compliance/checks/duplicates.mjs";
-import { checkLifecycle } from "./m3-compliance/checks/lifecycle.mjs";
-import { checkNamespace } from "./m3-compliance/checks/namespace.mjs";
-import { checkStaleness } from "./m3-compliance/checks/staleness.mjs";
-import { checkVerification } from "./m3-compliance/checks/verification.mjs";
-import { cleanup } from "./m3-compliance/cleanup.mjs";
-import { normalizeBase } from "./m3-compliance/client.mjs";
-import { runStamp } from "./m3-compliance/fixtures.mjs";
-import { parseArgs, refusals } from "./m3-compliance/options.mjs";
-import { Report } from "./m3-compliance/report.mjs";
+import { checkAnalytics } from "./compliance/checks/analytics.mjs";
+import { checkAudit } from "./compliance/checks/audit.mjs";
+import { checkDuplicates } from "./compliance/checks/duplicates.mjs";
+import { checkLifecycle } from "./compliance/checks/lifecycle.mjs";
+import { checkNamespace } from "./compliance/checks/namespace.mjs";
+import { checkStaleness } from "./compliance/checks/staleness.mjs";
+import { checkVerification } from "./compliance/checks/verification.mjs";
+import { cleanup } from "./compliance/cleanup.mjs";
+import { normalizeBase } from "./compliance/client.mjs";
+import { runStamp } from "./compliance/fixtures.mjs";
+import { parseArgs, refusals } from "./compliance/options.mjs";
+import { Report } from "./compliance/report-m3.mjs";
 
 const USAGE = `M3 sign-off compliance checker
 

@@ -26,13 +26,13 @@
  * 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
-import { checkDataset } from "./m2-compliance/checks/dataset.mjs";
-import { checkExport } from "./m2-compliance/checks/export.mjs";
-import { checkLiveness } from "./m2-compliance/checks/liveness.mjs";
-import { checkOpenApi } from "./m2-compliance/checks/openapi.mjs";
-import { normalizeBase } from "./m2-compliance/http.mjs";
-import { Report } from "./m2-compliance/report.mjs";
-import { loadStandardValidator } from "./m2-compliance/schema.mjs";
+import { checkDataset } from "./compliance/checks/dataset.mjs";
+import { checkExport } from "./compliance/checks/export.mjs";
+import { checkLiveness } from "./compliance/checks/liveness.mjs";
+import { checkOpenApi } from "./compliance/checks/openapi.mjs";
+import { normalizeBase } from "./compliance/http.mjs";
+import { Report } from "./compliance/report.mjs";
+import { loadStandardValidator } from "./compliance/schema.mjs";
 
 const USAGE = `M2 sign-off compliance checker
 
