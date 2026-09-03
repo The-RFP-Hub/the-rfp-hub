@@ -25,7 +25,7 @@ export async function checkDataset(report, ctx, { doc, bundle, standard }) {
   );
 
   // ── stats and the floor ──────────────────────────────────────────────────────────────────
-  const statsRes = await request(url(ctx.baseUrl, "/v1/stats"), { timeoutMs: ctx.timeoutMs });
+  const statsRes = await request(url(ctx.api, "/v1/stats"), { timeoutMs: ctx.timeoutMs });
   if (!statsRes.ok || statsRes.status !== 200) {
     c.fail("GET /v1/stats answers", `→ ${statsRes.ok ? statsRes.status : statsRes.error}`);
     return c.finish();
@@ -55,7 +55,7 @@ export async function checkDataset(report, ctx, { doc, bundle, standard }) {
   );
 
   // ── the schema the service serves is the version being validated against ────────────────
-  const schemaRes = await request(url(ctx.baseUrl, "/v1/opportunities/schema"), {
+  const schemaRes = await request(url(ctx.api, "/v1/opportunities/schema"), {
     timeoutMs: ctx.timeoutMs,
   });
   let servedSchema;
@@ -92,7 +92,7 @@ export async function checkDataset(report, ctx, { doc, bundle, standard }) {
   for (let page = 1; page <= expectedPages + 1; page++) {
     // No `sort`: paging uses whatever the published default is, which is the order a consumer
     // gets. The service breaks ties on a unique column, so the order is total and paging is stable.
-    const target = url(ctx.baseUrl, "/v1/opportunities") + query({ page, limit });
+    const target = url(ctx.api, "/v1/opportunities") + query({ page, limit });
     const res = await request(target, { timeoutMs: ctx.timeoutMs });
     if (!res.ok || res.status !== 200) {
       c.fail(
@@ -161,7 +161,7 @@ export async function checkDataset(report, ctx, { doc, bundle, standard }) {
   const capped = ctx.maxDetails > 0 && ctx.maxDetails < ids.length;
   const subject = capped ? ids.slice(0, ctx.maxDetails) : ids;
   const results = await mapLimit(subject, ctx.concurrency, async (id) => {
-    const res = await request(url(ctx.baseUrl, `/v1/opportunities/${encodeURIComponent(id)}`), {
+    const res = await request(url(ctx.api, `/v1/opportunities/${encodeURIComponent(id)}`), {
       timeoutMs: ctx.timeoutMs,
     });
     if (!res.ok || res.status !== 200) {
@@ -261,7 +261,7 @@ async function checkFilterConsistency(c, ctx, { name, values, tally, total }) {
   }
 
   const counts = await mapLimit(values, ctx.concurrency, async (value) => {
-    const target = url(ctx.baseUrl, "/v1/opportunities") + query({ [name]: value, limit: 1 });
+    const target = url(ctx.api, "/v1/opportunities") + query({ [name]: value, limit: 1 });
     const res = await request(target, { timeoutMs: ctx.timeoutMs });
     if (!res.ok || res.status !== 200)
       return { value, error: `→ ${res.ok ? res.status : res.error}` };
@@ -303,7 +303,7 @@ async function checkFilterConsistency(c, ctx, { name, values, tally, total }) {
   // predicate looks like) and not one of them (which is what a last-value-wins parser looks like).
   if (values.length >= 2) {
     const [a, b] = values;
-    const target = url(ctx.baseUrl, "/v1/opportunities") + query({ [name]: `${a},${b}`, limit: 1 });
+    const target = url(ctx.api, "/v1/opportunities") + query({ [name]: `${a},${b}`, limit: 1 });
     const res = await request(target, { timeoutMs: ctx.timeoutMs });
     const body = res.ok && res.status === 200 ? asJson(res).json : null;
     const expected = (tally?.[a] ?? 0) + (tally?.[b] ?? 0);

@@ -68,7 +68,7 @@ export async function checkOpenApi(report, ctx) {
   // `follow: true` on the two discovery probes: the question here is "is the documentation
   // reachable", and a UI that redirects to its own trailing-slash form is reachable. The operation
   // loop below is the opposite case and runs with redirects UNfollowed.
-  const ui = await request(url(ctx.baseUrl, "/v1/docs"), {
+  const ui = await request(url(ctx.api, "/v1/docs"), {
     timeoutMs: ctx.timeoutMs,
     follow: true,
   });
@@ -82,7 +82,7 @@ export async function checkOpenApi(report, ctx) {
   let docRes;
   let docPath;
   for (const candidate of DOC_PATHS) {
-    docRes = await request(url(ctx.baseUrl, candidate), {
+    docRes = await request(url(ctx.api, candidate), {
       timeoutMs: ctx.timeoutMs,
       follow: true,
     });
@@ -132,12 +132,12 @@ export async function checkOpenApi(report, ctx) {
       'servers[0].url is the relative "/" — correct wherever the document is fetched from, but a deployed service should publish its own absolute origin (PUBLIC_BASE_URL).',
     );
   } else {
-    const same = originOf(server) === originOf(ctx.baseUrl);
+    const same = originOf(server) === originOf(ctx.api);
     c.expect(
       same,
       "the document advertises this deployment's own origin",
       `servers[0].url = ${server}`,
-      `servers[0].url = ${server}, but the service under test is ${ctx.baseUrl} — every generated client would talk to the wrong host`,
+      `servers[0].url = ${server}, but the service under test is ${ctx.api} — every generated client would talk to the wrong host`,
     );
     c.expect(
       !server.endsWith("/"),
@@ -173,7 +173,7 @@ export async function checkOpenApi(report, ctx) {
   const bundle = new OpenApiBundle(doc);
 
   // ── a representative path-parameter value, discovered from the live dataset ──────────────
-  const sample = await request(url(ctx.baseUrl, "/v1/opportunities?limit=1"), {
+  const sample = await request(url(ctx.api, "/v1/opportunities?limit=1"), {
     timeoutMs: ctx.timeoutMs,
   });
   const sampleId =
@@ -324,7 +324,7 @@ async function exerciseOperation(c, ctx, bundle, { path, method, operation, path
     qs.append(param.name, String(value));
   }
 
-  const target = url(ctx.baseUrl, resolved) + (qs.toString() ? `?${qs}` : "");
+  const target = url(ctx.api, resolved) + (qs.toString() ? `?${qs}` : "");
   const res = await request(target, { timeoutMs: ctx.timeoutMs });
   if (!res.ok) {
     c.fail(name, `${target}: ${res.error}`);
@@ -629,7 +629,7 @@ async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
     //    loudly rather than return the whole dataset.
     await expect400(c, ctx, bundle, operation, {
       name: `${label} rejects an undocumented query parameter`,
-      target: `${url(ctx.baseUrl, resolved)}?${UNKNOWN_PARAM}=1`,
+      target: `${url(ctx.api, resolved)}?${UNKNOWN_PARAM}=1`,
       why: "an unknown parameter must be a 400, never a silently unfiltered 200",
     });
 
@@ -639,7 +639,7 @@ async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
       if (bad === undefined) continue;
       await expect400(c, ctx, bundle, operation, {
         name: `${label} rejects ${param.name}=${bad.value} (${bad.why})`,
-        target: `${url(ctx.baseUrl, resolved)}?${encodeURIComponent(param.name)}=${encodeURIComponent(bad.value)}`,
+        target: `${url(ctx.api, resolved)}?${encodeURIComponent(param.name)}=${encodeURIComponent(bad.value)}`,
         why: `the document constrains ${param.name}: ${bad.why}`,
       });
     }
@@ -667,7 +667,7 @@ async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
       ? `${label} refuses an anonymous caller as documented, for a record that does not exist`
       : `${label} answers 404 for a record that does not exist`;
     const missing = path.replace(/\{[^}]+\}/g, `m2-compliance:no-such-record-${Date.now()}`);
-    const target = url(ctx.baseUrl, missing);
+    const target = url(ctx.api, missing);
     const res = await request(target, { timeoutMs: ctx.timeoutMs });
     if (!res.ok) {
       c.fail(name, `${target}: ${res.error}`);

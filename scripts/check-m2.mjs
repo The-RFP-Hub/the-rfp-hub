@@ -160,7 +160,7 @@ async function main() {
     return 2;
   }
 
-  const ctx = { ...opts };
+  const ctx = { ...opts, api: opts.baseUrl };
   const report = new Report({
     title: "RFP Hub — M2 sign-off compliance check",
     api: opts.baseUrl,

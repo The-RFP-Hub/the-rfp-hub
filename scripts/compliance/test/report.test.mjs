@@ -21,7 +21,7 @@
 import { describe, expect, it } from "vitest";
 import { FAIL, INCOMPLETE, PASS, Report } from "../report.mjs";
 
-const meta = { baseUrl: "http://127.0.0.1:3001", exportUrl: "http://127.0.0.1:8081" };
+const meta = { api: "http://127.0.0.1:3001", exportUrl: "http://127.0.0.1:8081" };
 
 /** A report with one criterion per spec: each spec is a list of check statuses to record. */
 const build = (...specs) => {

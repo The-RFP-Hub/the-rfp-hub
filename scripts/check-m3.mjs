@@ -117,6 +117,7 @@ async function main() {
 
   const ctx = {
     ...opts,
+    api: opts.baseUrl,
     // The credential the read-and-own checks use. A session where one exists, because it is the
     // account acting directly rather than a scoped delegation of it.
     credential: opts.sessionToken ?? opts.apiKey,
@@ -125,7 +126,7 @@ async function main() {
 
   const report = new Report({
     title: "RFP Hub — M3 sign-off compliance check",
-    api: ctx.baseUrl,
+    api: ctx.api,
     namespace: ctx.namespace,
     fixturePrefix: `${ctx.namespace}:m3check-${state.run}-`,
     credentialKind: opts.sessionToken ? "session" : "api-key",

@@ -31,7 +31,7 @@ export const TRAFFIC_AGENT = "Mozilla/5.0 (rfphub m3 acceptance traffic)";
 /** One request, with an optional bearer credential and an explicit agent. */
 export async function call(ctx, path, options = {}) {
   const { token, agent = CHECKER_AGENT, headers = {}, ...rest } = options;
-  return request(url(ctx.baseUrl, path), {
+  return request(url(ctx.api, path), {
     timeoutMs: ctx.timeoutMs,
     ...rest,
     headers: {

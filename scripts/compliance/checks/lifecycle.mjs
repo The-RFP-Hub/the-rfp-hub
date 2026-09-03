@@ -104,7 +104,7 @@ export async function checkLifecycle(report, ctx, state) {
     // public, to belong to nobody else, and to be served as HTML — so the verification criterion
     // has something real to fetch without this tool depending on a third-party site staying up.
     // `--application-url` overrides it; see the note in checks/verification.mjs for what that buys.
-    applicationUrl: ctx.applicationUrl ?? `${ctx.baseUrl}/v1/docs`,
+    applicationUrl: ctx.applicationUrl ?? `${ctx.api}/v1/docs`,
   });
   state.document = document;
 

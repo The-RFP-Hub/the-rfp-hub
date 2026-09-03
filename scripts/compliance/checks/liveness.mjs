@@ -20,13 +20,13 @@ export async function checkLiveness(report, ctx) {
     "GET {base}/v1/health answers 200 and healthy, over a valid TLS transport, within a reported time.",
   );
 
-  const target = url(ctx.baseUrl, "/v1/health");
-  const parsed = new URL(ctx.baseUrl);
+  const target = url(ctx.api, "/v1/health");
+  const parsed = new URL(ctx.api);
   const loopback = isLoopbackHost(parsed.hostname);
 
   // ── transport ────────────────────────────────────────────────────────────────────────────
   if (parsed.protocol === "https:") {
-    const tls = await probeTls(ctx.baseUrl, { timeoutMs: ctx.timeoutMs });
+    const tls = await probeTls(ctx.api, { timeoutMs: ctx.timeoutMs });
     if (tls.valid) {
       const life =
         tls.daysRemaining === undefined
@@ -50,17 +50,17 @@ export async function checkLiveness(report, ctx) {
   } else if (loopback) {
     c.skip(
       "TLS certificate is valid for this host",
-      `${ctx.baseUrl} is a loopback origin — plaintext never leaves the machine there, so there is no transport to verify. A deployed base URL must be https://.`,
+      `${ctx.api} is a loopback origin — plaintext never leaves the machine there, so there is no transport to verify. A deployed base URL must be https://.`,
     );
   } else if (ctx.allowInsecure) {
     c.warn(
       "TLS certificate is valid for this host",
-      `${ctx.baseUrl} is plaintext on a non-loopback host and --allow-insecure was passed. This is not a signable transport.`,
+      `${ctx.api} is plaintext on a non-loopback host and --allow-insecure was passed. This is not a signable transport.`,
     );
   } else {
     c.fail(
       "TLS certificate is valid for this host",
-      `${ctx.baseUrl} is plaintext on a non-loopback host. The published base URL tells every client which scheme to speak, so http:// downgrades all of them at once. Pass --allow-insecure only for a throwaway environment.`,
+      `${ctx.api} is plaintext on a non-loopback host. The published base URL tells every client which scheme to speak, so http:// downgrades all of them at once. Pass --allow-insecure only for a throwaway environment.`,
     );
   }
 
@@ -118,7 +118,7 @@ export async function checkLiveness(report, ctx) {
   );
 
   // The root document is the service's own index of what it serves; cheap to confirm it answers.
-  const root = await request(url(ctx.baseUrl, "/"), { timeoutMs: ctx.timeoutMs });
+  const root = await request(url(ctx.api, "/"), { timeoutMs: ctx.timeoutMs });
   if (root.ok && root.status === 200) {
     const parsedRoot = asJson(root).json ?? {};
     c.info(

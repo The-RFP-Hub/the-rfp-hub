@@ -266,9 +266,9 @@ async function runCriterion({
   });
   running = server;
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  const report = new Report({ baseUrl, exportUrl: baseUrl });
-  const { criterion } = await checkOpenApi(report, { baseUrl, timeoutMs: 5000 });
+  const api = `http://127.0.0.1:${server.address().port}`;
+  const report = new Report({ api, exportUrl: api });
+  const { criterion } = await checkOpenApi(report, { api, timeoutMs: 5000 });
   return criterion;
 }
 
