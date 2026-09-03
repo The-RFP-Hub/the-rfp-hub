@@ -16,6 +16,7 @@
  * binary rather than a tool because a tool is reachable from the model's loop — with the caveat,
  * stated in the README and ADR 0012, that an agent holding a shell as this user can run them too.
  */
+import fs from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -336,12 +337,17 @@ function revoke(home: string, id: string | undefined): number {
   return 0;
 }
 
-/** `fileURLToPath` rather than building a `file://` URL, which is wrong for a path with a space. */
+/**
+ * `fileURLToPath` rather than a hand-built `file://` URL, which is wrong for a path with a space;
+ * `realpathSync` on both sides because the bin every installer creates is a symlink to this file.
+ */
 const isEntrypoint = (() => {
   const invoked = process.argv[1];
   if (invoked === undefined) return false;
   try {
-    return fileURLToPath(import.meta.url) === path.resolve(invoked);
+    return (
+      fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(path.resolve(invoked))
+    );
   } catch {
     return false;
   }

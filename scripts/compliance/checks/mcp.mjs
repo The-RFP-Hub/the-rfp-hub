@@ -73,7 +73,14 @@ async function probeRegistryInstall(spec, ctx) {
       cwd: ctx.repoRoot,
       timeout: Math.max(ctx.timeoutMs, 30000),
     });
-    return { ok: true, detail: stdout.trim().slice(0, 200) || "resolved" };
+    const printed = stdout.trim();
+    if (!/\d+\.\d+\.\d+/.test(printed)) {
+      return {
+        ok: false,
+        detail: `npx installed the package, but \`--version\` exited 0 and printed ${printed ? JSON.stringify(printed.slice(0, 200)) : "nothing"} — the bin shim loaded the module without running its CLI`,
+      };
+    }
+    return { ok: true, detail: printed.slice(0, 200) };
   } catch (err) {
     const stderr = (err.stderr ?? "").toString().trim();
     return { ok: false, detail: (stderr || err.message).slice(0, 800) };
