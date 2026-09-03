@@ -23,7 +23,7 @@ export async function checkAudit(report, ctx, state) {
 
   const id = state.publishedId;
   if (!id) {
-    c.skip("audit trail", "the lifecycle criterion did not create a fixture to have a history");
+    c.unmet("audit trail", "the lifecycle criterion did not create a fixture to have a history");
     return c.finish();
   }
   const path = `/v1/opportunities/${encodeURIComponent(id)}/audit`;
@@ -110,4 +110,16 @@ export async function checkAudit(report, ctx, state) {
   }
 
   return c.finish();
+}
+
+export const meta = {
+  key: "audit",
+  requires: [{ key: "lifecycle", hard: true }],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-3" },
+};
+
+export async function run(ctx) {
+  await checkAudit(ctx.report, ctx, ctx.state);
 }

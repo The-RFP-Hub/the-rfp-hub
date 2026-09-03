@@ -38,15 +38,8 @@
  * exercised (the run does not establish the milestone) · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
-import { checkAnalytics } from "./compliance/checks/analytics.mjs";
-import { checkAudit } from "./compliance/checks/audit.mjs";
-import { checkDuplicates } from "./compliance/checks/duplicates.mjs";
-import { checkLifecycle } from "./compliance/checks/lifecycle.mjs";
-import { checkNamespace } from "./compliance/checks/namespace.mjs";
-import { checkStaleness } from "./compliance/checks/staleness.mjs";
-import { checkVerification } from "./compliance/checks/verification.mjs";
-import { cleanup } from "./compliance/cleanup.mjs";
 import { normalizeBase } from "./compliance/client.mjs";
+import { TEARDOWN, WRITE_CRITERIA, selectCriteria } from "./compliance/criteria.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
 import { parseArgs, refusals } from "./compliance/options.mjs";
 import { Report } from "./compliance/report.mjs";
@@ -135,20 +128,15 @@ async function main() {
     node: process.version,
   });
 
+  ctx.report = report;
+  ctx.results = {};
+  ctx.state = state;
   try {
-    // Ordered: the lifecycle criterion creates the fixture the next five look at, and each of those
-    // SKIPS with the prerequisite as its reason rather than failing for something it never tested.
-    await checkLifecycle(report, ctx, state);
-    await checkNamespace(report, ctx, state);
-    await checkAudit(report, ctx, state);
-    await checkDuplicates(report, ctx, state);
-    await checkVerification(report, ctx, state);
-    await checkAnalytics(report, ctx, state);
-    await checkStaleness(report, ctx, state);
+    for (const criterion of selectCriteria(WRITE_CRITERIA).criteria) await criterion.run(ctx);
   } finally {
     // Runs whatever happened above. A teardown skipped because a criterion threw would leave rows
     // in somebody's deployment and say nothing about it.
-    await cleanup(report, ctx, state);
+    await TEARDOWN.run(ctx);
   }
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);

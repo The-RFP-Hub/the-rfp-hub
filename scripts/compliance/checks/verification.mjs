@@ -31,7 +31,7 @@ export async function checkVerification(report, ctx, state) {
 
   const id = state.publishedId;
   if (!id) {
-    c.skip("verification run", "the lifecycle criterion did not create a fixture to verify");
+    c.unmet("verification run", "the lifecycle criterion did not create a fixture to verify");
     return c.finish();
   }
   const path = `/v1/opportunities/${encodeURIComponent(id)}/verification`;
@@ -142,4 +142,16 @@ async function poll(ctx, path) {
     await sleep(POLL_INTERVAL_MS);
   }
   return null;
+}
+
+export const meta = {
+  key: "verification",
+  requires: [{ key: "lifecycle", hard: true }],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-5" },
+};
+
+export async function run(ctx) {
+  await checkVerification(ctx.report, ctx, ctx.state);
 }

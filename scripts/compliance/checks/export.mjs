@@ -474,3 +474,14 @@ function firstLine(text) {
       ?.trim() ?? "(empty)"
   );
 }
+
+export const meta = {
+  key: "export",
+  requires: [],
+  needs: ["api", "exportUrl", "standard"],
+  contract: { m2: "M2-4" },
+};
+
+export async function run(ctx) {
+  await checkExport(ctx.report, ctx, { standard: ctx.standard });
+}

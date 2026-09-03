@@ -337,3 +337,17 @@ function describeTally(tally) {
   const entries = Object.entries(tally ?? {});
   return entries.length === 0 ? "(none)" : entries.map(([k, v]) => `${k} ${v}`).join(", ");
 }
+
+export const meta = {
+  key: "dataset",
+  // Soft: the body falls back to its own defaults when no OpenAPI document was fetched, so a
+  // `--only dataset` run is a narrower check rather than a broken one.
+  requires: [{ key: "openapi", hard: false }],
+  needs: ["api", "standard"],
+  contract: { m2: "M2-3" },
+};
+
+export async function run(ctx) {
+  const { doc = null, bundle = null } = ctx.results.openapi ?? {};
+  await checkDataset(ctx.report, ctx, { doc, bundle, standard: ctx.standard });
+}

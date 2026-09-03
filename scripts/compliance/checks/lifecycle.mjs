@@ -216,3 +216,15 @@ export function missingFixture(state) {
     ? null
     : "the lifecycle criterion did not create a fixture, so there is nothing to check this against";
 }
+
+export const meta = {
+  key: "lifecycle",
+  requires: [],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-1" },
+};
+
+export async function run(ctx) {
+  await checkLifecycle(ctx.report, ctx, ctx.state);
+}

@@ -31,14 +31,14 @@ export async function checkAnalytics(report, ctx, state) {
 
   const id = state.publishedId;
   if (!id) {
-    c.skip(
+    c.unmet(
       "publisher analytics",
       "the lifecycle criterion did not create a fixture to generate traffic for",
     );
     return c.finish();
   }
   if (!state.isPublic) {
-    c.skip(
+    c.unmet(
       "publisher analytics",
       "the fixture landed pending, so it has no public detail route to read and no link-out to click. Run with a credential for a verified member of --namespace.",
     );
@@ -136,4 +136,16 @@ async function totals(ctx, id) {
   });
   if (!response.ok || response.status !== 200 || !response.json?.totals) return null;
   return response.json.totals;
+}
+
+export const meta = {
+  key: "analytics",
+  requires: [{ key: "lifecycle", hard: true }],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-6" },
+};
+
+export async function run(ctx) {
+  await checkAnalytics(ctx.report, ctx, ctx.state);
 }

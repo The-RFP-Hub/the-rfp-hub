@@ -30,7 +30,10 @@ export async function checkDuplicates(report, ctx, state) {
   );
 
   if (!state.publishedId || !state.document || !state.writeToken) {
-    c.skip("near-duplicate submission", "the lifecycle criterion produced no fixture to duplicate");
+    c.unmet(
+      "near-duplicate submission",
+      "the lifecycle criterion produced no fixture to duplicate",
+    );
     return c.finish();
   }
 
@@ -97,4 +100,16 @@ export async function checkDuplicates(report, ctx, state) {
   }
 
   return c.finish();
+}
+
+export const meta = {
+  key: "duplicates",
+  requires: [{ key: "lifecycle", hard: true }],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-4" },
+};
+
+export async function run(ctx) {
+  await checkDuplicates(ctx.report, ctx, ctx.state);
 }

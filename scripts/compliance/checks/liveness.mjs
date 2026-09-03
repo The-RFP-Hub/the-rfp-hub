@@ -132,3 +132,14 @@ export async function checkLiveness(report, ctx) {
 
   return c.finish();
 }
+
+export const meta = {
+  key: "liveness",
+  requires: [],
+  needs: ["api"],
+  contract: { m2: "M2-1" },
+};
+
+export async function run(ctx) {
+  await checkLiveness(ctx.report, ctx);
+}

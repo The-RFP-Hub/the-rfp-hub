@@ -22,7 +22,7 @@ export async function checkNamespace(report, ctx, state) {
   );
 
   if (!state.writeToken) {
-    c.skip("out-of-namespace submission", "the lifecycle criterion produced no write credential");
+    c.unmet("out-of-namespace submission", "the lifecycle criterion produced no write credential");
     return c.finish();
   }
 
@@ -95,4 +95,16 @@ export async function checkNamespace(report, ctx, state) {
   );
 
   return c.finish();
+}
+
+export const meta = {
+  key: "namespace",
+  requires: [{ key: "lifecycle", hard: true }],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-2" },
+};
+
+export async function run(ctx) {
+  await checkNamespace(ctx.report, ctx, ctx.state);
 }

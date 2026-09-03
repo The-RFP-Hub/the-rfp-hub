@@ -26,10 +26,7 @@
  * 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
-import { checkDataset } from "./compliance/checks/dataset.mjs";
-import { checkExport } from "./compliance/checks/export.mjs";
-import { checkLiveness } from "./compliance/checks/liveness.mjs";
-import { checkOpenApi } from "./compliance/checks/openapi.mjs";
+import { READ_CRITERIA } from "./compliance/criteria.mjs";
 import { normalizeBase } from "./compliance/http.mjs";
 import { Report } from "./compliance/report.mjs";
 import { loadStandardValidator } from "./compliance/schema.mjs";
@@ -160,7 +157,6 @@ async function main() {
     return 2;
   }
 
-  const ctx = { ...opts, api: opts.baseUrl };
   const report = new Report({
     title: "RFP Hub — M2 sign-off compliance check",
     api: opts.baseUrl,
@@ -173,10 +169,8 @@ async function main() {
     node: process.version,
   });
 
-  await checkLiveness(report, ctx);
-  const { doc, bundle } = await checkOpenApi(report, ctx);
-  await checkDataset(report, ctx, { doc, bundle, standard });
-  await checkExport(report, ctx, { standard });
+  const ctx = { ...opts, api: opts.baseUrl, report, results: {}, standard };
+  for (const criterion of READ_CRITERIA) await criterion.run(ctx);
 
   process.stdout.write(`${report.render({ color: opts.color })}\n`);
 

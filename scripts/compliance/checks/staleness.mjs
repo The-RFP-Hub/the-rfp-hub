@@ -25,7 +25,7 @@ export async function checkStaleness(report, ctx, state) {
   );
 
   if (!state.writeToken) {
-    c.skip("staleness closure", "the lifecycle criterion produced no write credential");
+    c.unmet("staleness closure", "the lifecycle criterion produced no write credential");
     return c.finish();
   }
 
@@ -149,4 +149,16 @@ export async function checkStaleness(report, ctx, state) {
   }
 
   return c.finish();
+}
+
+export const meta = {
+  key: "staleness",
+  requires: [{ key: "lifecycle", hard: true }],
+  needs: ["api", "namespace", "credential"],
+  writes: true,
+  contract: { m3: "M3-7" },
+};
+
+export async function run(ctx) {
+  await checkStaleness(ctx.report, ctx, ctx.state);
 }

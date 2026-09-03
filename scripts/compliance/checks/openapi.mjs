@@ -757,3 +757,16 @@ function violatingValue(param) {
   }
   return undefined;
 }
+
+export const meta = {
+  key: "openapi",
+  requires: [],
+  needs: ["api"],
+  contract: { m2: "M2-2" },
+};
+
+export async function run(ctx) {
+  // The one read criterion that PRODUCES data: the dataset criterion holds the served documents to
+  // the document this one fetched, rather than to a second copy of it.
+  ctx.results.openapi = await checkOpenApi(ctx.report, ctx);
+}
