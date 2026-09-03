@@ -104,8 +104,8 @@ export function parseArgs(argv) {
       case "--help":
         opts.help = true;
         break;
-      // The name check-m2 spelled, and the one every external sign-off recipe and the nightly
-      // workflow already carry. Kept as an alias so those keep working across the rename.
+      // The name the M2 checker spelled, and the one every external sign-off recipe already
+      // carries. Kept as an alias so those keep working across the rename.
       case "--base-url":
       case "--api":
         opts.api = next();

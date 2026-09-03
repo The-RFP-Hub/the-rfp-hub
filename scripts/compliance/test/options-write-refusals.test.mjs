@@ -64,7 +64,7 @@ describe("refusals", () => {
   });
 
   it("refuses a remote plaintext target: the credential would cross the wire in the clear", () => {
-    expect(check({ ...complete, api: "http://api-staging.ethrfps.app" })[0]).toContain("not https");
+    expect(check({ ...complete, api: "http://api-staging.example.org" })[0]).toContain("not https");
   });
 
   it("refuses a staging-looking host that is not on the allowlist", () => {

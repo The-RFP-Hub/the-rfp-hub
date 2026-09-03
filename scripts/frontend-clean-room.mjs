@@ -2,7 +2,8 @@
 // Deploy path B, proven mechanically: copy ONLY packages/frontend into a temp directory, rewrite its
 // two workspace dependencies to installable specs, `npm install && npm run build`, start the
 // standalone server and request `/`, `/publishers`, `/?q=…` and the `public/` assets against it.
-// Also the engine behind external-deploy-smoke.yml. The deploy paths: packages/frontend/README.md.
+// Also the engine behind the `clean-room` job in .github/workflows/ci.yml. The deploy paths:
+// packages/frontend/README.md.
 //
 // Usage: node scripts/frontend-clean-room.mjs [--api-url <url>] [--port <n>] [--keep] [--browser]
 //                                             [--require-publishers]

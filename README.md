@@ -116,40 +116,46 @@ collation change causes trouble, are in
 
 ## Verifying a deployment
 
-The milestone's completion criteria are checkable rather than assertable. `scripts/check-m2.mjs`
-runs them against a live deployment — health and TLS, every operation in the *published* OpenAPI
-document executed against the *live* service (including the strict-`400` negative contract), every
-served document validated against the Standard, and the CC0 export's freshness and
+Completion criteria are checkable rather than assertable, and there are two tools because there are
+two kinds of criterion.
+
+**`scripts/check-deployment.mjs` only reads.** Health and TLS, every operation in the *published*
+OpenAPI document executed against the *live* service (including the strict-`400` negative contract),
+every served document validated against the Standard, and the CC0 export's freshness and
 `latest.json`/`latest.csv` pair invariant:
 
 ```bash
-pnpm check:m2 --base-url https://api.example.org --export-url https://data.example.org
+pnpm check:deployment --milestone m2 --api https://api.example.org --export-url https://data.example.org
 ```
 
 Pass/fail per criterion on stdout, a JSON report alongside, non-zero exit on any failure. Nothing
-about a particular host or dataset is baked in. Run it by hand, or from any external runner, against
-whichever deployment you want an answer about. See
-[`scripts/m2-compliance/README.md`](./scripts/m2-compliance/README.md).
+about a particular host or dataset is baked in, and the tool holds no credential flag at all — which
+is what makes it safe to point at production, where its defaults already point. Run it by hand, or
+from any external runner, against whichever deployment you want an answer about.
 
 The nightly publishing job runs exactly this, against the deployment and the export it has just
 pushed, and fails if it does not pass — so the job going green means *published and independently
 verified*, not merely "ran". See [Open data](#open-data).
 
-`scripts/check-m3.mjs` does the same for the write surface — the publisher lifecycle, the review
+**`scripts/accept-writes.mjs` writes**, which is the other half: the publisher lifecycle, the review
 queue, the audit trail, duplicate detection, source verification, publisher analytics and the
 staleness job:
 
 ```bash
-pnpm check:m3 --base-url https://api.staging.example.org --namespace my-org --session-token "$SESSION"
+pnpm accept:writes --milestone m3 --api https://api-staging.example.org \
+  --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
 ```
 
-**It writes**, which is why it is stricter about being allowed to run: it refuses to start without
-credentials and a namespace, and refuses a target that does not look like staging unless
-`--allow-production` is passed in those words. Everything it creates is prefixed `m3check-` and is
-rejected and unlisted at the end. It is deliberately **not** wired into CI — CI has no deployment to
-write to, and a sign-off tool needing a standing publisher credential in repository secrets would be
-a worse thing to have than a tool somebody runs. See
-[`scripts/m3-compliance/README.md`](./scripts/m3-compliance/README.md).
+Because it writes, it refuses far more. The target must be loopback or an explicitly allowlisted
+staging origin, over https, with the redirect chain re-checked — there is no flag that forces
+production. It refuses to start without a namespace, a publisher credential and a reviewer
+credential, the last because its teardown rejects and unlists everything the run created and a run
+that cannot clean up after itself has no business writing. Everything it creates is prefixed
+`compliance-`. It is deliberately **not** wired into CI — CI has no deployment to write to, and a
+sign-off tool needing a standing publisher credential in repository secrets would be a worse thing
+to have than a tool somebody runs.
+
+Both tools, their criteria and their exit codes: [`scripts/compliance/README.md`](./scripts/compliance/README.md).
 
 ## Open data
 
