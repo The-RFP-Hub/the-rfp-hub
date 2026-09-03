@@ -57,7 +57,7 @@ const NAMESPACE_SHAPES: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export function namespacesFor(runId: string, seed = 0): Namespaces {
-  const base = `m3e2e-${runId.toLowerCase()}`;
+  const base = `e2e-${runId.toLowerCase()}`;
   const shape = NAMESPACE_SHAPES[
     ((seed % NAMESPACE_SHAPES.length) + NAMESPACE_SHAPES.length) % NAMESPACE_SHAPES.length
   ] as readonly [string, string];

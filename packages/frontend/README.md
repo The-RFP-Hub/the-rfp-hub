@@ -329,7 +329,7 @@ the tarball mode succeeds (see the note below). That HTTP request is only a fast
 fetch cannot actually reach the API would still return a 200 shell and pass it. **`--browser`
 is the real proof** — it drives a real headless Chromium through `/` and `/?q=<term>` and waits for
 an opportunity row to actually render from a live request, and is what
-`.github/workflows/external-deploy-smoke.yml` runs on every push touching this package.
+the `clean-room` job in `.github/workflows/ci.yml` runs whenever a change touches this package.
 
 > **`rfphub-validate` note.** `packages/frontend/src/lib/validate-client.ts` imports
 > `humanizeIssues` from `rfphub-validate`, which is exported by the package's source but missing
