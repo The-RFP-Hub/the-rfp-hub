@@ -1,16 +1,12 @@
 /**
- * Argument parsing for `scripts/check-deployment.mjs`, which only READS.
- *
- * No credential flag and no credential environment fallback, deliberately: this tool defaults to
- * production, and what makes that safe is having no way to be handed something to write with.
- *
- * `--only` and `--skip` are NOT interchangeable. `--skip` still registers the criterion, as an
- * unmet one, so a partial run reports incomplete; `--only` does not register the excluded criteria
- * at all, which is what a scoped lint needs. Refused together: the combination has no one meaning.
+ * Argument parsing for `scripts/check-deployment.mjs`, which only READS. No credential flag and no
+ * environment fallback, deliberately: this tool defaults to production, and what makes that safe is
+ * having no way to be handed something to write with. `--only` vs `--skip`: ./README.md.
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { READ_CRITERIA, READ_MILESTONES, criterionKeys } from "./criteria.mjs";
+import { isLoopbackHost } from "./http.mjs";
 
 const NUMERIC = new Set([
   "--timeout",
@@ -28,9 +24,8 @@ const MCP_SPEC_HELP =
 
 /**
  * Normalize `--mcp-spec` to what follows `npx -y @the-rfp-hub/mcp@`. The full-package form is
- * accepted and stripped because concatenating it produced `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next`,
- * an npm ENOENT nobody could read back to the flag. A range is refused: this criterion is about one
- * immutable artifact, and a range does not name one.
+ * stripped because concatenating it produced `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next`, an npm
+ * ENOENT nobody could read back to the flag. A range is refused: it does not name one artifact.
  */
 export function normalizeMcpSpec(raw) {
   const value = String(raw ?? "").trim();
@@ -187,10 +182,7 @@ export function parseArgs(argv) {
   return opts;
 }
 
-/**
- * Everything that has to hold before a request is made. Empty means go. A milestone this binary
- * does not own is an error naming the tool that does, rather than an empty run.
- */
+/** Empty means go. A milestone this binary does not own is an error naming the tool that does. */
 export function refusals(opts, milestones = READ_MILESTONES) {
   const reasons = [];
   if (opts.milestone !== undefined) {
@@ -234,13 +226,48 @@ export function selectionLine(opts, autoIncluded = []) {
 }
 
 /** A run narrowed by --only/--skip/--offline answers a narrower question, and must say so. */
+/**
+ * Flags that leave every criterion registered but hold it to LESS than the contract says. Not
+ * narrowings, so `--only`'s label never fired for them — which is how a run that validated 5 of
+ * 4000 documents printed the same green headline as one that validated all of them.
+ */
+export function weakenings(opts) {
+  const out = [];
+  if (opts.maxDetails > 0) {
+    out.push(
+      `--max-details ${opts.maxDetails}, so only that many served documents were validated against the Standard rather than every one`,
+    );
+  }
+  if (opts.allowInsecure && !onLoopback(opts.api)) {
+    out.push(
+      "--allow-insecure, so the target was not held to https on a host whose traffic leaves the machine",
+    );
+  }
+  return out;
+}
+
+function onLoopback(api) {
+  // Only the parse is guarded: catching around `isLoopbackHost` too would swallow a missing import
+  // and report every host as remote, which is the safe direction but hides the bug for good.
+  let hostname;
+  try {
+    hostname = new URL(api).hostname;
+  } catch {
+    return false;
+  }
+  return isLoopbackHost(hostname);
+}
+
 export function describeScope(opts) {
   const parts = [];
   if (opts.only.size > 0) parts.push(`--only ${[...opts.only].join(", ")}`);
   if (opts.skip.size > 0) parts.push(`--skip ${[...opts.skip].join(", ")}`);
   if (opts.offline) parts.push("--offline");
-  if (parts.length === 0) return undefined;
+  const weak = weakenings(opts);
+  if (parts.length === 0 && weak.length === 0) return undefined;
   const docsLint = opts.offline && opts.only.size === 1 && opts.only.has("docs");
-  const what = docsLint ? "docs lint, offline" : parts.join(" ");
-  return `${what} — NOT a deployment sign-off (${parts.join(" ")})`;
+  const narrowed = docsLint ? "docs lint, offline" : parts.join(" ");
+  const said = [narrowed, weak.length > 0 ? `weakened: ${weak.join("; ")}` : ""].filter(Boolean);
+  const flags = parts.length > 0 ? ` (${parts.join(" ")})` : "";
+  return `${said.join(" · ")} — NOT a deployment sign-off${flags}`;
 }

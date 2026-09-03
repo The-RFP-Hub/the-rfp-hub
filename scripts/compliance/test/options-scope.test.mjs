@@ -3,7 +3,7 @@
  * production defaults safe — there is no way to hand it a credential.
  */
 import { describe, expect, it } from "vitest";
-import { describeScope, normalizeMcpSpec, parseArgs, refusals } from "../options.mjs";
+import { describeScope, normalizeMcpSpec, parseArgs, refusals, weakenings } from "../options.mjs";
 
 const parse = (...argv) => parseArgs(argv);
 
@@ -83,6 +83,43 @@ describe("describeScope", () => {
 
   it("is undefined for a full run", () => {
     expect(describeScope({ only: new Set(), skip: new Set(), offline: false })).toBeUndefined();
+  });
+});
+
+/**
+ * A weakening leaves every criterion registered, so `--only`'s narrowing label never fired for it:
+ * a run that validated 5 of 4000 served documents printed the same green headline as one that
+ * validated all of them.
+ */
+describe("weakening flags", () => {
+  it("--max-details below all of them is a weakening, and 0 is not", () => {
+    expect(weakenings(parse("--max-details", "5"))[0]).toContain("--max-details 5");
+    expect(weakenings(parse("--max-details", "5"))[0]).toContain("rather than every one");
+    expect(weakenings(parse("--max-details", "0"))).toEqual([]);
+    expect(weakenings(parse())).toEqual([]);
+  });
+
+  it("--allow-insecure is a weakening off loopback, and nothing on it", () => {
+    const remote = parse("--allow-insecure", "--api", "http://api.example.org");
+    expect(weakenings(remote)[0]).toContain("--allow-insecure");
+    expect(weakenings(parse("--allow-insecure", "--api", "http://127.0.0.1:3001"))).toEqual([]);
+    expect(weakenings(parse("--allow-insecure", "--api", "http://localhost:3001"))).toEqual([]);
+  });
+
+  it("carries a `weakened:` scope label, which is what makes signOff false", () => {
+    const label = describeScope(parse("--max-details", "5"));
+    expect(label).toContain("weakened: --max-details 5");
+    expect(label).toContain("NOT a deployment sign-off");
+  });
+
+  it("says both when a run is narrowed AND weakened", () => {
+    const label = describeScope(parse("--only", "dataset", "--max-details", "5"));
+    expect(label).toContain("--only dataset");
+    expect(label).toContain("weakened:");
+  });
+
+  it("an unweakened, unnarrowed run still has no scope label at all", () => {
+    expect(describeScope(parse("--api", "https://api.example.org"))).toBeUndefined();
   });
 });
 
