@@ -10,6 +10,26 @@ on:
     # request proposing a change to the published data is a change worth checking.
     paths-ignore: ['exports/**']
   pull_request:
+  # The clean-room job's four inputs, hoisted so the whole pull-request gate stays one workflow.
+  workflow_dispatch:
+    inputs:
+      clean-room-mode:
+        description: "packed (build validate from this checkout) or published (use the npm registry)"
+        type: choice
+        options: [packed, published]
+        default: packed
+      clean-room-api-url:
+        description: "API origin the built frontend is checked against"
+        type: string
+        default: "https://api.ethrfps.app"
+      standard-spec:
+        description: "Only used in 'published' mode. Range for @the-rfp-hub/standard."
+        type: string
+        default: ""
+      validate-spec:
+        description: "Only used in 'published' mode. Range for rfphub-validate — set to ^0.3.1 once published."
+        type: string
+        default: ""
 
 # The workflow token, narrowed to reading the checkout. Without a `permissions:` block a job gets
 # whatever the repository's default Workflow permissions setting says — a checkbox in Settings that
@@ -18,8 +38,14 @@ on:
 permissions:
   contents: read
 
+# A superseded run on the same pull request has nothing left to say. Pushes to `main` are NOT
+# cancelled: each one is the only record that that commit was checked.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     # Postgres for the @the-rfp-hub/api integration tests (gated on DATABASE_URL; otherwise skipped).
@@ -80,6 +106,11 @@ jobs:
       - name: Source neutrality (repo-wide)
         run: pnpm check:neutral
 
+      # Agent Skills frontmatter (name/dir match, no top-level version/tags, description length,
+      # required sections, <500 lines) + the marketplace/plugin wiring under skills/*.
+      - name: Skill checks
+        run: pnpm check:skill
+
       # No secret may reach the container image or the buildx layer cache, which for this public
       # repository is stored in its own Actions cache. Runs before the build, because the thing it
       # protects is the build.
@@ -89,6 +120,11 @@ jobs:
       # Build first: validate's typecheck/tests resolve @the-rfp-hub/standard from its built dist.
       - name: Build
         run: pnpm build
+
+      # Next rewrites a tsconfig.json carrying neither "extends" nor "references"; the frontend's
+      # has no "extends" on purpose, so it carries "references": []. Fail here, not later in Lint.
+      - name: Frontend tsconfig survived the build
+        run: git diff --exit-code -- packages/frontend/tsconfig.json
 
       - name: Migrate API database (for integration tests)
         run: pnpm --filter @the-rfp-hub/api migrate
@@ -337,3 +373,133 @@ jobs:
         run: |
           npm ci
           npm run typecheck
+
+  # Which optional jobs this event needs. No third-party action, and no `grep` pipeline: under
+  # `set -o pipefail`, `grep -q` exits on its first match and `git diff` can take SIGPIPE, which
+  # reads as "nothing changed" — wrong in the direction that stops gating.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      clean-room: ${{ steps.filter.outputs.clean-room }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: filter
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          # No usable base (a new branch, a force-push, workflow_dispatch): FAIL OPEN and run
+          # everything. A filter that fails closed is a gate that silently stops gating.
+          if [ -z "${BASE_SHA:-}" ] || printf '%s' "$BASE_SHA" | grep -qE '^0+$' \
+             || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            echo "clean-room=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --quiet "$BASE_SHA" "$GITHUB_SHA" -- \
+               packages/frontend packages/validate packages/standard \
+               package.json pnpm-lock.yaml scripts/frontend-clean-room.mjs \
+               .github/workflows/ci.yml; then
+            echo "clean-room=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "clean-room=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # `scripts/frontend-clean-room.mjs` against a real API: a copy of ONLY packages/frontend has to
+  # install, build and serve. `packed` builds rfphub-validate from this checkout and is the default
+  # until 0.3.1 ships `humanizeIssues`; `published` takes it from the registry.
+  clean-room:
+    name: Clean-room build + standalone smoke test
+    needs: [changes]
+    if: needs.changes.outputs.clean-room == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # No credential should outlive the checkout for `npm install`'s lifecycle scripts to inherit.
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace (for the packed-mode build step, and to run the script itself)
+        run: pnpm install --frozen-lockfile
+
+      # Needed in both modes: rfphub-validate's own build depends on it.
+      - name: Build @the-rfp-hub/standard
+        run: pnpm --filter @the-rfp-hub/standard build
+
+      # `github.event.inputs.*`, not `inputs`: on a non-dispatch trigger that path is empty.
+      - name: Determine mode
+        id: mode
+        env:
+          MODE_INPUT: ${{ github.event.inputs.clean-room-mode }}
+        run: |
+          echo "mode=${MODE_INPUT:-packed}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and pack rfphub-validate from this checkout (packed mode)
+        if: steps.mode.outputs.mode == 'packed'
+        run: |
+          pnpm --filter rfphub-validate build
+          mkdir -p "$RUNNER_TEMP/rfphub-pack"
+          pnpm --filter rfphub-validate pack --pack-destination "$RUNNER_TEMP/rfphub-pack"
+
+      # `--browser` is required here: the HTTP checks alone pass on a build that never reaches the API.
+      - name: Install Chromium for the browser-driven check
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the clean-room script
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          API_URL_INPUT: ${{ github.event.inputs.clean-room-api-url }}
+          STANDARD_SPEC_INPUT: ${{ github.event.inputs.standard-spec }}
+          VALIDATE_SPEC_INPUT: ${{ github.event.inputs.validate-spec }}
+        run: |
+          set -euo pipefail
+          export NEXT_PUBLIC_API_URL="${API_URL_INPUT:-https://api.ethrfps.app}"
+          if [ -n "$STANDARD_SPEC_INPUT" ]; then
+            export RFPHUB_STANDARD_SPEC="$STANDARD_SPEC_INPUT"
+          fi
+          if [ "$MODE" = "packed" ]; then
+            tarball="$(ls "$RUNNER_TEMP"/rfphub-pack/rfphub-validate-*.tgz)"
+            export RFPHUB_VALIDATE_SPEC="$tarball"
+            echo "packed mode: RFPHUB_VALIDATE_SPEC=$RFPHUB_VALIDATE_SPEC"
+          elif [ -n "$VALIDATE_SPEC_INPUT" ]; then
+            export RFPHUB_VALIDATE_SPEC="$VALIDATE_SPEC_INPUT"
+            echo "published mode: RFPHUB_VALIDATE_SPEC=$RFPHUB_VALIDATE_SPEC"
+          else
+            echo "published mode: using the script's own default range (currently fails — see this job's header)"
+          fi
+          node scripts/frontend-clean-room.mjs --browser
+
+  # THE REQUIRED STATUS CHECK. It keeps the name `build` because that is the one status the branch
+  # ruleset requires; what changed is that it aggregates rather than doing the work. A required
+  # check that IS one job leaves every sibling advisory — red while the merge button stays green.
+  build:
+    name: build
+    needs: [test, changes, clean-room]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      # `success()` cannot tell a legitimately SKIPPED job (clean-room under its path filter) from
+      # one that FAILED or was CANCELLED. `needs.*.result` can.
+      - name: Every gate held
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS=$'\t' read -r job result; do
+            case "$result" in
+              success|skipped) printf '  ok       %-12s %s\n' "$job" "$result" ;;
+              *)               printf '  BLOCKING %-12s %s\n' "$job" "$result"; bad=1 ;;
+            esac
+          done < <(jq -r 'to_entries[] | "\(.key)\t\(.value.result)"' <<<"$RESULTS")
+          exit "$bad"

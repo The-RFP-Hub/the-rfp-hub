@@ -3,28 +3,14 @@ import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { NavigationBlockerProvider } from "@/components/NavigationBlocker";
 import { fontVariables } from "@/lib/fonts";
 import { AppProviders } from "@/lib/session";
-import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: {
-    default: "Directory | RFP Hub",
-    template: "%s | RFP Hub",
-  },
-  description:
-    "An open index of funding opportunities under one standard: read it without an account, and — for publishers — submit and maintain listings, read their traffic, and run the review queues.",
-  /*
-   * INDEXING STAYS OFF, even though half of this app is now public.
-   *
-   * It is not a statement about the directory's audience; it is a statement about this deployment.
-   * Nothing here is served from a canonical public host yet — there is no pipeline and no registered
-   * domain for it (see the deployment section of the README) — and a preview URL that indexes is a
-   * preview URL competing with the real one for every listing it carries. Turning this on is an
-   * operator decision to take once the directory has an address worth indexing, not a default to
-   * inherit from a build.
-   */
-  robots: { index: false, follow: false },
-};
+/**
+ * `generateMetadata`, not a static `metadata`: `robots` depends on the request (`lib/site-origin.ts`).
+ * It lives in its own module so a unit test can import it without `next/font/google`, which has no
+ * transform under this package's test runner.
+ */
+export { generateMetadata } from "@/lib/root-metadata";
 
 /**
  * EVERY PAGE IS RENDERED PER REQUEST, and it is the Content-Security-Policy that requires it.

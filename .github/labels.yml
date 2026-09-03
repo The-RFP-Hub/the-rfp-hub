@@ -1,0 +1,45 @@
+# The issue labels this repository's written process depends on: PROCESS.md's errata triage and
+# GOVERNANCE.md's appeal route. `documentation` and `bug` are GitHub's own repository defaults,
+# already present — nothing to create for those two.
+#
+# Nothing consumes this file — there is no label-sync workflow, deliberately, since labels are
+# also created by hand. It is a manifest; an operator applies it with the block below.
+#
+# TO APPLY (idempotent — `--force` updates an existing label rather than failing):
+#
+#   gh label create status:next-version   --color fbca04 --force --description "Real defect whose fix would change what validates. Parked until the next spec version opens."
+#   gh label create rfc                   --color 0e8a16 --force --description "A proposal: a field, a registry value, a process change, or a defect retriaged as not a defect."
+#   gh label create governance:appeal     --color b60205 --force --description "A decision is being appealed. Answered on the issue, in public, with the reasoning."
+#   gh label create publisher:application --color 1d76db --force --description "An organization applying to become a verified publisher."
+#
+# `documentation`, `bug` and `enhancement` are GitHub's own repository defaults and need no
+# creation step; listed below only so this file is the whole picture rather than most of it.
+
+# Errata — PROCESS.md § Errata triages every reported defect into one of these. `documentation`
+# and `bug` are GitHub defaults; the fourth outcome (not a defect at all) is relabeled `rfc`
+# rather than getting a dedicated label of its own.
+- name: documentation
+  color: 0075ca
+  description: "Erratum in an informative document: typo, broken link, stale number. Changes nothing that validates."
+- name: bug
+  color: d73a4a
+  description: "Erratum in the normative artifacts: they disagree, or a description contradicts the schema."
+- name: status:next-version
+  color: fbca04
+  description: "Real defect whose fix would change what validates. Parked until the next spec version opens."
+- name: rfc
+  color: 0e8a16
+  description: "A proposal: a field, a registry value, a process change, or a defect retriaged as not a defect."
+
+# Routing — the door added so the appeal path GOVERNANCE.md describes is reachable.
+- name: governance:appeal
+  color: b60205
+  description: "A decision is being appealed. Answered on the issue, in public, with the reasoning."
+
+# Already in use by the existing issue forms.
+- name: enhancement
+  color: a2eeef
+  description: "A feature request that is not (yet) a change to the standard."
+- name: publisher:application
+  color: 1d76db
+  description: "An organization applying to become a verified publisher."

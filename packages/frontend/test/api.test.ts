@@ -35,6 +35,38 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 describe("createApiClient", () => {
+  it("carries Retry-After off a 429 so a page can say how long to wait", async () => {
+    const { fetchImpl } = stubFetch(
+      () => new Response("{}", { status: 429, headers: { "retry-after": "45" } }),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl });
+
+    await expect(api.directory.list()).rejects.toMatchObject({
+      status: 429,
+      retryAfterSeconds: 45,
+    });
+  });
+
+  it("reads a Retry-After given as an HTTP date, and leaves an unreadable one undefined", async () => {
+    const at = new Date(Date.now() + 60_000).toUTCString();
+    const dated = stubFetch(
+      () => new Response("{}", { status: 429, headers: { "retry-after": at } }),
+    );
+    const api = createApiClient({ baseUrl: "https://api.example.com", fetchImpl: dated.fetchImpl });
+    const error = (await api.directory.list().catch((cause: unknown) => cause)) as ApiError;
+    expect(error.retryAfterSeconds).toBeGreaterThan(50);
+    expect(error.retryAfterSeconds).toBeLessThanOrEqual(60);
+
+    const nonsense = stubFetch(
+      () => new Response("{}", { status: 429, headers: { "retry-after": "soon" } }),
+    );
+    const other = createApiClient({
+      baseUrl: "https://api.example.com",
+      fetchImpl: nonsense.fetchImpl,
+    });
+    await expect(other.directory.list()).rejects.toMatchObject({ retryAfterSeconds: undefined });
+  });
+
   it("attaches the bearer token the token source returns", async () => {
     const { fetchImpl, calls } = stubFetch(() => json({ accountId: 1 }));
     const api = createApiClient({

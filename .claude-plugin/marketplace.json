@@ -1,0 +1,22 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "rfp-hub",
+  "owner": {
+    "name": "The RFP Hub",
+    "url": "https://ethrfps.app"
+  },
+  "description": "Agent skills for the RFP Hub — a public directory of Ethereum-ecosystem funding opportunities.",
+  "plugins": [
+    {
+      "name": "rfp-hub",
+      "displayName": "RFP Hub funding search",
+      "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFP Hub public API.",
+      "source": "./skills/funding-search",
+      "license": "MIT",
+      "homepage": "https://ethrfps.app",
+      "repository": "https://github.com/The-RFP-Hub/the-rfp-hub",
+      "category": "discovery",
+      "keywords": ["funding", "grants", "hackathons", "bounties", "discovery", "ethereum", "rfp"]
+    }
+  ]
+}

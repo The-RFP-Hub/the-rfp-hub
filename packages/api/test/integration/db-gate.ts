@@ -21,7 +21,7 @@ if (!hasDb && !flags[FLAG]) {
       "To run them against a throwaway Postgres (from packages/api):",
       "  docker compose -f docker-compose.test.yml up -d",
       "  DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run migrate",
-      "  DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub npx vitest run test/integration",
+      "  DATABASE_URL=postgres://rfphub:rfphub@localhost:5439/rfphub pnpm run test:integration",
       "  docker compose -f docker-compose.test.yml down",
     ].join("\n"),
   );

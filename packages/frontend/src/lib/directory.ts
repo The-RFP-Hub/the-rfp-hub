@@ -35,6 +35,23 @@ function schemaEnum(name: string): string[] {
   return values.map(String);
 }
 
+/** Read rather than re-typed, for the same reason the enums are: a hint that disagreed with the
+ *  rule the API validates against would call a reader's perfectly good slug malformed. */
+function organizationSlugPattern(): RegExp {
+  const defs = (
+    opportunitySchema as {
+      $defs?: Record<string, { properties?: Record<string, { pattern?: unknown }> }>;
+    }
+  ).$defs;
+  const pattern = defs?.organization?.properties?.slug?.pattern;
+  if (typeof pattern !== "string") {
+    throw new Error("the Standard's organization.slug property declares no pattern");
+  }
+  return new RegExp(pattern);
+}
+
+const ORGANIZATION_SLUG = organizationSlugPattern();
+
 const schemaFundingTypes = schemaEnum("fundingType");
 
 export const FUNDING_TYPES = [
@@ -98,6 +115,17 @@ export interface DirectorySelection {
   fundingType: string;
   status: string;
   ecosystem: string;
+  /** Free text, same shape as `ecosystem` — `categories[]` is not a closed vocabulary either. */
+  category: string;
+  /** An organization SLUG. Matches any operating OR sponsoring organization — see the field's hint. */
+  organization: string;
+  /** The control's raw text, so an in-progress edit ("1" before "1500") never round-trips a parse. */
+  minAward: string;
+  maxAward: string;
+  /** The `<input type="date">` value, `YYYY-MM-DD`. `directoryQuery` widens it to an RFC 3339
+   *  instant, once, rather than in every place that reads or writes this field. */
+  deadlineAfter: string;
+  deadlineBefore: string;
   ordering: Ordering;
   page: number;
 }
@@ -118,6 +146,12 @@ export const DEFAULT_SELECTION: DirectorySelection = {
   fundingType: "",
   status: "open",
   ecosystem: "",
+  category: "",
+  organization: "",
+  minAward: "",
+  maxAward: "",
+  deadlineAfter: "",
+  deadlineBefore: "",
   ordering: "nextDeadlineAt:asc",
   page: 1,
 };
@@ -129,6 +163,91 @@ export const PAGE_SIZE = 20;
 function filled(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
+}
+
+/** A number control's raw text as a finite number, or `undefined` when it is neither. */
+function finiteNumber(value: string): number | undefined {
+  const text = filled(value);
+  if (text === undefined) return undefined;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Not a finite number? FORWARDED AS TYPED, so the endpoint answers a 400 naming the parameter.
+ *  Dropping it left the address bar advertising a filter the request never carried. */
+function awardParam(value: string): number | string | undefined {
+  return finiteNumber(value) ?? filled(value);
+}
+
+/** A number input renders BLANK for `?minAward=abc` (and `1e400`, which is `Infinity`), so an
+ *  active filter would look like none; the DirectoryList shows the literal value as text instead. */
+export function awardInputValue(value: string): string {
+  const text = value.trim();
+  return finiteNumber(text) === undefined ? "" : text;
+}
+
+/** `YYYY-MM-DD` (what `<input type="date">` holds) → `date`; anything already an instant. */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** BOTH ENDS ARE INCLUSIVE OF THEIR DAY, so the day widens to its first or last instant rather
+ *  than to midnight for both. A value that is not a bare date passes through for the endpoint. */
+function instant(value: string, edge: "start" | "end"): string | undefined {
+  const text = filled(value);
+  if (text === undefined) return undefined;
+  if (!DATE_ONLY.test(text)) return text;
+  return edge === "start" ? `${text}T00:00:00.000Z` : `${text}T23:59:59.999Z`;
+}
+
+/** A DISPLAY VALUE ONLY: the picker renders blank for a full instant, so the day is extracted for
+ *  it while `directoryQuery` keeps reading the raw field — a link's time of day is never lost. */
+export function dateInputValue(value: string): string {
+  const trimmed = value.trim();
+  if (DATE_ONLY.test(trimmed)) return trimmed;
+  const match = /^(\d{4}-\d{2}-\d{2})T/.exec(trimmed);
+  return match?.[1] ?? "";
+}
+
+/** How much of a raw, retained URL value the "exact value from the link" hint will ever show. */
+export const RETAINED_VALUE_DISPLAY_LIMIT = 200;
+
+/** A query parameter has no length limit of its own. Bounding it where the URL BECOMES the
+ *  selection keeps control, address bar and request agreeing on one value. */
+export const FREE_TEXT_FILTER_LIMIT = 200;
+
+/** Bounds a reader-supplied URL value on its way to the DOM. A display concern only: the full
+ *  value is still what reaches the endpoint. */
+export function truncateForDisplay(
+  value: string,
+  limit: number = RETAINED_VALUE_DISPLAY_LIMIT,
+): string {
+  return value.length > limit ? `${value.slice(0, limit)}…` : value;
+}
+
+/** An inverted range can never match, so "nothing matches those filters" — a claim about the
+ *  corpus — is the wrong sentence. `organization` takes a slug, which only the placeholder said. */
+export function emptyResultHints(selection: DirectorySelection): string[] {
+  const hints: string[] = [];
+
+  const min = finiteNumber(selection.minAward);
+  const max = finiteNumber(selection.maxAward);
+  if (min !== undefined && max !== undefined && min > max) {
+    hints.push("Your minimum award is above your maximum, so nothing can match.");
+  }
+
+  const after = Date.parse(instant(selection.deadlineAfter, "start") ?? "");
+  const before = Date.parse(instant(selection.deadlineBefore, "end") ?? "");
+  if (!Number.isNaN(after) && !Number.isNaN(before) && after > before) {
+    hints.push("Your deadline range runs backwards: the after date is later than the before date.");
+  }
+
+  // Only when the value CANNOT be a slug. A valid one that simply matched nothing is an ordinary
+  // empty result, and telling that reader their slug is not a slug is worse than saying nothing.
+  const organization = filled(selection.organization);
+  if (organization !== undefined && !ORGANIZATION_SLUG.test(organization)) {
+    hints.push("Organization takes an organization slug, such as acme, not its display name.");
+  }
+
+  return hints;
 }
 
 /**
@@ -148,6 +267,12 @@ export function directoryQuery(
     fundingType: filled(selection.fundingType),
     status: filled(selection.status),
     ecosystem: filled(selection.ecosystem),
+    category: filled(selection.category),
+    organization: filled(selection.organization),
+    minAward: awardParam(selection.minAward),
+    maxAward: awardParam(selection.maxAward),
+    deadlineAfter: instant(selection.deadlineAfter, "start"),
+    deadlineBefore: instant(selection.deadlineBefore, "end"),
     sort,
     order: order === "desc" ? "desc" : "asc",
     page: selection.page,
@@ -161,7 +286,13 @@ export function isFiltered(selection: DirectorySelection): boolean {
     filled(selection.q) !== undefined ||
     filled(selection.fundingType) !== undefined ||
     filled(selection.status) !== undefined ||
-    filled(selection.ecosystem) !== undefined
+    filled(selection.ecosystem) !== undefined ||
+    filled(selection.category) !== undefined ||
+    filled(selection.organization) !== undefined ||
+    filled(selection.minAward) !== undefined ||
+    filled(selection.maxAward) !== undefined ||
+    filled(selection.deadlineAfter) !== undefined ||
+    filled(selection.deadlineBefore) !== undefined
   );
 }
 
@@ -181,9 +312,10 @@ export function isFiltered(selection: DirectorySelection): boolean {
  */
 export const ANY_STATUS = "any";
 
-/** Parse whatever is in the address bar, falling back to the default for anything unrecognised. */
+/** Parse whatever is in the address bar, falling back to the default for anything unrecognized. */
 export function selectionFromParams(params: URLSearchParams): DirectorySelection {
   const get = (key: string) => params.get(key)?.trim() ?? "";
+  const getBounded = (key: string) => get(key).slice(0, FREE_TEXT_FILTER_LIMIT);
 
   const status = get("status");
   const fundingType = get("type");
@@ -210,6 +342,14 @@ export function selectionFromParams(params: URLSearchParams): DirectorySelection
           ? status
           : DEFAULT_SELECTION.status,
     ecosystem: get("ecosystem"),
+    // Free text on the API side too, so passed straight through: a rejected value becomes the 400
+    // this page renders. `organization` is also the param a `/publishers` card links here with.
+    category: getBounded("category"),
+    organization: getBounded("organization"),
+    minAward: get("minAward"),
+    maxAward: get("maxAward"),
+    deadlineAfter: get("deadlineAfter"),
+    deadlineBefore: get("deadlineBefore"),
     ordering: ORDERING_VALUES.has(ordering) ? (ordering as Ordering) : DEFAULT_SELECTION.ordering,
     page: safePage,
   };
@@ -225,6 +365,18 @@ export function selectionToParams(selection: DirectorySelection): URLSearchParam
   if (q) params.set("q", q);
   const ecosystem = filled(selection.ecosystem);
   if (ecosystem) params.set("ecosystem", ecosystem);
+  const category = filled(selection.category);
+  if (category) params.set("category", category);
+  const organization = filled(selection.organization);
+  if (organization) params.set("organization", organization);
+  const minAward = filled(selection.minAward);
+  if (minAward) params.set("minAward", minAward);
+  const maxAward = filled(selection.maxAward);
+  if (maxAward) params.set("maxAward", maxAward);
+  const deadlineAfter = filled(selection.deadlineAfter);
+  if (deadlineAfter) params.set("deadlineAfter", deadlineAfter);
+  const deadlineBefore = filled(selection.deadlineBefore);
+  if (deadlineBefore) params.set("deadlineBefore", deadlineBefore);
   if (selection.fundingType) params.set("type", selection.fundingType);
   if (selection.status !== DEFAULT_SELECTION.status) {
     params.set("status", selection.status === "" ? ANY_STATUS : selection.status);
