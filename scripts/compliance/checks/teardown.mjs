@@ -1,8 +1,6 @@
 /**
- * Teardown as a criterion.
- *
- * It is never selectable and never skipped: a write run appends it last, in a `finally`, so a run
- * that left rows in somebody's deployment cannot report green about it.
+ * Never selectable and never skipped: a write run appends it last, in a `finally`, so a run that
+ * left rows in somebody's deployment cannot report green about it.
  */
 import { cleanup } from "../cleanup.mjs";
 

@@ -31,11 +31,8 @@ describe("refusals", () => {
     );
   });
 
-  /**
-   * The reviewer credential is the one that used to be optional. Without it the teardown could not
-   * reject the fixtures, and the run reported that as a warning — green, with rows left behind on
-   * somebody's deployment.
-   */
+  // The reviewer credential used to be optional, and a run without one reported the fixtures it
+  // could not reject as a warning — green, with rows left behind on somebody's deployment.
   it("refuses a run it could not tear down", () => {
     const noReviewer = {
       ...complete,

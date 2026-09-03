@@ -18,7 +18,6 @@ export const PRODUCTION_HOSTS = ["ethrfps.app", "api.ethrfps.app", "www.ethrfps.
 
 export const EXTRA_ORIGIN_ENV = "RFPHUB_ACCEPT_EXTRA_STAGING_ORIGIN";
 
-/** Scheme + host + non-default port, normalized. `null` — unclassifiable — is refused by callers. */
 export function normalizeOrigin(raw) {
   let url;
   try {
@@ -44,7 +43,6 @@ export function namesStaging(host) {
   );
 }
 
-/** The allowlist for this run: the project's staging origins, plus one opt-in from the env. */
 export function allowedOrigins(env = process.env) {
   const allowed = [...STAGING_ORIGINS];
   const extra = normalizeOrigin(env[EXTRA_ORIGIN_ENV]);
@@ -52,7 +50,6 @@ export function allowedOrigins(env = process.env) {
   return allowed;
 }
 
-/** Why this target must not be written to, or `null` when it may be. */
 export function targetRefusal(api, env = process.env) {
   const parsed = normalizeOrigin(api);
   if (!parsed) {

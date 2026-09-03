@@ -1,11 +1,7 @@
 /**
- * The registry, and the two selection rules that decide whether a scoped run means anything.
- *
- * A milestone profile that names a criterion the registry does not hold produces a run that reports
- * on fewer criteria than the milestone has, silently. A `--only` that drops a criterion's hard
- * prerequisite produces a criterion that can only report it had nothing to look at, which reads as
- * a finding about the deployment and is not one. Both are checked here rather than discovered on a
- * deployment.
+ * A milestone profile naming a criterion the registry does not hold reports on fewer criteria than
+ * the milestone has, silently; a `--only` dropping a hard prerequisite produces a criterion that
+ * can only report it had nothing to look at. Both are checked here rather than on a deployment.
  */
 import { describe, expect, it } from "vitest";
 import {

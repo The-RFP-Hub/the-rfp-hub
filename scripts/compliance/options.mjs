@@ -1,15 +1,12 @@
 /**
  * Argument parsing for `scripts/check-deployment.mjs`, which only READS.
  *
- * There is no credential flag and no credential environment fallback here, deliberately. This tool
- * defaults to production because reading production is the point; what makes that safe is that it
- * holds no code path that can write and no way to be handed something to write with. Everything
- * that writes lives in `accept-options.mjs` behind the target guard.
+ * No credential flag and no credential environment fallback, deliberately: this tool defaults to
+ * production, and what makes that safe is having no way to be handed something to write with.
  *
  * `--only` and `--skip` are NOT interchangeable. `--skip` still registers the criterion, as an
- * unmet one, so a run that looked at part of the contract reports incomplete; `--only` does not
- * register the excluded criteria at all, which is what a scoped lint needs — it has no deployment
- * to hold the others against. Refused together: the combination has no one meaning.
+ * unmet one, so a partial run reports incomplete; `--only` does not register the excluded criteria
+ * at all, which is what a scoped lint needs. Refused together: the combination has no one meaning.
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,9 +28,9 @@ const MCP_SPEC_HELP =
 
 /**
  * Normalize `--mcp-spec` to what follows `npx -y @the-rfp-hub/mcp@`. The full-package form is
- * accepted and stripped because the runbook spells it that way, and concatenating it produced
- * `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next` — an npm ENOENT nobody could read back to the flag. A
- * range is refused: this criterion is about one immutable artifact, and a range does not name one.
+ * accepted and stripped because concatenating it produced `@the-rfp-hub/mcp@@the-rfp-hub/mcp@next`,
+ * an npm ENOENT nobody could read back to the flag. A range is refused: this criterion is about one
+ * immutable artifact, and a range does not name one.
  */
 export function normalizeMcpSpec(raw) {
   const value = String(raw ?? "").trim();
@@ -45,7 +42,6 @@ export function normalizeMcpSpec(raw) {
   throw new Error(`--mcp-spec must be ${MCP_SPEC_HELP}, got "${value}"`);
 }
 
-/** Criterion keys wrapped under a `--help` flag column, so the block stays readable as they grow. */
 export function keyList(keys, width = 60, indent = " ".repeat(32)) {
   const lines = [];
   for (const key of keys) {
@@ -56,7 +52,6 @@ export function keyList(keys, width = 60, indent = " ".repeat(32)) {
   return lines.join(`,\n${indent}`);
 }
 
-/** A unique path per run: two runs writing the same file in a shared checkout race each other. */
 export function defaultReportPath(prefix, now = new Date()) {
   const stamp = now.toISOString().replace(/[:.]/g, "-");
   return join(tmpdir(), `${prefix}-${process.pid}-${stamp}.json`);
@@ -193,10 +188,8 @@ export function parseArgs(argv) {
 }
 
 /**
- * Everything that has to hold before a request is made. Empty means go.
- *
- * A milestone this binary does not own is an error rather than an empty run, and it names the tool
- * that does own it: `--milestone m3` here is somebody reaching for the write chain.
+ * Everything that has to hold before a request is made. Empty means go. A milestone this binary
+ * does not own is an error naming the tool that does, rather than an empty run.
  */
 export function refusals(opts, milestones = READ_MILESTONES) {
   const reasons = [];
@@ -231,10 +224,6 @@ export function refusals(opts, milestones = READ_MILESTONES) {
   return reasons;
 }
 
-/**
- * The header's Selection line, so a scoped run says what it looked at without anyone reading back
- * the flags — including a prerequisite the runner pulled in that nobody asked for.
- */
 export function selectionLine(opts, autoIncluded = []) {
   const parts = [];
   if (opts.only.size > 0) parts.push(`--only ${[...opts.only].join(", ")}`);

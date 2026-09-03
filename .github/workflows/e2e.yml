@@ -1,9 +1,8 @@
 # The Playwright suite against a real stack the runner boots itself.
 #
-# Deliberately NOT on `pull_request`. Bringing up Postgres, the API and the frontend for every push
-# to every branch costs more than it catches, and a pull request already has the whole of CI. The
-# responsive spec runs on every push to `main`, and the full suite once a night — so a regression is
-# caught after merge rather than before it, which is the trade this file makes on purpose.
+# Deliberately NOT on `pull_request`: bringing up Postgres, the API and the frontend for every push
+# to every branch costs more than it catches. A regression is therefore caught after merge rather
+# than before it, which is the trade this file makes on purpose.
 name: E2E
 
 on:
@@ -111,10 +110,9 @@ jobs:
             exit 1
           fi
 
-      # The full suite HAS legitimate skips: the setup project skips its cross-run assertion whenever
-      # no earlier run left an assignment record, which is the ordinary first run. Rejecting every
-      # skipped case would redden every night. The reporter already separates the two, so this
-      # asserts the one that means something — a case BLOCKED by a limitation of the run.
+      # The full suite HAS legitimate skips — the setup project's cross-run assertion skips on an
+      # ordinary first run — so rejecting every skipped case would redden every night. The reporter
+      # separates the two; this asserts the one that means something.
       - name: Nothing was blocked
         if: steps.suite.outputs.suite == 'full'
         shell: bash

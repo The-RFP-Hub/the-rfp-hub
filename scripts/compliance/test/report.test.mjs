@@ -123,10 +123,9 @@ describe("compliance run aggregation", () => {
 });
 
 /**
- * `unmet()` is the distinction `skip()` deliberately does not draw. `--only frontend` without
- * `--browser` used to print RESULT: PASS and exit 0 with nine browser checks at WARN, because a
- * criterion carrying warnings passes. A check the criterion DEPENDS on is a different thing from
- * one it does not, and only the second may stay green.
+ * `--only frontend` without `--browser` used to print RESULT: PASS and exit 0 with nine browser
+ * checks at WARN, because a criterion carrying warnings passes. A check the criterion DEPENDS on is
+ * a different thing from one it does not, and only the second may stay green.
  */
 describe("a required check that could not be performed", () => {
   it("makes its criterion INCOMPLETE and the run non-green", () => {

@@ -10,8 +10,7 @@ on:
     # request proposing a change to the published data is a change worth checking.
     paths-ignore: ['exports/**']
   pull_request:
-  # The clean-room job's four inputs, hoisted here so the whole PR gate stays one workflow. They are
-  # read through `github.event.inputs.*`, which is the empty string on every other trigger.
+  # The clean-room job's four inputs, hoisted so the whole pull-request gate stays one workflow.
   workflow_dispatch:
     inputs:
       clean-room-mode:
@@ -367,9 +366,9 @@ jobs:
           npm ci
           npm run typecheck
 
-  # Which of the optional jobs this event actually needs. No third-party action, and no `grep`
-  # pipeline: under `set -o pipefail`, `grep -q` exits on its first match and `git diff` can take
-  # SIGPIPE, which reads as "nothing changed" — the wrong answer in the direction that stops gating.
+  # Which optional jobs this event needs. No third-party action, and no `grep` pipeline: under
+  # `set -o pipefail`, `grep -q` exits on its first match and `git diff` can take SIGPIPE, which
+  # reads as "nothing changed" — wrong in the direction that stops gating.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -403,8 +402,7 @@ jobs:
 
   # `scripts/frontend-clean-room.mjs` against a real API: a copy of ONLY packages/frontend has to
   # install, build and serve. `packed` builds rfphub-validate from this checkout and is the default
-  # until 0.3.1 ships `humanizeIssues`; `published` takes it from the registry. A fork's PR runs
-  # `npm install` of that PR's own dependency list on the runner, read-only and without credentials.
+  # until 0.3.1 ships `humanizeIssues`; `published` takes it from the registry.
   clean-room:
     name: Clean-room build + standalone smoke test
     needs: [changes]
@@ -430,8 +428,7 @@ jobs:
       - name: Build @the-rfp-hub/standard
         run: pnpm --filter @the-rfp-hub/standard build
 
-      # `github.event.inputs.*`, not `inputs`: on every non-dispatch trigger that path reads as the
-      # empty string, which is what the default below relies on.
+      # `github.event.inputs.*`, not `inputs`: on a non-dispatch trigger that path is empty.
       - name: Determine mode
         id: mode
         env:
@@ -475,19 +472,16 @@ jobs:
           node scripts/frontend-clean-room.mjs --browser
 
   # THE REQUIRED STATUS CHECK. It keeps the name `build` because that is the one status the branch
-  # ruleset requires; what changed is that it now aggregates rather than doing the work itself.
-  #
-  # Sibling jobs are the reason it has to exist. A required check that IS one job leaves every other
-  # job advisory: they can go red while the required one stays green and the merge button lights up.
+  # ruleset requires; what changed is that it aggregates rather than doing the work. A required
+  # check that IS one job leaves every sibling advisory — red while the merge button stays green.
   build:
     name: build
     needs: [test, changes, clean-room]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      # `success()` is not enough on its own: a needed job that was legitimately SKIPPED (clean-room
-      # under its path filter) must not redden this, and one that FAILED or was CANCELLED must.
-      # `needs.*.result` is the only thing that tells those apart.
+      # `success()` cannot tell a legitimately SKIPPED job (clean-room under its path filter) from
+      # one that FAILED or was CANCELLED. `needs.*.result` can.
       - name: Every gate held
         env:
           RESULTS: ${{ toJSON(needs) }}

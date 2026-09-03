@@ -1,14 +1,11 @@
 /**
  * The two registries, and the rules for selecting from them.
  *
- * A criterion is a module exporting `meta` and `run(ctx)`. The runner never switches on a key: it
- * walks an ordered array and calls `run`, so adding a criterion is adding a module and a line here.
+ * Read criteria may be pointed at anything, including production; write criteria go in the other
+ * registry, behind the target guard. Nothing may appear in both — the separation is what lets one
+ * binary hold no code path that writes.
  *
- * READ criteria may be pointed at anything, including production, because they only read. WRITE
- * criteria go in the other registry, behind the target guard, because there is no safe default for
- * a tool that submits entries. Nothing may appear in both.
- *
- * Imports are static and relative to THIS file. A registry that resolved module paths from a string
+ * Imports are static and relative to THIS file. A registry resolving module paths from a string
  * would resolve them against whichever entry point imported it, which is not this directory.
  */
 import * as analytics from "./checks/analytics.mjs";
@@ -24,13 +21,12 @@ import * as staleness from "./checks/staleness.mjs";
 import * as teardown from "./checks/teardown.mjs";
 import * as verification from "./checks/verification.mjs";
 
-/** Read-only criteria, in the order a full run performs them. */
 export const READ_CRITERIA = [liveness, openapi, dataset, exportCheck];
 
 /**
  * Criteria that WRITE, in the order a full run performs them. The order is load-bearing: lifecycle
- * creates the fixture the other six read. `teardown` is here so it can be looked up, but it is
- * never selectable — a write run appends it, last, in a `finally`.
+ * creates the fixture the other six read. `teardown` is never selectable — a write run appends it,
+ * last, in a `finally`.
  */
 export const WRITE_CRITERIA = [
   lifecycle,
@@ -45,29 +41,17 @@ export const WRITE_CRITERIA = [
 
 export const TEARDOWN = teardown;
 
-/** Which criteria a contract milestone maps to. Extended with `m4` when its criteria land. */
+// `m4` is added with its criteria.
 export const READ_MILESTONES = { m2: ["liveness", "openapi", "dataset", "export"] };
 
 export const WRITE_MILESTONES = {
   m3: ["lifecycle", "namespace", "audit", "duplicates", "verification", "analytics", "staleness"],
 };
 
-/** Milestones the OTHER binary owns, so an error can say which tool to reach for. */
-export const MILESTONE_TOOL = { m2: "read", m3: "write", m4: "read" };
-
 const keyOf = (criterion) => criterion.meta.key;
 
 export function criterionKeys(registry) {
   return registry.filter((criterion) => criterion !== teardown).map(keyOf);
-}
-
-export function findCriterion(registry, key) {
-  return registry.find((criterion) => keyOf(criterion) === key);
-}
-
-/** The contract id a milestone maps a key to: a string, `null` for hygiene, `undefined` if unmapped. */
-export function contractId(registry, key, milestone) {
-  return findCriterion(registry, key)?.meta.contract?.[milestone];
 }
 
 /** `{ liveness: "M2-1", … }` for a milestone run — what the report stamps onto each criterion. */
@@ -81,12 +65,9 @@ export function contractIds(registry, milestone) {
 }
 
 /**
- * Which criteria this run registers, and what to say about the selection.
- *
- * A criterion excluded by `--only` is not registered at all, so a green scoped run is a clean pass
- * rather than a report full of holes. A HARD prerequisite of a selected criterion is pulled in
- * automatically and announced: `--only audit` without it produces a run whose single criterion can
- * only report that it had no fixture to read, which answers nothing.
+ * A criterion excluded by `--only` is not registered at all, so a green scoped run is a clean pass.
+ * A HARD prerequisite is pulled in automatically: `--only audit` without it produces a run whose
+ * single criterion can only report that it had no fixture to read, which answers nothing.
  */
 export function selectCriteria(registry, { only = new Set(), skip = new Set(), profile } = {}) {
   const selectable = registry.filter((criterion) => criterion !== teardown);
@@ -118,8 +99,6 @@ export function selectCriteria(registry, { only = new Set(), skip = new Set(), p
 }
 
 /**
- * Why this selection cannot mean anything, or an empty list.
- *
  * Skipping a criterion another selected criterion depends on is refused rather than run: the
  * dependent would report an unmet requirement for a reason the operator chose, which reads as a
  * finding about the deployment and is not one.

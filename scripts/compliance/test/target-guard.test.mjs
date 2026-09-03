@@ -1,10 +1,7 @@
 /**
- * The allowlist that decides which deployments may be written to.
- *
- * The rule it replaced asked whether any hostname segment read like a non-production environment,
- * which admits `not-staging-anymore.example.org`, `production-staging.example.org` and any CNAME
- * whoever controls DNS points wherever they like. Hostname text cannot prove which deployment
- * answers, so this is an explicit list plus a redirect chain that is re-checked at every hop.
+ * The rule this allowlist replaced asked whether a hostname segment read like a non-production
+ * environment, which admits `not-staging-anymore.example.org` and any CNAME whoever controls DNS
+ * points wherever they like.
  */
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -99,10 +96,7 @@ describe("targetRefusal", () => {
 });
 
 describe("redirectRefusal", () => {
-  /**
-   * The hop is what the hostname rules cannot see: an allowlisted origin that 302s somewhere else
-   * still receives the request that carries the credential.
-   */
+  // An allowlisted origin that 302s elsewhere still receives the request carrying the credential.
   it("refuses when a hop lands outside the allowlist", async () => {
     vi.resetModules();
     vi.doMock("../http.mjs", () => ({

@@ -1,24 +1,15 @@
 /**
  * Argument parsing and refusals for `scripts/accept-writes.mjs`, which WRITES.
  *
- * Every refusal here exists because the tool submits entries, mints a credential and generates
- * traffic against whatever it is pointed at:
+ * Three refusals, all because the tool submits entries against whatever it is pointed at: the
+ * target must be allowlisted (`target-guard.mjs`); a namespace and a publisher credential are
+ * required, because a run that quietly performed only the criteria it could would report an
+ * acceptance it had not established; and a reviewer credential is required too, because the
+ * teardown rejects and unlists with one and a run that cannot tear down must not start.
  *
- *   1. **The target is allowlisted**, by `target-guard.mjs` — loopback or a named staging origin,
- *      https off loopback, the redirect chain re-checked. There is no flag that unlocks production.
- *   2. **It will not run without a namespace and a publisher credential.** A tool that quietly
- *      performed the two criteria it could and reported them as an acceptance run would be worse
- *      than no tool.
- *   3. **It will not run without a reviewer credential either.** The teardown rejects and unlists
- *      the fixtures with one, so a run that cannot tear down must not start — it would leave rows
- *      in somebody's deployment and be green about it.
- *
- * WHY THE CREDENTIALS ALSO COME FROM THE ENVIRONMENT. Credentials passed as argv are visible to
- * every process on the machine: `ps` prints a full command line, and these are a live session token
- * and a live API key. A harness that boots a stack and then runs this checker against it (see the
- * e2e runner) hands them over in the child's environment instead, which `ps` does not print. The
- * flags still WIN, so an exported variable left over from an earlier session cannot silently
- * redirect a deliberate run.
+ * Credentials also come from the environment because argv is world-readable through `ps` and these
+ * are live tokens. The flags still WIN, so a variable left over from an earlier session cannot
+ * silently redirect a deliberate run.
  */
 import { WRITE_CRITERIA, criterionKeys } from "./criteria.mjs";
 import { defaultReportPath } from "./options.mjs";
@@ -142,13 +133,7 @@ export function parseArgs(argv, env = process.env) {
   return opts;
 }
 
-/**
- * Everything that has to be true before a single request is made. Empty means go.
- *
- * The reviewer credential is required rather than preferred: without one the teardown cannot take
- * the fixtures off the public surface, and a run that cannot clean up after itself has no business
- * writing to a deployment in the first place.
- */
+/** Everything that has to be true before a single request is made. Empty means go. */
 export function refusals(opts, milestones, env = process.env) {
   const reasons = [];
   const known = Object.keys(milestones);

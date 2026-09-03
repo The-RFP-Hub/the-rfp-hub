@@ -1,25 +1,16 @@
 /**
  * Result collection and rendering for the compliance checkers.
  *
- * Five check outcomes, and the difference between them is what makes the report signable:
+ * Six check outcomes, and two of them carry the whole value of a sign-off tool:
  *
- *   pass  the check was performed against the live deployment and it held
- *   fail  the check was performed and it did not hold — the criterion, and the run, go red
- *   warn  the check held, but something about it should be seen (a certificate near expiry)
- *   skip  the check could NOT be performed here, and the criterion does not depend on it
- *   info  observed context, asserting nothing (response times, counts, versions)
+ *   skip   could NOT be performed, and the criterion does not depend on it. Stays green.
+ *   unmet  could NOT be performed, and the criterion DOES depend on it (no `--browser`, a local
+ *          build standing in for a published one). Renders as a warning and makes the criterion
+ *          INCOMPLETE, so the run exits non-zero.
  *
- * `skip` existing separately from `pass` is the whole point: a sign-off tool that silently
- * downgrades "I could not check this" to "this is fine" is worse than no tool.
- *
- * `unmet` is the sixth, and it is the one `skip` cannot express: a check the criterion DOES depend
- * on that could not be performed (no `--browser`, a local build standing in for a published one).
- * It renders as a warning and makes the criterion INCOMPLETE, so the run exits non-zero rather than
- * reporting a requirement it never looked at as green.
- *
- * The same rule applies one level up, where it is easier to lose. A criterion nothing could be
- * checked in is not a criterion that passed, so the RUN has three outcomes rather than two — see
- * `Report.result`.
+ * A tool that silently downgrades "I could not check this" to "this is fine" is worse than no tool,
+ * and the same rule applies one level up: a criterion nothing could be checked in is not a
+ * criterion that passed, so the RUN has three outcomes rather than two — see `Report.result`.
  */
 
 export const PASS = "pass";
@@ -28,18 +19,15 @@ export const WARN = "warn";
 export const SKIP = "skip";
 export const INFO = "info";
 
-/** A criterion with an unmet requirement, or a run carrying one. */
 export const INCOMPLETE = "incomplete";
 
 const MARK = { [PASS]: "✓", [FAIL]: "✗", [WARN]: "!", [SKIP]: "-", [INFO]: "i" };
 const COLOR = { [PASS]: 32, [FAIL]: 31, [WARN]: 33, [SKIP]: 90, [INFO]: 36, [INCOMPLETE]: 33 };
 
-/** The label a criterion key wears in the console when a milestone maps it to a contract id. */
 function heading(criterion) {
   return criterion.contractId ? `${criterion.id} · ${criterion.contractId}` : criterion.id;
 }
 
-/** One completion criterion, and the individual checks performed for it. */
 export class Criterion {
   #unmet = [];
 
@@ -124,39 +112,26 @@ export class Report {
     this.startedAt = new Date().toISOString();
   }
 
-  /**
-   * `id` is always the capability key. The contract id, where a milestone maps one, is looked up
-   * rather than passed: a criterion module must not have to know which milestone is running it.
-   */
+  /** The contract id is looked up, not passed: a criterion must not know which milestone runs it. */
   criterion(id, name, describes) {
     const c = new Criterion(id, name, describes, this.meta.contractIds?.[id]);
     this.criteria.push(c);
     return c;
   }
 
-  /** Criteria the run could not establish — every check skipped, or a requirement unmet. */
   get notExercised() {
     return this.criteria.filter((c) => c.status === SKIP || c.status === INCOMPLETE);
   }
 
-  /** Individual checks that could not be performed, across every criterion. */
   get skippedChecks() {
     return this.criteria.reduce((n, c) => n + c.tally().skip, 0);
   }
 
   /**
-   * Three outcomes, because a sign-off has three:
-   *
-   *   pass        every criterion was exercised and held
-   *   fail        a criterion was exercised and did not hold
-   *   incomplete  nothing failed, but a criterion was never exercised or left a requirement
-   *               unmet — so the run does not establish the milestone, and must not exit 0
-   *
-   * A report with no criteria at all is FAIL: a report about nothing is not a green report.
-   *
-   * Note the level this operates at. A check-level `skip` INSIDE an exercised criterion is
-   * legitimate and stays green — a plaintext loopback origin has no transport to verify, and that
-   * must not redden a run — but it is surfaced in the headline either way, so it is never invisible.
+   * Three outcomes, because a sign-off has three: pass, fail, and incomplete — nothing failed, but
+   * a criterion was never exercised or left a requirement unmet, so the run does not establish the
+   * milestone and must not exit 0. A report with no criteria at all is FAIL: a report about nothing
+   * is not a green report.
    */
   get result() {
     if (this.criteria.length === 0) return FAIL;
@@ -165,14 +140,11 @@ export class Report {
     return PASS;
   }
 
-  /** The run is green only when no criterion failed AND every criterion was actually exercised. */
   get ok() {
     return this.result === PASS;
   }
 
   /**
-   * The console header, as a list of lines.
-   *
    * Built from what the run actually has rather than fixed by position: the M3 and M4 reports used
    * to rewrite two lines of a fixed header by string replacement, which silently ate a criterion
    * the day a row was added above.

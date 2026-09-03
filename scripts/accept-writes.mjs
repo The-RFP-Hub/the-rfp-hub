@@ -2,17 +2,13 @@
 /**
  * Write acceptance against a staging deployment.
  *
- * THIS TOOL WRITES to whatever it is pointed at: it submits entries, mints a credential, generates
- * analytics traffic and asks a reviewer to close things. So, unlike `check-deployment.mjs`, it has
- * no default target, refuses anything outside the staging allowlist, and refuses to start without
- * the reviewer credential its teardown needs.
+ * THIS TOOL WRITES to whatever it is pointed at. So, unlike `check-deployment.mjs`, it has no
+ * default target, refuses anything outside the staging allowlist, and refuses to start without the
+ * reviewer credential its teardown needs. What it produces is an ACCEPTANCE report, never a
+ * deployment sign-off.
  *
- * What it produces is an ACCEPTANCE report, never a deployment sign-off: it exercises behavior a
- * read-only probe cannot reach, and the report says so in its headline and in `signOff: false`.
- *
- * It is NOT wired into CI, deliberately. CI has no deployment to write to, and a tool that needed a
- * standing publisher credential in repository secrets would be a worse thing to have than a tool
- * somebody runs.
+ * It is NOT wired into CI, deliberately: CI has no deployment to write to, and a tool needing a
+ * standing publisher credential in repository secrets would be worse to have than one somebody runs.
  *
  * Usage:
  *   node scripts/accept-writes.mjs --milestone m3 --api https://api-staging.example.org \
@@ -103,8 +99,7 @@ async function main() {
     return 0;
   }
 
-  // Every refusal is decided before a single request is made, so a run that must not happen costs
-  // the deployment nothing at all.
+  // Decided before a single request is made, so a run that must not happen costs nothing at all.
   const reasons = [
     ...refusals(opts, WRITE_MILESTONES),
     ...selectionRefusals(WRITE_CRITERIA, { only: opts.only, skip: opts.skip }),

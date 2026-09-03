@@ -2,12 +2,11 @@
 /**
  * Read-only compliance check for a deployment.
  *
- * It fetches public documents and holds them to the contract they publish. Running it against
- * anything, twice, from anywhere, costs nothing — which is why its defaults point at production.
- *
- * It cannot write. There is no credential flag, no credential environment fallback, and no code
- * path that submits anything: the criteria that write live in `scripts/accept-writes.mjs`, behind
- * a staging-only target guard. That separation is the safety property, not a convention.
+ * It fetches public documents and holds them to the contract they publish, so running it anywhere,
+ * twice, costs nothing — which is why its defaults point at production. It cannot write: no
+ * credential flag, no environment fallback, and no code path that submits anything. The criteria
+ * that write live in `scripts/accept-writes.mjs`, behind a staging-only guard. That separation is
+ * the safety property, not a convention.
  *
  * Usage:
  *   node scripts/check-deployment.mjs --milestone m2 --api https://api.example.org \
@@ -123,8 +122,7 @@ async function main() {
     profile: opts.milestone ? READ_MILESTONES[opts.milestone] : undefined,
   });
 
-  // Loaded up front rather than per criterion: a run whose dataset and export criteria cannot
-  // validate anything must not start and then report that it looked.
+  // Up front, not per criterion: a run that cannot validate anything must not start and report.
   let standard;
   if (selection.criteria.some((c) => c.meta.needs.includes("standard"))) {
     try {
