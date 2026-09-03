@@ -27,23 +27,9 @@ export function announceBase(base, write = (msg) => process.stderr.write(`${msg}
   write(`Querying ${base} (${fromEnv ? "RFPHUB_API_BASE" : "default"})`);
 }
 
-export const DEFAULT_TIMEOUT_MS = 10_000;
-
-/** Ceiling on `RFPHUB_TIMEOUT_MS`. Without it, `RFPHUB_TIMEOUT_MS=1e12` disarms the one thing that
- * can abort a stalled request, and the caller waits forever with no explanation. */
-export const MAX_TIMEOUT_MS = 60_000;
-
-export function timeoutMs(warn = (msg) => process.stderr.write(`${msg}\n`)) {
-  const raw = Number(process.env.RFPHUB_TIMEOUT_MS);
-  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_TIMEOUT_MS;
-  if (raw > MAX_TIMEOUT_MS) {
-    warn(
-      `Note: RFPHUB_TIMEOUT_MS=${raw} exceeds this skill's ceiling of ${MAX_TIMEOUT_MS}ms. Using ${MAX_TIMEOUT_MS}.`,
-    );
-    return MAX_TIMEOUT_MS;
-  }
-  return raw;
-}
+/** Fixed request budget: not configurable, so no environment can disarm the one thing that can
+ * abort a stalled request. */
+export const TIMEOUT_MS = 10_000;
 
 /** The skill's own cap on `limit`: the agent's context-window budget, tighter than the API's 100. */
 export const MAX_LIMIT = 25;
@@ -335,8 +321,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
   const controller = new AbortController();
   // The timer covers the WHOLE request, body included: clearing it once the headers arrive leaves
   // a server that stalls mid-body hanging forever.
-  const budgetMs = timeoutMs();
-  const timer = setTimeout(() => controller.abort(), budgetMs);
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     let res;
     try {
@@ -347,7 +332,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
       });
     } catch (err) {
       if (err.name === "AbortError") {
-        throw new RequestError("timeout", `Request to ${url} timed out after ${budgetMs}ms.`);
+        throw new RequestError("timeout", `Request to ${url} timed out after ${TIMEOUT_MS}ms.`);
       }
       throw new RequestError("network", `Could not reach ${url}: ${err.message}`);
     }
@@ -378,7 +363,7 @@ export async function fetchJson(url, { invocationId = newInvocationId() } = {}) 
       if (err.name === "AbortError") {
         throw new RequestError(
           "timeout",
-          `Request to ${url} timed out after ${budgetMs}ms while reading the response body.`,
+          `Request to ${url} timed out after ${TIMEOUT_MS}ms while reading the response body.`,
         );
       }
       throw new RequestError("network", `Could not read the response from ${url}: ${err.message}`);

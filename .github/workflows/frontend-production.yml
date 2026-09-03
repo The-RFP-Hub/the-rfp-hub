@@ -13,13 +13,15 @@
 # Rollback is a git operation: push a new `frontend-prod-*` tag pointing at the previous good
 # commit (or dispatch this workflow with that tag).
 #
-# THIS ENVIRONMENT MUST ALSO CARRY `NEXT_PUBLIC_SITE_ORIGIN`, set to this deployment's own public
-# origin, in Vercel's Production environment variables (Settings → Environment Variables) — the
-# same place `NEXT_PUBLIC_API_URL` already lives, pulled in by the "Pull Vercel environment" step
-# below. It is deliberately absent from Preview (frontend-staging.yml): `src/app/layout.tsx`,
-# `sitemap.ts` and `robots.ts` only index, publish a sitemap and allow crawling when a request's own
-# origin matches this variable, so leaving it unset on staging and on every preview is what keeps
-# them out of search results. See `packages/frontend/README.md`'s "Environment" section.
+# INDEXING NEEDS NO VARIABLE HERE. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` only index,
+# publish a sitemap and allow crawling when a request's own origin matches this deployment's
+# canonical one, which on Vercel comes from `VERCEL_ENV` and `VERCEL_PROJECT_PRODUCTION_URL` — set
+# by the platform and pulled in by the "Pull Vercel environment" step below, as long as the project
+# exposes its system variables. It needs no variable, but it is not unguarded: the step before the
+# build fails the deploy if the pulled environment names no canonical origin. A preview is not
+# `production`, which is what keeps staging and every preview out of search results
+# (frontend-staging.yml). `NEXT_PUBLIC_SITE_ORIGIN` stays available as an explicit override for a
+# deployment off Vercel. See `packages/frontend/README.md`'s "Environment" section.
 name: Production frontend
 
 on:
@@ -90,6 +92,16 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      # BEFORE the build, because the failure this catches is silent: `robots.ts` and `sitemap.ts`
+      # are fail-closed, so a production build that resolved no canonical origin deploys green and
+      # asks search engines not to index it. The origin comes from Vercel's own VERCEL_ENV and
+      # VERCEL_PROJECT_PRODUCTION_URL, which reach the build only while the project exposes its
+      # system variables — a setting, on by default, that someone can turn off. This asserts on the
+      # file `vercel pull` just wrote, which is what `vercel build` feeds the build with, and prints
+      # the origin it resolved so the log says which host this deploy considers canonical.
+      - name: Assert the pulled environment names a canonical origin
+        run: node scripts/check-canonical-origin.mjs .vercel/.env.production.local
 
       - name: Build
         env:

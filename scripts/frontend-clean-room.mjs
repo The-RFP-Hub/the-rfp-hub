@@ -7,11 +7,13 @@
 //
 // Usage: node scripts/frontend-clean-room.mjs [--api-url <url>] [--port <n>] [--keep] [--browser]
 //                                             [--require-publishers]
-// Env: NEXT_PUBLIC_API_URL, RFPHUB_CLEAN_ROOM_PORT, REQUIRE_PUBLISHERS (= --require-publishers),
-//   RFPHUB_STANDARD_SPEC / RFPHUB_VALIDATE_SPEC — a registry range, or an absolute .tgz path used
-//   as `file:`. Build such a tarball with `pnpm pack`, NEVER `npm pack`: only pnpm rewrites the
-//   tarball's own `workspace:*` dependency, and `npm install` cannot resolve what `npm pack` leaves.
-//   rfphub-validate needs one until 0.3.1 publishes `humanizeIssues`, which the frontend imports.
+//                                             [--standard-spec <range|tgz>]
+//                                             [--validate-spec <range|tgz>]
+// Env: NEXT_PUBLIC_API_URL (the frontend's own build variable; --api-url wins).
+//   A spec is a registry range, or an absolute .tgz path used as `file:`. Build such a tarball with
+//   `pnpm pack`, NEVER `npm pack`: only pnpm rewrites the tarball's own `workspace:*` dependency,
+//   and `npm install` cannot resolve what `npm pack` leaves. rfphub-validate needs one until 0.3.1
+//   publishes `humanizeIssues`, which the frontend imports.
 //
 // Exit: 0 every check passed; 1 a check failed; 2 install or build itself failed.
 import { spawn, spawnSync } from "node:child_process";
@@ -40,6 +42,8 @@ function parseArgs(argv) {
     keep: false,
     browser: false,
     requirePublishers: false,
+    standardSpec: undefined,
+    validateSpec: undefined,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -48,6 +52,8 @@ function parseArgs(argv) {
     else if (a === "--keep") out.keep = true;
     else if (a === "--browser") out.browser = true;
     else if (a === "--require-publishers") out.requirePublishers = true;
+    else if (a === "--standard-spec") out.standardSpec = argv[++i];
+    else if (a === "--validate-spec") out.validateSpec = argv[++i];
     else if (a === "--help" || a === "-h") {
       console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\nimport")[0]);
       process.exit(0);
@@ -57,10 +63,6 @@ function parseArgs(argv) {
     }
   }
   return out;
-}
-
-function truthyEnv(value) {
-  return /^(1|true)$/i.test(value ?? "");
 }
 
 function resolveSpec(spec) {
@@ -394,13 +396,9 @@ function checkSearchNarrows(all, filtered) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const apiUrl = args.apiUrl ?? process.env.NEXT_PUBLIC_API_URL ?? "https://api.ethrfps.app";
-  const standardSpec = resolveSpec(process.env.RFPHUB_STANDARD_SPEC ?? "^3.0.0");
-  const validateSpec = resolveSpec(process.env.RFPHUB_VALIDATE_SPEC ?? "^0.3.0");
-  const port =
-    args.port ??
-    (process.env.RFPHUB_CLEAN_ROOM_PORT
-      ? Number(process.env.RFPHUB_CLEAN_ROOM_PORT)
-      : await freePort());
+  const standardSpec = resolveSpec(args.standardSpec ?? "^3.0.0");
+  const validateSpec = resolveSpec(args.validateSpec ?? "^0.3.0");
+  const port = args.port ?? (await freePort());
 
   console.log("frontend-clean-room: copying packages/frontend, then building against");
   console.log(`  @the-rfp-hub/standard -> ${standardSpec}`);
@@ -424,11 +422,9 @@ async function main() {
     });
 
     // What the copy ships decides whether /publishers must answer; the flag can only add the
-    // requirement, never drop it, so no CI input can quietly turn this assertion into a warning.
+    // requirement, never drop it, so no caller can quietly turn this assertion into a warning.
     const requirePublishers =
-      args.requirePublishers ||
-      truthyEnv(process.env.REQUIRE_PUBLISHERS) ||
-      existsSync(join(appDir, "src", "app", "publishers"));
+      args.requirePublishers || existsSync(join(appDir, "src", "app", "publishers"));
     console.log(`  /publishers required  -> ${requirePublishers}`);
 
     const pkgPath = join(appDir, "package.json");

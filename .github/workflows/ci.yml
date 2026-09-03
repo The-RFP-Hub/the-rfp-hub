@@ -504,20 +504,21 @@ jobs:
         run: |
           set -euo pipefail
           export NEXT_PUBLIC_API_URL="${API_URL_INPUT:-https://api.ethrfps.app}"
+          specs=()
           if [ -n "$STANDARD_SPEC_INPUT" ]; then
-            export RFPHUB_STANDARD_SPEC="$STANDARD_SPEC_INPUT"
+            specs+=(--standard-spec "$STANDARD_SPEC_INPUT")
           fi
           if [ "$MODE" = "packed" ]; then
             tarball="$(ls "$RUNNER_TEMP"/rfphub-pack/rfphub-validate-*.tgz)"
-            export RFPHUB_VALIDATE_SPEC="$tarball"
-            echo "packed mode: RFPHUB_VALIDATE_SPEC=$RFPHUB_VALIDATE_SPEC"
+            specs+=(--validate-spec "$tarball")
+            echo "packed mode: --validate-spec $tarball"
           elif [ -n "$VALIDATE_SPEC_INPUT" ]; then
-            export RFPHUB_VALIDATE_SPEC="$VALIDATE_SPEC_INPUT"
-            echo "published mode: RFPHUB_VALIDATE_SPEC=$RFPHUB_VALIDATE_SPEC"
+            specs+=(--validate-spec "$VALIDATE_SPEC_INPUT")
+            echo "published mode: --validate-spec $VALIDATE_SPEC_INPUT"
           else
             echo "published mode: using the script's own default range (currently fails — see this job's header)"
           fi
-          node scripts/frontend-clean-room.mjs --browser
+          node scripts/frontend-clean-room.mjs --browser "${specs[@]}"
 
   # THE REQUIRED STATUS CHECK. It keeps the name `build` because that is the one status the branch
   # ruleset requires; what changed is that it aggregates rather than doing the work. A required

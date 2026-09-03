@@ -33,9 +33,23 @@ export async function requestOrigin(): Promise<string | null> {
   );
 }
 
-/** `undefined` when none was declared — the normal state off production. */
+/**
+ * Vercel names the environment and the project's own production domain in the build environment.
+ * Anything but `production` — a preview, a branch deployment — deliberately resolves to nothing.
+ */
+function vercelProductionOrigin(): string | undefined {
+  if (process.env.VERCEL_ENV !== "production") return undefined;
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  return host ? `https://${host}` : undefined;
+}
+
+/**
+ * `undefined` when this deployment claims no canonical origin — the normal state off production.
+ * An explicit `NEXT_PUBLIC_SITE_ORIGIN` always wins, including when it is unparsable: a copy that
+ * names its own origin must never silently fall back to the platform's idea of one.
+ */
 export function canonicalSiteOrigin(): string | undefined {
-  const raw = process.env.NEXT_PUBLIC_SITE_ORIGIN;
+  const raw = process.env.NEXT_PUBLIC_SITE_ORIGIN || vercelProductionOrigin();
   if (!raw) return undefined;
   try {
     return new URL(raw).origin;

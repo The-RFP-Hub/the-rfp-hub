@@ -8,11 +8,17 @@ import {
   originFromHeaders,
   requestOrigin,
 } from "@/lib/site-origin";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
 }));
+
+// The suite must not inherit whatever platform variables the machine running it happens to export.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "");
+  vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -84,6 +90,38 @@ describe("canonicalSiteOrigin", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "not a url");
     expect(canonicalSiteOrigin()).toBeUndefined();
   });
+
+  it("derives the origin from Vercel's production environment when nothing was declared", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    expect(canonicalSiteOrigin()).toBe("https://ethrfps.app");
+  });
+
+  it("is undefined on a Vercel preview, which is what keeps every preview out of the index", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    expect(canonicalSiteOrigin()).toBeUndefined();
+  });
+
+  it("is undefined off Vercel with nothing declared — an unconfigured copy stays unindexed", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    expect(canonicalSiteOrigin()).toBeUndefined();
+  });
+
+  it("lets an explicit value win over Vercel's production domain", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    expect(canonicalSiteOrigin()).toBe("https://mirror.example.org");
+  });
+
+  it("is undefined when VERCEL_ENV says production but no production domain is named", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(canonicalSiteOrigin()).toBeUndefined();
+  });
 });
 
 describe("isCanonicalRequest", () => {
@@ -140,6 +178,24 @@ describe("isCanonicalRequest", () => {
   it("is false for a malformed NEXT_PUBLIC_SITE_ORIGIN — a typo costs indexing, never privacy", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "ethrfps.app");
     await mockHost("ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(false);
+  });
+
+  it("is true on Vercel production with nothing declared, once the request lands on that host", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    await expect(isCanonicalRequest()).resolves.toBe(true);
+  });
+
+  it("is false on a Vercel preview with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("feature-branch.vercel.app");
 
     await expect(isCanonicalRequest()).resolves.toBe(false);
   });
