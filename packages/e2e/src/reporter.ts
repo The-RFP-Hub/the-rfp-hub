@@ -51,7 +51,7 @@ interface RecordedTest {
  * report that escapes the scanner is precisely the file most worth scanning.
  */
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-const OUTPUT = join(packageDir, "test-results", "m3-e2e.json");
+const OUTPUT = join(packageDir, "test-results", "e2e-report.json");
 /**
  * The prefix a spec uses to say it could not run.
  *
@@ -62,7 +62,7 @@ const OUTPUT = join(packageDir, "test-results", "m3-e2e.json");
  */
 const BLOCKED_MARKER = "BLOCKED";
 
-export default class M3Reporter implements Reporter {
+export default class E2eReporter implements Reporter {
   private readonly tests: RecordedTest[] = [];
   private rootDir = process.cwd();
   private startedAt = Date.now();

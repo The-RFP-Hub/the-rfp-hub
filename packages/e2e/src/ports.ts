@@ -47,7 +47,7 @@ export function isFree(port: number): Promise<boolean> {
  * A port for a child to bind, distinct from every port already handed out in this run.
  *
  * `taken` is passed in rather than kept in module state so the caller — which knows the whole
- * run's allocation — stays the single authority, and so two runs in one process (the check-m3
+ * run's allocation — stays the single authority, and so two runs in one process (the compliance
  * boot, say) cannot leak allocations into each other.
  */
 export async function reserve(taken: Set<number> = new Set()): Promise<number> {

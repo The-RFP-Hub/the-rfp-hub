@@ -12,7 +12,7 @@ as `vitest`; the root test run excludes this package (see `vitest.config.ts`).
 ```sh
 pnpm --filter @the-rfp-hub/e2e exec playwright install chromium   # once, after pnpm install
 pnpm e2e                                                           # full run, from the repo root
-pnpm e2e -- m4-responsive.spec.ts                                  # one spec, same bring-up
+pnpm e2e -- responsive.spec.ts                                     # one spec, same bring-up
 ```
 
 **This package needs Node 20 or newer**, and declares it in its own `engines`. The rest of the
@@ -24,8 +24,9 @@ two servers have already been started.
 Other entry points:
 
 ```sh
-pnpm --filter @the-rfp-hub/e2e e2e:check-m3   # boots the stack, then runs the milestone checker
-                                               # (scripts/check-m3.mjs) against it with a real session
+pnpm --filter @the-rfp-hub/e2e e2e:compliance  # boots the stack, then runs the write-acceptance
+                                               # checker (scripts/accept-writes.mjs) against it
+                                               # with a real session
 ```
 
 Every resource the runner creates is scoped to one run (`E2E_RUN_ID`, or 8 random hex if unset):
@@ -113,12 +114,17 @@ Two fixtures exist because of that:
 An account holding no verified membership anywhere may have at most 5 entries awaiting review — a
 product rule fixed in code, not an environment setting; the sixth is a 409
 `pending_limit_reached`. The `submitter` actor is exactly such an account **and** is the run's
-general-purpose "some other account" — half a dozen specs across `m3-2`, `m3-3` and `m3-4` use it to
+general-purpose "some other account" — half a dozen specs — `05-write-namespace`, `06-duplicates`, `07-provenance-verification` — use it to
 manufacture a pending entry. Left alone, one of them fails on a rule it never meant to exercise, and
 *which* one depends on execution order.
 
+The numeric prefix on every file in `tests/` is what fixes that order. Playwright runs spec files in
+the alphabetical order of their paths, and with `workers: 1` that order is the run — so a rename
+that drops the prefix silently reshuffles the suite, and the coupling surfaces somewhere else as an
+unrelated `409`.
+
 So those specs call `pendingHeadroom("submitter", …)` before they submit, and the cap itself is
-asserted **once**, in `m3-1`, against an identity created for it that starts at zero. That is the
+asserted **once**, in `04-lifecycle.spec.ts`, against an identity created for it that starts at zero. That is the
 only place in the run where hitting the limit is the point.
 
 ## The administrator is granted, not configured
@@ -146,10 +152,11 @@ which the cross-run assertion in `tests/00-acceptance.setup.ts` checks rather th
 | `E2E_ACTOR_SEED` | Rotates which identity plays which part. Deterministic; recorded in the run state. |
 | `E2E_ASSIGNMENT_RECORD` | Where the cross-run assignment record is kept, for the "a fresh database grants nothing" assertion. Opt-in, outside the repository. |
 
-## `e2e:check-m3`
+## `e2e:compliance`
 
-One mode. It boots the same stack, signs in the way a person does, and runs the milestone checker
-against it.
+One mode. It boots the same stack, signs in the way a person does, and runs
+`scripts/accept-writes.mjs --milestone m3` against it over loopback, which the write target guard
+admits without an allowlist entry.
 
 There used to be two. When no provider was reachable the runner generated a key pair, booted a second
 API pinned to it, signed its own tokens and stamped the output `DOMAIN EVIDENCE ONLY` — an honest

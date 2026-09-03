@@ -35,12 +35,10 @@ container-env*.json
 # PUBLISHED dataset and has to stay tracked (see .github/workflows/nightly-export.yml).
 packages/api/exports/
 
-# reports written by scripts/check-m2.mjs, scripts/check-m3.mjs, scripts/check-m4.mjs and
-# scripts/accept-m4.mjs (each a record of one run against one deployment)
-m2-compliance-report.json
-m3-compliance-report.json
-m4-compliance-report*.json
-m4-accept-report*.json
+# reports written by scripts/check-deployment.mjs and scripts/accept-writes.mjs when --json names
+# a path in the checkout (each a record of one run against one deployment)
+compliance-report*.json
+accept-report*.json
 
 # The safety dump scripts/upgrade-dev-postgres.sh takes before moving the dev database onto a new
 # image. It is a copy of one developer's local data — not a repo artifact, and potentially large.
