@@ -81,14 +81,16 @@ run("M4MCP the MCP server against the real API", () => {
     return {
       ...(process.env as Record<string, string>),
       RFPHUB_API_BASE: base,
-      RFPHUB_MCP_HOME: home,
       ...extra,
     };
   }
 
   /** Spawn the built executable and drive it line by line over its own stdio. */
   function session(extra: Record<string, string> = {}): Session {
-    const child = spawn(process.execPath, [CLI], { env: env(extra), stdio: "pipe" });
+    const child = spawn(process.execPath, [CLI, "--state-dir", home], {
+      env: env(extra),
+      stdio: "pipe",
+    });
     const waiting: ((line: Record<string, unknown>) => void)[] = [];
     let buffer = "";
     child.stdout.setEncoding("utf8");
@@ -148,8 +150,8 @@ run("M4MCP the MCP server against the real API", () => {
   /** The CLI's approval mode, answered on stdin the way a person answers it. */
   function approve(approvalId: string): Promise<{ code: number | null; out: string }> {
     return new Promise((resolve) => {
-      const child = spawn(process.execPath, [CLI, "approve", approvalId], {
-        env: env({ RFPHUB_API_KEY: apiKey, RFPHUB_MCP_ENABLE_SUBMIT: "1" }),
+      const child = spawn(process.execPath, [CLI, "--state-dir", home, "approve", approvalId], {
+        env: env({ RFPHUB_API_KEY: apiKey }),
         stdio: "pipe",
       });
       let out = "";
@@ -222,9 +224,9 @@ run("M4MCP the MCP server against the real API", () => {
     fs.rmSync(home, { recursive: true, force: true });
   }, 60_000);
 
-  it("offers exactly two tools, and exactly three when the write flag is set", async () => {
+  it("offers exactly two tools, and exactly three once a credential is configured", async () => {
     expect(await toolNames()).toEqual(["fetch_opportunity", "search_opportunities"]);
-    expect(await toolNames({ RFPHUB_MCP_ENABLE_SUBMIT: "1", RFPHUB_API_KEY: apiKey })).toEqual([
+    expect(await toolNames({ RFPHUB_API_KEY: apiKey })).toEqual([
       "fetch_opportunity",
       "search_opportunities",
       "submit_opportunity",
@@ -285,7 +287,7 @@ run("M4MCP the MCP server against the real API", () => {
       title: "Submitted through the MCP server",
       ecosystems: [TAG],
     });
-    const s = session({ RFPHUB_MCP_ENABLE_SUBMIT: "1", RFPHUB_API_KEY: apiKey });
+    const s = session({ RFPHUB_API_KEY: apiKey });
     try {
       expect(await ownedIds()).not.toContain(SUBMITTED_ID);
 
