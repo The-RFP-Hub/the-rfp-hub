@@ -40,7 +40,7 @@ here. Copy `.env-example` to `.env.local` to start.
 |---|---|
 | `NEXT_PUBLIC_API_URL` | **Required, every environment.** Origin of the API, e.g. `http://localhost:3004`. It is where `/v1` lives, where sign-in lives (`/api/auth`), and it is written into the page's CSP `connect-src`, so the browser may talk to this API and nothing else. |
 | `NEXT_PUBLIC_GA_ID` | *Optional.* A Google Analytics 4 measurement id (`G-…`). When set, the layout loads gtag.js and the CSP opens exactly the Google origins GA4 needs; when unset — the default, and what every fork inherits — no analytics loads and the policy names no Google origin at all. Enabling it is a per-deployment decision with privacy-page consequences: see `src/app/privacy/page.tsx`. |
-| `NEXT_PUBLIC_SITE_ORIGIN` | **Optional, and set ONLY on production.** The one origin this deployment considers itself the canonical, indexable copy of the site — e.g. `https://ethrfps.app`. It must be **the scheme and host a browser actually uses**, exactly: `http://` where the visitor gets `https://`, or an internal hostname a proxy rewrites `Host` to, never matches. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` compare it against the incoming request's own origin (`src/lib/site-origin.ts`, which reads `X-Forwarded-Host` before `Host`) and index, sitemap and allow-crawl **only when they match**. The scheme comes from `X-Forwarded-Proto`, which the platform's edge sets — Next's own server fills it in as `http` when nothing else does, so a deployment served over plain HTTP with no TLS-terminating proxy in front never matches an `https://` value. **The app trusts `X-Forwarded-Host`**: run it behind a proxy that sets or overwrites that header (Vercel does), or do not expose it directly. Exposed directly, a requester who sends the header gets the indexable robots/sitemap/metadata in *their own* response — which costs nothing, because a crawler asks in its own name — but the header is the deployment's statement about itself, so let the edge be the one making it. Left unset, as it is on staging and on every Vercel preview, the deployment always answers `noindex` and `Disallow: /` — the fail-closed direction, so forgetting to set it costs production its search presence rather than costing a preview its privacy. |
+| `NEXT_PUBLIC_SITE_ORIGIN` | **Optional. On Vercel there is nothing to configure** — the production deployment identifies itself from Vercel's own `VERCEL_ENV` and `VERCEL_PROJECT_PRODUCTION_URL`, and every preview, being anything but `production`, stays `noindex`. Set this variable **elsewhere** to opt a deployment into indexing: it is the one origin that deployment considers itself the canonical, indexable copy of the site — e.g. `https://ethrfps.app` — and it wins over the Vercel-derived value wherever both exist. It must be **the scheme and host a browser actually uses**, exactly: `http://` where the visitor gets `https://`, or an internal hostname a proxy rewrites `Host` to, never matches. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` compare it against the incoming request's own origin (`src/lib/site-origin.ts`, which reads `X-Forwarded-Host` before `Host`) and index, sitemap and allow-crawl **only when they match**. The scheme comes from `X-Forwarded-Proto`, which the platform's edge sets — Next's own server fills it in as `http` when nothing else does, so a deployment served over plain HTTP with no TLS-terminating proxy in front never matches an `https://` value. **The app trusts `X-Forwarded-Host`**: run it behind a proxy that sets or overwrites that header (Vercel does), or do not expose it directly. Exposed directly, a requester who sends the header gets the indexable robots/sitemap/metadata in *their own* response — which costs nothing, because a crawler asks in its own name — but the header is the deployment's statement about itself, so let the edge be the one making it. Left unset off Vercel production, the deployment always answers `noindex` and `Disallow: /` — the fail-closed direction, so a missing value costs a copy its search presence rather than costing a preview its privacy. |
 
 None of them is a secret — an origin is an identifier, readable by anyone who loads the page.
 **Nothing secret may ever be added with this prefix.** This package holds no server-side credential
@@ -229,11 +229,12 @@ every other screen here.
 
 **Indexing is on — on ONE origin, and never by accident anywhere else.** `src/app/layout.tsx`'s
 `generateMetadata`, `sitemap.ts` and `robots.ts` all call `isCanonicalRequest()`
-(`src/lib/site-origin.ts`), which is true only when the incoming request's own origin matches
-`NEXT_PUBLIC_SITE_ORIGIN` — a variable set ONLY on the production deployment (see "Environment"
-above and `.github/workflows/frontend-production.yml`). Every other host this app answers on — this
-dev server, staging, a Vercel preview, a self-hosted copy that has not set the variable — resolves
-`false` and gets `noindex`, an empty sitemap and a blanket `Disallow: /`. It used to be off
+(`src/lib/site-origin.ts`), which is true only when the incoming request's own origin matches this
+deployment's canonical origin. That origin comes from Vercel — `VERCEL_ENV === "production"` plus
+`VERCEL_PROJECT_PRODUCTION_URL` — or, anywhere else, from an explicit `NEXT_PUBLIC_SITE_ORIGIN`,
+which also wins on Vercel when it is set (see "Environment" above). Every other host this app
+answers on — this dev server, staging, a Vercel preview, a self-hosted copy that has declared
+nothing — resolves `false` and gets `noindex`, an empty sitemap and a blanket `Disallow: /`. It used to be off
 everywhere for a simpler reason — nothing was served from a canonical address at all, and a preview
 URL that indexed would have competed with the real one for every listing it carried — and that
 reasoning has not gone away, it has just narrowed from "no deployment qualifies" to "exactly one
@@ -275,8 +276,10 @@ package can never fail the API image and block a service deploy.
 
 Leave `NEXT_PUBLIC_SITE_ORIGIN` **unset** unless this deployment IS the one canonical, indexable
 copy of the site — setting it anywhere else (a staging alias, a second self-hosted copy) makes
-that deployment index itself and compete with the real one in search results. See "Environment"
-above. Deploying your own copy against the public API is covered in its own section below.
+that deployment index itself and compete with the real one in search results. On Vercel it stays
+unset in every environment: production is recognized from Vercel's own variables. See
+"Environment" above. Deploying your own copy against the public API is covered in its own section
+below.
 
 Redeploy on every configuration change: both variables are baked into the bundle.
 

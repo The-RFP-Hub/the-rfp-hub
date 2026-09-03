@@ -13,13 +13,13 @@
 # Rollback is a git operation: push a new `frontend-prod-*` tag pointing at the previous good
 # commit (or dispatch this workflow with that tag).
 #
-# THIS ENVIRONMENT MUST ALSO CARRY `NEXT_PUBLIC_SITE_ORIGIN`, set to this deployment's own public
-# origin, in Vercel's Production environment variables (Settings → Environment Variables) — the
-# same place `NEXT_PUBLIC_API_URL` already lives, pulled in by the "Pull Vercel environment" step
-# below. It is deliberately absent from Preview (frontend-staging.yml): `src/app/layout.tsx`,
-# `sitemap.ts` and `robots.ts` only index, publish a sitemap and allow crawling when a request's own
-# origin matches this variable, so leaving it unset on staging and on every preview is what keeps
-# them out of search results. See `packages/frontend/README.md`'s "Environment" section.
+# INDEXING NEEDS NO VARIABLE HERE. `src/app/layout.tsx`, `sitemap.ts` and `robots.ts` only index,
+# publish a sitemap and allow crawling when a request's own origin matches this deployment's
+# canonical one, which on Vercel comes from `VERCEL_ENV` and `VERCEL_PROJECT_PRODUCTION_URL` — set
+# by the platform and pulled in by the "Pull Vercel environment" step below. A preview is not
+# `production`, which is what keeps staging and every preview out of search results
+# (frontend-staging.yml). `NEXT_PUBLIC_SITE_ORIGIN` stays available as an explicit override for a
+# deployment off Vercel. See `packages/frontend/README.md`'s "Environment" section.
 name: Production frontend
 
 on:
