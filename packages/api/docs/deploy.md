@@ -338,6 +338,14 @@ groups, and a migration-role secret that must exist first. Wiring it before thos
 every deploy. Create them, prove one run with a manual `workflow_dispatch`, then add the `needs`
 edge.
 
+Until then, both deploy workflows carry a `smoke` job after `deploy-ecs-service`: it waits for
+`/v1/health` to report `db: "up"`, then reads one live opportunity and its `/duplicates`, `/audit`
+and `/verification` sub-resources, failing the run on any 5xx. This is exactly the gap that let
+migration `0011` go unapplied on staging from 2026-08-27 onward while `/v1/opportunities/<id>/duplicates`
+500'd unnoticed — a deploy that outran its migration is now a failed, notified run instead of a
+quiet one. It is a detective control, not the fix: it catches the outcome after the image is
+already serving traffic, where the `migrate` job above would stop the rollout before that happens.
+
 ### The identity migration: order is not optional
 
 Migration `0006` swaps the account join key and drops the legacy identity columns. The old image
