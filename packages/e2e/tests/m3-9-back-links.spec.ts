@@ -125,8 +125,12 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
 
     // …and the way back NAMES the place, rather than being an arrow that could mean anything. The
     // label is derived from the origin's own query: `tab=claims` is "the claims queue".
-    const back = page.getByRole("link", { name: "← Back to the claims queue" });
+    const back = page.getByRole("link", { name: "Back to the claims queue", exact: true });
     await expect(back, "the way back says where it goes before it is clicked").toBeVisible();
+    await expect(
+      back.locator('svg[aria-hidden="true"]'),
+      "the arrow is drawn beside the words, never spelled into the name a reader is told",
+    ).toHaveCount(1);
     await back.click();
 
     // THE ROUND TRIP CLOSES ON THE SAME SCREEN. Landing on `/review` with Submissions selected is
@@ -170,7 +174,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     await expect(page).toHaveURL((url) => url.searchParams.get("back") === origin);
     await expect(page).toHaveURL((url) => url.searchParams.get("backLabel") === slug);
 
-    const back = page.getByRole("link", { name: `← Back to ${slug}` });
+    const back = page.getByRole("link", { name: `Back to ${slug}`, exact: true });
     await expect(
       back,
       "the way back is labelled with the organization, not with a slugified path",
@@ -208,7 +212,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     await page.goto(`${stack.urls.frontend}/listings/${encodeURIComponent(id)}`);
     await expect(page).toHaveTitle(`${document.title as string} | RFP Hub`);
     await expect(page.getByText(id, { exact: false }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /^← Back to/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /^Back to/ })).toHaveCount(0);
 
     // An off-allowlist origin is dropped SILENTLY, not shown as an error: a malformed `back` is not
     // something the reader did or can fix, and rendering it would be an open redirect wearing this
@@ -218,7 +222,7 @@ test.describe("M3-9 opening a listing from a queue, and getting back to it", () 
     );
     await expect(page.getByText(id, { exact: false }).first()).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /^← Back to/ }),
+      page.getByRole("link", { name: /^Back to/ }),
       "an attacker-supplied destination is never offered as a way back",
     ).toHaveCount(0);
   });
