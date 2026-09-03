@@ -398,9 +398,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
+          cache: pnpm
+
+      # check-deployment.mjs statically imports every criterion module, and one of them imports
+      # `ajv-formats`, so without an install the job dies with ERR_MODULE_NOT_FOUND before the
+      # docs check runs at all.
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
       # `docs/` is built by a stream landing concurrently with this checker, so any PR that
       # doesn't yet touch it must not turn this job red — that would be this job failing on work

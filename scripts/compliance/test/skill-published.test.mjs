@@ -9,10 +9,49 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PUBLISHED_FILES, SKILL_DIR, checkSkill } from "../checks/skill.mjs";
+import {
+  MAX_TITLE_LEN as SKILL_LIB_MAX_TITLE_LEN,
+  project,
+} from "../../../skills/funding-search/scripts/lib.mjs";
+import {
+  MAX_TITLE_LEN,
+  PROJECTED_ITEM_KEYS,
+  PUBLISHED_FILES,
+  SKILL_DIR,
+  checkSkill,
+} from "../checks/skill.mjs";
 import { Report } from "../report.mjs";
 
+/** Stands in for the real projection: drops every prose field, keeps `title` truncated. */
 const HELPER_SAFE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+const cap = ${MAX_TITLE_LEN};
+const cut = (t) => (t.length <= cap ? t : t.slice(0, cap - 1) + "\u2026");
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({ id: o.id, title: cut(o.title ?? ""), fundingType: o.fundingType })),
+}));
+`;
+
+const HELPER_LEAKY = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+process.stdout.write(JSON.stringify(page));
+`;
+
+/** Drops the prose but copies `title` through whole — the one thing the bound fixture catches. */
+const HELPER_UNBOUNDED_TITLE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({ id: o.id, title: o.title, fundingType: o.fundingType })),
+}));
+`;
+
+/** Drops `title` entirely: the projection declares it KEEPS the field, bounded, so this is wrong too. */
+const HELPER_DROPS_TITLE = `#!/usr/bin/env node
 const base = process.env.RFPHUB_API_BASE;
 const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
 process.stdout.write(JSON.stringify({
@@ -21,10 +60,60 @@ process.stdout.write(JSON.stringify({
 }));
 `;
 
-const HELPER_LEAKY = `#!/usr/bin/env node
+/** Rewrites the prose instead of copying it: the instruction literal never appears, the KEY does. */
+const HELPER_TRANSFORMS_PROSE = `#!/usr/bin/env node
 const base = process.env.RFPHUB_API_BASE;
 const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
-process.stdout.write(JSON.stringify(page));
+const cap = ${MAX_TITLE_LEN};
+const cut = (t) => (t.length <= cap ? t : t.slice(0, cap - 1) + "\u2026");
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({
+    id: o.id,
+    title: cut(o.title ?? ""),
+    summary: (o.summary ?? "").slice(0, 20),
+  })),
+}));
+`;
+
+/** Short, so a length-only bound would call it truncated — but it is not the title at all. */
+const HELPER_REDACTED_TITLE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({ id: o.id, title: "redacted", fundingType: o.fundingType })),
+}));
+`;
+
+/** One character over the cap, with no ellipsis: the off-by-one a `<=` on its own would miss. */
+const HELPER_OFF_BY_ONE_TITLE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({
+    id: o.id,
+    title: (o.title ?? "").slice(0, ${MAX_TITLE_LEN} + 1),
+    fundingType: o.fundingType,
+  })),
+}));
+`;
+
+/** Leaks one prose field only — the assertion must not depend on the whole page coming through. */
+const HELPER_LEAKS_ONE_PROSE_FIELD = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+const cap = ${MAX_TITLE_LEN};
+const cut = (t) => (t.length <= cap ? t : t.slice(0, cap - 1) + "\u2026");
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({
+    id: o.id,
+    title: cut(o.title ?? ""),
+    scopeOfWork: o.fundingDetails?.rfp?.scopeOfWork ?? null,
+  })),
+}));
 `;
 
 const LINT_OK = "process.stdout.write('\\u2713 1 skill(s) checked\\n');\n";
@@ -133,7 +222,92 @@ describe("checkSkill", () => {
     served = leaky;
     const result = await run();
     expect(result.failed.join(" | ")).toMatch(
-      /never emits injected prose|carries no description field/,
+      /prose fields carrying an injection|carries no description field/,
     );
+  });
+
+  it("fails when a single prose field leaks, with the title left clean", async () => {
+    const leaky = fileSet({ helper: HELPER_LEAKS_ONE_PROSE_FIELD });
+    await writeLocal(leaky);
+    served = leaky;
+    const result = await run();
+    expect(result.failed).toContain(
+      "the published search.mjs emits none of the prose fields carrying an injection",
+    );
+  });
+
+  it("fails when the helper copies a hostile title through unbounded", async () => {
+    const unbounded = fileSet({ helper: HELPER_UNBOUNDED_TITLE });
+    await writeLocal(unbounded);
+    served = unbounded;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs bounds the third-party title it keeps",
+    ]);
+  });
+
+  it("fails when the helper drops the title the projection promises to keep", async () => {
+    const dropped = fileSet({ helper: HELPER_DROPS_TITLE });
+    await writeLocal(dropped);
+    served = dropped;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs bounds the third-party title it keeps",
+    ]);
+  });
+
+  it("fails on rewritten prose that never carries the injection literal", async () => {
+    // The literal is gone; the KEY is not. A substring test alone would call this green.
+    const transformed = fileSet({ helper: HELPER_TRANSFORMS_PROSE });
+    await writeLocal(transformed);
+    served = transformed;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs emits only the keys its projection names",
+    ]);
+  });
+
+  it("fails when the helper replaces the title instead of truncating it", async () => {
+    const redacted = fileSet({ helper: HELPER_REDACTED_TITLE });
+    await writeLocal(redacted);
+    served = redacted;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs bounds the third-party title it keeps",
+    ]);
+  });
+
+  it("fails when the emitted title is one character over the cap", async () => {
+    const off = fileSet({ helper: HELPER_OFF_BY_ONE_TITLE });
+    await writeLocal(off);
+    served = off;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs bounds the third-party title it keeps",
+    ]);
+  });
+
+  it("asserts the cap the skill's own library declares", () => {
+    expect(MAX_TITLE_LEN).toBe(SKILL_LIB_MAX_TITLE_LEN);
+  });
+
+  it("pins the allow-list to what the skill's own project() emits", () => {
+    const emitted = Object.keys(
+      project(
+        {
+          id: "x",
+          title: "t",
+          fundingType: "grant",
+          status: "open",
+          ecosystems: ["Ethereum"],
+          operatingOrganizations: [{ name: "Acme" }],
+          applicationUrl: "https://example.org/apply",
+          fundingInfo: { budget: 1 },
+          deadlines: [],
+        },
+        "https://api.example",
+      ),
+    );
+    expect([...emitted].sort()).toEqual([...PROJECTED_ITEM_KEYS].sort());
   });
 });
