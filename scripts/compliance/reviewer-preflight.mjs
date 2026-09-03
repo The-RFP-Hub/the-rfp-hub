@@ -6,12 +6,14 @@
  * discovered at teardown that it could not reject any of them — leaving rows on the public surface
  * of somebody's deployment. An expired or demoted `--admin-token` failed the same way.
  *
- * So the capability is read off the deployment, over one request, before anything is created.
+ * So the capability is read off the deployment, over one request, before anything is created —
+ * including for the m4 profile, whose whole cycle writes through the MCP server.
  */
 import { callJson } from "./client.mjs";
 
 /** The credential the teardown will actually use — the same precedence `cleanup.mjs` applies. */
 export function reviewerCredential(opts) {
+  if (opts.reviewerToken) return { token: opts.reviewerToken, flag: "--reviewer-token" };
   return opts.adminToken
     ? { token: opts.adminToken, flag: "--admin-token" }
     : { token: opts.sessionToken, flag: "--session-token" };
@@ -31,7 +33,7 @@ export async function reviewerRefusal(ctx, opts) {
     return `${flag} was answered ${me.status} by ${ctx.api}/v1/me, so its capabilities cannot be established — ${TEARDOWN_WHY}`;
   }
   if (me.json?.canReview !== true) {
-    return `${flag} names an account that may not review (\`canReview\` is ${JSON.stringify(me.json?.canReview)} at ${ctx.api}/v1/me) — ${TEARDOWN_WHY}. Pass an --admin-token whose account may review.`;
+    return `${flag} names an account that may not review (\`canReview\` is ${JSON.stringify(me.json?.canReview)} at ${ctx.api}/v1/me) — ${TEARDOWN_WHY}. Pass ${flag === "--reviewer-token" ? "a --reviewer-token" : "an --admin-token"} whose account may review.`;
   }
   return null;
 }

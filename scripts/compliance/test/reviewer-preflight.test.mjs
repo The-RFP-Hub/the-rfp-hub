@@ -45,6 +45,10 @@ function run(args) {
         COMPLIANCE_SESSION_TOKEN: "",
         COMPLIANCE_ADMIN_TOKEN: "",
         COMPLIANCE_API_KEY: "",
+        COMPLIANCE_REVIEWER_TOKEN: "",
+        COMPLIANCE_WRITE_KEY: "",
+        RFPHUB_REVIEWER_TOKEN: "",
+        RFPHUB_WRITE_KEY: "",
       },
     });
     let out = "";
@@ -103,5 +107,43 @@ describe("the teardown credential", () => {
     // refusal and started exercising criteria, rather than being turned away at the door.
     expect(code).not.toBe(2);
     expect(out).not.toContain("may not review");
+  });
+});
+
+// The m4 profile reaches the same preflight under its own flag, and it matters more there: its one
+// criterion writes through the MCP server, which no refusal downstream could undo.
+describe("the m4 profile's reviewer", () => {
+  const submission = (origin, extra = []) => [
+    "--milestone",
+    "m4",
+    "--api",
+    origin,
+    "--reviewer-token",
+    "not-a-reviewer",
+    "--write-key",
+    "rfph_x",
+    "--json",
+    "-",
+    "--no-color",
+    ...extra,
+  ];
+
+  it("refuses a --reviewer-token that may not review, before the MCP cycle writes", async () => {
+    const api = await fakeApi({ canReview: false });
+    const { code, out } = await run(submission(api.origin));
+
+    expect(code).toBe(2);
+    expect(out).toContain("--reviewer-token names an account that may not review");
+    expect(out).toContain("Pass a --reviewer-token whose account may review");
+    expect(api.seen.filter((request) => !request.startsWith("GET "))).toEqual([]);
+  });
+
+  it("refuses a --reviewer-token the deployment does not accept", async () => {
+    const api = await fakeApi({ canReview: true, meStatus: 401 });
+    const { code, out } = await run(submission(api.origin));
+
+    expect(code).toBe(2);
+    expect(out).toContain("--reviewer-token was answered 401");
+    expect(api.seen.filter((request) => !request.startsWith("GET "))).toEqual([]);
   });
 });

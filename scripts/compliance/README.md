@@ -163,11 +163,12 @@ a browser could print `RESULT: PASS` having looked at none of them.
 
 ### `--offline`
 
-Applies to the **`docs` criterion only**: it skips the absolute-link 2xx/3xx requests and the
-execution of `safe-read` blocks. Every other criterion still uses the network, so the only
-combination that means anything is `--only docs --offline`, which is what the CI `docs-links` job
-runs. Everything else in the docs check — file existence, relative links, `#anchor` resolution,
-marker presence — still runs, because none of it needs the network.
+`docs` is the only criterion whose registry entry declares `offline: true`, and therefore the only
+one the flag leaves runnable — everything else here reads the deployment. Inside `docs` it skips the
+absolute-link 2xx/3xx requests and the execution of `safe-read` blocks; file existence, relative
+links, `#anchor` resolution and marker presence all still run, because none of them needs the
+network. So the only combination that means anything is `--only docs --offline`, which is what the
+CI `docs-links` job runs.
 
 ### `--expect-indexable`
 
@@ -376,6 +377,7 @@ scripts/compliance/
   csv.mjs xml.mjs schema.mjs   parsing and validation helpers
   fixtures.mjs         the documents a write run creates
   cleanup.mjs          the m3 profile's teardown, behind checks/teardown.mjs
+  reviewer-preflight.mjs  the teardown credential, proven before the first write
   browser.mjs          Playwright resolved through packages/e2e
   mcp-client.mjs       a hand-rolled newline-delimited JSON-RPC stdio client
   mock-server.mjs      the local recording HTTP server the MCP submit case uses

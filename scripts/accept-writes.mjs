@@ -150,7 +150,7 @@ async function main() {
   const notAReviewer = await reviewerRefusal(
     { api: opts.api, timeoutMs: opts.timeoutMs },
     opts,
-  ).catch((err) => `--admin-token could not be checked — ${err?.message ?? err}`);
+  ).catch((err) => `${reviewer.flag} could not be checked — ${err?.message ?? err}`);
   if (notAReviewer) {
     process.stderr.write(`accept-writes refuses to run:\n  • ${notAReviewer}\n`);
     return 2;

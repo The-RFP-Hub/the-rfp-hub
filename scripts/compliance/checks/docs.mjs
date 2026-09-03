@@ -243,6 +243,10 @@ export const meta = {
   key: "docs",
   requires: [],
   needs: ["api", "site", "repoRoot"],
+  // The only read criterion with anything left to say without the network: file existence, relative
+  // links and #anchors are all read off `--repo-root`. Every other one reads the deployment, so
+  // `--offline` correctly leaves them unmet rather than running them.
+  offline: true,
   contract: { m4: "M4-6" },
 };
 
