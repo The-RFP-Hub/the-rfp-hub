@@ -5,9 +5,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../m3-compliance/client.mjs", () => ({ callJson: vi.fn() }));
+vi.mock("../client.mjs", () => ({ callJson: vi.fn() }));
 
-const { callJson } = await import("../../m3-compliance/client.mjs");
+const { callJson } = await import("../client.mjs");
 const { fixtureDocument, ownedIds, runToken } = await import("../accept/flow.mjs");
 
 describe("runToken", () => {
@@ -17,10 +17,10 @@ describe("runToken", () => {
     expect(tokens.size).toBe(50);
   });
 
-  it("produces a fixture id in the m4check namespace", () => {
+  it("produces a fixture id in the compliance namespace", () => {
     const id = fixtureDocument(runToken()).id;
-    expect(id.startsWith("m4check:m4check-")).toBe(true);
-    expect(id).toMatch(/^m4check:m4check-[0-9a-z-]+$/);
+    expect(id.startsWith("compliance:compliance-")).toBe(true);
+    expect(id).toMatch(/^compliance:compliance-[0-9a-z-]+$/);
   });
 });
 

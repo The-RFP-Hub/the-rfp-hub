@@ -1,10 +1,12 @@
 /**
- * M4-4b's README rule: every configuration snippet pins an exact version, because a moving tag
- * turns "the description digest binds this build" into a promise about a build nobody has seen.
+ * The `mcp-publication` criterion's README rule: every configuration snippet pins an exact version,
+ * because a moving tag turns "the description digest binds this build" into a promise about a build
+ * nobody has seen.
  * `pnpm --filter @the-rfp-hub/mcp build` is not a configuration snippet and must not be flagged.
  */
 import { describe, expect, it } from "vitest";
-import { mcpApiBase, schemaErrors, unpinnedReadmeSpecs } from "../checks/mcp.mjs";
+import { unpinnedReadmeSpecs } from "../checks/mcp-publication.mjs";
+import { mcpApiBase, schemaErrors } from "../checks/mcp.mjs";
 
 const fenced = (...lines) => ["```json", ...lines, "```"].join("\n");
 

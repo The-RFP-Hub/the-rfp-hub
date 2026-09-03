@@ -24,7 +24,7 @@ beforeEach(async () => {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   api = `http://127.0.0.1:${server.address().port}`;
 
-  repoRoot = await mkdtemp(join(tmpdir(), "m4-check-docs-cwd-isolation-"));
+  repoRoot = await mkdtemp(join(tmpdir(), "compliance-docs-cwd-isolation-"));
   await mkdir(join(repoRoot, "docs"), { recursive: true });
   for (const relPath of HANDOFF_DOCS) {
     await writeFile(join(repoRoot, relPath), "# placeholder\n");

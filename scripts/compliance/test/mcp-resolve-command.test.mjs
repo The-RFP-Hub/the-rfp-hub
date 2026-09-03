@@ -16,7 +16,7 @@ let realDir;
 let linkedDir;
 
 beforeEach(async () => {
-  base = await mkdtemp(join(tmpdir(), "m4-check-resolve-command-"));
+  base = await mkdtemp(join(tmpdir(), "compliance-resolve-command-"));
   realDir = join(base, "real-repo");
   await mkdir(join(realDir, "packages/mcp/dist"), { recursive: true });
   await writeFile(join(realDir, "packages/mcp/dist/cli.js"), "// placeholder\n");
@@ -85,7 +85,7 @@ describe("resolveCommand — --mcp-spec local (explicit opt-out)", () => {
   });
 
   it("throws a clear error, naming the missing build, rather than crashing opaquely", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "m4-check-resolve-command-empty-"));
+    const empty = await mkdtemp(join(tmpdir(), "compliance-resolve-command-empty-"));
     try {
       expect(() => resolveCommand({ repoRoot: empty, mcpSpec: "local" })).toThrow(
         /packages\/mcp\/dist\/cli\.js not found/,

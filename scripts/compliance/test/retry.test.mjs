@@ -1,14 +1,14 @@
 /**
  * One retry for the GitHub publication probes.
  *
- * A sign-off run failed M4-1 with HTTP 502 on all four governance URLs; every one answered 200
+ * A sign-off run failed the governance criterion with HTTP 502 on all four governance URLs; every one answered 200
  * moments later. These tests spawn a real server that fails once and then succeeds, because the
  * property being locked in is "the second request is actually made and its answer is the one
  * returned" — and, just as important, that a 404 is never asked twice.
  */
 import { createServer } from "node:http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { request } from "../../m2-compliance/http.mjs";
+import { request } from "../http.mjs";
 import { RETRY_BACKOFF_MS, RETRY_HOSTS, isRetryable, requestPublished } from "../retry.mjs";
 
 let server;
@@ -96,7 +96,7 @@ describe("requestPublished", () => {
 });
 
 describe("the behavior this replaces", () => {
-  it("a plain request returns the 502 — which is how M4-1 went red on four published documents", async () => {
+  it("a plain request returns the 502 — which is how governance went red on four published documents", async () => {
     behavior = (n) =>
       n === 1 ? { status: 502, body: "bad gateway" } : { status: 200, body: "ok" };
     const res = await request(`${origin}/GOVERNANCE.md`, {});

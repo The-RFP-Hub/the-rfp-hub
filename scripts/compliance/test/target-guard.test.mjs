@@ -88,6 +88,33 @@ describe("targetRefusal", () => {
     expect(reason).toContain("There is no flag to force production");
   });
 
+  // Every one of these was ACCEPTED by the hostname heuristic this allowlist replaced.
+  it("refuses everything the segment-wise heuristic used to let through", () => {
+    for (const api of [
+      "https://api.ethrfps.app",
+      "https://API.ETHRFPS.APP",
+      "https://api.ethrfps.app.",
+      "https://ethrfps.app",
+      "https://104.21.1.2",
+      "https://not-staging-anymore.example.org",
+      "https://production-staging.example.org",
+      "https://staging.api.ethrfps.app.example.org",
+      "https://api-staging.example.org",
+      "http://staging.ethrfps.app",
+      "ftp://api-staging.ethrfps.app",
+    ]) {
+      expect(targetRefusal(api, {}), api).toEqual(expect.any(String));
+    }
+  });
+
+  it("resolves the default port rather than reading it as a different origin", () => {
+    expect(targetRefusal("https://api-staging.ethrfps.app:443", {})).toBeNull();
+  });
+
+  it("says plainly that it sends live credentials, so plaintext is loopback-only", () => {
+    expect(targetRefusal("http://api-staging.example.org", {})).toContain("live credentials");
+  });
+
   it("refuses remote plaintext, an unparseable target and userinfo", () => {
     expect(targetRefusal("http://api-staging.example.org", {})).toContain("not https");
     expect(targetRefusal("not a url", {})).toContain("must be an absolute http(s) URL");
@@ -111,6 +138,24 @@ describe("redirectRefusal", () => {
     const reason = await redirectRefusal("https://staging.ethrfps.app", { env: {} });
     expect(reason).toContain("redirects to https://api.ethrfps.app");
     expect(reason).toContain("is PRODUCTION");
+    vi.doUnmock("../http.mjs");
+    vi.resetModules();
+  });
+
+  it("refuses a chain that never settles", async () => {
+    vi.resetModules();
+    vi.doMock("../http.mjs", () => ({
+      isLoopbackHost: () => false,
+      request: async () => ({
+        ok: true,
+        status: 302,
+        location: "https://staging.ethrfps.app/v1/health",
+      }),
+    }));
+    const { redirectRefusal } = await import("../target-guard.mjs");
+    expect(await redirectRefusal("https://staging.ethrfps.app", { env: {} })).toContain(
+      "redirects more than 5 times",
+    );
     vi.doUnmock("../http.mjs");
     vi.resetModules();
   });

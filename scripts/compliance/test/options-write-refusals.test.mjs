@@ -81,7 +81,36 @@ describe("refusals", () => {
   });
 
   it("a milestone whose criteria are not registered is an error, not an empty run", () => {
-    expect(check({ ...complete, milestone: "m4" })[0]).toContain('unknown milestone "m4"');
+    expect(check({ ...complete, milestone: "m9" })[0]).toContain('unknown milestone "m9"');
+  });
+});
+
+describe("the m4 profile's refusals", () => {
+  const submission = {
+    milestone: "m4",
+    api: "https://api-staging.ethrfps.app",
+    reviewerToken: "t",
+    writeKey: "rfph_x",
+  };
+
+  it("passes with both of its credentials against an allowlisted staging origin", () => {
+    expect(check(submission)).toEqual([]);
+  });
+
+  it("wants neither a namespace nor a publisher session: it submits through the MCP server", () => {
+    expect(check({ ...submission, namespace: undefined, sessionToken: undefined })).toEqual([]);
+  });
+
+  it("names each missing credential individually", () => {
+    const reasons = check({ ...submission, reviewerToken: undefined, writeKey: undefined });
+    expect(reasons).toHaveLength(2);
+    expect(reasons.join("\n")).toContain("a reviewer credential is required");
+    expect(reasons.join("\n")).toContain("a write credential is required");
+  });
+
+  it("refuses production before a single request is made", () => {
+    const reasons = check({ ...submission, api: "https://api.ethrfps.app" });
+    expect(reasons[0]).toContain("is PRODUCTION");
   });
 });
 
@@ -133,6 +162,51 @@ describe("parseArgs", () => {
     expect(flagWins.sessionToken).toBe("from-flag");
     // The other two still fall back — one explicit flag does not disable the mechanism.
     expect(flagWins.adminToken).toBe("admin-from-env");
+  });
+
+  it("reads the m4 credentials under either name, the COMPLIANCE_ one first", () => {
+    expect(
+      parseArgs([], { RFPHUB_REVIEWER_TOKEN: "rev", RFPHUB_WRITE_KEY: "rfph_env" }),
+    ).toMatchObject({ reviewerToken: "rev", writeKey: "rfph_env" });
+    expect(
+      parseArgs([], { COMPLIANCE_REVIEWER_TOKEN: "first", RFPHUB_REVIEWER_TOKEN: "second" })
+        .reviewerToken,
+    ).toBe("first");
+    expect(
+      parseArgs(["--reviewer-token", "flag"], { RFPHUB_REVIEWER_TOKEN: "env" }).reviewerToken,
+    ).toBe("flag");
+  });
+
+  it("reads the m4 profile's own flags", () => {
+    const opts = parseArgs([
+      "--milestone",
+      "m4",
+      "--write-key",
+      "rfph_x",
+      "--repo-root",
+      "/tmp/checkout",
+      "--mcp-spec",
+      "@the-rfp-hub/mcp@0.1.0",
+      "--approve-timeout",
+      "9000",
+    ]);
+    expect(opts).toMatchObject({
+      milestone: "m4",
+      writeKey: "rfph_x",
+      repoRoot: "/tmp/checkout",
+      mcpSpec: "0.1.0",
+      approveTimeoutMs: 9000,
+      interactiveApproval: false,
+    });
+  });
+
+  // Waiting on a person is not waiting on a process, and an explicit flag still wins.
+  it("--interactive-approval raises the approval timeout unless one was named", () => {
+    expect(parseArgs(["--interactive-approval"]).approveTimeoutMs).toBe(300000);
+    expect(
+      parseArgs(["--interactive-approval", "--approve-timeout", "60000"]).approveTimeoutMs,
+    ).toBe(60000);
+    expect(parseArgs([]).approveTimeoutMs).toBe(15000);
   });
 
   it("narrows the profile with --only, and refuses it together with --skip", () => {

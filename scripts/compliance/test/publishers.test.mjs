@@ -1,20 +1,20 @@
 /**
- * M4-2's slug extraction and the whole 200 success path, with `request` and `withPage` mocked —
+ * The `publishers` criterion's slug extraction and the whole 200 success path, with `request` and `withPage` mocked —
  * production 404s on `/publishers` until the frontend stream lands, so nothing else exercises it.
  * The extraction only calls `page.$$eval(selector, fn)`, so an in-memory element list is enough.
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../m2-compliance/http.mjs", () => ({ request: vi.fn() }));
+vi.mock("../http.mjs", () => ({ request: vi.fn() }));
 vi.mock("../browser.mjs", () => ({ withPage: vi.fn() }));
 
-import { request } from "../../m2-compliance/http.mjs";
 import { withPage } from "../browser.mjs";
 import {
   checkPublishers,
   extractRenderedSlugs,
   publisherPayloadErrors,
 } from "../checks/publishers.mjs";
+import { request } from "../http.mjs";
 import { Report } from "../report.mjs";
 
 /** A fake Playwright `page`: `$$eval(selector, fn)` runs `fn` over whatever `dom[selector]` lists. */

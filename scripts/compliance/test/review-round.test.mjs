@@ -1,4 +1,4 @@
-/** The Codex review's findings, each written to fail against the code as it stood before the fix. */
+/** One review round's findings, each written to fail against the code as it stood before the fix. */
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,35 +6,35 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { extraLinkSources } from "../checks/docs.mjs";
 import { governanceCheckName } from "../checks/governance.mjs";
-import { unpinnedReadmeSpecs } from "../checks/mcp.mjs";
+import { unpinnedReadmeSpecs } from "../checks/mcp-publication.mjs";
 import { ACCEPTANCE_SCOPE, acceptanceReport } from "../report.mjs";
 
-vi.mock("../../m3-compliance/client.mjs", () => ({ callJson: vi.fn() }));
-vi.mock("../../m2-compliance/http.mjs", async (importOriginal) => ({
+vi.mock("../client.mjs", () => ({ callJson: vi.fn() }));
+vi.mock("../http.mjs", async (importOriginal) => ({
   ...(await importOriginal()),
   request: vi.fn(),
 }));
-const { callJson } = await import("../../m3-compliance/client.mjs");
-const { request } = await import("../../m2-compliance/http.mjs");
+const { callJson } = await import("../client.mjs");
+const { request } = await import("../http.mjs");
 const { TARGET_SELECTOR, deriveFilterValues, hasNoindexMeta, robotsBlocksAll } = await import(
   "../checks/frontend.mjs"
 );
 const { verifyTornDown, waitForHumanApproval } = await import("../accept/flow.mjs");
 
-describe("1 — an acceptance run is never an M4 sign-off", () => {
+describe("1 — an acceptance run is never a deployment sign-off", () => {
   it("reports signOff false and a scoped result even when every criterion passed", () => {
-    // accept-m4 registers M4-ACCEPT criteria, not the M4 rows. Built as a bare Report, a clean
-    // acceptance run emitted `signOff: true` for a milestone none of its checks looked at.
+    // A write run registers acceptance criteria, not milestone rows. Built as a bare Report, a
+    // clean acceptance run emitted `signOff: true` for a milestone none of its checks looked at.
     const report = acceptanceReport({ siteUrl: "(n/a)", baseUrl: "https://api.example.org" });
-    report.criterion("M4-ACCEPT", "interlock", "d").pass("held").finish();
-    report.criterion("M4-ACCEPT-T", "teardown", "d").pass("gone").finish();
+    report.criterion("write-cycle", "interlock", "d").pass("held").finish();
+    report.criterion("teardown", "teardown", "d").pass("gone").finish();
 
     expect(report.result).toBe("pass");
     expect(report.toJSON().signOff).toBe(false);
     expect(report.toJSON().scope).toBe(ACCEPTANCE_SCOPE);
     const rendered = report.render();
     expect(rendered).toContain("RESULT: SCOPED PASS");
-    expect(rendered).toContain("NOT an M4 sign-off");
+    expect(rendered).toContain("NOT a deployment sign-off");
     expect(rendered).not.toMatch(/RESULT: PASS/);
   });
 });
@@ -79,7 +79,7 @@ describe("3 — teardown is not verified by an owner listing that did not answer
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/") ? { ok: true, status: 500 } : publicGone,
     );
-    const result = await verifyTornDown({ writeKey: "rfph_x" }, "m4check:x");
+    const result = await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x");
     expect(result.ok).toBe(false);
     expect(result.ownerStatus).toContain("unverified");
   });
@@ -88,23 +88,27 @@ describe("3 — teardown is not verified by an owner listing that did not answer
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/") ? { ok: true, status: 200, json: {} } : publicGone,
     );
-    expect((await verifyTornDown({ writeKey: "rfph_x" }, "m4check:x")).ok).toBe(false);
+    expect((await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x")).ok).toBe(false);
   });
 
   it("passes only on a 200 owner listing that no longer carries the fixture", async () => {
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/") ? { ok: true, status: 200, json: { items: [] } } : publicGone,
     );
-    expect((await verifyTornDown({ writeKey: "rfph_x" }, "m4check:x")).ok).toBe(true);
+    expect((await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x")).ok).toBe(true);
   });
 
   it("fails when the entry is still pending for its owner", async () => {
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/")
-        ? { ok: true, status: 200, json: { items: [{ id: "m4check:x", reviewStatus: "pending" }] } }
+        ? {
+            ok: true,
+            status: 200,
+            json: { items: [{ id: "compliance:x", reviewStatus: "pending" }] },
+          }
         : publicGone,
     );
-    expect((await verifyTornDown({ writeKey: "rfph_x" }, "m4check:x")).ok).toBe(false);
+    expect((await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x")).ok).toBe(false);
   });
 });
 
@@ -314,7 +318,7 @@ describe("staging validation — a filter value has to change the FIRST PAGE", (
 });
 
 describe("staging validation — only form controls and nav links are measured", () => {
-  it("measures the set m4-responsive.spec.ts names, and no bare anchor", () => {
+  it("measures the set 13-responsive.spec.ts names, and no bare anchor", () => {
     // Staging flagged block-level prose and footer text links ("All opportunities" 116×23,
     // "Browse the directory"). A text link's hit area is its line box whatever its `display`, so
     // the previous `display:inline` exemption was the wrong test — the selector is.

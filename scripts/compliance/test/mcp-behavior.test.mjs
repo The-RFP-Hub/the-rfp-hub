@@ -1,5 +1,5 @@
 /**
- * M4-4's assertions, each shown to fail on a server that violates it. The criterion reported 11
+ * The `mcp` criterion's assertions, each shown to fail on a server that violates it. The criterion reported 11
  * passes while `outputSchema`, annotations, `structuredContent`, page 2 and the pagination envelope
  * were never looked at; a stand-in server that takes a defect by name is the only way to know an
  * assertion is doing anything.
@@ -74,7 +74,7 @@ async function run(defect) {
   };
   await checkMcp(report, ctx);
   const json = report.toJSON();
-  const m44 = json.criteria.find((c) => c.id === "M4-4");
+  const m44 = json.criteria.find((c) => c.id === "mcp");
   return {
     status: m44.status,
     failed: m44.checks.filter((c) => c.status === "fail").map((c) => c.name),
