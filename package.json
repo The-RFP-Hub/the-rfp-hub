@@ -17,6 +17,7 @@
     "check:m3": "node scripts/check-m3.mjs",
     "check:m4": "node scripts/check-m4.mjs",
     "accept:m4": "node scripts/accept-m4.mjs",
+    "frontend:clean-room": "node scripts/frontend-clean-room.mjs",
     "e2e": "pnpm --filter @the-rfp-hub/e2e e2e",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@changesets/cli": "^2.27.10",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.2",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",

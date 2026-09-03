@@ -273,31 +273,93 @@ environment, and production moves only on a `prod-*` (whole-product) or `fronten
 The API's image build still excludes `packages/frontend` (`.dockerignore`) precisely so that this
 package can never fail the API image and block a service deploy.
 
-To deploy it by hand instead — any host that can run a Next.js server (Vercel, or any Node
-runtime); this is also the reference-frontend path for anyone deploying their own copy against the
-public API:
-
-1. Point the host at this repository, with **root directory** `packages/frontend` and pnpm
-   workspaces enabled — the package depends on `rfphub-validate` and `@the-rfp-hub/standard` from
-   this workspace, so a build that cannot see the repository root will fail.
-2. Build command `pnpm --filter @the-rfp-hub/frontend... build` (the `...` builds workspace
-   dependencies first). Install command `pnpm install --frozen-lockfile`.
-3. Set `NEXT_PUBLIC_API_URL` **for that environment** as a build-time variable, and add this
-   deployment's own origin to the API's `TRUSTED_ORIGINS` — without it the browser's preflight for
-   the sign-in calls is refused and nobody can log in, while the public directory keeps working
-   (`/v1` is `origin: "*"`). That asymmetry is the symptom to recognise.
-4. Leave `NEXT_PUBLIC_SITE_ORIGIN` **unset**, unless this deployment IS the one canonical, indexable
-   copy of the site — setting it anywhere else (a staging alias, a second self-hosted copy) makes
-   that deployment index itself and compete with the real one in search results. See "Environment"
-   above.
-5. `output: "standalone"` is set, so a self-hosted deployment runs `node .next/standalone/server.js`
-   with `.next/static` and `public/` copied alongside it.
+Leave `NEXT_PUBLIC_SITE_ORIGIN` **unset** unless this deployment IS the one canonical, indexable
+copy of the site — setting it anywhere else (a staging alias, a second self-hosted copy) makes
+that deployment index itself and compete with the real one in search results. See "Environment"
+above. Deploying your own copy against the public API is covered in its own section below.
 
 Redeploy on every configuration change: both variables are baked into the bundle.
 
 If a pipeline is added later, it needs exactly two things this repository does not yet have — a
 build step with a per-environment API origin, and a way to register each preview URL with the API's
 trusted origins.
+
+### Deploying your own copy
+
+Everything below is for someone who is NOT this project — running their own deployment of this
+frontend against the public API, on their own infrastructure. **A copy deployed this way is
+read-only for sign-in**: the API's `TRUSTED_ORIGINS` is an exact allowlist
+(`packages/api/docs/auth.md` §7), so a browser's preflight for the auth calls is refused from any
+origin not on it, and there is no self-service way to add one — ask the API's operator. **The
+public directory works fully, with no ask required**: `/v1` serves with `origin: "*"` and
+`credentials: false`, so anonymous browsing, search, filters and the opportunity detail pages all
+work exactly as they do here. That is not a lesser deployment — "any external developer can deploy
+a custom frontend against the public API" is satisfied by a working public directory; publishing to
+the apex is this project's job, not every copy's.
+
+There are three ways to do it, in increasing order of how much of the repository comes along:
+
+**A — Clone the whole monorepo.** The path described just above this section, pointed at your own
+fork: root directory `packages/frontend`, pnpm workspaces enabled, `NEXT_PUBLIC_API_URL` set for
+your environment. The **Vercel Deploy Button** does exactly this in one click — Vercel's
+`root-directory` clone parameter is documented for this purpose, and clones the whole repository
+with "Include source files outside of the Root Directory" **on by default**, which is required
+here and is what lets the build see `pnpm-lock.yaml` and the two workspace dependencies:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/The-RFP-Hub/the-rfp-hub&root-directory=packages/frontend&env=NEXT_PUBLIC_API_URL&envDescription=Origin%20of%20the%20RFP%20Hub%20API%20this%20deployment%20reads%20from&envLink=https://github.com/The-RFP-Hub/the-rfp-hub/blob/main/packages/frontend/README.md&install-command=pnpm%20install%20--frozen-lockfile&build-command=pnpm%20--filter%20%40the-rfp-hub%2Ffrontend...%20build)
+
+> **Why the button sets `install-command`/`build-command`.** Vercel's zero-config default for a
+> `root-directory` project runs this package's own `build` script directly, without building
+> `@the-rfp-hub/standard` and `rfphub-validate` first — and both resolve from a `dist/` that does
+> not exist until something builds them, so the default fails with `Module not found: Can't resolve
+> '@the-rfp-hub/standard'` (reproduced locally). These cannot move to `vercel.json`: that file is
+> also read by the already-deployed project behind `frontend-staging.yml`, so a wrong guess there
+> would change the deployment that is live. The button's parameters only configure the new project.
+
+**B — Copy only this package**, against the npm-published versions of its two workspace
+dependencies (`@the-rfp-hub/standard@^3.0.0`, `rfphub-validate@^0.3.0`+ — see the note below). This
+is the "spin it up separately, as plainly as possible" path, and it is proven mechanically —
+`scripts/frontend-clean-room.mjs` at the repository root does exactly this: copies
+`packages/frontend` on its own, rewrites the two `workspace:*` dependencies to published ranges,
+`npm install`s and `npm run build`s it with no monorepo present, then starts the standalone server
+it produces and requests `/`, `/publishers`, a filtered `/` and every file in `public/`. Read that script's own header
+before running it — it documents both a "published" mode and a "local tarball" mode, and today only
+the tarball mode succeeds (see the note below). That HTTP request is only a fast pre-check, though:
+`DirectoryList` fetches its data from a `useEffect` after hydration, so a build whose client-side
+fetch cannot actually reach the API would still return a 200 shell and pass it. **`--browser`
+is the real proof** — it drives a real headless Chromium through `/` and `/?q=<term>` and waits for
+an opportunity row to actually render from a live request, and is what
+`.github/workflows/external-deploy-smoke.yml` runs on every push touching this package.
+
+> **`rfphub-validate` note.** `packages/frontend/src/lib/validate-client.ts` imports
+> `humanizeIssues` from `rfphub-validate`, which is exported by the package's source but missing
+> from the published `0.3.0` tarball. A patch (`0.3.1`) is queued
+> (`.changeset/validate-humanize-issues-export.md`) but not yet released. Until it is, path B needs
+> a locally built tarball in place of the npm range —
+> `pnpm --filter rfphub-validate build && pnpm --filter rfphub-validate pack` (NOT `npm pack`,
+> which does not rewrite the tarball's own `workspace:*` dependency on `@the-rfp-hub/standard` to a
+> real version) — pointed at with `RFPHUB_VALIDATE_SPEC=<path-to-tgz>`. Once `0.3.1` ships this
+> note, and the env var, go away.
+
+**C — Docker (optional, do this last).** A minimal Dockerfile over `output: "standalone"`: build
+with `npm run build` after an `npm install` with the same dependency rewrite as path B, then run
+the standalone output the same way the clean-room script does — see the next paragraph for the one
+part of that which is not obvious. `COPY public/ ...` **is** needed: this package ships `public/`
+with the icons `src/app/manifest.ts` names, and an image built without it serves a manifest whose
+icons all 404. Watch for pnpm's node_modules symlinks if the image build stage ever touches a
+pnpm-installed tree.
+
+**Running the standalone output, however you built it.** `output: "standalone"` (`next.config.ts`)
+is set, so any of the three paths produces a `.next/standalone` directory containing a `server.js`
+and its own pruned `node_modules`. Two things are easy to miss: neither `.next/static` nor
+`public/` is included in that output — Next's own documentation says so — and both must be copied
+to sit alongside `server.js`, as `<same directory>/.next/static` and `<same directory>/public`; and
+because this package sets `outputFileTracingRoot` to two directories above itself (correct in the
+monorepo, where that is the workspace root), a build from a stand-alone copy nests `server.js` a
+few directories deeper than
+`.next/standalone/server.js` — under whatever path Next computed from that root to the copy. Find
+it (`find .next/standalone -name server.js`) rather than assuming the flat path; the clean-room
+script does exactly that.
 
 ---
 
