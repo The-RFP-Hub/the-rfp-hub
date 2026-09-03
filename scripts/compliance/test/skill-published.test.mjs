@@ -9,8 +9,17 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MAX_TITLE_LEN as SKILL_LIB_MAX_TITLE_LEN } from "../../../skills/funding-search/scripts/lib.mjs";
-import { MAX_TITLE_LEN, PUBLISHED_FILES, SKILL_DIR, checkSkill } from "../checks/skill.mjs";
+import {
+  MAX_TITLE_LEN as SKILL_LIB_MAX_TITLE_LEN,
+  project,
+} from "../../../skills/funding-search/scripts/lib.mjs";
+import {
+  MAX_TITLE_LEN,
+  PROJECTED_ITEM_KEYS,
+  PUBLISHED_FILES,
+  SKILL_DIR,
+  checkSkill,
+} from "../checks/skill.mjs";
 import { Report } from "../report.mjs";
 
 /** Stands in for the real projection: drops every prose field, keeps `title` truncated. */
@@ -48,6 +57,46 @@ const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5"))
 process.stdout.write(JSON.stringify({
   total: page.total,
   items: page.items.map((o) => ({ id: o.id, fundingType: o.fundingType })),
+}));
+`;
+
+/** Rewrites the prose instead of copying it: the instruction literal never appears, the KEY does. */
+const HELPER_TRANSFORMS_PROSE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+const cap = ${MAX_TITLE_LEN};
+const cut = (t) => (t.length <= cap ? t : t.slice(0, cap - 1) + "\u2026");
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({
+    id: o.id,
+    title: cut(o.title ?? ""),
+    summary: (o.summary ?? "").slice(0, 20),
+  })),
+}));
+`;
+
+/** Short, so a length-only bound would call it truncated — but it is not the title at all. */
+const HELPER_REDACTED_TITLE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({ id: o.id, title: "redacted", fundingType: o.fundingType })),
+}));
+`;
+
+/** One character over the cap, with no ellipsis: the off-by-one a `<=` on its own would miss. */
+const HELPER_OFF_BY_ONE_TITLE = `#!/usr/bin/env node
+const base = process.env.RFPHUB_API_BASE;
+const page = await (await fetch(base + "/v1/opportunities?status=open&limit=5")).json();
+process.stdout.write(JSON.stringify({
+  total: page.total,
+  items: page.items.map((o) => ({
+    id: o.id,
+    title: (o.title ?? "").slice(0, ${MAX_TITLE_LEN} + 1),
+    fundingType: o.fundingType,
+  })),
 }));
 `;
 
@@ -207,7 +256,58 @@ describe("checkSkill", () => {
     ]);
   });
 
+  it("fails on rewritten prose that never carries the injection literal", async () => {
+    // The literal is gone; the KEY is not. A substring test alone would call this green.
+    const transformed = fileSet({ helper: HELPER_TRANSFORMS_PROSE });
+    await writeLocal(transformed);
+    served = transformed;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs emits only the keys its projection names",
+    ]);
+  });
+
+  it("fails when the helper replaces the title instead of truncating it", async () => {
+    const redacted = fileSet({ helper: HELPER_REDACTED_TITLE });
+    await writeLocal(redacted);
+    served = redacted;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs bounds the third-party title it keeps",
+    ]);
+  });
+
+  it("fails when the emitted title is one character over the cap", async () => {
+    const off = fileSet({ helper: HELPER_OFF_BY_ONE_TITLE });
+    await writeLocal(off);
+    served = off;
+    const result = await run();
+    expect(result.failed).toEqual([
+      "the published search.mjs bounds the third-party title it keeps",
+    ]);
+  });
+
   it("asserts the cap the skill's own library declares", () => {
     expect(MAX_TITLE_LEN).toBe(SKILL_LIB_MAX_TITLE_LEN);
+  });
+
+  it("pins the allow-list to what the skill's own project() emits", () => {
+    const emitted = Object.keys(
+      project(
+        {
+          id: "x",
+          title: "t",
+          fundingType: "grant",
+          status: "open",
+          ecosystems: ["Ethereum"],
+          operatingOrganizations: [{ name: "Acme" }],
+          applicationUrl: "https://example.org/apply",
+          fundingInfo: { budget: 1 },
+          deadlines: [],
+        },
+        "https://api.example",
+      ),
+    );
+    expect([...emitted].sort()).toEqual([...PROJECTED_ITEM_KEYS].sort());
   });
 });

@@ -51,22 +51,89 @@ export const MAX_TITLE_LEN = 140;
 const TITLE_TAIL = "TITLE-TAIL-MUST-NOT-SURVIVE";
 const HOSTILE_TITLE = `${"A".repeat(400 - TITLE_TAIL.length)}${TITLE_TAIL}`;
 
+/** Mirrors `truncateText` in the skill's lib.mjs: `max - 1` characters, then one ellipsis. */
+const EXPECTED_HOSTILE_TITLE = `${HOSTILE_TITLE.slice(0, MAX_TITLE_LEN - 1)}\u2026`;
+
+/**
+ * The projection's ENTIRE item allow-list, mirroring `project()` in the skill's lib.mjs. Pinned
+ * here rather than imported: this checker judges the PUBLISHED helper, and importing the local lib
+ * would let a local edit redefine what "correct" means. skill-published.test.mjs pins this list to
+ * what the lib's own `project()` really returns, so the two cannot drift apart unnoticed.
+ */
+export const PROJECTED_ITEM_KEYS = Object.freeze([
+  "id",
+  "title",
+  "fundingType",
+  "status",
+  "organization",
+  "ecosystems",
+  "nextDeadlineAt",
+  "awardSummary",
+  "applyUrl",
+]);
+
+/** Publisher prose that must not appear under any key, at any depth, however rewritten. */
+export const FORBIDDEN_PROSE_KEYS = Object.freeze([
+  "summary",
+  "description",
+  "eligibility",
+  "prerequisites",
+  "scopeOfWork",
+  "label",
+]);
+
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 
-/** Whether any object in a JSON value carries a `description` key. */
-export function findDescriptionField(value, path = "$") {
+/** The path of the first key anywhere in a JSON value for which `matches` holds, or null. */
+export function findKey(value, matches, path = "$") {
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      const found = findDescriptionField(value[i], `${path}[${i}]`);
+      const found = findKey(value[i], matches, `${path}[${i}]`);
       if (found) return found;
     }
     return null;
   }
   if (value && typeof value === "object") {
-    if ("description" in value) return `${path}.description`;
+    for (const key of Object.keys(value)) {
+      if (matches(key)) return `${path}.${key}`;
+    }
     for (const [key, v] of Object.entries(value)) {
-      const found = findDescriptionField(v, `${path}.${key}`);
+      const found = findKey(v, matches, `${path}.${key}`);
       if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** Whether any object in a JSON value carries a `description` key. */
+export function findDescriptionField(value, path = "$") {
+  return findKey(value, (key) => key === "description", path);
+}
+
+/**
+ * Structural, not textual: an absent literal only proves the helper did not copy the instruction
+ * VERBATIM. A helper that truncated, re-cased or summarized publisher prose would pass a substring
+ * test while still handing the model third-party instructions. Only "every emitted key is one the
+ * projection names" rules that out.
+ */
+export function projectionShapeProblem(output) {
+  const forbidden = findKey(output, (key) => FORBIDDEN_PROSE_KEYS.includes(key));
+  if (forbidden) return `a publisher prose field survived at ${forbidden}`;
+  const items = output?.items;
+  if (!Array.isArray(items)) {
+    return "the output carries no `items` array, so nothing about the projection is established";
+  }
+  if (items.length === 0) {
+    return "the output carries no items, so the projection was never exercised";
+  }
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return `items[${i}] is not an object`;
+    }
+    const extra = Object.keys(item).filter((key) => !PROJECTED_ITEM_KEYS.includes(key));
+    if (extra.length) {
+      return `items[${i}] carries ${extra.map((k) => JSON.stringify(k)).join(", ")}, outside the projection's allow-list (${PROJECTED_ITEM_KEYS.join(", ")})`;
     }
   }
   return null;
@@ -128,7 +195,7 @@ export async function checkSkill(report, ctx) {
   const c = report.criterion(
     "skill",
     "Agent skill published correctly",
-    "Every file the documented install channels need is on GitHub main with the same sha256 as the audited local copy; the repository's own skill lint passes against that fetched copy; and the fetched search.mjs drops every prose field an injected instruction was planted in (summary, description, eligibility, the organization description, the RFP scope of work, the deadline label), while the one third-party field its projection declares it keeps — title — comes back bounded to the skill's cap rather than whole, and no description field is emitted.",
+    "Every file the documented install channels need is on GitHub main with the same sha256 as the audited local copy; the repository's own skill lint passes against that fetched copy; and the fetched search.mjs, driven against a corpus with an injected instruction in summary, description, eligibility, the organization description, the RFP scope of work and a deadline label, emits only the keys its projection names — no prose key at any depth, and not the instruction itself — while the one third-party field the projection declares it keeps, title, comes back as exactly the truncation the skill documents rather than whole, dropped or rewritten.",
   );
 
   const workspace = await mkdtemp(join(tmpdir(), "compliance-skill-"));
@@ -245,12 +312,21 @@ async function driveHelper(c, ctx, workspace, name, corpus) {
 }
 
 async function runProseInjectionFixture(c, ctx, workspace) {
-  const name = "the published search.mjs emits none of the prose fields carrying an injection";
-  const run = await driveHelper(c, ctx, workspace, name, proseInjectionCorpus());
+  const shapeName = "the published search.mjs emits only the keys its projection names";
+  const literalName =
+    "the published search.mjs emits none of the prose fields carrying an injection";
+  const run = await driveHelper(c, ctx, workspace, shapeName, proseInjectionCorpus());
   if (!run) return;
+  const problem = projectionShapeProblem(run.output);
+  c.expect(
+    !problem,
+    shapeName,
+    `every item carried only allow-listed keys, and none of ${FORBIDDEN_PROSE_KEYS.join(", ")} appeared at any depth`,
+    `${problem} — ${run.stdout.slice(0, 300)}`,
+  );
   c.expect(
     !run.stdout.includes(INJECTION),
-    name,
+    literalName,
     "summary, description, eligibility, the organization description, the RFP scope of work and the deadline label were all dropped",
     `the injected instruction reached the helper's output: ${run.stdout.slice(0, 400)}`,
   );
@@ -258,7 +334,8 @@ async function runProseInjectionFixture(c, ctx, workspace) {
 
 /**
  * The title survives by design, so the question is not whether it appears but whether anything
- * bounds it. A 400-character title ending in a marker answers both halves at once.
+ * bounds it. Asserting the EXACT truncation, not merely a short string: "redacted" is short too,
+ * and a helper that dropped or rewrote the field would otherwise read as bounded.
  */
 async function runTitleBoundFixture(c, ctx, workspace) {
   const name = "the published search.mjs bounds the third-party title it keeps";
@@ -271,14 +348,14 @@ async function runTitleBoundFixture(c, ctx, workspace) {
       `no title came back for the hostile record — the projection is expected to KEEP a bounded title, not drop it: ${run.stdout.slice(0, 400)}`,
     );
   } else {
-    // truncateText spends max - 1 characters and appends one ellipsis, so the cap itself is the
-    // ceiling; + 1 tolerates an implementation that appends instead of replacing.
-    const bounded = title.length <= MAX_TITLE_LEN + 1 && !run.stdout.includes(TITLE_TAIL);
+    const exact = title === EXPECTED_HOSTILE_TITLE;
+    const bounded = title.length <= MAX_TITLE_LEN;
+    const tailGone = !run.stdout.includes(TITLE_TAIL);
     c.expect(
-      bounded,
+      exact && bounded && tailGone,
       name,
-      `a ${HOSTILE_TITLE.length}-character title came back as ${title.length} characters, tail dropped`,
-      `the ${HOSTILE_TITLE.length}-character title came back as ${title.length} characters${run.stdout.includes(TITLE_TAIL) ? ", trailing marker intact" : ""} — the cap of ${MAX_TITLE_LEN} did not apply`,
+      `a ${HOSTILE_TITLE.length}-character title came back as the first ${MAX_TITLE_LEN - 1} characters plus an ellipsis (${title.length} characters), tail dropped`,
+      `the ${HOSTILE_TITLE.length}-character title came back as ${title.length} characters${tailGone ? "" : ", trailing marker intact"} — expected exactly the first ${MAX_TITLE_LEN - 1} characters plus an ellipsis, got ${JSON.stringify(`${title.slice(0, 40)}${title.length > 40 ? "\u2026" : ""}`)}`,
     );
   }
   const found = findDescriptionField(run.output);
