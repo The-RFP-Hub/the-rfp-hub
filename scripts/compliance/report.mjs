@@ -1,16 +1,21 @@
 /**
- * Result collection and rendering for the M2 compliance checker.
+ * Result collection and rendering for the compliance checkers.
  *
- * Five outcomes, and the difference between them is what makes the report signable:
+ * Five check outcomes, and the difference between them is what makes the report signable:
  *
  *   pass  the check was performed against the live deployment and it held
  *   fail  the check was performed and it did not hold — the criterion, and the run, go red
  *   warn  the check held, but something about it should be seen (a certificate near expiry)
- *   skip  the check could NOT be performed here, and why. Never counted as a pass.
+ *   skip  the check could NOT be performed here, and the criterion does not depend on it
  *   info  observed context, asserting nothing (response times, counts, versions)
  *
  * `skip` existing separately from `pass` is the whole point: a sign-off tool that silently
  * downgrades "I could not check this" to "this is fine" is worse than no tool.
+ *
+ * `unmet` is the sixth, and it is the one `skip` cannot express: a check the criterion DOES depend
+ * on that could not be performed (no `--browser`, a local build standing in for a published one).
+ * It renders as a warning and makes the criterion INCOMPLETE, so the run exits non-zero rather than
+ * reporting a requirement it never looked at as green.
  *
  * The same rule applies one level up, where it is easier to lose. A criterion nothing could be
  * checked in is not a criterion that passed, so the RUN has three outcomes rather than two — see
@@ -23,18 +28,26 @@ export const WARN = "warn";
 export const SKIP = "skip";
 export const INFO = "info";
 
-/** Run-level only: no criterion failed, but at least one was never exercised. */
+/** A criterion with an unmet requirement, or a run carrying one. */
 export const INCOMPLETE = "incomplete";
 
 const MARK = { [PASS]: "✓", [FAIL]: "✗", [WARN]: "!", [SKIP]: "-", [INFO]: "i" };
-const COLOR = { [PASS]: 32, [FAIL]: 31, [WARN]: 33, [SKIP]: 90, [INFO]: 36 };
+const COLOR = { [PASS]: 32, [FAIL]: 31, [WARN]: 33, [SKIP]: 90, [INFO]: 36, [INCOMPLETE]: 33 };
+
+/** The label a criterion key wears in the console when a milestone maps it to a contract id. */
+function heading(criterion) {
+  return criterion.contractId ? `${criterion.id} · ${criterion.contractId}` : criterion.id;
+}
 
 /** One completion criterion, and the individual checks performed for it. */
-class Criterion {
-  constructor(id, name, describes) {
+export class Criterion {
+  #unmet = [];
+
+  constructor(id, name, describes, contractId) {
     this.id = id;
     this.name = name;
     this.describes = describes;
+    this.contractId = contractId;
     this.checks = [];
     this.startedAt = performance.now();
     this.elapsedMs = 0;
@@ -61,6 +74,16 @@ class Criterion {
     return this.#add(INFO, name, detail, data);
   }
 
+  /** A REQUIRED check that could not be performed. Renders as a warning; blocks the sign-off. */
+  unmet(name, detail, data) {
+    this.#unmet.push(name);
+    return this.warn(name, detail, data);
+  }
+
+  get unmetChecks() {
+    return [...this.#unmet];
+  }
+
   /** `expect(cond, name, okDetail, failDetail)` — the shape most checks want. */
   expect(condition, name, okDetail, failDetail, data) {
     return condition ? this.pass(name, okDetail, data) : this.fail(name, failDetail, data);
@@ -71,9 +94,10 @@ class Criterion {
     return this;
   }
 
-  /** A criterion is red if any check failed; warnings and skips never redden it on their own. */
+  /** A criterion is red if any check failed; warnings and optional skips never redden it alone. */
   get status() {
     if (this.checks.some((c) => c.status === FAIL)) return FAIL;
+    if (this.#unmet.length > 0) return INCOMPLETE;
     if (this.checks.some((c) => c.status === WARN)) return WARN;
     if (this.checks.every((c) => c.status === SKIP || c.status === INFO)) return SKIP;
     return PASS;
@@ -86,6 +110,13 @@ class Criterion {
   }
 }
 
+/** A write run registers acceptance criteria, not milestone rows: it is never a sign-off. */
+export const ACCEPTANCE_SCOPE = "write acceptance — NOT a deployment sign-off";
+
+export function acceptanceReport(meta) {
+  return new Report({ ...meta, scopeLabel: ACCEPTANCE_SCOPE });
+}
+
 export class Report {
   constructor(meta) {
     this.meta = meta;
@@ -93,21 +124,19 @@ export class Report {
     this.startedAt = new Date().toISOString();
   }
 
+  /**
+   * `id` is always the capability key. The contract id, where a milestone maps one, is looked up
+   * rather than passed: a criterion module must not have to know which milestone is running it.
+   */
   criterion(id, name, describes) {
-    const c = new Criterion(id, name, describes);
+    const c = new Criterion(id, name, describes, this.meta.contractIds?.[id]);
     this.criteria.push(c);
     return c;
   }
 
-  /**
-   * Criteria the run could not exercise at all — every check skipped, or no check ran.
-   *
-   * `Criterion.status` returns SKIP for both, and the second case is the quiet one: a criterion
-   * that recorded nothing satisfies `every()` vacuously, so it looks the same as one that was
-   * deliberately skipped. Neither is a sign-off.
-   */
+  /** Criteria the run could not establish — every check skipped, or a requirement unmet. */
   get notExercised() {
-    return this.criteria.filter((c) => c.status === SKIP);
+    return this.criteria.filter((c) => c.status === SKIP || c.status === INCOMPLETE);
   }
 
   /** Individual checks that could not be performed, across every criterion. */
@@ -120,10 +149,10 @@ export class Report {
    *
    *   pass        every criterion was exercised and held
    *   fail        a criterion was exercised and did not hold
-   *   incomplete  nothing failed, but a criterion was never exercised — so the run does not
-   *               establish the milestone, and must not exit 0 as though it did
+   *   incomplete  nothing failed, but a criterion was never exercised or left a requirement
+   *               unmet — so the run does not establish the milestone, and must not exit 0
    *
-   * A criterion with no criteria at all is FAIL: a report about nothing is not a green report.
+   * A report with no criteria at all is FAIL: a report about nothing is not a green report.
    *
    * Note the level this operates at. A check-level `skip` INSIDE an exercised criterion is
    * legitimate and stays green — a plaintext loopback origin has no transport to verify, and that
@@ -141,16 +170,47 @@ export class Report {
     return this.result === PASS;
   }
 
+  /**
+   * The console header, as a list of lines.
+   *
+   * Built from what the run actually has rather than fixed by position: the M3 and M4 reports used
+   * to rewrite two lines of a fixed header by string replacement, which silently ate a criterion
+   * the day a row was added above.
+   */
+  headerLines() {
+    const m = this.meta;
+    const row = (label, value) => `  ${label.padEnd(17)}${value}`;
+    const out = [m.title ?? "RFP Hub — deployment compliance check"];
+    if (m.milestone) {
+      out.push(
+        row("Milestone", `${m.milestone.toUpperCase()} — contract criteria mapped to checks`),
+      );
+    }
+    if (m.selection) out.push(row("Selection", m.selection));
+    if (m.scopeLabel) out.push(row("Scope", m.scopeLabel));
+    if (m.api) out.push(row("API", m.api));
+    if (m.site) out.push(row("Site", m.site));
+    if (m.exportUrl) out.push(row("Export root", m.exportUrl));
+    if (m.namespace) out.push(row("Namespace", m.namespace));
+    if (m.repoRoot) out.push(row("Repo root", m.repoRoot));
+    out.push(row("Started", this.startedAt));
+    return out;
+  }
+
   toJSON() {
+    const { title, milestone, scopeLabel, selection, contractIds, ...target } = this.meta;
     return {
-      tool: "m2-compliance",
+      tool: "compliance",
       // `ok` stays a boolean for consumers that only ask "is this green"; `result` is the one that
       // distinguishes a run that failed from a run that never got to look.
       ok: this.ok,
       result: this.result,
+      signOff: scopeLabel ? false : this.result === PASS,
+      ...(milestone ? { milestone } : {}),
+      ...(scopeLabel ? { scope: scopeLabel } : {}),
       startedAt: this.startedAt,
       finishedAt: new Date().toISOString(),
-      target: this.meta,
+      target,
       summary: {
         criteria: this.criteria.length,
         failed: this.criteria.filter((c) => c.status === FAIL).length,
@@ -167,11 +227,13 @@ export class Report {
       },
       criteria: this.criteria.map((c) => ({
         id: c.id,
+        ...(c.contractId === undefined ? {} : { contractId: c.contractId }),
         name: c.name,
         describes: c.describes,
         status: c.status,
         elapsedMs: c.elapsedMs,
         tally: c.tally(),
+        ...(c.unmetChecks.length > 0 ? { unmet: c.unmetChecks } : {}),
         checks: c.checks,
       })),
     };
@@ -180,15 +242,10 @@ export class Report {
   render({ color = false } = {}) {
     const esc = "\u001b[";
     const paint = (status, text) => (color ? `${esc}${COLOR[status]}m${text}${esc}0m` : text);
-    const out = [];
-    out.push("RFP Hub — M2 sign-off compliance check");
-    out.push(`  API base URL     ${this.meta.baseUrl}`);
-    out.push(`  Export root URL  ${this.meta.exportUrl}`);
-    out.push(`  Started          ${this.startedAt}`);
-    out.push("");
+    const out = [...this.headerLines(), ""];
 
     for (const c of this.criteria) {
-      const head = `[${c.id}] ${c.name}`;
+      const head = `[${heading(c)}] ${c.name}`;
       out.push(
         `${head} ${".".repeat(Math.max(2, 62 - head.length))} ${paint(c.status, c.status.toUpperCase())}  (${c.elapsedMs} ms)`,
       );
@@ -207,7 +264,7 @@ export class Report {
       const t = c.tally();
       const counts = `${t.pass} pass, ${t.fail} fail, ${t.warn} warn, ${t.skip} skip`;
       out.push(
-        `  ${paint(c.status, c.status.toUpperCase().padEnd(4))}  [${c.id}] ${c.name.padEnd(26)} ${counts}`,
+        `  ${paint(c.status, c.status.toUpperCase().padEnd(10))}  [${heading(c)}] ${c.name.padEnd(26)} ${counts}`,
       );
     }
     out.push("");
@@ -217,10 +274,17 @@ export class Report {
     // signing this off is entitled to see that something was not looked at without opening the JSON.
     const result = this.result;
     const notes = [];
-    if (result === INCOMPLETE) {
+    const never = this.criteria.filter((c) => c.status === SKIP);
+    const unmet = this.criteria.filter((c) => c.status === INCOMPLETE);
+    if (never.length > 0) {
       notes.push(
-        `${this.notExercised.length} criterion(s) never exercised: ${this.notExercised
-          .map((c) => c.id)
+        `${never.length} criterion(s) never exercised: ${never.map((c) => c.id).join(", ")}`,
+      );
+    }
+    if (unmet.length > 0) {
+      notes.push(
+        `${unmet.length} criterion(s) with unmet requirements: ${unmet
+          .map((c) => `${c.id} (${c.unmetChecks.join("; ")})`)
           .join(", ")}`,
       );
     }
@@ -228,10 +292,13 @@ export class Report {
     if (skipped > 0) notes.push(`${skipped} check(s) skipped`);
 
     const label = result === PASS ? "PASS" : result === FAIL ? "FAIL" : "INCOMPLETE";
+    const headline = this.meta.scopeLabel
+      ? `RESULT: SCOPED ${label} — ${this.meta.scopeLabel}`
+      : `RESULT: ${label}`;
     out.push(
       paint(
         result === PASS ? PASS : result === FAIL ? FAIL : WARN,
-        `RESULT: ${label}${notes.length ? ` (${notes.join("; ")})` : ""}`,
+        `${headline}${notes.length ? ` (${notes.join("; ")})` : ""}`,
       ),
     );
     return out.join("\n");

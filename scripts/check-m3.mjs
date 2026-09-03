@@ -49,7 +49,7 @@ import { cleanup } from "./compliance/cleanup.mjs";
 import { normalizeBase } from "./compliance/client.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
 import { parseArgs, refusals } from "./compliance/options.mjs";
-import { Report } from "./compliance/report-m3.mjs";
+import { Report } from "./compliance/report.mjs";
 
 const USAGE = `M3 sign-off compliance checker
 
@@ -124,7 +124,8 @@ async function main() {
   const state = { run: runStamp(), fixtureIds: [] };
 
   const report = new Report({
-    baseUrl: ctx.baseUrl,
+    title: "RFP Hub — M3 sign-off compliance check",
+    api: ctx.baseUrl,
     namespace: ctx.namespace,
     fixturePrefix: `${ctx.namespace}:m3check-${state.run}-`,
     credentialKind: opts.sessionToken ? "session" : "api-key",

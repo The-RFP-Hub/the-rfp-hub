@@ -162,7 +162,8 @@ async function main() {
 
   const ctx = { ...opts };
   const report = new Report({
-    baseUrl: opts.baseUrl,
+    title: "RFP Hub — M2 sign-off compliance check",
+    api: opts.baseUrl,
     exportUrl: opts.exportUrl,
     specVersion: standard.specVersion,
     minTotal: opts.minTotal,

@@ -34,7 +34,7 @@ const build = (...specs) => {
   return report;
 };
 
-describe("m2-compliance run aggregation", () => {
+describe("compliance run aggregation", () => {
   it("A — a criterion in which every check was skipped is not a pass", () => {
     const report = build(["skip", "skip"]);
     expect(report.result).toBe(INCOMPLETE);
@@ -119,5 +119,97 @@ describe("m2-compliance run aggregation", () => {
     expect(report.skippedChecks).toBe(3);
     expect(report.result).toBe(PASS);
     expect(report.render()).toContain("RESULT: PASS (3 check(s) skipped)");
+  });
+});
+
+/**
+ * `unmet()` is the distinction `skip()` deliberately does not draw. `--only frontend` without
+ * `--browser` used to print RESULT: PASS and exit 0 with nine browser checks at WARN, because a
+ * criterion carrying warnings passes. A check the criterion DEPENDS on is a different thing from
+ * one it does not, and only the second may stay green.
+ */
+describe("a required check that could not be performed", () => {
+  it("makes its criterion INCOMPLETE and the run non-green", () => {
+    const report = new Report(meta);
+    const c = report.criterion("frontend", "Reference frontend", "d");
+    c.pass("something real");
+    c.unmet("rendered slugs equal the API's", "needs --browser");
+    c.finish();
+    expect(c.status).toBe(INCOMPLETE);
+    expect(report.result).toBe(INCOMPLETE);
+    expect(report.ok).toBe(false);
+  });
+
+  it("is listed by name, in the headline and in the JSON", () => {
+    const report = new Report(meta);
+    report.criterion("frontend", "Reference frontend", "d").unmet("rendered slugs", "no browser");
+    expect(report.render()).toContain("frontend (rendered slugs)");
+    expect(report.toJSON().criteria[0].unmet).toEqual(["rendered slugs"]);
+  });
+
+  it("a plain warn still passes, and an optional skip still passes", () => {
+    const report = new Report(meta);
+    const c = report.criterion("liveness", "API liveness", "d");
+    c.pass("held");
+    c.warn("TLS certificate lifetime", "only 9 day(s) remaining");
+    c.skip("TLS certificate is valid", "loopback origin, no transport to inspect");
+    c.finish();
+    expect(c.status).toBe("warn");
+    expect(report.result).toBe(PASS);
+  });
+
+  it("a failure still outranks an unmet requirement", () => {
+    const report = new Report(meta);
+    const c = report.criterion("mcp", "MCP server", "d");
+    c.fail("callable", "no");
+    c.unmet("published", "needs the registry");
+    expect(c.status).toBe(FAIL);
+    expect(report.result).toBe(FAIL);
+  });
+});
+
+describe("scoped and mapped runs", () => {
+  it("a scoped run never renders the bare sign-off headline", () => {
+    const report = new Report({
+      ...meta,
+      scopeLabel: "write acceptance — NOT a deployment sign-off",
+    });
+    report.criterion("lifecycle", "Publisher lifecycle", "d").pass("held").finish();
+    const rendered = report.render();
+    expect(rendered).toContain("RESULT: SCOPED PASS");
+    expect(rendered).not.toMatch(/RESULT: PASS/);
+    expect(report.toJSON().signOff).toBe(false);
+  });
+
+  it("an unscoped green run is a sign-off", () => {
+    const report = build(["pass"]);
+    expect(report.toJSON().signOff).toBe(true);
+    expect(report.render()).toContain("RESULT: PASS");
+  });
+
+  it("a milestone stamps the contract id beside the capability key, never over it", () => {
+    const report = new Report({
+      ...meta,
+      milestone: "m3",
+      contractIds: { lifecycle: "M3-1", teardown: null },
+    });
+    report.criterion("lifecycle", "Publisher lifecycle", "d").pass("held").finish();
+    report.criterion("teardown", "Fixture teardown", "d").pass("held").finish();
+    const json = report.toJSON();
+    expect(json.milestone).toBe("m3");
+    expect(json.criteria.map((c) => [c.id, c.contractId])).toEqual([
+      ["lifecycle", "M3-1"],
+      ["teardown", null],
+    ]);
+    expect(report.render()).toContain("[lifecycle · M3-1]");
+    // the presentational half of `meta` never leaks into the target the report says it checked
+    expect(json.target).not.toHaveProperty("contractIds");
+    expect(json.target).not.toHaveProperty("milestone");
+  });
+
+  it("carries no milestone key at all when none was asked for", () => {
+    const json = build(["pass"]).toJSON();
+    expect(json).not.toHaveProperty("milestone");
+    expect(json.criteria[0]).not.toHaveProperty("contractId");
   });
 });
