@@ -1,6 +1,6 @@
 {
   "name": "@the-rfp-hub/api",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "private": true,
   "description": "RFP Hub public /v1/ REST API (Fastify + Postgres) serving the RFP Hub Standard.",
   "license": "MIT",

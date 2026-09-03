@@ -75,3 +75,5 @@ packages/frontend/CLAUDE.md
 # operator correspondence drafted locally (deployment values, provider names). Never a repo
 # artifact: the tree is source-neutral and this file is not.
 /INFRA-REQUEST.local.md
+
+.claude
