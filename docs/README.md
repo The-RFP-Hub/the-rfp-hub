@@ -45,7 +45,7 @@ The marker sits on the info string (` ```sh safe-read `) rather than in a commen
 only form, there is no preceding-comment alternative — so it survives copy-paste into a renderer
 and is greppable.
 
-What `pnpm check:m4` does with that, exactly:
+What `pnpm check:deployment --milestone m4` does with that, exactly:
 
 * **The marker is required in `docs/` and nowhere else.** Every `sh`/`bash` block under this
   directory must carry one of the three; none, or an unrecognized one, is a **hard failure** — a
@@ -61,7 +61,7 @@ What `pnpm check:m4` does with that, exactly:
   exactly what a rename produces.
 * **Absolute links and `safe-read` execution run only online.** `--offline` — what the CI
   `docs-links` job passes — keeps the marker and relative-link walk and drops those two, so CI
-  proves structure and a human running `pnpm check:m4` proves the requests.
+  proves structure and a human running `pnpm check:deployment` proves the requests.
 
 Two rules a `safe-read` block has to hold to, because the checker runs it for real:
 
@@ -72,7 +72,7 @@ Two rules a `safe-read` block has to hold to, because the checker runs it for re
   is a failure — a block that deliberately shows an error response has to swallow it (`|| true`)
   or be marked `no-run` instead.
 
-`scripts/m4-compliance/README.md` documents the runner's exact shape, including the two things it
+`scripts/compliance/README.md` documents the runner's exact shape, including the two things it
 deliberately does not do (`pipefail`, and shimming `jq -e`) and the one gap that leaves open.
 
 ```sh no-run

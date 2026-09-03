@@ -232,9 +232,9 @@ curl -sS https://example.org/robots.txt      # must NOT be "Disallow: /"
 curl -sS https://example.org/sitemap.xml | head -5
 ```
 
-`pnpm check:m4 --site https://example.org --expect-indexable` makes that robots row a **required**
-check rather than an informational one — pass it for production, and leave it off for staging and
-for any copy that is supposed to stay unindexed.
+`pnpm check:deployment --site https://example.org --only frontend --browser --expect-indexable`
+makes that robots row a **required** check rather than an informational one — pass it for
+production, and leave it off for staging and for any copy that is supposed to stay unindexed.
 
 ---
 
@@ -338,30 +338,31 @@ configuration change** — setting the variable on a running host changes nothin
 ### 5.7 Verify
 
 ```sh no-run
-pnpm check:m2 --base-url https://api.example.org --export-url https://data.example.org
+pnpm check:deployment --milestone m2 --api https://api.example.org --export-url https://data.example.org
 ```
 
-`check:m2` is read-only: health and TLS, every operation in the *published* OpenAPI document
+The M2 profile is read-only: health and TLS, every operation in the *published* OpenAPI document
 executed against the *live* service including the strict-`400` negative contract, every served
 document validated against the Standard, and the export's freshness and alias-pair invariant.
 
 ```sh staging-write
-pnpm check:m3 --base-url https://api-staging.example.org --namespace my-org --session-token "$SESSION"
+pnpm accept:writes --milestone m3 --api https://api-staging.example.org --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
 ```
 
-`check:m3` **writes** — the publisher lifecycle, the review queue, the audit trail, duplicate
-detection, source verification, analytics and the staleness job. It refuses to start without
-credentials and a namespace, and refuses a target that does not look like staging unless
-`--allow-production` is passed in those words. Everything it creates is prefixed `m3check-` and is
+`accept:writes --milestone m3` **writes** — the publisher lifecycle, the review queue, the audit
+trail, duplicate detection, source verification, analytics and the staleness job. It refuses to
+start without credentials and a namespace, and refuses any target that is not loopback or on the
+staging allowlist — there is no flag that forces production. A reviewer credential is required so
+the fixtures it creates can be torn down. Everything it creates is prefixed `compliance-` and is
 rejected and unlisted at the end.
 
 ```sh no-run
-pnpm check:m4 --site https://example.org --api https://api.example.org --browser
+pnpm check:deployment --milestone m4 --site https://example.org --api https://api.example.org --browser
 ```
 
-`check:m4` is read-only: its defaults already point at production, and the one case that looks like
-a write — the MCP server's fail-closed submit — runs against a local recording server the checker
-starts itself. It covers the governance documents and their links from the site, the public
+The M4 profile is read-only: its defaults already point at production, and the one case that
+looks like a write — the MCP server's fail-closed submit — runs against a local recording server
+the checker starts itself. It covers the governance documents and their links from the site, the public
 `/publishers` page, the reference frontend's search, filters, paging, detail and both deep-links,
 three responsive viewports, the MCP server being installable and callable, the agent skill, and
 these guides' links and `safe-read` blocks.
@@ -383,18 +384,17 @@ site, the API, npm and the MCP Registry. Offline, the docs criterion still walks
 marker and still resolves every relative link and `#anchor`; what it drops is the absolute-link
 requests and the execution of `safe-read` blocks. Run it as `--only docs --offline` — the
 combination that means what it says — rather than expecting `--offline` alone to make a full run
-network-free. See [`scripts/m4-compliance/README.md`](../scripts/m4-compliance/README.md).
+network-free. See [`scripts/compliance/README.md`](../scripts/compliance/README.md).
 
 ```sh staging-write
 RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
-  pnpm accept:m4 --api https://api-staging.example.org --interactive-approval
+  pnpm accept:writes --milestone m4 --api https://api-staging.example.org --interactive-approval
 ```
 
-`accept:m4` is the write-acceptance counterpart, **staging only** — there is no flag that points it
-at production. It drives the real MCP `submit_opportunity` interlock end to end — preview, an
-out-of-band `rfphub-mcp approve`, commit — and tears its fixture down afterwards. Same refusal
-shape as `check:m3`: no run without both credentials, and no target that does not look like
-staging.
+`accept:writes --milestone m4` is the write-acceptance counterpart, **staging only** — there is no
+flag that points it at production. It drives the real MCP `submit_opportunity` interlock end to
+end — preview, an out-of-band `rfphub-mcp approve`, commit — and tears its fixture down afterwards.
+It is the same guard as the M3 profile — there is no flag that forces production.
 
 `--interactive-approval` is the difference between evidence and a rehearsal. With it, the run
 **pauses** and asks you to run `rfphub-mcp approve <id>` in a second terminal; the report then
@@ -402,6 +402,45 @@ labels the approval `HUMAN`. Without it the checker drives the approval CLI itse
 `SIMULATED (non-interactive)` — honest, and useful in a loop, but it proves the plumbing rather
 than the interlock. **The acceptance report handed to the client must be produced with
 `--interactive-approval`**, and the label in the report is what says so.
+
+#### Milestone criteria → checks
+
+The two M3 numberings **diverge from M3-3 onward**, and both are real evidence. The compliance
+checker's numbering is authoritative for the JSON `contractId`; the e2e numbering is what the
+Playwright report prints. Both appear below, with the divergence stated.
+
+| Milestone | Contract criterion (compliance checker) | `--only` key | tool | Also verified by the e2e suite as |
+|---|---|---|---|---|
+| M2 | M2-1 API liveness | `liveness` | `check:deployment` | — |
+| M2 | M2-2 OpenAPI conformance | `openapi` | `check:deployment` | — |
+| M2 | M2-3 Dataset | `dataset` | `check:deployment` | — |
+| M2 | M2-4 Export freshness | `export` | `check:deployment` | — |
+| M3 | M3-1 Publisher lifecycle | `lifecycle` | `accept:writes` | **M3-1** `lifecycle.spec.ts` |
+| M3 | M3-2 Namespace review queue | `namespace` | `accept:writes` | **M3-2** `write-namespace.spec.ts` |
+| M3 | M3-3 Audit trail | `audit` | `accept:writes` | **M3-4** `provenance-verification.spec.ts` |
+| M3 | M3-4 Duplicate detection | `duplicates` | `accept:writes` | **M3-3** `duplicates.spec.ts` |
+| M3 | M3-5 Source verification & snapshot | `verification` | `accept:writes` | **M3-4** `provenance-verification.spec.ts` |
+| M3 | M3-6 Publisher analytics | `analytics` | `accept:writes` | **M3-5** `dashboard-analytics.spec.ts` |
+| M3 | M3-7 Staleness job | `staleness` | `accept:writes` | **M3-6** `staleness.spec.ts` |
+| M3 | — (hygiene, not a completion criterion) | `teardown` | `accept:writes` | — |
+| M3 | — (no checker criterion) | — | — | **M3-7** `public-browse.spec.ts` |
+| M3 | — (no checker criterion) | — | — | **M3-8** `organization.spec.ts` |
+| M3 | — (no checker criterion) | — | — | **M3-9** `back-links.spec.ts` |
+| M4 | M4-1 Governance published and linked | `governance` | `check:deployment` | — |
+| M4 | M4-2 Public `/publishers` | `publishers` | `check:deployment` | — |
+| M4 | M4-3 Reference frontend | `frontend` | `check:deployment` | **`responsive.spec.ts`** (the touch-target half) |
+| M4 | M4-4 MCP server callable | `mcp` | `check:deployment` | — |
+| M4 | M4-4b MCP server published | `mcp-publication` | `check:deployment` | — |
+| M4 | M4-5 Agent skill published | `skill` | `check:deployment` | — |
+| M4 | M4-6 Handoff documentation | `docs` | `check:deployment` | — |
+| M4 | M4-ACCEPT 3-phase MCP submission | `submission-cycle` | `accept:writes` | — |
+
+> **Why two M3 numberings.** The compliance checker numbers the *seven criteria it can exercise over
+> HTTP*; the Playwright suite numbers the *nine areas a browser has to prove*, and it splits the
+> audit trail and source verification differently (its M3-4 covers both, which the checker keeps
+> apart as M3-3 and M3-5) and adds three areas with no HTTP-only equivalent. Neither numbering is
+> wrong; a report cites the one belonging to the tool that produced it. `criteria[].contractId` in
+> `compliance-report.json` always means the first column.
 
 ---
 
@@ -527,9 +566,9 @@ pass the flag there, and do not claim provenance in a README on a release cut th
 ### 7.6 Prove the `next` tag, then promote
 
 ```sh no-run
-pnpm check:m4 --site https://example.org --api https://api.example.org --browser \
-  --only mcp --mcp-spec next
-npm dist-tag add @the-rfp-hub/mcp@0.1.0 latest        # only after check:m4 is green
+pnpm check:deployment --milestone m4 --site https://example.org --api https://api.example.org --browser \
+  --only mcp,mcp-publication --mcp-spec next
+npm dist-tag add @the-rfp-hub/mcp@0.1.0 latest        # only after the M4 profile is green
 ```
 
 `--mcp-spec next` is what makes the `mcp` check spawn `npx -y @the-rfp-hub/mcp@next` — the
@@ -553,10 +592,11 @@ RFPHUB_STANDARD_SPEC='^3.1.0' RFPHUB_VALIDATE_SPEC='^0.3.1' \
 are only correct while those are the newest published versions. In one change:
 
 * `scripts/frontend-clean-room.mjs` — the two `??` fallbacks, to `^3.1.0` and `^0.3.1`;
-* `.github/workflows/external-deploy-smoke.yml` — its `mode` input defaults to `packed` (build the
-  validator from the checkout) precisely because `published` could not work; flip that default to
-  `published`. Its `standard-spec` / `validate-spec` inputs are empty strings that fall through to
-  the script's own defaults, so the previous bullet is what fixes them;
+* the `clean-room` job in `.github/workflows/ci.yml` — its `clean-room-mode` dispatch input
+  defaults to `packed` (build the validator from the checkout) precisely because `published` could
+  not work; flip that default to `published`. Its `standard-spec` / `validate-spec` inputs are
+  empty strings that fall through to the script's own defaults, so the previous bullet is what
+  fixes them;
 * `packages/frontend/README.md` and [§9](#9-the-frontend-three-ways-to-deploy-a-copy) of this guide
   — delete the local-tarball workaround from both, and the ranges quoted alongside it.
 
@@ -729,7 +769,7 @@ install and filtered build commands, so nothing has to be typed into the project
 ### Path B — copy only the package, install from npm
 
 The most basic possible path, and the one CI proves on every push touching the package
-(`.github/workflows/external-deploy-smoke.yml`, a clean container with no monorepo). Do not do the
+(the `clean-room` job in `.github/workflows/ci.yml`, a clean container with no monorepo). Do not do the
 copy and the rewrite by hand — `scripts/frontend-clean-room.mjs` **is** the procedure, and it is
 the same code the workflow runs:
 

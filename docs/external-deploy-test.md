@@ -275,7 +275,7 @@ The report is published in the repository. Before it is committed:
 Say so, and say it in those words. Two things stand in, and **neither is a substitute** — they are
 narrower, and the report has to declare which evidence it is:
 
-**1. The clean-room CI job** (`.github/workflows/external-deploy-smoke.yml`, whose whole body is
+**1. The `clean-room` job** (in `.github/workflows/ci.yml`, whose whole body is
 an invocation of `scripts/frontend-clean-room.mjs` — `pnpm frontend:clean-room`). A container with
 no monorepo: it copies `packages/frontend` alone, rewrites the two workspace dependencies to
 published ranges or a local tarball, `npm install`, the package's own `npm run build`, finds and
