@@ -1,0 +1,14 @@
+{
+  "name": "rfp-hub",
+  "displayName": "RFP Hub funding search",
+  "description": "Search open Ethereum-ecosystem funding opportunities (grants, hackathons, bounties, accelerators, VC funds, RFPs) through the RFP Hub public API.",
+  "version": "0.1.0",
+  "author": {
+    "name": "The RFP Hub",
+    "url": "https://ethrfps.app"
+  },
+  "license": "MIT",
+  "homepage": "https://ethrfps.app",
+  "repository": "https://github.com/The-RFP-Hub/the-rfp-hub",
+  "skills": ["./"]
+}
