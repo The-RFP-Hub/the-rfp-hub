@@ -135,8 +135,7 @@ export function OpportunityView({
             {" "}
             · run by <UntrustedText value={operator.name} />
           </>
-        ) : null}{" "}
-        · <code>{entry.id}</code>
+        ) : null}
       </p>
 
       {entry.summary ? <UntrustedBlock value={entry.summary} /> : null}
@@ -196,6 +195,9 @@ export function OpportunityView({
        */}
       <details className="card">
         <summary>Machine-readable details (for developers)</summary>
+        <p className="muted footnote">
+          Listing id: <code>{entry.id}</code>
+        </p>
         <p className="muted footnote">
           The Standard&rsquo;s <code>fundingDetails</code> block for a{" "}
           <strong>{entry.fundingType}</strong>, verbatim. It is a different shape for each of the

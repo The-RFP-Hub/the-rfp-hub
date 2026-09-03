@@ -27,7 +27,7 @@ export function formatInstant(value: string | null | undefined): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   const day = formatDay(parsed.toISOString().slice(0, 10));
-  return `${day} ${parsed.toISOString().slice(11, 16)} UTC`;
+  return `${day} ${parsed.getUTCFullYear()}, ${parsed.toISOString().slice(11, 16)} UTC`;
 }
 
 /** An RFC 3339 instant as a plain, human-readable UTC calendar date. */

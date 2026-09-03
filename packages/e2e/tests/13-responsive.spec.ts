@@ -1,6 +1,6 @@
 /**
- * M4 — mobile-responsive evidence for the three public pages: `/`, `/opportunities/{id}` and
- * `/publishers`.
+ * M4 — mobile-responsive evidence for the public directory, opportunity, publisher and explainer
+ * pages.
  *
  * `globals.css` has carried breakpoints and a `(pointer: coarse)` touch-target rule for a while,
  * but nothing ever exercised them in a real browser at a real viewport. All three pages are
@@ -108,8 +108,29 @@ async function expectUsableNav(page: Page, viewport: Viewport): Promise<void> {
 async function expectDirectoryControlsAreTouchable(page: Page): Promise<void> {
   await expectTouchTarget(page.getByLabel("Search", { exact: true }), "the Search box");
   await expectTouchTarget(page.getByLabel("Status", { exact: true }), "the Status select");
-  await expectTouchTarget(page.getByLabel("Organization", { exact: true }), "the Organization box");
   await expectTouchTarget(page.getByRole("button", { name: "Search" }), "the Search button");
+
+  const more = page.locator(".filters-more > summary");
+  await expectTouchTarget(more, "the More filters disclosure");
+  await more.click();
+  await expectTouchTarget(page.getByLabel("Organization", { exact: true }), "the Organization box");
+}
+
+async function expectMobileDirectoryRowsToReflow(page: Page): Promise<void> {
+  const result = await page.locator(".directory-table-scroll").evaluate((element) => {
+    const browser = globalThis as unknown as {
+      getComputedStyle: (target: unknown) => { overflowX: string };
+    };
+    return {
+      fits: element.scrollWidth <= element.clientWidth,
+      overflowX: browser.getComputedStyle(element).overflowX,
+    };
+  });
+  expect(result.fits, "the mobile result list must not require horizontal scrolling").toBe(true);
+  expect(
+    result.overflowX,
+    "the mobile result list must reflow instead of becoming a scroll box",
+  ).toBe("visible");
 }
 
 test.describe("M4 responsive layout", () => {
@@ -118,7 +139,7 @@ test.describe("M4 responsive layout", () => {
   });
 
   for (const viewport of VIEWPORTS) {
-    test(`${viewport.name} — the directory, an entry, and /publishers`, async ({
+    test(`${viewport.name} — the directory, an entry, /publishers, and /how-it-works`, async ({
       browser,
       stack,
       api,
@@ -152,6 +173,7 @@ test.describe("M4 responsive layout", () => {
 
         // Both touch viewports: 768×1024 also runs `isMobile`, so the same rule has to hold there.
         if (viewport.hasTouch) await expectDirectoryControlsAreTouchable(page);
+        if (viewport.width <= 640) await expectMobileDirectoryRowsToReflow(page);
 
         await page.goto(`${stack.urls.frontend}/opportunities/${encodeURIComponent(id)}`);
         // The apply action renders only once the entry's data has loaded, so it doubles as the
@@ -183,6 +205,12 @@ test.describe("M4 responsive layout", () => {
         ).toBeVisible();
         await waitForResourceSettled(page);
         await expectNoHorizontalOverflow(page, "/publishers");
+        await expectUsableNav(page, viewport);
+
+        await page.goto(`${stack.urls.frontend}/how-it-works`);
+        await expect(page.getByRole("heading", { name: "How the Hub works" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Who can do what" })).toBeVisible();
+        await expectNoHorizontalOverflow(page, "/how-it-works");
         await expectUsableNav(page, viewport);
       } finally {
         await context.close();

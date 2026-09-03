@@ -53,7 +53,7 @@ import {
 } from "@heroicons/react/20/solid";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface NavItem {
   href: string;
@@ -196,6 +196,7 @@ export function Chrome({ children }: { children: ReactNode }) {
   const api = useApi();
   const pathname = usePathname() ?? "/";
   const me = session.me.status === "ready" ? session.me.data : null;
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const { confirmNavigation } = useNavigationBlocker();
   // Mount + route changes only. This package deliberately has no polling layer; a mutation made in
   // this tab dispatches the local event below so the count can settle immediately.
@@ -213,12 +214,17 @@ export function Chrome({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
   }, [unread.reload]);
 
+  // A route change is the event: closing the compact menu keeps the destination from inheriting an
+  // expanded header. The pathname is deliberately read only as this effect's invalidation key.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname intentionally closes the menu on navigation
+  useEffect(() => setAccountMenuOpen(false), [pathname]);
+
   return (
     <div className="shell">
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <header className="shell-header">
+      <header className="shell-header" data-account-open={accountMenuOpen ? "true" : "false"}>
         <GuardedLink href="/" className="brand">
           <BrandMark className="brand-mark" />
           <span className="brand-text">
@@ -227,13 +233,27 @@ export function Chrome({ children }: { children: ReactNode }) {
           </span>
         </GuardedLink>
 
-        <nav className="shell-nav" aria-label="Sections">
+        {session.authenticated ? (
+          <button
+            type="button"
+            className="shell-menu-toggle"
+            aria-expanded={accountMenuOpen}
+            aria-controls="account-navigation"
+            onClick={() => setAccountMenuOpen((open) => !open)}
+          >
+            <IconLabel icon={UserCircleIcon}>Account</IconLabel>
+          </button>
+        ) : null}
+
+        <nav className="shell-nav" aria-label="Sections" id="account-navigation">
           <NavGroup items={PUBLIC_NAV} pathname={pathname} me={me} />
           {me ? <NavGroup items={accountNav(me, unreadCount)} pathname={pathname} me={me} /> : null}
           {me ? <NavGroup items={STAFF_NAV} pathname={pathname} me={me} /> : null}
         </nav>
 
-        <div className="shell-session">
+        <div
+          className={`shell-session${session.authenticated ? " shell-session-authenticated" : ""}`}
+        >
           {session.error ? (
             <span className="muted">sign-in unavailable</span>
           ) : !session.ready ? (

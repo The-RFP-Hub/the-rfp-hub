@@ -135,13 +135,13 @@ describe("the visual-system token boundary", () => {
     expect(formCss).toMatch(/\.consequenceLater\s*\{[^}]*border-style:\s*dashed;/s);
   });
 
-  it("marks active filters with ink, weight and a hueless glyph", () => {
+  it("marks active filters with ink, weight and an explicit hueless label", () => {
     const css = readFileSync(stylesheets[0][1], "utf8");
     const controls = css.match(/\.filters \.is-set select,[\s\S]*?\}/)?.[0] ?? "";
     const marker = css.match(/\.filters \.is-set label::after\s*\{[^}]*\}/s)?.[0] ?? "";
     expect(controls).toContain("border-color: var(--ink)");
     expect(controls).toContain("font-weight: 600");
-    expect(marker).toContain('content: " •"');
+    expect(marker).toContain('content: " — active"');
     expect(`${controls}${marker}`).not.toContain("--accent");
   });
 

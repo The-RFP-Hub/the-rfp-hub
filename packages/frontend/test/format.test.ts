@@ -23,7 +23,7 @@ describe("formatDay", () => {
 
 describe("formatInstant", () => {
   it("renders an RFC 3339 instant in UTC", () => {
-    expect(formatInstant("2026-08-14T09:05:00Z")).toBe("14 Aug 09:05 UTC");
+    expect(formatInstant("2026-08-14T09:05:00Z")).toBe("14 Aug 2026, 09:05 UTC");
   });
 
   it("has an honest answer for a missing timestamp", () => {

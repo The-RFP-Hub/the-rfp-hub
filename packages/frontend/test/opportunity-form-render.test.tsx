@@ -874,7 +874,7 @@ describe("drafts and dirty navigation", () => {
       screen.getByText((_, node) =>
         Boolean(
           node?.tagName === "P" &&
-            node.textContent === "Draft saved on this device on 25 Aug 20:50 UTC.",
+            node.textContent === "Draft saved on this device on 25 Aug 2026, 20:50 UTC.",
         ),
       ),
     ).toBeTruthy();
