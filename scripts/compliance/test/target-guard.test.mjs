@@ -5,10 +5,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  EXTRA_ORIGIN_ENV,
   STAGING_ORIGINS,
   allowedOrigins,
-  namesStaging,
   normalizeOrigin,
   targetRefusal,
 } from "../target-guard.mjs";
@@ -34,58 +32,40 @@ describe("normalizeOrigin", () => {
   });
 });
 
-describe("namesStaging", () => {
-  it("wants a whole label, not a substring", () => {
-    expect(namesStaging("staging.example.org")).toBe(true);
-    expect(namesStaging("api-staging.example.org")).toBe(true);
-    expect(namesStaging("staging-api.example.org")).toBe(true);
-    expect(namesStaging("notstagingatall.example.org")).toBe(false);
-  });
-
-  it("a `prod` label vetoes it: saying staging as well does not make it staging", () => {
-    expect(namesStaging("staging.prod.example.org")).toBe(false);
-    expect(namesStaging("production-staging.example.org")).toBe(false);
-  });
-});
-
 describe("allowedOrigins", () => {
-  it("is the project's staging origins by default", () => {
-    expect(allowedOrigins({})).toEqual(STAGING_ORIGINS);
-  });
-
-  it("takes one https, staging-named extra from the environment", () => {
-    expect(allowedOrigins({ [EXTRA_ORIGIN_ENV]: "https://api-staging.example.org" })).toContain(
-      "https://api-staging.example.org",
+  it("is the project's staging origins, and takes nothing that could widen them", () => {
+    expect(allowedOrigins()).toEqual(STAGING_ORIGINS);
+    // The previous design read one extra origin out of a variable, which put "where may live
+    // credentials be sent" in somebody's shell rather than in a reviewed commit. Nothing is read
+    // at run time now: an argument is ignored, and an origin that is not on the list is refused.
+    expect(allowedOrigins({ ANY_VARIABLE: "https://api-staging.example.org" })).toEqual(
+      STAGING_ORIGINS,
+    );
+    expect(targetRefusal("https://api-staging.example.org")).toContain(
+      "not an allowed write target",
     );
   });
 
-  it("will not be extended with production, plaintext, or a host that only sounds like staging", () => {
-    for (const value of [
-      "https://api.ethrfps.app",
-      "http://api-staging.example.org",
-      "https://notstagingatall.example.org",
-      "https://staging.prod.example.org",
-    ]) {
-      expect(allowedOrigins({ [EXTRA_ORIGIN_ENV]: value }), value).toEqual(STAGING_ORIGINS);
-    }
+  it("names editing the constant as the way a fork adds its own staging origin", () => {
+    expect(targetRefusal("https://api-staging.example.org")).toContain("STAGING_ORIGINS");
   });
 });
 
 describe("targetRefusal", () => {
   it("allows loopback, plaintext included: that traffic never leaves the machine", () => {
     for (const api of ["http://localhost:3001", "http://127.0.0.1:3001", "http://[::1]:3001"]) {
-      expect(targetRefusal(api, {}), api).toBeNull();
+      expect(targetRefusal(api), api).toBeNull();
     }
   });
 
   it("allows the allowlisted staging origins", () => {
-    for (const api of STAGING_ORIGINS) expect(targetRefusal(api, {}), api).toBeNull();
+    for (const api of STAGING_ORIGINS) expect(targetRefusal(api), api).toBeNull();
   });
 
   it("names production as production, and offers no way to force it", () => {
-    const reason = targetRefusal("https://api.ethrfps.app", {});
+    const reason = targetRefusal("https://api.ethrfps.app");
     expect(reason).toContain("is PRODUCTION");
-    expect(reason).toContain("There is no flag to force production");
+    expect(reason).toContain("There is no flag and no variable that forces production");
   });
 
   // Every one of these was ACCEPTED by the hostname heuristic this allowlist replaced.
@@ -105,22 +85,22 @@ describe("targetRefusal", () => {
       STAGING_ORIGINS[0].replace("https:", "http:"),
       "ftp://api-staging.ethrfps.app",
     ]) {
-      expect(targetRefusal(api, {}), api).toEqual(expect.any(String));
+      expect(targetRefusal(api), api).toEqual(expect.any(String));
     }
   });
 
   it("resolves the default port rather than reading it as a different origin", () => {
-    expect(targetRefusal("https://api-staging.ethrfps.app:443", {})).toBeNull();
+    expect(targetRefusal("https://api-staging.ethrfps.app:443")).toBeNull();
   });
 
   it("says plainly that it sends live credentials, so plaintext is loopback-only", () => {
-    expect(targetRefusal("http://api-staging.example.org", {})).toContain("live credentials");
+    expect(targetRefusal("http://api-staging.example.org")).toContain("live credentials");
   });
 
   it("refuses remote plaintext, an unparseable target and userinfo", () => {
-    expect(targetRefusal("http://api-staging.example.org", {})).toContain("not https");
-    expect(targetRefusal("not a url", {})).toContain("must be an absolute http(s) URL");
-    expect(targetRefusal("https://a:b@staging.ethrfps.app", {})).toContain("no userinfo");
+    expect(targetRefusal("http://api-staging.example.org")).toContain("not https");
+    expect(targetRefusal("not a url")).toContain("must be an absolute http(s) URL");
+    expect(targetRefusal("https://a:b@staging.ethrfps.app")).toContain("no userinfo");
   });
 });
 
@@ -137,7 +117,7 @@ describe("redirectRefusal", () => {
       }),
     }));
     const { redirectRefusal } = await import("../target-guard.mjs");
-    const reason = await redirectRefusal("https://staging.ethrfps.app", { env: {} });
+    const reason = await redirectRefusal("https://staging.ethrfps.app");
     expect(reason).toContain("redirects to https://api.ethrfps.app");
     expect(reason).toContain("is PRODUCTION");
     vi.doUnmock("../http.mjs");
@@ -155,7 +135,7 @@ describe("redirectRefusal", () => {
       }),
     }));
     const { redirectRefusal } = await import("../target-guard.mjs");
-    expect(await redirectRefusal("https://staging.ethrfps.app", { env: {} })).toContain(
+    expect(await redirectRefusal("https://staging.ethrfps.app")).toContain(
       "redirects more than 5 times",
     );
     vi.doUnmock("../http.mjs");
@@ -169,7 +149,7 @@ describe("redirectRefusal", () => {
       request: async () => ({ ok: true, status: 200 }),
     }));
     const { redirectRefusal } = await import("../target-guard.mjs");
-    expect(await redirectRefusal("https://staging.ethrfps.app", { env: {} })).toBeNull();
+    expect(await redirectRefusal("https://staging.ethrfps.app")).toBeNull();
     vi.doUnmock("../http.mjs");
     vi.resetModules();
   });
