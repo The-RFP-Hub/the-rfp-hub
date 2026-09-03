@@ -221,11 +221,11 @@ describe("8 — every markdown file under skills/ is link-checked", () => {
 
   beforeEach(async () => {
     repoRoot = await mkdtemp(join(tmpdir(), "m4-skills-walk-"));
-    await mkdir(join(repoRoot, "skills/rfp-hub-funding-search/references"), { recursive: true });
+    await mkdir(join(repoRoot, "skills/funding-search/references"), { recursive: true });
     await writeFile(join(repoRoot, "skills/README.md"), "# skills\n");
-    await writeFile(join(repoRoot, "skills/rfp-hub-funding-search/SKILL.md"), "# skill\n");
+    await writeFile(join(repoRoot, "skills/funding-search/SKILL.md"), "# skill\n");
     await writeFile(
-      join(repoRoot, "skills/rfp-hub-funding-search/references/api-reference.md"),
+      join(repoRoot, "skills/funding-search/references/api-reference.md"),
       "# reference\n",
     );
   });
@@ -238,8 +238,8 @@ describe("8 — every markdown file under skills/ is link-checked", () => {
     // The walk took only top-level markdown and each directory's own SKILL.md, so a broken link
     // in `references/api-reference.md` was never looked at.
     const sources = extraLinkSources(repoRoot);
-    expect(sources).toContain("skills/rfp-hub-funding-search/references/api-reference.md");
-    expect(sources).toContain("skills/rfp-hub-funding-search/SKILL.md");
+    expect(sources).toContain("skills/funding-search/references/api-reference.md");
+    expect(sources).toContain("skills/funding-search/SKILL.md");
     expect(sources).toContain("skills/README.md");
   });
 });

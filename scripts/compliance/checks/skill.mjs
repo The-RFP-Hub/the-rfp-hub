@@ -20,7 +20,7 @@ import { requestPublished } from "../retry.mjs";
 
 const execFileAsync = promisify(execFile);
 
-export const SKILL_NAME = "rfp-hub-funding-search";
+export const SKILL_NAME = "funding-search";
 export const SKILL_DIR = `skills/${SKILL_NAME}`;
 const RAW_BASE = "https://raw.githubusercontent.com/The-RFP-Hub/the-rfp-hub/main";
 

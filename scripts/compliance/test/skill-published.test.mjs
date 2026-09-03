@@ -34,8 +34,8 @@ const LINT_FAIL =
 function fileSet({ helper = HELPER_SAFE } = {}) {
   return {
     ".claude-plugin/marketplace.json": '{"name":"rfp-hub"}\n',
-    [`${SKILL_DIR}/SKILL.md`]: "---\nname: rfp-hub-funding-search\n---\n\n# What this is\n",
-    [`${SKILL_DIR}/.claude-plugin/plugin.json`]: '{"name":"rfp-hub-funding-search"}\n',
+    [`${SKILL_DIR}/SKILL.md`]: "---\nname: funding-search\n---\n\n# What this is\n",
+    [`${SKILL_DIR}/.claude-plugin/plugin.json`]: '{"name":"funding-search"}\n',
     [`${SKILL_DIR}/scripts/search.mjs`]: helper,
     [`${SKILL_DIR}/scripts/get.mjs`]: "// get\n",
     [`${SKILL_DIR}/scripts/lib.mjs`]: "// lib\n",
