@@ -52,6 +52,7 @@ env:
   APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL }}
   ECR_REPOSITORY_MAIN: production-rfp-hub
   ECS_CONTAINER: rfp-hub-production
+  API_BASE_URL: https://api.ethrfps.app # canonical (adr/0007), not account-specific
 
 jobs:
   build_image:
@@ -280,8 +281,80 @@ jobs:
         run: |
           rm -f "$RUNNER_TEMP/container-env.json" "$RUNNER_TEMP/task-definition.rendered.json" "$RUNNER_TEMP/task-definition.json"
 
+  # Read-only, no AWS credential — mirrors staging.yml's `smoke` job.
+  smoke:
+    name: Smoke test
+    needs: [deploy-ecs-service]
+    if: |
+      !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Retrying: the load balancer can still be draining the old task here.
+      - name: Wait for /v1/health
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + 120 ))
+          while true; do
+            code="$(curl -sS -o "$RUNNER_TEMP/health.json" -w '%{http_code}' "$API_BASE_URL/v1/health" || echo "000")"
+            db="$(jq -r '.db // empty' "$RUNNER_TEMP/health.json" 2>/dev/null || true)"
+            echo "GET /v1/health -> $code (db: ${db:-?})"
+            if [ "$code" = "200" ] && [ "$db" = "up" ]; then
+              exit 0
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::/v1/health did not report 200 with db: up within 2 minutes."
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Fetch a live opportunity id
+        id: sample
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o "$RUNNER_TEMP/list.json" -w '%{http_code}' "$API_BASE_URL/v1/opportunities?limit=1" || echo "000")"
+          echo "GET /v1/opportunities?limit=1 -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::/v1/opportunities returned $code, expected 200."
+            exit 1
+          fi
+          id="$(jq -r '.items[0].id // empty' "$RUNNER_TEMP/list.json")"
+          if [ -z "$id" ]; then
+            echo "::error::/v1/opportunities?limit=1 returned no items — cannot exercise the per-entry routes."
+            exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      # `/verification` 404s for an entry never checked, a real state — the only route allowed a non-200.
+      - name: Exercise the per-entry read routes
+        env:
+          ID: ${{ steps.sample.outputs.id }}
+        run: |
+          set -euo pipefail
+          fail=0
+          check() {
+            local path="$1"
+            shift
+            local code
+            code="$(curl -sS -o /dev/null -w '%{http_code}' "$API_BASE_URL$path" || echo "000")"
+            echo "GET $path -> $code"
+            for ok in "$@"; do
+              if [ "$code" = "$ok" ]; then
+                return 0
+              fi
+            done
+            echo "::error::GET $path returned $code, expected one of: $*"
+            fail=1
+          }
+          check "/v1/opportunities/$ID" 200
+          check "/v1/opportunities/$ID/duplicates" 200
+          check "/v1/opportunities/$ID/audit" 200
+          check "/v1/opportunities/$ID/verification" 200 404
+          exit "$fail"
+
   notification:
-    needs: [build_image, deploy-ecs-service]
+    needs: [build_image, deploy-ecs-service, smoke]
     if: |
       !failure() && !cancelled()
     runs-on: ubuntu-latest
@@ -301,12 +374,12 @@ jobs:
   # environment, this third-party action's node process included, for no reason other than where the
   # step happened to sit. Here it can read the webhook and nothing else.
   #
-  # `needs:` names both jobs so it still fires when `build_image` fails and `deploy-ecs-service` is
-  # skipped. `status` has to be stated: the action defaults it to THIS job's status, which is a
-  # success — the run that failed is the one upstream.
+  # `needs:` names all three jobs (added `smoke`) so it still fires on any of their failures.
+  # `status` has to be stated: the action defaults it to THIS job's status, a success — the run
+  # that failed is the one upstream.
   failure-notification:
     name: Notify on failure
-    needs: [build_image, deploy-ecs-service]
+    needs: [build_image, deploy-ecs-service, smoke]
     if: failure()
     runs-on: ubuntu-latest
     timeout-minutes: 10
