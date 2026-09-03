@@ -303,7 +303,8 @@ Three more refusals, all decided before a single request is made:
 | Refusal | Why |
 |---|---|
 | no `--namespace`, no publisher credential (`m3`) | A run that quietly performed the criteria it could and reported an acceptance would be worse than no tool. |
-| no reviewer token, no write key (`m4`) | The submission profile drives the MCP server, so those are the two credentials it needs; both may also arrive as `COMPLIANCE_REVIEWER_TOKEN` / `COMPLIANCE_WRITE_KEY`, or under the `RFPHUB_` names the MCP server's own documentation spells. |
+| a key from the other profile in `--only`/`--skip` | The registry knows every write criterion, but the state, the fixture ids and the teardown all follow `--milestone`. `--milestone m4 --only lifecycle` created an M3 fixture that the M4 teardown does not know to remove. |
+| no reviewer token, no write key (`m4`) | The submission profile drives the MCP server, so those are the two credentials it needs; both may also arrive as `COMPLIANCE_REVIEWER_TOKEN` / `COMPLIANCE_WRITE_KEY`, or under the `RFPHUB_` names the MCP server's own documentation spells. Those four variables are read **only** under `--milestone m4`, so one left in a shell cannot outrank an `--admin-token` passed to an m3 run. |
 | the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, an expired `--admin-token`, or a `--reviewer-token` whose account was demoted used to pass every refusal, create fixtures, and only then discover at teardown that it could not remove any of them. |
 | `--keep-fixtures` | Permitted, but it records an **unmet** requirement, so the run reports `INCOMPLETE` rather than exiting 0 with rows left behind. |
 

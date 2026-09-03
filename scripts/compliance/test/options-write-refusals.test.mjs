@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { parseArgs, refusals } from "../accept-options.mjs";
 import { WRITE_MILESTONES } from "../criteria.mjs";
+import { reviewerCredential } from "../reviewer-preflight.mjs";
 
 const complete = {
   milestone: "m3",
@@ -82,6 +83,45 @@ describe("refusals", () => {
 
   it("a milestone whose criteria are not registered is an error, not an empty run", () => {
     expect(check({ ...complete, milestone: "m9" })[0]).toContain('unknown milestone "m9"');
+  });
+});
+
+describe("selecting across profiles", () => {
+  const m3 = {
+    milestone: "m3",
+    api: "https://api-staging.ethrfps.app",
+    namespace: "my-org",
+    sessionToken: "t",
+    adminToken: "a",
+  };
+  const m4 = {
+    milestone: "m4",
+    api: "https://api-staging.ethrfps.app",
+    reviewerToken: "t",
+    writeKey: "rfph_x",
+  };
+
+  it("refuses --only lifecycle under m4, naming the profile it belongs to", () => {
+    const [reason] = check({ ...m4, only: new Set(["lifecycle"]) });
+    expect(reason).toContain("--only lifecycle is not part of the M4 profile");
+    expect(reason).toContain("belongs to m3");
+  });
+
+  it("refuses --only submission-cycle under m3, naming the profile it belongs to", () => {
+    const [reason] = check({ ...m3, only: new Set(["submission-cycle"]) });
+    expect(reason).toContain("--only submission-cycle is not part of the M3 profile");
+    expect(reason).toContain("belongs to m4");
+  });
+
+  it("refuses a cross-profile --skip the same way", () => {
+    expect(check({ ...m4, skip: new Set(["staleness"]) })[0]).toContain(
+      "--skip staleness is not part of the M4 profile",
+    );
+  });
+
+  it("leaves a key from the run's own profile alone", () => {
+    expect(check({ ...m3, only: new Set(["audit"]) })).toEqual([]);
+    expect(check({ ...m4, only: new Set(["submission-cycle"]) })).toEqual([]);
   });
 });
 
@@ -164,16 +204,31 @@ describe("parseArgs", () => {
     expect(flagWins.adminToken).toBe("admin-from-env");
   });
 
+  it("does not read the m4 credential environment on an m3 run", () => {
+    // A token left over from a submission run used to outrank an --admin-token passed by hand, so
+    // an m3 teardown rejected with whichever credential the shell happened to be carrying.
+    const stale = { RFPHUB_REVIEWER_TOKEN: "stale", COMPLIANCE_WRITE_KEY: "rfph_stale" };
+    const m3 = parseArgs(["--milestone", "m3", "--admin-token", "admin-flag"], stale);
+    expect(m3.reviewerToken).toBeUndefined();
+    expect(m3.writeKey).toBeUndefined();
+    expect(reviewerCredential(m3)).toEqual({ token: "admin-flag", flag: "--admin-token" });
+
+    const m4 = parseArgs(["--milestone", "m4"], stale);
+    expect(reviewerCredential(m4)).toEqual({ token: "stale", flag: "--reviewer-token" });
+  });
+
   it("reads the m4 credentials under either name, the COMPLIANCE_ one first", () => {
+    const m4 = ["--milestone", "m4"];
     expect(
-      parseArgs([], { RFPHUB_REVIEWER_TOKEN: "rev", RFPHUB_WRITE_KEY: "rfph_env" }),
+      parseArgs(m4, { RFPHUB_REVIEWER_TOKEN: "rev", RFPHUB_WRITE_KEY: "rfph_env" }),
     ).toMatchObject({ reviewerToken: "rev", writeKey: "rfph_env" });
     expect(
-      parseArgs([], { COMPLIANCE_REVIEWER_TOKEN: "first", RFPHUB_REVIEWER_TOKEN: "second" })
+      parseArgs(m4, { COMPLIANCE_REVIEWER_TOKEN: "first", RFPHUB_REVIEWER_TOKEN: "second" })
         .reviewerToken,
     ).toBe("first");
     expect(
-      parseArgs(["--reviewer-token", "flag"], { RFPHUB_REVIEWER_TOKEN: "env" }).reviewerToken,
+      parseArgs([...m4, "--reviewer-token", "flag"], { RFPHUB_REVIEWER_TOKEN: "env" })
+        .reviewerToken,
     ).toBe("flag");
   });
 

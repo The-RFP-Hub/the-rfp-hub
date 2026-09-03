@@ -140,6 +140,18 @@ async function main() {
   }
 
   const needs = (name) => reachable.some((c) => c.meta.needs.includes(name));
+
+  // Deferred until the selection is known, so a malformed --site cannot refuse a run that never
+  // reads it. Untrimmed, `https://host/` built `https://host//publishers`.
+  if (needs("site")) {
+    try {
+      opts.site = normalizeBase(opts.site, "--site");
+    } catch (err) {
+      process.stderr.write(`${err.message}\n`);
+      return 2;
+    }
+  }
+
   const report = new Report({
     title: "RFP Hub — deployment compliance check",
     milestone: opts.milestone,

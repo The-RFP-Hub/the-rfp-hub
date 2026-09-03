@@ -30,6 +30,8 @@ const CREDENTIAL_ENV = {
   writeKey: ["COMPLIANCE_WRITE_KEY", "RFPHUB_WRITE_KEY"],
 };
 
+const SUBMISSION_CREDENTIALS = new Set(["reviewerToken", "writeKey"]);
+
 /** A slug is the id prefix of everything this run writes, so it is held to the shape ids are. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -155,7 +157,11 @@ export function parseArgs(argv, env = process.env) {
   if (opts.only.size > 0 && opts.skip.size > 0) {
     throw new Error("--only and --skip cannot be combined: --only already says what runs");
   }
+  // The m4 names are read only under the m4 profile: a token left in the environment from an
+  // earlier submission run must not quietly outrank an --admin-token passed to an m3 run.
+  const submission = opts.milestone === "m4";
   for (const [key, variables] of Object.entries(CREDENTIAL_ENV)) {
+    if (!submission && SUBMISSION_CREDENTIALS.has(key)) continue;
     for (const variable of variables) {
       if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
     }
@@ -182,6 +188,7 @@ export function refusals(opts, milestones, env = process.env) {
     );
   }
   if (!opts.api) reasons.push("--api is required");
+  reasons.push(...crossProfileRefusals(opts, milestones));
   if (opts.milestone === "m4") {
     reasons.push(...submissionRefusals(opts));
   } else {
@@ -190,6 +197,28 @@ export function refusals(opts, milestones, env = process.env) {
   if (opts.api) {
     const refusal = targetRefusal(opts.api, env);
     if (refusal) reasons.push(refusal);
+  }
+  return reasons;
+}
+
+/**
+ * The registry validates `--only` against every write criterion, but the state, the fixture ids and
+ * the teardown follow `--milestone`: `--milestone m4 --only lifecycle` wrote an M3 fixture the M4
+ * teardown does not know to remove, and left it on the deployment.
+ */
+function crossProfileRefusals(opts, milestones) {
+  const profile = milestones[opts.milestone];
+  if (!profile) return [];
+  const reasons = [];
+  const owner = (key) =>
+    Object.entries(milestones).find(([, keys]) => keys.includes(key))?.[0] ?? "no profile";
+  for (const flag of ["only", "skip"]) {
+    for (const key of opts[flag] ?? []) {
+      if (profile.includes(key)) continue;
+      reasons.push(
+        `--${flag} ${key} is not part of the ${opts.milestone.toUpperCase()} profile (${profile.join(", ")}) — ${key} belongs to ${owner(key)}, and the fixtures it writes are torn down by that profile's teardown, not this one`,
+      );
+    }
   }
   return reasons;
 }

@@ -13,7 +13,11 @@ import { callJson } from "./client.mjs";
 
 /** The credential the teardown will actually use — the same precedence `cleanup.mjs` applies. */
 export function reviewerCredential(opts) {
-  if (opts.reviewerToken) return { token: opts.reviewerToken, flag: "--reviewer-token" };
+  // Only under m4, whose teardown rejects with this token. Elsewhere an --admin-token names the
+  // reviewer, and a --reviewer-token left over from a submission run must not displace it.
+  if (opts.milestone === "m4" && opts.reviewerToken) {
+    return { token: opts.reviewerToken, flag: "--reviewer-token" };
+  }
   return opts.adminToken
     ? { token: opts.adminToken, flag: "--admin-token" }
     : { token: opts.sessionToken, flag: "--session-token" };
