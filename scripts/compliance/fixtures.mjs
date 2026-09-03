@@ -1,7 +1,7 @@
 /**
  * The documents this checker writes, and the one rule that keeps them findable afterwards.
  *
- * Every id this run creates is `<namespace>:m3check-<run>-<name>`. The `m3check-` prefix is what
+ * Every id this run creates is `<namespace>:compliance-<run>-<name>`. The `compliance-` prefix is what
  * makes a leftover fixture identifiable months later as a compliance artifact rather than a real
  * listing somebody has to investigate, and `<run>` is a UTC timestamp so two runs never collide on
  * a `public_id` and report a `409` as a criterion failure.
@@ -20,7 +20,7 @@ export function runStamp(now = new Date()) {
     .slice(0, 13);
 }
 
-export const FIXTURE_MARKER = "m3check";
+export const FIXTURE_MARKER = "compliance";
 
 export function fixtureId(namespace, run, name) {
   return `${namespace}:${FIXTURE_MARKER}-${run}-${name}`;

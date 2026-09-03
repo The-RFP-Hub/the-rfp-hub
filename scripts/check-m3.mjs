@@ -56,7 +56,7 @@ const USAGE = `M3 sign-off compliance checker
   node scripts/check-m3.mjs --base-url <url> --namespace <slug> (--session-token <t> | --api-key <k>)
 
 THIS TOOL WRITES to the deployment it is pointed at: it submits entries, mints an API key and
-generates analytics traffic. Everything it creates is prefixed \`m3check-\` and is rejected and
+generates analytics traffic. Everything it creates is prefixed \`compliance-\` and is rejected and
 unlisted at the end when a reviewer credential is available.
 
 Required
@@ -128,7 +128,7 @@ async function main() {
     title: "RFP Hub — M3 sign-off compliance check",
     api: ctx.api,
     namespace: ctx.namespace,
-    fixturePrefix: `${ctx.namespace}:m3check-${state.run}-`,
+    fixturePrefix: `${ctx.namespace}:compliance-${state.run}-`,
     credentialKind: opts.sessionToken ? "session" : "api-key",
     adminToken: Boolean(opts.adminToken),
     views: ctx.views,
@@ -136,8 +136,8 @@ async function main() {
   });
 
   try {
-    // Ordered: M3-1 creates the fixture the next five look at, and each of those SKIPS with the
-    // prerequisite as its reason rather than failing for something it never got to test.
+    // Ordered: the lifecycle criterion creates the fixture the next five look at, and each of those
+    // SKIPS with the prerequisite as its reason rather than failing for something it never tested.
     await checkLifecycle(report, ctx, state);
     await checkNamespace(report, ctx, state);
     await checkAudit(report, ctx, state);

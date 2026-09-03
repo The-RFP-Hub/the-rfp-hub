@@ -24,13 +24,13 @@ import { fixtureId, paraphraseOf } from "../fixtures.mjs";
 
 export async function checkDuplicates(report, ctx, state) {
   const c = report.criterion(
-    "M3-4",
+    "duplicates",
     "Duplicate detection",
     "A reworded resubmission surfaces the original to the submitter, and reports honestly when detection did not run.",
   );
 
   if (!state.publishedId || !state.document || !state.writeToken) {
-    c.skip("near-duplicate submission", "criterion M3-1 produced no fixture to duplicate");
+    c.skip("near-duplicate submission", "the lifecycle criterion produced no fixture to duplicate");
     return c.finish();
   }
 

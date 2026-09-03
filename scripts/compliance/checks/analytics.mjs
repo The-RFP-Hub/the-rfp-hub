@@ -24,7 +24,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function checkAnalytics(report, ctx, state) {
   const c = report.criterion(
-    "M3-6",
+    "analytics",
     "Publisher analytics",
     "Real reads and link-outs are counted and served back to the entry's publisher on the same day, before any rollup.",
   );
@@ -33,7 +33,7 @@ export async function checkAnalytics(report, ctx, state) {
   if (!id) {
     c.skip(
       "publisher analytics",
-      "criterion M3-1 did not create a fixture to generate traffic for",
+      "the lifecycle criterion did not create a fixture to generate traffic for",
     );
     return c.finish();
   }

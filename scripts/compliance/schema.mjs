@@ -19,7 +19,7 @@ import addFormats from "ajv-formats";
 import Ajv2020 from "ajv/dist/2020.js";
 
 /** The synthetic identity the served components are registered under, so `$ref`s can be rebased. */
-const OAS_ID = "https://rfphub.local/m2-compliance/openapi.json";
+const OAS_ID = "https://rfphub.local/compliance/openapi.json";
 
 /**
  * Deep-copy the served components, dropping any nested `$id`.

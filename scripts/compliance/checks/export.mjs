@@ -34,7 +34,7 @@ const sha256 = (body) => createHash("sha256").update(body).digest("hex");
 
 export async function checkExport(report, ctx, { standard }) {
   const c = report.criterion(
-    "4",
+    "export",
     "Export freshness",
     `latest.json and latest.csv download, parse, describe the same dataset (and, where a manifest is published, the same verified run), carry a CC0 licence and are no more than ${ctx.freshnessHours}h old.`,
   );

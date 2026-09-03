@@ -15,7 +15,7 @@ const SAMPLES = 3;
 
 export async function checkLiveness(report, ctx) {
   const c = report.criterion(
-    "1",
+    "liveness",
     "API liveness",
     "GET {base}/v1/health answers 200 and healthy, over a valid TLS transport, within a reported time.",
   );

@@ -16,19 +16,19 @@ import { fixtureDocument, fixtureId } from "../fixtures.mjs";
 
 export async function checkNamespace(report, ctx, state) {
   const c = report.criterion(
-    "M3-2",
+    "namespace",
     "Namespace review queue",
     "A submission into a namespace the credential does not hold is accepted, lands pending, and is not publicly readable.",
   );
 
   if (!state.writeToken) {
-    c.skip("out-of-namespace submission", "criterion M3-1 produced no write credential");
+    c.skip("out-of-namespace submission", "the lifecycle criterion produced no write credential");
     return c.finish();
   }
 
   // A namespace nobody holds, derived from the fixture namespace so it is recognisable in a
   // directory listing later and cannot collide with a real organisation's slug.
-  const foreign = `${ctx.namespace}-m3check-foreign`;
+  const foreign = `${ctx.namespace}-compliance-foreign`;
   const id = fixtureId(foreign, state.run, "foreign");
   const document = fixtureDocument({
     id,
@@ -70,7 +70,7 @@ export async function checkNamespace(report, ctx, state) {
     `answered ${publicRead.status ?? publicRead.error} — an unapproved entry must not be readable`,
   );
 
-  const list = await callJson(ctx, "/v1/opportunities?limit=100&q=m3check", {});
+  const list = await callJson(ctx, "/v1/opportunities?limit=100&q=compliance", {});
   if (list.ok && list.status === 200 && Array.isArray(list.json?.items)) {
     c.expect(
       !list.json.items.some((item) => item.id === id),

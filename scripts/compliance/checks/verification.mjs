@@ -24,14 +24,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function checkVerification(report, ctx, state) {
   const c = report.criterion(
-    "M3-5",
+    "verification",
     "Source verification & snapshot",
     "An entry carrying an applicationUrl produces a recorded verification run with a snapshot digest, and the entry's verifiedAgainstSource flag reflects it.",
   );
 
   const id = state.publishedId;
   if (!id) {
-    c.skip("verification run", "criterion M3-1 did not create a fixture to verify");
+    c.skip("verification run", "the lifecycle criterion did not create a fixture to verify");
     return c.finish();
   }
   const path = `/v1/opportunities/${encodeURIComponent(id)}/verification`;

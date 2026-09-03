@@ -19,7 +19,7 @@ import { url, asJson, mapLimit, query, request } from "../http.mjs";
 
 export async function checkDataset(report, ctx, { doc, bundle, standard }) {
   const c = report.criterion(
-    "3",
+    "dataset",
     "Dataset",
     `/v1/stats reports at least ${ctx.minTotal} entries, the list pages consistently, every served document validates against Standard v${standard.specVersion}, and filtered counts agree with the aggregate.`,
   );

@@ -21,7 +21,7 @@ import { callJson } from "./client.mjs";
 
 export async function cleanup(report, ctx, state) {
   const c = report.criterion(
-    "M3-T",
+    "teardown",
     "Fixture teardown",
     "Entries this run created are taken off every public surface, and the credential it minted is revoked. A hygiene criterion rather than a completion criterion — reported at the same level on purpose, so a run that left rows behind in a deployment cannot be green.",
   );
@@ -60,7 +60,7 @@ export async function cleanup(report, ctx, state) {
   if (!reviewer) {
     c.warn(
       "fixtures are taken off the public surface",
-      `no reviewer credential, so ${state.fixtureIds.length} fixture(s) are LEFT IN PLACE and will need rejecting by hand. They are all prefixed \`m3check-\`:\n${state.fixtureIds.map((id) => `  ${id}`).join("\n")}`,
+      `no reviewer credential, so ${state.fixtureIds.length} fixture(s) are LEFT IN PLACE and will need rejecting by hand. They are all prefixed \`compliance-\`:\n${state.fixtureIds.map((id) => `  ${id}`).join("\n")}`,
       { fixtures: state.fixtureIds },
     );
     return c.finish();

@@ -51,7 +51,7 @@ const UNKNOWN_PARAM = "definitely_not_a_documented_parameter";
  * route-shaped: authentication answers before the parameter is read, so nothing about the record
  * is being asked, and a name that says so keeps the request out of anyone's logs as a lookup.
  */
-const ANONYMOUS_PLACEHOLDER = "m2-compliance-anonymous";
+const ANONYMOUS_PLACEHOLDER = "compliance-anonymous";
 
 /** Why a secured operation's strict-query probes are deferred rather than run. See the header. */
 const SECURED_NEGATIVE_REASON =
@@ -59,7 +59,7 @@ const SECURED_NEGATIVE_REASON =
 
 export async function checkOpenApi(report, ctx) {
   const c = report.criterion(
-    "2",
+    "openapi",
     "OpenAPI conformance",
     "Every operation in the PUBLISHED OpenAPI document, executed against the live service and held to its own declared status, media type and response schema — plus the strict-query negative contract.",
   );
@@ -666,7 +666,7 @@ async function exerciseNegatives(c, ctx, bundle, operations, pathValues) {
     const name = secured
       ? `${label} refuses an anonymous caller as documented, for a record that does not exist`
       : `${label} answers 404 for a record that does not exist`;
-    const missing = path.replace(/\{[^}]+\}/g, `m2-compliance:no-such-record-${Date.now()}`);
+    const missing = path.replace(/\{[^}]+\}/g, `compliance:no-such-record-${Date.now()}`);
     const target = url(ctx.api, missing);
     const res = await request(target, { timeoutMs: ctx.timeoutMs });
     if (!res.ok) {

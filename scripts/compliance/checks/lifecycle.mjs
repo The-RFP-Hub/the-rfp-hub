@@ -12,7 +12,7 @@ import { fixtureDocument, fixtureId } from "../fixtures.mjs";
 
 export async function checkLifecycle(report, ctx, state) {
   const c = report.criterion(
-    "M3-1",
+    "lifecycle",
     "Publisher lifecycle",
     "Identity resolves, a scoped key can be minted, and an entry is created and then replaced through the API.",
   );
@@ -62,7 +62,7 @@ export async function checkLifecycle(report, ctx, state) {
     const minted = await callJson(ctx, "/v1/keys", {
       method: "POST",
       token: ctx.sessionToken,
-      body: { name: `m3check ${state.run}`, scopes: ["read", "write", "publish"] },
+      body: { name: `compliance ${state.run}`, scopes: ["read", "write", "publish"] },
     });
     if (minted.ok && (minted.status === 200 || minted.status === 201) && minted.json?.token) {
       state.mintedKeyId = minted.json.key?.id ?? null;
@@ -214,5 +214,5 @@ export async function checkLifecycle(report, ctx, state) {
 export function missingFixture(state) {
   return state.publishedId
     ? null
-    : "criterion M3-1 did not create a fixture, so there is nothing to check this against";
+    : "the lifecycle criterion did not create a fixture, so there is nothing to check this against";
 }

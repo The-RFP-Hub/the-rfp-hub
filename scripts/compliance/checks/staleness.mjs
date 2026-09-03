@@ -19,13 +19,13 @@ import { fixtureDocument, fixtureId } from "../fixtures.mjs";
 
 export async function checkStaleness(report, ctx, state) {
   const c = report.criterion(
-    "M3-7",
+    "staleness",
     "Staleness job",
     "An open entry whose fixed deadline has passed is closed by the job, with the reason and the actor recorded.",
   );
 
   if (!state.writeToken) {
-    c.skip("staleness closure", "criterion M3-1 produced no write credential");
+    c.skip("staleness closure", "the lifecycle criterion produced no write credential");
     return c.finish();
   }
 

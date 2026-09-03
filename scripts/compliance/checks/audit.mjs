@@ -16,14 +16,14 @@ import { callJson } from "../client.mjs";
 
 export async function checkAudit(report, ctx, state) {
   const c = report.criterion(
-    "M3-3",
+    "audit",
     "Audit trail",
     "Every mutation of an entry is recorded with its action, actor and timestamp; the public view is redacted and the owner's is not.",
   );
 
   const id = state.publishedId;
   if (!id) {
-    c.skip("audit trail", "criterion M3-1 did not create a fixture to have a history");
+    c.skip("audit trail", "the lifecycle criterion did not create a fixture to have a history");
     return c.finish();
   }
   const path = `/v1/opportunities/${encodeURIComponent(id)}/audit`;
@@ -55,7 +55,7 @@ export async function checkAudit(report, ctx, state) {
       `the PUT succeeded but no \`update\` row followed it — actions: ${actions.join(", ")}`,
     );
   } else {
-    c.skip("the update is recorded", "the PUT in criterion M3-1 did not succeed");
+    c.skip("the update is recorded", "the PUT in the lifecycle criterion did not succeed");
   }
 
   c.expect(
