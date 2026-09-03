@@ -111,14 +111,14 @@ paths, and the read-only limitation every copy inherits, are in
 
 ```sh no-run
 # 1. multi-agent installer: detects the agents you have and copies the skill into each
-npx skills add The-RFP-Hub/the-rfp-hub --skill rfp-hub-funding-search
+npx skills add The-RFP-Hub/the-rfp-hub --skill funding-search
 
 # 2. Claude Code plugin marketplace
 claude plugin marketplace add The-RFP-Hub/the-rfp-hub
 claude plugin install rfp-hub@rfp-hub
 
 # 3. a plain copy into whichever agent's skill directory applies
-cp -R skills/rfp-hub-funding-search ~/.claude/skills/
+cp -R skills/funding-search ~/.claude/skills/
 ```
 
 Every agent's directory, with the citation for each, is in

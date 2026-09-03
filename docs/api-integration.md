@@ -394,9 +394,9 @@ whoever controls the package the ability to change what a user already installed
 
 ### The agent skill
 
-[`rfp-hub-funding-search`](../skills/rfp-hub-funding-search/SKILL.md) teaches an agent to search the
-Hub without an MCP client. It ships zero-dependency Node helpers — `scripts/search.mjs` (defaulting
-to `status=open`) and `scripts/get.mjs` — which build the query, refuse parameters the API does not
+[`funding-search`](../skills/funding-search/SKILL.md) teaches an agent to search the Hub without an
+MCP client. It ships zero-dependency Node helpers — `scripts/search.mjs` (defaulting to
+`status=open`) and `scripts/get.mjs` — which build the query, refuse parameters the API does not
 declare, and **project** the response down to a small, bounded set of fields before the agent ever
 sees it. That projection is code rather than an instruction in prose, on purpose: by the time a
 rule in a prompt could apply, third-party description text has already reached the model.
