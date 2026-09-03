@@ -74,7 +74,7 @@ test.describe("@dedupe M3-3 detection", () => {
     skipUnlessActor(stack, "publisher", "submitter", "reviewer");
     // EVERY TEST HERE MANUFACTURES A PENDING ROW AS THE SUBMITTER, and an account with no verified
     // membership may have only so many waiting at once (`PENDING_SUBMISSION_LIMIT`). That cap is a
-    // real rule this suite is a heavy user of, and it is asserted deliberately in `lifecycle.spec.ts`; here it
+    // real rule this suite is a heavy user of, and it is asserted deliberately in `04-lifecycle.spec.ts`; here it
     // is only in the way, so the slots are freed the way the product frees them — by a reviewer
     // deciding the oldest ones — rather than by pretending the rule is not there.
     await pendingHeadroom("submitter", 2);
@@ -268,7 +268,7 @@ test.describe("@dedupe M3-3 what a reviewer does with a pair", () => {
     skipUnlessActor(stack, "publisher", "submitter", "reviewer");
     // EVERY TEST HERE MANUFACTURES A PENDING ROW AS THE SUBMITTER, and an account with no verified
     // membership may have only so many waiting at once (`PENDING_SUBMISSION_LIMIT`). That cap is a
-    // real rule this suite is a heavy user of, and it is asserted deliberately in `lifecycle.spec.ts`; here it
+    // real rule this suite is a heavy user of, and it is asserted deliberately in `04-lifecycle.spec.ts`; here it
     // is only in the way, so the slots are freed the way the product frees them — by a reviewer
     // deciding the oldest ones — rather than by pretending the rule is not there.
     await pendingHeadroom("submitter", 2);

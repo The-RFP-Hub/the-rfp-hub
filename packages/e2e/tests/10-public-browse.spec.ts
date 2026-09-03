@@ -1,7 +1,7 @@
 /**
  * The anonymous visitor: the directory, an entry, and the two counters a real reader moves.
  *
- * WHY THIS IS ITS OWN FILE RATHER THAN PART OF `dashboard-analytics.spec.ts`. That file is about
+ * WHY THIS IS ITS OWN FILE RATHER THAN PART OF `08-dashboard-analytics.spec.ts`. That file is about
  * the SIGNED-IN dashboard, and every test in it is gated on a browser session belonging to the
  * publisher (`skipUnlessBrowserSession`). These criteria are the opposite claim — that none of this
  * needs an account — so folding them in would have put them behind a guard that contradicts what

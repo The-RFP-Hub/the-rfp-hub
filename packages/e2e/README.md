@@ -114,12 +114,17 @@ Two fixtures exist because of that:
 An account holding no verified membership anywhere may have at most 5 entries awaiting review — a
 product rule fixed in code, not an environment setting; the sixth is a 409
 `pending_limit_reached`. The `submitter` actor is exactly such an account **and** is the run's
-general-purpose "some other account" — half a dozen specs — `write-namespace`, `duplicates`, `provenance-verification` — use it to
+general-purpose "some other account" — half a dozen specs — `05-write-namespace`, `06-duplicates`, `07-provenance-verification` — use it to
 manufacture a pending entry. Left alone, one of them fails on a rule it never meant to exercise, and
 *which* one depends on execution order.
 
+The numeric prefix on every file in `tests/` is what fixes that order. Playwright runs spec files in
+the alphabetical order of their paths, and with `workers: 1` that order is the run — so a rename
+that drops the prefix silently reshuffles the suite, and the coupling surfaces somewhere else as an
+unrelated `409`.
+
 So those specs call `pendingHeadroom("submitter", …)` before they submit, and the cap itself is
-asserted **once**, in `lifecycle.spec.ts`, against an identity created for it that starts at zero. That is the
+asserted **once**, in `04-lifecycle.spec.ts`, against an identity created for it that starts at zero. That is the
 only place in the run where hitting the limit is the point.
 
 ## The administrator is granted, not configured

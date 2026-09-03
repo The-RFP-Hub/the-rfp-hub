@@ -84,7 +84,7 @@ export interface TestFixtures {
  * `pending_limit_reached` — correctly — and a spec that is about duplicate detection or audit
  * redaction fails on a rule it never meant to exercise.
  *
- * The cap itself is asserted deliberately and in one place (`lifecycle.spec.ts`), against an
+ * The cap itself is asserted deliberately and in one place (`04-lifecycle.spec.ts`), against an
  * identity created for it, so that nothing else in the run has to care what order it ran in.
  */
 export const PENDING_SUBMISSION_LIMIT = 5;

@@ -18,7 +18,7 @@
  * belongs to it (see `skipUnlessBrowserSession`). The OUTSIDER who files into that namespace is
  * `otherPublisher`: it is a genuinely different account, and — being verified in its own
  * namespace — it is exempt from the pending cap, so seeding two submissions here cannot be
- * confused with the cap criterion that `lifecycle.spec.ts` owns.
+ * confused with the cap criterion that `04-lifecycle.spec.ts` owns.
  */
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import {
