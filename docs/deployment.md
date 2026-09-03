@@ -387,8 +387,8 @@ combination that means what it says — rather than expecting `--offline` alone 
 network-free. See [`scripts/compliance/README.md`](../scripts/compliance/README.md).
 
 ```sh staging-write
-COMPLIANCE_SESSION_TOKEN=... COMPLIANCE_ADMIN_TOKEN=... \
-  pnpm accept:writes --milestone m4 --api https://api-staging.example.org --interactive-approval
+COMPLIANCE_REVIEWER_TOKEN=... COMPLIANCE_WRITE_KEY=rfph_... \
+  pnpm accept:writes --milestone m4 --api https://api-staging.ethrfps.app --interactive-approval
 ```
 
 `accept:writes --milestone m4` is the write-acceptance counterpart, **staging only** — there is no
