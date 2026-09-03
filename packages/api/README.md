@@ -595,7 +595,8 @@ Two properties of the job are worth stating plainly:
 
 - **A green run means published AND independently verified**, never merely "ran". After pushing, the
   job polls the public raw URL until it serves the manifest it just published, then runs
-  `node scripts/check-m2.mjs` against the deployment and the published export root. The checker
+  `node scripts/check-deployment.mjs --milestone m2` against the deployment and the published
+  export root. The checker
   re-downloads the files as any consumer would and re-hashes the archives the manifest names; a
   non-zero exit fails the job.
 - **Publishing data never deploys anything.** `ci.yml` and `staging.yml` carry
