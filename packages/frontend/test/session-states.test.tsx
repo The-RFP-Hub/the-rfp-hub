@@ -323,6 +323,27 @@ describe("organization navigation", () => {
     expect(within(navigation).getAllByRole("link")).toHaveLength(11);
     expect(within(navigation).getByRole("link", { name: longName })).toBeTruthy();
   });
+
+  it("lets a signed-in reader reveal account navigation from the compact header", async () => {
+    session.data = { user: { id: "user_1" } };
+    render(
+      <ApiClientProvider value={clientFor(async () => me)}>
+        <Chrome>
+          <p>Publisher workbench</p>
+        </Chrome>
+      </ApiClientProvider>,
+    );
+
+    const toggle = screen.getByRole("button", { name: "Account" });
+    expect(toggle.getAttribute("aria-controls")).toBe("account-navigation");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      (await screen.findByRole("navigation", { name: "Sections" })).querySelectorAll("ul"),
+    ).not.toHaveLength(0);
+  });
 });
 
 /**

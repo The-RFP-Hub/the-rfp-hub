@@ -520,6 +520,26 @@ describe("the directory's filters", () => {
     navigation.push.mockClear();
   });
 
+  it("keeps optional filters collapsed until they are needed", async () => {
+    const { client } = stub();
+    const view = mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const disclosure = screen.getByText("More filters").closest("details");
+    expect(disclosure?.open).toBe(false);
+    expect(screen.queryByRole("link", { name: "Clear filters" })).toBeNull();
+
+    view.unmount();
+    navigation.params = new URLSearchParams("ecosystem=Optimism&sort=postedAt%3Adesc");
+    mount(client, <DirectoryList />);
+    await screen.findByText("Acme Foundation");
+
+    const activeDisclosure = screen.getByText("More filters").closest("details");
+    expect(activeDisclosure?.open).toBe(true);
+    expect(screen.getByText("2 set")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Clear filters" }).getAttribute("href")).toBe("/");
+  });
+
   it("renders what the URL says, so a shared link and a reload both work", async () => {
     navigation.params = new URLSearchParams("q=zk&type=grant&status=closed&ecosystem=Optimism");
     const { client, list } = stub();
@@ -829,16 +849,19 @@ describe("the public opportunity page", () => {
     mount(client, <PublicOpportunity id="acme:round-4" />);
 
     expect(await screen.findByRole("heading", { name: HOSTILE_TITLE })).toBeTruthy();
-    // The identity line: type as a word, status as a badge, the id in mono at the END of it — the
-    // reader's questions in the order they ask them, with the join key last.
+    // The identity line keeps applicant-facing facts only. The join key remains available inside
+    // the developer disclosure rather than competing with status and operator here.
     expect(screen.getByText("Open", { selector: ".badge" }).className).toContain("badge-open");
-    expect(screen.getByText("acme:round-4", { selector: "code" })).toBeTruthy();
+    const listingId = screen.getByText("acme:round-4", { selector: "code" });
+    expect(listingId.closest("details")?.textContent).toContain(
+      "Machine-readable details (for developers)",
+    );
     expect(screen.getByText(/Grants for public-goods infrastructure/)).toBeTruthy();
     expect(screen.getByText("Teams shipping open-source infrastructure.")).toBeTruthy();
 
     // The derived "next deadline" AND the full dates table behind it — two renderings of the
     // same instant, which is why this is an all-query rather than a single one.
-    expect(screen.getAllByText("30 Sep 23:59 UTC")).toHaveLength(2);
+    expect(screen.getAllByText("30 Sep 2099, 23:59 UTC")).toHaveLength(2);
     expect(screen.getByText("application")).toBeTruthy();
 
     // Money: the per-award range and the committed-to-date figure, in the record's own currency.
@@ -927,7 +950,7 @@ describe("the public opportunity page", () => {
     // The verdict is a low-bar anti-spam signal and the badge's own title text says so.
     const badge = screen.getByText("link looks right");
     expect(badge.getAttribute("title")).toMatch(/not a fact-check/);
-    expect(screen.getByText(/last checked 10 Aug 09:00 UTC/)).toBeTruthy();
+    expect(screen.getByText(/last checked 10 Aug 2026, 09:00 UTC/)).toBeTruthy();
     expect(screen.getByText("Submitted with an API key")).toBeTruthy();
     const machineDetails = screen
       .getByText("Machine-readable details (for developers)")

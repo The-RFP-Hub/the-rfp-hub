@@ -474,7 +474,7 @@ describe("the deadline column", () => {
       fixed("2026-09-30T23:59:00Z", "application"),
     ];
     expect(nextFixedDeadline(deadlines, now)?.label).toBe("application");
-    expect(describeDeadline(deadlines, now)).toBe("30 Sep 23:59 UTC");
+    expect(describeDeadline(deadlines, now)).toBe("30 Sep 2026, 23:59 UTC");
   });
 
   it("says rolling rather than inventing a date", () => {
@@ -493,7 +493,7 @@ describe("the deadline column", () => {
 
   it("prefers a fixed date over a rolling entry on a record carrying both", () => {
     const deadlines: Deadline[] = [{ deadlineType: "rolling" }, fixed("2026-09-30T23:59:00Z")];
-    expect(describeDeadline(deadlines, now)).toBe("30 Sep 23:59 UTC");
+    expect(describeDeadline(deadlines, now)).toBe("30 Sep 2026, 23:59 UTC");
   });
 
   it("renders the directory deadline as a calendar date without a time", () => {

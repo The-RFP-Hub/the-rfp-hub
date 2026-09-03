@@ -88,6 +88,30 @@ const FUNDING_TYPE_ICONS: Readonly<Record<FundingType, HeroIcon>> = {
   vc_fund: BuildingOffice2Icon,
 };
 
+/** Optional controls live behind one disclosure, but their active state must remain visible. */
+function advancedFilterCount(selection: DirectorySelection): number {
+  return [
+    selection.ecosystem,
+    selection.category,
+    selection.organization,
+    selection.minAward,
+    selection.maxAward,
+    selection.deadlineAfter,
+    selection.deadlineBefore,
+    selection.ordering === DEFAULT_SELECTION.ordering ? "" : selection.ordering,
+  ].filter((value) => value.trim() !== "").length;
+}
+
+/** Whether "Clear filters" would make a meaningful change, excluding pagination alone. */
+function hasCustomSelection(selection: DirectorySelection): boolean {
+  return (
+    selection.q.trim() !== "" ||
+    selection.fundingType !== DEFAULT_SELECTION.fundingType ||
+    selection.status !== DEFAULT_SELECTION.status ||
+    advancedFilterCount(selection) > 0
+  );
+}
+
 export function DirectoryList() {
   const api = useApi();
   const router = useRouter();
@@ -103,7 +127,11 @@ export function DirectoryList() {
   // WHAT THE READER IS EDITING. Seeded from the URL and re-seeded whenever it changes underneath —
   // which is what makes the controls follow a back button instead of contradicting it.
   const [draft, setDraft] = useState<DirectorySelection>(applied);
-  useEffect(() => setDraft(applied), [applied]);
+  const [advancedOpen, setAdvancedOpen] = useState(() => advancedFilterCount(applied) > 0);
+  useEffect(() => {
+    setDraft(applied);
+    if (advancedFilterCount(applied) > 0) setAdvancedOpen(true);
+  }, [applied]);
 
   const load = useCallback(() => api.directory.list(directoryQuery(applied)), [api, applied]);
   const { state, reload } = useResource(load);
@@ -140,256 +168,279 @@ export function DirectoryList() {
        */}
       <search>
         <form className="filters" onSubmit={search}>
-          <div className={`field${draft.q.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-q">
-              <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
-            </label>
-            <input
-              id="directory-q"
-              type="search"
-              value={draft.q}
-              onChange={(event) => setDraft({ ...draft, q: event.target.value })}
-              placeholder="storage, zk, retrieval…"
-            />
-          </div>
+          <div className="filters-primary">
+            <div className={`field field-search${draft.q.trim() ? " is-set" : ""}`}>
+              <label htmlFor="directory-q">
+                <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
+              </label>
+              <input
+                id="directory-q"
+                type="search"
+                value={draft.q}
+                onChange={(event) => setDraft({ ...draft, q: event.target.value })}
+                placeholder="storage, zk, retrieval…"
+              />
+            </div>
 
-          {/*
-           * A DATALIST, NOT A SELECT. `ecosystems[]` is free text in the Standard — it is whatever a
-           * publisher called their own ecosystem — so a closed list would hide real listings whose
-           * spelling is not in it. This offers the common ones and still accepts anything typed.
-           *
-           * Written assuming the API matches case-insensitively: the live corpus carries both
-           * `Ethereum` and `ethereum`, and `Filecoin` and `filecoin`, so an exact-match filter answers
-           * a reader who typed the wrong case with an empty page about a well-populated ecosystem.
-           */}
-          <div className={`field${draft.ecosystem.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-ecosystem">
-              <IconLabel icon={GlobeAltIcon}>Ecosystem</IconLabel>
-            </label>
-            <input
-              id="directory-ecosystem"
-              list="directory-ecosystems"
-              value={draft.ecosystem}
-              onChange={(event) => setDraft({ ...draft, ecosystem: event.target.value })}
-              placeholder="Any ecosystem"
-            />
-            <datalist id="directory-ecosystems">
-              {SUGGESTED_ECOSYSTEMS.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-          </div>
+            <div className={`field${draft.fundingType ? " is-set" : ""}`}>
+              <label htmlFor="directory-type">
+                <IconLabel icon={BanknotesIcon}>Funding type</IconLabel>
+              </label>
+              <select
+                id="directory-type"
+                value={draft.fundingType}
+                onChange={(event) => commit({ fundingType: event.target.value })}
+              >
+                <option value="">Any type</option>
+                {FUNDING_TYPES.map((value) => (
+                  <option key={value} value={value}>
+                    {fundingTypeLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className={`field${draft.fundingType ? " is-set" : ""}`}>
-            <label htmlFor="directory-type">
-              <IconLabel icon={BanknotesIcon}>Funding type</IconLabel>
-            </label>
-            <select
-              id="directory-type"
-              value={draft.fundingType}
-              onChange={(event) => commit({ fundingType: event.target.value })}
-            >
-              <option value="">Any type</option>
-              {FUNDING_TYPES.map((value) => (
-                <option key={value} value={value}>
-                  {fundingTypeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/*
-           * THE DEFAULT IS VISIBLE. This control opens holding `open` rather than blank, because the
-           * list it is describing is already narrowed to open opportunities — a filter the reader
-           * cannot see is a filter they cannot undo.
-           */}
-          <div className={`field${draft.status ? " is-set" : ""}`}>
-            <label htmlFor="directory-status">
-              <IconLabel icon={SignalIcon}>Status</IconLabel>
-            </label>
-            <select
-              id="directory-status"
-              value={draft.status}
-              onChange={(event) => commit({ status: event.target.value })}
-            >
-              <option value="">Any status</option>
-              {STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {opportunityStatusLabel(value)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="directory-order">
-              <IconLabel icon={ArrowsUpDownIcon}>Order by</IconLabel>
-            </label>
-            <select
-              id="directory-order"
-              value={draft.ordering}
-              onChange={(event) => commit({ ordering: event.target.value as Ordering })}
-            >
-              {ORDERINGS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={`field${draft.category.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-category">
-              <IconLabel icon={TagIcon}>Category</IconLabel>
-            </label>
-            <input
-              id="directory-category"
-              value={draft.category}
-              onChange={(event) => setDraft({ ...draft, category: event.target.value })}
-              placeholder="Any category"
-            />
-          </div>
-
-          {/*
-           * A slug, and the hint says what it matches: the API's `organization` param is wider than
-           * the label suggests — operating AND sponsoring organizations, not only the one in the
-           * "Organization" column. It is also the param a `/publishers` card links here with.
-           */}
-          <div className={`field${draft.organization.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-organization">
-              <IconLabel icon={BuildingOffice2Icon}>Organization</IconLabel>
-            </label>
-            <input
-              id="directory-organization"
-              value={draft.organization}
-              onChange={(event) => setDraft({ ...draft, organization: event.target.value })}
-              placeholder="Organization slug"
-            />
-            <p className="hint">Matches the operating OR the sponsoring organization.</p>
-          </div>
-
-          <div className={`field${draft.minAward.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-min-award">
-              <IconLabel icon={ArrowUpIcon}>Min award/budget</IconLabel>
-            </label>
-            <input
-              id="directory-min-award"
-              type="number"
-              step="any"
-              inputMode="decimal"
-              value={awardInputValue(draft.minAward)}
-              onChange={(event) => setDraft({ ...draft, minAward: event.target.value })}
-              placeholder="No minimum"
-            />
-            <p className="hint">
-              Compares a listing&rsquo;s award amount; one that states only a total program budget
-              (no award range) is compared using that budget instead.
-            </p>
-            {/* The control renders blank for `?minAward=abc`, but the value IS still sent. */}
-            {draft.minAward.trim() && awardInputValue(draft.minAward) !== draft.minAward.trim() ? (
-              <p className="hint">
-                Filtering on the exact value from the link:{" "}
-                <code className="wrap-anywhere">
-                  <UntrustedText value={truncateForDisplay(draft.minAward.trim())} />
-                </code>
-              </p>
-            ) : null}
-          </div>
-
-          <div className={`field${draft.maxAward.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-max-award">
-              <IconLabel icon={ArrowDownIcon}>Max award/budget</IconLabel>
-            </label>
-            <input
-              id="directory-max-award"
-              type="number"
-              step="any"
-              inputMode="decimal"
-              value={awardInputValue(draft.maxAward)}
-              onChange={(event) => setDraft({ ...draft, maxAward: event.target.value })}
-              placeholder="No maximum"
-            />
-            <p className="hint">
-              Compares a listing&rsquo;s award amount; one that states only a total program budget
-              (no award range) is compared using that budget instead.
-            </p>
-            {draft.maxAward.trim() && awardInputValue(draft.maxAward) !== draft.maxAward.trim() ? (
-              <p className="hint">
-                Filtering on the exact value from the link:{" "}
-                <code className="wrap-anywhere">
-                  <UntrustedText value={truncateForDisplay(draft.maxAward.trim())} />
-                </code>
-              </p>
-            ) : null}
-          </div>
-
-          {/*
-           * Both bounds compare against the derived `nextDeadlineAt`. An entry with no upcoming
-           * fixed deadline has a NULL there and is excluded by either — which is why the labels and
-           * hints say "fixed" and "rolling" rather than leaving it implicit.
-           */}
-          <div className={`field${draft.deadlineAfter.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-deadline-after">
-              <IconLabel icon={CalendarDaysIcon}>Next fixed deadline after</IconLabel>
-            </label>
-            <input
-              id="directory-deadline-after"
-              type="date"
-              value={dateInputValue(draft.deadlineAfter)}
-              onChange={(event) => setDraft({ ...draft, deadlineAfter: event.target.value })}
-            />
-            <p className="hint">
-              Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones with no
-              upcoming fixed deadline, are excluded by this filter.
-            </p>
             {/*
-             * A link can carry a full instant, which the picker shows as blank — an ACTIVE filter
-             * looking like no filter. The exact value stays visible as text, and resubmitting the
-             * form untouched still sends it rather than the truncated day.
+             * THE DEFAULT IS VISIBLE. This control opens holding `open` rather than blank, because the
+             * list it is describing is already narrowed to open opportunities — a filter the reader
+             * cannot see is a filter they cannot undo.
              */}
-            {draft.deadlineAfter.trim() &&
-            dateInputValue(draft.deadlineAfter) !== draft.deadlineAfter.trim() ? (
-              <p className="hint">
-                Filtering on the exact value from the link:{" "}
-                <code className="wrap-anywhere">
-                  <UntrustedText value={truncateForDisplay(draft.deadlineAfter.trim())} />
-                </code>
-              </p>
-            ) : null}
+            <div className={`field${draft.status ? " is-set" : ""}`}>
+              <label htmlFor="directory-status">
+                <IconLabel icon={SignalIcon}>Status</IconLabel>
+              </label>
+              <select
+                id="directory-status"
+                value={draft.status}
+                onChange={(event) => commit({ status: event.target.value })}
+              >
+                <option value="">Any status</option>
+                {STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {opportunityStatusLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field field-action">
+              <button type="submit">
+                <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
+              </button>
+            </div>
           </div>
 
-          <div className={`field${draft.deadlineBefore.trim() ? " is-set" : ""}`}>
-            <label htmlFor="directory-deadline-before">
-              <IconLabel icon={CalendarIcon}>Next fixed deadline before</IconLabel>
-            </label>
-            <input
-              id="directory-deadline-before"
-              type="date"
-              value={dateInputValue(draft.deadlineBefore)}
-              onChange={(event) => setDraft({ ...draft, deadlineBefore: event.target.value })}
-            />
-            <p className="hint">
-              Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones with no
-              upcoming fixed deadline, are excluded by this filter.
-            </p>
-            {/* Length-bounded and `UntrustedText`, same as above: a query param has no limit of
-             * its own and this still has to fit the narrowest viewport. */}
-            {draft.deadlineBefore.trim() &&
-            dateInputValue(draft.deadlineBefore) !== draft.deadlineBefore.trim() ? (
-              <p className="hint">
-                Filtering on the exact value from the link:{" "}
-                <code className="wrap-anywhere">
-                  <UntrustedText value={truncateForDisplay(draft.deadlineBefore.trim())} />
-                </code>
-              </p>
-            ) : null}
-          </div>
+          <details
+            className="filters-more"
+            open={advancedOpen}
+            onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <span>More filters</span>
+              <span className="filters-more-summary">
+                {advancedFilterCount(draft) > 0
+                  ? `${advancedFilterCount(draft)} set`
+                  : "Ecosystem, award, deadline & sorting"}
+              </span>
+            </summary>
 
-          <div className="field field-action">
-            <button type="submit">
-              <IconLabel icon={MagnifyingGlassIcon}>Search</IconLabel>
-            </button>
-          </div>
+            <div className="filters-advanced">
+              {/*
+               * A DATALIST, NOT A SELECT. `ecosystems[]` is free text in the Standard — it is whatever a
+               * publisher called their own ecosystem — so a closed list would hide real listings whose
+               * spelling is not in it. This offers the common ones and still accepts anything typed.
+               */}
+              <div className={`field${draft.ecosystem.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-ecosystem">
+                  <IconLabel icon={GlobeAltIcon}>Ecosystem</IconLabel>
+                </label>
+                <input
+                  id="directory-ecosystem"
+                  list="directory-ecosystems"
+                  value={draft.ecosystem}
+                  onChange={(event) => setDraft({ ...draft, ecosystem: event.target.value })}
+                  placeholder="Any ecosystem"
+                />
+                <datalist id="directory-ecosystems">
+                  {SUGGESTED_ECOSYSTEMS.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div className="field">
+                <label htmlFor="directory-order">
+                  <IconLabel icon={ArrowsUpDownIcon}>Order by</IconLabel>
+                </label>
+                <select
+                  id="directory-order"
+                  value={draft.ordering}
+                  onChange={(event) => commit({ ordering: event.target.value as Ordering })}
+                >
+                  {ORDERINGS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={`field${draft.category.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-category">
+                  <IconLabel icon={TagIcon}>Category</IconLabel>
+                </label>
+                <input
+                  id="directory-category"
+                  value={draft.category}
+                  onChange={(event) => setDraft({ ...draft, category: event.target.value })}
+                  placeholder="Any category"
+                />
+              </div>
+
+              {/*
+               * A slug, and the hint says what it matches: the API's `organization` param is wider than
+               * the label suggests — operating AND sponsoring organizations, not only the one in the
+               * "Organization" column. It is also the param a `/publishers` card links here with.
+               */}
+              <div className={`field${draft.organization.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-organization">
+                  <IconLabel icon={BuildingOffice2Icon}>Organization</IconLabel>
+                </label>
+                <input
+                  id="directory-organization"
+                  value={draft.organization}
+                  onChange={(event) => setDraft({ ...draft, organization: event.target.value })}
+                  placeholder="Organization slug"
+                />
+                <p className="hint">Matches the operating OR the sponsoring organization.</p>
+              </div>
+
+              <div className={`field${draft.minAward.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-min-award">
+                  <IconLabel icon={ArrowUpIcon}>Min award/budget</IconLabel>
+                </label>
+                <input
+                  id="directory-min-award"
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={awardInputValue(draft.minAward)}
+                  onChange={(event) => setDraft({ ...draft, minAward: event.target.value })}
+                  placeholder="No minimum"
+                />
+                <p className="hint">
+                  Compares a listing&rsquo;s award amount; one that states only a total program
+                  budget (no award range) is compared using that budget instead.
+                </p>
+                {/* The control renders blank for `?minAward=abc`, but the value IS still sent. */}
+                {draft.minAward.trim() &&
+                awardInputValue(draft.minAward) !== draft.minAward.trim() ? (
+                  <p className="hint">
+                    Filtering on the exact value from the link:{" "}
+                    <code className="wrap-anywhere">
+                      <UntrustedText value={truncateForDisplay(draft.minAward.trim())} />
+                    </code>
+                  </p>
+                ) : null}
+              </div>
+
+              <div className={`field${draft.maxAward.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-max-award">
+                  <IconLabel icon={ArrowDownIcon}>Max award/budget</IconLabel>
+                </label>
+                <input
+                  id="directory-max-award"
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={awardInputValue(draft.maxAward)}
+                  onChange={(event) => setDraft({ ...draft, maxAward: event.target.value })}
+                  placeholder="No maximum"
+                />
+                <p className="hint">
+                  Compares a listing&rsquo;s award amount; one that states only a total program
+                  budget (no award range) is compared using that budget instead.
+                </p>
+                {draft.maxAward.trim() &&
+                awardInputValue(draft.maxAward) !== draft.maxAward.trim() ? (
+                  <p className="hint">
+                    Filtering on the exact value from the link:{" "}
+                    <code className="wrap-anywhere">
+                      <UntrustedText value={truncateForDisplay(draft.maxAward.trim())} />
+                    </code>
+                  </p>
+                ) : null}
+              </div>
+
+              {/*
+               * Both bounds compare against the derived `nextDeadlineAt`. An entry with no upcoming
+               * fixed deadline has a NULL there and is excluded by either — which is why the labels and
+               * hints say "fixed" and "rolling" rather than leaving it implicit.
+               */}
+              <div className={`field${draft.deadlineAfter.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-deadline-after">
+                  <IconLabel icon={CalendarDaysIcon}>Next fixed deadline after</IconLabel>
+                </label>
+                <input
+                  id="directory-deadline-after"
+                  type="date"
+                  value={dateInputValue(draft.deadlineAfter)}
+                  onChange={(event) => setDraft({ ...draft, deadlineAfter: event.target.value })}
+                />
+                <p className="hint">
+                  Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones
+                  with no upcoming fixed deadline, are excluded by this filter.
+                </p>
+                {/*
+                 * A link can carry a full instant, which the picker shows as blank — an ACTIVE filter
+                 * looking like no filter. The exact value stays visible as text, and resubmitting the
+                 * form untouched still sends it rather than the truncated day.
+                 */}
+                {draft.deadlineAfter.trim() &&
+                dateInputValue(draft.deadlineAfter) !== draft.deadlineAfter.trim() ? (
+                  <p className="hint">
+                    Filtering on the exact value from the link:{" "}
+                    <code className="wrap-anywhere">
+                      <UntrustedText value={truncateForDisplay(draft.deadlineAfter.trim())} />
+                    </code>
+                  </p>
+                ) : null}
+              </div>
+
+              <div className={`field${draft.deadlineBefore.trim() ? " is-set" : ""}`}>
+                <label htmlFor="directory-deadline-before">
+                  <IconLabel icon={CalendarIcon}>Next fixed deadline before</IconLabel>
+                </label>
+                <input
+                  id="directory-deadline-before"
+                  type="date"
+                  value={dateInputValue(draft.deadlineBefore)}
+                  onChange={(event) => setDraft({ ...draft, deadlineBefore: event.target.value })}
+                />
+                <p className="hint">
+                  Compares the earliest upcoming fixed deadline. Rolling-only listings, and ones
+                  with no upcoming fixed deadline, are excluded by this filter.
+                </p>
+                {/* Length-bounded and `UntrustedText`, same as above: a query param has no limit of
+                 * its own and this still has to fit the narrowest viewport. */}
+                {draft.deadlineBefore.trim() &&
+                dateInputValue(draft.deadlineBefore) !== draft.deadlineBefore.trim() ? (
+                  <p className="hint">
+                    Filtering on the exact value from the link:{" "}
+                    <code className="wrap-anywhere">
+                      <UntrustedText value={truncateForDisplay(draft.deadlineBefore.trim())} />
+                    </code>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </details>
+
+          {hasCustomSelection(draft) ? (
+            <Link className="filters-clear" href={selectionToHref(DEFAULT_SELECTION)}>
+              Clear filters
+            </Link>
+          ) : null}
         </form>
       </search>
 
@@ -432,8 +483,8 @@ export function DirectoryList() {
                 <EmptyResult applied={applied} page={list.page} />
               ) : (
                 <>
-                  <div className="table-scroll">
-                    <table>
+                  <div className="table-scroll directory-table-scroll">
+                    <table className="directory-table">
                       <thead>
                         <tr>
                           <th scope="col">Opportunity</th>
@@ -618,14 +669,18 @@ export function DirectoryRow({ item }: { item: OpportunitySummary }) {
           </div>
         </div>
       </th>
-      <td className="muted">
+      <td className="muted directory-organization" data-label="Organization">
         <UntrustedText value={operator?.name} />
       </td>
-      <td>{typeLabel}</td>
-      <td>
+      <td className="directory-type" data-label="Type">
+        {typeLabel}
+      </td>
+      <td className="directory-status" data-label="Status">
         <StatusBadge status={item.status} />
       </td>
-      <td className="numeric">{describeDirectoryDeadline(item.deadlines)}</td>
+      <td className="numeric directory-deadline" data-label="Deadline">
+        {describeDirectoryDeadline(item.deadlines)}
+      </td>
     </tr>
   );
 }

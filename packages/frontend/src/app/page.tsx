@@ -31,11 +31,8 @@ export default function DirectoryPage() {
     <section>
       <h1>Funding opportunities</h1>
       <p className="lede">
-        An open, neutral index of funding in the Ethereum ecosystem — grants, hackathons, bounties,
-        RFPs. <strong>Free to read, no account.</strong>
-        <br />
-        We link you to each program&rsquo;s own application page;{" "}
-        <strong>we never take applications ourselves</strong>.
+        Browse grants, hackathons, bounties and RFPs across the Ethereum ecosystem. Free to read;
+        applications stay on each program&rsquo;s own site.
       </p>
 
       <NoScriptNotice />
