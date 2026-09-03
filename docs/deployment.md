@@ -352,9 +352,9 @@ pnpm accept:writes --milestone m3 --api https://api-staging.example.org --namesp
 `accept:writes --milestone m3` **writes** — the publisher lifecycle, the review queue, the audit
 trail, duplicate detection, source verification, analytics and the staleness job. It refuses to
 start without credentials and a namespace, and refuses any target that is not loopback or on the
-staging allowlist — there is no flag that forces production. A reviewer credential is required so
-the fixtures it creates can be torn down. Everything it creates is prefixed `compliance-` and is
-rejected and unlisted at the end.
+staging allowlist — there is no flag that forces production. An admin credential is required so
+the fixtures it creates can be torn down (unless the session token is itself a reviewer's).
+Everything it creates is prefixed `compliance-` and is rejected and unlisted at the end.
 
 ```sh no-run
 pnpm check:deployment --milestone m4 --site https://example.org --api https://api.example.org --browser
@@ -387,7 +387,7 @@ combination that means what it says — rather than expecting `--offline` alone 
 network-free. See [`scripts/compliance/README.md`](../scripts/compliance/README.md).
 
 ```sh staging-write
-RFPHUB_REVIEWER_TOKEN=... RFPHUB_WRITE_KEY=rfph_... \
+COMPLIANCE_SESSION_TOKEN=... COMPLIANCE_ADMIN_TOKEN=... \
   pnpm accept:writes --milestone m4 --api https://api-staging.example.org --interactive-approval
 ```
 
@@ -415,20 +415,20 @@ Playwright report prints. Both appear below, with the divergence stated.
 | M2 | M2-2 OpenAPI conformance | `openapi` | `check:deployment` | — |
 | M2 | M2-3 Dataset | `dataset` | `check:deployment` | — |
 | M2 | M2-4 Export freshness | `export` | `check:deployment` | — |
-| M3 | M3-1 Publisher lifecycle | `lifecycle` | `accept:writes` | **M3-1** `lifecycle.spec.ts` |
-| M3 | M3-2 Namespace review queue | `namespace` | `accept:writes` | **M3-2** `write-namespace.spec.ts` |
-| M3 | M3-3 Audit trail | `audit` | `accept:writes` | **M3-4** `provenance-verification.spec.ts` |
-| M3 | M3-4 Duplicate detection | `duplicates` | `accept:writes` | **M3-3** `duplicates.spec.ts` |
-| M3 | M3-5 Source verification & snapshot | `verification` | `accept:writes` | **M3-4** `provenance-verification.spec.ts` |
-| M3 | M3-6 Publisher analytics | `analytics` | `accept:writes` | **M3-5** `dashboard-analytics.spec.ts` |
-| M3 | M3-7 Staleness job | `staleness` | `accept:writes` | **M3-6** `staleness.spec.ts` |
+| M3 | M3-1 Publisher lifecycle | `lifecycle` | `accept:writes` | **M3-1** `04-lifecycle.spec.ts` |
+| M3 | M3-2 Namespace review queue | `namespace` | `accept:writes` | **M3-2** `05-write-namespace.spec.ts` |
+| M3 | M3-3 Audit trail | `audit` | `accept:writes` | **M3-4** `07-provenance-verification.spec.ts` |
+| M3 | M3-4 Duplicate detection | `duplicates` | `accept:writes` | **M3-3** `06-duplicates.spec.ts` |
+| M3 | M3-5 Source verification & snapshot | `verification` | `accept:writes` | **M3-4** `07-provenance-verification.spec.ts` |
+| M3 | M3-6 Publisher analytics | `analytics` | `accept:writes` | **M3-5** `08-dashboard-analytics.spec.ts` |
+| M3 | M3-7 Staleness job | `staleness` | `accept:writes` | **M3-6** `09-staleness.spec.ts` |
 | M3 | — (hygiene, not a completion criterion) | `teardown` | `accept:writes` | — |
-| M3 | — (no checker criterion) | — | — | **M3-7** `public-browse.spec.ts` |
-| M3 | — (no checker criterion) | — | — | **M3-8** `organization.spec.ts` |
-| M3 | — (no checker criterion) | — | — | **M3-9** `back-links.spec.ts` |
+| M3 | — (no checker criterion) | — | — | **M3-7** `10-public-browse.spec.ts` |
+| M3 | — (no checker criterion) | — | — | **M3-8** `11-organization.spec.ts` |
+| M3 | — (no checker criterion) | — | — | **M3-9** `12-back-links.spec.ts` |
 | M4 | M4-1 Governance published and linked | `governance` | `check:deployment` | — |
 | M4 | M4-2 Public `/publishers` | `publishers` | `check:deployment` | — |
-| M4 | M4-3 Reference frontend | `frontend` | `check:deployment` | **`responsive.spec.ts`** (the touch-target half) |
+| M4 | M4-3 Reference frontend | `frontend` | `check:deployment` | **`13-responsive.spec.ts`** (the touch-target half) |
 | M4 | M4-4 MCP server callable | `mcp` | `check:deployment` | — |
 | M4 | M4-4b MCP server published | `mcp-publication` | `check:deployment` | — |
 | M4 | M4-5 Agent skill published | `skill` | `check:deployment` | — |
@@ -567,7 +567,7 @@ pass the flag there, and do not claim provenance in a README on a release cut th
 
 ```sh no-run
 pnpm check:deployment --milestone m4 --site https://example.org --api https://api.example.org --browser \
-  --only mcp,mcp-publication --mcp-spec next
+  --only mcp --only mcp-publication --mcp-spec next
 npm dist-tag add @the-rfp-hub/mcp@0.1.0 latest        # only after the M4 profile is green
 ```
 
