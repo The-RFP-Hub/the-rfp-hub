@@ -52,7 +52,7 @@ outrank a flag passed by hand.
 |---|---|---|---|---|
 | `--session-token` | `COMPLIANCE_SESSION_TOKEN` | A signed-in session. | Mints the key and drives the session-only surfaces. | Must be a reviewer's session, unless `--admin-token` is given. |
 | `--admin-token` | `COMPLIANCE_ADMIN_TOKEN` | The teardown credential: it rejects and unlists. | Required, unless the session may review. | Same, and optional for the same reason. |
-| `--api-key` | `COMPLIANCE_API_KEY` | An `rfph_` key. | An alternative to the session; session-only criteria then report a skip. | **Required** — write-scoped, never publish-scoped, and the only credential handed to the MCP server. |
+| `--api-key` | `COMPLIANCE_API_KEY` | An `rfph_` key. | An alternative to the session; session-only criteria then report a skip. | **Required** — the only credential handed to the MCP server. Its scope is proven against `GET /v1/me` before the server starts: `write`, and not `publish`. |
 
 A flag wins over its variable, so a leftover value cannot quietly redirect a deliberate run; the
 variables exist because `argv` is world-readable through `ps` and these are live tokens.
@@ -326,7 +326,8 @@ The rule this replaced asked whether any hostname segment read like a non-produc
 which admits `not-staging-anymore.example.org`, `production-staging.example.org` and any CNAME
 whoever controls DNS points wherever they like. Hostname text cannot prove which deployment answers.
 
-Three more refusals, all decided before a single request is made:
+The remaining refusals. Most are decided before a single request is made; the two that ask the
+deployment a question cost one `GET /v1/me` each, and both happen before anything is created:
 
 | Refusal | Why |
 |---|---|
@@ -334,6 +335,7 @@ Three more refusals, all decided before a single request is made:
 | a key from the other profile in `--only`/`--skip` | The registry knows every write criterion, but the state, the fixture ids and the teardown all follow `--milestone`. `--milestone m4 --only lifecycle` created an M3 fixture that the M4 teardown does not know to remove. |
 | no `--api-key`, no reviewer credential (`m4`) | The submission profile hands the MCP server one write-scoped `rfph_` key, and tears the entry down with the same reviewer credential every profile uses. |
 | the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, or an expired `--admin-token`, used to pass every refusal, create fixtures, and only then discover at teardown that it could not remove any of them. |
+| the `--api-key` is scoped wrong (`m4`) | Presence of a key is not the scope to submit with, and the same `GET /v1/me` reports it. A key carrying `publish` would publish the fixture outright, so `pending` would hold against an entry that never was pending — the profile's central assertion, passing for the wrong reason, with the teardown then rejecting a live listing. A key without `write` fails three phases in, after the run has already reported what it was exercising. Both refuse by name, before the MCP server is spawned; a key the deployment answers `401` for is refused there too. |
 | `--keep-fixtures` | Permitted, but it records an **unmet** requirement, so the run reports `INCOMPLETE` rather than exiting 0 with rows left behind. |
 
 Everything a write run creates is named `<namespace>:compliance-<runstamp>-<what>`, so a leftover

@@ -29,6 +29,7 @@ import {
   selectionRefusals,
 } from "./compliance/criteria.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
+import { keyScopeRefusal } from "./compliance/key-preflight.mjs";
 import { keyList, selectionLine } from "./compliance/options.mjs";
 import { acceptanceReport } from "./compliance/report.mjs";
 import { reviewerCredential, reviewerRefusal } from "./compliance/reviewer-preflight.mjs";
@@ -155,6 +156,17 @@ async function main() {
   ).catch((err) => `${reviewer.flag} could not be checked — ${err?.message ?? err}`);
   if (notAReviewer) {
     process.stderr.write(`accept-writes refuses to run:\n  • ${notAReviewer}\n`);
+    return 2;
+  }
+
+  // Same reasoning one step further: presence of a key is not the scope to submit with. A
+  // publish-scoped key would make the profile's central assertion hold against an entry that was
+  // never pending, which is worse than failing.
+  const badScope = await keyScopeRefusal({ api: opts.api, timeoutMs: opts.timeoutMs }, opts).catch(
+    (err) => `--api-key could not be checked — ${err?.message ?? err}`,
+  );
+  if (badScope) {
+    process.stderr.write(`accept-writes refuses to run:\n  • ${badScope}\n`);
     return 2;
   }
 
