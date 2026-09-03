@@ -34,7 +34,7 @@ import {
   selectionRefusals,
 } from "./compliance/criteria.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
-import { selectionLine } from "./compliance/options.mjs";
+import { keyList, selectionLine } from "./compliance/options.mjs";
 import { acceptanceReport } from "./compliance/report.mjs";
 import { EXTRA_ORIGIN_ENV, STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
 
@@ -48,9 +48,11 @@ THIS TOOL WRITES to the deployment it is pointed at. Everything it creates is pr
 "write acceptance — NOT a deployment sign-off", and signOff is always false.
 
 Target guard — there is no flag that forces production
-  Loopback, or https to ${STAGING_ORIGINS.join(" / ")}, or one extra https origin whose hostname
-  carries a "staging" label and no "prod" label, named by ${EXTRA_ORIGIN_ENV}. The redirect chain
-  the target answers with is re-checked to 5 hops and must also end inside the allowlist.
+  Loopback, or https to one of
+${STAGING_ORIGINS.map((origin) => `    ${origin}`).join("\n")}
+  or one extra https origin whose hostname carries a "staging" label and no "prod" label, named by
+  ${EXTRA_ORIGIN_ENV}. The redirect chain the target answers with is re-checked
+  to 5 hops and must also end inside the allowlist.
 
 Required
   --milestone <id>        Which acceptance profile to run. Known here: ${Object.keys(WRITE_MILESTONES).join(", ")}.
@@ -69,7 +71,7 @@ Options
                           had no fixture to read. Refused together with --skip.
   --skip <key>            Repeatable. Registers the criterion as unmet, which makes the run
                           INCOMPLETE. Refused if a selected criterion depends on it.
-                          Keys: ${criterionKeys(WRITE_CRITERIA).join(" ")}
+                          Keys: ${keyList(criterionKeys(WRITE_CRITERIA))}
   --application-url <url> The applicationUrl the fixtures carry. Defaults to the deployment's own
                           /v1/docs, which is always reachable; point it at a real HTML page to
                           exercise the verification snapshot digest end to end.

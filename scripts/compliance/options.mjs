@@ -45,6 +45,17 @@ export function normalizeMcpSpec(raw) {
   throw new Error(`--mcp-spec must be ${MCP_SPEC_HELP}, got "${value}"`);
 }
 
+/** Criterion keys wrapped under a `--help` flag column, so the block stays readable as they grow. */
+export function keyList(keys, width = 60, indent = " ".repeat(32)) {
+  const lines = [];
+  for (const key of keys) {
+    const last = lines.length - 1;
+    if (last >= 0 && `${lines[last]}, ${key}`.length <= width) lines[last] += `, ${key}`;
+    else lines.push(key);
+  }
+  return lines.join(`,\n${indent}`);
+}
+
 /** A unique path per run: two runs writing the same file in a shared checkout race each other. */
 export function defaultReportPath(prefix, now = new Date()) {
   const stamp = now.toISOString().replace(/[:.]/g, "-");

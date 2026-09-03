@@ -26,7 +26,13 @@ import {
   selectionRefusals,
 } from "./compliance/criteria.mjs";
 import { normalizeBase } from "./compliance/http.mjs";
-import { describeScope, parseArgs, refusals, selectionLine } from "./compliance/options.mjs";
+import {
+  describeScope,
+  keyList,
+  parseArgs,
+  refusals,
+  selectionLine,
+} from "./compliance/options.mjs";
 import { Report } from "./compliance/report.mjs";
 import { loadStandardValidator } from "./compliance/schema.mjs";
 
@@ -42,7 +48,7 @@ Selection
                           scoped run is a clean pass. A hard prerequisite is added and announced.
   --skip <key>            Repeatable. Registers the criterion as unmet, which makes the run
                           INCOMPLETE. Refused together with --only.
-                          Keys: ${criterionKeys(READ_CRITERIA).join(" ")}
+                          Keys: ${keyList(criterionKeys(READ_CRITERIA))}
   (nothing)               Every registered read criterion runs, under its capability key.
 
 Targets
