@@ -9,12 +9,15 @@
  * Usage:
  *   node scripts/accept-writes.mjs --milestone m3 --api https://api-staging.example.org \
  *     --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
+ *   node scripts/accept-writes.mjs --milestone m4 --api https://api-staging.example.org \
+ *     --session-token "$REVIEWER_SESSION" --api-key "$RFPH_KEY"
  *
  * Exit codes: 0 every selected criterion exercised and held · 1 a criterion failed, or a required
  * check was never exercised · 2 the run could not be made.
  */
 import { writeFileSync } from "node:fs";
 import { parseArgs, refusals } from "./compliance/accept-options.mjs";
+import { runToken } from "./compliance/accept/flow.mjs";
 import { normalizeBase } from "./compliance/client.mjs";
 import {
   TEARDOWN,
@@ -26,10 +29,11 @@ import {
   selectionRefusals,
 } from "./compliance/criteria.mjs";
 import { runStamp } from "./compliance/fixtures.mjs";
+import { keyScopeRefusal } from "./compliance/key-preflight.mjs";
 import { keyList, selectionLine } from "./compliance/options.mjs";
 import { acceptanceReport } from "./compliance/report.mjs";
 import { reviewerCredential, reviewerRefusal } from "./compliance/reviewer-preflight.mjs";
-import { EXTRA_ORIGIN_ENV, STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
+import { STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
 
 const USAGE = `RFP Hub — write acceptance (staging only)
 
@@ -40,16 +44,18 @@ THIS TOOL WRITES to the deployment it is pointed at. Everything it creates is pr
 \`compliance-\` and is rejected and unlisted at the end. The report is labeled
 "write acceptance — NOT a deployment sign-off", and signOff is always false.
 
-Target guard — there is no flag that forces production
+Target guard — nothing forces production: no flag, and no variable
   Loopback, or https to one of
 ${STAGING_ORIGINS.map((origin) => `    ${origin}`).join("\n")}
-  or one extra https origin whose hostname carries a "staging" label and no "prod" label, named by
-  ${EXTRA_ORIGIN_ENV}. The redirect chain the target answers with is re-checked
-  to 5 hops and must also end inside the allowlist.
+  The redirect chain the target answers with is re-checked to 5 hops and must also end inside the
+  allowlist. A fork adds its own staging origin by editing STAGING_ORIGINS in
+  scripts/compliance/target-guard.mjs.
 
-Required
+Required, every profile
   --milestone <id>        Which acceptance profile to run. Known here: ${Object.keys(WRITE_MILESTONES).join(", ")}.
   --api <url>             Origin of the deployed /v1/ API. --base-url is an accepted alias.
+
+Required, --milestone m3 (the publisher write chain)
   --namespace <slug>      The namespace fixtures are created in. Lowercase, hyphenated.
   --session-token <token> A signed-in session. Needed for key minting and for the session-only
                           surfaces; strongly preferred over --api-key.
@@ -57,6 +63,25 @@ Required
                           report a skip rather than a pass.
   --admin-token <token>   An administrator session, unless --session-token is itself a reviewer.
                           Required: the teardown rejects and unlists with it.
+
+Required, --milestone m4 (the real 3-phase MCP submission interlock)
+  --api-key <key>         A write-scoped \`rfph_\` key — write only, never publish, so the fixture
+                          lands pending by construction, which is what this profile proves. It is
+                          the only credential handed to the MCP server.
+  --session-token <token> A signed-in session whose account may review: the teardown rejects and
+                          unlists the entry this run submits, unless --admin-token is given.
+  --admin-token <token>   An administrator session, unless --session-token is itself a reviewer.
+
+Options, --milestone m4
+  --repo-root <path>      Repo checkout, for resolving packages/mcp/dist/cli.js. Default: cwd.
+  --mcp-spec <spec>       npm version for npx (default "next" — the real registry package). Pass
+                          "local" for packages/mcp/dist/cli.js, to drive a pre-publish build.
+  --interactive-approval  Pause at phase 2 and print the exact \`rfphub-mcp approve <id>\` command
+                          for a HUMAN to run in another terminal, then wait for it. Without it the
+                          CLI is driven non-interactively and the report says the approval was
+                          SIMULATED.
+  --approve-timeout <ms>  How long phase 2 may take. Default 15000, raised to 300000 with
+                          --interactive-approval, which waits on a person.
 
 Options
   --only <key>            Repeatable. Narrows the profile to those criteria. A hard prerequisite is
@@ -80,7 +105,8 @@ Options
   -h, --help              This text.
 
 Credentials may also arrive as COMPLIANCE_SESSION_TOKEN / COMPLIANCE_ADMIN_TOKEN /
-COMPLIANCE_API_KEY, which keeps them off the command line \`ps\` prints. The flags win.
+COMPLIANCE_API_KEY, which keeps them off the command line \`ps\` prints. The flags win. Those three
+are the whole credential surface: both profiles draw from the same set.
 `;
 
 async function main() {
@@ -127,9 +153,20 @@ async function main() {
   const notAReviewer = await reviewerRefusal(
     { api: opts.api, timeoutMs: opts.timeoutMs },
     opts,
-  ).catch((err) => `--admin-token could not be checked — ${err?.message ?? err}`);
+  ).catch((err) => `${reviewer.flag} could not be checked — ${err?.message ?? err}`);
   if (notAReviewer) {
     process.stderr.write(`accept-writes refuses to run:\n  • ${notAReviewer}\n`);
+    return 2;
+  }
+
+  // Same reasoning one step further: presence of a key is not the scope to submit with. A
+  // publish-scoped key would make the profile's central assertion hold against an entry that was
+  // never pending, which is worse than failing.
+  const badScope = await keyScopeRefusal({ api: opts.api, timeoutMs: opts.timeoutMs }, opts).catch(
+    (err) => `--api-key could not be checked — ${err?.message ?? err}`,
+  );
+  if (badScope) {
+    process.stderr.write(`accept-writes refuses to run:\n  • ${badScope}\n`);
     return 2;
   }
 
@@ -139,18 +176,31 @@ async function main() {
     profile: opts.only.size > 0 ? undefined : WRITE_MILESTONES[opts.milestone],
   });
 
-  const state = { run: runStamp(), fixtureIds: [] };
+  const submission = opts.milestone === "m4";
+  // The submission profile writes ONE entry through the MCP server, and its id has to be unique per
+  // process: `runStamp` is a minute-resolution timestamp, so two runs started in the same minute
+  // shared a fixture id and the second one "found" the first one's entry.
+  const state = { run: submission ? runToken() : runStamp(), fixtureIds: [] };
   const report = acceptanceReport({
     title: "RFP Hub — write acceptance",
     milestone: opts.milestone,
     selection: selectionLine(opts, selection.autoIncluded),
     contractIds: contractIds(WRITE_CRITERIA, opts.milestone),
     api: opts.api,
-    namespace: opts.namespace,
-    fixturePrefix: `${opts.namespace}:compliance-${state.run}-`,
-    credentialKind: opts.sessionToken ? "session" : "api-key",
-    adminToken: Boolean(opts.adminToken),
-    views: opts.views,
+    ...(submission
+      ? {
+          repoRoot: opts.repoRoot,
+          fixturePrefix: `compliance:compliance-${state.run}`,
+          mcpSpec: opts.mcpSpec ?? "next",
+          approval: opts.interactiveApproval ? "HUMAN" : "SIMULATED (non-interactive)",
+        }
+      : {
+          namespace: opts.namespace,
+          fixturePrefix: `${opts.namespace}:compliance-${state.run}-`,
+          credentialKind: opts.sessionToken ? "session" : "api-key",
+          adminToken: Boolean(opts.adminToken),
+          views: opts.views,
+        }),
     node: process.version,
   });
 
@@ -159,6 +209,8 @@ async function main() {
     // The credential the read-and-own checks use. A session where one exists, because it is the
     // account acting directly rather than a scoped delegation of it.
     credential: opts.sessionToken ?? opts.apiKey,
+    // The resolved teardown credential — whichever of --admin-token / --session-token the preflight
+    // just proved may review.
     reviewerToken: reviewer.token,
     report,
     results: {},

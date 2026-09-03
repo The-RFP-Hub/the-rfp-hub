@@ -3,6 +3,7 @@
  * production defaults safe — there is no way to hand it a credential.
  */
 import { describe, expect, it } from "vitest";
+import { READ_CRITERIA, criterionKeys } from "../criteria.mjs";
 import { describeScope, normalizeMcpSpec, parseArgs, refusals, weakenings } from "../options.mjs";
 
 const parse = (...argv) => parseArgs(argv);
@@ -46,9 +47,13 @@ describe("--milestone", () => {
     expect(reason).toContain("accept:writes --milestone m3");
   });
 
+  it("m4 selects the M4 read criteria", () => {
+    expect(refusals(parse("--milestone", "m4"))).toEqual([]);
+  });
+
   it("a milestone whose criteria are not registered is an error, not an empty run", () => {
-    const [reason] = refusals(parse("--milestone", "m4"));
-    expect(reason).toContain('unknown milestone "m4"');
+    const [reason] = refusals(parse("--milestone", "m9"));
+    expect(reason).toContain('unknown milestone "m9"');
   });
 
   it("cannot be combined with --only", () => {
@@ -60,6 +65,14 @@ describe("--milestone", () => {
 describe("--only, --skip and --export-url", () => {
   it("an unknown criterion key is refused at parse time, with the keys that exist", () => {
     expect(() => parse("--only", "M2-1")).toThrow(/--only must be one of liveness, openapi/);
+    expect(() => parse("--skip", "M4-4")).toThrow(/--skip must be one of/);
+  });
+
+  it("accepts every registered key, repeatable", () => {
+    for (const key of criterionKeys(READ_CRITERIA)) {
+      expect(() => parse("--only", key), key).not.toThrow();
+    }
+    expect([...parse("--skip", "mcp", "--skip", "docs").skip].sort()).toEqual(["docs", "mcp"]);
   });
 
   it("--export-url is required only when the export criterion actually runs", () => {
@@ -77,6 +90,34 @@ describe("--only, --skip and --export-url", () => {
 
   it("--only and --skip together is refused: the combination has no one meaning", () => {
     expect(() => parse("--only", "liveness", "--skip", "export")).toThrow(/cannot be combined/);
+  });
+});
+
+describe("behavior flags", () => {
+  it("--browser, --offline and --expect-indexable are off by default", () => {
+    const opts = parse();
+    expect(opts.browser).toBe(false);
+    expect(opts.offline).toBe(false);
+    expect(opts.expectIndexable).toBe(false);
+  });
+
+  it("sets each of them", () => {
+    const opts = parse("--browser", "--offline", "--expect-indexable");
+    expect(opts.browser).toBe(true);
+    expect(opts.offline).toBe(true);
+    expect(opts.expectIndexable).toBe(true);
+  });
+
+  it("parses --timeout and --concurrency, and refuses a non-number", () => {
+    const opts = parse("--timeout", "5000", "--concurrency", "2");
+    expect(opts.timeoutMs).toBe(5000);
+    expect(opts.concurrency).toBe(2);
+    expect(() => parse("--timeout", "-1")).toThrow(/must be a non-negative number/);
+    expect(() => parse("--timeout", "soon")).toThrow(/must be a non-negative number/);
+  });
+
+  it("names an unknown argument rather than ignoring it", () => {
+    expect(() => parse("--not-a-real-flag")).toThrow(/unknown argument "--not-a-real-flag"/);
   });
 });
 
@@ -151,7 +192,13 @@ describe("normalizeMcpSpec", () => {
     expect(normalizeMcpSpec("@the-rfp-hub/mcp@next")).toBe("next");
   });
 
-  it("refuses a range: this criterion is about one immutable artifact", () => {
-    expect(() => normalizeMcpSpec("^0.1.0")).toThrow(/--mcp-spec must be/);
+  it("refuses a range, a wildcard and an empty value, with an actionable message", () => {
+    for (const bad of ["*", "1.x", "^1.0.0", ">=1", "", "  "]) {
+      expect(() => normalizeMcpSpec(bad)).toThrow(/--mcp-spec/);
+    }
+  });
+
+  it("refuses a missing value rather than swallowing the next flag", () => {
+    expect(() => parse("--mcp-spec")).toThrow(/--mcp-spec needs a value/);
   });
 });

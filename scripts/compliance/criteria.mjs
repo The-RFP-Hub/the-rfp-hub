@@ -1,20 +1,40 @@
 // The two registries. Why they are two, and what --only/--skip mean: ./README.md.
 // Imports stay static and relative to THIS file — a path resolved from a string would resolve
 // against whichever entry point imported it, which is not this directory.
+import * as submissionCycle from "./accept/submission-cycle.mjs";
 import * as analytics from "./checks/analytics.mjs";
 import * as audit from "./checks/audit.mjs";
 import * as dataset from "./checks/dataset.mjs";
+import * as docs from "./checks/docs.mjs";
 import * as duplicates from "./checks/duplicates.mjs";
 import * as exportCheck from "./checks/export.mjs";
+import * as frontend from "./checks/frontend.mjs";
+import * as governance from "./checks/governance.mjs";
 import * as lifecycle from "./checks/lifecycle.mjs";
 import * as liveness from "./checks/liveness.mjs";
+import * as mcpPublication from "./checks/mcp-publication.mjs";
+import * as mcp from "./checks/mcp.mjs";
 import * as namespaceCheck from "./checks/namespace.mjs";
 import * as openapi from "./checks/openapi.mjs";
+import * as publishers from "./checks/publishers.mjs";
+import * as skill from "./checks/skill.mjs";
 import * as staleness from "./checks/staleness.mjs";
 import * as teardown from "./checks/teardown.mjs";
 import * as verification from "./checks/verification.mjs";
 
-export const READ_CRITERIA = [liveness, openapi, dataset, exportCheck];
+export const READ_CRITERIA = [
+  liveness,
+  openapi,
+  dataset,
+  exportCheck,
+  governance,
+  publishers,
+  frontend,
+  mcp,
+  mcpPublication,
+  skill,
+  docs,
+];
 
 // Order is load-bearing: lifecycle creates the fixture the other six read. `teardown` is never
 // selectable — a write run appends it, last, in a `finally`.
@@ -26,16 +46,20 @@ export const WRITE_CRITERIA = [
   verification,
   analytics,
   staleness,
+  submissionCycle,
   teardown,
 ];
 
 export const TEARDOWN = teardown;
 
-// `m4` is added with its criteria.
-export const READ_MILESTONES = { m2: ["liveness", "openapi", "dataset", "export"] };
+export const READ_MILESTONES = {
+  m2: ["liveness", "openapi", "dataset", "export"],
+  m4: ["governance", "publishers", "frontend", "mcp", "mcp-publication", "skill", "docs"],
+};
 
 export const WRITE_MILESTONES = {
   m3: ["lifecycle", "namespace", "audit", "duplicates", "verification", "analytics", "staleness"],
+  m4: ["submission-cycle"],
 };
 
 const keyOf = (criterion) => criterion.meta.key;

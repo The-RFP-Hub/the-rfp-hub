@@ -105,3 +105,41 @@ describe("the teardown credential", () => {
     expect(out).not.toContain("may not review");
   });
 });
+
+// The m4 profile reaches the same preflight through the same credential, and it matters more
+// there: its one criterion writes through the MCP server, which no refusal downstream could undo.
+describe("the m4 profile's reviewer", () => {
+  const submission = (origin, extra = []) => [
+    "--milestone",
+    "m4",
+    "--api",
+    origin,
+    "--session-token",
+    "not-a-reviewer",
+    "--api-key",
+    "rfph_x",
+    "--json",
+    "-",
+    "--no-color",
+    ...extra,
+  ];
+
+  it("refuses a session that may not review, before the MCP cycle writes", async () => {
+    const api = await fakeApi({ canReview: false });
+    const { code, out } = await run(submission(api.origin));
+
+    expect(code).toBe(2);
+    expect(out).toContain("--session-token names an account that may not review");
+    expect(out).toContain("Pass an --admin-token whose account may review");
+    expect(api.seen.filter((request) => !request.startsWith("GET "))).toEqual([]);
+  });
+
+  it("checks the --admin-token instead when one is given, exactly as m3 does", async () => {
+    const api = await fakeApi({ canReview: true, meStatus: 401 });
+    const { code, out } = await run(submission(api.origin, ["--admin-token", "expired"]));
+
+    expect(code).toBe(2);
+    expect(out).toContain("--admin-token was answered 401");
+    expect(api.seen.filter((request) => !request.startsWith("GET "))).toEqual([]);
+  });
+});

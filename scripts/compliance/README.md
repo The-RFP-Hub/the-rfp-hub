@@ -25,6 +25,10 @@ pnpm check:deployment --milestone m2 \
 pnpm accept:writes --milestone m3 \
   --api https://api-staging.example.org \
   --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
+
+pnpm accept:writes --milestone m4 \
+  --api https://api-staging.example.org \
+  --session-token "$REVIEWER_SESSION" --api-key "$RFPH_KEY"
 ```
 
 `--help` on either lists every flag. Human-readable pass/fail per criterion goes to stdout, a
@@ -36,6 +40,25 @@ or a required check was never exercised · `2` the run could not be made at all.
 
 Neither is wired into CI. They answer "does the definition of done hold against this deployment",
 which is a question someone asks, not a monitor — and CI has no deployment to write to.
+
+### Credentials — one set, both profiles
+
+`accept:writes` takes three credentials, and a profile uses the ones its criteria need. There is no
+per-profile name for the same job: "the reviewer's session" and "the key the MCP submits with" are
+these three under different names, and a second set of names meant a token left in a shell could
+outrank a flag passed by hand.
+
+| Flag | Variable | What it is | `m3` | `m4` |
+|---|---|---|---|---|
+| `--session-token` | `COMPLIANCE_SESSION_TOKEN` | A signed-in session. | Mints the key and drives the session-only surfaces. | Must be a reviewer's session, unless `--admin-token` is given. |
+| `--admin-token` | `COMPLIANCE_ADMIN_TOKEN` | The teardown credential: it rejects and unlists. | Required, unless the session may review. | Same, and optional for the same reason. |
+| `--api-key` | `COMPLIANCE_API_KEY` | An `rfph_` key. | An alternative to the session; session-only criteria then report a skip. | **Required** — the only credential handed to the MCP server. Its scope is proven against `GET /v1/me` before the server starts: `write`, and not `publish`. |
+
+A flag wins over its variable, so a leftover value cannot quietly redirect a deliberate run; the
+variables exist because `argv` is world-readable through `ps` and these are live tokens.
+
+Whichever of `--admin-token` and `--session-token` will do the teardown is checked against
+`GET /v1/me` before the first write — the same precedence, for both profiles.
 
 ## Selecting criteria
 
@@ -106,9 +129,21 @@ is an error too, rather than a run that quietly checks fewer things than the mil
 | M3 | M3-6 Publisher analytics | `analytics` | `accept:writes` |
 | M3 | M3-7 Staleness job | `staleness` | `accept:writes` |
 | M3 | — hygiene, not a completion criterion | `teardown` | `accept:writes` |
+| M4 | M4-1 Governance framework published and linked | `governance` | `check:deployment` |
+| M4 | M4-2 Public `/publishers` page | `publishers` | `check:deployment` |
+| M4 | M4-3 Reference frontend live and behaving | `frontend` | `check:deployment` |
+| M4 | M4-4 MCP server installable and callable | `mcp` | `check:deployment` |
+| M4 | M4-4b MCP server published | `mcp-publication` | `check:deployment` |
+| M4 | M4-5 Agent skill published correctly | `skill` | `check:deployment` |
+| M4 | M4-6 Handoff documentation | `docs` | `check:deployment` |
+| M4 | M4-ACCEPT Real 3-phase MCP submission interlock | `submission-cycle` | `accept:writes` |
 
 `teardown` is not selectable: a write run appends it, last, in a `finally`, and its `contractId` is
 `null` in every profile.
+
+`mcp` and `mcp-publication` are two criteria, not one: a server behaves identically whether it came
+from npm, the Registry or a local build, so whether it is PUBLISHED needs its own evidence. `--only
+mcp` therefore registers the behavior half alone, and `--skip mcp` leaves publication running.
 
 ### What each one asserts
 
@@ -125,7 +160,15 @@ is an error too, rather than a run that quietly checks fewer things than the mil
 | `verification` | A run is recorded, timestamped, names the URL it fetched, decides `existsAtSource`, and — when a page was retrieved — carries a sha256 of the bytes; the entry's own flag agrees with the run. |
 | `analytics` | Real reads and a link-out click are counted and served back to the publisher **the same day, before any rollup**; another reader cannot see them. |
 | `staleness` | An entry whose fixed deadline has passed is closed by the job, attributed to `actorKind: "job"` with `reason: "past_due"`, and a second run writes no second closure. |
-| `teardown` | Fixtures are rejected and unlisted, and the minted key is revoked. |
+| `teardown` | Fixtures are rejected and unlisted, and the minted key is revoked. For the `m4` profile, the one entry it submitted is rejected and then proved gone from the owner listing **and** the public route. |
+| `governance` | The four governance documents exist and their GitHub URLs answer 200; `/how-it-works` carries an anchor whose `href` is each of the four exact canonical URLs (read from `packages/frontend/src/lib/links.ts`); and the home page carries at least one of those same four exact hrefs **outside** `<footer>` — a link the global chrome puts on every page is not the home page linking to the framework. |
+| `publishers` | The route answers 200; `GET /v1/publishers` has the shape it promises (items array, integer `total` equal to `items.length`, unique non-empty slugs); rendered, the page shows exactly those slugs — or the empty state when there are none — and the browser's own request carries no `Authorization` header. |
+| `frontend` | TLS (a non-loopback plaintext site FAILS); liveness; `robots.txt` reported, or required with `--expect-indexable`; rendered: `q`, an ecosystem filter, a funding-type filter and `page=2` each change **which** entries are shown, and the two filters — values chosen from live data for actually NARROWING the corpus, never a dominant value whose first page is the unfiltered one — match what the API returns for the same filter; the detail page's visible `<h1>` is the title; both deep-link hrefs are exact; three viewports have no horizontal overflow, and at the two touch viewports (built with `isMobile`, so `(pointer: coarse)` matches the way it does on a real phone) no **form control** (`input`, `select`, `textarea`, `button`, `[role="button"]`) and no **nav link** (`nav a`) is under 44 px tall — the scope `packages/e2e/tests/13-responsive.spec.ts` asserts. A text link outside a nav is not measured whatever its `display`: its hit area is the line box, and widening it would break the sentence around it. |
+| `mcp` | `npx` resolves `@the-rfp-hub/mcp` from the real npm registry and runs; **exactly** two tools without `RFPHUB_API_KEY` and **exactly** three with it, each with an `outputSchema` and boolean annotation hints; `search_opportunities` returns `structuredContent` that validates against its own advertised schema and matches the API page for page, envelope field for envelope, across two pages of a query derived from the live corpus; no `rfph_` substring anywhere, including after the process exits; phase 1 answers `pending` and makes no network write — against a **local recording server this checker starts itself**, never against `--api`. |
+| `mcp-publication` | `npm view` resolves the selected spec to an exact version whose published `mcpName` matches the manifest; the official MCP Registry carries that server at that version with the same npm package identifier; every `npx` configuration snippet in `packages/mcp/README.md` pins an exact version (never `@latest`, never a dist-tag). |
+| `skill` | Every file the documented install channels need is on GitHub `main` with the same sha256 as the audited local copy; the repository's own `scripts/check-skill.mjs` passes against that fetched copy; the fetched `scripts/search.mjs`, run against a corpus whose every prose field carries an injected instruction, emits neither the instruction nor a `description` field. |
+| `docs` | The four `docs/*.md` guides exist; every link and `#anchor` in them — and in the root markdown, `skills/**` and `packages/mcp/README.md` — resolves; only `safe-read` `sh` blocks are ever executed, and those succeed. |
+| `submission-cycle` | The real MCP `submit_opportunity` interlock end to end against staging: an owner snapshot before anything, exactly three tools, an exact `status: "pending"` with the snapshot proved unchanged, a phase-3 commit with an invalid approval that must be refused with the snapshot still unchanged, then the approval, the commit, and the fixture verified pending through `GET /v1/me/opportunities`. |
 
 The e2e suite covers what only a browser can prove, and its own report numbers those areas
 differently: it splits the audit trail and source verification into one `provenance-verification`
@@ -133,14 +176,148 @@ spec, and adds `public-browse`, `organization` and `back-links`, which have no H
 equivalent. Neither numbering is wrong; a report cites the one belonging to the tool that produced
 it, and `criteria[].contractId` always means the first column of the table above.
 
+## Behavior flags
+
+### `--browser`
+
+The frontend and `/publishers` are client-rendered, so a plain `fetch` of the HTML sees an (almost)
+empty shell. `--browser` resolves Playwright **through `packages/e2e`'s own `node_modules`** (see
+`browser.mjs`) rather than adding a second copy of the dependency at the repo root, and launches
+Chromium for the rendered governance anchors, the `/publishers` slug comparison and its
+network-header check, and every frontend check that needs to see the result set change.
+
+Without `--browser` those requirements are reported **unmet**, which makes their criterion
+`INCOMPLETE` and the run exit non-zero. They were WARNs, and a WARN was green — a full run without
+a browser could print `RESULT: PASS` having looked at none of them.
+
+### `--offline`
+
+`docs` is the only criterion whose registry entry declares `offline: true`, and therefore the only
+one the flag leaves runnable — everything else here reads the deployment. Inside `docs` it skips the
+absolute-link 2xx/3xx requests and the execution of `safe-read` blocks; file existence, relative
+links, `#anchor` resolution and marker presence all still run, because none of them needs the
+network. So the only combination that means anything is `--only docs --offline`, which is what the
+CI `docs-links` job runs.
+
+### `--expect-indexable`
+
+Index state is **reported**, not held to a contract, because the decision is the operator's. Pass
+`--expect-indexable` when the deployment is meant to be indexed and the row becomes a requirement:
+a `robots.txt` that disallows `/` for every user-agent, or a home page carrying
+`<meta name="robots" content="…noindex…">`, then fails instead of being noted.
+
+### `--mcp-spec`
+
+Accepts a dist-tag (`next`), an exact version (`0.1.0`), `local`, or a full `@the-rfp-hub/mcp@<x>`
+normalized to `<x>` — the operator runbook spells it that last way, and concatenating it produced
+`@the-rfp-hub/mcp@@the-rfp-hub/mcp@next`, an npm ENOENT nobody could read back to the flag. A range
+(`^1.0.0`, `1.x`, `*`) is refused: this criterion is about one immutable published artifact, and a
+range does not name one.
+
+1. Default (`next`) → `npx -y @the-rfp-hub/mcp@<spec>`, the real npm registry, which is what
+   "installable" has to mean for the criterion's own name to be true. Before the package is
+   published this FAILS by name, and the remaining behavior checks are reported unmet rather than
+   each failing with a copy of the same npm error.
+2. `--mcp-spec local` → the EXPLICIT opt-out: `node <repo-root>/packages/mcp/dist/cli.js`, for
+   developing `packages/mcp` (or this checker) before publish. `mcp` is renamed to "MCP server
+   callable from a local build", and **`mcp-publication` is INCOMPLETE** — a local build is not
+   evidence of publication, and the run cannot go green.
+
+The local path resolves `dist/cli.js` through `fs.realpathSync` before spawning it. `cli.ts`'s own
+entrypoint guard compares `fileURLToPath(import.meta.url)` (which Node resolves through symlinks)
+against `path.resolve(process.argv[1])` (which does not), and a `--repo-root` under `os.tmpdir()` —
+`/tmp` → `/private/tmp` on macOS — made the two disagree: the CLI silently did nothing and exited 0,
+indistinguishable from "hung" until this checker's timeout fired.
+
+`RFPHUB_API_BASE` is handed to the server as a **bare origin** — the server requires https off
+loopback and rejects any path, query, fragment or userinfo at startup — so a `--api` carrying a
+path is trimmed (and said so), and a plaintext non-loopback `--api` fails by name rather than as an
+opaque startup error inside "tools/list succeeds".
+
+Every server process is spawned with its own disposable `--state-dir`, removed afterwards: a real
+server's `guard()` writes an audit line for every tool call, so without it even the read-only cases
+would leave entries in whoever runs this checker's own `~/.rfphub/audit.log`, and the submit case's
+preview would land in `~/.rfphub/pending/` indistinguishable from a real one.
+
+The read-only case additionally **strips** `RFPHUB_API_KEY` from the child's environment rather
+than merely declining to set it: that variable is what registers the write tool, so a key exported
+in the operator's own shell would otherwise make the two-tool assertion vacuous.
+
+## The `sh`-block marker convention
+
+Defined by the docs stream itself (`docs/README.md`), not by this checker. Every fenced ` ```sh `
+(or `bash`) block in `docs/**` carries the marker as **the second word of the info string**:
+
+~~~
+```sh safe-read
+curl -s "$API/v1/health"
+```
+~~~
+
+- **`safe-read`** — a `GET` against a public endpoint, no credential. The **only** kind this checker
+  ever executes, and it must succeed.
+- **`staging-write`** — mints a key, requests an OTP, submits/reviews/revokes. Never executed.
+- **`no-run`** — a deployment or infrastructure mutation. Never executed, ever.
+
+**The marker requirement applies to `docs/**` only.** There, an unmarked `sh`/`bash` block is a hard
+failure: a block this tool cannot tell is safe to run would otherwise go unexercised without anyone
+noticing. In the root `*.md` files, `skills/**` and `packages/mcp/README.md` — markdown that predates
+the convention and is owned by other streams — an unmarked block is reported as "not executed" and
+never fails, while a marker is honored wherever it appears. Their links and `#anchors` are held to
+exactly the same standard as the guides': a broken relative link in the root README is as broken for
+a reader as one in `docs/`.
+
+### What a `safe-read` block may contain
+
+Blocks are **parsed and spawned directly. There is no shell.** The previous implementation passed
+each block to `bash -c` with the operator's full `process.env`, so a checker advertised as read-only
+executed arbitrary commands chosen by a markdown file, with whatever npm or cloud credentials the
+shell had exported. The grammar now is:
+
+- stage 0 is `curl` with GET/HEAD semantics: no `-d`/`--data*`/`-F`/`-T`, no `Authorization` or
+  `Cookie` header, no `-u`, no `-X` other than GET/HEAD, and `--fail` is added when the block did
+  not ask for it;
+- later pipeline stages may only be `jq`, `head`, `sed -n`, or `python3 -m json.tool`;
+- command substitution exists in exactly one form, `NAME=$(<pipeline>)`, whose inside must satisfy
+  the same grammar — that is what the guides use to pick a sample id;
+- backticks, redirection, `;`, `&`, `&&` and any `||` other than a trailing `|| true` are refused;
+- every URL must expand to the `--api`/`--site` origin under test, and a `/v1/r/` link-out must
+  carry `DNT: 1` or the block is refused before it can record a click;
+- the child environment is an allowlist (`PATH`, `HOME`, `LANG`, `LC_ALL`, `TMPDIR`), never
+  `process.env`;
+- `$API` (and `$SITE`) are the documented placeholders; any other undefined variable is refused.
+
+A block outside the grammar FAILS by name, with the reason. Documentation staying simple enough to
+run is a feature, not a limitation.
+
+Running the stages ourselves also closes the gap the previous design documented as open: under bash,
+`curl -f … | jq` reported only `jq`'s status, and plain `jq` on the empty body `-f` leaves behind
+exits 0 — so a 404 "succeeded". Adding `set -o pipefail` instead broke `curl … | head -40`, because
+`head` closing the pipe makes curl's own write fail. Buffering between stages removes the conflict:
+`head` reads a completed capture, and curl's exit code is examined directly.
+
+Blocks run in a fresh temporary working directory, never `--repo-root`: a real block does
+`curl … -o dataset.json`, and running that in the caller's checkout left the file behind.
+
+## Transient GitHub errors
+
+The probes that ask whether a document is published — the four governance URLs, the skill files and
+the marketplace manifest — get **one** retry after 2 s on a transport failure or a 5xx from
+`github.com` / `raw.githubusercontent.com`, and the four governance requests are issued one at a
+time rather than concurrently. A sign-off run failed the governance criterion with HTTP 502 on all
+four URLs, every one of which answered 200 moments later; a gateway error is not evidence that a
+document is unpublished. A **4xx is never retried** — a 404 is the answer, and asking twice would
+only make an honest red run slower.
+
 ## The write target guard
 
 There is no `--allow-production`, and no other flag that reaches production. `accept:writes` accepts
 
 - **loopback**, plaintext included: that traffic never leaves the machine;
-- **https to an explicitly allowlisted staging origin**;
-- **one extra https origin** whose hostname carries a `staging` label and no `prod` label, named by
-  `RFPHUB_ACCEPT_EXTRA_STAGING_ORIGIN`.
+- **https to an explicitly allowlisted staging origin** — the `STAGING_ORIGINS` constant in
+  [`target-guard.mjs`](./target-guard.mjs), and nothing at run time adds to it. A fork that deploys
+  its own staging edits that constant, in a commit somebody reviews; where live credentials may be
+  sent is not a decision a variable in a shell should be able to make.
 
 The redirect chain the target answers with is followed to five hops and every hop re-checked, because
 an allowlisted origin that 302s elsewhere still receives the request carrying the credential.
@@ -149,17 +326,31 @@ The rule this replaced asked whether any hostname segment read like a non-produc
 which admits `not-staging-anymore.example.org`, `production-staging.example.org` and any CNAME
 whoever controls DNS points wherever they like. Hostname text cannot prove which deployment answers.
 
-Three more refusals, all decided before a single request is made:
+The remaining refusals. Most are decided before a single request is made; the two that ask the
+deployment a question cost one `GET /v1/me` each, and both happen before anything is created:
 
 | Refusal | Why |
 |---|---|
-| no `--namespace`, no publisher credential | A run that quietly performed the criteria it could and reported an acceptance would be worse than no tool. |
-| the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, or an expired `--admin-token`, used to pass every refusal, create four fixtures, and only then discover at teardown that it could not remove any of them. |
+| no `--namespace`, no publisher credential (`m3`) | A run that quietly performed the criteria it could and reported an acceptance would be worse than no tool. |
+| a key from the other profile in `--only`/`--skip` | The registry knows every write criterion, but the state, the fixture ids and the teardown all follow `--milestone`. `--milestone m4 --only lifecycle` created an M3 fixture that the M4 teardown does not know to remove. |
+| no `--api-key`, no reviewer credential (`m4`) | The submission profile hands the MCP server one write-scoped `rfph_` key, and tears the entry down with the same reviewer credential every profile uses. |
+| the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, or an expired `--admin-token`, used to pass every refusal, create fixtures, and only then discover at teardown that it could not remove any of them. |
+| the `--api-key` is scoped wrong (`m4`) | Presence of a key is not the scope to submit with, and the same `GET /v1/me` reports it. A key carrying `publish` would publish the fixture outright, so `pending` would hold against an entry that never was pending — the profile's central assertion, passing for the wrong reason, with the teardown then rejecting a live listing. A key without `write` fails three phases in, after the run has already reported what it was exercising. Both refuse by name, before the MCP server is spawned; a key the deployment answers `401` for is refused there too. |
 | `--keep-fixtures` | Permitted, but it records an **unmet** requirement, so the run reports `INCOMPLETE` rather than exiting 0 with rows left behind. |
 
 Everything a write run creates is named `<namespace>:compliance-<runstamp>-<what>`, so a leftover
 fixture is identifiable months later as a compliance artifact rather than a listing somebody has to
-investigate.
+investigate. The `m4` profile's single entry is `compliance:compliance-<runtoken>`, whose token
+carries the pid and random bytes as well as the timestamp: two runs started in the same minute
+shared an id, and the second one then "found" the first one's entry.
+
+### `--milestone m4`: the approval is labeled for what it is
+
+By default the CLI is driven non-interactively and the report says
+`approval: SIMULATED (non-interactive)` — that automates the CLI, it does not demonstrate a human
+decision. `--interactive-approval` prints the exact `rfphub-mcp approve <id>` command for an
+operator to run in another terminal and waits for it (`--approve-timeout` rises to five minutes,
+because waiting on a person is not waiting on a process), and the report says `approval: HUMAN`.
 
 ## `skip`, `unmet` and why neither is a pass
 
@@ -198,6 +389,10 @@ every compliance run count as real publisher traffic.
 - **The dashboard rendering the analytics.** They prove the API counts real traffic and serves it to
   the publisher; that the numbers reach a screen is the dashboard's own render test and the e2e
   suite. The report says this in the criterion rather than implying more.
+- **A human reviewer's actual approval flow, unless it is driven.** That is
+  `pnpm accept:writes --milestone m4 --interactive-approval`, staging only.
+- **SEO/indexability beyond `--expect-indexable`'s two mechanical checks.** Whether a deployment
+  *should* be indexed is the operator's decision, not a contract.
 - **Anything about a particular host being the right one.** Nothing about a host, domain or dataset
   size is hard-coded. The operations executed, their parameters, the accepted values and the error
   contract are read out of the OpenAPI document the deployment publishes; the only numbers carried
@@ -218,7 +413,16 @@ scripts/compliance/
   client.mjs           HTTP with credentials and the two agents
   csv.mjs xml.mjs schema.mjs   parsing and validation helpers
   fixtures.mjs         the documents a write run creates
-  cleanup.mjs          teardown, behind checks/teardown.mjs
+  cleanup.mjs          the m3 profile's teardown, behind checks/teardown.mjs
+  reviewer-preflight.mjs  the teardown credential, proven before the first write
+  browser.mjs          Playwright resolved through packages/e2e
+  mcp-client.mjs       a hand-rolled newline-delimited JSON-RPC stdio client
+  mock-server.mjs      the local recording HTTP server the MCP submit case uses
+  links.mjs            markdown links, GitHub heading slugs        (test/links.test.mjs)
+  markers.mjs          sh-block marker parsing                     (test/markers.test.mjs)
+  safe-read.mjs        the safe-read grammar and executor          (test/docs-safe-read.test.mjs)
+  retry.mjs            one retry for the GitHub publication probes (test/retry.test.mjs)
   checks/*.mjs         one file per criterion, each exporting meta + run(ctx)
+  accept/*.mjs         the MCP submission flow and its criterion
   test/*.test.mjs      collected by the root `pnpm test`
 ```

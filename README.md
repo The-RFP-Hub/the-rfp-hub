@@ -158,6 +158,34 @@ to have than a tool somebody runs.
 
 Both tools, their criteria and their exit codes: [`scripts/compliance/README.md`](./scripts/compliance/README.md).
 
+The same read-only tool covers governance, the reference frontend, the MCP server, the agent skill
+and the handoff docs:
+
+```bash no-run
+pnpm check:deployment --milestone m4 --site https://ethrfps.app --api https://api.ethrfps.app --browser
+```
+
+The one case that could look like a write — `submit_opportunity`'s fail-closed behavior — runs
+against a local recording server the checker starts itself, never against `--api`. Pass `--browser`
+for the checks that need a rendered page (search/filter/pagination, `/publishers`, the three
+responsive viewports); without it those requirements are reported unmet, which makes their criterion
+incomplete and the run exit non-zero. `--offline` applies to the docs criterion only, so the
+combination that means anything is `--only docs --offline` — a docs lint, labeled as such and never
+a deployment sign-off.
+
+The write side has a second profile, staging only, which drives the real MCP `submit_opportunity`
+interlock end to end — preview, an out-of-band `rfphub-mcp approve`, commit — and tears the fixture
+down afterwards:
+
+```bash staging-write
+pnpm accept:writes --milestone m4 --api https://api.staging.example.org \
+  --session-token "$REVIEWER_SESSION" --api-key "$RFPH_KEY"
+```
+
+The same three credential flags as the publisher profile, under the same target guard: a session
+whose account may review (or an `--admin-token`), because the teardown rejects the entry, and the
+write-scoped `rfph_` key the MCP server submits with. No run without both.
+
 ## Open data
 
 The dataset is published to [`exports/`](./exports) on the default branch by a scheduled workflow

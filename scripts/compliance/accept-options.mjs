@@ -2,9 +2,9 @@
  * Argument parsing and refusals for `scripts/accept-writes.mjs`, which WRITES.
  *
  * Three refusals, all because the tool submits entries against whatever it is pointed at: the
- * target must be allowlisted (`target-guard.mjs`); a namespace and a publisher credential are
- * required, because a run that quietly performed only the criteria it could would report an
- * acceptance it had not established; and a reviewer credential is required too, because the
+ * target must be allowlisted (`target-guard.mjs`); the credentials the selected profile writes
+ * with are required, because a run that quietly performed only the criteria it could would report
+ * an acceptance it had not established; and a reviewer credential is required too, because the
  * teardown rejects and unlists with one and a run that cannot tear down must not start.
  *
  * Credentials also come from the environment because argv is world-readable through `ps` and these
@@ -12,15 +12,20 @@
  * silently redirect a deliberate run.
  */
 import { WRITE_CRITERIA, criterionKeys } from "./criteria.mjs";
-import { defaultReportPath } from "./options.mjs";
+import { defaultReportPath, normalizeMcpSpec } from "./options.mjs";
 import { targetRefusal } from "./target-guard.mjs";
 
-const NUMERIC = new Set(["--views", "--timeout", "--concurrency"]);
+const NUMERIC = new Set(["--views", "--timeout", "--concurrency", "--approve-timeout"]);
 
+/**
+ * ONE credential set, whatever the profile. Three tokens with three jobs — a session, a teardown
+ * credential, an `rfph_` key — and both profiles draw from them, because "the reviewer's session"
+ * and "the key the MCP submits with" are those same three jobs under different names.
+ */
 const CREDENTIAL_ENV = {
-  sessionToken: "COMPLIANCE_SESSION_TOKEN",
-  adminToken: "COMPLIANCE_ADMIN_TOKEN",
-  apiKey: "COMPLIANCE_API_KEY",
+  sessionToken: ["COMPLIANCE_SESSION_TOKEN"],
+  adminToken: ["COMPLIANCE_ADMIN_TOKEN"],
+  apiKey: ["COMPLIANCE_API_KEY"],
 };
 
 /** A slug is the id prefix of everything this run writes, so it is held to the shape ids are. */
@@ -31,11 +36,15 @@ export function parseArgs(argv, env = process.env) {
     milestone: undefined,
     api: undefined,
     namespace: undefined,
+    repoRoot: process.cwd(),
+    mcpSpec: undefined,
+    interactiveApproval: false,
     only: new Set(),
     skip: new Set(),
     json: undefined,
     views: 5,
     timeoutMs: 20000,
+    approveTimeoutMs: 15000,
     concurrency: 4,
     keepFixtures: false,
     help: false,
@@ -95,6 +104,18 @@ export function parseArgs(argv, env = process.env) {
       case "--admin-token":
         opts.adminToken = next();
         break;
+      case "--repo-root":
+        opts.repoRoot = next();
+        break;
+      case "--mcp-spec":
+        opts.mcpSpec = normalizeMcpSpec(next());
+        break;
+      case "--interactive-approval":
+        opts.interactiveApproval = true;
+        break;
+      case "--approve-timeout":
+        opts.approveTimeoutMs = number(next());
+        break;
       case "--application-url":
         opts.applicationUrl = next();
         break;
@@ -126,15 +147,21 @@ export function parseArgs(argv, env = process.env) {
   if (opts.only.size > 0 && opts.skip.size > 0) {
     throw new Error("--only and --skip cannot be combined: --only already says what runs");
   }
-  for (const [key, variable] of Object.entries(CREDENTIAL_ENV)) {
-    if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
+  for (const [key, variables] of Object.entries(CREDENTIAL_ENV)) {
+    for (const variable of variables) {
+      if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
+    }
+  }
+  // Waiting on a person is not waiting on a process: 15s is right for a driven CLI, absurd here.
+  if (opts.interactiveApproval && !argv.includes("--approve-timeout")) {
+    opts.approveTimeoutMs = 300000;
   }
   if (opts.json === undefined) opts.json = defaultReportPath("accept-report");
   return opts;
 }
 
 /** Everything that has to be true before a single request is made. Empty means go. */
-export function refusals(opts, milestones, env = process.env) {
+export function refusals(opts, milestones) {
   const reasons = [];
   const known = Object.keys(milestones);
   if (!opts.milestone) {
@@ -147,6 +174,62 @@ export function refusals(opts, milestones, env = process.env) {
     );
   }
   if (!opts.api) reasons.push("--api is required");
+  reasons.push(...crossProfileRefusals(opts, milestones));
+  if (opts.milestone === "m4") {
+    reasons.push(...submissionRefusals(opts));
+  } else {
+    reasons.push(...publisherRefusals(opts));
+  }
+  if (opts.api) {
+    const refusal = targetRefusal(opts.api);
+    if (refusal) reasons.push(refusal);
+  }
+  return reasons;
+}
+
+/**
+ * The registry validates `--only` against every write criterion, but the state, the fixture ids and
+ * the teardown follow `--milestone`: `--milestone m4 --only lifecycle` wrote an M3 fixture the M4
+ * teardown does not know to remove, and left it on the deployment.
+ */
+function crossProfileRefusals(opts, milestones) {
+  const profile = milestones[opts.milestone];
+  if (!profile) return [];
+  const reasons = [];
+  const owner = (key) =>
+    Object.entries(milestones).find(([, keys]) => keys.includes(key))?.[0] ?? "no profile";
+  for (const flag of ["only", "skip"]) {
+    for (const key of opts[flag] ?? []) {
+      if (profile.includes(key)) continue;
+      reasons.push(
+        `--${flag} ${key} is not part of the ${opts.milestone.toUpperCase()} profile (${profile.join(", ")}) — ${key} belongs to ${owner(key)}, and the fixtures it writes are torn down by that profile's teardown, not this one`,
+      );
+    }
+  }
+  return reasons;
+}
+
+/**
+ * The m4 profile submits through the MCP server, which holds the `rfph_` key, and tears down with
+ * the same reviewer credential every other profile uses.
+ */
+function submissionRefusals(opts) {
+  const reasons = [];
+  if (!opts.apiKey) {
+    reasons.push(
+      "--api-key is required (or COMPLIANCE_API_KEY) — a write-scoped rfph_ key, never a publish-scoped one, so the fixture lands pending by construction, which is the property this profile proves. It is the only credential handed to the MCP server",
+    );
+  }
+  if (!opts.adminToken && !opts.sessionToken) {
+    reasons.push(
+      "a reviewer credential is required (--admin-token, or COMPLIANCE_ADMIN_TOKEN, or a --session-token whose account may review) — the teardown rejects and unlists the entry this run submits, and a run that cannot tear down must not start",
+    );
+  }
+  return reasons;
+}
+
+function publisherRefusals(opts) {
+  const reasons = [];
   if (!opts.namespace) {
     reasons.push(
       "--namespace is required — this run WRITES, and that is the namespace it writes in",
@@ -163,10 +246,6 @@ export function refusals(opts, milestones, env = process.env) {
     reasons.push(
       "a reviewer credential is required (--admin-token, or COMPLIANCE_ADMIN_TOKEN, or a --session-token whose account may review) — the teardown rejects and unlists everything this run creates, and a run that cannot tear down must not start",
     );
-  }
-  if (opts.api) {
-    const refusal = targetRefusal(opts.api, env);
-    if (refusal) reasons.push(refusal);
   }
   return reasons;
 }

@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { READ_CRITERIA } from "../criteria.mjs";
 
 const BINARY = fileURLToPath(new URL("../../check-deployment.mjs", import.meta.url));
 
@@ -92,11 +93,20 @@ describe("--offline", () => {
     expect(code).toBe(1);
 
     const json = reportOf(out);
-    expect(json.result).toBe("incomplete");
     expect(json.signOff).toBe(false);
-    expect(json.criteria.map((c) => c.id)).toEqual(["liveness", "openapi", "dataset", "export"]);
-    expect(json.criteria.every((c) => c.status === "incomplete")).toBe(true);
-    expect(json.criteria.every((c) => c.unmet[0] === "skipped: --offline")).toBe(true);
+    // Derived from the registry, not listed: a criterion added later must be classified by its own
+    // `offline` flag rather than silently joining whichever list this test happened to spell.
+    const grounded = READ_CRITERIA.filter((c) => c.meta.offline !== true).map((c) => c.meta.key);
+    const reachable = READ_CRITERIA.filter((c) => c.meta.offline === true).map((c) => c.meta.key);
+    expect(json.criteria.map((c) => c.id).sort()).toEqual([...grounded, ...reachable].sort());
+    for (const key of grounded) {
+      const criterion = json.criteria.find((c) => c.id === key);
+      expect(criterion.status, key).toBe("incomplete");
+      expect(criterion.unmet[0], key).toBe("skipped: --offline");
+    }
+    for (const key of reachable) {
+      expect(json.criteria.find((c) => c.id === key).unmet, key).toBeUndefined();
+    }
   });
 
   it("a weakened run reaches the deployment but is not a sign-off", async () => {

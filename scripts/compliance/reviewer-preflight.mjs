@@ -6,11 +6,17 @@
  * discovered at teardown that it could not reject any of them — leaving rows on the public surface
  * of somebody's deployment. An expired or demoted `--admin-token` failed the same way.
  *
- * So the capability is read off the deployment, over one request, before anything is created.
+ * So the capability is read off the deployment, over one request, before anything is created —
+ * including for the m4 profile, whose whole cycle writes through the MCP server and whose teardown
+ * rejects the entry it submitted.
  */
 import { callJson } from "./client.mjs";
 
-/** The credential the teardown will actually use — the same precedence `cleanup.mjs` applies. */
+/**
+ * The credential the teardown will actually use — the same precedence `cleanup.mjs` applies, and
+ * the same one for every profile: an `--admin-token` names the reviewer, and a `--session-token`
+ * stands in when that account may review on its own.
+ */
 export function reviewerCredential(opts) {
   return opts.adminToken
     ? { token: opts.adminToken, flag: "--admin-token" }

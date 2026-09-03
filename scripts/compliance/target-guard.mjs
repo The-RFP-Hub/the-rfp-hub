@@ -16,8 +16,6 @@ export const STAGING_ORIGINS = ["https://staging.ethrfps.app", "https://api-stag
 /** So a refusal can say "that is production", not just "that is not on the list". */
 export const PRODUCTION_HOSTS = ["ethrfps.app", "api.ethrfps.app", "www.ethrfps.app"];
 
-export const EXTRA_ORIGIN_ENV = "RFPHUB_ACCEPT_EXTRA_STAGING_ORIGIN";
-
 export function normalizeOrigin(raw) {
   let url;
   try {
@@ -34,41 +32,34 @@ export function normalizeOrigin(raw) {
   return { origin: `${url.protocol}//${host}${port}`, protocol: url.protocol, host };
 }
 
-/** https, and a label naming staging: one carrying `prod` is not made safe by also saying staging. */
-export function namesStaging(host) {
-  const labels = host.split(".");
-  if (labels.some((label) => label.includes("prod"))) return false;
-  return labels.some(
-    (label) => label === "staging" || label.startsWith("staging-") || label.endsWith("-staging"),
-  );
+/**
+ * The allowlist, and nothing widens it at run time. A fork that deploys its own staging edits
+ * `STAGING_ORIGINS` above, in a commit somebody reviews — which is the difference between a
+ * decision about where live credentials may be sent and a variable in a shell.
+ */
+export function allowedOrigins() {
+  return [...STAGING_ORIGINS];
 }
 
-export function allowedOrigins(env = process.env) {
-  const allowed = [...STAGING_ORIGINS];
-  const extra = normalizeOrigin(env[EXTRA_ORIGIN_ENV]);
-  if (extra && extra.protocol === "https:" && namesStaging(extra.host)) allowed.push(extra.origin);
-  return allowed;
-}
-
-export function targetRefusal(api, env = process.env) {
+export function targetRefusal(api) {
   const parsed = normalizeOrigin(api);
   if (!parsed) {
     return `--api must be an absolute http(s) URL with no userinfo, got "${api}"`;
   }
   if (isLoopbackHost(parsed.host)) return null;
   if (parsed.protocol !== "https:") {
-    return `${parsed.origin} is not https, and this tool sends a live publisher credential — only loopback may be plaintext`;
+    return `${parsed.origin} is not https, and this tool sends live credentials to it — a publisher credential, a reviewer session and a write-scoped key — so only loopback may be plaintext`;
   }
-  const allowed = allowedOrigins(env);
+  const allowed = allowedOrigins();
   if (allowed.includes(parsed.origin)) return null;
   const production = PRODUCTION_HOSTS.includes(parsed.host)
     ? `${parsed.origin} is PRODUCTION. `
     : "";
-  return `${production}${parsed.origin} is not an allowed write target. This tool submits real entries, so it accepts only loopback or ${allowed.join(", ")}. There is no flag to force production; add another staging origin with ${EXTRA_ORIGIN_ENV}=<https origin whose hostname carries a "staging" label>`;
+  return `${production}${parsed.origin} is not an allowed write target. This tool submits real entries, so it accepts only loopback or ${allowed.join(", ")}. There is no flag and no variable that forces production; a fork adds its own staging origin by editing STAGING_ORIGINS in scripts/compliance/target-guard.mjs`;
 }
 
 /** Refuse when the redirect chain leaves the allowlist: a CNAME passes every hostname rule there is. */
-export async function redirectRefusal(api, { timeoutMs = 10000, env = process.env } = {}) {
+export async function redirectRefusal(api, { timeoutMs = 10000 } = {}) {
   let target = `${api}/v1/health`;
   for (let hop = 0; hop < 5; hop++) {
     const res = await request(target, { timeoutMs });
@@ -80,7 +71,7 @@ export async function redirectRefusal(api, { timeoutMs = 10000, env = process.en
     } catch {
       return `${target} redirects to an unparseable Location "${res.location}"`;
     }
-    const refusal = targetRefusal(next, env);
+    const refusal = targetRefusal(next);
     if (refusal) return `${api} redirects to ${next}, and ${refusal}`;
     target = next;
   }

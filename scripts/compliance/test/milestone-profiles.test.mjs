@@ -52,6 +52,22 @@ describe("the registries", () => {
     const mapped = Object.values(m3).filter((id) => id !== null);
     expect(new Set(mapped).size).toBe(mapped.length);
     expect(m3.teardown).toBeNull();
+
+    const m4 = contractIds(READ_CRITERIA, "m4");
+    expect(Object.values(m4)).toEqual(["M4-1", "M4-2", "M4-3", "M4-4", "M4-4b", "M4-5", "M4-6"]);
+    expect(contractIds(WRITE_CRITERIA, "m4")).toEqual({
+      "submission-cycle": "M4-ACCEPT",
+      teardown: null,
+    });
+  });
+
+  it("a milestone selects its own criteria and nothing else", () => {
+    expect(keys(selectCriteria(READ_CRITERIA, { profile: READ_MILESTONES.m4 }))).toEqual(
+      READ_MILESTONES.m4,
+    );
+    expect(keys(selectCriteria(READ_CRITERIA, { profile: READ_MILESTONES.m2 }))).toEqual(
+      READ_MILESTONES.m2,
+    );
   });
 
   it("teardown is not selectable — a write run appends it, always", () => {
@@ -81,6 +97,25 @@ describe("--only and --skip", () => {
   it("--skip lifecycle with a dependent selected is refused, not run", () => {
     const reasons = selectionRefusals(WRITE_CRITERIA, { skip: new Set(["lifecycle"]) });
     expect(reasons.join("\n")).toContain("--skip lifecycle cannot be combined with namespace");
+  });
+
+  // The two used to be one criterion, and the module-level guard read `--skip mcp` for both: the
+  // registry answering each key separately is what makes each of them skippable on its own.
+  it("--skip mcp leaves mcp-publication running, and the other way round", () => {
+    expect(keys(selectCriteria(READ_CRITERIA, { skip: new Set(["mcp"]) }))).toContain(
+      "mcp-publication",
+    );
+    expect(keys(selectCriteria(READ_CRITERIA, { skip: new Set(["mcp"]) }))).not.toContain("mcp");
+    expect(keys(selectCriteria(READ_CRITERIA, { skip: new Set(["mcp-publication"]) }))).toContain(
+      "mcp",
+    );
+    expect(
+      keys(selectCriteria(READ_CRITERIA, { skip: new Set(["mcp-publication"]) })),
+    ).not.toContain("mcp-publication");
+  });
+
+  it("--only mcp registers one criterion, not the publication half as well", () => {
+    expect(keys(selectCriteria(READ_CRITERIA, { only: new Set(["mcp"]) }))).toEqual(["mcp"]);
   });
 
   it("--skip of a criterion nothing depends on is allowed", () => {
