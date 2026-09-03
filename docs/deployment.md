@@ -624,15 +624,34 @@ Leaving the defaults behind is not cosmetic: it is what keeps the next person's 
 
 ### 7.7 The MCP Registry
 
+The Registry does not follow npm: every version needs its own publish, and it is done by the
+**MCP Registry** workflow (`.github/workflows/mcp-registry.yml`), dispatched by hand on the release
+tag once the npm package of §7.5–7.6 is on the registry. It is a workflow rather than a laptop
+command for one reason: the registry grants `io.github.<org>/*` to a person's GitHub token only
+when that person is an **Owner** of the organization — a member gets a 403 that names only their
+personal namespace, whatever its hint about public membership says — while a workflow's OIDC token
+gets the namespace from the repository's owner, with no role involved.
+
 ```sh no-run
-cd packages/mcp
-mcp-publisher init                 # writes server.json; commit it
-mcp-publisher login github
-mcp-publisher publish
+gh workflow run mcp-registry.yml -f ref=<the release tag>
+gh run watch
 ```
 
-`package.json` must carry the `mcpName` field, and it must match the name in `server.json` — the
-registry uses that pairing to confirm the npm package and the registry entry are the same server.
+The workflow refuses to publish when the npm package `server.json` names is not on the registry
+yet, or carries a different `mcpName`, and fails if the Registry does not serve the version
+afterwards. An Owner can still do the same by hand: `mcp-publisher login github` and
+`mcp-publisher publish`, from `packages/mcp`.
+
+**The namespace is `io.github.The-RFP-Hub`, in the organization's own case.** The registry grants
+`io.github.<login>/*` spelled exactly as the GitHub login and matches it as a case-sensitive prefix,
+and it compares the published npm package's `mcpName` to the server name character for character.
+`mcpName` in `package.json` and `name` in `server.json` must be that exact string; the lowercase
+name 0.1.0 and 0.1.1 shipped with could be published by nobody.
+
+`changeset version` bumps `package.json` only. The same release commit must move
+`packages/mcp/server.json` (`version` and `packages[0].version`) and every pinned snippet in
+`packages/mcp/README.md` to the new number — `pnpm --filter @the-rfp-hub/mcp test` fails until it
+does. The server reports `package.json`'s version, so nothing in `src/` needs touching.
 
 **Every configuration example in every README pins an exact version.** Never `@latest` in a snippet
 somebody will paste into an agent's configuration: an example that floats hands whoever controls

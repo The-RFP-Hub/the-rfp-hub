@@ -1,0 +1,87 @@
+# Publishes packages/mcp/server.json to the official MCP Registry. A workflow, not a laptop
+# command: the registry grants io.github.<org>/* to a person's token only as an org Owner, while
+# this job's OIDC token gets the namespace from the repository's owner. Case matters — the grant
+# is spelled like the GitHub login, io.github.The-RFP-Hub. See docs/deployment.md §7.7.
+name: MCP Registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag whose packages/mcp/server.json to publish (the release tag)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish server.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp
+    steps:
+      - name: Require the dispatched ref to be a tag
+        working-directory: .
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          if ! git ls-remote --exit-code "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${REF}" > /dev/null; then
+            echo "::error::'${REF}' is not a tag on this repository. Publish from the release tag."
+            exit 1
+          fi
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: The npm package server.json names is published, with the same mcpName
+        run: |
+          name=$(jq -r .name server.json)
+          version=$(jq -r .version server.json)
+          pkg=$(jq -r '.packages[0].identifier' server.json)
+          pkg_version=$(jq -r '.packages[0].version' server.json)
+          if [ "$version" != "$pkg_version" ]; then
+            echo "::error::server.json is version ${version} but names ${pkg}@${pkg_version}"
+            exit 1
+          fi
+          published=$(npm view "${pkg}@${version}" mcpName 2>/dev/null || true)
+          if [ "$published" != "$name" ]; then
+            echo "::error::${pkg}@${version} on npm carries mcpName '${published:-<none>}'; server.json is named '${name}'. Publish npm first, with that exact name."
+            exit 1
+          fi
+          echo "publishing ${name}@${version} -> ${pkg}@${version}"
+
+      - name: Install mcp-publisher
+        working-directory: ${{ runner.temp }}
+        env:
+          VERSION: "1.8.1"
+          SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          curl -sSL -o mcp-publisher.tgz "https://github.com/modelcontextprotocol/registry/releases/download/v${VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${SHA256}  mcp-publisher.tgz" | sha256sum -c -
+          mkdir -p bin && tar xzf mcp-publisher.tgz -C bin mcp-publisher
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          ./bin/mcp-publisher --version
+
+      - name: Publish
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish
+
+      - name: The Registry serves the version
+        run: |
+          name=$(jq -r .name server.json)
+          version=$(jq -r .version server.json)
+          url="https://registry.modelcontextprotocol.io/v0/servers/$(jq -rn --arg n "$name" '$n | @uri')/versions/${version}"
+          curl -sSf "$url" | jq -e --arg n "$name" --arg v "$version" '.server.name == $n and .server.version == $v' > /dev/null
+          echo "$url"

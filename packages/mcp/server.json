@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.the-rfp-hub/rfp-hub",
+  "name": "io.github.The-RFP-Hub/rfp-hub",
   "title": "RFP Hub",
   "description": "Search Ethereum-ecosystem funding opportunities; submit one behind a human approval step.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://github.com/The-RFP-Hub/the-rfp-hub/tree/main/packages/mcp",
   "repository": {
     "url": "https://github.com/The-RFP-Hub/the-rfp-hub",
@@ -15,7 +15,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@the-rfp-hub/mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": { "type": "stdio" },
       "environmentVariables": [
         {

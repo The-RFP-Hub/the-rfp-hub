@@ -43,11 +43,11 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
 const META_KEY = "io.github.the-rfp-hub/tool-descriptions";
 
 describe("server.json agrees with the package", () => {
-  it("carries the same registry name as package.json's mcpName", () => {
+  it("carries the same registry name as package.json's mcpName, in the organization's own case", () => {
     expect(manifest.name).toBe(pkg.mcpName);
-    // The registry namespace is lowercase; the GitHub organization is `The-RFP-Hub`.
-    expect(manifest.name).toBe(manifest.name.toLowerCase());
-    expect(manifest.name).toBe("io.github.the-rfp-hub/rfp-hub");
+    // The Registry grants `io.github.<login>/*` in the login's exact case and matches it as a
+    // case-sensitive prefix. The organization's login is `The-RFP-Hub`.
+    expect(manifest.name).toBe("io.github.The-RFP-Hub/rfp-hub");
   });
 
   it("names the npm package this workspace publishes, at one consistent version", () => {
@@ -99,6 +99,7 @@ describe("the README's own mitigation", () => {
       const version = match[1];
       if (version === undefined) continue; // A prose mention of the package name, not a command.
       expect(version).toMatch(/^@\d+\.\d+\.\d+$/);
+      if (pkg.version !== "0.0.0") expect(version).toBe(`@${pkg.version}`);
     }
   });
 
