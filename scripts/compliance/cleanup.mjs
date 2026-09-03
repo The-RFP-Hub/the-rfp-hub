@@ -58,9 +58,10 @@ export async function cleanup(report, ctx, state) {
     c.skip("fixtures are taken off the public surface", "this run created none");
     return c.finish();
   }
-  // Unreachable: a reviewer credential is a parse-time requirement. Kept as a FAIL rather than
-  // deleted so a future regression that makes it reachable again cannot be green.
-  const reviewer = ctx.adminToken ?? (state.me?.canReview ? ctx.sessionToken : undefined);
+  // Unreachable: the credential is proven to carry `canReview` before the first write. Kept as a
+  // FAIL rather than deleted so a future regression that makes it reachable again cannot be green.
+  const reviewer =
+    ctx.reviewerToken ?? ctx.adminToken ?? (state.me?.canReview ? ctx.sessionToken : undefined);
   if (!reviewer) {
     c.fail(
       "fixtures are taken off the public surface",

@@ -1,17 +1,5 @@
-/**
- * Result collection and rendering for the compliance checkers.
- *
- * Six check outcomes, and two of them carry the whole value of a sign-off tool:
- *
- *   skip   could NOT be performed, and the criterion does not depend on it. Stays green.
- *   unmet  could NOT be performed, and the criterion DOES depend on it (no `--browser`, a local
- *          build standing in for a published one). Renders as a warning and makes the criterion
- *          INCOMPLETE, so the run exits non-zero.
- *
- * A tool that silently downgrades "I could not check this" to "this is fine" is worse than no tool,
- * and the same rule applies one level up: a criterion nothing could be checked in is not a
- * criterion that passed, so the RUN has three outcomes rather than two — see `Report.result`.
- */
+// Result collection and rendering. What the six outcomes mean, and why `skip` and `unmet` are
+// different things rather than one lenient one: ./README.md.
 
 export const PASS = "pass";
 export const FAIL = "fail";
@@ -127,12 +115,7 @@ export class Report {
     return this.criteria.reduce((n, c) => n + c.tally().skip, 0);
   }
 
-  /**
-   * Three outcomes, because a sign-off has three: pass, fail, and incomplete — nothing failed, but
-   * a criterion was never exercised or left a requirement unmet, so the run does not establish the
-   * milestone and must not exit 0. A report with no criteria at all is FAIL: a report about nothing
-   * is not a green report.
-   */
+  /** A report with no criteria at all is FAIL: a report about nothing is not a green report. */
   get result() {
     if (this.criteria.length === 0) return FAIL;
     if (this.criteria.some((c) => c.status === FAIL)) return FAIL;
@@ -144,11 +127,8 @@ export class Report {
     return this.result === PASS;
   }
 
-  /**
-   * Built from what the run actually has rather than fixed by position: the M3 and M4 reports used
-   * to rewrite two lines of a fixed header by string replacement, which silently ate a criterion
-   * the day a row was added above.
-   */
+  // Built from what the run has, not fixed by position: the old reports rewrote two lines of a
+  // fixed header by string replacement, which ate a criterion the day a row was added above.
   headerLines() {
     const m = this.meta;
     const row = (label, value) => `  ${label.padEnd(17)}${value}`;
@@ -241,9 +221,8 @@ export class Report {
     }
     out.push("");
 
-    // The headline carries the skip counts even when the run passes. A legitimate skip inside an
-    // exercised criterion — the loopback TLS probe — is green and should stay green, but a reader
-    // signing this off is entitled to see that something was not looked at without opening the JSON.
+    // The headline carries the skip counts even when the run passes: a legitimate skip stays green,
+    // but a reader signing this off may see it without opening the JSON.
     const result = this.result;
     const notes = [];
     const never = this.criteria.filter((c) => c.status === SKIP);

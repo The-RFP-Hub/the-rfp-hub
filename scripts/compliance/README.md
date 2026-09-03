@@ -57,6 +57,29 @@ seen the contract.
 dependent is selected is refused rather than run: the dependent would report an unmet requirement
 the operator chose, which reads as a finding about the deployment and is not one.
 
+`--offline` is a promise rather than a hint. A criterion that reads the deployment cannot keep it,
+so under the flag only criteria whose registry entry declares `offline: true` run at all; the rest
+are registered as unmet, which makes the run INCOMPLETE. `--offline --only liveness` therefore
+opens no socket and exits 1, rather than quietly probing the network and reporting PASS.
+
+### Flags that weaken a run without narrowing it
+
+`--max-details N` (anything but `0`, which means every served document) and `--allow-insecure` on a
+non-loopback target leave every criterion registered — nothing is missing from the report — while
+holding the deployment to less than the contract says. Because nothing is missing, the narrowing
+label above never fired for them, and a run that validated 5 of 4000 documents printed the same
+green headline as one that validated all of them. Both now stamp a `weakened: …` scope label, which
+is what sets `signOff: false` in the JSON and turns the console headline into `RESULT: SCOPED …`.
+
+### The two registries, and why they are two
+
+A criterion is a module exporting `meta` and `run(ctx)`. The runner never switches on a key: it
+walks an ordered array and calls `run`, so adding a criterion is adding a module and a line in
+`criteria.mjs`. Read criteria may be pointed at anything, including production; write criteria live
+in the other registry, behind the target guard. **Nothing may appear in both** — that separation is
+what lets `check-deployment.mjs` hold no code path that writes, which is the property that makes its
+production defaults safe.
+
 `--milestone m3` on `check:deployment` is an error naming `accept:writes`, and `--milestone m2` on
 `accept:writes` is an error naming `check:deployment`. A milestone whose criteria are not registered
 is an error too, rather than a run that quietly checks fewer things than the milestone has.
@@ -274,7 +297,7 @@ Three more refusals, all decided before a single request is made:
 |---|---|
 | no `--namespace`, no publisher credential (`m3`) | A run that quietly performed the criteria it could and reported an acceptance would be worse than no tool. |
 | no reviewer token, no write key (`m4`) | The submission profile drives the MCP server, so those are the two credentials it needs; both may also arrive as `COMPLIANCE_REVIEWER_TOKEN` / `COMPLIANCE_WRITE_KEY`, or under the `RFPHUB_` names the MCP server's own documentation spells. |
-| no reviewer credential | The teardown rejects and unlists everything the run creates. A run that cannot clean up after itself must not write in the first place. |
+| the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, an expired `--admin-token`, or a `--reviewer-token` whose account was demoted used to pass every refusal, create fixtures, and only then discover at teardown that it could not remove any of them. |
 | `--keep-fixtures` | Permitted, but it records an **unmet** requirement, so the run reports `INCOMPLETE` rather than exiting 0 with rows left behind. |
 
 Everything a write run creates is named `<namespace>:compliance-<runstamp>-<what>`, so a leftover
@@ -293,7 +316,8 @@ because waiting on a person is not waiting on a process), and the report says `a
 
 ## `skip`, `unmet` and why neither is a pass
 
-Six check outcomes, and the two that could be confused are the ones that matter:
+Six check outcomes, and the two that could be confused are the ones that matter. A tool that
+silently downgrades "I could not check this" to "this is fine" is worse than no tool:
 
 - **`skip`** — the check could not be performed, and the criterion does **not** depend on it. Stays
   green. A plaintext loopback origin has no transport to inspect; an API-key run cannot exercise

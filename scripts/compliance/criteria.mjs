@@ -1,14 +1,6 @@
-/**
- * The two registries, and the rules for selecting from them.
- *
- * Read criteria may be pointed at anything, including production; write criteria go in the other
- * registry, behind the target guard. Nothing may appear in both — the separation is what lets one
- * binary hold no code path that writes.
- *
- * Imports are static and relative to THIS file. A registry resolving module paths from a string
- * would resolve them against whichever entry point imported it, which is not this directory.
- */
-
+// The two registries. Why they are two, and what --only/--skip mean: ./README.md.
+// Imports stay static and relative to THIS file — a path resolved from a string would resolve
+// against whichever entry point imported it, which is not this directory.
 import * as submissionCycle from "./accept/submission-cycle.mjs";
 import * as analytics from "./checks/analytics.mjs";
 import * as audit from "./checks/audit.mjs";
@@ -44,11 +36,8 @@ export const READ_CRITERIA = [
   docs,
 ];
 
-/**
- * Criteria that WRITE, in the order a full run performs them. The order is load-bearing: lifecycle
- * creates the fixture the other six read. `teardown` is never selectable — a write run appends it,
- * last, in a `finally`.
- */
+// Order is load-bearing: lifecycle creates the fixture the other six read. `teardown` is never
+// selectable — a write run appends it, last, in a `finally`.
 export const WRITE_CRITERIA = [
   lifecycle,
   namespaceCheck,
@@ -89,11 +78,7 @@ export function contractIds(registry, milestone) {
   return ids;
 }
 
-/**
- * A criterion excluded by `--only` is not registered at all, so a green scoped run is a clean pass.
- * A HARD prerequisite is pulled in automatically: `--only audit` without it produces a run whose
- * single criterion can only report that it had no fixture to read, which answers nothing.
- */
+/** A HARD prerequisite is pulled in: `--only audit` alone could only report it had no fixture. */
 export function selectCriteria(registry, { only = new Set(), skip = new Set(), profile } = {}) {
   const selectable = registry.filter((criterion) => criterion !== teardown);
   const wanted = profile
@@ -124,9 +109,8 @@ export function selectCriteria(registry, { only = new Set(), skip = new Set(), p
 }
 
 /**
- * Skipping a criterion another selected criterion depends on is refused rather than run: the
- * dependent would report an unmet requirement for a reason the operator chose, which reads as a
- * finding about the deployment and is not one.
+ * Skipping a prerequisite of a selected criterion is refused: the dependent would report an unmet
+ * requirement the operator chose, which reads as a finding about the deployment and is not one.
  */
 export function selectionRefusals(registry, { only = new Set(), skip = new Set() } = {}) {
   const reasons = [];

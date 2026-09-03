@@ -2,13 +2,9 @@
 /**
  * Write acceptance against a staging deployment.
  *
- * THIS TOOL WRITES to whatever it is pointed at. So, unlike `check-deployment.mjs`, it has no
- * default target, refuses anything outside the staging allowlist, and refuses to start without the
- * reviewer credential its teardown needs. What it produces is an ACCEPTANCE report, never a
- * deployment sign-off.
- *
- * It is NOT wired into CI, deliberately: CI has no deployment to write to, and a tool needing a
- * standing publisher credential in repository secrets would be worse to have than one somebody runs.
+ * THIS TOOL WRITES to whatever it is pointed at, so it has no default target and refuses anything
+ * outside the staging allowlist. What it produces is an ACCEPTANCE report, never a sign-off. Not
+ * wired into CI, deliberately — see ./compliance/README.md.
  *
  * Usage:
  *   node scripts/accept-writes.mjs --milestone m3 --api https://api-staging.example.org \
@@ -35,6 +31,7 @@ import {
 import { runStamp } from "./compliance/fixtures.mjs";
 import { keyList, selectionLine } from "./compliance/options.mjs";
 import { acceptanceReport } from "./compliance/report.mjs";
+import { reviewerCredential, reviewerRefusal } from "./compliance/reviewer-preflight.mjs";
 import { EXTRA_ORIGIN_ENV, STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
 
 const USAGE = `RFP Hub — write acceptance (staging only)
@@ -147,6 +144,18 @@ async function main() {
     return 2;
   }
 
+  // Presence of a token is not the capability to reject, and finding that out at teardown is too
+  // late — the fixtures are already on the deployment's public surface by then.
+  const reviewer = reviewerCredential(opts);
+  const notAReviewer = await reviewerRefusal(
+    { api: opts.api, timeoutMs: opts.timeoutMs },
+    opts,
+  ).catch((err) => `--admin-token could not be checked — ${err?.message ?? err}`);
+  if (notAReviewer) {
+    process.stderr.write(`accept-writes refuses to run:\n  • ${notAReviewer}\n`);
+    return 2;
+  }
+
   const selection = selectCriteria(WRITE_CRITERIA, {
     only: opts.only,
     skip: opts.skip,
@@ -186,6 +195,7 @@ async function main() {
     // The credential the read-and-own checks use. A session where one exists, because it is the
     // account acting directly rather than a scoped delegation of it.
     credential: opts.sessionToken ?? opts.apiKey ?? opts.writeKey,
+    reviewerToken: reviewer.token,
     report,
     results: {},
     state,
@@ -197,7 +207,7 @@ async function main() {
       const key = criterion.meta.key;
       report
         .criterion(key, key, "Not performed: excluded from this run with --skip.")
-        .unmet(key, `--skip ${key}`)
+        .unmet(`skipped: --skip ${key}`, "excluded by the caller")
         .finish();
     }
   } finally {
