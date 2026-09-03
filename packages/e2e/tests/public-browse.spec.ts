@@ -1,12 +1,13 @@
 /**
  * The anonymous visitor: the directory, an entry, and the two counters a real reader moves.
  *
- * WHY THIS IS ITS OWN FILE RATHER THAN PART OF `m3-5`. That file is about the SIGNED-IN dashboard,
- * and every test in it is gated on a browser session belonging to the publisher
- * (`skipUnlessBrowserSession`). These criteria are the opposite claim — that none of this needs an
- * account — so folding them in would have put them behind a guard that contradicts what they assert,
- * and they would have silently stopped running at exactly the ladder levels where a session is
- * unavailable. One area per file is the convention here; the public surface is a new area.
+ * WHY THIS IS ITS OWN FILE RATHER THAN PART OF `dashboard-analytics.spec.ts`. That file is about
+ * the SIGNED-IN dashboard, and every test in it is gated on a browser session belonging to the
+ * publisher (`skipUnlessBrowserSession`). These criteria are the opposite claim — that none of this
+ * needs an account — so folding them in would have put them behind a guard that contradicts what
+ * they assert, and they would have silently stopped running at exactly the ladder levels where a
+ * session is unavailable. One area per file is the convention here; the public surface is a new
+ * area.
  *
  * EVERY CASE RUNS IN A CONTEXT BUILT FRESH, WITH NO `storageState`. The project supplies a signed-in
  * one (see `playwright.config.ts`), which would make "an anonymous visitor can read this" untestable

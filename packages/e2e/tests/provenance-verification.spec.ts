@@ -154,7 +154,7 @@ test.describe("M3-4 the audit trail", () => {
     // Needs an entry that is genuinely not public, which means a submission that cannot auto-publish.
     skipUnlessActor(stack, "submitter");
     // …and an account with no verified membership may have only so many waiting at once. The cap is
-    // asserted on its own terms in `m3-1`; here it would just be an unrelated 409, so a slot is
+    // asserted on its own terms in `lifecycle.spec.ts`; here it would just be an unrelated 409, so a slot is
     // freed the way the product frees one.
     await pendingHeadroom("submitter", 1);
     const submitter = await api("submitter");

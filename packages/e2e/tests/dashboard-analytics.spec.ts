@@ -270,7 +270,10 @@ test.describe("M3-5 the signed-in dashboard", () => {
       "the minted key's secret must be extractable for the artifact scan",
     ).toBeTruthy();
     if (minted)
-      register(minted, { label: "api key minted through the UI (m3-5)", longLived: true });
+      register(minted, {
+        label: "api key minted through the UI (dashboard-analytics)",
+        longLived: true,
+      });
 
     await page.reload();
     // The secret exists in exactly one place — the create response — and the page holding it is the

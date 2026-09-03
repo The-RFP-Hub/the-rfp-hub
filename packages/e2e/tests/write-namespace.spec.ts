@@ -34,7 +34,7 @@ test.describe("M3-2 who may publish, and where", () => {
     // criterion, and no privileged actor can stand in for it.
     skipUnlessActor(stack, "submitter");
     // The same absence is what the pending cap applies to, so the queue slot has to be there before
-    // this can assert anything about the entry. The cap itself is `m3-1`'s criterion.
+    // this can assert anything about the entry. The cap itself is `lifecycle.spec.ts`'s criterion.
     await pendingHeadroom("submitter", 1);
     const submitter = await api("submitter");
     const document = opportunityFixture(stack.namespaces.publisher, `submitter-${Date.now()}`);
