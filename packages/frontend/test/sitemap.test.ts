@@ -3,7 +3,7 @@
  * the declared canonical origin. Staging and every preview must get an empty sitemap.
  */
 import sitemap from "@/app/sitemap";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -22,6 +22,12 @@ async function mockHost(host: string | null, forwardedHost: string | null = null
             : null,
   } as unknown as Awaited<ReturnType<typeof headers>>);
 }
+
+// The suite must not inherit whatever platform variables the machine running it happens to export.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "");
+  vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -78,6 +84,42 @@ describe("the public sitemap", () => {
 
     const entries = await sitemap();
     expect(entries.map((entry) => entry.url)).toContain("https://ethrfps.app/publishers");
+  });
+
+  it("publishes on Vercel production with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    const entries = await sitemap();
+    expect(entries.map((entry) => entry.url)).toContain("https://ethrfps.app/");
+  });
+
+  it("is empty on a Vercel preview with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
+
+    await expect(sitemap()).resolves.toEqual([]);
+  });
+
+  it("is empty off Vercel with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    await mockHost("copy.example.org");
+
+    await expect(sitemap()).resolves.toEqual([]);
+  });
+
+  it("publishes for the explicit variable, not Vercel's production domain, when both are present", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("mirror.example.org");
+
+    const entries = await sitemap();
+    expect(entries.map((entry) => entry.url)).toContain("https://mirror.example.org/");
   });
 
   it("carries no opportunity, organization or listing route", async () => {

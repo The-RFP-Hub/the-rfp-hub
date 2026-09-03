@@ -4,7 +4,7 @@
  */
 import robots from "@/app/robots";
 import { NOINDEX_ROUTE_PREFIXES } from "@/lib/noindex-routes";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -23,6 +23,12 @@ async function mockHost(host: string | null, forwardedHost: string | null = null
             : null,
   } as unknown as Awaited<ReturnType<typeof headers>>);
 }
+
+// The suite must not inherit whatever platform variables the machine running it happens to export.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "");
+  vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -95,5 +101,49 @@ describe("robots.txt", () => {
 
     const file = await robots();
     expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
+  });
+
+  it("allows the public surface on Vercel production with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    const file = await robots();
+    expect(file.rules).toEqual({
+      userAgent: "*",
+      allow: "/",
+      disallow: [...NOINDEX_ROUTE_PREFIXES],
+    });
+    expect(file.sitemap).toBe("https://ethrfps.app/sitemap.xml");
+  });
+
+  it("disallows everything on a Vercel preview with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
+
+    const file = await robots();
+    expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
+    expect(file.sitemap).toBeUndefined();
+  });
+
+  it("disallows everything off Vercel with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    await mockHost("copy.example.org");
+
+    const file = await robots();
+    expect(file.rules).toEqual({ userAgent: "*", disallow: "/" });
+  });
+
+  it("follows the explicit variable, not Vercel's production domain, when both are present", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("mirror.example.org");
+
+    const file = await robots();
+    expect(file.sitemap).toBe("https://mirror.example.org/sitemap.xml");
   });
 });

@@ -5,7 +5,7 @@
  * renders `index: true`.
  */
 import { generateMetadata } from "@/lib/root-metadata";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -24,6 +24,12 @@ async function mockHost(host: string | null, forwardedHost: string | null = null
             : null,
   } as unknown as Awaited<ReturnType<typeof headers>>);
 }
+
+// The suite must not inherit whatever platform variables the machine running it happens to export.
+beforeEach(() => {
+  vi.stubEnv("VERCEL_ENV", "");
+  vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -68,6 +74,44 @@ describe("the root layout's robots metadata", () => {
 
     const metadata = await generateMetadata();
     expect(metadata.robots).toEqual({ index: true, follow: true });
+  });
+
+  it("indexes on Vercel production with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    const metadata = await generateMetadata();
+    expect(metadata.robots).toEqual({ index: true, follow: true });
+  });
+
+  it("stays noindex on a Vercel preview with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("the-rfp-hub-git-feature-branch.vercel.app");
+
+    const metadata = await generateMetadata();
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("stays noindex off Vercel with nothing declared", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "");
+    await mockHost("copy.example.org");
+
+    const metadata = await generateMetadata();
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("follows the explicit variable, not Vercel's production domain, when both are present", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_ORIGIN", "https://mirror.example.org");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "ethrfps.app");
+    await mockHost("ethrfps.app");
+
+    const metadata = await generateMetadata();
+    expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
   it("keeps the title and description regardless of indexing", async () => {
