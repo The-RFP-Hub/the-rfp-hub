@@ -63,9 +63,9 @@ interface Session {
   stop(): void;
 }
 
-/** Spawn the built CLI and drive it line by line. */
-function session(env: Record<string, string>): Session {
-  const child = spawn(process.execPath, [CLI], {
+/** Spawn the built CLI and drive it line by line. State goes to a fresh directory per session. */
+function session(env: Record<string, string> = {}): Session {
+  const child = spawn(process.execPath, [CLI, "--state-dir", tempHome()], {
     env: { ...process.env, RFPHUB_API_BASE: baseUrl, ...env },
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -104,8 +104,8 @@ function session(env: Record<string, string>): Session {
 }
 
 describe("tools/list over stdio", () => {
-  it("offers two tools with no write flag set", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome() });
+  it("offers two tools when no credential is configured", async () => {
+    const s = session();
     try {
       const reply = await s.send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
       const tools = (reply.result as { tools: { name: string }[] }).tools;
@@ -118,12 +118,8 @@ describe("tools/list over stdio", () => {
     }
   });
 
-  it("offers three when the write flag is set, and none of them takes a credential", async () => {
-    const s = session({
-      RFPHUB_MCP_HOME: tempHome(),
-      RFPHUB_MCP_ENABLE_SUBMIT: "1",
-      RFPHUB_API_KEY: FAKE_KEY,
-    });
+  it("offers three when a credential is configured, and none of them takes one as an argument", async () => {
+    const s = session({ RFPHUB_API_KEY: FAKE_KEY });
     try {
       const reply = await s.send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
       const tools = (reply.result as { tools: { name: string; inputSchema: unknown }[] }).tools;
@@ -142,7 +138,7 @@ describe("tools/list over stdio", () => {
   });
 
   it("publishes the annotations, hints though they are", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome() });
+    const s = session();
     try {
       const reply = await s.send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
       const tools = (reply.result as { tools: { name: string; annotations?: unknown }[] }).tools;
@@ -156,7 +152,7 @@ describe("tools/list over stdio", () => {
 
 describe("tools/call over stdio", () => {
   it("runs a search against the local server and returns the projection", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome() });
+    const s = session();
     try {
       const reply = await s.send({
         jsonrpc: "2.0",
@@ -191,7 +187,7 @@ describe("tools/call over stdio", () => {
   });
 
   it("returns a coded error result rather than a protocol failure", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome() });
+    const s = session();
     try {
       const reply = await s.send({
         jsonrpc: "2.0",
@@ -206,7 +202,7 @@ describe("tools/call over stdio", () => {
   });
 
   it("refuses an unknown filter instead of silently returning everything", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome() });
+    const s = session();
     try {
       const reply = await s.send({
         jsonrpc: "2.0",
@@ -224,7 +220,7 @@ describe("tools/call over stdio", () => {
 
 describe("stdout discipline", () => {
   it("writes the startup banner to stderr, never into the protocol stream", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome() });
+    const s = session();
     const stderr: string[] = [];
     s.child.stderr.setEncoding("utf8");
     s.child.stderr.on("data", (chunk: string) => stderr.push(chunk));
@@ -251,11 +247,7 @@ describe("the edges of the stdio boundary", () => {
 
   it("answers a pathologically nested document with a code, and sends nothing to the API", async () => {
     const before = requests.length;
-    const s = session({
-      RFPHUB_MCP_HOME: tempHome(),
-      RFPHUB_MCP_ENABLE_SUBMIT: "1",
-      RFPHUB_API_KEY: FAKE_KEY,
-    });
+    const s = session({ RFPHUB_API_KEY: FAKE_KEY });
     try {
       const document = `{"id":"example-org:x","nested":${nested(5_000)}}`;
       const reply = await s.sendRaw(
@@ -271,7 +263,7 @@ describe("the edges of the stdio boundary", () => {
   });
 
   it("exits quietly when the client closes stdout mid-session", async () => {
-    const s = session({ RFPHUB_MCP_HOME: tempHome(), RFPHUB_API_KEY: FAKE_KEY });
+    const s = session({ RFPHUB_API_KEY: FAKE_KEY });
     let stderr = "";
     s.child.stderr.setEncoding("utf8");
     s.child.stderr.on("data", (chunk: string) => {

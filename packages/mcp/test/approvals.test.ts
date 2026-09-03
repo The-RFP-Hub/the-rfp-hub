@@ -53,7 +53,7 @@ function context(
     responses?: Parameters<typeof stubFetch>[0];
   } = {},
 ): { ctx: ToolContext; stub: ReturnType<typeof stubFetch> } {
-  const config = testConfig({ submitEnabled: true, ...(overrides.config ?? {}) });
+  const config = testConfig(overrides.config ?? {});
   const stub = stubFetch(overrides.responses ?? [{ body: {} }]);
   return {
     stub,
@@ -231,7 +231,7 @@ describe("phase 3 — commit", () => {
   });
 
   it("does not restore the approval after an ambiguous network failure", async () => {
-    const config = testConfig({ submitEnabled: true });
+    const config = testConfig();
     const ctx: ToolContext = {
       config,
       api: new ApiClient(config, {

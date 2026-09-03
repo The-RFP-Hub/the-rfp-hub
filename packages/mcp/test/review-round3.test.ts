@@ -147,7 +147,7 @@ describe("arguments rejected before the handler still spend the write tool's bud
   }
 
   function build(home: string, policy: Policy) {
-    const config = testConfig({ submitEnabled: true, home });
+    const config = testConfig({ home });
     const server = createServer({
       config,
       api: new ApiClient(config, { fetchImpl: stubFetch([{ body: {} }]).fetchImpl }),
@@ -288,7 +288,7 @@ describe("a stale lock is broken atomically", () => {
 // ────────────────────────────────── 6. inherited members are not tools ──
 describe("the tool lookup answers for own properties only", () => {
   function tools(home: string) {
-    const config = testConfig({ submitEnabled: false, home });
+    const config = testConfig({ apiKey: null, home });
     const server = createServer({
       config,
       api: new ApiClient(config, { fetchImpl: stubFetch([{ body: {} }]).fetchImpl }),

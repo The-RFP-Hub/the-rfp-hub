@@ -6,8 +6,9 @@
  * audit line, and turns any failure into a coded `isError` result. `installErrorBoundary` extends
  * that to the SDK's own argument-validation and unknown-tool paths, which quote arguments back.
  *
- * The write tool is registered ONLY when `RFPHUB_MCP_ENABLE_SUBMIT=1`: a poisoned search result
- * then has no write tool to reach for, which is stronger than one that exists and refuses.
+ * The write tool is registered ONLY when a credential is configured: without `RFPHUB_API_KEY` a
+ * poisoned search result has no write tool to reach for, which is stronger than one that exists
+ * and refuses.
  */
 import { type CallToolResult, McpServer } from "@modelcontextprotocol/server";
 import { appendAudit, summarizeInput } from "./audit.js";
@@ -143,7 +144,7 @@ function installErrorBoundary(server: McpServer, ctx: ToolContext): void {
             formatToolError(
               new ToolError(
                 "tool_not_found",
-                "This server does not offer a tool by that name. Call `tools/list` for the ones it does. The write tool is registered only when the operator sets RFPHUB_MCP_ENABLE_SUBMIT=1, so its absence is a configuration choice, not an error.",
+                "This server does not offer a tool by that name. Call `tools/list` for the ones it does. The write tool is registered only when the operator configures RFPHUB_API_KEY, so its absence is a configuration choice, not an error.",
               ),
             ),
           );
@@ -202,7 +203,7 @@ export function createServer(options: CreateServerOptions): McpServer {
       }),
   );
 
-  if (config.submitEnabled) {
+  if (config.apiKey !== null) {
     server.registerTool(
       submitTool.TOOL_NAME,
       {

@@ -84,8 +84,7 @@ interface RunningApprove {
  * reaching its prompt must not leave the test hanging on a signal that will never come.
  */
 function spawnApprove(home: string, id: string): RunningApprove {
-  const child: ChildProcess = spawn(process.execPath, [CLI, "approve", id], {
-    env: { ...process.env, RFPHUB_MCP_HOME: home },
+  const child: ChildProcess = spawn(process.execPath, [CLI, "--state-dir", home, "approve", id], {
     stdio: ["pipe", "pipe", "pipe"],
   });
   let out = "";
@@ -114,8 +113,7 @@ function spawnApprove(home: string, id: string): RunningApprove {
 function approve(home: string, id: string, answer = "approve"): { code: number; out: string } {
   requireBuilt();
   try {
-    const out = execFileSync(process.execPath, [CLI, "approve", id], {
-      env: { ...process.env, RFPHUB_MCP_HOME: home },
+    const out = execFileSync(process.execPath, [CLI, "--state-dir", home, "approve", id], {
       input: `${answer}\n`,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -371,7 +369,8 @@ describe("the server boundary", () => {
     home: string,
     options: { policy?: Policy; api?: ApiClient; submit?: boolean } = {},
   ) {
-    const config = testConfig({ submitEnabled: options.submit ?? true, home });
+    // The key IS the switch: registration follows `RFPHUB_API_KEY`, nothing else.
+    const config = testConfig({ apiKey: (options.submit ?? true) ? FAKE_KEY : null, home });
     const server = createServer({
       config,
       api: options.api ?? new ApiClient(config, { fetchImpl: stubFetch([{ body: {} }]).fetchImpl }),
@@ -447,14 +446,14 @@ describe("the server boundary", () => {
       message = err instanceof Error ? err.message : String(err);
     }
     expect(message).toContain("[tool_not_found]");
-    expect(message).toContain("RFPHUB_MCP_ENABLE_SUBMIT=1");
+    expect(message).toContain("RFPHUB_API_KEY");
 
     const audit = fs.readFileSync(auditPath(home), "utf8");
     expect(audit).toContain('"status":"tool_not_found"');
     expect(audit).toContain('"tool":"no_such_tool"');
   });
 
-  it("answers submit_opportunity as unknown when the write flag is not set", async () => {
+  it("answers submit_opportunity as unknown when no credential is configured", async () => {
     const home = tempHome();
     const { tools } = build(home, { submit: false });
     let message = "";
@@ -477,7 +476,7 @@ describe("the server boundary", () => {
 
   it("codes a malformed 2xx at the HTTP boundary instead of recording it as ok", async () => {
     const home = tempHome();
-    const config = testConfig({ submitEnabled: false, home });
+    const config = testConfig({ apiKey: null, home });
     // `total` is a string where the contract promises a number. This used to sail through as `ok`
     // and fail downstream, in the SDK's words, after the audit line was already written.
     const api = new ApiClient(config, {
@@ -502,7 +501,7 @@ describe("the server boundary", () => {
 
   it("still codes a result the published output schema rejects", async () => {
     const home = tempHome();
-    const config = testConfig({ submitEnabled: false, home });
+    const config = testConfig({ apiKey: null, home });
     // Past the HTTP boundary and wrong anyway: the guard's own output check is the last net.
     const api = {
       listOpportunities: async () => ({
@@ -525,7 +524,7 @@ describe("the server boundary", () => {
 
   it("passes a well-formed result through untouched", async () => {
     const home = tempHome();
-    const config = testConfig({ submitEnabled: false, home });
+    const config = testConfig({ apiKey: null, home });
     const api = new ApiClient(config, {
       fetchImpl: stubFetch([{ body: { items: [], page: 1, limit: 10, total: 0, totalPages: 1 } }])
         .fetchImpl,
@@ -613,7 +612,7 @@ describe("the admission caps say what they mirror", () => {
 describe("approve then submit still works after all of this", () => {
   it("runs the three phases with a real terminal approval", async () => {
     const home = tempHome();
-    const config = testConfig({ submitEnabled: true, home });
+    const config = testConfig({ home });
     const stub = stubFetch([
       {
         body: {

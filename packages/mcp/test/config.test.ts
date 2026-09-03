@@ -1,24 +1,24 @@
 /**
- * What `RFPHUB_API_BASE` and `RFPHUB_MCP_TIMEOUT_MS` are allowed to be.
+ * What `RFPHUB_API_BASE` is allowed to be, and where local state lands.
  *
  * The base is not merely a URL: the write path sends a bearer credential to it, and the approval a
  * human grants binds its ORIGIN. So a base that puts the credential in cleartext, hides one inside
  * the URL, or carries a path the origin binding cannot see has to be refused at startup — before a
  * preview exists for anyone to approve.
  */
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { computeApprovalId, documentHashOf } from "../src/approvals.js";
 import {
   ConfigError,
   DEFAULT_TIMEOUT_MS,
-  MAX_TIMEOUT_MS,
   canonicalOrigin,
+  defaultStateDir,
   loadConfig,
-  resolveTimeoutMs,
 } from "../src/config.js";
 
-function load(env: Record<string, string>) {
-  return loadConfig(env as NodeJS.ProcessEnv);
+function load(env: Record<string, string>, options: { stateDir?: string } = {}) {
+  return loadConfig(env as NodeJS.ProcessEnv, options);
 }
 
 describe("the API base must be https, or loopback", () => {
@@ -108,24 +108,36 @@ describe("origin canonicalization keeps one approval per destination", () => {
 });
 
 describe("the request deadline", () => {
-  it("defaults, and accepts a value inside the bounds", () => {
-    expect(resolveTimeoutMs(undefined)).toBe(DEFAULT_TIMEOUT_MS);
-    expect(resolveTimeoutMs("  ")).toBe(DEFAULT_TIMEOUT_MS);
-    expect(resolveTimeoutMs("2500")).toBe(2_500);
+  it("is a constant, so nothing can raise it or take it away", () => {
     expect(load({}).timeoutMs).toBe(DEFAULT_TIMEOUT_MS);
-    expect(load({ RFPHUB_MCP_TIMEOUT_MS: "3000" }).timeoutMs).toBe(3_000);
-  });
-
-  it("refuses anything that would remove or corrupt the bound", () => {
-    for (const value of ["0", "-1", "abc", "1.5", "Infinity", String(MAX_TIMEOUT_MS + 1)]) {
-      expect(() => resolveTimeoutMs(value), value).toThrow(ConfigError);
-    }
   });
 });
 
-describe("RFPHUB_MCP_HOME wins", () => {
-  it("takes precedence over the user's home directory", () => {
-    const config = load({ RFPHUB_MCP_HOME: "/tmp/somewhere-else", HOME: "/home/someone" });
-    expect(config.home).toBe("/tmp/somewhere-else");
+describe("the state directory", () => {
+  it("defaults under the user's home when --state-dir is absent", () => {
+    expect(load({}).home).toBe(defaultStateDir());
+    expect(defaultStateDir().endsWith(path.join(path.sep, ".rfphub"))).toBe(true);
+  });
+
+  it("takes the flag when it is given, and makes a relative path absolute", () => {
+    expect(load({}, { stateDir: "/tmp/somewhere-else" }).home).toBe("/tmp/somewhere-else");
+    expect(load({}, { stateDir: "  /tmp/padded  " }).home).toBe("/tmp/padded");
+    expect(load({}, { stateDir: "state" }).home).toBe(path.resolve("state"));
+  });
+});
+
+describe("the environment surface", () => {
+  it("reads exactly two variables, and would notice a third being added", () => {
+    // A Proxy rather than a list of names: the assertion is over what the code TOUCHES, so a
+    // variable reintroduced anywhere in `loadConfig` fails here without anyone remembering to.
+    const seen: string[] = [];
+    const env = new Proxy({} as NodeJS.ProcessEnv, {
+      get(_target, property) {
+        if (typeof property === "string") seen.push(property);
+        return undefined;
+      },
+    });
+    loadConfig(env, { stateDir: "/tmp/state" });
+    expect([...new Set(seen)].sort()).toEqual(["RFPHUB_API_BASE", "RFPHUB_API_KEY"]);
   });
 });

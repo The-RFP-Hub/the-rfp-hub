@@ -13,13 +13,12 @@ export {
 export {
   loadConfig,
   canonicalOrigin,
+  defaultStateDir,
   keyFingerprint,
-  resolveTimeoutMs,
   ConfigError,
   DEFAULT_API_BASE,
   DEFAULT_TIMEOUT_MS,
-  MAX_TIMEOUT_MS,
-  MIN_TIMEOUT_MS,
+  type LoadConfigOptions,
   type McpConfig,
 } from "./config.js";
 export {

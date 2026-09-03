@@ -1,10 +1,11 @@
 /**
  * The local state directory, and the properties it must actually have before anything trusts it.
  *
- * `RFPHUB_MCP_HOME` holds write approvals and rate-limit counters — security decisions kept in
- * files — so "0700 directory, 0600 files" is a precondition to be CHECKED, not requested: a mode
- * asked for at creation says nothing about a path that already existed, and a path that is a
- * symlink is not the path that was configured. Establish it, or refuse.
+ * The state directory (`--state-dir`, default `~/.rfphub`) holds write approvals and rate-limit
+ * counters — security decisions kept in files — so "0700 directory, 0600 files" is a precondition
+ * to be CHECKED, not requested: a mode asked for at creation says nothing about a path that
+ * already existed, and a path that is a symlink is not the path that was configured. Establish it,
+ * or refuse.
  */
 import fs from "node:fs";
 import { ToolError } from "./errors.js";
@@ -19,7 +20,7 @@ export class InsecureStateError extends ToolError {
   constructor(target: string, problem: string) {
     super(
       "policy_denied",
-      `This server's local state at ${target} ${problem}, so the call is refused. Approvals and rate-limit counters only mean anything while they are this user's own files — a directory at 0700, files at 0600, no symlinks. Fix that path, or point RFPHUB_MCP_HOME at somewhere this user owns.`,
+      `This server's local state at ${target} ${problem}, so the call is refused. Approvals and rate-limit counters only mean anything while they are this user's own files — a directory at 0700, files at 0600, no symlinks. Fix that path, or point --state-dir at somewhere this user owns.`,
       { path: target },
     );
   }

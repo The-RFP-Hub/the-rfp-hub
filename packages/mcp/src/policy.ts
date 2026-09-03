@@ -225,7 +225,7 @@ export class Policy {
   private storeError(file: string, cause: unknown): ToolError {
     return new ToolError(
       "policy_denied",
-      `The rate-limit store at ${file} is unusable, so this call is refused. This server fails closed: a budget it cannot count is a budget it cannot enforce. Make the directory writable (or point RFPHUB_MCP_HOME somewhere that is) and retry.`,
+      `The rate-limit store at ${file} is unusable, so this call is refused. This server fails closed: a budget it cannot count is a budget it cannot enforce. Make the directory writable (or point --state-dir somewhere that is) and retry.`,
       { cause: cause instanceof Error ? cause.message : String(cause) },
     );
   }

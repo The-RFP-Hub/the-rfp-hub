@@ -1,8 +1,10 @@
 /**
- * Everything the server reads from its ENVIRONMENT, resolved once. The credential is deliberately
- * not a tool parameter: a model that can put a key in an argument can put it in a transcript.
- * `apiOrigin` is separate because the approval binds to it — a trailing slash, an explicit `:443`
- * and an upper-case host are one destination and must produce one approval.
+ * Everything the server is configured with, resolved once. Only two things come from the
+ * environment: the credential — deliberately not a tool parameter, because a model that can put a
+ * key in an argument can put it in a transcript — and the deployment's base URL. Everything else
+ * is a flag or a constant. `apiOrigin` is separate because the approval binds to it: a trailing
+ * slash, an explicit `:443` and an upper-case host are one destination and must produce one
+ * approval.
  */
 import os from "node:os";
 import path from "node:path";
@@ -10,11 +12,16 @@ import path from "node:path";
 /** The production API. Overridable for staging and for the integration tests. */
 export const DEFAULT_API_BASE = "https://api.ethrfps.app";
 
-/** How long any one API request — headers and body together — may take. */
+/**
+ * How long any one API request — headers and body together — may take. Fixed: a deadline an
+ * operator can raise is a deadline a stalled destination can hold a tool call open behind.
+ */
 export const DEFAULT_TIMEOUT_MS = 20_000;
-export const MIN_TIMEOUT_MS = 1_000;
-/** A hard ceiling: an operator may shorten the deadline, never remove it. */
-export const MAX_TIMEOUT_MS = 120_000;
+
+/** Where approvals, rate-limit counters and the audit log live unless `--state-dir` says otherwise. */
+export function defaultStateDir(): string {
+  return path.join(os.homedir(), ".rfphub");
+}
 
 export interface McpConfig {
   /** Base URL for `/v1/...` paths. Always a bare canonical origin — see `canonicalOrigin`. */
@@ -23,8 +30,6 @@ export interface McpConfig {
   apiOrigin: string;
   /** The `rfph_` credential, or null when none is configured. Reads never send it. */
   apiKey: string | null;
-  /** Whether the write tool is REGISTERED at all — not merely whether it refuses. */
-  submitEnabled: boolean;
   /** Directory for the approval, policy-counter and audit files. 0700. */
   home: string;
   /** Per-request deadline in milliseconds. */
@@ -93,29 +98,23 @@ export function canonicalOrigin(base: string): string {
   return parseBase(base).origin;
 }
 
-/** `RFPHUB_MCP_TIMEOUT_MS`, or the default. Out of range is refused, never silently clamped. */
-export function resolveTimeoutMs(raw: string | undefined): number {
-  const text = raw?.trim();
-  if (text === undefined || text === "") return DEFAULT_TIMEOUT_MS;
-  const value = Number(text);
-  if (!Number.isInteger(value) || value < MIN_TIMEOUT_MS || value > MAX_TIMEOUT_MS) {
-    throw new ConfigError(
-      `RFPHUB_MCP_TIMEOUT_MS must be a whole number of milliseconds between ${MIN_TIMEOUT_MS} and ${MAX_TIMEOUT_MS}; got ${JSON.stringify(text)}.`,
-    );
-  }
-  return value;
+export interface LoadConfigOptions {
+  /** `--state-dir`. A container with no writable home has no other way to say where state goes. */
+  stateDir?: string | undefined;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
+export function loadConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: LoadConfigOptions = {},
+): McpConfig {
   const apiOrigin = canonicalOrigin(env.RFPHUB_API_BASE?.trim() || DEFAULT_API_BASE);
   const apiKeyRaw = env.RFPHUB_API_KEY?.trim();
+  const stateDir = options.stateDir?.trim();
   return {
     apiBase: apiOrigin,
     apiOrigin,
     apiKey: apiKeyRaw ? apiKeyRaw : null,
-    submitEnabled: env.RFPHUB_MCP_ENABLE_SUBMIT === "1",
-    // Wins over HOME and `os.homedir()`: a container may have no home, or a shared one.
-    home: env.RFPHUB_MCP_HOME?.trim() || path.join(os.homedir(), ".rfphub"),
-    timeoutMs: resolveTimeoutMs(env.RFPHUB_MCP_TIMEOUT_MS),
+    home: stateDir ? path.resolve(stateDir) : defaultStateDir(),
+    timeoutMs: DEFAULT_TIMEOUT_MS,
   };
 }

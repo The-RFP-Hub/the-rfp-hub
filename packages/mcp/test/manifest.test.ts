@@ -22,6 +22,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "server.json"), "utf
     version: string;
     transport: { type: string };
     environmentVariables: { name: string; isSecret: boolean }[];
+    packageArguments?: { type: string; name: string; isRequired?: boolean }[];
   }[];
   _meta: Record<string, { digest: string }>;
 };
@@ -70,14 +71,16 @@ describe("server.json agrees with the package", () => {
     expect(secret).toEqual(["RFPHUB_API_KEY"]);
   });
 
-  it("documents every variable the server actually reads", () => {
+  it("documents every variable the server actually reads, and no others", () => {
     const declared = (manifest.packages[0]?.environmentVariables ?? []).map((v) => v.name).sort();
-    expect(declared).toEqual([
-      "RFPHUB_API_BASE",
-      "RFPHUB_API_KEY",
-      "RFPHUB_MCP_ENABLE_SUBMIT",
-      "RFPHUB_MCP_HOME",
-    ]);
+    expect(declared).toEqual(["RFPHUB_API_BASE", "RFPHUB_API_KEY"]);
+  });
+
+  it("declares --state-dir as an argument rather than a variable", () => {
+    const args = manifest.packages[0]?.packageArguments ?? [];
+    expect(args.map((a) => a.name)).toEqual(["--state-dir"]);
+    expect(args[0]?.type).toBe("named");
+    expect(args[0]?.isRequired).toBe(false);
   });
 });
 

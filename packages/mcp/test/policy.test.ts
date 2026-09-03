@@ -99,7 +99,7 @@ describe("fail-closed", () => {
 
 describe("submit spends the budget of the PHASE, not of the tool", () => {
   function context(policy: Policy, responses: Parameters<typeof stubFetch>[0], home: string) {
-    const config = testConfig({ submitEnabled: true, home });
+    const config = testConfig({ home });
     const stub = stubFetch(responses);
     const ctx: ToolContext = {
       config,
@@ -184,7 +184,7 @@ describe("a refused write spends the attempt meter, never the commit budget", ()
 
   it("charges attempt and leaves commit at zero when the approval is missing", async () => {
     const home = tempHome();
-    const config = testConfig({ submitEnabled: true, home });
+    const config = testConfig({ home });
     const policy = new Policy(home, { now: () => NOW });
     const stub = stubFetch([{ body: {} }]);
     const server = createServer({

@@ -26,21 +26,18 @@
         },
         {
           "name": "RFPHUB_API_KEY",
-          "description": "RFP Hub API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. A write-scoped key is recommended: its submissions land pending a reviewer's decision.",
+          "description": "RFP Hub API credential. Needed ONLY to submit; searching and fetching are anonymous and never send it. Setting it is what registers the write tool at all: without it tools/list returns two tools. A write-scoped key is recommended: its submissions land pending a reviewer's decision.",
           "isRequired": false,
           "isSecret": true
-        },
+        }
+      ],
+      "packageArguments": [
         {
-          "name": "RFPHUB_MCP_ENABLE_SUBMIT",
-          "description": "Set to 1 to register the write tool. Without it the tool is not registered at all and tools/list returns two tools.",
+          "type": "named",
+          "name": "--state-dir",
+          "description": "Directory for write approvals, rate-limit counters and the local audit log. Defaults to ~/.rfphub and must be writable — rate limiting fails closed. Pass it where this user has no writable home, and pass the same directory to `rfphub-mcp approve`.",
           "isRequired": false,
-          "isSecret": false
-        },
-        {
-          "name": "RFPHUB_MCP_HOME",
-          "description": "Directory for write approvals, rate-limit counters and the local audit log. Defaults to ~/.rfphub and must be writable — rate limiting fails closed.",
-          "isRequired": false,
-          "isSecret": false
+          "format": "filepath"
         }
       ]
     }

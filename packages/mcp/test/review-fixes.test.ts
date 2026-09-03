@@ -318,7 +318,7 @@ describe("the preview refuses what the API would refuse on admission", () => {
   });
 
   it("refuses at PREVIEW time, so no approval is ever created for it", async () => {
-    const config = testConfig({ submitEnabled: true });
+    const config = testConfig();
     const stub = stubFetch([{ body: {} }]);
     const ctx: ToolContext = {
       config,
@@ -339,7 +339,7 @@ describe("the preview refuses what the API would refuse on admission", () => {
 // ──────────────────────────────────────── 8. the budget is reserved before the approval ──
 describe("a purely local failure never spends the human's approval", () => {
   async function previewed() {
-    const config = testConfig({ submitEnabled: true });
+    const config = testConfig();
     const stub = stubFetch([
       {
         body: {
@@ -438,7 +438,7 @@ describe("the audit log records the phase that happened", () => {
       },
     ]);
     const { createServer } = await import("../src/server.js");
-    const config = testConfig({ submitEnabled: true, home });
+    const config = testConfig({ home });
     const server = createServer({
       config,
       api: new ApiClient(config, { fetchImpl: stub.fetchImpl }),
@@ -485,8 +485,7 @@ describe("the audit log records the phase that happened", () => {
 describe("the CLI treats an approval id as a digest, not as a path fragment", () => {
   function cli(args: string[], home: string): { status: number; stderr: string; stdout: string } {
     try {
-      const stdout = execFileSync(process.execPath, [CLI, ...args], {
-        env: { ...process.env, RFPHUB_MCP_HOME: home },
+      const stdout = execFileSync(process.execPath, [CLI, "--state-dir", home, ...args], {
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
       });

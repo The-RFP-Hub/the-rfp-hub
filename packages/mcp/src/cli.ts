@@ -7,6 +7,10 @@
  *   rfphub-mcp approve <id>     print the five bindings and the document, ask, and grant
  *   rfphub-mcp revoke <id>      delete a pending preview and any approval for it
  *
+ * `--state-dir` is accepted in every mode and must name the SAME directory in all of them: the
+ * server writes the preview there and the approval modes read it back. It is a flag rather than a
+ * variable because a path is not a secret and an MCP client that can pass `env` can pass `args`.
+ *
  * IN SERVER MODE STDOUT IS THE WIRE: a stray `console.log` corrupts the session, so diagnostics go
  * to stderr and never carry a request body. The approval modes are a separate mode of the same
  * binary rather than a tool because a tool is reachable from the model's loop — with the caveat,
@@ -32,7 +36,7 @@ import {
   readPending,
   writeApproval,
 } from "./approvals.js";
-import { ConfigError, loadConfig } from "./config.js";
+import { ConfigError, defaultStateDir, loadConfig } from "./config.js";
 import { redactString, registerSecret } from "./redact.js";
 import { PROTOCOL_VERSION, SERVER_NAME, SERVER_VERSION, createServer } from "./server.js";
 import { RedactingTransport } from "./transport.js";
@@ -58,12 +62,50 @@ const USAGE = `rfphub-mcp — the RFP Hub MCP server
   rfphub-mcp revoke <id>     delete a preview and any approval for it
   rfphub-mcp --help
 
+Options (every mode):
+  --state-dir <dir>          approvals, rate-limit counters and the audit log (default ~/.rfphub).
+                             Pass the same directory to the server and to \`approve\`. Required
+                             where this user has no writable home, as in a container.
+
 Environment:
   RFPHUB_API_BASE            API base URL (default https://api.ethrfps.app)
-  RFPHUB_API_KEY             credential, needed only to submit; searching is anonymous
-  RFPHUB_MCP_ENABLE_SUBMIT   set to 1 to register the write tool at all
-  RFPHUB_MCP_HOME            state directory (default ~/.rfphub); must be writable
+  RFPHUB_API_KEY             credential. Searching and fetching are anonymous and never send it;
+                             setting it is what registers the write tool at all
 `;
+
+class UsageError extends Error {}
+
+const STATE_DIR_USAGE =
+  "--state-dir needs a directory, as in `rfphub-mcp --state-dir /var/lib/rfphub`.";
+
+/**
+ * Only one flag, so no parser library. `--state-dir` is pulled out wherever it appears; everything
+ * else stays a positional word in order, which keeps `approve <id>` reading the same.
+ */
+function parseArgs(argv: string[]): { words: string[]; stateDir: string | undefined } {
+  const words: string[] = [];
+  let stateDir: string | undefined;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i] as string;
+    if (arg === "--state-dir") {
+      const value = argv[i + 1];
+      if (value === undefined || value === "" || value.startsWith("-")) {
+        throw new UsageError(STATE_DIR_USAGE);
+      }
+      stateDir = value;
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith("--state-dir=")) {
+      const value = arg.slice("--state-dir=".length);
+      if (value === "") throw new UsageError(STATE_DIR_USAGE);
+      stateDir = value;
+      continue;
+    }
+    words.push(arg);
+  }
+  return { words, stateDir };
+}
 
 /** stderr only. See the file header. */
 function say(line: string): void {
@@ -71,7 +113,14 @@ function say(line: string): void {
 }
 
 async function main(argv: string[]): Promise<number> {
-  const [mode, ...rest] = argv;
+  let parsed: ReturnType<typeof parseArgs>;
+  try {
+    parsed = parseArgs(argv);
+  } catch (err) {
+    say(err instanceof UsageError ? err.message : String(err));
+    return 2;
+  }
+  const [mode, ...rest] = parsed.words;
 
   if (mode === "--help" || mode === "-h" || mode === "help") {
     process.stdout.write(USAGE);
@@ -84,7 +133,7 @@ async function main(argv: string[]): Promise<number> {
 
   let config: ReturnType<typeof loadConfig>;
   try {
-    config = loadConfig();
+    config = loadConfig(process.env, { stateDir: parsed.stateDir });
   } catch (err) {
     if (err instanceof ConfigError) {
       say(`configuration error: ${err.message}`);
@@ -112,7 +161,7 @@ async function main(argv: string[]): Promise<number> {
 function serve(config: ReturnType<typeof loadConfig>): Promise<number> {
   say(
     `${SERVER_NAME} ${SERVER_VERSION} on stdio · protocol ${PROTOCOL_VERSION} · api ${config.apiOrigin} · ` +
-      `submit ${config.submitEnabled ? "ENABLED" : "disabled"} · key ${config.apiKey ? "present" : "absent"}`,
+      `submit ${config.apiKey ? "ENABLED" : "disabled"} · key ${config.apiKey ? "present" : "absent"} · state ${config.home}`,
   );
   serveStdio(() => createServer({ config }), {
     // Wrapped so EVERY outbound message is redacted, the SDK's own error paths included.
@@ -124,6 +173,9 @@ function serve(config: ReturnType<typeof loadConfig>): Promise<number> {
 }
 
 function pending(home: string): number {
+  // The hint has to be runnable: a listing of a directory the default would not have found must
+  // carry the flag that found it.
+  const flag = home === defaultStateDir() ? "" : ` --state-dir ${home}`;
   const previews = listPending(home);
   const approvals = listApprovals(home);
   const now = new Date();
@@ -142,7 +194,7 @@ function pending(home: string): number {
     const state = isExpired(record, now) ? "EXPIRED" : `expires ${record.expiresAt}`;
     lines.push(`  ${record.approvalId}  ${state}`);
     lines.push(describeBinding(record).replace(/^/gm, "  "));
-    lines.push(`    approve with: rfphub-mcp approve ${record.approvalId}`);
+    lines.push(`    approve with: rfphub-mcp${flag} approve ${record.approvalId}`);
   }
   lines.push("");
   lines.push(`Approvals granted and not yet used (${approvalsDir(home)}):`);

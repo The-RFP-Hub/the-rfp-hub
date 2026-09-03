@@ -427,7 +427,7 @@ export class ApiClient {
   private timedOut(operation: string): ToolError {
     return new ToolError(
       "exec_failed",
-      `The API did not answer ${operation} within this server's ${this.config.timeoutMs}ms deadline, so the request was abandoned. Nothing was retried. Raise RFPHUB_MCP_TIMEOUT_MS if this destination is legitimately slow.`,
+      `The API did not answer ${operation} within this server's ${this.config.timeoutMs}ms deadline, so the request was abandoned. Nothing was retried. The deadline is fixed; a destination that is legitimately this slow is a destination to fix.`,
       { timeoutMs: this.config.timeoutMs, transport: true },
     );
   }

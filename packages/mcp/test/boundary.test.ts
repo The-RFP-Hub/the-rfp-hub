@@ -44,11 +44,10 @@ beforeAll(() => {
     throw new Error("run `pnpm --filter @the-rfp-hub/mcp build` before this suite");
   }
   home = tempHome();
-  child = spawn(process.execPath, [CLI], {
+  child = spawn(process.execPath, [CLI, "--state-dir", home], {
     env: {
       ...process.env,
       RFPHUB_API_BASE: "http://127.0.0.1:1",
-      RFPHUB_MCP_HOME: home,
     },
     stdio: ["pipe", "pipe", "pipe"],
   });

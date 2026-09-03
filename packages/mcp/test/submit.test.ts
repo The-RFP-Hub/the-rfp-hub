@@ -20,7 +20,7 @@ import { FAKE_KEY, rejection, stubFetch, tempHome, testConfig, validDocument } f
 afterEach(() => clearRegisteredSecrets());
 
 function context(overrides: { apiKey?: string | null } = {}) {
-  const config = testConfig({ submitEnabled: true, ...overrides });
+  const config = testConfig(overrides);
   const stub = stubFetch([{ body: {} }]);
   const ctx: ToolContext = {
     config,
@@ -181,7 +181,7 @@ describe("the submission result", () => {
 describe("the preview says exactly what it is required to say", () => {
   async function previewOf(document: Record<string, unknown> = validDocument()) {
     const home = tempHome();
-    const config = testConfig({ submitEnabled: true, home });
+    const config = testConfig({ home });
     const ctx: ToolContext = {
       config,
       api: new ApiClient(config, { fetchImpl: stubFetch([{ body: {} }]).fetchImpl }),

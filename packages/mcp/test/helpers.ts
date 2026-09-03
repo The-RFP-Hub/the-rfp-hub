@@ -39,7 +39,6 @@ export function testConfig(overrides: Partial<McpConfig> = {}): McpConfig {
     apiBase,
     apiOrigin: overrides.apiOrigin ?? canonicalOrigin(apiBase),
     apiKey: overrides.apiKey !== undefined ? overrides.apiKey : FAKE_KEY,
-    submitEnabled: overrides.submitEnabled ?? false,
     home: overrides.home ?? tempHome(),
     timeoutMs: overrides.timeoutMs ?? 20_000,
   };
