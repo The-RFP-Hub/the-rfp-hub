@@ -25,6 +25,10 @@ pnpm check:deployment --milestone m2 \
 pnpm accept:writes --milestone m3 \
   --api https://api-staging.example.org \
   --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
+
+pnpm accept:writes --milestone m4 \
+  --api https://api-staging.example.org \
+  --session-token "$REVIEWER_SESSION" --api-key "$RFPH_KEY"
 ```
 
 `--help` on either lists every flag. Human-readable pass/fail per criterion goes to stdout, a
@@ -36,6 +40,25 @@ or a required check was never exercised · `2` the run could not be made at all.
 
 Neither is wired into CI. They answer "does the definition of done hold against this deployment",
 which is a question someone asks, not a monitor — and CI has no deployment to write to.
+
+### Credentials — one set, both profiles
+
+`accept:writes` takes three credentials, and a profile uses the ones its criteria need. There is no
+per-profile name for the same job: "the reviewer's session" and "the key the MCP submits with" are
+these three under different names, and a second set of names meant a token left in a shell could
+outrank a flag passed by hand.
+
+| Flag | Variable | What it is | `m3` | `m4` |
+|---|---|---|---|---|
+| `--session-token` | `COMPLIANCE_SESSION_TOKEN` | A signed-in session. | Mints the key and drives the session-only surfaces. | Must be a reviewer's session, unless `--admin-token` is given. |
+| `--admin-token` | `COMPLIANCE_ADMIN_TOKEN` | The teardown credential: it rejects and unlists. | Required, unless the session may review. | Same, and optional for the same reason. |
+| `--api-key` | `COMPLIANCE_API_KEY` | An `rfph_` key. | An alternative to the session; session-only criteria then report a skip. | **Required** — write-scoped, never publish-scoped, and the only credential handed to the MCP server. |
+
+A flag wins over its variable, so a leftover value cannot quietly redirect a deliberate run; the
+variables exist because `argv` is world-readable through `ps` and these are live tokens.
+
+Whichever of `--admin-token` and `--session-token` will do the teardown is checked against
+`GET /v1/me` before the first write — the same precedence, for both profiles.
 
 ## Selecting criteria
 
@@ -141,7 +164,7 @@ mcp` therefore registers the behavior half alone, and `--skip mcp` leaves public
 | `governance` | The four governance documents exist and their GitHub URLs answer 200; `/how-it-works` carries an anchor whose `href` is each of the four exact canonical URLs (read from `packages/frontend/src/lib/links.ts`); and the home page carries at least one of those same four exact hrefs **outside** `<footer>` — a link the global chrome puts on every page is not the home page linking to the framework. |
 | `publishers` | The route answers 200; `GET /v1/publishers` has the shape it promises (items array, integer `total` equal to `items.length`, unique non-empty slugs); rendered, the page shows exactly those slugs — or the empty state when there are none — and the browser's own request carries no `Authorization` header. |
 | `frontend` | TLS (a non-loopback plaintext site FAILS); liveness; `robots.txt` reported, or required with `--expect-indexable`; rendered: `q`, an ecosystem filter, a funding-type filter and `page=2` each change **which** entries are shown, and the two filters — values chosen from live data for actually NARROWING the corpus, never a dominant value whose first page is the unfiltered one — match what the API returns for the same filter; the detail page's visible `<h1>` is the title; both deep-link hrefs are exact; three viewports have no horizontal overflow, and at the two touch viewports (built with `isMobile`, so `(pointer: coarse)` matches the way it does on a real phone) no **form control** (`input`, `select`, `textarea`, `button`, `[role="button"]`) and no **nav link** (`nav a`) is under 44 px tall — the scope `packages/e2e/tests/13-responsive.spec.ts` asserts. A text link outside a nav is not measured whatever its `display`: its hit area is the line box, and widening it would break the sentence around it. |
-| `mcp` | `npx` resolves `@the-rfp-hub/mcp` from the real npm registry and runs; **exactly** two tools without `RFPHUB_MCP_ENABLE_SUBMIT` and **exactly** three with it, each with an `outputSchema` and boolean annotation hints; `search_opportunities` returns `structuredContent` that validates against its own advertised schema and matches the API page for page, envelope field for envelope, across two pages of a query derived from the live corpus; no `rfph_` substring anywhere, including after the process exits; phase 1 answers `pending` and makes no network write — against a **local recording server this checker starts itself**, never against `--api`. |
+| `mcp` | `npx` resolves `@the-rfp-hub/mcp` from the real npm registry and runs; **exactly** two tools without `RFPHUB_API_KEY` and **exactly** three with it, each with an `outputSchema` and boolean annotation hints; `search_opportunities` returns `structuredContent` that validates against its own advertised schema and matches the API page for page, envelope field for envelope, across two pages of a query derived from the live corpus; no `rfph_` substring anywhere, including after the process exits; phase 1 answers `pending` and makes no network write — against a **local recording server this checker starts itself**, never against `--api`. |
 | `mcp-publication` | `npm view` resolves the selected spec to an exact version whose published `mcpName` matches the manifest; the official MCP Registry carries that server at that version with the same npm package identifier; every `npx` configuration snippet in `packages/mcp/README.md` pins an exact version (never `@latest`, never a dist-tag). |
 | `skill` | Every file the documented install channels need is on GitHub `main` with the same sha256 as the audited local copy; the repository's own `scripts/check-skill.mjs` passes against that fetched copy; the fetched `scripts/search.mjs`, run against a corpus whose every prose field carries an injected instruction, emits neither the instruction nor a `description` field. |
 | `docs` | The four `docs/*.md` guides exist; every link and `#anchor` in them — and in the root markdown, `skills/**` and `packages/mcp/README.md` — resolves; only `safe-read` `sh` blocks are ever executed, and those succeed. |
@@ -211,10 +234,14 @@ loopback and rejects any path, query, fragment or userinfo at startup — so a `
 path is trimmed (and said so), and a plaintext non-loopback `--api` fails by name rather than as an
 opaque startup error inside "tools/list succeeds".
 
-Every server process gets its own disposable `RFPHUB_MCP_HOME`, removed afterwards: a real server's
-`guard()` writes an audit line for every tool call, so without it even the read-only cases would
-leave entries in whoever runs this checker's own `~/.rfphub/audit.log`, and the submit-enabled
-case's preview would land in `~/.rfphub/pending/` indistinguishable from a real one.
+Every server process is spawned with its own disposable `--state-dir`, removed afterwards: a real
+server's `guard()` writes an audit line for every tool call, so without it even the read-only cases
+would leave entries in whoever runs this checker's own `~/.rfphub/audit.log`, and the submit case's
+preview would land in `~/.rfphub/pending/` indistinguishable from a real one.
+
+The read-only case additionally **strips** `RFPHUB_API_KEY` from the child's environment rather
+than merely declining to set it: that variable is what registers the write tool, so a key exported
+in the operator's own shell would otherwise make the two-tool assertion vacuous.
 
 ## The `sh`-block marker convention
 
@@ -287,9 +314,10 @@ only make an honest red run slower.
 There is no `--allow-production`, and no other flag that reaches production. `accept:writes` accepts
 
 - **loopback**, plaintext included: that traffic never leaves the machine;
-- **https to an explicitly allowlisted staging origin**;
-- **one extra https origin** whose hostname carries a `staging` label and no `prod` label, named by
-  `RFPHUB_ACCEPT_EXTRA_STAGING_ORIGIN`.
+- **https to an explicitly allowlisted staging origin** — the `STAGING_ORIGINS` constant in
+  [`target-guard.mjs`](./target-guard.mjs), and nothing at run time adds to it. A fork that deploys
+  its own staging edits that constant, in a commit somebody reviews; where live credentials may be
+  sent is not a decision a variable in a shell should be able to make.
 
 The redirect chain the target answers with is followed to five hops and every hop re-checked, because
 an allowlisted origin that 302s elsewhere still receives the request carrying the credential.
@@ -304,8 +332,8 @@ Three more refusals, all decided before a single request is made:
 |---|---|
 | no `--namespace`, no publisher credential (`m3`) | A run that quietly performed the criteria it could and reported an acceptance would be worse than no tool. |
 | a key from the other profile in `--only`/`--skip` | The registry knows every write criterion, but the state, the fixture ids and the teardown all follow `--milestone`. `--milestone m4 --only lifecycle` created an M3 fixture that the M4 teardown does not know to remove. |
-| no reviewer token, no write key (`m4`) | The submission profile drives the MCP server, so those are the two credentials it needs; both may also arrive as `COMPLIANCE_REVIEWER_TOKEN` / `COMPLIANCE_WRITE_KEY`, or under the `RFPHUB_` names the MCP server's own documentation spells. Those four variables are read **only** under `--milestone m4`, so one left in a shell cannot outrank an `--admin-token` passed to an m3 run. |
-| the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, an expired `--admin-token`, or a `--reviewer-token` whose account was demoted used to pass every refusal, create fixtures, and only then discover at teardown that it could not remove any of them. |
+| no `--api-key`, no reviewer credential (`m4`) | The submission profile hands the MCP server one write-scoped `rfph_` key, and tears the entry down with the same reviewer credential every profile uses. |
+| the reviewer credential cannot review | Checked against `GET /v1/me` on the target **before the first write**, because presence of a token is not the capability to reject. A `--session-token` that is not a reviewer, or an expired `--admin-token`, used to pass every refusal, create fixtures, and only then discover at teardown that it could not remove any of them. |
 | `--keep-fixtures` | Permitted, but it records an **unmet** requirement, so the run reports `INCOMPLETE` rather than exiting 0 with rows left behind. |
 
 Everything a write run creates is named `<namespace>:compliance-<runstamp>-<what>`, so a leftover

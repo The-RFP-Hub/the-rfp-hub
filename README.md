@@ -179,10 +179,12 @@ down afterwards:
 
 ```bash staging-write
 pnpm accept:writes --milestone m4 --api https://api.staging.example.org \
-  --reviewer-token "$REVIEWER" --write-key "$RFPH_KEY"
+  --session-token "$REVIEWER_SESSION" --api-key "$RFPH_KEY"
 ```
 
-No run without both credentials, under the same target guard.
+The same three credential flags as the publisher profile, under the same target guard: a session
+whose account may review (or an `--admin-token`), because the teardown rejects the entry, and the
+write-scoped `rfph_` key the MCP server submits with. No run without both.
 
 ## Open data
 
