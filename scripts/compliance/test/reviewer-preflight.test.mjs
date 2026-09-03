@@ -45,10 +45,6 @@ function run(args) {
         COMPLIANCE_SESSION_TOKEN: "",
         COMPLIANCE_ADMIN_TOKEN: "",
         COMPLIANCE_API_KEY: "",
-        COMPLIANCE_REVIEWER_TOKEN: "",
-        COMPLIANCE_WRITE_KEY: "",
-        RFPHUB_REVIEWER_TOKEN: "",
-        RFPHUB_WRITE_KEY: "",
       },
     });
     let out = "";
@@ -110,17 +106,17 @@ describe("the teardown credential", () => {
   });
 });
 
-// The m4 profile reaches the same preflight under its own flag, and it matters more there: its one
-// criterion writes through the MCP server, which no refusal downstream could undo.
+// The m4 profile reaches the same preflight through the same credential, and it matters more
+// there: its one criterion writes through the MCP server, which no refusal downstream could undo.
 describe("the m4 profile's reviewer", () => {
   const submission = (origin, extra = []) => [
     "--milestone",
     "m4",
     "--api",
     origin,
-    "--reviewer-token",
+    "--session-token",
     "not-a-reviewer",
-    "--write-key",
+    "--api-key",
     "rfph_x",
     "--json",
     "-",
@@ -128,22 +124,22 @@ describe("the m4 profile's reviewer", () => {
     ...extra,
   ];
 
-  it("refuses a --reviewer-token that may not review, before the MCP cycle writes", async () => {
+  it("refuses a session that may not review, before the MCP cycle writes", async () => {
     const api = await fakeApi({ canReview: false });
     const { code, out } = await run(submission(api.origin));
 
     expect(code).toBe(2);
-    expect(out).toContain("--reviewer-token names an account that may not review");
-    expect(out).toContain("Pass a --reviewer-token whose account may review");
+    expect(out).toContain("--session-token names an account that may not review");
+    expect(out).toContain("Pass an --admin-token whose account may review");
     expect(api.seen.filter((request) => !request.startsWith("GET "))).toEqual([]);
   });
 
-  it("refuses a --reviewer-token the deployment does not accept", async () => {
+  it("checks the --admin-token instead when one is given, exactly as m3 does", async () => {
     const api = await fakeApi({ canReview: true, meStatus: 401 });
-    const { code, out } = await run(submission(api.origin));
+    const { code, out } = await run(submission(api.origin, ["--admin-token", "expired"]));
 
     expect(code).toBe(2);
-    expect(out).toContain("--reviewer-token was answered 401");
+    expect(out).toContain("--admin-token was answered 401");
     expect(api.seen.filter((request) => !request.startsWith("GET "))).toEqual([]);
   });
 });

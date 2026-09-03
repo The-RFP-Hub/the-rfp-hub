@@ -35,13 +35,13 @@ describe("ownedIds", () => {
         json: { items: all.slice((page - 1) * 100, page * 100), total: all.length },
       };
     });
-    const ids = await ownedIds({ writeKey: "rfph_x" });
+    const ids = await ownedIds({ apiKey: "rfph_x" });
     expect(ids).toHaveLength(250);
     expect(ids.at(-1)).toBe("acme:item-249");
   });
 
   it("throws rather than reporting an empty snapshot when the listing errors", async () => {
     callJson.mockResolvedValue({ ok: true, status: 500 });
-    await expect(ownedIds({ writeKey: "rfph_x" })).rejects.toThrow(/answered 500/);
+    await expect(ownedIds({ apiKey: "rfph_x" })).rejects.toThrow(/answered 500/);
   });
 });

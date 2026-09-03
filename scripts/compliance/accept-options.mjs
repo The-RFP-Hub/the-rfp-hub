@@ -2,9 +2,9 @@
  * Argument parsing and refusals for `scripts/accept-writes.mjs`, which WRITES.
  *
  * Three refusals, all because the tool submits entries against whatever it is pointed at: the
- * target must be allowlisted (`target-guard.mjs`); a namespace and a publisher credential are
- * required, because a run that quietly performed only the criteria it could would report an
- * acceptance it had not established; and a reviewer credential is required too, because the
+ * target must be allowlisted (`target-guard.mjs`); the credentials the selected profile writes
+ * with are required, because a run that quietly performed only the criteria it could would report
+ * an acceptance it had not established; and a reviewer credential is required too, because the
  * teardown rejects and unlists with one and a run that cannot tear down must not start.
  *
  * Credentials also come from the environment because argv is world-readable through `ps` and these
@@ -18,19 +18,15 @@ import { targetRefusal } from "./target-guard.mjs";
 const NUMERIC = new Set(["--views", "--timeout", "--concurrency", "--approve-timeout"]);
 
 /**
- * Env names in the order they are consulted. The `RFPHUB_` pair is what the MCP server's own
- * documentation spells for the same two credentials, so both are accepted rather than making an
- * operator hold two names for one token.
+ * ONE credential set, whatever the profile. Three tokens with three jobs — a session, a teardown
+ * credential, an `rfph_` key — and both profiles draw from them, because "the reviewer's session"
+ * and "the key the MCP submits with" are those same three jobs under different names.
  */
 const CREDENTIAL_ENV = {
   sessionToken: ["COMPLIANCE_SESSION_TOKEN"],
   adminToken: ["COMPLIANCE_ADMIN_TOKEN"],
   apiKey: ["COMPLIANCE_API_KEY"],
-  reviewerToken: ["COMPLIANCE_REVIEWER_TOKEN", "RFPHUB_REVIEWER_TOKEN"],
-  writeKey: ["COMPLIANCE_WRITE_KEY", "RFPHUB_WRITE_KEY"],
 };
-
-const SUBMISSION_CREDENTIALS = new Set(["reviewerToken", "writeKey"]);
 
 /** A slug is the id prefix of everything this run writes, so it is held to the shape ids are. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -108,12 +104,6 @@ export function parseArgs(argv, env = process.env) {
       case "--admin-token":
         opts.adminToken = next();
         break;
-      case "--reviewer-token":
-        opts.reviewerToken = next();
-        break;
-      case "--write-key":
-        opts.writeKey = next();
-        break;
       case "--repo-root":
         opts.repoRoot = next();
         break;
@@ -157,11 +147,7 @@ export function parseArgs(argv, env = process.env) {
   if (opts.only.size > 0 && opts.skip.size > 0) {
     throw new Error("--only and --skip cannot be combined: --only already says what runs");
   }
-  // The m4 names are read only under the m4 profile: a token left in the environment from an
-  // earlier submission run must not quietly outrank an --admin-token passed to an m3 run.
-  const submission = opts.milestone === "m4";
   for (const [key, variables] of Object.entries(CREDENTIAL_ENV)) {
-    if (!submission && SUBMISSION_CREDENTIALS.has(key)) continue;
     for (const variable of variables) {
       if (opts[key] === undefined && env[variable]) opts[key] = env[variable];
     }
@@ -175,7 +161,7 @@ export function parseArgs(argv, env = process.env) {
 }
 
 /** Everything that has to be true before a single request is made. Empty means go. */
-export function refusals(opts, milestones, env = process.env) {
+export function refusals(opts, milestones) {
   const reasons = [];
   const known = Object.keys(milestones);
   if (!opts.milestone) {
@@ -195,7 +181,7 @@ export function refusals(opts, milestones, env = process.env) {
     reasons.push(...publisherRefusals(opts));
   }
   if (opts.api) {
-    const refusal = targetRefusal(opts.api, env);
+    const refusal = targetRefusal(opts.api);
     if (refusal) reasons.push(refusal);
   }
   return reasons;
@@ -223,17 +209,20 @@ function crossProfileRefusals(opts, milestones) {
   return reasons;
 }
 
-/** The m4 profile submits through the MCP server, so it needs that server's two credentials. */
+/**
+ * The m4 profile submits through the MCP server, which holds the `rfph_` key, and tears down with
+ * the same reviewer credential every other profile uses.
+ */
 function submissionRefusals(opts) {
   const reasons = [];
-  if (!opts.reviewerToken) {
+  if (!opts.apiKey) {
     reasons.push(
-      "a reviewer credential is required (--reviewer-token, COMPLIANCE_REVIEWER_TOKEN or RFPHUB_REVIEWER_TOKEN) — the teardown rejects and unlists the entry this run submits, and a run that cannot tear down must not start",
+      "--api-key is required (or COMPLIANCE_API_KEY) — a write-scoped rfph_ key, never a publish-scoped one, so the fixture lands pending by construction, which is the property this profile proves. It is the only credential handed to the MCP server",
     );
   }
-  if (!opts.writeKey) {
+  if (!opts.adminToken && !opts.sessionToken) {
     reasons.push(
-      "a write credential is required (--write-key, COMPLIANCE_WRITE_KEY or RFPHUB_WRITE_KEY) — a write-scoped rfph_ key, never a publish-scoped one, so the fixture lands pending by construction, which is the property this profile proves",
+      "a reviewer credential is required (--admin-token, or COMPLIANCE_ADMIN_TOKEN, or a --session-token whose account may review) — the teardown rejects and unlists the entry this run submits, and a run that cannot tear down must not start",
     );
   }
   return reasons;

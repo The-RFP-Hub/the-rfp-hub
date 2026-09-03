@@ -142,7 +142,7 @@ export async function ownedIds(ctx) {
   const ids = [];
   for (let page = 1; page <= 50; page++) {
     const res = await callJson(ctx, `/v1/me/opportunities?limit=100&page=${page}`, {
-      token: ctx.writeKey,
+      token: ctx.apiKey,
     });
     if (!res.ok || res.status !== 200) {
       throw new Error(`GET /v1/me/opportunities answered ${res.status ?? res.error}`);
@@ -174,11 +174,11 @@ export async function runSubmissionCycle(ctx, state, c) {
   const env = {
     // A bare origin: the server refuses a base carrying a path, query, fragment or userinfo.
     RFPHUB_API_BASE: new URL(ctx.api).origin,
-    RFPHUB_API_KEY: ctx.writeKey,
-    RFPHUB_MCP_ENABLE_SUBMIT: "1",
-    RFPHUB_MCP_HOME: mcpHome,
+    // The whole environment the server gets. Setting it is also what registers the write tool.
+    RFPHUB_API_KEY: ctx.apiKey,
   };
-  const client = new McpStdioClient(resolved.command, resolved.args, { cwd: ctx.repoRoot, env });
+  const serve = resolveCommand(ctx, ["--state-dir", mcpHome]);
+  const client = new McpStdioClient(serve.command, serve.args, { cwd: ctx.repoRoot, env });
   client.start();
 
   try {
@@ -186,7 +186,7 @@ export async function runSubmissionCycle(ctx, state, c) {
     const names = (listResponse.result?.tools ?? []).map((t) => t.name).sort();
     c.expect(
       names.length === 3 && [...READ_TOOLS, SUBMIT_TOOL].every((n) => names.includes(n)),
-      "tools/list is exactly three tools with RFPHUB_MCP_ENABLE_SUBMIT=1",
+      "tools/list is exactly three tools with RFPHUB_API_KEY set",
       names.join(", "),
       `expected exactly [${[...READ_TOOLS, SUBMIT_TOOL].sort().join(", ")}], got [${names.join(", ")}]`,
     );
@@ -252,7 +252,7 @@ export async function runSubmissionCycle(ctx, state, c) {
       `the owner listing changed after a REFUSED commit: ${before.length} → ${afterRefusal.length}`,
     );
 
-    const approveArgs = resolveCommand(ctx, ["approve", approvalId]);
+    const approveArgs = resolveCommand(ctx, ["--state-dir", mcpHome, "approve", approvalId]);
     const approveCommand = `${approveArgs.command} ${approveArgs.args.join(" ")}`;
     state.approvalMode = ctx.interactiveApproval ? "HUMAN" : "SIMULATED (non-interactive)";
     try {
@@ -271,7 +271,7 @@ export async function runSubmissionCycle(ctx, state, c) {
           return true;
         };
         await waitForHumanApproval(state, {
-          command: `RFPHUB_MCP_HOME=${mcpHome} ${approveCommand}`,
+          command: approveCommand,
           timeoutMs: ctx.approveTimeoutMs,
           onPrompt: (text) => process.stderr.write(`${text}\n`),
         });
@@ -327,7 +327,7 @@ export async function runSubmissionCycle(ctx, state, c) {
  * read surface, which hides pending entries by design.
  */
 export async function verifyLandedPending(ctx, opportunityId) {
-  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", { token: ctx.writeKey });
+  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", { token: ctx.apiKey });
   if (!mine.ok || mine.status !== 200) {
     throw new Error(
       `GET /v1/me/opportunities answered ${mine.status ?? mine.error} — could not verify the fixture landed`,
@@ -368,7 +368,7 @@ export async function teardown(ctx, opportunityId) {
  * endpoint answers 200.
  */
 export async function verifyTornDown(ctx, opportunityId) {
-  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", { token: ctx.writeKey });
+  const mine = await callJson(ctx, "/v1/me/opportunities?limit=100", { token: ctx.apiKey });
   const publicRes = await callJson(ctx, `/v1/opportunities/${encodeURIComponent(opportunityId)}`);
   // A 401, a 500 or a body without `items` made `find` return undefined, which read as "the entry
   // is gone". An owner listing that did not answer is not evidence of anything.

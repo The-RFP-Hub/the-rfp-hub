@@ -57,7 +57,7 @@ describe("refusals", () => {
   it("refuses production, and offers no flag that unlocks it", () => {
     const reasons = check({ ...complete, api: "https://api.ethrfps.app" });
     expect(reasons[0]).toContain("is PRODUCTION");
-    expect(reasons[0]).toContain("There is no flag to force production");
+    expect(reasons[0]).toContain("There is no flag and no variable that forces production");
     expect(reasons[0]).not.toContain("--allow-production");
   });
 
@@ -97,8 +97,8 @@ describe("selecting across profiles", () => {
   const m4 = {
     milestone: "m4",
     api: "https://api-staging.ethrfps.app",
-    reviewerToken: "t",
-    writeKey: "rfph_x",
+    sessionToken: "t",
+    apiKey: "rfph_x",
   };
 
   it("refuses --only lifecycle under m4, naming the profile it belongs to", () => {
@@ -129,23 +129,27 @@ describe("the m4 profile's refusals", () => {
   const submission = {
     milestone: "m4",
     api: "https://api-staging.ethrfps.app",
-    reviewerToken: "t",
-    writeKey: "rfph_x",
+    sessionToken: "t",
+    apiKey: "rfph_x",
   };
 
-  it("passes with both of its credentials against an allowlisted staging origin", () => {
+  it("passes with the same credential names the m3 profile uses", () => {
     expect(check(submission)).toEqual([]);
   });
 
-  it("wants neither a namespace nor a publisher session: it submits through the MCP server", () => {
-    expect(check({ ...submission, namespace: undefined, sessionToken: undefined })).toEqual([]);
+  it("wants no namespace: it submits through the MCP server, in the compliance namespace", () => {
+    expect(check({ ...submission, namespace: undefined })).toEqual([]);
+  });
+
+  it("takes an --admin-token in place of the session, as the m3 profile does", () => {
+    expect(check({ ...submission, sessionToken: undefined, adminToken: "a" })).toEqual([]);
   });
 
   it("names each missing credential individually", () => {
-    const reasons = check({ ...submission, reviewerToken: undefined, writeKey: undefined });
+    const reasons = check({ ...submission, sessionToken: undefined, apiKey: undefined });
     expect(reasons).toHaveLength(2);
+    expect(reasons.join("\n")).toContain("--api-key is required");
     expect(reasons.join("\n")).toContain("a reviewer credential is required");
-    expect(reasons.join("\n")).toContain("a write credential is required");
   });
 
   it("refuses production before a single request is made", () => {
@@ -204,39 +208,39 @@ describe("parseArgs", () => {
     expect(flagWins.adminToken).toBe("admin-from-env");
   });
 
-  it("does not read the m4 credential environment on an m3 run", () => {
-    // A token left over from a submission run used to outrank an --admin-token passed by hand, so
-    // an m3 teardown rejected with whichever credential the shell happened to be carrying.
-    const stale = { RFPHUB_REVIEWER_TOKEN: "stale", COMPLIANCE_WRITE_KEY: "rfph_stale" };
-    const m3 = parseArgs(["--milestone", "m3", "--admin-token", "admin-flag"], stale);
-    expect(m3.reviewerToken).toBeUndefined();
-    expect(m3.writeKey).toBeUndefined();
+  it("resolves the teardown credential the same way for both profiles", () => {
+    // A separate m4-only credential used to exist, read from its own variables, so a token left in
+    // the shell could outrank an --admin-token passed by hand. There is one set now.
+    const m3 = parseArgs(["--milestone", "m3", "--admin-token", "admin-flag"], {});
     expect(reviewerCredential(m3)).toEqual({ token: "admin-flag", flag: "--admin-token" });
 
-    const m4 = parseArgs(["--milestone", "m4"], stale);
-    expect(reviewerCredential(m4)).toEqual({ token: "stale", flag: "--reviewer-token" });
+    const m4 = parseArgs(["--milestone", "m4", "--admin-token", "admin-flag"], {});
+    expect(reviewerCredential(m4)).toEqual({ token: "admin-flag", flag: "--admin-token" });
+
+    const session = parseArgs(["--milestone", "m4", "--session-token", "s"], {});
+    expect(reviewerCredential(session)).toEqual({ token: "s", flag: "--session-token" });
   });
 
-  it("reads the m4 credentials under either name, the COMPLIANCE_ one first", () => {
-    const m4 = ["--milestone", "m4"];
-    expect(
-      parseArgs(m4, { RFPHUB_REVIEWER_TOKEN: "rev", RFPHUB_WRITE_KEY: "rfph_env" }),
-    ).toMatchObject({ reviewerToken: "rev", writeKey: "rfph_env" });
-    expect(
-      parseArgs(m4, { COMPLIANCE_REVIEWER_TOKEN: "first", RFPHUB_REVIEWER_TOKEN: "second" })
-        .reviewerToken,
-    ).toBe("first");
-    expect(
-      parseArgs([...m4, "--reviewer-token", "flag"], { RFPHUB_REVIEWER_TOKEN: "env" })
-        .reviewerToken,
-    ).toBe("flag");
+  it("reads the same three variables whatever the milestone", () => {
+    const env = {
+      COMPLIANCE_SESSION_TOKEN: "s",
+      COMPLIANCE_ADMIN_TOKEN: "a",
+      COMPLIANCE_API_KEY: "rfph_env",
+    };
+    for (const milestone of ["m3", "m4"]) {
+      expect(parseArgs(["--milestone", milestone], env)).toMatchObject({
+        sessionToken: "s",
+        adminToken: "a",
+        apiKey: "rfph_env",
+      });
+    }
   });
 
   it("reads the m4 profile's own flags", () => {
     const opts = parseArgs([
       "--milestone",
       "m4",
-      "--write-key",
+      "--api-key",
       "rfph_x",
       "--repo-root",
       "/tmp/checkout",
@@ -247,12 +251,18 @@ describe("parseArgs", () => {
     ]);
     expect(opts).toMatchObject({
       milestone: "m4",
-      writeKey: "rfph_x",
+      apiKey: "rfph_x",
       repoRoot: "/tmp/checkout",
       mcpSpec: "0.1.0",
       approveTimeoutMs: 9000,
       interactiveApproval: false,
     });
+  });
+
+  it("has no flag for a credential outside the one set", () => {
+    for (const flag of ["--reviewer-token", "--write-key"]) {
+      expect(() => parseArgs([flag, "x"])).toThrow(/unknown argument/);
+    }
   });
 
   // Waiting on a person is not waiting on a process, and an explicit flag still wins.

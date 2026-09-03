@@ -79,7 +79,7 @@ describe("3 — teardown is not verified by an owner listing that did not answer
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/") ? { ok: true, status: 500 } : publicGone,
     );
-    const result = await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x");
+    const result = await verifyTornDown({ apiKey: "rfph_x" }, "compliance:x");
     expect(result.ok).toBe(false);
     expect(result.ownerStatus).toContain("unverified");
   });
@@ -88,14 +88,14 @@ describe("3 — teardown is not verified by an owner listing that did not answer
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/") ? { ok: true, status: 200, json: {} } : publicGone,
     );
-    expect((await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x")).ok).toBe(false);
+    expect((await verifyTornDown({ apiKey: "rfph_x" }, "compliance:x")).ok).toBe(false);
   });
 
   it("passes only on a 200 owner listing that no longer carries the fixture", async () => {
     callJson.mockImplementation(async (_ctx, path) =>
       path.startsWith("/v1/me/") ? { ok: true, status: 200, json: { items: [] } } : publicGone,
     );
-    expect((await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x")).ok).toBe(true);
+    expect((await verifyTornDown({ apiKey: "rfph_x" }, "compliance:x")).ok).toBe(true);
   });
 
   it("fails when the entry is still pending for its owner", async () => {
@@ -108,7 +108,7 @@ describe("3 — teardown is not verified by an owner listing that did not answer
           }
         : publicGone,
     );
-    expect((await verifyTornDown({ writeKey: "rfph_x" }, "compliance:x")).ok).toBe(false);
+    expect((await verifyTornDown({ apiKey: "rfph_x" }, "compliance:x")).ok).toBe(false);
   });
 });
 

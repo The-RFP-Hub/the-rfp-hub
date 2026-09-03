@@ -10,7 +10,7 @@
  *   node scripts/accept-writes.mjs --milestone m3 --api https://api-staging.example.org \
  *     --namespace my-org --session-token "$SESSION" --admin-token "$ADMIN"
  *   node scripts/accept-writes.mjs --milestone m4 --api https://api-staging.example.org \
- *     --reviewer-token "$REVIEWER" --write-key "$RFPH_KEY"
+ *     --session-token "$REVIEWER_SESSION" --api-key "$RFPH_KEY"
  *
  * Exit codes: 0 every selected criterion exercised and held · 1 a criterion failed, or a required
  * check was never exercised · 2 the run could not be made.
@@ -32,7 +32,7 @@ import { runStamp } from "./compliance/fixtures.mjs";
 import { keyList, selectionLine } from "./compliance/options.mjs";
 import { acceptanceReport } from "./compliance/report.mjs";
 import { reviewerCredential, reviewerRefusal } from "./compliance/reviewer-preflight.mjs";
-import { EXTRA_ORIGIN_ENV, STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
+import { STAGING_ORIGINS, redirectRefusal } from "./compliance/target-guard.mjs";
 
 const USAGE = `RFP Hub — write acceptance (staging only)
 
@@ -43,12 +43,12 @@ THIS TOOL WRITES to the deployment it is pointed at. Everything it creates is pr
 \`compliance-\` and is rejected and unlisted at the end. The report is labeled
 "write acceptance — NOT a deployment sign-off", and signOff is always false.
 
-Target guard — there is no flag that forces production
+Target guard — nothing forces production: no flag, and no variable
   Loopback, or https to one of
 ${STAGING_ORIGINS.map((origin) => `    ${origin}`).join("\n")}
-  or one extra https origin whose hostname carries a "staging" label and no "prod" label, named by
-  ${EXTRA_ORIGIN_ENV}. The redirect chain the target answers with is re-checked
-  to 5 hops and must also end inside the allowlist.
+  The redirect chain the target answers with is re-checked to 5 hops and must also end inside the
+  allowlist. A fork adds its own staging origin by editing STAGING_ORIGINS in
+  scripts/compliance/target-guard.mjs.
 
 Required, every profile
   --milestone <id>        Which acceptance profile to run. Known here: ${Object.keys(WRITE_MILESTONES).join(", ")}.
@@ -64,9 +64,12 @@ Required, --milestone m3 (the publisher write chain)
                           Required: the teardown rejects and unlists with it.
 
 Required, --milestone m4 (the real 3-phase MCP submission interlock)
-  --reviewer-token <t>    A reviewer session, used only for teardown (reject + unlist).
-  --write-key <key>       A write-scoped \`rfph_\` key — write only, never publish, so the fixture
-                          lands pending by construction, which is what this profile proves.
+  --api-key <key>         A write-scoped \`rfph_\` key — write only, never publish, so the fixture
+                          lands pending by construction, which is what this profile proves. It is
+                          the only credential handed to the MCP server.
+  --session-token <token> A signed-in session whose account may review: the teardown rejects and
+                          unlists the entry this run submits, unless --admin-token is given.
+  --admin-token <token>   An administrator session, unless --session-token is itself a reviewer.
 
 Options, --milestone m4
   --repo-root <path>      Repo checkout, for resolving packages/mcp/dist/cli.js. Default: cwd.
@@ -101,9 +104,8 @@ Options
   -h, --help              This text.
 
 Credentials may also arrive as COMPLIANCE_SESSION_TOKEN / COMPLIANCE_ADMIN_TOKEN /
-COMPLIANCE_API_KEY / COMPLIANCE_REVIEWER_TOKEN / COMPLIANCE_WRITE_KEY, which keeps them off the
-command line \`ps\` prints; RFPHUB_REVIEWER_TOKEN and RFPHUB_WRITE_KEY are accepted for the last
-two. The flags win.
+COMPLIANCE_API_KEY, which keeps them off the command line \`ps\` prints. The flags win. Those three
+are the whole credential surface: both profiles draw from the same set.
 `;
 
 async function main() {
@@ -194,7 +196,9 @@ async function main() {
     ...opts,
     // The credential the read-and-own checks use. A session where one exists, because it is the
     // account acting directly rather than a scoped delegation of it.
-    credential: opts.sessionToken ?? opts.apiKey ?? opts.writeKey,
+    credential: opts.sessionToken ?? opts.apiKey,
+    // The resolved teardown credential — whichever of --admin-token / --session-token the preflight
+    // just proved may review.
     reviewerToken: reviewer.token,
     report,
     results: {},
