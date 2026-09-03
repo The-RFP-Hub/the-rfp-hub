@@ -20,12 +20,23 @@ import {
 } from "@/components/badges";
 import { EmptyState, ErrorState, Loading, ResourceView } from "@/components/states";
 import { ApiError } from "@/lib/api";
-import { useResource } from "@/lib/resource";
+import { RESOURCE_TIMEOUT_MS, useResource } from "@/lib/resource";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useCallback, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 /* ------------------------------------------------------------------ useResource --- */
+
+/** A read that never settles, so the hook's own timeout is the only thing that can end it. */
+function NeverSettles({ timeoutMs }: { timeoutMs: number }) {
+  const load = useCallback(() => new Promise<string>(() => {}), []);
+  const { state, reload } = useResource(load, { timeoutMs });
+  return (
+    <ResourceView resource={state} what="the list" onRetry={reload}>
+      {(data) => <p>{data}</p>}
+    </ResourceView>
+  );
+}
 
 /**
  * A harness whose loader can be resolved by hand, so the IN-FLIGHT moment — the one this change is
@@ -53,6 +64,20 @@ function Harness({ load }: { load: (attempt: number) => Promise<string> }) {
 }
 
 describe("useResource", () => {
+  it("gives up on a read that never answers, instead of spinning forever", async () => {
+    render(<NeverSettles timeoutMs={20} />);
+    expect(screen.getByText(/Loading the list/)).toBeTruthy();
+
+    expect(await screen.findByText(/We couldn’t load the list/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
+    expect(within(details).getByText("timeout")).toBeTruthy();
+  });
+
+  it("defaults to a bound a reader would actually wait out", () => {
+    expect(RESOURCE_TIMEOUT_MS).toBe(30_000);
+  });
+
   /** A promise with its resolver pulled out, so a test can decide when a read finishes. */
   function deferred<T>() {
     let settle!: (value: T) => void;
@@ -182,6 +207,33 @@ describe("ErrorState", () => {
     const details = screen.getByText("Technical details").closest("details") as HTMLDetailsElement;
     expect(details.open).toBe(false);
     expect(within(details).getByText("forbidden")).toBeTruthy();
+  });
+
+  it("does not invite an immediate retry after a 429, and says how long to wait", () => {
+    render(
+      <ErrorState
+        error={new ApiError(429, "rate_limited", "Too many requests.", undefined, 30)}
+        what="the directory"
+        onRetry={() => {}}
+      />,
+    );
+
+    // A retry button here fires the request that was just refused, and gets refused again.
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.getByText(/Wait about 30 seconds/)).toBeTruthy();
+  });
+
+  it("falls back to a vaguer wait when no Retry-After was readable", () => {
+    render(
+      <ErrorState
+        error={new ApiError(429, "rate_limited", "Too many requests.")}
+        what="the directory"
+        onRetry={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/Wait a moment/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   });
 
   it("keeps generic diagnostics in a closed disclosure", () => {

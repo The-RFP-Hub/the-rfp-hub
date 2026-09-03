@@ -65,11 +65,16 @@ only under [`PROCESS.md`](./packages/standard/PROCESS.md). They are different nu
 
 The standard is governed by written process, not by whoever is around:
 
-- [`GOVERNANCE.md`](./GOVERNANCE.md) — editors, the decision rule, review windows, appeals, and
-  the list of things this project deliberately does *not* have.
+- [`GOVERNANCE.md`](./GOVERNANCE.md) — editors, the decision rule, review windows, appeals,
+  non-discrimination and ranking (what decides indexing, what never does, and why there is no paid
+  placement), and the list of things this project deliberately does *not* have.
+- [`REVIEW-CRITERIA.md`](./REVIEW-CRITERIA.md) — what a reviewer checks on a single submitted
+  listing, what is explicitly not a criterion, what "pending" means, and who decides.
+- [`PUBLISHERS.md`](./PUBLISHERS.md) — how an organization becomes a verified publisher, claims an
+  entry, and how verification is revoked.
 - [`packages/standard/PROCESS.md`](./packages/standard/PROCESS.md) — feature stages, what
-  "breaking" means operationally, deprecation, how to register a vocabulary value, the release
-  checklist.
+  "breaking" means operationally, deprecation, how to register a vocabulary value, the
+  [RFC process](./packages/standard/PROCESS.md#rfc-process) routing table, the release checklist.
 - [`adr/`](./adr) — the decision records behind the shape of the data model.
 
 ## Guides

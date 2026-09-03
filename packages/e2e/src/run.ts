@@ -604,7 +604,10 @@ async function runPlaywright(
   argv: string[],
   onChild: (child: processes.ManagedChild) => void,
 ): Promise<number> {
-  const passthrough = argv.filter((arg) => arg !== "--check-m3");
+  // `pnpm e2e -- m4-responsive.spec.ts` hands this script a literal `--` before the filter, and
+  // Playwright reads that `--` as "no more options", silently dropping the filter and running the
+  // whole suite.
+  const passthrough = argv.filter((arg) => arg !== "--check-m3" && arg !== "--");
   const env = playwrightEnv({
     stateFile: ctx.statePath,
     secretsFile: ctx.secretsPath,

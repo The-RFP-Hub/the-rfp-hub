@@ -21,7 +21,15 @@ import { GuardedLink, useNavigationBlocker } from "@/components/NavigationBlocke
  * renders the API's own 403.
  */
 import { AuthUnavailable, ErrorState, Loading } from "@/components/states";
-import { HOW_IT_WORKS, HOW_IT_WORKS_ROLES, REPOSITORY, STANDARD, apiDocsUrl } from "@/lib/links";
+import {
+  GOVERNANCE,
+  HOW_IT_WORKS,
+  HOW_IT_WORKS_ROLES,
+  PUBLISHERS,
+  REPOSITORY,
+  STANDARD,
+  apiDocsUrl,
+} from "@/lib/links";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/notification-events";
 import type { GateCopy } from "@/lib/presentation";
 import { useResource } from "@/lib/resource";
@@ -35,6 +43,7 @@ import {
   BookOpenIcon,
   BuildingOffice2Icon,
   ChartBarSquareIcon,
+  CheckBadgeIcon,
   ClipboardDocumentCheckIcon,
   DocumentTextIcon,
   KeyIcon,
@@ -59,6 +68,7 @@ interface NavItem {
 /** Readable to everybody, session or not. */
 const PUBLIC_NAV: NavItem[] = [
   { href: "/", label: "Directory", icon: ListBulletIcon },
+  { href: PUBLISHERS, label: "Publishers", icon: CheckBadgeIcon },
   { href: HOW_IT_WORKS, label: "How it works", icon: BookOpenIcon },
 ];
 
@@ -258,6 +268,7 @@ export function Chrome({ children }: { children: ReactNode }) {
           RFP Hub
         </GuardedLink>
         <GuardedLink href={HOW_IT_WORKS}>About</GuardedLink>
+        <GuardedLink href={PUBLISHERS}>Publishers</GuardedLink>
         <a href={STANDARD} target="_blank" rel="noopener noreferrer">
           <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
             The Standard
@@ -277,6 +288,9 @@ export function Chrome({ children }: { children: ReactNode }) {
           <IconLabel icon={ArrowTopRightOnSquareIcon} position="end">
             GitHub
           </IconLabel>
+        </a>
+        <a href={GOVERNANCE} target="_blank" rel="noopener noreferrer">
+          Governance
         </a>
         <GuardedLink href="/privacy">Privacy</GuardedLink>
         <GuardedLink href="/terms">Terms</GuardedLink>
