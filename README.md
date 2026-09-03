@@ -37,7 +37,7 @@ JSON Schema (draft 2020-12) describing a funding opportunity. It's published as
 
 Validate anything against it:
 
-```bash
+```bash no-run
 npx rfphub-validate opportunity.json
 ```
 
@@ -78,6 +78,53 @@ The standard is governed by written process, not by whoever is around:
   [RFC process](./packages/standard/PROCESS.md#rfc-process) routing table, the release checklist.
 - [`adr/`](./adr) — the decision records behind the shape of the data model.
 
+## Guides
+
+[`docs/`](./docs) holds the handoff guides — four documents, each written for one person doing one
+job, linking to the per-package detail rather than duplicating it:
+
+- [`docs/deployment.md`](./docs/deployment.md) — what runs where, what must exist in the cloud
+  account **before** the first deploy (there is no infrastructure-as-code), the required variables,
+  the first-deploy sequence, rollback, the manual npm release runbook, and the three ways to deploy
+  a copy of the frontend.
+- [`docs/api-integration.md`](./docs/api-integration.md) — a five-minute read-only quickstart, the
+  write flow from an email address to a publishing key, the scope table, and the nine contracts
+  that surprise integrators.
+- [`docs/publisher-onboarding.md`](./docs/publisher-onboarding.md) — for whoever operates the Hub:
+  running a publisher application end to end, refusing one, revoking verification, and deciding a
+  disputed claim.
+- [`docs/external-deploy-test.md`](./docs/external-deploy-test.md) — the two-hour protocol that
+  proves an outside developer can deploy a frontend against the public API from the docs alone.
+
+Every shell block in those guides is marked `no-run`, `safe-read` or `staging-write`; the
+convention is defined in [`docs/README.md`](./docs/README.md).
+
+## Deploy your own copy, or install the skill
+
+**Deploy your own copy of the frontend** with the one-click Deploy Button in
+[`packages/frontend/README.md`](./packages/frontend/README.md#deploying-your-own-copy). It lives in
+exactly one place on purpose — a Deploy Button URL carries the whole build configuration in its
+query string, so a second copy of the button is a second configuration that drifts. The other two
+paths, and the read-only limitation every copy inherits, are in
+[`docs/deployment.md` §9](./docs/deployment.md#9-the-frontend-three-ways-to-deploy-a-copy).
+
+**Install the agent skill** through any of three channels, all of which install the same directory:
+
+```sh no-run
+# 1. multi-agent installer: detects the agents you have and copies the skill into each
+npx skills add The-RFP-Hub/the-rfp-hub --skill funding-search
+
+# 2. Claude Code plugin marketplace
+claude plugin marketplace add The-RFP-Hub/the-rfp-hub
+claude plugin install rfp-hub@rfp-hub
+
+# 3. a plain copy into whichever agent's skill directory applies
+cp -R skills/funding-search ~/.claude/skills/
+```
+
+Every agent's directory, with the citation for each, is in
+[`skills/README.md`](./skills/README.md).
+
 ## Repo topology
 
 Developed as one pnpm workspace for fast iteration (the schema and its generated types move
@@ -89,7 +136,7 @@ ranges and verify standalone install, build and test; `packages/api` is not publ
 
 ## Develop
 
-```bash
+```bash no-run
 pnpm install
 pnpm codegen        # regenerate TS types from the JSON Schema
 pnpm codegen:check  # fail if generated types drift from the schema (CI gate)
@@ -106,7 +153,7 @@ the data directory is compatible and the named volume is reused — but the C li
 changes with the image, and with it the collation provider. Run the script; it dumps first, refreshes
 the collation version, reindexes, migrates, and compares row counts before and after:
 
-```bash
+```bash no-run
 packages/api/scripts/upgrade-dev-postgres.sh
 ```
 
@@ -245,7 +292,7 @@ The API's list query contract is strict — an undefined parameter or an out-of-
 Reading is public and unauthenticated, and stays that way. **Writing** is authenticated, and the
 credential you hold decides not only whether a submission is accepted but whether it goes live:
 
-```sh
+```sh no-run
 API=https://api.ethrfps.app
 
 # Who am I, and what may I do?
