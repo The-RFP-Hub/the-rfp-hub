@@ -381,15 +381,12 @@ describe("an unusable response body fails loudly instead of reading as an empty 
       });
       // Headers must be flushed for the client to see the declared length at all; the body then
       // never arrives. Without an abort before the throw, the request holds the socket — and the
-      // process — open long after exit 6 was already decided.
+      // process — open until the 10s request budget fires, long after exit 6 was decided.
       res.flushHeaders();
     });
     server = fake.server;
     const startedAt = Date.now();
-    const { code, stderr } = await run(searchScript, [], {
-      RFPHUB_API_BASE: fake.base,
-      RFPHUB_TIMEOUT_MS: "30000",
-    });
+    const { code, stderr } = await run(searchScript, [], { RFPHUB_API_BASE: fake.base });
     expect(code).toBe(MALFORMED_EXIT_CODE);
     expect(stderr).toMatch(/Narrow the query/);
     expect(Date.now() - startedAt).toBeLessThan(4000);

@@ -10,16 +10,15 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_LIMIT,
-  DEFAULT_TIMEOUT_MS,
   EXIT,
   MAX_CURRENCY_LEN,
   MAX_LIMIT,
   MAX_ORGANIZATION_LEN,
   MAX_Q_LEN,
-  MAX_TIMEOUT_MS,
   MAX_TITLE_LEN,
   RequestError,
   SKILL_VERSION,
+  TIMEOUT_MS,
   apiBase,
   assertKnownFlags,
   assertNoExtraPositionals,
@@ -39,7 +38,6 @@ import {
   projectDetail,
   projectPage,
   sanitizeText,
-  timeoutMs,
   trackingHeaders,
   truncateText,
   validateFormat,
@@ -468,40 +466,12 @@ describe("apiBase", () => {
   });
 });
 
-describe("timeoutMs", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it("falls back to the default when unset, non-numeric or non-positive", () => {
-    vi.stubEnv("RFPHUB_TIMEOUT_MS", undefined);
-    expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
-    vi.stubEnv("RFPHUB_TIMEOUT_MS", "nope");
-    expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
-    vi.stubEnv("RFPHUB_TIMEOUT_MS", "-1");
-    expect(timeoutMs()).toBe(DEFAULT_TIMEOUT_MS);
-  });
-
-  it("passes a usable override through without a note", () => {
-    vi.stubEnv("RFPHUB_TIMEOUT_MS", "2500");
-    let warned = "";
-    expect(
-      timeoutMs((msg) => {
-        warned = msg;
-      }),
-    ).toBe(2500);
-    expect(warned).toBe("");
-  });
-
-  it("clamps an absurd override to the ceiling instead of waiting forever", () => {
-    vi.stubEnv("RFPHUB_TIMEOUT_MS", "1e12");
-    let warned = "";
-    expect(
-      timeoutMs((msg) => {
-        warned = msg;
-      }),
-    ).toBe(MAX_TIMEOUT_MS);
-    expect(warned).toMatch(new RegExp(String(MAX_TIMEOUT_MS)));
+describe("TIMEOUT_MS", () => {
+  it("is a fixed budget no environment can raise or lower", () => {
+    expect(TIMEOUT_MS).toBe(10_000);
+    expect(readFileSync(resolve(skillDir, "scripts/lib.mjs"), "utf8")).not.toContain(
+      "RFPHUB_TIMEOUT_MS",
+    );
   });
 });
 
