@@ -100,7 +100,9 @@ describe("targetRefusal", () => {
       "https://production-staging.example.org",
       "https://staging.api.ethrfps.app.example.org",
       "https://api-staging.example.org",
-      "http://staging.ethrfps.app",
+      // Derived, never written out: a plaintext URL on this project's own domain is a neutrality
+      // violation wherever it appears, including in a test that exists to refuse it.
+      STAGING_ORIGINS[0].replace("https:", "http:"),
       "ftp://api-staging.ethrfps.app",
     ]) {
       expect(targetRefusal(api, {}), api).toEqual(expect.any(String));
