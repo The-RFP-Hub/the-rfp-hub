@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 const BINARY = fileURLToPath(new URL("../../accept-writes.mjs", import.meta.url));
+const NO_MCP_BUILD = fileURLToPath(new URL("fixtures/no-mcp-build", import.meta.url));
 
 let running;
 afterEach(async () => {
@@ -45,7 +46,7 @@ async function fakeApi({ scopes, keyStatus = 200, credentialKind = "api_key" }) 
   return { origin: `http://127.0.0.1:${server.address().port}`, seen };
 }
 
-function run(origin) {
+function run(origin, extra = []) {
   return new Promise((resolve) => {
     const child = spawn(
       process.execPath,
@@ -62,6 +63,7 @@ function run(origin) {
         "--json",
         "-",
         "--no-color",
+        ...extra,
       ],
       {
         env: {
@@ -90,11 +92,16 @@ const writes = (api) => api.seen.filter((request) => !request.startsWith("GET ")
 describe("the m4 write key's scope", () => {
   it("lets a write-only key through to the criteria", async () => {
     const api = await fakeApi({ scopes: ["write"] });
-    const { code, out } = await run(api.origin);
+    const { code, out } = await run(api.origin, [
+      "--mcp-spec",
+      "local",
+      "--repo-root",
+      NO_MCP_BUILD,
+    ]);
 
-    // Not 2: it got past every refusal and started exercising the profile, which then fails on
-    // this fake deployment's 404s. That is the pass condition here.
+    // Not 2: it got past every refusal and reached the deliberately absent local MCP build.
     expect(code).not.toBe(2);
+    expect(out).toContain("packages/mcp/dist/cli.js not found");
     expect(out).not.toContain("--api-key has scopes");
   });
 
